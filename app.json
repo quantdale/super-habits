@@ -2,6 +2,7 @@
   "expo": {
     "name": "superhabits",
     "slug": "superhabits",
+    "scheme": "superhabits",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,8 +24,17 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      "expo-sqlite"
+    ],
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
