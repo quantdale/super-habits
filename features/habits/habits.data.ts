@@ -4,53 +4,57 @@ import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 
-export function listHabits(): Habit[] {
-  return getDatabase().getAllSync<Habit>(
+export async function listHabits(): Promise<Habit[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<Habit>(
     "SELECT * FROM habits WHERE deleted_at IS NULL ORDER BY created_at DESC",
   );
 }
 
-export function addHabit(name: string, targetPerDay: number) {
+export async function addHabit(name: string, targetPerDay: number): Promise<void> {
   const id = createId("habit");
   const now = nowIso();
-  getDatabase().runSync(
+  const db = await getDatabase();
+  await db.runAsync(
     "INSERT INTO habits (id, name, target_per_day, reminder_time, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, NULL)",
     [id, name, targetPerDay, now, now],
   );
   syncEngine.enqueue({ entity: "habits", id, updatedAt: now, operation: "create" });
 }
 
-export function incrementHabit(habitId: string, dateKey = toDateKey()) {
-  const db = getDatabase();
+export async function incrementHabit(habitId: string, dateKey = toDateKey()): Promise<void> {
+  const db = await getDatabase();
   const now = nowIso();
-  const existing = db.getFirstSync<{ id: string; count: number }>(
+  const existing = await db.getFirstAsync<{ id: string; count: number }>(
     "SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
     [habitId, dateKey],
   );
   if (existing) {
-    db.runSync("UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?", [
+    await db.runAsync("UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?", [
       existing.count + 1,
       now,
       existing.id,
     ]);
     return;
   }
-  db.runSync(
+  await db.runAsync(
     "INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
     [createId("habit_completion"), habitId, dateKey, now, now],
   );
 }
 
-export function getHabitCountByDate(habitId: string, dateKey = toDateKey()): number {
-  const row = getDatabase().getFirstSync<{ count: number }>(
+export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
     "SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
     [habitId, dateKey],
   );
   return row?.count ?? 0;
 }
 
-export function deleteHabit(habitId: string) {
+export async function deleteHabit(habitId: string): Promise<void> {
   const now = nowIso();
-  getDatabase().runSync("UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, habitId]);
+  const db = await getDatabase();
+  await db.runAsync("UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, habitId]);
   syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "delete" });
 }

@@ -16,7 +16,7 @@ export function TodosScreen() {
   const [items, setItems] = useState<Todo[]>([]);
 
   const refresh = useCallback(() => {
-    setItems(listTodos());
+    listTodos().then(setItems);
   }, []);
 
   useFocusEffect(
@@ -25,12 +25,12 @@ export function TodosScreen() {
     }, [refresh]),
   );
 
-  const onCreate = () => {
+  const onCreate = async () => {
     if (!title.trim()) {
       Alert.alert("Missing title", "Please enter a to-do title.");
       return;
     }
-    addTodo({ title: title.trim(), notes: notes.trim() || undefined });
+    await addTodo({ title: title.trim(), notes: notes.trim() || undefined });
     setTitle("");
     setNotes("");
     refresh();
@@ -50,7 +50,12 @@ export function TodosScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <Card>
-            <Pressable onPress={() => (toggleTodo(item), refresh())}>
+            <Pressable
+              onPress={async () => {
+                await toggleTodo(item);
+                refresh();
+              }}
+            >
               <Text className={`text-base ${item.completed ? "text-slate-400 line-through" : "text-slate-900"}`}>
                 {item.title}
               </Text>
@@ -60,8 +65,8 @@ export function TodosScreen() {
               <Button
                 label="Delete"
                 variant="danger"
-                onPress={() => {
-                  removeTodo(item.id);
+                onPress={async () => {
+                  await removeTodo(item.id);
                   refresh();
                 }}
               />

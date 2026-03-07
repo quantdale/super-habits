@@ -9,7 +9,7 @@ const queryClient = new QueryClient();
 
 export function AppProviders({ children }: PropsWithChildren) {
   useEffect(() => {
-    initializeDatabase();
+    initializeDatabase().catch(() => undefined);
     registerServiceWorker();
     ensureGuestProfile().catch(() => undefined);
   }, []);

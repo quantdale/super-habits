@@ -3,17 +3,24 @@ import { PomodoroSession } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 
-export function logPomodoroSession(startedAt: string, endedAt: string, durationSeconds: number, type: "focus" | "break") {
+export async function logPomodoroSession(
+  startedAt: string,
+  endedAt: string,
+  durationSeconds: number,
+  type: "focus" | "break",
+): Promise<void> {
   const id = createId("pomodoro");
   const createdAt = nowIso();
-  getDatabase().runSync(
+  const db = await getDatabase();
+  await db.runAsync(
     "INSERT INTO pomodoro_sessions (id, started_at, ended_at, duration_seconds, session_type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     [id, startedAt, endedAt, durationSeconds, type, createdAt],
   );
 }
 
-export function listPomodoroSessions(limit = 20): PomodoroSession[] {
-  return getDatabase().getAllSync<PomodoroSession>(
+export async function listPomodoroSessions(limit = 20): Promise<PomodoroSession[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<PomodoroSession>(
     "SELECT * FROM pomodoro_sessions ORDER BY started_at DESC LIMIT ?",
     [limit],
   );

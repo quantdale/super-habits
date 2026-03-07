@@ -1,8 +1,6 @@
 import * as SQLite from "expo-sqlite";
 
-const db = SQLite.openDatabaseSync("superhabits.db");
-
-let initialized = false;
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const bootstrapStatements = [
   "PRAGMA journal_mode = WAL;",
@@ -75,16 +73,21 @@ const bootstrapStatements = [
   );`,
 ];
 
-export function initializeDatabase() {
-  if (initialized) return;
-
+async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
+  const database = await SQLite.openDatabaseAsync("superhabits.db");
   for (const statement of bootstrapStatements) {
-    db.execSync(statement);
+    await database.execAsync(statement);
   }
-  initialized = true;
+  return database;
 }
 
-export function getDatabase() {
-  initializeDatabase();
-  return db;
+export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) {
+    dbPromise = openAndBootstrap();
+  }
+  return dbPromise;
+}
+
+export async function initializeDatabase(): Promise<void> {
+  await getDatabase();
 }

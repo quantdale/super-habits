@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
@@ -6,7 +6,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
-import { WorkoutRoutine } from "@/core/db/types";
+import { WorkoutLog, WorkoutRoutine } from "@/core/db/types";
 import {
   addRoutine,
   completeRoutine,
@@ -19,9 +19,13 @@ export function WorkoutScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
-  const [revision, setRevision] = useState(0);
+  const [logs, setLogs] = useState<WorkoutLog[]>([]);
 
-  const refresh = useCallback(() => setRoutines(listRoutines()), []);
+  const refresh = useCallback(async () => {
+    const [r, l] = await Promise.all([listRoutines(), listWorkoutLogs(8)]);
+    setRoutines(r);
+    setLogs(l);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,14 +33,12 @@ export function WorkoutScreen() {
     }, [refresh]),
   );
 
-  const logs = useMemo(() => listWorkoutLogs(8), [revision]);
-
-  const onCreate = () => {
+  const onCreate = async () => {
     if (!name.trim()) {
       Alert.alert("Missing name", "Enter a routine name.");
       return;
     }
-    addRoutine(name.trim(), description.trim());
+    await addRoutine(name.trim(), description.trim());
     setName("");
     setDescription("");
     refresh();
@@ -58,16 +60,16 @@ export function WorkoutScreen() {
           <View className="mt-3 gap-2">
             <Button
               label="Complete workout"
-              onPress={() => {
-                completeRoutine(routine.id);
-                setRevision((v) => v + 1);
+              onPress={async () => {
+                await completeRoutine(routine.id);
+                refresh();
               }}
             />
             <Button
               label="Delete routine"
               variant="danger"
-              onPress={() => {
-                deleteRoutine(routine.id);
+              onPress={async () => {
+                await deleteRoutine(routine.id);
                 refresh();
               }}
             />

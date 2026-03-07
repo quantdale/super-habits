@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
 import { listPomodoroSessions, logPomodoroSession } from "@/features/pomodoro/pomodoro.data";
+import { PomodoroSession } from "@/core/db/types";
 import { scheduleTimerEndNotification } from "@/lib/notifications";
 
 const FOCUS_SECONDS = 25 * 60;
@@ -14,6 +15,11 @@ export function PomodoroScreen() {
   const [isRunning, setIsRunning] = useState(false);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+
+  useEffect(() => {
+    listPomodoroSessions(8).then(setSessions);
+  }, [historyVersion]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -35,8 +41,6 @@ export function PomodoroScreen() {
 
     return () => clearInterval(timer);
   }, [isRunning, startedAt]);
-
-  const sessions = useMemo(() => listPomodoroSessions(8), [historyVersion]);
 
   const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
   const seconds = String(remaining % 60).padStart(2, "0");

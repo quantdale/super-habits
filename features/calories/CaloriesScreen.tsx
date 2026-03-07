@@ -22,7 +22,9 @@ export function CaloriesScreen() {
   const [fats, setFats] = useState("");
   const [entries, setEntries] = useState<CalorieEntry[]>([]);
 
-  const refresh = useCallback(() => setEntries(listCalorieEntries()), []);
+  const refresh = useCallback(() => {
+    listCalorieEntries().then(setEntries);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -32,7 +34,7 @@ export function CaloriesScreen() {
 
   const total = useMemo(() => caloriesTotal(entries), [entries]);
 
-  const onAdd = () => {
+  const onAdd = async () => {
     if (!food.trim()) {
       Alert.alert("Missing food", "Enter a food name.");
       return;
@@ -43,7 +45,7 @@ export function CaloriesScreen() {
       return;
     }
 
-    addCalorieEntry({
+    await addCalorieEntry({
       foodName: food.trim(),
       calories: calorieValue,
       protein: Number(protein) || 0,
@@ -101,8 +103,8 @@ export function CaloriesScreen() {
             <Button
               label="Delete"
               variant="danger"
-              onPress={() => {
-                deleteCalorieEntry(entry.id);
+              onPress={async () => {
+                await deleteCalorieEntry(entry.id);
                 refresh();
               }}
             />

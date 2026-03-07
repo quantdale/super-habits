@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
@@ -19,8 +19,14 @@ export function HabitsScreen() {
   const [name, setName] = useState("");
   const [target, setTarget] = useState("1");
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
 
-  const refresh = useCallback(() => setHabits(listHabits()), []);
+  const refresh = useCallback(async () => {
+    const list = await listHabits();
+    setHabits(list);
+    const counts = await Promise.all(list.map((h) => getHabitCountByDate(h.id)));
+    setCompletionMap(Object.fromEntries(list.map((h, i) => [h.id, counts[i]])));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -28,16 +34,12 @@ export function HabitsScreen() {
     }, [refresh]),
   );
 
-  const completionMap = useMemo(() => {
-    return Object.fromEntries(habits.map((habit) => [habit.id, getHabitCountByDate(habit.id)]));
-  }, [habits]);
-
-  const onAdd = () => {
+  const onAdd = async () => {
     if (!name.trim()) {
       Alert.alert("Missing name", "Enter a habit name.");
       return;
     }
-    addHabit(name.trim(), Math.max(1, Number(target) || 1));
+    await addHabit(name.trim(), Math.max(1, Number(target) || 1));
     setName("");
     setTarget("1");
     refresh();
@@ -69,16 +71,16 @@ export function HabitsScreen() {
             <View className="mt-3 gap-2">
               <Button
                 label="Mark completion"
-                onPress={() => {
-                  incrementHabit(habit.id);
+                onPress={async () => {
+                  await incrementHabit(habit.id);
                   refresh();
                 }}
               />
               <Button
                 label="Delete habit"
                 variant="danger"
-                onPress={() => {
-                  deleteHabit(habit.id);
+                onPress={async () => {
+                  await deleteHabit(habit.id);
                   refresh();
                 }}
               />
