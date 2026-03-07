@@ -1,0 +1,148 @@
+diff --git a/node_modules/@react-native/community-cli-plugin/README.md b/node_modules/@react-native/community-cli-plugin/README.md
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetCatalogIOS.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetCatalogIOS.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetCatalogIOS.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetCatalogIOS.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetPathUtils.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetPathUtils.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetPathUtils.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/assetPathUtils.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/buildBundle.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/buildBundle.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/buildBundle.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/buildBundle.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/createKeepFileAsync.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/createKeepFileAsync.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/createKeepFileAsync.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/createKeepFileAsync.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/filterPlatformAssetScales.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/filterPlatformAssetScales.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/filterPlatformAssetScales.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/filterPlatformAssetScales.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathAndroid.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathAndroid.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathAndroid.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathAndroid.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathIOS.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathIOS.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathIOS.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/getAssetDestPathIOS.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/index.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/index.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/index.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/index.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/saveAssets.js b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/saveAssets.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/saveAssets.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/saveAssets.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/OpenDebuggerKeyboardHandler.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/OpenDebuggerKeyboardHandler.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/OpenDebuggerKeyboardHandler.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/start/OpenDebuggerKeyboardHandler.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/attachKeyHandlers.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/attachKeyHandlers.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/attachKeyHandlers.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/start/attachKeyHandlers.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/index.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/index.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/index.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/start/index.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
+old mode 100644
+new mode 100755
+index 8a2260f..1b7a1bc
+--- a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
++++ b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
+@@ -123,6 +123,9 @@ async function runServer(_argv, cliConfig, args) {
+   _devMiddleware.createDevMiddleware)({
+     serverBaseUrl: devServerUrl,
+     logger: (0, _createDevMiddlewareLogger.default)(terminalReporter),
++    unstable_experiments: {
++      enableStandaloneFuseboxShell: false,
++    },
+   });
+   metroConfig.reporter = {
+     update(event) {
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js.flow b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/index.js b/node_modules/@react-native/community-cli-plugin/dist/index.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/index.js.flow b/node_modules/@react-native/community-cli-plugin/dist/index.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/createDevMiddlewareLogger.js b/node_modules/@react-native/community-cli-plugin/dist/utils/createDevMiddlewareLogger.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/createDevMiddlewareLogger.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/createDevMiddlewareLogger.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/errors.js b/node_modules/@react-native/community-cli-plugin/dist/utils/errors.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/errors.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/errors.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/isDevServerRunning.js b/node_modules/@react-native/community-cli-plugin/dist/utils/isDevServerRunning.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/isDevServerRunning.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/isDevServerRunning.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/loadMetroConfig.js b/node_modules/@react-native/community-cli-plugin/dist/utils/loadMetroConfig.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/loadMetroConfig.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/loadMetroConfig.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/metroPlatformResolver.js b/node_modules/@react-native/community-cli-plugin/dist/utils/metroPlatformResolver.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/metroPlatformResolver.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/metroPlatformResolver.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/parseKeyValueParamArray.js b/node_modules/@react-native/community-cli-plugin/dist/utils/parseKeyValueParamArray.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/parseKeyValueParamArray.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/parseKeyValueParamArray.js.flow
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/version.js b/node_modules/@react-native/community-cli-plugin/dist/utils/version.js
+old mode 100644
+new mode 100755
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/utils/version.js.flow b/node_modules/@react-native/community-cli-plugin/dist/utils/version.js.flow
+old mode 100644
+new mode 100755

@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@shopify/flash-list": "2.0.2",
@@ -41,6 +42,7 @@
     "@expo/metro-runtime": "~55.0.6",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^55.0.10",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2",
     "vitest": "^3.2.4"
   },
