@@ -8,7 +8,7 @@ import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
-import { Habit, HabitCategory } from "@/core/db/types";
+import { Habit, HabitCategory, HabitIcon } from "@/core/db/types";
 import {
   addHabit,
   decrementHabit,
@@ -19,6 +19,12 @@ import {
   updateHabit,
 } from "@/features/habits/habits.data";
 import { HabitCircle } from "@/features/habits/HabitCircle";
+import {
+  DEFAULT_HABIT_COLOR,
+  DEFAULT_HABIT_ICON,
+  HABIT_COLORS,
+  HABIT_ICONS,
+} from "@/features/habits/habitPresets";
 
 const CATEGORIES: HabitCategory[] = ["anytime", "morning", "afternoon", "evening"];
 const CATEGORY_LABELS: Record<HabitCategory, string> = {
@@ -58,6 +64,8 @@ export function HabitsScreen() {
   const [name, setName] = useState("");
   const [target, setTarget] = useState("1");
   const [category, setCategory] = useState<HabitCategory>("anytime");
+  const [icon, setIcon] = useState<HabitIcon>(DEFAULT_HABIT_ICON);
+  const [color, setColor] = useState(DEFAULT_HABIT_COLOR);
 
   const refresh = useCallback(async () => {
     const list = await listHabits();
@@ -79,6 +87,8 @@ export function HabitsScreen() {
     setName("");
     setTarget("1");
     setCategory(presetCategory ?? "anytime");
+    setIcon(DEFAULT_HABIT_ICON);
+    setColor(DEFAULT_HABIT_COLOR);
     setModalVisible(true);
   };
 
@@ -87,6 +97,8 @@ export function HabitsScreen() {
     setName(habit.name);
     setTarget(String(habit.target_per_day));
     setCategory((habit.category ?? "anytime") as HabitCategory);
+    setIcon((HABIT_ICONS.includes(habit.icon as HabitIcon) ? habit.icon : DEFAULT_HABIT_ICON) as HabitIcon);
+    setColor(HABIT_COLORS.includes(habit.color) ? habit.color : DEFAULT_HABIT_COLOR);
     setModalVisible(true);
   };
 
@@ -101,14 +113,18 @@ export function HabitsScreen() {
         name: name.trim(),
         targetPerDay: targetNum,
         category,
+        icon,
+        color,
       });
     } else {
-      await addHabit(name.trim(), targetNum, category);
+      await addHabit(name.trim(), targetNum, category, icon, color);
     }
     setEditingHabit(null);
     setName("");
     setTarget("1");
     setCategory("anytime");
+    setIcon(DEFAULT_HABIT_ICON);
+    setColor(DEFAULT_HABIT_COLOR);
     setModalVisible(false);
     refresh();
   };
@@ -278,6 +294,38 @@ export function HabitsScreen() {
                       {CATEGORY_LABELS[c]}
                     </Text>
                   </Pressable>
+                ))}
+              </View>
+              <Text className="mb-1 text-sm font-medium text-slate-700">Icon</Text>
+              <View className="mb-3 flex-row flex-wrap gap-2">
+                {HABIT_ICONS.map((iconName) => (
+                  <Pressable
+                    key={iconName}
+                    onPress={() => setIcon(iconName)}
+                    className={`items-center justify-center rounded-lg p-2 ${
+                      icon === iconName ? "bg-brand-500" : "bg-slate-200"
+                    }`}
+                    style={{ width: 44, height: 44 }}
+                  >
+                    <MaterialIcons
+                      name={iconName}
+                      size={24}
+                      color={icon === iconName ? "white" : "#64748b"}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+              <Text className="mb-1 text-sm font-medium text-slate-700">Color</Text>
+              <View className="mb-3 flex-row flex-wrap gap-2">
+                {HABIT_COLORS.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => setColor(c)}
+                    className={`rounded-full ${
+                      color === c ? "ring-2 ring-slate-400 ring-offset-2" : ""
+                    }`}
+                    style={{ width: 36, height: 36, backgroundColor: c }}
+                  />
                 ))}
               </View>
               <View className="flex-row gap-2">

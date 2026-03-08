@@ -3,6 +3,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Habit } from "@/core/db/types";
 import { calculateHabitProgress } from "@/features/habits/habits.domain";
 import { ProgressRing } from "@/features/habits/ProgressRing";
+import { DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
 
 type HabitCircleProps = {
   habit: Habit;
@@ -13,12 +14,12 @@ type HabitCircleProps = {
 
 const CIRCLE_SIZE = 72;
 const STROKE_WIDTH = 4;
-const DEFAULT_ICON_COLOR = "#64748b";
 const DEFAULT_BG_COLOR = "#f1f5f9";
-const PROGRESS_COLOR = "#94a3b8";
 
 export function HabitCircle({ habit, todayCount, onIncrement, onDecrement }: HabitCircleProps) {
   const progress = calculateHabitProgress(todayCount, habit.target_per_day);
+  const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
+  const habitColor = habit.color ?? "#64748b";
 
   const ringSize = CIRCLE_SIZE + STROKE_WIDTH * 2;
 
@@ -45,7 +46,7 @@ export function HabitCircle({ habit, todayCount, onIncrement, onDecrement }: Hab
             strokeWidth={STROKE_WIDTH}
             progress={progress}
             backgroundColor="#e2e8f0"
-            progressColor={PROGRESS_COLOR}
+            progressColor={habitColor}
           />
         </View>
         <View
@@ -61,7 +62,7 @@ export function HabitCircle({ habit, todayCount, onIncrement, onDecrement }: Hab
             justifyContent: "center",
           }}
         >
-          <MaterialIcons name="check-circle" size={36} color={DEFAULT_ICON_COLOR} />
+          <MaterialIcons name={iconName} size={36} color={habitColor} />
         </View>
       </Pressable>
       <Text

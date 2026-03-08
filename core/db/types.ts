@@ -13,11 +13,27 @@ export type Todo = BaseEntity & {
 
 export type HabitCategory = "anytime" | "morning" | "afternoon" | "evening";
 
+export type HabitIcon =
+  | "check-circle"
+  | "favorite"
+  | "local-drink"
+  | "menu-book"
+  | "fitness-center"
+  | "wb-sunny"
+  | "bedtime"
+  | "self-improvement"
+  | "water-drop"
+  | "coffee"
+  | "psychology"
+  | "spa";
+
 export type Habit = BaseEntity & {
   name: string;
   target_per_day: number;
   reminder_time: string | null;
   category: HabitCategory;
+  icon: HabitIcon;
+  color: string;
 };
 
 export type HabitCompletion = {

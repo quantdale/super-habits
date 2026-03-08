@@ -19,6 +19,8 @@ const bootstrapStatements = [
     target_per_day INTEGER NOT NULL DEFAULT 1,
     reminder_time TEXT,
     category TEXT NOT NULL DEFAULT 'anytime',
+    icon TEXT NOT NULL DEFAULT 'check-circle',
+    color TEXT NOT NULL DEFAULT '#64748b',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -87,6 +89,21 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     }
     await db.runAsync(
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '2')",
+    );
+  }
+  if (version < 3) {
+    try {
+      await db.execAsync("ALTER TABLE habits ADD COLUMN icon TEXT NOT NULL DEFAULT 'check-circle'");
+    } catch {
+      // Column may already exist from CREATE TABLE
+    }
+    try {
+      await db.execAsync("ALTER TABLE habits ADD COLUMN color TEXT NOT NULL DEFAULT '#64748b'");
+    } catch {
+      // Column may already exist from CREATE TABLE
+    }
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '3')",
     );
   }
 }

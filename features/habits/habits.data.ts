@@ -1,8 +1,9 @@
 import { getDatabase } from "@/core/db/client";
-import { Habit, HabitCategory } from "@/core/db/types";
+import { Habit, HabitCategory, HabitIcon } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
+import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
 
 const CATEGORY_ORDER = "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
 
@@ -17,13 +18,15 @@ export async function addHabit(
   name: string,
   targetPerDay: number,
   category: HabitCategory = "anytime",
+  icon: HabitIcon = DEFAULT_HABIT_ICON,
+  color: string = DEFAULT_HABIT_COLOR,
 ): Promise<void> {
   const id = createId("habit");
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    "INSERT INTO habits (id, name, target_per_day, reminder_time, category, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, ?, NULL)",
-    [id, name, targetPerDay, category, now, now],
+    "INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)",
+    [id, name, targetPerDay, category, icon, color, now, now],
   );
   syncEngine.enqueue({ entity: "habits", id, updatedAt: now, operation: "create" });
 }
@@ -79,13 +82,27 @@ export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()
 
 export async function updateHabit(
   habitId: string,
-  updates: { name: string; targetPerDay: number; category: HabitCategory },
+  updates: {
+    name: string;
+    targetPerDay: number;
+    category: HabitCategory;
+    icon?: HabitIcon;
+    color?: string;
+  },
 ): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    "UPDATE habits SET name = ?, target_per_day = ?, category = ?, updated_at = ? WHERE id = ?",
-    [updates.name, updates.targetPerDay, updates.category, now, habitId],
+    "UPDATE habits SET name = ?, target_per_day = ?, category = ?, icon = ?, color = ?, updated_at = ? WHERE id = ?",
+    [
+      updates.name,
+      updates.targetPerDay,
+      updates.category,
+      updates.icon ?? DEFAULT_HABIT_ICON,
+      updates.color ?? DEFAULT_HABIT_COLOR,
+      now,
+      habitId,
+    ],
   );
   syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "update" });
 }
