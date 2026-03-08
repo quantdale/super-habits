@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 
 const NAV_ITEMS = [
@@ -17,13 +17,15 @@ type NavItemProps = {
   label: string;
   shortLabel: string;
   collapsed: boolean;
+  style?: unknown;
 } & Record<string, unknown>;
 
-function NavItem({ isFocused, onPress, onLongPress, label, shortLabel, collapsed, ...rest }: NavItemProps) {
+function NavItem({ isFocused, onPress, onLongPress, label, shortLabel, collapsed, style, ...rest }: NavItemProps) {
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
+      style={style ? StyleSheet.flatten(style) : undefined}
       className={`mb-1 flex flex-row items-center rounded-lg px-3 py-2.5 ${
         isFocused ? "bg-brand-500" : "bg-transparent"
       } ${collapsed ? "justify-center" : ""}`}
