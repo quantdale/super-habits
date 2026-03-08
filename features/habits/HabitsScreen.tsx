@@ -33,7 +33,8 @@ const CATEGORY_LABELS: Record<HabitCategory, string> = {
   afternoon: "Afternoon",
   evening: "Evening",
 };
-const CATEGORY_ICONS: Record<HabitCategory, string> = {
+type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
+const CATEGORY_ICONS: Record<HabitCategory, MaterialIconName> = {
   anytime: "schedule",
   morning: "wb-sunny",
   afternoon: "wb-cloudy",
