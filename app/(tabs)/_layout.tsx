@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 
 const NAV_ITEMS = [
@@ -41,41 +42,63 @@ function NavItem({ isFocused, onPress, onLongPress, label, shortLabel, collapsed
   );
 }
 
+const BURGER_STRIP_WIDTH = 56;
+const SIDEBAR_PANEL_WIDTH = 144;
+
 export default function TabsLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const sidebarWidth = sidebarCollapsed ? 56 : 200;
+  const panelWidth = sidebarCollapsed ? 0 : SIDEBAR_PANEL_WIDTH;
 
   return (
     <Tabs className="flex-1 flex-row">
-      <TabList
-        className="flex shrink-0 flex-col border-r border-slate-200 bg-white px-2 py-3"
-        style={{
-          width: sidebarWidth,
-          minWidth: sidebarWidth,
-          maxWidth: sidebarWidth,
-          flexDirection: "column",
-          justifyContent: "flex-start",
-        }}
-      >
-        {NAV_ITEMS.map((item) => (
-          <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-            <NavItem
-              label={item.label}
-              shortLabel={item.shortLabel}
-              collapsed={sidebarCollapsed}
-            />
-          </TabTrigger>
-        ))}
-        <Pressable
-          onPress={() => setSidebarCollapsed((c) => !c)}
-          className="mt-auto border-t border-slate-200 py-3"
-          style={{ alignItems: sidebarCollapsed ? "center" : "flex-start", paddingHorizontal: 12 }}
+      <View className="flex shrink-0 flex-row border-r border-slate-200 bg-white">
+        <View
+          className="flex-col border-r border-slate-200 px-2 py-3"
+          style={{
+            width: BURGER_STRIP_WIDTH,
+            minWidth: BURGER_STRIP_WIDTH,
+            maxWidth: BURGER_STRIP_WIDTH,
+          }}
         >
-          <Text className="text-slate-500" selectable={false}>
-            {sidebarCollapsed ? "»" : "«"}
-          </Text>
-        </Pressable>
-      </TabList>
+          <Pressable
+            onPress={() => setSidebarCollapsed((c) => !c)}
+            className="flex-row items-center justify-center rounded-lg py-2.5"
+            style={{ minHeight: 44 }}
+          >
+            <MaterialIcons name="menu" size={24} color="#64748b" />
+          </Pressable>
+        </View>
+        <TabList
+          className="flex shrink-0 flex-col bg-white px-2 py-3"
+          style={{
+            width: panelWidth,
+            minWidth: panelWidth,
+            maxWidth: panelWidth,
+            flexDirection: "column",
+            justifyContent: "flex-start",
+            overflow: "hidden",
+          }}
+        >
+          {NAV_ITEMS.map((item) => (
+            <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
+              <NavItem
+                label={item.label}
+                shortLabel={item.shortLabel}
+                collapsed={false}
+              />
+            </TabTrigger>
+          ))}
+          <Pressable
+            onPress={() => setSidebarCollapsed((c) => !c)}
+            className="mt-auto border-t border-slate-200 py-3"
+            style={{ paddingHorizontal: 12 }}
+          >
+            <Text className="text-slate-500" selectable={false}>
+              «
+            </Text>
+          </Pressable>
+        </TabList>
+      </View>
       <View className="flex-1">
         <TabSlot />
       </View>

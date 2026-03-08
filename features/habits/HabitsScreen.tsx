@@ -173,7 +173,7 @@ export function HabitsScreen() {
         ) : (
           CATEGORIES.map((cat) => (
             <View key={cat} className="mb-6">
-              <View className="mb-2 flex-row items-center gap-2">
+              <View className="mb-2 flex-row items-center justify-center gap-2">
                 <MaterialIcons name={CATEGORY_ICONS[cat]} size={20} color="#94a3b8" />
                 <Text className="text-sm font-medium text-slate-600">{CATEGORY_LABELS[cat]}</Text>
               </View>
