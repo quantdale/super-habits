@@ -1,0 +1,15 @@
+diff --git a/node_modules/metro-file-map/src/watchers/FallbackWatcher.js b/node_modules/metro-file-map/src/watchers/FallbackWatcher.js
+index e431e90..e061105 100644
+--- a/node_modules/metro-file-map/src/watchers/FallbackWatcher.js
++++ b/node_modules/metro-file-map/src/watchers/FallbackWatcher.js
+@@ -322,7 +322,9 @@ class FallbackWatcher extends _AbstractWatcher.AbstractWatcher {
+ exports.default = FallbackWatcher;
+ function isIgnorableFileError(error) {
+   return (
+-    error.code === "ENOENT" || (error.code === "EPERM" && platform === "win32")
++    error.code === "ENOENT" ||
++    (error.code === "EPERM" && platform === "win32") ||
++    error.code === "EACCES"
+   );
+ }
+ function recReaddir(
