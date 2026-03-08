@@ -11,10 +11,13 @@ export type Todo = BaseEntity & {
   completed: 0 | 1;
 };
 
+export type HabitCategory = "anytime" | "morning" | "afternoon" | "evening";
+
 export type Habit = BaseEntity & {
   name: string;
   target_per_day: number;
   reminder_time: string | null;
+  category: HabitCategory;
 };
 
 export type HabitCompletion = {

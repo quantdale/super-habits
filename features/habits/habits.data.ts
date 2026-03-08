@@ -1,23 +1,29 @@
 import { getDatabase } from "@/core/db/client";
-import { Habit } from "@/core/db/types";
+import { Habit, HabitCategory } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 
+const CATEGORY_ORDER = "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
+
 export async function listHabits(): Promise<Habit[]> {
   const db = await getDatabase();
   return db.getAllAsync<Habit>(
-    "SELECT * FROM habits WHERE deleted_at IS NULL ORDER BY created_at DESC",
+    `SELECT * FROM habits WHERE deleted_at IS NULL ORDER BY ${CATEGORY_ORDER}, created_at DESC`,
   );
 }
 
-export async function addHabit(name: string, targetPerDay: number): Promise<void> {
+export async function addHabit(
+  name: string,
+  targetPerDay: number,
+  category: HabitCategory = "anytime",
+): Promise<void> {
   const id = createId("habit");
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    "INSERT INTO habits (id, name, target_per_day, reminder_time, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, NULL)",
-    [id, name, targetPerDay, now, now],
+    "INSERT INTO habits (id, name, target_per_day, reminder_time, category, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, ?, NULL)",
+    [id, name, targetPerDay, category, now, now],
   );
   syncEngine.enqueue({ entity: "habits", id, updatedAt: now, operation: "create" });
 }
@@ -43,6 +49,25 @@ export async function incrementHabit(habitId: string, dateKey = toDateKey()): Pr
   );
 }
 
+export async function decrementHabit(habitId: string, dateKey = toDateKey()): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const existing = await db.getFirstAsync<{ id: string; count: number }>(
+    "SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
+    [habitId, dateKey],
+  );
+  if (!existing || existing.count <= 0) return;
+  if (existing.count === 1) {
+    await db.runAsync("DELETE FROM habit_completions WHERE id = ?", [existing.id]);
+    return;
+  }
+  await db.runAsync("UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?", [
+    existing.count - 1,
+    now,
+    existing.id,
+  ]);
+}
+
 export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()): Promise<number> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
@@ -50,6 +75,19 @@ export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()
     [habitId, dateKey],
   );
   return row?.count ?? 0;
+}
+
+export async function updateHabit(
+  habitId: string,
+  updates: { name: string; targetPerDay: number; category: HabitCategory },
+): Promise<void> {
+  const now = nowIso();
+  const db = await getDatabase();
+  await db.runAsync(
+    "UPDATE habits SET name = ?, target_per_day = ?, category = ?, updated_at = ? WHERE id = ?",
+    [updates.name, updates.targetPerDay, updates.category, now, habitId],
+  );
+  syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "update" });
 }
 
 export async function deleteHabit(habitId: string): Promise<void> {

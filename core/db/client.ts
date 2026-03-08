@@ -18,6 +18,7 @@ const bootstrapStatements = [
     name TEXT NOT NULL,
     target_per_day INTEGER NOT NULL DEFAULT 1,
     reminder_time TEXT,
+    category TEXT NOT NULL DEFAULT 'anytime',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -73,11 +74,29 @@ const bootstrapStatements = [
   );`,
 ];
 
+async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
+  );
+  const version = row?.value ? parseInt(row.value, 10) : 0;
+  if (version < 2) {
+    try {
+      await db.execAsync("ALTER TABLE habits ADD COLUMN category TEXT NOT NULL DEFAULT 'anytime'");
+    } catch {
+      // Column may already exist from CREATE TABLE
+    }
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '2')",
+    );
+  }
+}
+
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
   const database = await SQLite.openDatabaseAsync("superhabits.db");
   for (const statement of bootstrapStatements) {
     await database.execAsync(statement);
   }
+  await runMigrations(database);
   return database;
 }
 
