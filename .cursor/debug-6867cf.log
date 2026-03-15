@@ -144,3 +144,45 @@
 {"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1772956099774}
 {"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1772956099776}
 {"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile found existing","data":{"hypothesisId":"H5"},"timestamp":1772956099790}
+{"sessionId":"6867cf","location":"AppProviders.tsx","message":"AppProviders useEffect","data":{"hypothesisId":"H1","platform":"web","visibility":"visible"},"timestamp":1773589438018}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"openAndBootstrap entered","data":{"hypothesisId":"H2","openCallCount":1,"hadExistingPromise":false},"timestamp":1773589438020}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":true},"timestamp":1773589438020}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"initializeDatabase started","data":{"hypothesisId":"H4"},"timestamp":1773589438019}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1773589438037}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"openDatabaseAsync resolved","data":{"hypothesisId":"H2","openCallCount":1},"timestamp":1773589438089}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"runMigrations about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1773589438092}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"initializeDatabase completed","data":{"hypothesisId":"H4"},"timestamp":1773589438095}
+{"sessionId":"6867cf","location":"todos.data.ts","message":"listTodos about to getAllAsync","data":{"hypothesisId":"H5"},"timestamp":1773589438096}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1773589438096}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile started","data":{"hypothesisId":"H4"},"timestamp":1773589438096}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile got db","data":{"hypothesisId":"H4"},"timestamp":1773589438096}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1773589438096}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile found existing","data":{"hypothesisId":"H5"},"timestamp":1773589438103}
+{"sessionId":"6867cf","location":"AppProviders.tsx","message":"AppProviders useEffect","data":{"hypothesisId":"H1","platform":"web","visibility":"visible"},"timestamp":1773589440478}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"initializeDatabase started","data":{"hypothesisId":"H4"},"timestamp":1773589440478}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":true},"timestamp":1773589440479}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"openAndBootstrap entered","data":{"hypothesisId":"H2","openCallCount":1,"hadExistingPromise":false},"timestamp":1773589440478}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1773589440488}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"openDatabaseAsync resolved","data":{"hypothesisId":"H2","openCallCount":1},"timestamp":1773589440528}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"runMigrations about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1773589440531}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"initializeDatabase completed","data":{"hypothesisId":"H4"},"timestamp":1773589440533}
+{"sessionId":"6867cf","location":"todos.data.ts","message":"listTodos about to getAllAsync","data":{"hypothesisId":"H5"},"timestamp":1773589440533}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile started","data":{"hypothesisId":"H4"},"timestamp":1773589440534}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1773589440534}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile got db","data":{"hypothesisId":"H4"},"timestamp":1773589440534}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1773589440534}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile found existing","data":{"hypothesisId":"H5"},"timestamp":1773589440541}
+{"sessionId":"6867cf","location":"AppProviders.tsx","message":"AppProviders useEffect","data":{"hypothesisId":"H1","platform":"web","visibility":"visible"},"timestamp":1773589441489}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"initializeDatabase started","data":{"hypothesisId":"H4"},"timestamp":1773589441489}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"openAndBootstrap entered","data":{"hypothesisId":"H2","openCallCount":1,"hadExistingPromise":false},"timestamp":1773589441489}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":true},"timestamp":1773589441489}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1773589441498}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"openDatabaseAsync resolved","data":{"hypothesisId":"H2","openCallCount":1},"timestamp":1773589441536}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"runMigrations about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1773589441539}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"initializeDatabase completed","data":{"hypothesisId":"H4"},"timestamp":1773589441540}
+{"sessionId":"6867cf","location":"todos.data.ts","message":"listTodos about to getAllAsync","data":{"hypothesisId":"H5"},"timestamp":1773589441540}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile started","data":{"hypothesisId":"H4"},"timestamp":1773589441540}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile got db","data":{"hypothesisId":"H4"},"timestamp":1773589441541}
+{"sessionId":"6867cf","location":"core/db/client.ts","message":"getDatabase called","data":{"hypothesisId":"H2","dbPromiseWasNull":false},"timestamp":1773589441541}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile about to getFirstAsync","data":{"hypothesisId":"H5"},"timestamp":1773589441541}
+{"sessionId":"6867cf","location":"guestProfile.ts","message":"ensureGuestProfile found existing","data":{"hypothesisId":"H5"},"timestamp":1773589441546}

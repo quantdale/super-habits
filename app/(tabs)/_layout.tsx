@@ -4,7 +4,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 
 const NAV_ITEMS = [
-  { name: "todos", href: "/(tabs)/todos" as const, label: "Todos", shortLabel: "T" },
+  { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", shortLabel: "T" },
   { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", shortLabel: "H" },
   { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", shortLabel: "F" },
   { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", shortLabel: "W" },
@@ -51,9 +51,19 @@ export default function TabsLayout() {
 
   return (
     <Tabs className="flex-1 flex-row">
-      <View className="flex shrink-0 flex-row border-r border-slate-200 bg-white">
+      <TabList
+        className="flex shrink-0 flex-col border-r border-slate-200 bg-white px-2 py-3"
+        style={{
+          width: BURGER_STRIP_WIDTH + panelWidth,
+          minWidth: BURGER_STRIP_WIDTH + panelWidth,
+          maxWidth: BURGER_STRIP_WIDTH + panelWidth,
+          flexDirection: "column",
+          justifyContent: "flex-start",
+          overflow: "hidden",
+        }}
+      >
         <View
-          className="flex-col border-r border-slate-200 px-2 py-3"
+          className="flex-row items-center justify-center border-b border-slate-200 py-2.5"
           style={{
             width: BURGER_STRIP_WIDTH,
             minWidth: BURGER_STRIP_WIDTH,
@@ -68,40 +78,26 @@ export default function TabsLayout() {
             <MaterialIcons name="menu" size={24} color="#64748b" />
           </Pressable>
         </View>
-        <TabList
-          className="flex shrink-0 flex-col bg-white px-2 py-3"
-          style={{
-            width: panelWidth,
-            minWidth: panelWidth,
-            maxWidth: panelWidth,
-            flexDirection: "column",
-            justifyContent: "flex-start",
-            overflow: "hidden",
-          }}
+        {NAV_ITEMS.map((item) => (
+          <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
+            <NavItem
+              label={item.label}
+              shortLabel={item.shortLabel}
+              collapsed={sidebarCollapsed}
+            />
+          </TabTrigger>
+        ))}
+        <Pressable
+          onPress={() => setSidebarCollapsed((c) => !c)}
+          className="mt-auto border-t border-slate-200 py-3"
+          style={{ paddingHorizontal: 12 }}
         >
-          {NAV_ITEMS.map((item) => (
-            <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-              <NavItem
-                label={item.label}
-                shortLabel={item.shortLabel}
-                collapsed={false}
-              />
-            </TabTrigger>
-          ))}
-          <Pressable
-            onPress={() => setSidebarCollapsed((c) => !c)}
-            className="mt-auto border-t border-slate-200 py-3"
-            style={{ paddingHorizontal: 12 }}
-          >
-            <Text className="text-slate-500" selectable={false}>
-              «
-            </Text>
-          </Pressable>
-        </TabList>
-      </View>
-      <View className="flex-1">
-        <TabSlot />
-      </View>
+          <Text className="text-slate-500" selectable={false}>
+            «
+          </Text>
+        </Pressable>
+      </TabList>
+      <TabSlot className="flex-1" />
     </Tabs>
   );
 }
