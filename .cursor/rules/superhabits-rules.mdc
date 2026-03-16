@@ -1,0 +1,95 @@
+---
+description: SuperHabits project rules — invariants, conventions, and patterns
+alwaysApply: true
+---
+
+# SuperHabits — Project Rules
+
+## Project identity
+SuperHabits is an offline-first React Native + Expo app with 5 modules:
+todos, habits, pomodoro, workout, calories.
+Stack: React Native 0.83, Expo 55, TypeScript 5.9, expo-router, SQLite
+(expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
+Target: Web (PWA), iOS, Android.
+Status: Active MVP. No production deployment pipeline yet.
+Schema version: 3. Next migration number: 4.
+
+## Non-negotiable invariants — violating these causes silent data corruption
+
+1. SOFT DELETE ONLY
+   Never use DELETE FROM on main entity tables (todos, habits, habit_completions
+   is the exception, workout_logs, calorie_entries, pomodoro_sessions).
+   Always set deleted_at = datetime('now') and filter WHERE deleted_at IS NULL.
+   Hard delete = data loss with no recovery path.
+
+2. SYNC ENQUEUE ON EVERY WRITE
+   Every INSERT/UPDATE on main entities must call syncEngine.enqueue(record)
+   immediately after the DB operation.
+   Exceptions (intentionally not synced): pomodoro_sessions, workout_logs,
+   habit_completions.
+   Missing enqueue = silent sync gap when cloud sync is enabled.
+
+3. DB SINGLETON MUST INITIALIZE BEFORE ANY DATA ACCESS
+   All data functions call await getDatabase() at the start.
+   Never open a second SQLite connection. Never access db before init.
+   Breaking the singleton breaks the entire app on cold start.
+
+4. IDs VIA createId(prefix) ONLY
+   Never use Math.random(), crypto.randomUUID(), or raw timestamps as IDs.
+   Format: {prefix}_{timestamp}_{random8} — enforced in lib/id.ts.
+   Prefix must match the entity: "todo", "habit", "cal", "wrk", "pom".
+
+5. DATE KEYS VIA toDateKey() ONLY
+   All YYYY-MM-DD date strings must come from toDateKey() in lib/time.ts.
+   KNOWN BUG: toDateKey() currently uses UTC not local time. Do NOT fix
+   this silently — it will corrupt historical records. Flag it explicitly
+   if you touch date handling.
+
+6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
+   Never modify an existing migration. Always add a new file numbered N+1.
+   Current schema version: 3. Next: 4.
+   Migration logic runs in core/db/client.ts — add new case to the switch.
+   schema.sql is a reference doc only — it is NOT executed at runtime.
+
+7. UNIQUE(habit_id, date_key) on habit_completions
+   Never INSERT a completion without checking for duplicates.
+   The data layer uses INSERT OR REPLACE — do not change this pattern.
+
+## File naming conventions
+- Source files: camelCase (e.g. todoHelpers.ts)
+- React components: PascalCase (e.g. TodoCard.tsx)
+- Data layer: {feature}.data.ts (e.g. todos.data.ts)
+- Domain/pure logic: {feature}.domain.ts (e.g. habits.domain.ts)
+- Screens: {Feature}Screen.tsx (e.g. TodosScreen.tsx)
+- Route wrappers: app/(tabs)/{feature}.tsx — thin, just renders the Screen
+
+## Adding a new feature — required structure
+features/{name}/
+  {name}.data.ts      ← all SQLite CRUD, exports typed functions
+  {name}.domain.ts    ← pure logic, no DB imports, fully testable
+  {name}Screen.tsx    ← React Native UI, imports from .data and .domain
+
+Route file: app/(tabs)/{name}.tsx → renders {Name}Screen
+Tab entry: app/(tabs)/_layout.tsx → add tab icon + href
+
+## Unused dependencies — do NOT add usage without discussion
+The following are installed but intentionally unused:
+- zustand (state management — may be used for future global state)
+- @tanstack/react-query (no hooks used — QueryClient provided but dormant)
+- date-fns (listed in package.json, not imported anywhere in source)
+- expo-background-fetch, expo-task-manager (deferred background sync)
+Do not wire these up without an explicit decision to do so.
+
+## Testing requirements
+- Every new *.domain.ts function must have a Vitest unit test
+- Test files live in tests/ directory
+- Run: npm test
+- Current count: 6 tests passing
+- No DB or component tests yet — do not block on this, but document gaps
+
+## Current known bugs (do not silently fix — coordinate first)
+- toDateKey() uses UTC not local time (lib/time.ts)
+- Meal type hard-coded to "snack" in calories.data.ts
+- nextPomodoroState() is dead code (pomodoro.domain.ts)
+- Sync queue is in-memory only, never flushed
+- schema.sql is out of date (reference only, not authoritative)
