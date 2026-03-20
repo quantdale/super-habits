@@ -64,6 +64,7 @@ const bootstrapStatements = [
     protein REAL NOT NULL DEFAULT 0,
     carbs REAL NOT NULL DEFAULT 0,
     fats REAL NOT NULL DEFAULT 0,
+    fiber REAL NOT NULL DEFAULT 0,
     meal_type TEXT NOT NULL,
     consumed_on TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -104,6 +105,18 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     }
     await db.runAsync(
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '3')",
+    );
+  }
+  if (version < 4) {
+    try {
+      await db.execAsync(
+        "ALTER TABLE calorie_entries ADD COLUMN fiber REAL NOT NULL DEFAULT 0",
+      );
+    } catch {
+      // Column may already exist from CREATE TABLE
+    }
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '4')",
     );
   }
 }

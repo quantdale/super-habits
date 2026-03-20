@@ -20,6 +20,7 @@ export function CaloriesScreen() {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fats, setFats] = useState("");
+  const [fiber, setFiber] = useState("");
   const [entries, setEntries] = useState<CalorieEntry[]>([]);
 
   const refresh = useCallback(() => {
@@ -51,6 +52,7 @@ export function CaloriesScreen() {
       protein: Number(protein) || 0,
       carbs: Number(carbs) || 0,
       fats: Number(fats) || 0,
+      fiber: Number(fiber) || 0,
       mealType: "snack",
     });
     setFood("");
@@ -58,6 +60,7 @@ export function CaloriesScreen() {
     setProtein("");
     setCarbs("");
     setFats("");
+    setFiber("");
     refresh();
   };
 
@@ -70,20 +73,21 @@ export function CaloriesScreen() {
           label="Calories"
           value={calories}
           onChangeText={setCalories}
-          keyboardType="numeric"
+          unsignedInteger
           placeholder="150"
         />
         <View className="flex-row gap-2">
           <View className="flex-1">
-            <TextField label="Protein (g)" value={protein} onChangeText={setProtein} keyboardType="numeric" />
+            <TextField label="Protein (g)" value={protein} onChangeText={setProtein} unsignedInteger />
           </View>
           <View className="flex-1">
-            <TextField label="Carbs (g)" value={carbs} onChangeText={setCarbs} keyboardType="numeric" />
+            <TextField label="Carbs (g)" value={carbs} onChangeText={setCarbs} unsignedInteger />
           </View>
           <View className="flex-1">
-            <TextField label="Fats (g)" value={fats} onChangeText={setFats} keyboardType="numeric" />
+            <TextField label="Fats (g)" value={fats} onChangeText={setFats} unsignedInteger />
           </View>
         </View>
+        <TextField label="Fiber (g)" value={fiber} onChangeText={setFiber} unsignedInteger placeholder="0" />
         <Button label="Add entry" onPress={onAdd} />
       </Card>
 
@@ -97,7 +101,7 @@ export function CaloriesScreen() {
             {entry.food_name} - {entry.calories} kcal
           </Text>
           <Text className="mt-1 text-sm text-slate-600">
-            P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g
+            P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber {entry.fiber}g
           </Text>
           <View className="mt-3">
             <Button

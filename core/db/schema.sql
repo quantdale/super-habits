@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS calorie_entries (
   protein REAL NOT NULL DEFAULT 0,
   carbs REAL NOT NULL DEFAULT 0,
   fats REAL NOT NULL DEFAULT 0,
+  fiber REAL NOT NULL DEFAULT 0,
   meal_type TEXT NOT NULL,
   consumed_on TEXT NOT NULL,
   created_at TEXT NOT NULL,

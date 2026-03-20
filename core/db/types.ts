@@ -73,6 +73,7 @@ export type CalorieEntry = BaseEntity & {
   protein: number;
   carbs: number;
   fats: number;
+  fiber: number;
   meal_type: "breakfast" | "lunch" | "dinner" | "snack";
   consumed_on: string;
 };
