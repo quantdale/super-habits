@@ -1,4 +1,4 @@
-import type { HabitIcon } from "@/core/db/types";
+import type { HabitIcon } from "./types";
 
 export const HABIT_ICONS: readonly HabitIcon[] = [
   "check-circle",

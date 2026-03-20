@@ -18,15 +18,16 @@ export async function addCalorieEntry(input: {
   protein?: number;
   carbs?: number;
   fats?: number;
+  fiber?: number;
   mealType: "breakfast" | "lunch" | "dinner" | "snack";
   consumedOn?: string;
 }): Promise<void> {
-  const id = createId("calorie");
+  const id = createId("cal");
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
   const db = await getDatabase();
   await db.runAsync(
-    "INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+    "INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
     [
       id,
       input.foodName,
@@ -34,6 +35,7 @@ export async function addCalorieEntry(input: {
       input.protein ?? 0,
       input.carbs ?? 0,
       input.fats ?? 0,
+      input.fiber ?? 0,
       input.mealType,
       consumedOn,
       now,

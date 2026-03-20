@@ -12,7 +12,7 @@ export async function listRoutines(): Promise<WorkoutRoutine[]> {
 }
 
 export async function addRoutine(name: string, description: string): Promise<void> {
-  const id = createId("workout_routine");
+  const id = createId("wrk");
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
@@ -23,7 +23,7 @@ export async function addRoutine(name: string, description: string): Promise<voi
 }
 
 export async function completeRoutine(routineId: string, notes?: string): Promise<void> {
-  const id = createId("workout_log");
+  const id = createId("wrk");
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(

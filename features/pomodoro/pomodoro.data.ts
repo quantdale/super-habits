@@ -9,7 +9,7 @@ export async function logPomodoroSession(
   durationSeconds: number,
   type: "focus" | "break",
 ): Promise<void> {
-  const id = createId("pomodoro");
+  const id = createId("pom");
   const createdAt = nowIso();
   const db = await getDatabase();
   await db.runAsync(

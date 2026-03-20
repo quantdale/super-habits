@@ -37,12 +37,12 @@ WORKFLOW
 
 NON-NEGOTIABLES
 - Soft delete only — never DELETE FROM main entities
-- Every write calls syncEngine.enqueue() (except pomodoro, workout, habit_completions)
+- Every write calls syncEngine.enqueue() where applicable (exceptions: pomodoro_sessions, workout_logs, habit_completions — not synced)
 - All IDs via createId(prefix) — never raw random/uuid
 - All timestamps via nowIso() — all date keys via toDateKey()
 - New columns require a new migration (never modify existing migrations)
-- Current schema version: 3 — next migration: case 4
+- Current schema version: 4 — next migration: version 5 (new if (version < 5) block in runMigrations)
 - schema.sql is reference only — never execute it
-- UNIQUE(habit_id, date_key): use INSERT OR REPLACE for habit_completions
+- UNIQUE(habit_id, date_key): use SELECT + INSERT/UPDATE (increment/decrement); hard DELETE when count reaches 0 (allowed exception to soft-delete rule — non-synced entity, see habits.data.ts ~63–66 for comment)
 - All SELECT queries include WHERE deleted_at IS NULL
-- 6 tests must pass after every change
+- 7 tests must pass after every change (update if test count changes)

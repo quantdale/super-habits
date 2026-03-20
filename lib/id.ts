@@ -1,3 +1,17 @@
+/**
+ * Canonical ID prefixes (entity → prefix). Use only these at call sites.
+ * Format: {prefix}_{timestamp_ms}_{8_random_chars}
+ *
+ * | Entity              | Prefix |
+ * |---------------------|--------|
+ * | todos               | todo   |
+ * | habits              | habit  |
+ * | habit_completions   | hcmp   |
+ * | calorie_entries     | cal    |
+ * | workout (routine/log)| wrk   |
+ * | pomodoro_sessions   | pom    |
+ * | guest (app_meta)    | guest  |
+ */
 export function createId(prefix: string): string {
   const random = Math.random().toString(36).slice(2, 10);
   return `${prefix}_${Date.now()}_${random}`;

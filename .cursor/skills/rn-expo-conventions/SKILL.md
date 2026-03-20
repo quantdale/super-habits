@@ -25,7 +25,7 @@ Apply this when writing any UI, navigation, or platform-specific code.
 
 ## React Native specifics
 - List rendering: use @shopify/flash-list (FlashList), not FlatList
-  FlashList requires estimatedItemSize prop
+  This project uses **FlashList v2** (`@shopify/flash-list@2.x`): typings do **not** include `estimatedItemSize` (unlike v1). Use `data`, `renderItem`, `keyExtractor`, etc., per current types.
 - Animations: use react-native-reanimated (not Animated from RN core)
 - SVG: react-native-svg (react-native-svg components, not <svg> HTML)
 - Safe area: use <Screen> from core/ui/Screen.tsx (wraps SafeAreaView)
@@ -78,7 +78,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - Run: npm test
 - Only pure function tests (no DB, no component rendering yet)
 - Every new domain function needs a test
-- Current count: 6 tests passing
+- Current count: 7 tests passing (update when tests change)
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers (required for web)
@@ -89,4 +89,4 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - App.tsx — legacy, not used by expo-router
 - index.ts — legacy registerRootComponent, not used
 - nextPomodoroState() in pomodoro.domain.ts — dead code
-- lib/supabase.ts — placeholder, REMOTE_MODE = false, not used
+- lib/supabase.ts — in-memory `remoteMode` ("disabled" default); `setRemoteMode` / `isRemoteEnabled` not wired from UI; no Supabase client yet

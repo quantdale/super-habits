@@ -8,7 +8,7 @@ import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
-import { Habit, HabitCategory, HabitIcon } from "@/core/db/types";
+import type { Habit, HabitCategory, HabitIcon } from "./types";
 import {
   addHabit,
   decrementHabit,

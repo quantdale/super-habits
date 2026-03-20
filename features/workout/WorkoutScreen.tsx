@@ -6,7 +6,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
-import { WorkoutLog, WorkoutRoutine } from "@/core/db/types";
+import type { WorkoutLog, WorkoutRoutine } from "./types";
 import {
   addRoutine,
   completeRoutine,

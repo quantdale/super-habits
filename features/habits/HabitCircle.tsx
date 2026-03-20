@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { Habit } from "@/core/db/types";
+import type { Habit } from "./types";
 import { calculateHabitProgress } from "@/features/habits/habits.domain";
 import { ProgressRing } from "@/features/habits/ProgressRing";
 import { DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";

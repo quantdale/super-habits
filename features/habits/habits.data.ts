@@ -48,7 +48,7 @@ export async function incrementHabit(habitId: string, dateKey = toDateKey()): Pr
   }
   await db.runAsync(
     "INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
-    [createId("habit_completion"), habitId, dateKey, now, now],
+    [createId("hcmp"), habitId, dateKey, now, now],
   );
 }
 
@@ -61,6 +61,8 @@ export async function decrementHabit(habitId: string, dateKey = toDateKey()): Pr
   );
   if (!existing || existing.count <= 0) return;
   if (existing.count === 1) {
+    // Hard delete intentional: habit_completions is a toggle-off
+    // operation (non-synced entity, allowed exception per db-and-sync-invariants)
     await db.runAsync("DELETE FROM habit_completions WHERE id = ?", [existing.id]);
     return;
   }

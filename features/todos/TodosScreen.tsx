@@ -8,7 +8,7 @@ import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { SectionTitle } from "@/core/ui/SectionTitle";
-import { Todo } from "@/core/db/types";
+import type { Todo } from "./types";
 import { addTodo, listTodos, removeTodo, toggleTodo } from "@/features/todos/todos.data";
 
 export function TodosScreen() {

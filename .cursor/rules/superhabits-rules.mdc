@@ -12,7 +12,7 @@ Stack: React Native 0.83, Expo 55, TypeScript 5.9, expo-router, SQLite
 (expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. No production deployment pipeline yet.
-Schema version: 3. Next migration number: 4.
+Schema version: 4. Next migration number: 5.
 
 ## Non-negotiable invariants — violating these causes silent data corruption
 
@@ -47,13 +47,16 @@ Schema version: 3. Next migration number: 4.
 
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always add a new file numbered N+1.
-   Current schema version: 3. Next: 4.
-   Migration logic runs in core/db/client.ts — add new case to the switch.
+   Current schema version: 4. Next: 5.
+   Migration logic runs in core/db/client.ts — append a new block in runMigrations() (if (version < N)).
    schema.sql is a reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions
-   Never INSERT a completion without checking for duplicates.
-   The data layer uses INSERT OR REPLACE — do not change this pattern.
+   The data layer (habits.data.ts) avoids duplicate rows by:
+   - SELECT for an existing row matching (habit_id, date_key)
+   - INSERT with createId("hcmp") if none exists; UPDATE count if it does
+   - On decrement to zero: DELETE that row (hard delete — allowed exception for this table)
+   Do not change this pattern without reviewing UNIQUE and sync implications.
 
 ## File naming conventions
 - Source files: camelCase (e.g. todoHelpers.ts)
@@ -84,12 +87,16 @@ Do not wire these up without an explicit decision to do so.
 - Every new *.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 6 tests passing
+- Current count: 7 tests passing (update this when tests change)
 - No DB or component tests yet — do not block on this, but document gaps
 
 ## Current known bugs (do not silently fix — coordinate first)
 - toDateKey() uses UTC not local time (lib/time.ts)
-- Meal type hard-coded to "snack" in calories.data.ts
-- nextPomodoroState() is dead code (pomodoro.domain.ts)
-- Sync queue is in-memory only, never flushed
+- Sync flush is gated on isRemoteEnabled() (lib/supabase.ts) — interval / visibility / NetInfo flush
+  runs only when remote is enabled. While remote is off (default), the in-memory sync queue can grow
+  with NoopSyncAdapter; this is intentional until cloud sync is turned on. Document as a tradeoff, not
+  a silent bug fix.
 - schema.sql is out of date (reference only, not authoritative)
+
+Resolved in repo (do not re-report as open): CaloriesScreen passes mealType to addCalorieEntry;
+PomodoroScreen uses nextPomodoroState for UI; syncEngine.flush() is wired in AppProviders when remote is on.

@@ -10,7 +10,7 @@ Use data-agent subagent.
 Migration request: {{change}}
 
 Rules:
-- Current schema version: 3. New migration: case 4 (or next available).
+- Current schema version: 4. New migration: version 5 (next if (version < 5) block in runMigrations).
 - Read core/db/client.ts completely before writing anything.
 - Never modify existing migration cases.
 - Never modify bootstrap DDL.

@@ -5,7 +5,8 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
 import { listPomodoroSessions, logPomodoroSession } from "@/features/pomodoro/pomodoro.data";
-import { PomodoroSession } from "@/core/db/types";
+import { nextPomodoroState } from "@/features/pomodoro/pomodoro.domain";
+import type { PomodoroSession } from "./types";
 import { scheduleTimerEndNotification } from "@/lib/notifications";
 
 const FOCUS_SECONDS = 25 * 60;
@@ -30,7 +31,14 @@ export function PomodoroScreen() {
           setIsRunning(false);
           const endedAt = new Date();
           if (startedAt) {
-            logPomodoroSession(startedAt.toISOString(), endedAt.toISOString(), FOCUS_SECONDS, "focus");
+            void logPomodoroSession(
+              startedAt.toISOString(),
+              endedAt.toISOString(),
+              FOCUS_SECONDS,
+              "focus",
+            ).catch((err) => {
+              console.error("[PomodoroScreen] logPomodoroSession failed", err);
+            });
             setHistoryVersion((v) => v + 1);
           }
           return 0;
@@ -44,6 +52,8 @@ export function PomodoroScreen() {
 
   const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
   const seconds = String(remaining % 60).padStart(2, "0");
+
+  const pomodoroState = nextPomodoroState(remaining, isRunning);
 
   const start = async () => {
     const now = new Date();
@@ -61,7 +71,10 @@ export function PomodoroScreen() {
           {minutes}:{seconds}
         </Text>
         <View className="mt-4 gap-2">
-          <Button label={isRunning ? "Running..." : "Start focus"} onPress={start} />
+          <Button
+            label={pomodoroState === "running" ? "Running..." : "Start focus"}
+            onPress={start}
+          />
           <Button
             label="Reset"
             variant="ghost"

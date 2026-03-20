@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current: 3
-- Next migration number: 4
+- Current: 4
+- Next migration number: 5
 - Migrations live in: core/db/migrations/ (reference) + inline in client.ts
 - schema.sql is a REFERENCE ONLY — not executed at runtime
 - To add a column: add a new migration case, never alter the bootstrap DDL
@@ -44,9 +44,10 @@ Exception: habit_completions uses hard delete (toggle off = DELETE).
 
 ## Sync enqueue rule
 After every INSERT or UPDATE on main entities, call:
-  await syncEngine.enqueue({ table, id, operation, payload, timestamp })
+  syncEngine.enqueue({ entity, id, updatedAt, operation })
+  where operation is "create" | "update" | "delete" (see core/sync/sync.engine.ts SyncRecord)
 
-Entities that DO sync: todos, habits, calorie_entries
+Entities that DO sync: todos, habits, calorie_entries, workout_routines (enqueue entity names match syncEngine usage in *.data.ts)
 Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions
 (This is intentional — local-only data.)
 
@@ -74,12 +75,19 @@ toDateKey(date: Date): string — returns YYYY-MM-DD
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity)
-2. Add CREATE TABLE to a NEW migration in client.ts (case 4: next)
+2. Add CREATE TABLE to a NEW migration in client.ts (next version block: if (version < 5) …)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync
 5. Add unit tests for domain functions in tests/
 
 ## UNIQUE constraint on habit_completions
 UNIQUE(habit_id, date_key) — enforced at DB level
-Data layer uses INSERT OR REPLACE — do not change to INSERT OR IGNORE
-Violation: duplicate completion for same habit on same day
+
+Data layer (features/habits/habits.data.ts):
+- SELECT for existing row by (habit_id, date_key)
+- If none: INSERT new completion row
+- If exists: UPDATE count (increment/decrement paths)
+- If count would become 0: DELETE the row (hard delete — allowed exception; habit_completions does not sync)
+
+This satisfies the constraint without relying on INSERT OR REPLACE. Do not introduce duplicate
+INSERTs for the same (habit_id, date_key).

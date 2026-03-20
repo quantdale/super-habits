@@ -45,4 +45,4 @@ NON-NEGOTIABLES
 - Do not wire up zustand or React Query hooks without explicit instruction
 - Do not fix toDateKey() UTC bug silently — flag it
 - Do not change the hard-coded meal_type="snack" without a plan
-- 6 tests must pass after every change
+- 7 tests must pass after every change (update if test count changes)

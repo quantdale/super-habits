@@ -1,3 +1,13 @@
+-- ============================================================
+-- REFERENCE SNAPSHOT ONLY — NOT EXECUTED AT RUNTIME
+-- ============================================================
+-- The authoritative schema is the bootstrapStatements array
+-- in core/db/client.ts, plus the runMigrations() cases.
+-- Current stored schema version: 4 (next migration: case 5).
+-- This file may lag behind the live schema. Do not rely on it
+-- for migrations or type generation.
+-- ============================================================
+
 PRAGMA journal_mode = WAL;
 
 CREATE TABLE IF NOT EXISTS todos (

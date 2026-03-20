@@ -12,13 +12,13 @@ Phase 1 — Intake (answer before planning):
 - What data needs to persist? List every field with type.
 - What is the entity name and ID prefix? (e.g. "todo", "habit", "cal")
 - Does it need a new DB table? If yes, what columns?
-- Should writes sync? (most do — exceptions: pomodoro, workout, habits)
+- Should writes sync? (most entity tables do — exceptions: pomodoro_sessions, workout_logs, habit_completions)
 - What pure domain logic is needed? (calculations, validations, state machines)
 - Does it need notifications?
 - Does it touch any existing feature's data?
 
 Phase 2 — Plan (list every file to create or modify):
-- New migration: core/db/client.ts case N (current: 3, next: 4)
+- New migration: core/db/client.ts runMigrations (current stored version: 4, next: 5)
 - New type: core/db/types.ts
 - New data file: features/{name}/{name}.data.ts
 - New domain file: features/{name}/{name}.domain.ts

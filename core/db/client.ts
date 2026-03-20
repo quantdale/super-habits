@@ -1,9 +1,10 @@
+import { Platform } from "react-native";
 import * as SQLite from "expo-sqlite";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const bootstrapStatements = [
-  "PRAGMA journal_mode = WAL;",
+  ...(Platform.OS === "web" ? [] : ["PRAGMA journal_mode = WAL;"]),
   `CREATE TABLE IF NOT EXISTS todos (
     id TEXT PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
@@ -132,7 +133,10 @@ async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
 
 export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
-    dbPromise = openAndBootstrap();
+    dbPromise = openAndBootstrap().catch((err) => {
+      dbPromise = null;
+      throw err;
+    });
   }
   return dbPromise;
 }
