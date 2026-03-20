@@ -2,213 +2,417 @@
 
 ## Scope
 
-This document covers **`core/`**: database client and schema bootstrap, TypeScript entity types, SQL reference files, sync engine, guest profile auth, React providers, PWA service worker registration, and shared UI components.
+`core/`: SQLite client (`core/db/client.ts`, `types.ts`, `schema.sql`, `migrations/`), sync (`core/sync/sync.engine.ts`), guest profile (`core/auth/guestProfile.ts`), `core/providers/AppProviders.tsx`, PWA (`core/pwa/registerServiceWorker.ts`), shared UI (`core/ui/*`).
 
 ---
 
-## Purpose
+## `core/db/client.ts`
 
-**What it does:** Provides shared infrastructure for the Expo app: **singleton SQLite** access with **CREATE TABLE** bootstrap and **versioned migrations**; **typed domain models** aligned with tables; a **pluggable sync queue** (default noop); **local-first “guest” profile** stored in `app_meta`; **React Query** + **gesture handler** root; **Workbox** service worker registration on web; and a small **UI kit** used by feature screens.
+### Module-level state
 
-**Problem it solves:** Keeps persistence, cross-cutting UI, and future sync hooks in one place so feature modules stay thin and consistent.
+| Name | Type | Role |
+|------|------|------|
+| `dbPromise` | `Promise<SQLite.SQLiteDatabase> \| null` | Lazy singleton; reset to `null` on failed open |
+
+### `bootstrapStatements` (exact DDL)
+
+Executed in order via `openAndBootstrap()` → `for (const statement of bootstrapStatements) await database.execAsync(statement)`.
+
+1. **WAL (native only):** If `Platform.OS !== "web"`, prepend `"PRAGMA journal_mode = WAL;"`. **Web:** no WAL pragma in array (empty spread branch).
+
+2. **`todos`**
+
+```sql
+CREATE TABLE IF NOT EXISTS todos (
+  id TEXT PRIMARY KEY NOT NULL,
+  title TEXT NOT NULL,
+  notes TEXT,
+  completed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+```
+
+3. **`habits`**
+
+```sql
+CREATE TABLE IF NOT EXISTS habits (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  target_per_day INTEGER NOT NULL DEFAULT 1,
+  reminder_time TEXT,
+  category TEXT NOT NULL DEFAULT 'anytime',
+  icon TEXT NOT NULL DEFAULT 'check-circle',
+  color TEXT NOT NULL DEFAULT '#64748b',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+```
+
+4. **`habit_completions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS habit_completions (
+  id TEXT PRIMARY KEY NOT NULL,
+  habit_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(habit_id, date_key)
+);
+```
+
+5. **`pomodoro_sessions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+  id TEXT PRIMARY KEY NOT NULL,
+  started_at TEXT NOT NULL,
+  ended_at TEXT NOT NULL,
+  duration_seconds INTEGER NOT NULL,
+  session_type TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+```
+
+6. **`workout_routines`**
+
+```sql
+CREATE TABLE IF NOT EXISTS workout_routines (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+```
+
+7. **`workout_logs`**
+
+```sql
+CREATE TABLE IF NOT EXISTS workout_logs (
+  id TEXT PRIMARY KEY NOT NULL,
+  routine_id TEXT NOT NULL,
+  notes TEXT,
+  completed_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+```
+
+8. **`calorie_entries`**
+
+```sql
+CREATE TABLE IF NOT EXISTS calorie_entries (
+  id TEXT PRIMARY KEY NOT NULL,
+  food_name TEXT NOT NULL,
+  calories INTEGER NOT NULL,
+  protein REAL NOT NULL DEFAULT 0,
+  carbs REAL NOT NULL DEFAULT 0,
+  fats REAL NOT NULL DEFAULT 0,
+  fiber REAL NOT NULL DEFAULT 0,
+  meal_type TEXT NOT NULL,
+  consumed_on TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+```
+
+9. **`app_meta`**
+
+```sql
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);
+```
+
+### `runMigrations(db)` — full walkthrough
+
+Reads version:  
+`SELECT value FROM app_meta WHERE key = 'db_schema_version'` → `parseInt` → default `0`.
+
+| Condition | SQL / actions | Version written | Idempotency |
+|-----------|---------------|-----------------|-------------|
+| `version < 2` | `ALTER TABLE habits ADD COLUMN category TEXT NOT NULL DEFAULT 'anytime'` inside **try/catch** (ignore if column exists) | `INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '2')` | try/catch absorbs duplicate column |
+| `version < 3` | Two try/catch blocks: `ADD COLUMN icon ...`, `ADD COLUMN color ...` | `'3'` | same |
+| `version < 4` | try/catch: `ALTER TABLE calorie_entries ADD COLUMN fiber REAL NOT NULL DEFAULT 0` | `'4'` | same |
+
+**Note:** Bootstrap `CREATE TABLE` already includes columns for new installs; migrations patch older DBs. **No** `version < 1` bootstrap inserts `db_schema_version` at install — version starts unset (`0`) until first migration runs.
+
+### Exported functions
+
+#### `getDatabase(): Promise<SQLite.SQLiteDatabase>`
+
+1. If `dbPromise` is null, set `dbPromise = openAndBootstrap().catch((err) => { dbPromise = null; throw err; })`.
+2. Return `dbPromise`.
+
+**Error behavior:** Failed open clears singleton so retry possible.
+
+#### `initializeDatabase(): Promise<void>`
+
+- `await getDatabase()` — public “ensure ready” hook.
+
+**Callers:** `AppProviders` (mount). **Callees:** `getDatabase` → `openAndBootstrap` → `runMigrations`.
 
 ---
 
-## Tech stack
+## `core/db/types.ts` — type reference
 
-| Area | Evidence |
-|------|----------|
-| **expo-sqlite** | `import * as SQLite from "expo-sqlite"` in `core/db/client.ts` |
-| **React / React Native** | `AppProviders`, `core/ui/*` use `react`, `react-native` |
-| **@tanstack/react-query** | `QueryClient`, `QueryClientProvider` in `AppProviders.tsx` |
-| **react-native-gesture-handler** | `GestureHandlerRootView`, `ScrollView` in `Screen.tsx`, `Pressable` in `Button.tsx` |
-| **NativeWind / className** | `core/ui/*` and `Screen.tsx` use `className` |
-| **workbox-window** | `Workbox` import in `registerServiceWorker.ts` |
-| **TypeScript** | `.ts` / `.tsx` throughout |
-
----
-
-## Architecture pattern
-
-**Monolithic client shared library** inside a single app repo: **layered helpers** (DB singleton, sync engine, UI primitives) with **no separate npm package**. **Not** a microservice or server.
-
----
-
-## Entry points
-
-| Entry | Role |
-|-------|------|
-| **`initializeDatabase()`** | `core/db/client.ts` — exported async function; **await `getDatabase()`** (opens DB, runs bootstrap + migrations). |
-| **`getDatabase()`** | Returns shared `Promise<SQLiteDatabase>`; lazy singleton. |
-| **`AppProviders`** | `core/providers/AppProviders.tsx` — mounted from `app/_layout.tsx`; runs DB init, SW registration, guest profile in `useEffect`. |
-| **`syncEngine`** | `core/sync/sync.engine.ts` — exported singleton `SyncEngine` instance used by feature `.data.ts` files. |
-| **`registerServiceWorker()`** | `core/pwa/registerServiceWorker.ts` — called from `AppProviders` on mount. |
-| **`ensureGuestProfile()`** | `core/auth/guestProfile.ts` — called from `AppProviders` on mount. |
-| **UI components** | Imported by feature screens as needed (no single barrel export file in `core/ui/`). |
-
----
-
-## Folder structure
-
-| Path | Role |
-|------|------|
-| `core/db/client.ts` | SQLite singleton, `bootstrapStatements` (DDL), `runMigrations()` (version 2–4), `getDatabase`, `initializeDatabase`. |
-| `core/db/types.ts` | Exported TypeScript types for entities (`Todo`, `Habit`, `CalorieEntry`, etc.). |
-| `core/db/schema.sql` | **Reference** DDL (see Quirks — may diverge from runtime bootstrap). |
-| `core/db/migrations/001_initial_supabase.sql` | Commented as reserved for post-MVP; defines `profiles` table (Postgres-style `uuid`, `timestamptz`) — **not** executed by `client.ts`. |
-| `core/sync/sync.engine.ts` | `SyncRecord`, `SyncAdapter`, `NoopSyncAdapter`, `SyncEngine`, `syncEngine`. |
-| `core/auth/guestProfile.ts` | Reads/writes `app_meta` key `guest_profile`; creates id via `createId("guest")`. |
-| `core/providers/AppProviders.tsx` | `QueryClientProvider`, `GestureHandlerRootView`, startup side effects. |
-| `core/pwa/registerServiceWorker.ts` | Registers `/sw.js` via Workbox on web only. |
-| `core/ui/Screen.tsx` | Safe area + optional scroll + padding. |
-| `core/ui/Button.tsx` | Primary / ghost / danger `Pressable` button. |
-| `core/ui/Card.tsx` | White rounded container. |
-| `core/ui/TextField.tsx` | Labeled text input; optional `unsignedInteger` digit filter. |
-| `core/ui/SectionTitle.tsx` | Title + optional subtitle. |
-| `core/ui/NumberStepperField.tsx` | Minus / plus stepper around numeric `TextInput`. |
-
----
-
-## API surface (HTTP / REST)
-
-**Not found** — `core/` exposes no HTTP endpoints.
-
----
-
-## Data models
-
-### Runtime SQLite tables (from `client.ts` bootstrap)
-
-| Table | Purpose (inferred from DDL + `types.ts`) |
-|-------|------------------------------------------|
-| `todos` | Todo items with soft delete (`deleted_at`). |
-| `habits` | Habit definitions with `category`, `icon`, `color`, soft delete. |
-| `habit_completions` | Per-habit per-day counts; `UNIQUE(habit_id, date_key)`. |
-| `pomodoro_sessions` | Completed timer sessions (no `deleted_at` in DDL). |
-| `workout_routines` | Named routines, soft delete. |
-| `workout_logs` | Completion logs per routine (no `deleted_at` in DDL). |
-| `calorie_entries` | Food/macros/meal/day, soft delete. |
-| `app_meta` | Key/value store (`db_schema_version`, `guest_profile`, etc.). |
-
-### TypeScript types (`core/db/types.ts`)
-
-| Type | Extends / fields |
-|------|------------------|
-| `BaseEntity` | `id`, `created_at`, `updated_at`, `deleted_at` |
-| `Todo` | `title`, `notes`, `completed` (0 \| 1) |
+| Type | Fields |
+|------|--------|
+| `BaseEntity` | `id`, `created_at`, `updated_at`, `deleted_at: string \| null` |
+| `Todo` | BaseEntity + `title`, `notes`, `completed: 0 \| 1` |
 | `HabitCategory` | `"anytime" \| "morning" \| "afternoon" \| "evening"` |
-| `HabitIcon` | Union of string literals (Material icon names) |
-| `Habit` | `name`, `target_per_day`, `reminder_time`, `category`, `icon`, `color` |
-| `HabitCompletion` | `habit_id`, `date_key`, `count`, timestamps |
-| `PomodoroSession` | `started_at`, `ended_at`, `duration_seconds`, `session_type` (`"focus" \| "break"`) |
-| `WorkoutRoutine` | `name`, `description` |
-| `WorkoutLog` | `routine_id`, `notes`, `completed_at` |
-| `CalorieEntry` | `food_name`, macros, `meal_type`, `consumed_on` |
+| `HabitIcon` | Union of Material icon name strings (see file) |
+| `Habit` | BaseEntity + `name`, `target_per_day`, `reminder_time`, `category`, `icon`, `color` |
+| `HabitCompletion` | `id`, `habit_id`, `date_key`, `count`, `created_at`, `updated_at` |
+| `PomodoroSession` | `id`, `started_at`, `ended_at`, `duration_seconds`, `session_type: "focus" \| "break"`, `created_at` |
+| `WorkoutRoutine` | BaseEntity + `name`, `description` |
+| `WorkoutLog` | `id`, `routine_id`, `notes`, `completed_at`, `created_at` |
+| `CalorieEntry` | BaseEntity + `food_name`, `calories`, `protein`, `carbs`, `fats`, `fiber`, `meal_type`, `consumed_on` |
 
-### Sync records (`core/sync/sync.engine.ts`)
-
-| Field | Type |
-|-------|------|
-| `entity` | `string` |
-| `id` | `string` |
-| `updatedAt` | `string` |
-| `operation` | `"create" \| "update" \| "delete"` |
-
-### `001_initial_supabase.sql` (not wired to runtime)
-
-| Object | Definition |
-|--------|------------|
-| `profiles` | `id uuid primary key`, `created_at timestamptz default now()` |
+**SQLite mapping:** Column names use `snake_case`; TS types mirror row shapes returned by `expo-sqlite`.
 
 ---
 
-## Config & environment variables
+## `core/db/schema.sql`
 
-| Item | Location | Notes |
-|------|----------|-------|
-| `app_meta` keys | SQLite | `db_schema_version` (string int), `guest_profile` (JSON serialized `GuestProfile`) |
-| `.env` in `core/` | — | **Not found** |
+Reference snapshot only — **not executed** at runtime. Header states it may lag; authoritative DDL is `bootstrapStatements` + migrations.
 
 ---
 
-## Inter-service communication
+## `core/db/migrations/001_initial_supabase.sql`
 
-| Mechanism | Details |
-|-----------|---------|
-| **Sync engine** | `syncEngine.enqueue(record)` pushes to **in-memory** `queue`; `flush()` calls `adapter.push`. Default **`NoopSyncAdapter`** — no network. |
-| **Remote backend** | **Not implemented** in `core/` — no Supabase/HTTP client here. |
+Postgres-style `profiles` table — **not** run by `client.ts`. Reserved for post-MVP.
 
 ---
 
-## Auth & authorization
+## `core/sync/sync.engine.ts`
 
-| Mechanism | Details |
-|-----------|---------|
-| **Guest profile** | `ensureGuestProfile()` ensures a row in `app_meta` with key `guest_profile` containing JSON `{ id, createdAt }` from `createId("guest")`. **No** passwords, OAuth, or role checks in `core/`. |
-| **Route protection** | **Not found** in `core/` — no auth gate components. |
+### `SyncRecord`
 
----
+```ts
+type SyncRecord = {
+  entity: string;
+  id: string;
+  updatedAt: string;
+  operation: "create" | "update" | "delete";
+};
+```
 
-## Key business logic
+### `SyncAdapter`
 
-| Module | Behavior |
+| Method | Contract |
 |--------|----------|
-| **`getDatabase()`** | Single cached promise; `openDatabaseAsync("superhabits.db")`, then exec bootstrap DDL, then `runMigrations()`. |
-| **`runMigrations()`** | Reads `app_meta.db_schema_version`; applies ALTERs for versions 2 (habits `category`), 3 (habits `icon`, `color`), 4 (`calorie_entries.fiber`), idempotent try/catch. |
-| **`SyncEngine`** | `enqueue` appends; `flush` snapshots queue, pushes via adapter, clears queue. |
-| **`ensureGuestProfile()`** | Returns existing parsed profile or inserts new one. |
-| **`registerServiceWorker()`** | One-shot; web only; registers `/sw.js`. |
-| **`Screen`** | Optional `ScrollView` from gesture-handler; padding toggle. |
-| **`TextField`** | Optional strip non-digits when `unsignedInteger`. |
-| **`NumberStepperField`** | Clamps step between `min` and `max` (default 1–999). |
+| `push(records: SyncRecord[])` | `Promise<void>` |
+| `pull(since: string \| null)` | `Promise<SyncRecord[]>` |
+
+### `NoopSyncAdapter`
+
+| Method | Behavior |
+|--------|----------|
+| `push` | No-op resolve |
+| `pull` | Returns `[]` |
+
+### `SyncEngine`
+
+| Member | Detail |
+|--------|--------|
+| `private queue: SyncRecord[]` | In-memory FIFO list |
+| `constructor(adapter = new NoopSyncAdapter())` | Injectable adapter (future cloud) |
+
+#### `enqueue(record: SyncRecord): void`
+
+- Pushes `record` onto `this.queue`.
+
+#### `async flush(): Promise<void>`
+
+1. If `queue.length === 0`, return.
+2. `snapshot = [...queue]` (shallow copy of array; records are plain objects).
+3. `await this.adapter.push(snapshot)`.
+4. `this.queue = []`.
+
+**If `adapter.push` throws:** `queue` is **not** cleared — snapshot was already taken but assignment step 4 not reached; **queued records remain** for a later flush attempt.
+
+**Call sites for `flush`:** `core/providers/AppProviders.tsx` — only when `isRemoteEnabled()` is true (see below). Otherwise intervals/listeners not registered.
+
+### Exported `syncEngine`
+
+Singleton: `new SyncEngine()` — default noop adapter.
 
 ---
 
-## Background jobs / scheduled tasks
+## `core/auth/guestProfile.ts`
 
-**Not found** in `core/` — no `expo-background-fetch` / `expo-task-manager` usage in these files.
+### `ensureGuestProfile(): Promise<GuestProfile>`
 
----
+`GuestProfile`: `{ id: string; createdAt: string }`.
 
-## Error handling
+**Steps:**
 
-| Location | Behavior |
-|----------|----------|
-| `AppProviders` `useEffect` | `initializeDatabase().catch(...)` → **`console.error("[db] initializeDatabase failed", e)`** |
-| `AppProviders` `useEffect` | `ensureGuestProfile().catch(() => undefined)` — **errors swallowed** |
-| `getDatabase()` | On failure, clears `dbPromise` and rethrows |
-| `core/ui/*` | **Not found** — no explicit error UI |
+1. `getDatabase()`.
+2. `SELECT value FROM app_meta WHERE key = ?` with `["guest_profile"]`.
+3. If row exists → `JSON.parse` and return.
+4. Else: `id = createId("guest")`, `createdAt = new Date().toISOString()`, `INSERT INTO app_meta (key, value) VALUES (?, ?)` with JSON string, return profile.
 
----
+**Errors:** Uncaught if DB throws; caller `AppProviders` uses `.catch(() => undefined)` — **swallows** errors (silent guest failure).
 
-## Testing
-
-| Item | Finding |
-|------|---------|
-| Tests importing `core/` | **Not found** under `tests/` (no `core/` path in test imports at time of writing). |
-| Framework | Vitest (project-wide). |
+**Callers:** `AppProviders`. **Callees:** `getDatabase`, `createId`.
 
 ---
 
-## Deployment
+## `core/providers/AppProviders.tsx`
 
-**Not found** in `core/` — no `Dockerfile`, CI, or IaC. CI runs at repo root (`.github/workflows/ci.yml`).
+### `queryClient`
+
+`new QueryClient()` — default options; **no** global error/retry customization in source.
+
+### Effect 1 — bootstrap (deps: `[]`)
+
+| Order | Call | Error handling |
+|-------|------|----------------|
+| 1 | `initializeDatabase().catch((e) => console.error("[db] initializeDatabase failed", e))` | Log only — **does not rethrow** |
+| 2 | `registerServiceWorker()` | Sync — no await; SW registration is fire-and-forget inside function |
+| 3 | `ensureGuestProfile().catch(() => undefined)` | **Swallowed** |
+
+**Note:** `registerServiceWorker` is not awaited; DB and guest are async with independent error paths.
+
+### Effect 2 — sync flush (deps: `[]`)
+
+1. If `!isRemoteEnabled()` → **return early** (no listeners).
+2. Define `flush`: `void syncEngine.flush().catch((e) => console.error("[sync] flush failed", e))`.
+3. `setInterval(flush, 30_000)`.
+4. If web and `document` defined: `visibilitychange` → when `document.visibilityState === "hidden"`, call `flush`.
+5. `NetInfo.addEventListener`: if `state.isConnected`, call `flush`.
+
+**Cleanup:** `clearInterval`, remove visibility listener, `unsubscribeNetInfo()`.
+
+**Remote default:** `lib/supabase.ts` initializes `remoteMode` to `"disabled"` — **flush machinery is off** unless `setRemoteMode("enabled")` is called (no UI in repo for this at KB time).
+
+### Tree
+
+`GestureHandlerRootView` → `QueryClientProvider` → `children`.
 
 ---
 
-## Quirks
+## `core/pwa/registerServiceWorker.ts`
 
-1. **`schema.sql` vs runtime:** `core/db/schema.sql` **habits** table omits `category`, `icon`, `color` present in **`client.ts`** bootstrap — reference file is **not** the single source of truth. Project rules note `schema.sql` is reference-only.
-2. **Supabase migration file:** `001_initial_supabase.sql` is **not** executed by `client.ts`; comment says “Reserved for post-MVP.”
-3. **React Query:** `QueryClientProvider` wraps the app, but **`AppProviders` does not** pass queries from feature code in this file — **no** `useQuery` usage verified in `core/`.
-4. **Sync:** `flush()` is **not** called automatically from `core/` — queue can grow until something calls `flush()` (project rules: sync queue in-memory only).
-5. **Web vs native:** WAL pragma is **skipped** on `Platform.OS === "web"` in `client.ts`.
-6. **`Button` ghost variant:** Uses `variant === "ghost"` → `bg-slate-200` but label text remains **`text-white`** — may reduce contrast (visual quirk).
+### State
+
+`let registered = false` — prevents double registration.
+
+### `registerServiceWorker(): void`
+
+1. If `registered` or `Platform.OS !== "web"` → return.
+2. If no `serviceWorker` in `navigator` → return.
+3. `new Workbox("/sw.js")`, `wb.register()`, `registered = true`.
+
+**Errors:** Uncaught from `register()` (no try/catch).
 
 ---
 
-## Open questions
+## `core/ui` components
 
-1. Whether **`flush()`** is invoked anywhere on app lifecycle or only manually — **requires** searching the full repo outside `core/`.
-2. Intended use of **`QueryClient`** without feature-level hooks — **not documented** in `core/`.
-3. Whether **`profiles`** in `001_initial_supabase.sql` will map to **`guest_profile`** or replace it — **not specified** in code.
+### `Screen.tsx`
+
+| Prop | Type | Default | Effect |
+|------|------|---------|--------|
+| `children` | `ReactNode` | — | Content |
+| `scroll` | `boolean` | `false` | If true, wraps inner content in `ScrollView` from `react-native-gesture-handler` with `keyboardShouldPersistTaps="always"`, `keyboardDismissMode="on-drag"` |
+| `padded` | `boolean` | `true` | If true, inner `View` uses `px-4 py-3`; if false, `flex-1 bg-slate-50` only |
+
+Outer: `SafeAreaView` with `flex-1 bg-slate-50`.
+
+### `Button.tsx`
+
+| Prop | Type | Default | Effect |
+|------|------|---------|--------|
+| `label` | `string` | — | Button text |
+| `onPress` | `() => void` | — | Handler |
+| `variant` | `"primary" \| "ghost" \| "danger"` | `"primary"` | See class table below |
+
+**Variant → `Pressable` container `className` (concat after `rounded-xl px-4 py-3`):**
+
+| Variant | Container classes |
+|---------|-------------------|
+| primary | `bg-brand-500` |
+| danger | `bg-rose-500` |
+| ghost | `bg-slate-200 dark:bg-slate-700` |
+
+**Variant → label `Text` classes:**
+
+| Variant | Label classes |
+|---------|---------------|
+| primary | `text-white` |
+| danger | `text-white` |
+| ghost | `text-slate-900 dark:text-slate-100` |
+
+Shared: `text-center font-semibold`.
+
+### `Card.tsx`
+
+| Prop | Effect |
+|------|--------|
+| `children` | Wrapped in `View` with `mb-3 rounded-2xl bg-white p-4 shadow-sm` |
+
+### `TextField.tsx`
+
+| Prop | Type | Default | Effect |
+|------|------|---------|--------|
+| `label` | `string` | — | Label above input |
+| `value` / `onChangeText` | Controlled | — | Passed to `TextInput` |
+| `placeholder` | `string` | optional | |
+| `keyboardType` | `"default" \| "numeric" \| "number-pad"` | `"default"` | Overridden when `unsignedInteger` |
+| `unsignedInteger` | `boolean` | `false` | If true: `keyboardType` → `number-pad`; `onChangeText` receives `text.replace(/\D/g, "")` — **digits only** |
+
+### `SectionTitle.tsx`
+
+| Prop | Effect |
+|------|--------|
+| `title` | Large bold title |
+| `subtitle` | Optional smaller text below; if absent, no subtitle margin |
+
+### `NumberStepperField.tsx`
+
+| Prop | Type | Default | Effect |
+|------|------|---------|--------|
+| `label` | `string` | — | |
+| `value` / `onChange` | `string` / `(value: string) => void` | — | **String** contract — parent stores numeric as string |
+| `min` | `number` | `1` | Clamp lower bound for ± buttons |
+| `max` | `number` | `999` | Clamp upper bound |
+| `placeholder` | `string` | `"1"` | |
+
+**Clamp logic:** `num = Number(value)`; `validNum = Number.isFinite(num) ? num : min`. Minus: `Math.max(min, validNum - 1)`; Plus: `Math.min(max, validNum + 1)`. **Direct `TextInput` edits** call `onChange` with raw string — **no clamp** on manual typing until user taps ±.
+
+**`onBlur`:** The `TextInput` has **no** `onBlur` prop — **no onBlur — raw string persists until ± tap** (or parent-driven `value` change).
+
+**Direct-edit edge cases** (parent receives via `onChange` = `onChangeText` passthrough):
+
+| User types | `Number(value)` | `validNum` on next ± press | Effect of **−** (default `min=1`) | Effect of **+** |
+|------------|-----------------|----------------------------|-----------------------------------|-----------------|
+| `""` | `0` | `0` | `Math.max(1, -1)` → **`"1"`** | `Math.min(999, 1)` → **`"1"`** |
+| `"0"` | `0` | `0` | same → **`"1"`** | same → **`"1"`** |
+| `"abc"` | `NaN` | `min` (`1`) | `Math.max(1, 0)` → **`"1"`** | `Math.min(999, 2)` → **`"2"`** |
+
+Until ± is pressed, **`"0"`**, **`""`**, `"abc"` remain in parent state as typed (invalid numeric display allowed).
+
+---
+
+## SQL not in `client.ts`
+
+All feature-layer SQL is documented in [04_FEATURES.md](./04_FEATURES.md).
+
+---
+
+## Known bugs / quirks
+
+| Issue | Location | Detail |
+|-------|----------|--------|
+| **schema.sql lag** | `core/db/schema.sql` | Missing `category`, `icon`, `color` on habits vs bootstrap — reference only |
+| **Guest failure silent** | `AppProviders` + `ensureGuestProfile` | Errors swallowed |
+| **Sync queue growth** | `SyncEngine` + remote off | Enqueues still run; flush only when remote enabled |

@@ -2,172 +2,122 @@
 
 ## Scope
 
-This document covers the **`lib/`** directory: cross-cutting utilities for **IDs**, **timestamps and date keys**, **local notifications**, and a **remote-mode stub** for future cloud work.
+`lib/id.ts`, `lib/time.ts`, `lib/notifications.ts`, `lib/supabase.ts` — cross-cutting utilities (no React).
 
 ---
 
-## Purpose
+## `lib/id.ts`
 
-**What it does:** Centralizes small, reusable helpers so feature `*.data.ts` and a few other modules do not duplicate ID/time logic or notification setup.
+### `createId(prefix: string): string`
 
-**Problem it solves:** Consistent ID shape for SQLite rows, ISO timestamps for `created_at`/`updated_at`, a single place to configure `expo-notifications` behavior, and a placeholder for future Supabase/remote toggles.
+**Implementation (exact):**
 
----
+```ts
+const random = Math.random().toString(36).slice(2, 10);
+return `${prefix}_${Date.now()}_${random}`;
+```
 
-## Tech stack
+**Algorithm:** `{prefix}_{Date.now() as ms}_{8 chars from base36 random}`.
 
-| File | Dependencies / APIs |
-|------|---------------------|
-| `id.ts` | Pure TypeScript (uses `Math.random`, `Date.now`) |
-| `time.ts` | Pure TypeScript (`Date`) |
-| `notifications.ts` | `expo-notifications`, `react-native` `Platform` |
-| `supabase.ts` | Pure TypeScript (module state only) |
+**Properties:**
 
-**Not used in `lib/`:** `uuid` npm package (listed in root `package.json` but **no** `import` from `"uuid"` in source files searched).
+- **Not cryptographically strong** — `Math.random()` is predictable; acceptable for local-only row IDs and sync keys in MVP.
+- **Collision risk:** Extremely low for single-device ms + 8 chars; not formally guaranteed unique across distributed writers without extra checks.
 
----
+**Callers:** `features/*/*.data.ts`, `core/auth/guestProfile.ts`.
 
-## Architecture pattern
+**Callees:** None.
 
-**Shared utility library** (flat folder, no package boundary) consumed via path alias `@/lib/*`. **Not** a standalone npm package or microservice.
+**Errors:** Does not throw.
 
----
-
-## Entry points
-
-| Exporting module | Exported symbols |
-|------------------|------------------|
-| `lib/id.ts` | `createId(prefix: string): string` |
-| `lib/time.ts` | `nowIso(): string`, `toDateKey(date?: Date): string` |
-| `lib/notifications.ts` | Side effect: `Notifications.setNotificationHandler` at import time; `ensureNotificationPermission()`, `scheduleTimerEndNotification(seconds, title, body)` |
-| `lib/supabase.ts` | `RemoteMode`, `setRemoteMode(mode)`, `isRemoteEnabled()` |
+**Documented prefixes (comment in file):** `todo`, `habit`, `hcmp`, `cal`, `wrk`, `pom`, `guest`.
 
 ---
 
-## Folder structure
+## `lib/time.ts`
 
-| Path | Role |
-|------|------|
-| `lib/id.ts` | ID factory with documented prefix convention (comment table). |
-| `lib/time.ts` | ISO “now” and YYYY-MM-DD date key. |
-| `lib/notifications.ts` | Permission + Android channel + scheduled timer notification. |
-| `lib/supabase.ts` | In-memory `remoteMode` flag; comment references future Supabase client. |
+### `nowIso(): string`
 
----
+- Returns `new Date().toISOString()` — UTC ISO 8601.
 
-## API surface (HTTP / REST)
+**Callers:** All `*.data.ts` files for `created_at` / `updated_at` / log timestamps.
 
-**Not found** — `lib/` exposes no HTTP endpoints.
+### `toDateKey(date = new Date()): string`
 
-### Public functions (library API)
+- Returns `date.toISOString().slice(0, 10)` — **UTC calendar date** `YYYY-MM-DD`.
 
-| Function | Inputs | Output / behavior |
-|----------|--------|-------------------|
-| `createId` | `prefix: string` | String `{prefix}_{Date.now()}_{8 base36 chars}` (see implementation). |
-| `nowIso` | — | `new Date().toISOString()`. |
-| `toDateKey` | Optional `Date` (default `new Date()`) | First 10 chars of `toISOString()` → `YYYY-MM-DD` in **UTC**. |
-| `ensureNotificationPermission` | — | `Promise<boolean>` — reads permission, may request, sets Android `"default"` channel on Android. |
-| `scheduleTimerEndNotification` | `seconds`, `title`, `body` | Returns `null` if permission denied; else `scheduleNotificationAsync` with `TIME_INTERVAL` trigger. |
-| `setRemoteMode` | `"disabled" \| "enabled"` | Sets module-level `remoteMode`. |
-| `isRemoteEnabled` | — | `true` iff `remoteMode === "enabled"`. |
+**Known bug (do not fix silently — coordinate migration):**
 
----
+| Symptom | User in UTC+8 at local 23:00 Monday | `toISOString()` date |
+|---------|--------------------------------------|------------------------|
+| “Today” vs key | Still Monday locally | May already be **Tuesday** UTC → `date_key` / `consumed_on` is Tuesday |
 
-## Data models
+**Blast radius:**
 
-**Not found** — no interfaces/types exported except `RemoteMode` in `supabase.ts` (and implicit notification handler return shape inside `expo-notifications`).
+| Area | Column | Effect |
+|------|--------|--------|
+| Habits | `habit_completions.date_key` | Completions bucketed to wrong calendar day vs user expectation |
+| Calories | `calorie_entries.consumed_on` | “Today’s” list can show wrong day near midnight |
+| `listCalorieEntries()` / habit defaults | Default `toDateKey()` | Same |
 
----
+**Migration to local dates would require:**  
+- Replace `toDateKey()` implementation to use local YYYY-MM-DD (e.g. `getFullYear`, `getMonth`, `getDate`).  
+- **Existing rows:** historical `date_key` / `consumed_on` values are UTC-based — backfill or accept discontinuity; any report comparing “calendar days” would need one-time script or versioned interpretation.  
+- **Tests / docs:** update any assumption of UTC keys.  
+- **Coordination:** project rules flag silent fixes — must be explicit team decision.
 
-## Config & environment variables
-
-**Not found** in `lib/` — no `.env` reads or config files.
+**Call sites:** See [00_INDEX.md](./00_INDEX.md) cross-feature map.
 
 ---
 
-## Inter-service communication
+## `lib/notifications.ts`
 
-| Item | Details |
-|------|---------|
-| **Remote / Supabase** | **Stub only** — `isRemoteEnabled` / `setRemoteMode` are **not** imported elsewhere in the repo (grep); no HTTP or SDK calls. |
-| **Notifications** | Uses **local** `expo-notifications` scheduling only. |
+### Import-time side effect
 
----
+`Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }) })` — runs when module loads.
 
-## Auth & authorization
+### `ensureNotificationPermission(): Promise<boolean>`
 
-**Not found** — `lib/` does not implement user auth. `createId("guest")` is used from `core/auth/guestProfile.ts` for local guest profile IDs.
+1. `getPermissionsAsync()` — if `granted`, return `true`.
+2. `requestPermissionsAsync()`.
+3. On Android: `setNotificationChannelAsync("default", { name: "default", importance: HIGH })`.
+4. Return `request.status === "granted"`.
 
----
+**Throws:** Delegates to expo-notifications (network/storage errors possible).
 
-## Key business logic
+### `scheduleTimerEndNotification(seconds: number, title: string, body: string)`
 
-| Unit | Behavior |
-|------|----------|
-| **`createId`** | Builds unique string IDs from prefix + millisecond timestamp + pseudo-random alphanumeric segment (`Math.random().toString(36).slice(2, 10)`). |
-| **`toDateKey`** | Derives calendar date string from **UTC** ISO string slice — **not** local timezone (see Quirks). |
-| **`notifications` module load** | Registers global handler: sound on, banner/list on, badge off. |
-| **`scheduleTimerEndNotification`** | Ensures permission, then schedules a one-shot interval notification. |
+1. `ensureNotificationPermission()`.
+2. If not allowed → return `null`.
+3. Else `scheduleNotificationAsync` with `trigger: { type: TIME_INTERVAL, seconds }`.
 
----
+**Returns:** `Promise` of notification id or `null`.
 
-## Background jobs / scheduled tasks
-
-**Not found** as cron/background-fetch. **`scheduleTimerEndNotification`** schedules a **local notification** after N seconds via Expo (not a server push).
+**Callers:** `PomodoroScreen` on timer start.
 
 ---
 
-## Error handling
+## `lib/supabase.ts`
 
-| Location | Behavior |
-|----------|----------|
-| `ensureNotificationPermission` / `scheduleTimerEndNotification` | No try/catch in file — errors propagate to callers. |
-| `scheduleTimerEndNotification` | Returns **`null`** when permission not granted (no throw). |
+### Types and state
 
----
+- `export type RemoteMode = "disabled" | "enabled"`
+- `let remoteMode: RemoteMode = "disabled"`
 
-## Testing
+### `setRemoteMode(mode: RemoteMode): void`
 
-| Item | Finding |
-|------|---------|
-| Tests importing `@/lib/` | **Not found** under `tests/` at time of writing. |
-| Indirect coverage | Domain tests may exercise logic that **does not** import `lib/` directly. |
+- Assigns module-level `remoteMode`.
 
----
+### `isRemoteEnabled(): boolean`
 
-## Deployment
+- Returns `remoteMode === "enabled"`.
 
-**Not found** — `lib/` has no deploy artifacts.
+**Callers:** `AppProviders` (gates sync flush listeners).
+
+**Post-MVP:** Comment in file references future Supabase client — **no** Supabase imports in app source at KB time.
 
 ---
 
-## Quirks
+## Architecture
 
-1. **`toDateKey` and UTC:** Uses `date.toISOString().slice(0, 10)`, so the “date” reflects **UTC**, not the device’s local calendar. Workspace rules flag this as a **known issue** if date handling is changed without coordination.
-2. **`createId` randomness:** Uses **`Math.random()`**, not `crypto` or `uuid` package — matches small helper style but is weaker than cryptographically strong IDs (acceptable for local-only IDs; project rules still mandate this helper over ad-hoc IDs).
-3. **`lib/supabase.ts` name:** File suggests Supabase; implementation is only **remote mode toggles** — **no** Supabase client.
-4. **`notifications.ts` side effects:** Importing the module runs **`setNotificationHandler`** immediately — any import path pulls in notification configuration.
-5. **`uuid` dependency:** Declared in `package.json` but **unused** in application source (per grep).
-
----
-
-## Consumers (observed import graph)
-
-| Importer | Imports from `lib/` |
-|----------|---------------------|
-| `core/auth/guestProfile.ts` | `createId` |
-| `features/todos/todos.data.ts` | `createId`, `nowIso` |
-| `features/habits/habits.data.ts` | `createId`, `nowIso`, `toDateKey` |
-| `features/pomodoro/pomodoro.data.ts` | `createId`, `nowIso` |
-| `features/workout/workout.data.ts` | `createId`, `nowIso` |
-| `features/calories/calories.data.ts` | `createId`, `nowIso`, `toDateKey` |
-| `features/pomodoro/PomodoroScreen.tsx` | `scheduleTimerEndNotification` |
-
-**No importers found** for `setRemoteMode` / `isRemoteEnabled` outside `lib/supabase.ts`.
-
----
-
-## Open questions
-
-1. Whether **`uuid`** will replace or complement **`createId`** — **not decided in code** (package present, unused).
-2. Whether **`remoteMode`** will be wired to settings UI or sync — **no** references yet.
+Flat utilities consumed as `@/lib/*`. **No** HTTP surface.

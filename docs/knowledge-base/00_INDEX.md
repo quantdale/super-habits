@@ -1,153 +1,183 @@
 # 00_INDEX.md
 
-**Knowledge-base location:** generated section files live under `docs/knowledge-base/` in this repository. **Master summary:** [KNOWLEDGE_BASE.md](./KNOWLEDGE_BASE.md).
-
-## Repositories / modules (full inventory)
-
-**Repository:** `superhabits` — single npm/Expo app package (offline-first productivity client; README describes MVP modules: todos, habits, pomodoro, workout, calories).
-
-| Path | One-sentence description |
-|------|---------------------------|
-| `.cursor/` | Cursor IDE project metadata: rules, agent prompts, slash commands, and skills for DB/sync, feature layout, and RN/Expo conventions. |
-| `.cursor/agents/` | Markdown agent instruction files (e.g. data-agent, feature-agent). |
-| `.cursor/commands/` | Reusable command docs (e.g. new-feature, audit, check, fix-data, fix-ui, new-migration). |
-| `.cursor/rules/` | Workspace rules (e.g. `superhabits-rules.mdc`) encoding project invariants and conventions. |
-| `.cursor/skills/` | Packaged skills (`db-and-sync-invariants`, `feature-module-pattern`, `rn-expo-conventions`) with `SKILL.md` files. |
-| `.devcontainer/` | VS Code Dev Container definition (Node-based image, port 8081 for Expo Metro, `npm install` on create). |
-| `.github/` | GitHub configuration; contains `workflows/` for CI. |
-| `.github/workflows/` | CI workflow (`ci.yml`) running install, typecheck, and tests. |
-| `.vscode/` | Present as a directory in the repo root (contents not enumerated in discovery pass; may be empty or tooling-specific). |
-| `app/` | Expo Router file-based routes: root layout, index redirect, tab layout, and thin tab route files that mount feature screens. |
-| `app/(tabs)/` | Tab navigator routes (e.g. todos, habits, pomodoro, workout, calories). |
-| `assets/` | Directory present for Expo `app.json` references (icons, splash, favicon paths); file listing in discovery did not enumerate individual asset files. |
-| `core/` | Shared application infrastructure: database, sync, auth/guest profile, UI primitives, providers, PWA helpers. |
-| `core/auth/` | Guest profile persistence/ensure logic (`guestProfile.ts`). |
-| `core/db/` | SQLite via `expo-sqlite`: singleton client, bootstrap DDL, `types.ts`, reference `schema.sql`, and `migrations/` SQL artifacts. |
-| `core/db/migrations/` | SQL migration/reference file(s) (e.g. `001_initial_supabase.sql`). |
-| `core/providers/` | React app-level providers (e.g. DB init, PWA registration, guest profile). |
-| `core/pwa/` | Web/PWA support (e.g. service worker registration). |
-| `core/sync/` | In-app sync engine (`sync.engine.ts`) with adapter interface and default noop adapter + exported `syncEngine` singleton. |
-| `core/ui/` | Reusable RN UI components (Screen, Button, Card, TextField, etc.). |
-| `dist/` | Build output directory (present at repo root; typically generated). |
-| `features/calories/` | Calorie tracking: screen, `.data.ts` (SQLite), `.domain.ts` (pure logic). |
-| `features/habits/` | Habit tracking: screen, components (e.g. progress ring, circle), presets, `.data.ts`, `.domain.ts`. |
-| `features/pomodoro/` | Pomodoro timer: screen, `.data.ts`, `.domain.ts`. |
-| `features/todos/` | Todo list: screen, `.data.ts`. |
-| `features/workout/` | Workout routines/logs: screen, `.data.ts`. |
-| `lib/` | Cross-cutting utilities: ID generation, time/date helpers, local notifications wrapper, remote-mode stub for future Supabase (`supabase.ts`). |
-| `node_modules/` | Installed npm dependencies (third-party; not application source). |
-| `patches/` | `patch-package` patches for dependencies (e.g. Metro-related packages). |
-| `public/` | Static web assets served with the app (e.g. `sw.js` for service worker). |
-| `tests/` | Vitest unit tests for `*.domain.ts` and selected data tests. |
-| Root files | `package.json`, `app.json`, `App.tsx`, `index.ts`, `babel.config.js`, `metro.config.js`, `tailwind.config.js`, `global.css`, `vitest.config.ts`, `tsconfig.json`, `README.md`, `CODEBASE_KNOWLEDGE.md`, `nativewind-env.d.ts`, `expo-env.d.ts`, `.gitignore`. |
-
-**Not found:** Separate backend service repo, Go/Rust/Java/Python service roots (`go.mod`, `Cargo.toml`, `pom.xml`, `requirements.txt` at root), Dockerfiles, Terraform/IaC at repository root, additional `package.json` workspaces.
+**Knowledge-base location:** `docs/knowledge-base/`. **Master summary:** [KNOWLEDGE_BASE.md](./KNOWLEDGE_BASE.md).
 
 ---
 
-## Functional groupings
+## Repository identity
 
-| Grouping | What belongs here (in this repo) |
-|----------|----------------------------------|
-| **Frontend / client application** | `app/`, `features/`, `core/ui/`, `core/providers/`, `App.tsx` (legacy sample), `global.css`, NativeWind/Tailwind config. |
-| **Data & persistence** | `core/db/`, feature `*.data.ts` files, `core/sync/`. |
-| **Auth & identity (local)** | `core/auth/` (guest profile), `lib/supabase.ts` (remote mode stub only; no Supabase client in source). |
-| **PWA / web** | `core/pwa/`, `public/sw.js`, `workbox-window` dependency, Expo web static output settings in `app.json`. |
-| **Backend / API server** | **Not found** in this repository (no HTTP server implementation discovered). |
-| **Infrastructure / deployment** | **Not found** — no Dockerfile or cloud deploy configs in discovery; `.github/workflows/ci.yml` provides CI only. |
-| **Tooling & DX** | `.devcontainer/`, `.github/workflows/`, `patches/`, `vitest.config.ts`, `babel.config.js`, `metro.config.js`, `tsconfig.json`, `.cursor/*`. |
-| **Documentation** | `README.md`, `CODEBASE_KNOWLEDGE.md`, `.cursor` skills/rules/commands. |
+| Attribute | Value |
+|-----------|--------|
+| **Name** | `superhabits` (npm package, private) |
+| **Purpose** | Offline-first Expo + React Native client; five modules: todos, habits, pomodoro, workout, calories |
+| **Entry** | `package.json` → `"main": "expo-router/entry"` |
+| **Schema version (stored)** | `4` (`app_meta.db_schema_version`) |
+| **Next migration** | `5` (new `if (version < 5)` block in `core/db/client.ts` → `runMigrations`) |
 
 ---
 
-## High-level tech stack (inferred from manifests and configs)
+## Top-level directory map
 
-- **Runtime / framework:** Node.js (CI uses 20; devcontainer image Node 22); **Expo SDK ~55**, **React 19**, **React Native 0.83**, **expo-router** for navigation.
-- **Language:** **TypeScript 5.9** (strict), path alias `@/*` → repo root.
-- **Styling:** **NativeWind 4** + **Tailwind CSS 3** (`tailwind.config.js`, `global.css`).
-- **Local database:** **expo-sqlite** (WAL mentioned for non-web in `core/db/client.ts`).
-- **Testing:** **Vitest** 3, Node environment (`vitest.config.ts`).
-- **PWA:** **workbox-window**; custom `public/sw.js`.
-- **Other notable deps:** `@shopify/flash-list`, `react-native-reanimated`, `react-native-gesture-handler`, `react-native-svg`, `expo-notifications`, `expo-file-system`, `uuid` (package.json; usage not verified in Stage 0).
-- **Declared but not verified in Stage 0 as “actively used” in app code:** `@tanstack/react-query`, `zustand`, `date-fns`, `expo-background-fetch`, `expo-task-manager` (project rules state some are intentionally unused).
+| Path | Role |
+|------|------|
+| `app/` | Expo Router routes: root layout, index redirect, `(tabs)` layout + thin tab route files |
+| `assets/` | Icons, splash, favicon (referenced from `app.json`) |
+| `core/` | DB singleton, types, sync engine, guest profile, `AppProviders`, PWA registration, shared `ui/` |
+| `features/` | Feature modules: `{name}.data.ts`, `{name}Screen.tsx`, optional `{name}.domain.ts`, `types.ts` re-exports |
+| `lib/` | `id`, `time`, `notifications`, `supabase` (remote stub) |
+| `public/` | Web static assets; `sw.js` service worker |
+| `tests/` | Vitest unit tests (domain-focused; one skipped data stub) |
+| `patches/` | `patch-package` overrides for `node_modules` |
+| `.github/workflows/` | CI (`ci.yml`) |
+| `.devcontainer/` | VS Code Dev Container (Node image, port 8081) |
+| `.cursor/` | Rules, agents, commands, skills (not modified by KB; described in [06_EDITOR_AND_DOCS.md](./06_EDITOR_AND_DOCS.md)) |
+
+**Not present:** Backend API server, Docker deploy config, monorepo workspaces, root `CODEBASE_KNOWLEDGE.md` (verify if added later).
 
 ---
 
-## Dependency map (internal modules)
+## Cross-feature interaction map
 
-Plain-text summary:
+### `toDateKey()` (`lib/time.ts`)
 
-- **`app/*`** imports **`core/providers`**, **`features/*/`*Screen***, and Expo Router primitives; **`app/index.tsx`** redirects to **`/(tabs)/todos`**.
-- **`features/*/*.data.ts`** import **`core/db/client`**, **`core/db/types`**, **`lib/id`**, **`lib/time`**, and some enqueue **`core/sync/sync.engine`** (`syncEngine`).
-- **`features/*/*Screen.tsx`** import **`core/ui/*`** and **`core/db/types`** and respective **`.data` / `.domain`** modules.
-- **`core/providers/AppProviders.tsx`** imports **`core/db/client`** (initialize), **`core/pwa/registerServiceWorker`**, **`core/auth/guestProfile`**.
-- **`core/auth/guestProfile.ts`** imports **`core/db/client`**.
-- **`lib/supabase.ts`** exports remote mode toggles only; **no imports from other app modules** observed in Stage 0 snippet.
+| Consumer | Call pattern | Column / effect |
+|----------|--------------|-----------------|
+| `features/habits/habits.data.ts` | Default arg on `incrementHabit`, `decrementHabit`, `getHabitCountByDate` | `habit_completions.date_key` |
+| `features/calories/calories.data.ts` | Default on `listCalorieEntries`; `addCalorieEntry` uses `input.consumedOn ?? toDateKey()` | `calorie_entries.consumed_on` |
 
-Mermaid (logical dependency direction):
+**No other features** call `toDateKey()` directly. Habits UI does not pass a custom date — always “today” per helper defaults.
+
+### `syncEngine.enqueue()` (`core/sync/sync.engine.ts`)
+
+| File | Entity string | Operations | Notes |
+|------|-----------------|------------|--------|
+| `features/todos/todos.data.ts` | `todos` | create, update, delete | After every mutating write |
+| `features/habits/habits.data.ts` | `habits` | create, update, delete | Completions **not** enqueued |
+| `features/calories/calories.data.ts` | `calorie_entries` | create, delete | |
+| `features/workout/workout.data.ts` | `workout_routines` | create, delete | `completeRoutine` (logs) **not** enqueued |
+
+**Intentionally not synced:** `pomodoro_sessions`, `workout_logs`, `habit_completions` (per project rules).
+
+### `useFocusEffect` (expo-router)
+
+| Screen | Purpose |
+|--------|---------|
+| `TodosScreen` | `listTodos` → `setItems` on tab focus |
+| `HabitsScreen` | `refresh` (habits + completion map) |
+| `WorkoutScreen` | `refresh` (routines + logs) |
+| `CaloriesScreen` | `refresh` (entries for current date key) |
+
+**Not used:** `PomodoroScreen` (history loaded via `useEffect` on `historyVersion` only).
+
+### Type imports: `core/db/types` vs feature `types.ts`
+
+| Feature | `types.ts` |
+|---------|------------|
+| todos | `export type { Todo } from "@/core/db/types"` |
+| habits | Re-exports `Habit`, `HabitCategory`, `HabitIcon` |
+| pomodoro | Re-exports `PomodoroSession` |
+| workout | Re-exports `WorkoutLog`, `WorkoutRoutine` |
+| calories | Re-exports `CalorieEntry`; local `MealType`, `CalorieEntryTotals` |
+
+Screens import `./types` or `@/core/db/types` depending on file; semantics align with SQLite rows.
+
+---
+
+## Tech stack (pinned)
+
+| Layer | Choices |
+|-------|---------|
+| **Framework** | Expo SDK ~55, React 19, React Native 0.83, TypeScript 5.9 strict |
+| **Navigation** | expo-router (file routes), `expo-router/ui` for custom tabs |
+| **DB** | expo-sqlite; WAL on native (`PRAGMA journal_mode = WAL`), omitted on web bootstrap |
+| **Styling** | NativeWind 4 + Tailwind 3; `global.css` → `nativewind/metro` |
+| **Lists** | `@shopify/flash-list` 2.x (Todos only) |
+| **Testing** | Vitest 3, Node environment, `@/` alias |
+| **PWA (web)** | `workbox-window` registers `public/sw.js` |
+
+**CI Node:** 20 (`.github/workflows/ci.yml`). **Devcontainer Node:** 22 image (`.devcontainer/devcontainer.json`) — intentional mismatch with CI.
+
+---
+
+## Dependency inventory (from `package.json`)
+
+Legend: **Active** = imported from app/library source; **Dormant** = installed per rules but no feature hooks; **Unused** = no `import` found in `*.ts` / `*.tsx` at KB write time.
+
+### `dependencies`
+
+| Package | Version | Role | Import locus / verdict |
+|---------|---------|------|-------------------------|
+| `@expo/vector-icons` | ^15.0.2 | Material icons in tabs, screens, habit circles | Active |
+| `@react-native-community/netinfo` | 11.5.2 | `NetInfo.addEventListener` in `AppProviders` → flush sync when online | Active |
+| `@shopify/flash-list` | 2.0.2 | `TodosScreen` list | Active |
+| `@tanstack/react-query` | ^5.90.21 | `QueryClient` + `QueryClientProvider` in `AppProviders` | **Wired; dormant** (no `useQuery` / `useMutation` in features) |
+| `date-fns` | ^4.1.0 | — | **Declared; unused** in source |
+| `expo` | ~55.0.5 | SDK | Active (transitive) |
+| `expo-background-fetch` | ^55.0.9 | — | **Declared; unused** |
+| `expo-file-system` | ^55.0.10 | — | **Declared; unused** in `*.ts`/`*.tsx` |
+| `expo-notifications` | ^55.0.11 | `lib/notifications.ts` | Active |
+| `expo-router` | ^55.0.4 | Routes, `Redirect`, `useFocusEffect`, `Tabs`/`TabTrigger`/`TabSlot` | Active |
+| `expo-sqlite` | ^55.0.10 | `core/db/client.ts` | Active |
+| `expo-status-bar` | ~55.0.4 | `app/_layout.tsx` | Active |
+| `expo-task-manager` | ^55.0.9 | — | **Declared; unused** |
+| `nativewind` | ^4.2.2 | Babel preset + Metro `withNativeWind` | Active (tooling) |
+| `react` / `react-dom` | 19.2.0 | UI | Active |
+| `react-native` | 0.83.2 | UI | Active |
+| `react-native-gesture-handler` | ^2.30.0 | `ScrollView` in `Screen`, `Pressable` in `Button`, `GestureHandlerRootView` | Active |
+| `react-native-reanimated` | 4.2.1 | Babel plugin | Active (tooling) |
+| `react-native-safe-area-context` | ~5.6.2 | Transitive / Expo | Active |
+| `react-native-screens` | ~4.23.0 | Expo Router stack | Active |
+| `react-native-svg` | 15.15.3 | `ProgressRing.tsx` | Active |
+| `react-native-web` | ^0.21.0 | Web target | Active |
+| `tailwindcss` | ^3.4.19 | Tailwind binary for NativeWind | Active (tooling) |
+| `uuid` | ^13.0.0 | — | **Declared; unverified** — IDs use `lib/id.ts` `createId`, not `uuid` |
+| `workbox-window` | ^7.4.0 | `registerServiceWorker.ts` | Active (web only) |
+| `zustand` | ^5.0.11 | — | **Declared; dormant** |
+
+### `devDependencies`
+
+| Package | Version | Role |
+|---------|---------|------|
+| `@expo/metro-runtime` | ~55.0.6 | Metro / Expo web |
+| `@types/react` | ~19.2.2 | TypeScript types |
+| `babel-preset-expo` | ^55.0.10 | `babel.config.js` |
+| `cross-env` | ^10.1.0 | `EXPO_UNSTABLE_HEADLESS=1` for `npm run web` |
+| `patch-package` | ^8.0.1 | `postinstall`; applies `patches/*` |
+| `typescript` | ~5.9.2 | `tsc` |
+| `vitest` | ^3.2.4 | `npm test` |
+
+---
+
+## Internal module dependency (summary)
 
 ```mermaid
 flowchart TB
-  subgraph entry["Entry"]
-    ER["expo-router entry (package.json main)"]
-  end
-  subgraph app["app/"]
-    Routes["Layouts + tab routes"]
-  end
-  subgraph features["features/*"]
-    FData["*.data.ts"]
-    FDomain["*.domain.ts"]
-    FUI["*Screen.tsx + components"]
-  end
-  subgraph core["core/"]
-    DB["db/client + types"]
-    Sync["sync/sync.engine"]
-    Auth["auth/guestProfile"]
-    Prov["providers/AppProviders"]
-    PWA["pwa/"]
-    UI["ui/"]
-  end
-  subgraph lib["lib/"]
-    Id["id.ts"]
-    Time["time.ts"]
-    Notif["notifications.ts"]
-    Rem["supabase.ts (remote stub)"]
-  end
-  ER --> app
-  app --> Prov
-  app --> features
-  FUI --> UI
-  FUI --> FData
-  FUI --> FDomain
-  FData --> DB
-  FData --> Id
-  FData --> Time
-  FData --> Sync
-  FDomain --> DB
-  Prov --> DB
-  Prov --> PWA
-  Prov --> Auth
-  Auth --> DB
+  ER["package.json main: expo-router/entry"]
+  APP["app/_layout.tsx → AppProviders"]
+  FEAT["features/* Screen + data + domain"]
+  CORE["core/db + sync + auth + ui + providers"]
+  LIB["lib/id + time + notifications + supabase"]
+  ER --> APP --> FEAT
+  FEAT --> CORE
+  FEAT --> LIB
+  CORE --> LIB
 ```
 
 ---
 
-## Documentation order for Stages 1–N (proposed)
+## Documentation order (reference)
 
-Groups will be documented **one at a time** after confirmation, in this order:
-
-1. **`APP_ROUTING`** — `app/` (Expo Router shell, tabs, entry redirect) and relationship to `package.json` main / legacy `App.tsx` + `index.ts`.
-2. **`CORE_INFRA`** — `core/` (database client & types, migrations reference, sync engine, guest auth, providers, PWA, UI kit).
-3. **`LIB_SHARED`** — `lib/` (IDs, time, notifications, remote-mode stub).
-4. **`FEATURES`** — `features/todos`, `features/habits`, `features/pomodoro`, `features/workout`, `features/calories` (screens, data, domain).
-5. **`QA_AND_TOOLING`** — `tests/`, `.github/workflows/`, `patches/`, `.devcontainer/`, root build/test configs (`vitest`, `babel`, `metro`, `tsconfig`, `tailwind`).
-6. **`EDITOR_AND_DOCS`** — `.cursor/` (rules, skills, commands, agents) and top-level docs (`README.md`, `CODEBASE_KNOWLEDGE.md`); optional note on `assets/` and `public/` if treated as static deliverables.
+1. [01_APP_ROUTING.md](./01_APP_ROUTING.md) — routes and tab shell  
+2. [02_CORE_INFRA.md](./02_CORE_INFRA.md) — DB, sync, providers, UI kit  
+3. [03_LIB_SHARED.md](./03_LIB_SHARED.md) — shared libraries  
+4. [04_FEATURES.md](./04_FEATURES.md) — feature modules  
+5. [05_QA_AND_TOOLING.md](./05_QA_AND_TOOLING.md) — tests, CI, configs, SW, patches  
+6. [06_EDITOR_AND_DOCS.md](./06_EDITOR_AND_DOCS.md) — Cursor assets, README  
 
 ---
 
-## Discovery notes (strict, no assumptions)
+## Discovery notes
 
-- **Single repository** only; no monorepo packages beyond the root `package.json`.
-- **`.env` files:** **Not found** in the working tree (`.gitignore` allows ignoring `.env*.local`).
-- **Docker:** **Not found.**
-- **`assets/`:** Directory exists; individual files were not listed in the automated listing used during discovery — asset **filenames** are **Not found** in this index unless enumerated in a later pass.
+- **`.env`:** not committed; `.gitignore` may ignore `.env*.local`.  
+- **HTTP API:** none in repo.  
+- **`schema.sql`:** reference only; runtime DDL is `bootstrapStatements` + `runMigrations` in `core/db/client.ts`.
