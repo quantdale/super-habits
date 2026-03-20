@@ -5,15 +5,42 @@ on:
     branches: ["**"]
   pull_request:
 
+# Cancel any in-progress run for the same branch/PR when a new commit is pushed.
+# This prevents redundant runs when you push quick follow-up commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test
+
+      # Cache node_modules keyed on the lockfile hash.
+      # patch-package runs on postinstall, so this also caches patched modules.
+      # Cache is invalidated automatically whenever package-lock.json changes.
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      # Only run npm ci (+ patch-package postinstall) on cache miss.
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
