@@ -1,12 +1,13 @@
 # pre-pr
 
 Run the full SuperHabits pre-PR health check before opening or merging
-any pull request. Combines the live web inspection (puppeteer MCP) with
+any pull request. Combines the live web inspection (playwright MCP) with
 the code quality gate (typecheck + tests). Both must pass for a green light.
 
 Requires:
 - `npm run web` running on localhost:8081 (one tab only)
-- Puppeteer MCP connected in Cursor Settings → MCP
+- Playwright MCP must be connected in Cursor Settings → MCP
+- **inspect-web is no longer a separate command** — its full functionality is available via **“run pre-pr in deep mode”** (see Phase 2, §2e).
 
 ---
 
@@ -28,9 +29,13 @@ Report result:
 
 ---
 
-## Phase 2 — Live web inspection (puppeteer MCP)
+## Phase 2 — Live web inspection (playwright MCP)
 
-Use the puppeteer MCP to inspect the running app.
+**For a deeper inspection pass, tell Cursor: “run pre-pr in deep mode”** — this adds SW transfer size checks, per-tab body text evaluation, and `window.__dbReady` probe to the standard checks (see §2e below).
+
+Use the playwright MCP to inspect the running app (`browser_navigate`,
+`browser_evaluate`, `browser_take_screenshot`; `browser_click` /
+`browser_fill` if needed).
 BASE_URL = http://localhost:8081
 
 ### 2a — Cross-origin isolation
@@ -87,6 +92,31 @@ After all tabs are visited, collect all console messages:
 - List every `console.warn` worth noting
 - Ignore React DevTools and HMR noise
 
+### 2e — Deep mode additions (run when requested)
+
+Only run this subsection when the user asked for **pre-pr in deep mode** (optional; extends §2a–2d).
+
+**Transfer size check**
+
+Evaluate: `performance.getEntriesByType("navigation")[0].transferSize`
+
+- If `0`: served from cache (SW or disk)
+- If `> 0`: served from network (fresh)
+
+**DB ready probe**
+
+Evaluate: `window.__dbReady ?? "not exposed"`
+
+(`"not exposed"` is acceptable — the app does not expose this global.)
+
+**Per-tab body text**
+
+After each tab screenshot in §2c, evaluate `document.body.innerText` and confirm it contains screen-specific text (not a blank error state). In deep mode, treat this as mandatory evidence per tab.
+
+**Headed mode**
+
+To watch the browser live, ask: **“run pre-pr in headed mode”**. Playwright MCP supports this via browser launch options.
+
 ---
 
 ## Phase 3 — Final report
@@ -114,7 +144,7 @@ If PASS: safe to open PR.
 
 If FAIL: list every failing check with:
 - Root cause (file + line if known)
-- Recommended fix command (/fix-data, /fix-ui, or specific action)
+- Recommended fix command (**/fix**, or specific action)
 - Whether it blocks the PR or is acceptable tech debt
 
 ---
@@ -132,6 +162,7 @@ If FAIL: list every failing check with:
 
 - Only one localhost:8081 tab open at a time — OPFS lock will cause
   DB init failure if multiple tabs are open
-- Puppeteer uses a fresh Chromium instance — results are reproducible
-  and independent of your personal browser cache state
+- Playwright runs headless by default — no browser window will
+  appear. The check runs fully in the background. You do not need
+  to keep any window visible or in focus. (Use **headed mode** only when explicitly requested — see §2e.)
 - Run this before every PR, not just when something seems broken

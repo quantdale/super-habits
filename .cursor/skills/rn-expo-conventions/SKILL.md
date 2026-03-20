@@ -25,7 +25,7 @@ Apply this when writing any UI, navigation, or platform-specific code.
 
 ## React Native specifics
 - List rendering: use @shopify/flash-list (FlashList), not FlatList
-  This project uses **FlashList v2** (`@shopify/flash-list@2.x`): typings do **not** include `estimatedItemSize` (unlike v1). Use `data`, `renderItem`, `keyExtractor`, etc., per current types.
+  This project uses **FlashList v2** (`@shopify/flash-list@2.x`): `estimatedItemSize` is **not** required in TypeScript props (differs from v1 docs). **TodosScreen** uses `data`, `renderItem`, and `keyExtractor` only.
 - Animations: use react-native-reanimated (not Animated from RN core)
 - SVG: react-native-svg (react-native-svg components, not <svg> HTML)
 - Safe area: use <Screen> from core/ui/Screen.tsx (wraps SafeAreaView)
@@ -53,9 +53,11 @@ Apply this when writing any UI, navigation, or platform-specific code.
 The following are initialized here in order:
 1. QueryClient (React Query — dormant)
 2. GestureHandlerRootView (required for @shopify/flash-list + gestures)
-3. DB init (getDatabase() called once on mount)
+3. DB init (initializeDatabase / getDatabase on mount)
 4. Service worker registration (web only)
 5. Guest profile creation (core/auth/guestProfile.ts)
+
+When **`isRemoteEnabled()`** is true (`lib/supabase.ts`), a separate effect registers **`syncEngine.flush()`** on an interval, on web visibility (hidden), and on NetInfo reconnect — **not** when remote is off (default).
 
 Do NOT add DB calls before AppProviders initializes. Any component that
 calls a *.data.ts function must be a descendant of AppProviders.
@@ -78,15 +80,27 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - Run: npm test
 - Only pure function tests (no DB, no component rendering yet)
 - Every new domain function needs a test
-- Current count: 7 tests passing (update when tests change)
+- Current count: 7 tests passing — update whenever tests are added or removed
 
 ## Metro / build config
-- metro.config.js: WASM support, COOP/COEP headers (required for web)
+- metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)
 - babel.config.js: expo preset + nativewind + reanimated (order matters)
 - Do not change babel plugin order — reanimated must be last
 
-## Known dead/unused code
+## Known dead/unused or legacy code
 - App.tsx — legacy, not used by expo-router
 - index.ts — legacy registerRootComponent, not used
-- nextPomodoroState() in pomodoro.domain.ts — dead code
+- `nextPomodoroState()` in `pomodoro.domain.ts` — **used in Vitest**; PomodoroScreen does not import it yet (labels inline)
 - lib/supabase.ts — in-memory `remoteMode` ("disabled" default); `setRemoteMode` / `isRemoteEnabled` not wired from UI; no Supabase client yet
+
+## MCP tools (development workflow)
+
+Three MCP servers are commonly configured for this project in the user’s MCP config (e.g. `~/.cursor/mcp.json`):
+
+| Server | Package | Key tools | Used for |
+|--------|---------|-----------|----------|
+| playwright | `@playwright/mcp@latest` | browser_navigate, browser_evaluate, browser_take_screenshot, browser_console_messages | Web inspection, pre-PR checks |
+| lighthouse | `@danielsogl/lighthouse-mcp@latest` | Lighthouse audit tools | Performance, PWA, accessibility |
+| fetch | mcp-server-fetch (uvx) | fetch | HTTP header verification |
+
+Use **/inspect-web** and **/pre-pr** for browser-based checks. Use **/audit-performance** for Lighthouse scores.

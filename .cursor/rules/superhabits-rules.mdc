@@ -12,7 +12,7 @@ Stack: React Native 0.83, Expo 55, TypeScript 5.9, expo-router, SQLite
 (expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. No production deployment pipeline yet.
-Schema version: 4. Next migration number: 5.
+Current stored schema version: **4** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 5) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands (no case 5 block exists until then).
 
 ## Non-negotiable invariants — violating these causes silent data corruption
 
@@ -47,7 +47,7 @@ Schema version: 4. Next migration number: 5.
 
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always add a new file numbered N+1.
-   Current schema version: 4. Next: 5.
+   Current stored version: 4. Next migration number: 5 (new `if (version < 5)` block in `runMigrations` in `core/db/client.ts`).
    Migration logic runs in core/db/client.ts — append a new block in runMigrations() (if (version < N)).
    schema.sql is a reference doc only — it is NOT executed at runtime.
 
@@ -87,7 +87,7 @@ Do not wire these up without an explicit decision to do so.
 - Every new *.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 7 tests passing (update this when tests change)
+- Current count: 7 tests passing — **update this count whenever tests are added or removed**
 - No DB or component tests yet — do not block on this, but document gaps
 
 ## Current known bugs (do not silently fix — coordinate first)
@@ -98,5 +98,16 @@ Do not wire these up without an explicit decision to do so.
   a silent bug fix.
 - schema.sql is out of date (reference only, not authoritative)
 
-Resolved in repo (do not re-report as open): CaloriesScreen passes mealType to addCalorieEntry;
-PomodoroScreen uses nextPomodoroState for UI; syncEngine.flush() is wired in AppProviders when remote is on.
+Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true.
+
+Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.ts` is covered by Vitest; **PomodoroScreen** currently uses inline button labels and does not import it — wire the screen to the domain helper if you want a single source of truth for `Running...` vs `Start focus`.
+
+## Web / PWA context (not application bugs)
+- **COEP:** `metro.config.js` and `app.json` set `Cross-Origin-Embedder-Policy: require-corp` (was `credentialless` in some setups) to establish `crossOriginIsolated` for shared-memory WASM on web.
+- **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v2` (`CACHE_VERSION = "v2"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
+
+## MCP tools (development)
+Configured in the user’s MCP settings (e.g. `~/.cursor/mcp.json` on Unix; equivalent on Windows). Useful servers for this repo:
+- **Playwright MCP** — live browser inspection; use with `/inspect-web` and `/pre-pr`.
+- **Lighthouse MCP** — performance, PWA, accessibility; use with `/audit-performance`.
+- **Fetch MCP** — HTTP header verification (e.g. COOP/COEP); use in `/audit-performance` phase 1.

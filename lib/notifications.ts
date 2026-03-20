@@ -28,6 +28,9 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 }
 
 export async function scheduleTimerEndNotification(seconds: number, title: string, body: string) {
+  if (Platform.OS === "web") {
+    return null;
+  }
   const allowed = await ensureNotificationPermission();
   if (!allowed) {
     return null;
@@ -37,4 +40,15 @@ export async function scheduleTimerEndNotification(seconds: number, title: strin
     content: { title, body },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds },
   });
+}
+
+export async function cancelScheduledNotification(id: string | null | undefined): Promise<void> {
+  if (!id || Platform.OS === "web") {
+    return;
+  }
+  try {
+    await Notifications.cancelScheduledNotificationAsync(id);
+  } catch {
+    // Already fired or invalid id
+  }
 }

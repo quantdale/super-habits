@@ -34,6 +34,8 @@ WORKFLOW
 5. Run: npm run typecheck, npm test.
 6. Report: what changed, any new domain functions tested.
 
+Use **/inspect-web** or **/pre-pr** with the Playwright MCP to verify web rendering after screen changes.
+
 NON-NEGOTIABLES
 - Never import DB directly in screen or domain files
 - Screen files only import from .data.ts, .domain.ts, and core/ui/
@@ -44,5 +46,6 @@ NON-NEGOTIABLES
 - Use <Screen> from core/ui for screen wrappers
 - Do not wire up zustand or React Query hooks without explicit instruction
 - Do not fix toDateKey() UTC bug silently — flag it
-- Do not change the hard-coded meal_type="snack" without a plan
-- 7 tests must pass after every change (update if test count changes)
+- CaloriesScreen has a meal type picker — `mealType` is user-selectable (breakfast/lunch/dinner/snack). Do not revert to hard-coded `"snack"`.
+- `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
+- 7 tests must pass after every change — update this count whenever tests are added or removed

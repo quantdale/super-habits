@@ -1,15 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
 import { listPomodoroSessions, logPomodoroSession } from "@/features/pomodoro/pomodoro.data";
-import { nextPomodoroState } from "@/features/pomodoro/pomodoro.domain";
 import type { PomodoroSession } from "./types";
-import { scheduleTimerEndNotification } from "@/lib/notifications";
+import {
+  cancelScheduledNotification,
+  scheduleTimerEndNotification,
+} from "@/lib/notifications";
 
 const FOCUS_SECONDS = 25 * 60;
+
+const NOTIFY_TITLE = "Focus complete";
+const NOTIFY_BODY = "Great work. Time for a short break.";
 
 export function PomodoroScreen() {
   const [remaining, setRemaining] = useState(FOCUS_SECONDS);
@@ -17,6 +22,7 @@ export function PomodoroScreen() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+  const notificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     listPomodoroSessions(8).then(setSessions);
@@ -29,6 +35,8 @@ export function PomodoroScreen() {
         if (prev <= 1) {
           clearInterval(timer);
           setIsRunning(false);
+          void cancelScheduledNotification(notificationIdRef.current);
+          notificationIdRef.current = null;
           const endedAt = new Date();
           if (startedAt) {
             void logPomodoroSession(
@@ -53,14 +61,39 @@ export function PomodoroScreen() {
   const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
   const seconds = String(remaining % 60).padStart(2, "0");
 
-  const pomodoroState = nextPomodoroState(remaining, isRunning);
+  const canStartFresh =
+    !isRunning && (remaining === FOCUS_SECONDS || remaining === 0);
+  const canResume = !isRunning && remaining > 0 && remaining < FOCUS_SECONDS;
 
-  const start = async () => {
+  const startFresh = async () => {
+    void cancelScheduledNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
     const now = new Date();
     setStartedAt(now);
     setRemaining(FOCUS_SECONDS);
+    const id = await scheduleTimerEndNotification(FOCUS_SECONDS, NOTIFY_TITLE, NOTIFY_BODY);
+    notificationIdRef.current = id;
     setIsRunning(true);
-    await scheduleTimerEndNotification(FOCUS_SECONDS, "Focus complete", "Great work. Time for a short break.");
+  };
+
+  const pause = () => {
+    void cancelScheduledNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    setIsRunning(false);
+  };
+
+  const resume = async () => {
+    const id = await scheduleTimerEndNotification(remaining, NOTIFY_TITLE, NOTIFY_BODY);
+    notificationIdRef.current = id;
+    setIsRunning(true);
+  };
+
+  const reset = () => {
+    void cancelScheduledNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    setIsRunning(false);
+    setRemaining(FOCUS_SECONDS);
+    setStartedAt(null);
   };
 
   return (
@@ -71,18 +104,18 @@ export function PomodoroScreen() {
           {minutes}:{seconds}
         </Text>
         <View className="mt-4 gap-2">
-          <Button
-            label={pomodoroState === "running" ? "Running..." : "Start focus"}
-            onPress={start}
-          />
-          <Button
-            label="Reset"
-            variant="ghost"
-            onPress={() => {
-              setIsRunning(false);
-              setRemaining(FOCUS_SECONDS);
-            }}
-          />
+          {canStartFresh ? (
+            <Button label="Start focus" onPress={startFresh} />
+          ) : null}
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <Button label="Pause" variant="ghost" disabled={!isRunning} onPress={pause} />
+            </View>
+            <View className="flex-1">
+              <Button label="Resume" variant="ghost" disabled={!canResume} onPress={resume} />
+            </View>
+          </View>
+          <Button label="Reset" variant="ghost" onPress={reset} />
         </View>
       </Card>
 

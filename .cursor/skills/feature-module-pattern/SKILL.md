@@ -17,6 +17,9 @@ features/{featureName}/
 Route file (thin wrapper):
   app/(tabs)/{featureName}.tsx
 
+## types.ts (feature-local barrel)
+Each feature may include `types.ts` that re-exports entity types from `@/core/db/types` and defines local types (e.g. `MealType`, `CalorieEntryTotals` in `features/calories/types.ts`). Screens import from `./types`, not from `@/core/db/types` directly, unless there is a deliberate exception.
+
 ## {featureName}.data.ts — rules
 - Imports: getDatabase from core/db/client, createId from lib/id,
            nowIso/toDateKey from lib/time, syncEngine from core/sync
@@ -35,7 +38,7 @@ Route file (thin wrapper):
 - Houses calculations, transformations, validations, state machines
 - Examples from existing features:
   - habits.domain.ts: calculateStreak(), isCompletedToday(), groupByCategory()
-  - pomodoro.domain.ts: formatTime(), getNextState(), TIMER_DURATIONS
+  - pomodoro.domain.ts: `nextPomodoroState()`, `PomodoroState` type (Vitest-covered; screen may wire labels through this helper)
 
 ## {featureName}Screen.tsx — rules
 - Imports data functions from .data.ts
@@ -77,9 +80,9 @@ habits:
   screen: HabitsScreen — progress rings, daily completion
 
 pomodoro:
-  data: addSession, listSessions
-  domain: formatTime, TIMER_DURATIONS, getNextState (dead code)
-  screen: PomodoroScreen — countdown timer, setInterval
+  data: logPomodoroSession, listPomodoroSessions
+  domain: nextPomodoroState, PomodoroState
+  screen: PomodoroScreen — countdown timer, setInterval; primary labels are inline (optional: derive from nextPomodoroState)
 
 workout:
   data: addWorkoutLog, listWorkoutLogs
@@ -88,9 +91,8 @@ workout:
 
 calories:
   data: addCalorieEntry, listCalorieEntries, getDailySummary
-  domain: none yet
-  screen: CaloriesScreen — entry form (meal_type hard-coded to "snack")
-  BUG: meal_type is hard-coded — addCalorieEntry always sets type = "snack"
+  domain: caloriesTotal, kcalFromMacros
+  screen: CaloriesScreen — entry form with meal type picker (breakfast/lunch/dinner/snack); mealType is user-selectable
 
 ## Adding a new feature checklist
 - [ ] Create features/{name}/ directory

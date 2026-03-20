@@ -41,8 +41,8 @@ NON-NEGOTIABLES
 - All IDs via createId(prefix) — never raw random/uuid
 - All timestamps via nowIso() — all date keys via toDateKey()
 - New columns require a new migration (never modify existing migrations)
-- Current schema version: 4 — next migration: version 5 (new if (version < 5) block in runMigrations)
+- Current schema version: **4** — next migration: new **`if (version < 5)`** block in `runMigrations()` in `core/db/client.ts` (when a schema change is introduced)
 - schema.sql is reference only — never execute it
-- UNIQUE(habit_id, date_key): use SELECT + INSERT/UPDATE (increment/decrement); hard DELETE when count reaches 0 (allowed exception to soft-delete rule — non-synced entity, see habits.data.ts ~63–66 for comment)
+- UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed exception to soft-delete — non-synced entity, no `syncEngine.enqueue()`. See `features/habits/habits.data.ts` ~63–66 for the explanatory comment.
 - All SELECT queries include WHERE deleted_at IS NULL
-- 7 tests must pass after every change (update if test count changes)
+- 7 tests must pass after every change — update this count whenever tests are added or removed

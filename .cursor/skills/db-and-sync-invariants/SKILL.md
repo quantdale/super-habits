@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current: 4
-- Next migration number: 5
+- Current stored version: **4**
+- Next migration number: **5** (add `if (version < 5) { ... }` in `runMigrations()` in `core/db/client.ts` when needed)
 - Migrations live in: core/db/migrations/ (reference) + inline in client.ts
 - schema.sql is a REFERENCE ONLY — not executed at runtime
 - To add a column: add a new migration case, never alter the bootstrap DDL
@@ -45,7 +45,7 @@ Exception: habit_completions uses hard delete (toggle off = DELETE).
 ## Sync enqueue rule
 After every INSERT or UPDATE on main entities, call:
   syncEngine.enqueue({ entity, id, updatedAt, operation })
-  where operation is "create" | "update" | "delete" (see core/sync/sync.engine.ts SyncRecord)
+  where operation is `"create" | "update" | "delete"` — `SyncRecord` shape in `core/sync/sync.engine.ts` is `{ entity: string; id: string; updatedAt: string; operation: ... }` (not `payload`, `table`, or `timestamp`).
 
 Entities that DO sync: todos, habits, calorie_entries, workout_routines (enqueue entity names match syncEngine usage in *.data.ts)
 Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions
@@ -83,11 +83,9 @@ toDateKey(date: Date): string — returns YYYY-MM-DD
 ## UNIQUE constraint on habit_completions
 UNIQUE(habit_id, date_key) — enforced at DB level
 
-Data layer (features/habits/habits.data.ts):
-- SELECT for existing row by (habit_id, date_key)
-- If none: INSERT new completion row
-- If exists: UPDATE count (increment/decrement paths)
-- If count would become 0: DELETE the row (hard delete — allowed exception; habit_completions does not sync)
+Data layer (`features/habits/habits.data.ts`):
+- **Increment:** SELECT → if no row: INSERT (new row, count=1); if row exists: UPDATE (count+1).
+- **Decrement:** SELECT → if count === 1: DELETE (hard delete — allowed exception); else UPDATE (count−1).
+- Hard delete is the allowed exception for this table — it is not a synced entity; **no** `syncEngine.enqueue()` needed.
 
-This satisfies the constraint without relying on INSERT OR REPLACE. Do not introduce duplicate
-INSERTs for the same (habit_id, date_key).
+Do not use INSERT OR REPLACE for this flow. Do not introduce duplicate INSERTs for the same (habit_id, date_key).

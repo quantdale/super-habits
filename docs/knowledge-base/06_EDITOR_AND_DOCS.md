@@ -4,6 +4,16 @@
 
 Cursor project assets under `.cursor/` (read-only for KB authors per repo policy), root `README.md`, and documentation gaps. **This file summarizes** rules/agents/commands/skills — it does not replace the live files in `.cursor/`.
 
+### MCP servers (`~/.cursor/mcp.json`)
+
+Configured in the user’s Cursor settings (not in-repo). Complements Playwright for audits and HTTP inspection.
+
+| MCP | Package | Purpose |
+|-----|---------|---------|
+| playwright | @playwright/mcp@latest | Live browser inspection, pre-PR checks |
+| lighthouse | @danielsogl/lighthouse-mcp@latest | Performance audits, PWA checklist, Core Web Vitals |
+| fetch | mcp-server-fetch (`pip install`; `python -m mcp_server_fetch`) | HTTP response headers, endpoint inspection |
+
 ---
 
 ## `.cursor/rules/superhabits-rules.mdc`
