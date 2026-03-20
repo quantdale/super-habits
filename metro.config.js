@@ -8,7 +8,7 @@ config.resolver.assetExts.push("wasm");
 config.server = config.server || {};
 config.server.enhanceMiddleware = (metroMiddleware) => {
   return (req, res, next) => {
-    res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     return metroMiddleware(req, res, next);
   };

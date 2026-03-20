@@ -1,5 +1,4 @@
-import { Text } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, Text } from "react-native";
 
 type ButtonProps = {
   label: string;

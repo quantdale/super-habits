@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Modal, Pressable, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
@@ -57,6 +57,8 @@ function groupHabitsByCategory(habits: Habit[]): Record<HabitCategory, Habit[]> 
 }
 
 export function HabitsScreen() {
+  const { height: windowHeight } = useWindowDimensions();
+  const modalMaxHeight = windowHeight * 0.88;
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
@@ -263,8 +265,13 @@ export function HabitsScreen() {
             setEditingHabit(null);
           }}
         >
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <Card>
+          <Pressable onPress={(e) => e.stopPropagation()} style={{ maxHeight: modalMaxHeight, width: "100%" }}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+              style={{ maxHeight: modalMaxHeight }}
+            >
+              <Card>
               <Text className="mb-3 text-lg font-semibold text-slate-900">
                 {editingHabit ? "Edit habit" : "Add habit"}
               </Text>
@@ -343,7 +350,8 @@ export function HabitsScreen() {
                   onPress={onSubmit}
                 />
               </View>
-            </Card>
+              </Card>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

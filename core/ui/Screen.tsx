@@ -1,6 +1,5 @@
 import { PropsWithChildren } from "react";
-import { SafeAreaView, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { SafeAreaView, ScrollView, View } from "react-native";
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
@@ -8,7 +7,9 @@ type ScreenProps = PropsWithChildren<{
 }>;
 
 export function Screen({ children, scroll = false, padded = true }: ScreenProps) {
-  const content = (
+  const paddedClass = padded ? "bg-slate-50 px-4 py-3 pb-8" : "bg-slate-50";
+  const scrollContent = <View className={paddedClass}>{children}</View>;
+  const fillContent = (
     <View className={padded ? "flex-1 bg-slate-50 px-4 py-3" : "flex-1 bg-slate-50"}>
       {children}
     </View>
@@ -17,11 +18,16 @@ export function Screen({ children, scroll = false, padded = true }: ScreenProps)
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       {scroll ? (
-        <ScrollView keyboardShouldPersistTaps="always" keyboardDismissMode="on-drag">
-          {content}
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="grow"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {scrollContent}
         </ScrollView>
       ) : (
-        content
+        fillContent
       )}
     </SafeAreaView>
   );
