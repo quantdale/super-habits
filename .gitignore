@@ -37,9 +37,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Playwright MCP + Lighthouse audit output (dev tooling only)
+.cursor/playwright-output/*
+!.cursor/playwright-output/.gitkeep
+
 # generated native folders
 /ios
 /android
-
-# Playwright MCP screenshot output
-.cursor/playwright-output/

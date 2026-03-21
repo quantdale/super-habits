@@ -37,17 +37,19 @@ Use the playwright MCP to inspect the running app (`browser_navigate`,
 `browser_evaluate`, `browser_take_screenshot`; `browser_click` /
 `browser_fill` if needed).
 
+---
 SCREENSHOT OUTPUT FOLDER: .cursor/playwright-output/
- Save every browser_take_screenshot call to this folder.
- Use descriptive filenames:
-   pre-pr-initial-load.png
-   pre-pr-todos.png
-   pre-pr-habits.png
-   pre-pr-pomodoro.png
-   pre-pr-workout.png
-   pre-pr-calories.png
- Create the folder if it does not exist. Do not save
- screenshots anywhere else.
+Save ALL browser_take_screenshot calls to this folder.
+Use these exact filenames:
+  pre-pr-initial-load.png
+  pre-pr-todos.png
+  pre-pr-habits.png
+  pre-pr-pomodoro.png
+  pre-pr-workout.png
+  pre-pr-calories.png
+Create the folder if it does not exist.
+Do not save screenshots to the project root or any other path.
+---
 
 BASE_URL = http://localhost:8081
 
@@ -66,7 +68,8 @@ app.json) may have been reverted. Do not continue inspection.
 Check console for `[db] initializeDatabase failed` — if present,
 DB is not opening (likely isolation failure or OPFS lock).
 
-Take a screenshot of the initial load to `.cursor/playwright-output/pre-pr-initial-load.png`.
+Take a screenshot → save as
+`.cursor/playwright-output/pre-pr-initial-load.png`
 
 ### 2b — Service worker
 
@@ -85,7 +88,7 @@ reload once and re-check.
 
 ### 2c — All 5 feature tabs
 
-Navigate to each URL. Take a screenshot to the path shown. Check for blank/error state.
+Navigate to each URL. Take a screenshot → save as the path in the table. Check for blank/error state.
 
 | URL | Expected | Screenshot | Status |
 |-----|----------|------------|--------|
@@ -126,6 +129,8 @@ Evaluate: `window.__dbReady ?? "not exposed"`
 
 After each tab screenshot in §2c, evaluate `document.body.innerText` and confirm it contains screen-specific text (not a blank error state). In deep mode, treat this as mandatory evidence per tab.
 
+If taking additional screenshots in deep mode (optional), save as `.cursor/playwright-output/pre-pr-deep-{tabname}.png` (e.g. `.cursor/playwright-output/pre-pr-deep-todos.png`).
+
 **Headed mode**
 
 To watch the browser live, ask: **“run pre-pr in headed mode”**. Playwright MCP supports this via browser launch options.
@@ -153,15 +158,16 @@ Produce this table:
 
 **OVERALL: PASS or FAIL**
 
+**Screenshot output:** .cursor/playwright-output/
+(Folder is in .gitignore — not committed to the repo.
+ Delete contents before each run if you want a clean set.)
+
 If PASS: safe to open PR.
 
 If FAIL: list every failing check with:
 - Root cause (file + line if known)
 - Recommended fix command (**/fix**, or specific action)
 - Whether it blocks the PR or is acceptable tech debt
-
-Screenshots saved to: .cursor/playwright-output/
- This folder is in .gitignore — not committed to the repo.
 
 ---
 

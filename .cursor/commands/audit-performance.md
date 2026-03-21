@@ -8,6 +8,20 @@ on localhost:8081.
 
 BASE_URL = http://localhost:8081
 
+---
+OUTPUT FOLDER: .cursor/playwright-output/
+Save ALL screenshots and any exported Lighthouse reports to
+this folder. Use these filenames:
+  audit-perf-mobile.png           (Phase 2 — if screenshot taken)
+  audit-perf-desktop.png          (Phase 3 — if screenshot taken)
+  audit-pwa.png                   (Phase 4 — if screenshot taken)
+  audit-accessibility.png         (Phase 5 — if screenshot taken)
+  audit-best-practices-seo.png    (Phase 6 — if screenshot taken)
+  lighthouse-report.json          (full JSON report if exported)
+Create the folder if it does not exist.
+Do not save output to the project root or any other path.
+---
+
 ## Phase 1 — Header verification (Fetch MCP)
 
 Fetch BASE_URL and inspect response headers.
@@ -105,7 +119,13 @@ List the top 3 issues by impact on user experience, with:
 - Which file to change
 - Estimated effort (low/medium/high)
 
+**Audit output:** .cursor/playwright-output/
+(Folder is in .gitignore — not committed to the repo.
+ Lighthouse JSON report saved here if the MCP supports export.)
+
 **Known acceptable issues:**
 - localhost is used (some PWA checks require HTTPS — expected in dev)
 - expo-notifications warning on web — known Expo limitation
 - No ESLint configured — not a Lighthouse concern
+- Output screenshots are for local reference only —
+  .cursor/playwright-output/ is gitignored

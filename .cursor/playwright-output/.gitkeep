@@ -1,0 +1,4 @@
+# This file keeps the folder tracked by git.
+# All other contents of this folder are gitignored.
+# Playwright screenshots and Lighthouse output are saved here
+# during /pre-pr and /audit-performance runs.
