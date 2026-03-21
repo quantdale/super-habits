@@ -104,3 +104,33 @@ Three MCP servers are commonly configured for this project in the user’s MCP c
 | fetch | mcp-server-fetch (uvx) | fetch | HTTP header verification |
 
 Use **/inspect-web** and **/pre-pr** for browser-based checks. Use **/audit-performance** for Lighthouse scores.
+
+## E2E Testing (Playwright)
+
+E2E tests live in `e2e/` at the project root.
+
+**Setup files:**
+- `playwright.config.ts` — config (`headless: true`, Chromium only, `workers: 1` for OPFS/SQLite lock on web, HTML report paths)
+- `e2e/global.setup.ts` — confirms `crossOriginIsolated` before the suite runs
+- `e2e/helpers/navigation.ts` — `goToTab()`, `waitForDb()`, `hardReload()`
+- `e2e/helpers/db.ts` — `clearDatabase()` via OPFS `removeEntry()`
+
+**`clearDatabase()` pattern:** Called in `test.beforeEach` (not `afterEach`) so failures leave state intact for debugging. Deletes `superhabits.db`, `.db-wal`, `.db-shm` from OPFS then reloads the page.
+
+**Selector conventions for React Native Web:** RN Web renders components differently from standard HTML. Prefer in this order:
+1. `getByText('exact label')` for visible copy
+2. `getByPlaceholderText(/hint/i)` or `getByPlaceholder(...)` for inputs
+3. `getByRole('button', { name: /label/i })` when accessible names match
+4. Label-scoped DOM (e.g. text label → sibling `input`) or helpers in `e2e/helpers/forms.ts` for controlled `TextInput` (often needs click + `type()` with delay, not `fill()` alone)
+5. `locator('[data-testid="..."]')` — only if already present in a component
+
+Do NOT add `data-testid` to components to make tests pass.
+
+**Running after UI changes:**
+  npx playwright test e2e/{feature}.spec.ts
+If a UI change breaks a selector, fix the selector in the spec. Use `/e2e-fix` to auto-detect and repair selector mismatches.
+
+**Output locations:**
+- HTML report: `.cursor/playwright-output/e2e-report/`
+- Failure screenshots / traces: `.cursor/playwright-output/e2e-failures/`
+- Under `.cursor/playwright-output/` (gitignored as appropriate in `.gitignore`)

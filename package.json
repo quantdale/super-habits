@@ -10,6 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report .cursor/playwright-output/e2e-report",
+    "e2e:headed": "playwright test --headed",
+    "e2e:debug": "playwright test --debug",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -43,12 +47,14 @@
   },
   "devDependencies": {
     "@expo/metro-runtime": "~55.0.6",
+    "@playwright/test": "^1.58.2",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^55.0.10",
     "cross-env": "^10.1.0",
     "patch-package": "^8.0.1",
     "typescript": "~5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^9.0.4"
   },
   "private": true
 }

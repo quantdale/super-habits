@@ -73,26 +73,31 @@ todos:
   data: addTodo, listTodos, updateTodo, deleteTodo (soft)
   domain: none yet
   screen: TodosScreen — FlashList, add/edit/complete/delete
+  e2e: `e2e/todos.spec.ts`
 
 habits:
   data: addHabit, listHabits, toggleCompletion, getCompletionsForDate
   domain: calculateStreak, isCompletedToday, HABIT_PRESETS
   screen: HabitsScreen — progress rings, daily completion
+  e2e: `e2e/habits.spec.ts`
 
 pomodoro:
   data: logPomodoroSession, listPomodoroSessions
   domain: nextPomodoroState, PomodoroState
   screen: PomodoroScreen — countdown timer, setInterval; primary labels are inline (optional: derive from nextPomodoroState)
+  e2e: `e2e/pomodoro.spec.ts`
 
 workout:
   data: addWorkoutLog, listWorkoutLogs
   domain: none yet
   screen: WorkoutScreen — routine list, log entry
+  e2e: `e2e/workout.spec.ts`
 
 calories:
   data: addCalorieEntry, listCalorieEntries, getDailySummary
   domain: caloriesTotal, kcalFromMacros
   screen: CaloriesScreen — entry form with meal type picker (breakfast/lunch/dinner/snack); mealType is user-selectable
+  e2e: `e2e/calories.spec.ts`
 
 ## Adding a new feature checklist
 - [ ] Create features/{name}/ directory
@@ -104,3 +109,5 @@ calories:
 - [ ] Add TypeScript types to core/db/types.ts
 - [ ] Add migration to core/db/client.ts (version N+1)
 - [ ] Write Vitest tests for all domain functions in tests/
+- [ ] Add E2E spec: `e2e/{name}.spec.ts` covering: empty state (no data), validation (empty form submission), happy path (add item), delete or primary destructive action where applicable, data persistence (add → reload → still present)
+- [ ] Run `npx playwright test e2e/{name}.spec.ts` to confirm the spec passes against the implemented screen

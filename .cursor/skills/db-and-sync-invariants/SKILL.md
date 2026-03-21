@@ -79,6 +79,7 @@ toDateKey(date: Date): string — returns YYYY-MM-DD
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync
 5. Add unit tests for domain functions in tests/
+6. Add E2E data persistence coverage: `e2e/{name}.spec.ts` should include a test that adds a row, reloads the page, and confirms the row is still visible — validates SQLite write → read → render. Run: `npx playwright test e2e/{name}.spec.ts`
 
 ## UNIQUE constraint on habit_completions
 UNIQUE(habit_id, date_key) — enforced at DB level
@@ -89,3 +90,17 @@ Data layer (`features/habits/habits.data.ts`):
 - Hard delete is the allowed exception for this table — it is not a synced entity; **no** `syncEngine.enqueue()` needed.
 
 Do not use INSERT OR REPLACE for this flow. Do not introduce duplicate INSERTs for the same (habit_id, date_key).
+
+## E2E infrastructure checks (`e2e/infrastructure.spec.ts`)
+
+The E2E suite includes `e2e/infrastructure.spec.ts`, which verifies (among other things):
+- COEP is `require-corp` (not `credentialless`)
+- COOP is `same-origin`
+- `crossOriginIsolated` is `true` (required for SQLite WASM on web)
+- Service worker / shell cache behavior (e.g. `superhabits-shell-v2` / `CACHE_VERSION` in `public/sw.js` — see spec assertions)
+- Localhost serves assets from network (SW dev bypass active)
+- OPFS lock: second context/tab surfaces lock-related errors when another holds the DB
+- No `[db] initializeDatabase failed` (or equivalent) on clean load
+
+Run after changes to `metro.config.js`, `app.json`, `public/sw.js`, or `core/providers/AppProviders.tsx`:
+  npx playwright test e2e/infrastructure.spec.ts

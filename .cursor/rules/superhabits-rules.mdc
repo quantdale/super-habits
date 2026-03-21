@@ -90,6 +90,50 @@ Do not wire these up without an explicit decision to do so.
 - Current count: 7 tests passing — **update this count whenever tests are added or removed**
 - No DB or component tests yet — do not block on this, but document gaps
 
+## E2E Tests (Playwright)
+
+E2E tests live in `e2e/` at the project root. They run against the Metro dev server (`npm run web` on `localhost:8081`).
+
+**Test files:**
+- `e2e/todos.spec.ts` — Todos feature
+- `e2e/habits.spec.ts` — Habits feature
+- `e2e/pomodoro.spec.ts` — Pomodoro feature
+- `e2e/workout.spec.ts` — Workout feature
+- `e2e/calories.spec.ts` — Calories feature
+- `e2e/infrastructure.spec.ts` — Headers, SW, OPFS, DB init
+
+**Config:** `playwright.config.ts`
+- `headless: true` always
+- Chromium only
+- `workers: 1` and `fullyParallel: false` — OPFS + expo-sqlite hold one lock per origin; parallel workers against `localhost:8081` cause flaky navigation/reload (see config comments)
+- `retries: 2` on CI, `0` locally
+- HTML report: `.cursor/playwright-output/e2e-report/`
+- Failure screenshots / traces: `.cursor/playwright-output/e2e-failures/` (`outputDir`)
+
+**Commands:**
+- `npm run e2e` — run all E2E tests
+- `npm run e2e:report` — open HTML report
+- `npm run e2e:headed` — run with visible browser (debug only)
+- `npm run e2e:debug` — Playwright inspector
+
+**Slash commands:**
+- `/test` — run unit tests + E2E tests in one pass
+- `/e2e-fix` — run E2E, read report via Playwright MCP, auto-fix
+
+**E2E invariants:**
+- `clearDatabase()` called in `test.beforeEach` (not `afterEach`)
+- `e2e/global.setup.ts` aborts if `crossOriginIsolated` is false
+- Do not add `data-testid` to app components
+- Do not change assertions to make tests pass artificially
+- If a test reveals a genuine bug, fix the app not the test
+- E2E tests are NOT unit tests — they require a running dev server
+
+## CI (GitHub Actions)
+
+Two jobs (see `.github/workflows/ci.yml`):
+- **quality** — typecheck + unit tests (runs first)
+- **e2e** — Playwright Chromium tests (runs only if **quality** passes); starts `npm run web`, waits on `localhost:8081`, then `npm run e2e`
+
 ## Current known bugs (do not silently fix — coordinate first)
 - toDateKey() uses UTC not local time (lib/time.ts)
 - Sync flush is gated on isRemoteEnabled() (lib/supabase.ts) — interval / visibility / NetInfo flush
@@ -108,6 +152,8 @@ Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.t
 
 ## MCP tools (development)
 Configured in the user’s MCP settings (e.g. `~/.cursor/mcp.json` on Unix; equivalent on Windows). Useful servers for this repo:
-- **Playwright MCP** — live browser inspection; use with `/inspect-web` and `/pre-pr`.
+- **Playwright MCP** — live browser inspection; use with `/inspect-web`, `/pre-pr`, and `/e2e-fix`.
 - **Lighthouse MCP** — performance, PWA, accessibility; use with `/audit-performance`.
 - **Fetch MCP** — HTTP header verification (e.g. COOP/COEP); use in `/audit-performance` phase 1.
+
+**Slash commands (summary):** `/inspect-web`, `/pre-pr`, `/audit-performance`, `/test` (unit + E2E), `/e2e-fix` (E2E run + report-driven fixes).

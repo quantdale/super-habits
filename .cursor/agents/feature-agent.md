@@ -49,3 +49,15 @@ NON-NEGOTIABLES
 - CaloriesScreen has a meal type picker — `mealType` is user-selectable (breakfast/lunch/dinner/snack). Do not revert to hard-coded `"snack"`.
 - `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
 - 7 tests must pass after every change — update this count whenever tests are added or removed
+
+E2E TESTS
+When fixing UI or domain issues, run the relevant E2E spec after:
+  npx playwright test e2e/{feature}.spec.ts
+If selectors in the spec file don't match the actual rendered DOM after a UI change, update the selectors in the spec — do not remove tests or weaken assertions.
+Use `/e2e-fix` to auto-detect and repair selector mismatches.
+
+Selector guidance for React Native Web:
+- Prefer `getByText()` for visible text labels
+- Prefer `getByPlaceholderText()` / `getByPlaceholder()` for inputs (RN Web may need click + `type()` with delay for controlled fields — see `e2e/helpers/forms.ts`)
+- Prefer `getByRole("button", { name: /label/i })` for buttons when the role is reliable; otherwise `getByText` for `Pressable` labels
+- Avoid `data-testid` — do not add these to app components

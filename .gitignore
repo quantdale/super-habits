@@ -41,6 +41,10 @@ yarn-error.*
 .cursor/playwright-output/*
 !.cursor/playwright-output/.gitkeep
 
+# Playwright E2E
+/playwright-report/
+/test-results/
+
 # generated native folders
 /ios
 /android

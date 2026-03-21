@@ -46,3 +46,10 @@ NON-NEGOTIABLES
 - UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed exception to soft-delete — non-synced entity, no `syncEngine.enqueue()`. See `features/habits/habits.data.ts` ~63–66 for the explanatory comment.
 - All SELECT queries include WHERE deleted_at IS NULL
 - 7 tests must pass after every change — update this count whenever tests are added or removed
+
+E2E TESTS
+When fixing data layer issues, run the relevant E2E spec after:
+  npx playwright test e2e/{feature}.spec.ts
+Data persistence tests are especially important — they confirm SQLite writes and reads correctly through the full stack.
+If a migration is added, run `e2e/infrastructure.spec.ts` too to confirm DB init still succeeds cleanly:
+  npx playwright test e2e/infrastructure.spec.ts
