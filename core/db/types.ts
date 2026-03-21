@@ -5,10 +5,15 @@ export type BaseEntity = {
   deleted_at: string | null;
 };
 
+export type TodoPriority = "urgent" | "normal" | "low";
+
 export type Todo = BaseEntity & {
   title: string;
   notes: string | null;
   completed: 0 | 1;
+  due_date: string | null;
+  priority: TodoPriority;
+  sort_order: number;
 };
 
 export type HabitCategory = "anytime" | "morning" | "afternoon" | "evening";

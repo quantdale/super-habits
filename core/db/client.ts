@@ -137,6 +137,38 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '5')",
     );
   }
+  if (version < 6) {
+    try {
+      await db.runAsync(`ALTER TABLE todos ADD COLUMN due_date TEXT`);
+    } catch {
+      // Column may already exist
+    }
+    try {
+      await db.runAsync(
+        `ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'`,
+      );
+    } catch {
+      // Column may already exist
+    }
+    try {
+      await db.runAsync(
+        `ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
+      );
+    } catch {
+      // Column may already exist
+    }
+    await db.runAsync(
+      `UPDATE todos SET sort_order = (
+         SELECT COUNT(*) FROM todos t2
+         WHERE t2.created_at <= todos.created_at
+           AND t2.deleted_at IS NULL
+       ) WHERE deleted_at IS NULL`,
+    );
+    await db.runAsync(
+      `INSERT OR REPLACE INTO app_meta (key, value)
+       VALUES ('db_schema_version', '6')`,
+    );
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
