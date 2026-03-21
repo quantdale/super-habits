@@ -4,6 +4,75 @@ import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 
+export type DailySummary = {
+  dateKey: string;
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFats: number;
+  totalFiber: number;
+};
+
+export async function getCalorieSummaryByRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<DailySummary[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<DailySummary>(
+    `SELECT
+       consumed_on            AS dateKey,
+       SUM(calories)          AS totalCalories,
+       SUM(protein)           AS totalProtein,
+       SUM(carbs)             AS totalCarbs,
+       SUM(fats)              AS totalFats,
+       SUM(fiber)             AS totalFiber
+     FROM calorie_entries
+     WHERE deleted_at IS NULL
+       AND consumed_on >= ?
+       AND consumed_on <= ?
+     GROUP BY consumed_on
+     ORDER BY consumed_on ASC`,
+    [startDateKey, endDateKey],
+  );
+}
+
+export type CalorieGoal = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+};
+
+const GOAL_KEY = "calorie_goal";
+export const DEFAULT_GOAL: CalorieGoal = {
+  calories: 2000,
+  protein: 150,
+  carbs: 200,
+  fats: 65,
+};
+
+export async function getCalorieGoal(): Promise<CalorieGoal> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM app_meta WHERE key = ?`,
+    [GOAL_KEY],
+  );
+  if (!row) return DEFAULT_GOAL;
+  try {
+    return JSON.parse(row.value) as CalorieGoal;
+  } catch {
+    return DEFAULT_GOAL;
+  }
+}
+
+export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(`INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)`, [
+    GOAL_KEY,
+    JSON.stringify(goal),
+  ]);
+}
+
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {
   const db = await getDatabase();
   return db.getAllAsync<CalorieEntry>(

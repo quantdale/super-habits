@@ -10,9 +10,25 @@ import {
   addCalorieEntry,
   deleteCalorieEntry,
   listCalorieEntries,
+  getCalorieSummaryByRange,
+  getCalorieGoal,
+  setCalorieGoal,
+  DEFAULT_GOAL,
+  type CalorieGoal,
+  type DailySummary,
 } from "@/features/calories/calories.data";
-import { caloriesTotal, kcalFromMacros } from "@/features/calories/calories.domain";
+import {
+  buildMacroDonutData,
+  buildWeeklyTrend,
+  calculateGoalProgress,
+  caloriesTotal,
+  kcalFromMacros,
+} from "@/features/calories/calories.domain";
+import { toDateKey } from "@/lib/time";
 import type { CalorieEntry, MealType } from "./types";
+import { MacroDonutChart } from "./MacroDonutChart";
+import { WeeklyCalorieChart } from "./WeeklyCalorieChart";
+import { CalorieGoalSheet } from "./CalorieGoalSheet";
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "breakfast", label: "Breakfast" },
@@ -30,10 +46,22 @@ export function CaloriesScreen() {
   const [mealType, setMealType] = useState<MealType>("breakfast");
   const [formError, setFormError] = useState<string | null>(null);
   const [entries, setEntries] = useState<CalorieEntry[]>([]);
+  const [goal, setGoal] = useState<CalorieGoal>(DEFAULT_GOAL);
+  const [weeklyData, setWeeklyData] = useState<DailySummary[]>([]);
+  const [goalSheetVisible, setGoalSheetVisible] = useState(false);
+  const [weeklyVisible, setWeeklyVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await listCalorieEntries();
     setEntries(next);
+
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    const weekSummaries = await getCalorieSummaryByRange(toDateKey(start), toDateKey(new Date()));
+    setWeeklyData(weekSummaries);
+
+    const savedGoal = await getCalorieGoal();
+    setGoal(savedGoal);
   }, []);
 
   useFocusEffect(
@@ -46,7 +74,20 @@ export function CaloriesScreen() {
     setFormError(null);
   }, [food, protein, carbs, fats, fiber, mealType]);
 
-  const total = useMemo(() => caloriesTotal(entries), [entries]);
+  const todayTotals = {
+    protein: entries.reduce((s, e) => s + e.protein, 0),
+    carbs: entries.reduce((s, e) => s + e.carbs, 0),
+    fats: entries.reduce((s, e) => s + e.fats, 0),
+    fiber: entries.reduce((s, e) => s + e.fiber, 0),
+  };
+  const macroSlices = buildMacroDonutData(
+    todayTotals.protein,
+    todayTotals.carbs,
+    todayTotals.fats,
+    todayTotals.fiber,
+  );
+  const weeklyTrend = buildWeeklyTrend(weeklyData, 7);
+  const goalProgress = calculateGoalProgress(caloriesTotal(entries), goal.calories);
 
   const computedKcal = useMemo(
     () =>
@@ -154,8 +195,47 @@ export function CaloriesScreen() {
       </Card>
 
       <Card>
-        <Text className="text-lg font-semibold text-slate-900">Today total: {total} kcal</Text>
+        <View className="mb-4">
+          <View className="flex-row justify-between mb-1">
+            <Text className="text-sm text-slate-600">Today: {caloriesTotal(entries)} kcal</Text>
+            <Pressable onPress={() => setGoalSheetVisible(true)}>
+              <Text className="text-sm text-brand-500">
+                Goal: {goal.calories} kcal ✎
+              </Text>
+            </Pressable>
+          </View>
+          <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <View
+              className={`h-full rounded-full ${goalProgress.over ? "bg-rose-400" : "bg-brand-500"}`}
+              style={{ width: `${goalProgress.percent}%` }}
+            />
+          </View>
+          {goalProgress.over && (
+            <Text className="text-xs text-rose-400 mt-1">
+              {caloriesTotal(entries) - goal.calories} kcal over goal
+            </Text>
+          )}
+        </View>
+
+        <MacroDonutChart slices={macroSlices} totalKcal={caloriesTotal(entries)} goalKcal={goal.calories} />
+
+        <Pressable onPress={() => setWeeklyVisible((v) => !v)} className="py-2">
+          <Text className="text-xs text-brand-500 text-center">
+            {weeklyVisible ? "▲ hide weekly" : "▼ weekly trend"}
+          </Text>
+        </Pressable>
+        {weeklyVisible && <WeeklyCalorieChart data={weeklyTrend} goalKcal={goal.calories} />}
       </Card>
+
+      <CalorieGoalSheet
+        visible={goalSheetVisible}
+        currentGoal={goal}
+        onSave={async (newGoal) => {
+          await setCalorieGoal(newGoal);
+          setGoal(newGoal);
+        }}
+        onClose={() => setGoalSheetVisible(false)}
+      />
 
       {entries.map((entry) => (
         <Card key={entry.id}>
@@ -163,8 +243,7 @@ export function CaloriesScreen() {
             {entry.food_name} - {entry.calories} kcal
           </Text>
           <Text className="mt-1 text-sm capitalize text-slate-600">
-            {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{" "}
-            {entry.fiber}g
+            {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber {entry.fiber}g
           </Text>
           <View className="mt-3">
             <Button
