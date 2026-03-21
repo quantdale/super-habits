@@ -8,6 +8,8 @@ import { DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
 type HabitCircleProps = {
   habit: Habit;
   todayCount: number;
+  streak: number;
+  showStreak?: boolean;
   onIncrement: () => void;
   onDecrement: () => void;
 };
@@ -16,7 +18,14 @@ const CIRCLE_SIZE = 72;
 const STROKE_WIDTH = 4;
 const DEFAULT_BG_COLOR = "#f1f5f9";
 
-export function HabitCircle({ habit, todayCount, onIncrement, onDecrement }: HabitCircleProps) {
+export function HabitCircle({
+  habit,
+  todayCount,
+  streak,
+  showStreak = true,
+  onIncrement,
+  onDecrement,
+}: HabitCircleProps) {
   const progress = calculateHabitProgress(todayCount, habit.target_per_day);
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
   const habitColor = habit.color ?? "#64748b";
@@ -65,6 +74,11 @@ export function HabitCircle({ habit, todayCount, onIncrement, onDecrement }: Hab
           <MaterialIcons name={iconName} size={36} color={habitColor} />
         </View>
       </Pressable>
+      {showStreak && streak > 0 && (
+        <Text className="mt-0.5 text-xs font-medium text-amber-500">
+          {streak > 2 ? "🔥" : "⚡"} {streak}
+        </Text>
+      )}
       <Text
         className="mt-2 text-center text-xs font-medium text-slate-700"
         numberOfLines={2}

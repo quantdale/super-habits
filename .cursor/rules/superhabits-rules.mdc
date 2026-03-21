@@ -12,7 +12,7 @@ Stack: React Native 0.83, Expo 55, TypeScript 5.9, expo-router, SQLite
 (expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. No production deployment pipeline yet.
-Current stored schema version: **4** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 5) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands (no case 5 block exists until then).
+Current stored schema version: **5** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 6) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 ## Non-negotiable invariants — violating these causes silent data corruption
 
@@ -41,13 +41,13 @@ Current stored schema version: **4** (see `app_meta.db_schema_version`). Next mi
 
 5. DATE KEYS VIA toDateKey() ONLY
    All YYYY-MM-DD date strings must come from toDateKey() in lib/time.ts.
-   KNOWN BUG: toDateKey() currently uses UTC not local time. Do NOT fix
-   this silently — it will corrupt historical records. Flag it explicitly
-   if you touch date handling.
+   Since migration 5, toDateKey() uses the device’s **local** calendar date
+   (YYYY-MM-DD). Rows written before migration 5 used UTC calendar dates;
+   see `app_meta.date_key_cutover` — no silent backfill of old rows.
 
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always add a new file numbered N+1.
-   Current stored version: 4. Next migration number: 5 (new `if (version < 5)` block in `runMigrations` in `core/db/client.ts`).
+   Current stored version: 5. Next migration number: 6 (new `if (version < 6)` block in `runMigrations` in `core/db/client.ts`).
    Migration logic runs in core/db/client.ts — append a new block in runMigrations() (if (version < N)).
    schema.sql is a reference doc only — it is NOT executed at runtime.
 
@@ -87,7 +87,7 @@ Do not wire these up without an explicit decision to do so.
 - Every new *.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 7 tests passing — **update this count whenever tests are added or removed**
+- Current count: 19 tests passing — **update this count whenever tests are added or removed**
 - No DB or component tests yet — do not block on this, but document gaps
 
 ## E2E Tests (Playwright)
@@ -135,14 +135,13 @@ Two jobs (see `.github/workflows/ci.yml`):
 - **e2e** — Playwright Chromium tests (runs only if **quality** passes); starts `npm run web`, waits on `localhost:8081`, then `npm run e2e`
 
 ## Current known bugs (do not silently fix — coordinate first)
-- toDateKey() uses UTC not local time (lib/time.ts)
 - Sync flush is gated on isRemoteEnabled() (lib/supabase.ts) — interval / visibility / NetInfo flush
   runs only when remote is enabled. While remote is off (default), the in-memory sync queue can grow
   with NoopSyncAdapter; this is intentional until cloud sync is turned on. Document as a tradeoff, not
   a silent bug fix.
 - schema.sql is out of date (reference only, not authoritative)
 
-Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true.
+Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
 
 Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.ts` is covered by Vitest; **PomodoroScreen** currently uses inline button labels and does not import it — wire the screen to the domain helper if you want a single source of truth for `Running...` vs `Start focus`.
 

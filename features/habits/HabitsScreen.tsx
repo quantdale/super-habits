@@ -13,12 +13,20 @@ import {
   addHabit,
   decrementHabit,
   deleteHabit,
+  getCompletionHistory,
   getHabitCountByDate,
   incrementHabit,
   listHabits,
   updateHabit,
 } from "@/features/habits/habits.data";
+import {
+  buildDayCompletions,
+  calculateCurrentStreak,
+  getStreakLabel,
+  type DayCompletion,
+} from "@/features/habits/habits.domain";
 import { HabitCircle } from "@/features/habits/HabitCircle";
+import { HabitHeatmap } from "@/features/habits/HabitHeatmap";
 import {
   DEFAULT_HABIT_COLOR,
   DEFAULT_HABIT_ICON,
@@ -61,6 +69,9 @@ export function HabitsScreen() {
   const modalMaxHeight = windowHeight * 0.88;
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
+  const [streakMap, setStreakMap] = useState<Record<string, number>>({});
+  const [historyMap, setHistoryMap] = useState<Record<string, DayCompletion[]>>({});
+  const [expandedHabits, setExpandedHabits] = useState<Record<string, boolean>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -75,6 +86,24 @@ export function HabitsScreen() {
     setHabits(list);
     const counts = await Promise.all(list.map((h) => getHabitCountByDate(h.id)));
     setCompletionMap(Object.fromEntries(list.map((h, i) => [h.id, counts[i]])));
+
+    const streaks: Record<string, number> = {};
+    const histories: Record<string, DayCompletion[]> = {};
+    for (const habit of list) {
+      const completions = await getCompletionHistory(habit.id, 30);
+      const dayCompletions = buildDayCompletions(completions, habit.target_per_day, 30);
+      streaks[habit.id] = calculateCurrentStreak(dayCompletions);
+      histories[habit.id] = dayCompletions;
+    }
+    setStreakMap(streaks);
+    setHistoryMap(histories);
+  }, []);
+
+  const toggleHeatmap = useCallback((habitId: string) => {
+    setExpandedHabits((prev) => ({
+      ...prev,
+      [habitId]: !prev[habitId],
+    }));
   }, []);
 
   useFocusEffect(
@@ -227,13 +256,42 @@ export function HabitsScreen() {
                     );
                   }
                   return (
-                    <HabitCircle
-                      key={habit.id}
-                      habit={habit}
-                      todayCount={todayCount}
-                      onIncrement={() => handleIncrement(habit.id)}
-                      onDecrement={() => handleDecrement(habit.id)}
-                    />
+                    <View key={habit.id} className="items-center">
+                      <HabitCircle
+                        habit={habit}
+                        todayCount={todayCount}
+                        streak={streakMap[habit.id] ?? 0}
+                        onIncrement={() => handleIncrement(habit.id)}
+                        onDecrement={() => handleDecrement(habit.id)}
+                      />
+                      <View className="mt-1 flex-row items-center justify-between px-1">
+                        {(streakMap[habit.id] ?? 0) > 0 && (
+                          <View className="flex-row items-center gap-1">
+                            <Text className="text-xs text-amber-500">
+                              {(streakMap[habit.id] ?? 0) > 2 ? "🔥" : "⚡"}
+                            </Text>
+                            <Text className="text-xs text-slate-500">
+                              {getStreakLabel(streakMap[habit.id] ?? 0)}
+                            </Text>
+                          </View>
+                        )}
+                        <Pressable
+                          onPress={() => toggleHeatmap(habit.id)}
+                          className="ml-auto px-2 py-1"
+                          hitSlop={8}
+                        >
+                          <Text className="text-xs text-brand-500">
+                            {expandedHabits[habit.id] ? "▲ hide" : "▼ history"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      {expandedHabits[habit.id] && historyMap[habit.id] && (
+                        <HabitHeatmap
+                          dayCompletions={historyMap[habit.id]}
+                          accentColor={habit.color}
+                        />
+                      )}
+                    </View>
                   );
                 })}
                 <Pressable

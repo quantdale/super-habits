@@ -120,6 +120,23 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '4')",
     );
   }
+  if (version < 5) {
+    // Record the UTC→local date key cutover in app_meta.
+    // Rows written before this migration used UTC date keys (toISOString().slice(0, 10)).
+    // Rows written after use local calendar keys via toDateKey() in lib/time.ts.
+    // No backfill — rationale in docs/knowledge-base/03_LIB_SHARED.md.
+    const cutoverIso = new Date().toISOString();
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('date_key_format', 'local')",
+    );
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('date_key_cutover', ?)",
+      [cutoverIso],
+    );
+    await db.runAsync(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '5')",
+    );
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

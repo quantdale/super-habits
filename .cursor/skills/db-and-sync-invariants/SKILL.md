@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current stored version: **4**
-- Next migration number: **5** (add `if (version < 5) { ... }` in `runMigrations()` in `core/db/client.ts` when needed)
+- Current stored version: **5**
+- Next migration number: **6** (add `if (version < 6) { ... }` in `runMigrations()` in `core/db/client.ts` when needed)
 - Migrations live in: core/db/migrations/ (reference) + inline in client.ts
 - schema.sql is a REFERENCE ONLY — not executed at runtime
 - To add a column: add a new migration case, never alter the bootstrap DDL
@@ -68,14 +68,15 @@ NEVER use: Math.random(), crypto.randomUUID(), or Date.now() alone as IDs.
 ## Timestamp helpers (lib/time.ts)
 nowIso(): string     — returns current UTC time as ISO 8601 string
                        use for created_at, updated_at
-toDateKey(date: Date): string — returns YYYY-MM-DD
-                       KNOWN BUG: uses UTC not local time
-                       DO NOT FIX silently — would corrupt historical records
-                       DO flag it and coordinate a fix with the team
+toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **local**
+                       calendar date (getFullYear / getMonth / getDate).
+                       Migration 5 records `app_meta.date_key_format` = `local` and
+                       `date_key_cutover` (ISO timestamp). Rows written before that
+                       cutover used UTC calendar dates; no automatic backfill.
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity)
-2. Add CREATE TABLE to a NEW migration in client.ts (next version block: if (version < 5) …)
+2. Add CREATE TABLE to a NEW migration in client.ts (next version block: if (version < 6) …)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync
 5. Add unit tests for domain functions in tests/

@@ -1,1 +1,1 @@
-export type { Habit, HabitCategory, HabitIcon } from "@/core/db/types";
+export type { Habit, HabitCategory, HabitCompletion, HabitIcon } from "@/core/db/types";

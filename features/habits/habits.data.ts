@@ -1,5 +1,5 @@
 import { getDatabase } from "@/core/db/client";
-import { Habit, HabitCategory, HabitIcon } from "@/core/db/types";
+import { Habit, HabitCategory, HabitCompletion, HabitIcon } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -80,6 +80,27 @@ export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()
     [habitId, dateKey],
   );
   return row?.count ?? 0;
+}
+
+export async function getCompletionHistory(
+  habitId: string,
+  days: number = 30,
+): Promise<HabitCompletion[]> {
+  const db = await getDatabase();
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - (days - 1));
+  const startKey = toDateKey(startDate);
+  const endKey = toDateKey(new Date());
+
+  return db.getAllAsync<HabitCompletion>(
+    `SELECT * FROM habit_completions
+     WHERE habit_id = ?
+       AND date_key >= ?
+       AND date_key <= ?
+     ORDER BY date_key ASC`,
+    [habitId, startKey, endKey],
+  );
 }
 
 export async function updateHabit(

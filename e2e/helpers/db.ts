@@ -20,5 +20,5 @@ export async function clearDatabase(page: Page) {
       await root.removeEntry("superhabits.db-shm", { recursive: true });
     } catch {}
   });
-  await page.reload({ waitUntil: "load", timeout: 60_000 });
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
 }

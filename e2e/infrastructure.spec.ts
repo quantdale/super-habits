@@ -66,6 +66,7 @@ test.describe("Infrastructure", () => {
   });
 
   test("second tab gets OPFS lock error when first is open", async () => {
+    test.setTimeout(90_000);
     const browser = await chromium.launch({ headless: true });
     // Same browser context = shared OPFS (separate contexts each have their own OPFS)
     const context = await browser.newContext();

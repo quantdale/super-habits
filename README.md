@@ -41,7 +41,7 @@ Offline-first productivity app for **web (PWA)**, **iOS**, and **Android**. Data
 - `app/*` — routes; tab shell in `app/(tabs)/`
 - `core/*` — DB client, migrations, shared UI/sync helpers
 - `lib/*` — IDs, time helpers, remote flags
-- `tests/*` — Vitest specs (domain tests today; **7** passing tests)
+- `tests/*` — Vitest specs (domain tests today; **19** passing tests)
 
 Schema migrations run in `core/db/client.ts` (`runMigrations`). Stored schema version is tracked in `app_meta.db_schema_version` (currently **4**).
 

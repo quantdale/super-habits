@@ -44,27 +44,18 @@ return `${prefix}_${Date.now()}_${random}`;
 
 ### `toDateKey(date = new Date()): string`
 
-- Returns `date.toISOString().slice(0, 10)` — **UTC calendar date** `YYYY-MM-DD`.
+- Returns **local** calendar `YYYY-MM-DD` via `getFullYear()`, `getMonth() + 1`, `getDate()` (padded).
+- **Cutover (migration 5):** `app_meta` keys `date_key_format` = `local` and `date_key_cutover` (ISO UTC time when the migration ran) mark when keys switched from the old behavior to local dates.
 
-**Known bug (do not fix silently — coordinate migration):**
+**Historical behavior (before migration 5):** `toDateKey` used `date.toISOString().slice(0, 10)` — **UTC** calendar date. **Existing rows** written before the cutover still store those UTC-based keys; new writes use local keys. **No backfill** — original local timezone at write time was not stored, so backfill would be guesswork.
 
-| Symptom | User in UTC+8 at local 23:00 Monday | `toISOString()` date |
-|---------|--------------------------------------|------------------------|
-| “Today” vs key | Still Monday locally | May already be **Tuesday** UTC → `date_key` / `consumed_on` is Tuesday |
+**Blast radius (fixed for new writes):**
 
-**Blast radius:**
-
-| Area | Column | Effect |
+| Area | Column | Notes |
 |------|--------|--------|
-| Habits | `habit_completions.date_key` | Completions bucketed to wrong calendar day vs user expectation |
-| Calories | `calorie_entries.consumed_on` | “Today’s” list can show wrong day near midnight |
-| `listCalorieEntries()` / habit defaults | Default `toDateKey()` | Same |
-
-**Migration to local dates would require:**  
-- Replace `toDateKey()` implementation to use local YYYY-MM-DD (e.g. `getFullYear`, `getMonth`, `getDate`).  
-- **Existing rows:** historical `date_key` / `consumed_on` values are UTC-based — backfill or accept discontinuity; any report comparing “calendar days” would need one-time script or versioned interpretation.  
-- **Tests / docs:** update any assumption of UTC keys.  
-- **Coordination:** project rules flag silent fixes — must be explicit team decision.
+| Habits | `habit_completions.date_key` | New completions use local day; pre-cutover rows keep UTC-based keys |
+| Calories | `calorie_entries.consumed_on` | Same |
+| Defaults | `listCalorieEntries()` / habit APIs | Default `toDateKey()` matches local “today” |
 
 **Call sites:** See [00_INDEX.md](./00_INDEX.md) cross-feature map.
 
