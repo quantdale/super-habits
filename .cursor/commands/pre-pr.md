@@ -36,6 +36,19 @@ Report result:
 Use the playwright MCP to inspect the running app (`browser_navigate`,
 `browser_evaluate`, `browser_take_screenshot`; `browser_click` /
 `browser_fill` if needed).
+
+SCREENSHOT OUTPUT FOLDER: .cursor/playwright-output/
+ Save every browser_take_screenshot call to this folder.
+ Use descriptive filenames:
+   pre-pr-initial-load.png
+   pre-pr-todos.png
+   pre-pr-habits.png
+   pre-pr-pomodoro.png
+   pre-pr-workout.png
+   pre-pr-calories.png
+ Create the folder if it does not exist. Do not save
+ screenshots anywhere else.
+
 BASE_URL = http://localhost:8081
 
 ### 2a — Cross-origin isolation
@@ -53,7 +66,7 @@ app.json) may have been reverted. Do not continue inspection.
 Check console for `[db] initializeDatabase failed` — if present,
 DB is not opening (likely isolation failure or OPFS lock).
 
-Take a screenshot of the initial load.
+Take a screenshot of the initial load to `.cursor/playwright-output/pre-pr-initial-load.png`.
 
 ### 2b — Service worker
 
@@ -72,15 +85,15 @@ reload once and re-check.
 
 ### 2c — All 5 feature tabs
 
-Navigate to each URL. Take a screenshot. Check for blank/error state.
+Navigate to each URL. Take a screenshot to the path shown. Check for blank/error state.
 
 | URL | Expected | Screenshot | Status |
 |-----|----------|------------|--------|
-| `http://localhost:8081/(tabs)/todos` | Todos screen renders | — | ? |
-| `http://localhost:8081/(tabs)/habits` | Habits screen renders | — | ? |
-| `http://localhost:8081/(tabs)/pomodoro` | Pomodoro screen renders | — | ? |
-| `http://localhost:8081/(tabs)/workout` | Workout screen renders | — | ? |
-| `http://localhost:8081/(tabs)/calories` | Calories screen renders | — | ? |
+| `http://localhost:8081/(tabs)/todos` | Todos screen renders | `.cursor/playwright-output/pre-pr-todos.png` | ? |
+| `http://localhost:8081/(tabs)/habits` | Habits screen renders | `.cursor/playwright-output/pre-pr-habits.png` | ? |
+| `http://localhost:8081/(tabs)/pomodoro` | Pomodoro screen renders | `.cursor/playwright-output/pre-pr-pomodoro.png` | ? |
+| `http://localhost:8081/(tabs)/workout` | Workout screen renders | `.cursor/playwright-output/pre-pr-workout.png` | ? |
+| `http://localhost:8081/(tabs)/calories` | Calories screen renders | `.cursor/playwright-output/pre-pr-calories.png` | ? |
 
 For each screen, also evaluate `document.body.innerText` — confirm
 it contains screen-specific text (not just a blank or error message).
@@ -146,6 +159,9 @@ If FAIL: list every failing check with:
 - Root cause (file + line if known)
 - Recommended fix command (**/fix**, or specific action)
 - Whether it blocks the PR or is acceptable tech debt
+
+Screenshots saved to: .cursor/playwright-output/
+ This folder is in .gitignore — not committed to the repo.
 
 ---
 
