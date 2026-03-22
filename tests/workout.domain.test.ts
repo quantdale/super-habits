@@ -7,6 +7,7 @@ import {
   summarizeCompletedSets,
   buildWorkoutActivityDays,
   buildWorkoutFrequency,
+  buildWorkoutHeatmapDays,
 } from "@/features/workout/workout.domain";
 import type { WorkoutLog } from "@/core/db/types";
 
@@ -120,6 +121,20 @@ describe("buildWorkoutFrequency", () => {
     const iso = new Date().toISOString();
     const freq = buildWorkoutFrequency([workoutLog(iso), workoutLog(iso)], 7);
     expect(freq[0].value).toBe(2);
+  });
+});
+
+describe("buildWorkoutHeatmapDays", () => {
+  it("returns 30 entries and caps intensity at 3", () => {
+    const iso = new Date().toISOString();
+    const logs = [workoutLog(iso), workoutLog(iso), workoutLog(iso), workoutLog(iso)];
+    const heat = buildWorkoutHeatmapDays(logs, 30);
+    expect(heat).toHaveLength(30);
+    const y = new Date().getFullYear();
+    const m = String(new Date().getMonth() + 1).padStart(2, "0");
+    const d = String(new Date().getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+    expect(heat.find((h) => h.dateKey === todayKey)?.value).toBe(3);
   });
 });
 

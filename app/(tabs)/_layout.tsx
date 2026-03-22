@@ -27,47 +27,50 @@ type TopTabItemProps = {
   [key: string]: unknown;
 };
 
-/** expo-router TabTrigger may inject layout — icon+label column is re-applied after flatten(style) so content stays centered. */
-const TOP_TAB_PRESSABLE_STYLE = {
-  flex: 1,
-  minWidth: 0,
-  flexDirection: "column" as const,
-  justifyContent: "center" as const,
-  alignItems: "center" as const,
-};
-
+/** expo-router TabTrigger may inject layout — row + center is re-applied after flatten(style). */
 function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: TopTabItemProps) {
   return (
     <Pressable
       onPress={onPress}
       style={[
-        TOP_TAB_PRESSABLE_STYLE,
-        StyleSheet.flatten(style),
         {
+          flex: 1,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 5,
+          minWidth: 0,
           backgroundColor: isFocused ? TAB_CONTENT_SURFACE : TAB_RAIL_BG,
           borderBottomWidth: isFocused ? 0 : 1,
           borderBottomColor: TAB_RAIL_BORDER,
           borderTopLeftRadius: 8,
           borderTopRightRadius: 8,
           marginTop: isFocused ? 0 : 3,
-          paddingTop: isFocused ? 10 : 7,
-          paddingBottom: 10,
-          paddingHorizontal: 6,
+          paddingVertical: 10,
+          paddingHorizontal: 4,
+        },
+        StyleSheet.flatten(style),
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 5,
+          minWidth: 0,
         },
       ]}
       {...rest}
     >
       <MaterialIcons
         name={icon as keyof typeof MaterialIcons.glyphMap}
-        size={18}
+        size={16}
         color={isFocused ? color : "#94a3b8"}
       />
       <Text
         style={{
-          fontSize: 11,
-          marginTop: 2,
+          fontSize: 12,
           color: isFocused ? color : "#94a3b8",
           fontWeight: isFocused ? "600" : "400",
+          flexShrink: 1,
         }}
         numberOfLines={1}
       >

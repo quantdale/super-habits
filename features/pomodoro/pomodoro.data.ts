@@ -54,3 +54,17 @@ export async function listPomodoroSessions(limit = 20): Promise<PomodoroSession[
     [limit],
   );
 }
+
+/** All sessions whose start time falls in [startDateKey, endDateKey] (local calendar day bounds). */
+export async function listPomodoroSessionsForDateRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<PomodoroSession[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<PomodoroSession>(
+    `SELECT * FROM pomodoro_sessions
+     WHERE started_at >= ? AND started_at <= ?
+     ORDER BY started_at DESC`,
+    [`${startDateKey}T00:00:00`, `${endDateKey}T23:59:59.999`],
+  );
+}

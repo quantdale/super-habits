@@ -1,62 +1,95 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text } from "react-native";
 import { PieChart } from "react-native-gifted-charts";
-import type { MacroSlice } from "./calories.domain";
+
+const RING_GRAY = "#e2e8f0";
+const OVER_COLOR = "#ef4444";
+
+const MACRO_CHIPS: {
+  label: string;
+  key: "protein" | "carbs" | "fats" | "fiber";
+  color: string;
+}[] = [
+  { label: "Protein", key: "protein", color: "#3B82F6" },
+  { label: "Carbs", key: "carbs", color: "#F59E0B" },
+  { label: "Fats", key: "fats", color: "#F97316" },
+  { label: "Fiber", key: "fiber", color: "#10B981" },
+];
 
 type Props = {
-  slices: MacroSlice[];
   totalKcal: number;
-  goalKcal?: number;
+  goalKcal: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  sectionColor: string;
 };
 
-export function MacroDonutChart({ slices, totalKcal, goalKcal }: Props) {
-  if (slices.length === 0) {
-    return (
-      <View className="items-center py-4">
-        <Text className="text-slate-400 text-sm">
-          No entries yet — add food to see your macro breakdown
-        </Text>
-      </View>
-    );
-  }
+export function MacroDonutChart({
+  totalKcal,
+  goalKcal,
+  protein,
+  carbs,
+  fats,
+  fiber,
+  sectionColor,
+}: Props) {
+  const consumed = totalKcal;
+  const goal = Math.max(0, goalKcal);
 
-  const pieData = slices.map((s) => ({
-    value: s.kcal,
-    color: s.color,
-    text: `${s.value}%`,
-  }));
+  const progressData = useMemo(() => {
+    if (goal <= 0) {
+      if (consumed <= 0) {
+        return [{ value: 1, color: RING_GRAY }];
+      }
+      return [{ value: Math.max(consumed, 1), color: sectionColor }];
+    }
+    if (consumed > goal) {
+      return [{ value: Math.max(consumed, 1), color: OVER_COLOR }];
+    }
+    const remaining = goal - consumed;
+    if (consumed <= 0) {
+      return [{ value: Math.max(goal, 1), color: RING_GRAY }];
+    }
+    if (remaining <= 0) {
+      return [{ value: Math.max(consumed, 1), color: sectionColor }];
+    }
+    return [
+      { value: consumed, color: sectionColor },
+      { value: remaining, color: RING_GRAY },
+    ];
+  }, [consumed, goal, sectionColor]);
+
+  const macroValues = { protein, carbs, fats, fiber };
 
   return (
     <View className="items-center py-2">
       <PieChart
-        data={pieData}
+        data={progressData}
         donut
         radius={80}
         innerRadius={55}
+        showText={false}
         centerLabelComponent={() => (
-          <View className="items-center">
-            <Text className="text-lg font-semibold text-slate-800">{totalKcal}</Text>
-            <Text className="text-xs text-slate-400">kcal</Text>
-            {goalKcal ? (
-              <Text className="text-xs text-slate-400">/ {goalKcal}</Text>
+          <View className="items-center px-1">
+            <Text className="text-lg font-semibold text-slate-800">
+              {Math.round(consumed)}
+            </Text>
+            {goal > 0 ? (
+              <Text className="text-xs text-slate-400">/ {Math.round(goal)}</Text>
             ) : null}
+            <Text className="text-xs text-slate-400">kcal</Text>
           </View>
         )}
       />
-      <View className="flex-row flex-wrap justify-center gap-3 mt-3">
-        {slices.map((s) => (
-          <View key={s.label} className="flex-row items-center gap-1">
-            <View
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                backgroundColor: s.color,
-              }}
-            />
-            <Text className="text-xs text-slate-600">
-              {s.label} {s.grams}g
+      <View className="mt-3 flex-row justify-around px-2">
+        {MACRO_CHIPS.map((m) => (
+          <View key={m.label} className="items-center">
+            <Text style={{ fontSize: 15, fontWeight: "700", color: m.color }}>
+              {Math.round(macroValues[m.key])}g
             </Text>
+            <Text style={{ fontSize: 11, color: "#94a3b8" }}>{m.label}</Text>
           </View>
         ))}
       </View>

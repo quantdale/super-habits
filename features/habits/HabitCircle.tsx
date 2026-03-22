@@ -10,12 +10,16 @@ type HabitCircleProps = {
   todayCount: number;
   streak: number;
   showStreak?: boolean;
+  /** When false, parent renders the habit name (e.g. Avocation-style row). */
+  showName?: boolean;
+  /** Outer ring fits around this diameter (default 56). */
+  size?: number;
   onIncrement: () => void;
   onDecrement: () => void;
 };
 
-const CIRCLE_SIZE = 72;
-const STROKE_WIDTH = 4;
+const DEFAULT_SIZE = 56;
+const DEFAULT_STROKE = 4;
 const DEFAULT_BG_COLOR = "#f1f5f9";
 
 export function HabitCircle({
@@ -23,6 +27,8 @@ export function HabitCircle({
   todayCount,
   streak,
   showStreak = true,
+  showName = true,
+  size = DEFAULT_SIZE,
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
@@ -30,10 +36,12 @@ export function HabitCircle({
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
   const habitColor = habit.color ?? "#64748b";
 
-  const ringSize = CIRCLE_SIZE + STROKE_WIDTH * 2;
+  const strokeWidth = Math.max(3, Math.round(size / 14));
+  const ringSize = size + strokeWidth * 2;
+  const iconSize = Math.round(size * 0.5);
 
   return (
-    <View className="items-center" style={{ width: 88 }}>
+    <View className="items-center" style={{ width: Math.max(64, ringSize) }}>
       <Pressable
         onPress={onIncrement}
         onLongPress={onDecrement}
@@ -52,7 +60,7 @@ export function HabitCircle({
         >
           <ProgressRing
             size={ringSize}
-            strokeWidth={STROKE_WIDTH}
+            strokeWidth={strokeWidth}
             progress={progress}
             backgroundColor="#e2e8f0"
             progressColor={habitColor}
@@ -61,17 +69,17 @@ export function HabitCircle({
         <View
           style={{
             position: "absolute",
-            left: (ringSize - CIRCLE_SIZE) / 2,
-            top: (ringSize - CIRCLE_SIZE) / 2,
-            width: CIRCLE_SIZE,
-            height: CIRCLE_SIZE,
-            borderRadius: CIRCLE_SIZE / 2,
+            left: (ringSize - size) / 2,
+            top: (ringSize - size) / 2,
+            width: size,
+            height: size,
+            borderRadius: size / 2,
             backgroundColor: DEFAULT_BG_COLOR,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <MaterialIcons name={iconName} size={36} color={habitColor} />
+          <MaterialIcons name={iconName} size={iconSize} color={habitColor} />
         </View>
       </Pressable>
       {showStreak && streak > 0 && (
@@ -79,12 +87,14 @@ export function HabitCircle({
           {streak > 2 ? "🔥" : "⚡"} {streak}
         </Text>
       )}
-      <Text
-        className="mt-2 text-center text-xs font-medium text-slate-700"
-        numberOfLines={2}
-      >
-        {habit.name}
-      </Text>
+      {showName ? (
+        <Text
+          className="mt-2 text-center text-xs font-medium text-slate-700"
+          numberOfLines={2}
+        >
+          {habit.name}
+        </Text>
+      ) : null}
     </View>
   );
 }

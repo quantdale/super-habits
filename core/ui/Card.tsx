@@ -1,17 +1,20 @@
-import { PropsWithChildren } from "react";
+import type { ReactNode } from "react";
 import { View } from "react-native";
 
-type CardProps = PropsWithChildren<{
-  accentColor?: string; // hex color for left strip
+type CardProps = {
+  children: ReactNode;
+  accentColor?: string;
   className?: string;
-}>;
+};
 
 export function Card({ children, accentColor, className }: CardProps) {
   return (
     <View
       className={`mb-3 overflow-hidden rounded-2xl bg-white ${className ?? ""}`}
       style={{
-        shadowColor: "#6366f1",
+        borderWidth: 1,
+        borderColor: "#e8e8f0",
+        shadowColor: "#000000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,

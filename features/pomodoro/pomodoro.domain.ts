@@ -1,5 +1,19 @@
 import type { PomodoroSession } from "./types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+
+function buildDateRangeOldestFirst(days: number): string[] {
+  const result: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${dd}`);
+  }
+  return result;
+}
 
 function buildDateRange(days: number): string[] {
   const result: string[] = [];
@@ -182,7 +196,7 @@ export function formatSessionTime(startedAt: string): string {
  */
 export function buildPomodoroActivityDays(
   sessions: PomodoroSession[],
-  days: number = 30,
+  days: number = 364,
 ): ActivityDay[] {
   const set = new Set<string>();
   for (const s of sessions) {
@@ -196,4 +210,34 @@ export function buildPomodoroActivityDays(
     dateKey,
     active: set.has(dateKey),
   }));
+}
+
+export function buildPomodoroHeatmapDays(
+  sessions: PomodoroSession[],
+  days: number = 364,
+): HeatmapDay[] {
+  const map = new Map<string, number>();
+  for (const s of sessions) {
+    const d = new Date(s.started_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return buildDateRangeOldestFirst(days).map((dateKey) => {
+    const count = map.get(dateKey) ?? 0;
+    return {
+      dateKey,
+      value: count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3,
+    };
+  });
+}
+
+/** Consecutive days with activity, counting from today backward (uses heatmap values). */
+export function computeFocusStreakFromHeatmapDays(heatmapDays: HeatmapDay[]): number {
+  if (heatmapDays.length === 0) return 0;
+  let streak = 0;
+  for (let i = heatmapDays.length - 1; i >= 0; i--) {
+    if (heatmapDays[i].value > 0) streak++;
+    else break;
+  }
+  return streak;
 }

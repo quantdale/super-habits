@@ -1,7 +1,21 @@
 import type { DailySummary } from "./calories.data";
 import type { SavedMeal } from "@/core/db/types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { SECTION_COLORS } from "@/constants/sectionColors";
+
+function buildDateRangeOldestFirst(days: number): string[] {
+  const result: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${dd}`);
+  }
+  return result;
+}
 
 function buildDateRange(days: number): string[] {
   const result: string[] = [];
@@ -65,23 +79,27 @@ export function buildWeeklyTrend(
 export type MacroSlice = {
   /** Percent of total macro kcal (0–100), adjusted so slices sum to 100. */
   value: number;
-  /** Energy from this macro (same basis as kcalFromMacros). */
+  /** Energy from this macro for split visualization (carbs use total carbs × 4; fiber separate). */
   kcal: number;
   color: string;
   label: string;
-  /** Grams shown in the legend — carbs use digestible grams (carbs − fiber). */
+  /** Grams shown in the legend — carbs use total carbs grams. */
   grams: number;
 };
 
+/**
+ * Builds macro split slices for charts that need proportional segments.
+ * Carbs use total carbs × 4 kcal so a carb slice appears whenever carbs > 0
+ * (digestible carbs can be 0 when fiber ≥ carbs). Fiber keeps its own slice.
+ */
 export function buildMacroDonutData(
   protein: number,
   carbs: number,
   fats: number,
   fiber: number,
 ): MacroSlice[] {
-  const digestibleCarbs = Math.max(0, carbs - fiber);
   const proteinKcal = protein * 4;
-  const carbsKcal = digestibleCarbs * 4;
+  const carbsKcal = carbs * 4;
   const fiberKcal = fiber * 2;
   const fatsKcal = fats * 9;
   const totalKcal = proteinKcal + carbsKcal + fiberKcal + fatsKcal;
@@ -90,7 +108,7 @@ export function buildMacroDonutData(
 
   const raw = [
     { kcal: proteinKcal, color: SECTION_COLORS.todos, label: "Protein" as const, grams: protein },
-    { kcal: carbsKcal, color: SECTION_COLORS.calories, label: "Carbs" as const, grams: digestibleCarbs },
+    { kcal: carbsKcal, color: SECTION_COLORS.calories, label: "Carbs" as const, grams: carbs },
     { kcal: fatsKcal, color: SECTION_COLORS.workout, label: "Fats" as const, grams: fats },
     { kcal: fiberKcal, color: SECTION_COLORS.habits, label: "Fiber" as const, grams: fiber },
   ];
@@ -143,7 +161,7 @@ export function filterSavedMeals(meals: SavedMeal[], query: string): SavedMeal[]
 export function buildCalorieActivityDays(
   summaries: DailySummary[],
   goalCalories: number = 2000,
-  days: number = 30,
+  days: number = 364,
 ): ActivityDay[] {
   const map = new Map<string, number>();
   for (const s of summaries) {
@@ -157,5 +175,24 @@ export function buildCalorieActivityDays(
       value:
         goalCalories > 0 ? Math.min(1, cal / goalCalories) : cal > 0 ? 1 : 0,
     };
+  });
+}
+
+export function buildCalorieHeatmapDays(
+  summaries: DailySummary[],
+  goalCalories: number = 2000,
+  days: number = 364,
+): HeatmapDay[] {
+  const map = new Map<string, number>();
+  for (const s of summaries) {
+    map.set(s.dateKey, s.totalCalories);
+  }
+  return buildDateRangeOldestFirst(days).map((dateKey) => {
+    const cal = map.get(dateKey) ?? 0;
+    if (cal === 0) return { dateKey, value: 0 };
+    const pct = cal / goalCalories;
+    if (pct < 0.33) return { dateKey, value: 1 };
+    if (pct < 0.66) return { dateKey, value: 2 };
+    return { dateKey, value: 3 };
   });
 }

@@ -9,6 +9,7 @@ import {
   buildHabitGrid,
   calculateOverallConsistency,
   buildHabitActivityDays,
+  buildAggregatedHabitHeatmap,
   type DayCompletion,
 } from "@/features/habits/habits.domain";
 import type { HabitCompletionRow } from "@/features/habits/habits.data";
@@ -239,6 +240,100 @@ describe("buildHabitActivityDays", () => {
     const todayEntry = activity.find((a) => a.dateKey === todayKey);
     expect(todayEntry?.active).toBe(true);
     expect(todayEntry?.value).toBe(0.5);
+  });
+});
+
+describe("buildAggregatedHabitHeatmap", () => {
+  it("returns all zeros for empty grid with requested length", () => {
+    const heat = buildAggregatedHabitHeatmap([], 14);
+    expect(heat).toHaveLength(14);
+    expect(heat.every((d) => d.value === 0)).toBe(true);
+  });
+
+  it("returns value 3 when the single habit is completed that day", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const habits = [{ id: "h1", name: "Run", color: "#4f79ff", target_per_day: 1 }];
+    const grid = buildHabitGrid(
+      habits,
+      [{ habit_id: "h1", date_key: todayKey, count: 1 }],
+      30,
+    );
+    const heat = buildAggregatedHabitHeatmap(grid, 30);
+    const todayEntry = heat.find((h) => h.dateKey === todayKey);
+    expect(todayEntry?.value).toBe(3);
+  });
+
+  it("returns value 1 when fewer than half of habits are completed", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const habits = [
+      { id: "h1", name: "Run", color: "#4f79ff", target_per_day: 1 },
+      { id: "h2", name: "Read", color: "#22c55e", target_per_day: 1 },
+      { id: "h3", name: "Meditate", color: "#f00", target_per_day: 1 },
+    ];
+    const grid = buildHabitGrid(
+      habits,
+      [{ habit_id: "h1", date_key: todayKey, count: 1 }],
+      30,
+    );
+    const heat = buildAggregatedHabitHeatmap(grid, 30);
+    const todayEntry = heat.find((h) => h.dateKey === todayKey);
+    expect(todayEntry?.value).toBe(1);
+  });
+
+  it("returns value 2 when exactly half of habits are completed (boundary)", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const habits = [
+      { id: "h1", name: "Run", color: "#4f79ff", target_per_day: 1 },
+      { id: "h2", name: "Read", color: "#22c55e", target_per_day: 1 },
+    ];
+    const grid = buildHabitGrid(
+      habits,
+      [{ habit_id: "h1", date_key: todayKey, count: 1 }],
+      30,
+    );
+    const heat = buildAggregatedHabitHeatmap(grid, 30);
+    const todayEntry = heat.find((h) => h.dateKey === todayKey);
+    expect(todayEntry?.value).toBe(2);
+  });
+
+  it("returns value 2 when both of three habits are completed", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const habits = [
+      { id: "h1", name: "A", color: "#4f79ff", target_per_day: 1 },
+      { id: "h2", name: "B", color: "#22c55e", target_per_day: 1 },
+      { id: "h3", name: "C", color: "#f00", target_per_day: 1 },
+    ];
+    const grid = buildHabitGrid(
+      habits,
+      [
+        { habit_id: "h1", date_key: todayKey, count: 1 },
+        { habit_id: "h2", date_key: todayKey, count: 1 },
+      ],
+      30,
+    );
+    const heat = buildAggregatedHabitHeatmap(grid, 30);
+    const todayEntry = heat.find((h) => h.dateKey === todayKey);
+    expect(todayEntry?.value).toBe(2);
   });
 });
 

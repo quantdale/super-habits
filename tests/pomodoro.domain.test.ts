@@ -9,7 +9,10 @@ import {
   getModeLabel,
   parseMinutesSeconds,
   DEFAULT_SETTINGS,
+  buildPomodoroHeatmapDays,
+  computeFocusStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
+import type { PomodoroSession } from "@/core/db/types";
 
 describe("nextPomodoroState", () => {
   it("returns finished at zero", () => {
@@ -121,5 +124,60 @@ describe("parseMinutesSeconds", () => {
     expect(parseMinutesSeconds("abc")).toBeNull();
     expect(parseMinutesSeconds("25")).toBeNull();
     expect(parseMinutesSeconds("5:99")).toBeNull();
+  });
+});
+
+function pomSession(startedAt: string): PomodoroSession {
+  return {
+    id: "pom_test",
+    started_at: startedAt,
+    ended_at: startedAt,
+    duration_seconds: 1500,
+    session_type: "focus",
+    created_at: startedAt,
+  };
+}
+
+describe("buildPomodoroHeatmapDays", () => {
+  it("returns N days oldest-first with zeros when no sessions", () => {
+    const days = buildPomodoroHeatmapDays([], 30);
+    expect(days).toHaveLength(30);
+    expect(days[0].dateKey < days[29].dateKey).toBe(true);
+    expect(days.every((d) => d.value === 0)).toBe(true);
+  });
+
+  it("maps session counts to bucket values 1–3", () => {
+    const iso = new Date().toISOString();
+    const days = buildPomodoroHeatmapDays(
+      [pomSession(iso), pomSession(iso), pomSession(iso)],
+      30,
+    );
+    const y = new Date().getFullYear();
+    const m = String(new Date().getMonth() + 1).padStart(2, "0");
+    const dd = String(new Date().getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${dd}`;
+    const today = days.find((d) => d.dateKey === todayKey);
+    expect(today?.value).toBe(3);
+  });
+});
+
+describe("computeFocusStreakFromHeatmapDays", () => {
+  it("counts consecutive days with activity from today backward", () => {
+    expect(
+      computeFocusStreakFromHeatmapDays([
+        { dateKey: "2025-01-01", value: 0 },
+        { dateKey: "2025-01-02", value: 1 },
+        { dateKey: "2025-01-03", value: 1 },
+      ]),
+    ).toBe(2);
+  });
+
+  it("returns 0 when today has no activity", () => {
+    expect(
+      computeFocusStreakFromHeatmapDays([
+        { dateKey: "2025-01-01", value: 1 },
+        { dateKey: "2025-01-02", value: 0 },
+      ]),
+    ).toBe(0);
   });
 });

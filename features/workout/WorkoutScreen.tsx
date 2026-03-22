@@ -16,9 +16,13 @@ import {
   listRoutines,
   listWorkoutLogsForRange,
 } from "@/features/workout/workout.data";
-import { buildWorkoutActivityDays, buildWorkoutFrequency } from "@/features/workout/workout.domain";
-import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
-import { WorkoutFrequencyChart } from "@/features/workout/WorkoutFrequencyChart";
+import {
+  buildWorkoutActivityDays,
+  buildWorkoutHeatmapDays,
+  computeWorkoutStreakFromHeatmapDays,
+} from "@/features/workout/workout.domain";
+import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
 import { RoutineDetailScreen } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
@@ -87,23 +91,21 @@ export function WorkoutScreen() {
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
-  const [workoutFreqData, setWorkoutFreqData] = useState<
-    { dateKey: string; label: string; value: number }[]
-  >([]);
+  const [workoutHeatmapDays, setWorkoutHeatmapDays] = useState<HeatmapDay[]>([]);
   const [currentView, setCurrentView] = useState<ViewState>({ type: "list" });
 
   const refresh = useCallback(async () => {
     const r = await listRoutines();
     setRoutines(r);
 
-    const start30 = new Date();
-    start30.setDate(start30.getDate() - 29);
-    const startKey = toDateKey(start30);
+    const start364 = new Date();
+    start364.setDate(start364.getDate() - 363);
+    const startKey = toDateKey(start364);
     const endKey = toDateKey(new Date());
     const allLogs = await listWorkoutLogsForRange(startKey, endKey);
     setLogs(allLogs.slice(0, 30));
-    setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 30));
-    setWorkoutFreqData(buildWorkoutFrequency(allLogs, 30));
+    setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 364));
+    setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
   }, []);
 
   useFocusEffect(
@@ -161,6 +163,8 @@ export function WorkoutScreen() {
   }
 
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
+  const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
+  const workoutDaysCount = workoutActivityDays.filter((d) => d.active).length;
 
   if (currentView.type === "session") {
     return (
@@ -189,6 +193,45 @@ export function WorkoutScreen() {
           workoutStripHasActivity ? "Create simple routines and mark completions." : undefined
         }
       />
+      <View className="mb-4 flex-row gap-3">
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>💪</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.workout,
+                  marginTop: 2,
+                }}
+              >
+                {workoutDaysCount}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>workout days</Text>
+            </View>
+          </Card>
+        </View>
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>📅</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.workout,
+                  marginTop: 2,
+                }}
+              >
+                {workoutStreak}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>day streak</Text>
+            </View>
+          </Card>
+        </View>
+      </View>
+
       {!workoutStripHasActivity ? (
         <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
           <Text className="text-center text-sm text-slate-500">
@@ -235,14 +278,6 @@ export function WorkoutScreen() {
       <View className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
         <Text className="mb-3 text-sm font-semibold text-slate-700">Workout history</Text>
 
-        <ActivityPreviewStrip
-          days={workoutActivityDays}
-          accentColor={COLOR}
-          statLabel={`${workoutActivityDays.filter((d) => d.active).length} workout days in last 30 days`}
-          emptyLabel="Complete a workout to start tracking"
-          showLabel={workoutStripHasActivity}
-        />
-
         {logs.length === 0 ? (
           <View className="items-center py-4">
             <Text className="text-center text-sm text-slate-400">
@@ -260,7 +295,12 @@ export function WorkoutScreen() {
         )}
 
         <View className="mt-2">
-          <WorkoutFrequencyChart data={workoutFreqData} />
+          <GitHubHeatmap
+            days={workoutHeatmapDays}
+            color={SECTION_COLORS.workout}
+            label="Session intensity — last 52 weeks"
+            weeks={52}
+          />
         </View>
       </View>
     </Screen>

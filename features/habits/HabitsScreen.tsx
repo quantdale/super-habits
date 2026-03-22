@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
@@ -21,17 +21,13 @@ import {
   updateHabit,
 } from "@/features/habits/habits.data";
 import {
+  buildAggregatedHabitHeatmap,
   buildDayCompletions,
-  buildGridDateHeaders,
-  buildHabitActivityDays,
   buildHabitGrid,
   calculateCurrentStreak,
   calculateOverallConsistency,
-  getStreakLabel,
-  type GridDateHeader,
-  type HabitGridRow,
 } from "@/features/habits/habits.domain";
-import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { HabitCircle } from "@/features/habits/HabitCircle";
 import { HabitsOverviewGrid } from "@/features/habits/HabitsOverviewGrid";
 import {
@@ -40,7 +36,15 @@ import {
   HABIT_COLORS,
   HABIT_ICONS,
 } from "@/features/habits/habitPresets";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_COLORS_LIGHT } from "@/constants/sectionColors";
+import { toDateKey } from "@/lib/time";
+
+const TIME_GROUPS = [
+  { key: "anytime" as const, label: "Anytime", icon: "🔄" },
+  { key: "morning" as const, label: "Morning", icon: "☀️" },
+  { key: "afternoon" as const, label: "Afternoon", icon: "⛅" },
+  { key: "evening" as const, label: "Evening", icon: "🌙" },
+] as const;
 
 const CATEGORIES: HabitCategory[] = ["anytime", "morning", "afternoon", "evening"];
 const CATEGORY_LABELS: Record<HabitCategory, string> = {
@@ -49,30 +53,7 @@ const CATEGORY_LABELS: Record<HabitCategory, string> = {
   afternoon: "Afternoon",
   evening: "Evening",
 };
-type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 const COLOR = SECTION_COLORS.habits;
-
-const CATEGORY_ICONS: Record<HabitCategory, MaterialIconName> = {
-  anytime: "schedule",
-  morning: "wb-sunny",
-  afternoon: "wb-cloudy",
-  evening: "nights-stay",
-};
-
-function groupHabitsByCategory(habits: Habit[]): Record<HabitCategory, Habit[]> {
-  const groups: Record<HabitCategory, Habit[]> = {
-    anytime: [],
-    morning: [],
-    afternoon: [],
-    evening: [],
-  };
-  for (const habit of habits) {
-    const cat = (habit.category ?? "anytime") as HabitCategory;
-    if (groups[cat]) groups[cat].push(habit);
-    else groups.anytime.push(habit);
-  }
-  return groups;
-}
 
 export function HabitsScreen() {
   const { height: windowHeight } = useWindowDimensions();
@@ -88,10 +69,8 @@ export function HabitsScreen() {
   const [category, setCategory] = useState<HabitCategory>("anytime");
   const [icon, setIcon] = useState<HabitIcon>(DEFAULT_HABIT_ICON);
   const [color, setColor] = useState(DEFAULT_HABIT_COLOR);
-  const [overviewGrid, setOverviewGrid] = useState<HabitGridRow[]>([]);
-  const [overviewHeaders, setOverviewHeaders] = useState<GridDateHeader[]>([]);
+  const [habitHeatmapDays, setHabitHeatmapDays] = useState<HeatmapDay[]>([]);
   const [consistencyPct, setConsistencyPct] = useState(0);
-  const [habitActivityDays, setHabitActivityDays] = useState<ActivityDay[]>([]);
   const [overallStreak, setOverallStreak] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -108,24 +87,12 @@ export function HabitsScreen() {
     }
     setStreakMap(streaks);
 
-    const start = new Date();
-    start.setDate(start.getDate() - 29);
-    const startKey = (() => {
-      const y = start.getFullYear();
-      const m = String(start.getMonth() + 1).padStart(2, "0");
-      const d = String(start.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    })();
-    const endKey = (() => {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, "0");
-      const d = String(now.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    })();
+    const start364 = new Date();
+    start364.setDate(start364.getDate() - 363);
+    const startKey = toDateKey(start364);
+    const endKey = toDateKey(new Date());
 
     const allCompletions = await getAllHabitCompletionsForRange(startKey, endKey);
-    const headers = buildGridDateHeaders(30);
     const gridBuilt = buildHabitGrid(
       list.map((h) => ({
         id: h.id,
@@ -134,16 +101,13 @@ export function HabitsScreen() {
         target_per_day: h.target_per_day,
       })),
       allCompletions,
-      30,
+      364,
     );
     const pct = calculateOverallConsistency(gridBuilt);
-    setOverviewHeaders(headers);
-    setOverviewGrid(gridBuilt);
     setConsistencyPct(pct);
+    setHabitHeatmapDays(buildAggregatedHabitHeatmap(gridBuilt, 364));
 
-    const activityDays = buildHabitActivityDays(gridBuilt, 30);
     const bestStreak = Math.max(0, ...Object.values(streaks));
-    setHabitActivityDays(activityDays);
     setOverallStreak(bestStreak);
   }, []);
 
@@ -152,8 +116,6 @@ export function HabitsScreen() {
       refresh();
     }, [refresh]),
   );
-
-  const groups = useMemo(() => groupHabitsByCategory(habits), [habits]);
 
   const openAddModal = (presetCategory?: HabitCategory) => {
     setEditingHabit(null);
@@ -218,6 +180,10 @@ export function HabitsScreen() {
     [refresh],
   );
 
+  const handleAddHabitToGroup = (timeOfDay: HabitCategory) => {
+    openAddModal(timeOfDay);
+  };
+
   return (
     <Screen scroll padded>
       <View className="mb-4 flex-row items-center justify-between">
@@ -230,33 +196,85 @@ export function HabitsScreen() {
         </Pressable>
       </View>
 
+      <View className="mb-4 flex-row gap-3">
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>⚡</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.habits,
+                  marginTop: 2,
+                }}
+              >
+                {overallStreak} days
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>best streak</Text>
+            </View>
+          </Card>
+        </View>
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>📊</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.habits,
+                  marginTop: 2,
+                }}
+              >
+                {consistencyPct}%
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>consistent</Text>
+            </View>
+          </Card>
+        </View>
+      </View>
+
       <View className="bg-habits-light pb-4">
         {habits.length === 0 ? (
-          <View className="items-center px-4 py-12">
-            <View className="w-full max-w-sm items-center rounded-xl border border-slate-100 bg-white p-4">
-              <Text className="text-center text-sm text-slate-500">Add your first habit</Text>
-              <Text className="mt-1 text-center text-xs text-slate-400">Track daily consistency.</Text>
-              <Pressable
-                onPress={() => openAddModal()}
-                className="mt-4 items-center justify-center rounded-full border-2 border-dashed border-slate-300 bg-white"
-                style={{ width: 80, height: 80 }}
-              >
-                <MaterialIcons name="add" size={32} color="#94a3b8" />
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          CATEGORIES.map((cat) => (
-            <View key={cat} className="mb-6">
-              <View className="mb-2 flex-row items-center justify-center gap-2">
-                <MaterialIcons name={CATEGORY_ICONS[cat]} size={20} color="#94a3b8" />
-                <Text className="text-sm font-medium text-slate-600">{CATEGORY_LABELS[cat]}</Text>
+          <Text className="mb-4 px-4 text-center text-sm text-slate-500">
+            Pick a time of day and tap Add to create your first habit.
+          </Text>
+        ) : null}
+
+        {TIME_GROUPS.map((group) => {
+          const groupHabits = habits.filter((h) => (h.category ?? "anytime") === group.key);
+
+          return (
+            <View key={group.key} className="mb-6">
+              <View className="mb-3 flex-row items-center gap-2 px-1">
+                <Text style={{ fontSize: 16 }}>{group.icon}</Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#64748b",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {group.label}
+                </Text>
               </View>
-              <View className="flex-row flex-wrap gap-4">
-                {groups[cat].map((habit) => {
-                  const todayCount = completionMap[habit.id] ?? 0;
-                  if (editMode) {
-                    return (
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  paddingHorizontal: 4,
+                  gap: 16,
+                }}
+              >
+                {editMode
+                  ? groupHabits.map((habit) => (
                       <View key={habit.id} className="items-center" style={{ width: 88 }}>
                         <View
                           className="items-center justify-center rounded-full bg-slate-200"
@@ -297,63 +315,90 @@ export function HabitsScreen() {
                           </View>
                         </View>
                       </View>
-                    );
-                  }
-                  return (
-                    <View key={habit.id} className="items-center">
-                      <HabitCircle
-                        habit={habit}
-                        todayCount={todayCount}
-                        streak={streakMap[habit.id] ?? 0}
-                        onIncrement={() => handleIncrement(habit.id)}
-                        onDecrement={() => handleDecrement(habit.id)}
-                      />
-                      {(streakMap[habit.id] ?? 0) > 0 ? (
-                        <View className="mt-1 flex-row items-center justify-center px-1">
-                          <View className="flex-row items-center gap-1">
-                            <Text className="text-xs text-amber-500">
-                              {(streakMap[habit.id] ?? 0) > 2 ? "🔥" : "⚡"}
-                            </Text>
-                            <Text className="text-xs text-slate-500">
-                              {getStreakLabel(streakMap[habit.id] ?? 0)}
-                            </Text>
-                          </View>
+                    ))
+                  : groupHabits.map((habit) => {
+                      const todayCount = completionMap[habit.id] ?? 0;
+                      const streak = streakMap[habit.id] ?? 0;
+                      return (
+                        <View key={habit.id} className="items-center">
+                          <HabitCircle
+                            habit={habit}
+                            todayCount={todayCount}
+                            streak={streak}
+                            size={56}
+                            showName={false}
+                            showStreak={false}
+                            onIncrement={() => handleIncrement(habit.id)}
+                            onDecrement={() => handleDecrement(habit.id)}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: "#64748b",
+                              marginTop: 4,
+                              textAlign: "center",
+                              maxWidth: 64,
+                            }}
+                            numberOfLines={2}
+                          >
+                            {habit.name}
+                          </Text>
+                          {streak > 0 ? (
+                            <View className="mt-0.5 flex-row items-center gap-0.5">
+                              <Text style={{ fontSize: 10 }}>{streak > 2 ? "🔥" : "⚡"}</Text>
+                              <Text style={{ fontSize: 10, color: "#94a3b8" }}>{streak}</Text>
+                            </View>
+                          ) : null}
                         </View>
-                      ) : null}
-                    </View>
-                  );
-                })}
-                <Pressable
-                  onPress={() => openAddModal(cat)}
-                  className="items-center justify-center rounded-full border-2 border-dashed border-slate-300 bg-white"
-                  style={{ width: 80, height: 80 }}
-                >
-                  <MaterialIcons name="add" size={32} color="#94a3b8" />
-                </Pressable>
-              </View>
-            </View>
-          ))
-        )}
+                      );
+                    })}
 
-        <ActivityPreviewStrip
-          days={habitActivityDays}
-          accentColor={COLOR}
-          statLabel={
-            overallStreak > 0
-              ? `${overallStreak} day${overallStreak !== 1 ? "s" : ""} best streak`
-              : `${consistencyPct}% consistency`
-          }
-          emptyLabel="Complete habits to start your streak"
-        />
+                <Pressable
+                  onPress={() => handleAddHabitToGroup(group.key)}
+                  className="items-center justify-center"
+                  style={{ width: 64 }}
+                >
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      borderWidth: 2,
+                      borderColor: `${SECTION_COLORS.habits}60`,
+                      borderStyle: "dashed",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: SECTION_COLORS_LIGHT.habits,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 24,
+                        color: SECTION_COLORS.habits,
+                        lineHeight: 28,
+                      }}
+                    >
+                      +
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: SECTION_COLORS.habits,
+                      marginTop: 4,
+                    }}
+                  >
+                    Add
+                  </Text>
+                </Pressable>
+              </ScrollView>
+            </View>
+          );
+        })}
       </View>
 
       <View className="mt-2 pb-8">
-        <Text className="text-xs text-slate-400 mb-2">30-day overview</Text>
-        <HabitsOverviewGrid
-          grid={overviewGrid}
-          headers={overviewHeaders}
-          consistencyPercent={consistencyPct}
-        />
+        <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
       </View>
 
       <Modal

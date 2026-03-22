@@ -7,19 +7,21 @@ import { Button } from "@/core/ui/Button";
 import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
-  listPomodoroSessions,
+  listPomodoroSessionsForDateRange,
   logPomodoroSession,
   getPomodoroSettings,
   savePomodoroSettings,
 } from "@/features/pomodoro/pomodoro.data";
+import { toDateKey } from "@/lib/time";
 import type { PomodoroSession } from "./types";
 import {
   cancelScheduledNotification,
   scheduleTimerEndNotification,
 } from "@/lib/notifications";
 import {
-  buildPomodoroActivityDays,
+  buildPomodoroHeatmapDays,
   calculateGrowthProgress,
+  computeFocusStreakFromHeatmapDays,
   DEFAULT_SETTINGS,
   getModeColor,
   getModeDuration,
@@ -29,7 +31,7 @@ import {
   type PomodoroMode,
   type PomodoroSettings,
 } from "./pomodoro.domain";
-import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { FocusSprout } from "./FocusSprout";
 import { GardenGrid } from "./GardenGrid";
 import { BackgroundWarning } from "./BackgroundWarning";
@@ -60,7 +62,7 @@ export function PomodoroScreen() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
-  const [pomodoroActivityDays, setPomodoroActivityDays] = useState<ActivityDay[]>([]);
+  const [pomodoroHeatmapDays, setPomodoroHeatmapDays] = useState<HeatmapDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
 
@@ -86,9 +88,13 @@ export function PomodoroScreen() {
   }, []);
 
   useEffect(() => {
-    listPomodoroSessions(30).then((s) => {
+    const start364 = new Date();
+    start364.setDate(start364.getDate() - 363);
+    const startKey = toDateKey(start364);
+    const endKey = toDateKey(new Date());
+    listPomodoroSessionsForDateRange(startKey, endKey).then((s) => {
       setSessions(s);
-      setPomodoroActivityDays(buildPomodoroActivityDays(s, 30));
+      setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
     });
   }, [historyVersion]);
 
@@ -250,8 +256,7 @@ export function PomodoroScreen() {
   );
   const upNextMinutes = Math.round(getModeDuration(upNextMode, settings) / 60);
 
-  const pomodoroStripLabelVisible =
-    sessions.length > 0 || pomodoroActivityDays.some((d) => d.active);
+  const focusStreak = computeFocusStreakFromHeatmapDays(pomodoroHeatmapDays);
 
   return (
     <Screen scroll>
@@ -261,6 +266,47 @@ export function PomodoroScreen() {
       />
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
+
+      <View className="mb-4 flex-row gap-3">
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>🎯</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.focus,
+                  marginTop: 2,
+                }}
+              >
+                {sessions.length}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                sessions this year
+              </Text>
+            </View>
+          </Card>
+        </View>
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>🔥</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.focus,
+                  marginTop: 2,
+                }}
+              >
+                {focusStreak}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>day streak</Text>
+            </View>
+          </Card>
+        </View>
+      </View>
 
       <Card accentColor={COLOR}>
         <View className="mb-4 flex-row flex-wrap justify-center">
@@ -354,16 +400,17 @@ export function PomodoroScreen() {
         ) : null}
       </Card>
 
-      <ActivityPreviewStrip
-        days={pomodoroActivityDays}
-        accentColor={COLOR}
-        statLabel={`${sessions.length} session${sessions.length !== 1 ? "s" : ""} in last 30 days`}
-        emptyLabel="Complete a session to start your garden"
-        showLabel={pomodoroStripLabelVisible}
-      />
-
       <View className="mt-6">
         <GardenGrid sessions={sessions} />
+      </View>
+
+      <View className="mt-6">
+        <GitHubHeatmap
+          days={pomodoroHeatmapDays}
+          color={SECTION_COLORS.focus}
+          label="Focus — last 52 weeks"
+          weeks={52}
+        />
       </View>
     </Screen>
   );
