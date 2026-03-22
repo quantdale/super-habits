@@ -7,6 +7,8 @@ export type BaseEntity = {
 
 export type TodoPriority = "urgent" | "normal" | "low";
 
+export type TodoRecurrence = "daily" | null;
+
 export type Todo = BaseEntity & {
   title: string;
   notes: string | null;
@@ -14,6 +16,8 @@ export type Todo = BaseEntity & {
   due_date: string | null;
   priority: TodoPriority;
   sort_order: number;
+  recurrence: TodoRecurrence;
+  recurrence_id: string | null;
 };
 
 export type HabitCategory = "anytime" | "morning" | "afternoon" | "evening";

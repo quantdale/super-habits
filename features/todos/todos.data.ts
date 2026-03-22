@@ -1,8 +1,9 @@
 import { getDatabase } from "@/core/db/client";
-import type { Todo, TodoPriority } from "@/core/db/types";
+import type { Todo, TodoPriority, TodoRecurrence } from "@/core/db/types";
 import { createId } from "@/lib/id";
-import { nowIso } from "@/lib/time";
+import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
+import { getTomorrowDateKey } from "./todos.domain";
 
 export async function listTodos(): Promise<Todo[]> {
   const db = await getDatabase();
@@ -18,6 +19,60 @@ export async function addTodo(input: {
   notes?: string;
   dueDate?: string | null;
   priority?: TodoPriority;
+  recurrence?: TodoRecurrence;
+}): Promise<void> {
+  const db = await getDatabase();
+  const id = createId("todo");
+  const now = nowIso();
+
+  const recurrenceId = input.recurrence === "daily" ? createId("rec") : null;
+
+  const dueDate =
+    input.dueDate !== undefined
+      ? input.dueDate
+      : input.recurrence === "daily"
+        ? toDateKey()
+        : null;
+
+  const maxRow = await db.getFirstAsync<{ maxOrder: number }>(
+    `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
+     FROM todos WHERE deleted_at IS NULL AND completed = 0`,
+  );
+  const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
+
+  await db.runAsync(
+    `INSERT INTO todos
+       (id, title, notes, completed, due_date, priority,
+        sort_order, recurrence, recurrence_id,
+        created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    [
+      id,
+      input.title,
+      input.notes ?? null,
+      dueDate,
+      input.priority ?? "normal",
+      sortOrder,
+      input.recurrence ?? null,
+      recurrenceId,
+      now,
+      now,
+    ],
+  );
+  syncEngine.enqueue({
+    entity: "todos",
+    id,
+    updatedAt: now,
+    operation: "create",
+  });
+}
+
+export async function createRecurringInstance(input: {
+  title: string;
+  notes: string | null;
+  priority: TodoPriority;
+  recurrenceId: string;
+  dueDate: string;
 }): Promise<void> {
   const db = await getDatabase();
   const id = createId("todo");
@@ -32,25 +87,58 @@ export async function addTodo(input: {
   await db.runAsync(
     `INSERT INTO todos
        (id, title, notes, completed, due_date, priority,
-        sort_order, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, NULL)`,
+        sort_order, recurrence, recurrence_id,
+        created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, 0, ?, ?, ?, 'daily', ?, ?, ?, NULL)`,
     [
       id,
       input.title,
-      input.notes ?? null,
-      input.dueDate ?? null,
-      input.priority ?? "normal",
+      input.notes,
+      input.dueDate,
+      input.priority,
       sortOrder,
+      input.recurrenceId,
       now,
       now,
     ],
   );
+
   syncEngine.enqueue({
     entity: "todos",
     id,
     updatedAt: now,
     operation: "create",
   });
+}
+
+export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<Todo[]> {
+  if (recurrenceIds.length === 0) return [];
+  const db = await getDatabase();
+
+  const results: Todo[] = [];
+  for (const recId of recurrenceIds) {
+    const row = await db.getFirstAsync<Todo>(
+      `SELECT * FROM todos
+       WHERE recurrence_id = ?
+         AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [recId],
+    );
+    if (row) results.push(row);
+  }
+  return results;
+}
+
+export async function listAllActiveTodosForRecurrence(): Promise<
+  Pick<Todo, "recurrence_id" | "recurrence" | "due_date" | "deleted_at">[]
+> {
+  const db = await getDatabase();
+  return db.getAllAsync(
+    `SELECT recurrence_id, recurrence, due_date, deleted_at
+     FROM todos
+     WHERE deleted_at IS NULL`,
+  );
 }
 
 export async function updateTodoOrder(orderedIds: string[]): Promise<void> {
@@ -119,6 +207,26 @@ export async function toggleTodo(todo: Todo): Promise<void> {
   const next = todo.completed === 1 ? 0 : 1;
   await db.runAsync("UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?", [next, now, todo.id]);
   syncEngine.enqueue({ entity: "todos", id: todo.id, updatedAt: now, operation: "update" });
+
+  if (next === 1 && todo.recurrence === "daily" && todo.recurrence_id) {
+    const tomorrow = getTomorrowDateKey();
+    const existing = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM todos
+       WHERE recurrence_id = ?
+         AND due_date = ?
+         AND deleted_at IS NULL`,
+      [todo.recurrence_id, tomorrow],
+    );
+    if (!existing) {
+      await createRecurringInstance({
+        title: todo.title,
+        notes: todo.notes,
+        priority: todo.priority,
+        recurrenceId: todo.recurrence_id,
+        dueDate: tomorrow,
+      });
+    }
+  }
 }
 
 export async function removeTodo(id: string): Promise<void> {

@@ -12,6 +12,7 @@
  * | workout (routine/log)| wrk   |
  * | pomodoro_sessions   | pom    |
  * | guest (app_meta)    | guest  |
+ * | recurring todo ser. | rec    |
  */
 export function createId(prefix: string): string {
   const random = Math.random().toString(36).slice(2, 10);

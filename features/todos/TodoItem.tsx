@@ -39,9 +39,16 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
             />
           </Pressable>
           <Pressable onPress={onToggle} className="min-w-0 flex-1">
-            <Text className={`text-base ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>
-              {todo.title}
-            </Text>
+            <View className="flex-row flex-wrap items-center gap-1">
+              <Text className={`text-base ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                {todo.title}
+              </Text>
+              {todo.recurrence === "daily" ? (
+                <View className="ml-1 self-start rounded border border-brand-200 bg-brand-50 px-1.5 py-0.5">
+                  <Text className="text-xs text-brand-500">↻ daily</Text>
+                </View>
+              ) : null}
+            </View>
             {todo.notes ? <Text className="mt-1 text-sm text-slate-500">{todo.notes}</Text> : null}
             <View className="mt-2 flex-row flex-wrap gap-2">
               {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} /> : null}

@@ -6,6 +6,7 @@ import {
   buildMacroDonutData,
   calculateGoalProgress,
   filterSavedMeals,
+  buildCalorieActivityDays,
 } from "@/features/calories/calories.domain";
 import type { DailySummary } from "@/features/calories/calories.data";
 import type { SavedMeal } from "@/core/db/types";
@@ -115,6 +116,37 @@ describe("calculateGoalProgress", () => {
 
   it("remaining is 0 when over goal", () => {
     expect(calculateGoalProgress(2500, 2000).remaining).toBe(0);
+  });
+});
+
+describe("buildCalorieActivityDays", () => {
+  it("marks days inactive with zero value when no summaries", () => {
+    const days = buildCalorieActivityDays([], 2000, 7);
+    expect(days).toHaveLength(7);
+    expect(days.every((d) => !d.active && d.value === 0)).toBe(true);
+  });
+
+  it("sets active and caps value at 1 vs goal", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const summaries: DailySummary[] = [
+      {
+        dateKey: todayKey,
+        totalCalories: 1000,
+        totalProtein: 0,
+        totalCarbs: 0,
+        totalFats: 0,
+        totalFiber: 0,
+      },
+    ];
+    const activity = buildCalorieActivityDays(summaries, 2000, 7);
+    const todayEntry = activity.find((a) => a.dateKey === todayKey);
+    expect(todayEntry?.active).toBe(true);
+    expect(todayEntry?.value).toBe(0.5);
   });
 });
 

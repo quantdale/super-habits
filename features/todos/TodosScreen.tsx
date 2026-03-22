@@ -11,8 +11,12 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { toDateKey } from "@/lib/time";
 import type { Todo, TodoPriority } from "./types";
 import { TodoItem } from "./TodoItem";
+import { findMissingRecurrenceIds, getTodayDateKey } from "./todos.domain";
 import {
   addTodo,
+  createRecurringInstance,
+  getRecurringTodosByIds,
+  listAllActiveTodosForRecurrence,
   listTodos,
   removeTodo,
   toggleTodo,
@@ -26,6 +30,7 @@ export function TodosScreen() {
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [priority, setPriority] = useState<TodoPriority>("normal");
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
   const [items, setItems] = useState<Todo[]>([]);
   const [createExpanded, setCreateExpanded] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -42,10 +47,33 @@ export function TodosScreen() {
     listTodos().then(setItems);
   }, []);
 
+  const loadTodosOnFocus = useCallback(async () => {
+    const allTodos = await listAllActiveTodosForRecurrence();
+    const todayKey = getTodayDateKey();
+    const missingIds = findMissingRecurrenceIds(allTodos, todayKey);
+
+    if (missingIds.length > 0) {
+      const templates = await getRecurringTodosByIds(missingIds);
+      for (const template of templates) {
+        const recurrenceId = template.recurrence_id;
+        if (!recurrenceId) continue;
+        await createRecurringInstance({
+          title: template.title,
+          notes: template.notes,
+          priority: template.priority,
+          recurrenceId,
+          dueDate: todayKey,
+        });
+      }
+    }
+    const list = await listTodos();
+    setItems(list);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      refresh();
-    }, [refresh]),
+      void loadTodosOnFocus();
+    }, [loadTodosOnFocus]),
   );
 
   useEffect(() => {
@@ -64,6 +92,7 @@ export function TodosScreen() {
     setNotes("");
     setDueDate(null);
     setPriority("normal");
+    setIsRecurring(false);
     setEditingId(null);
     setShowDatePicker(false);
   };
@@ -86,6 +115,7 @@ export function TodosScreen() {
         notes: notes.trim() || undefined,
         dueDate: dueDate ?? null,
         priority,
+        recurrence: isRecurring ? "daily" : null,
       });
     }
     resetForm();
@@ -143,6 +173,23 @@ export function TodosScreen() {
               </Pressable>
             ))}
           </View>
+          {!editingId ? (
+            <Pressable
+              onPress={() => setIsRecurring((v) => !v)}
+              className="mb-3 flex-row items-center gap-2 py-2"
+            >
+              <View
+                className={`h-5 w-5 items-center justify-center rounded border-2 ${
+                  isRecurring ? "border-brand-500 bg-brand-500" : "border-slate-300"
+                }`}
+              >
+                {isRecurring ? (
+                  <Text className="text-xs font-bold text-white">↻</Text>
+                ) : null}
+              </View>
+              <Text className="text-sm text-slate-600">Repeat daily</Text>
+            </Pressable>
+          ) : null}
           {Platform.OS === "web" ? (
             <TextField
               label="Due date (YYYY-MM-DD)"

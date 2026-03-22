@@ -8,6 +8,7 @@ import {
   buildGridDateHeaders,
   buildHabitGrid,
   calculateOverallConsistency,
+  buildHabitActivityDays,
   type DayCompletion,
 } from "@/features/habits/habits.domain";
 import type { HabitCompletionRow } from "@/features/habits/habits.data";
@@ -208,6 +209,36 @@ describe("buildHabitGrid", () => {
     const todayCell = h2Row.cells.find((c) => c.dateKey === todayKey)!;
     expect(todayCell.completed).toBe(false);
     expect(todayCell.partial).toBe(true);
+  });
+});
+
+describe("buildHabitActivityDays", () => {
+  it("returns inactive days when grid is empty", () => {
+    const days = buildHabitActivityDays([], 14);
+    expect(days).toHaveLength(14);
+    expect(days.every((d) => !d.active)).toBe(true);
+  });
+
+  it("sets active and value from fraction of habits completed that day", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const habits = [
+      { id: "h1", name: "Run", color: "#4f79ff", target_per_day: 1 },
+      { id: "h2", name: "Read", color: "#22c55e", target_per_day: 1 },
+    ];
+    const grid = buildHabitGrid(
+      habits,
+      [{ habit_id: "h1", date_key: todayKey, count: 1 }],
+      30,
+    );
+    const activity = buildHabitActivityDays(grid, 30);
+    const todayEntry = activity.find((a) => a.dateKey === todayKey);
+    expect(todayEntry?.active).toBe(true);
+    expect(todayEntry?.value).toBe(0.5);
   });
 });
 
