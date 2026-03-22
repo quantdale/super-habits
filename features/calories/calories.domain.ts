@@ -1,4 +1,5 @@
 import type { DailySummary } from "./calories.data";
+import type { SavedMeal } from "@/core/db/types";
 
 /**
  * (protein × 4) + ((carbs − fiber) × 4) + (fiber × 2) + (fat × 9)
@@ -107,4 +108,15 @@ export function calculateGoalProgress(
     remaining: Math.max(0, goal - actual),
     over: actual > goal,
   };
+}
+
+/**
+ * Client-side filter for saved meals search.
+ * Used to filter the already-loaded list without a DB round-trip
+ * when the user types in the search input.
+ */
+export function filterSavedMeals(meals: SavedMeal[], query: string): SavedMeal[] {
+  if (!query.trim()) return meals;
+  const q = query.trim().toLowerCase();
+  return meals.filter((m) => m.food_name.toLowerCase().includes(q));
 }

@@ -1,5 +1,5 @@
 import { getDatabase } from "@/core/db/client";
-import { CalorieEntry } from "@/core/db/types";
+import { CalorieEntry, SavedMeal } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -112,6 +112,112 @@ export async function addCalorieEntry(input: {
     ],
   );
   syncEngine.enqueue({ entity: "calorie_entries", id, updatedAt: now, operation: "create" });
+  await upsertSavedMeal({
+    foodName: input.foodName,
+    calories: input.calories,
+    protein: input.protein ?? 0,
+    carbs: input.carbs ?? 0,
+    fats: input.fats ?? 0,
+    fiber: input.fiber ?? 0,
+    mealType: input.mealType,
+  });
+}
+
+export async function upsertSavedMeal(input: {
+  foodName: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  mealType: string;
+}): Promise<void> {
+  if (!input.foodName?.trim()) return;
+
+  const db = await getDatabase();
+  const now = nowIso();
+
+  const existing = await db.getFirstAsync<SavedMeal>(
+    `SELECT * FROM saved_meals
+     WHERE food_name = ? COLLATE NOCASE`,
+    [input.foodName],
+  );
+
+  if (existing) {
+    await db.runAsync(
+      `UPDATE saved_meals SET
+         calories     = ?,
+         protein      = ?,
+         carbs        = ?,
+         fats         = ?,
+         fiber        = ?,
+         meal_type    = ?,
+         use_count    = use_count + 1,
+         last_used_at = ?
+       WHERE id = ?`,
+      [
+        input.calories,
+        input.protein,
+        input.carbs,
+        input.fats,
+        input.fiber,
+        input.mealType,
+        now,
+        existing.id,
+      ],
+    );
+  } else {
+    const id = createId("smeal");
+    await db.runAsync(
+      `INSERT INTO saved_meals
+         (id, food_name, calories, protein, carbs, fats, fiber,
+          meal_type, use_count, last_used_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      [
+        id,
+        input.foodName,
+        input.calories,
+        input.protein,
+        input.carbs,
+        input.fats,
+        input.fiber,
+        input.mealType,
+        now,
+        now,
+      ],
+    );
+  }
+}
+
+export async function listRecentSavedMeals(limit: number = 5): Promise<SavedMeal[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<SavedMeal>(
+    `SELECT * FROM saved_meals
+     ORDER BY last_used_at DESC
+     LIMIT ?`,
+    [limit],
+  );
+}
+
+export async function searchSavedMeals(query: string): Promise<SavedMeal[]> {
+  const db = await getDatabase();
+  if (!query.trim()) {
+    return db.getAllAsync<SavedMeal>(
+      `SELECT * FROM saved_meals
+       ORDER BY use_count DESC, last_used_at DESC`,
+    );
+  }
+  return db.getAllAsync<SavedMeal>(
+    `SELECT * FROM saved_meals
+     WHERE food_name LIKE ? COLLATE NOCASE
+     ORDER BY use_count DESC, last_used_at DESC`,
+    [`%${query.trim()}%`],
+  );
+}
+
+export async function deleteSavedMeal(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(`DELETE FROM saved_meals WHERE id = ?`, [id]);
 }
 
 export async function deleteCalorieEntry(id: string): Promise<void> {

@@ -103,3 +103,17 @@ export type CalorieEntry = BaseEntity & {
   meal_type: "breakfast" | "lunch" | "dinner" | "snack";
   consumed_on: string;
 };
+
+export type SavedMeal = {
+  id: string;
+  food_name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  meal_type: string;
+  use_count: number;
+  last_used_at: string;
+  created_at: string;
+};

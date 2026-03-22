@@ -10,6 +10,8 @@ import {
   addCalorieEntry,
   deleteCalorieEntry,
   listCalorieEntries,
+  listRecentSavedMeals,
+  searchSavedMeals,
   getCalorieSummaryByRange,
   getCalorieGoal,
   setCalorieGoal,
@@ -25,10 +27,12 @@ import {
   kcalFromMacros,
 } from "@/features/calories/calories.domain";
 import { toDateKey } from "@/lib/time";
-import type { CalorieEntry, MealType } from "./types";
+import type { CalorieEntry, MealType, SavedMeal } from "./types";
 import { MacroDonutChart } from "./MacroDonutChart";
 import { WeeklyCalorieChart } from "./WeeklyCalorieChart";
 import { CalorieGoalSheet } from "./CalorieGoalSheet";
+import { SavedMealChips } from "./SavedMealChips";
+import { SavedMealSearchSheet } from "./SavedMealSearchSheet";
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "breakfast", label: "Breakfast" },
@@ -50,10 +54,18 @@ export function CaloriesScreen() {
   const [weeklyData, setWeeklyData] = useState<DailySummary[]>([]);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
   const [weeklyVisible, setWeeklyVisible] = useState(false);
+  const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
+  const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
+  const [searchSheetVisible, setSearchSheetVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await listCalorieEntries();
     setEntries(next);
+
+    const recent = await listRecentSavedMeals(5);
+    const all = await searchSavedMeals("");
+    setRecentMeals(recent);
+    setAllSavedMeals(all);
 
     const start = new Date();
     start.setDate(start.getDate() - 6);
@@ -100,6 +112,15 @@ export function CaloriesScreen() {
     [protein, carbs, fats, fiber],
   );
 
+  const handleSelectSavedMeal = (meal: SavedMeal) => {
+    setFood(meal.food_name);
+    setProtein(String(meal.protein));
+    setCarbs(String(meal.carbs));
+    setFats(String(meal.fats));
+    setFiber(String(meal.fiber));
+    setMealType(meal.meal_type as MealType);
+  };
+
   const onAdd = () => {
     void (async () => {
       setFormError(null);
@@ -144,6 +165,17 @@ export function CaloriesScreen() {
     <Screen scroll>
       <SectionTitle title="Calories" subtitle="Manual nutrition entry for MVP." />
       <Card>
+        <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
+        {allSavedMeals.length > 0 ? (
+          <Pressable
+            onPress={() => setSearchSheetVisible(true)}
+            className="flex-row items-center gap-1 mb-3"
+          >
+            <Text className="text-xs text-brand-500">
+              🔍 Search saved meals ({allSavedMeals.length})
+            </Text>
+          </Pressable>
+        ) : null}
         <TextField label="Food" value={food} onChangeText={setFood} placeholder="Greek yogurt" />
         <View className="flex-row gap-2">
           <View className="flex-1">
@@ -235,6 +267,19 @@ export function CaloriesScreen() {
           setGoal(newGoal);
         }}
         onClose={() => setGoalSheetVisible(false)}
+      />
+
+      <SavedMealSearchSheet
+        visible={searchSheetVisible}
+        meals={allSavedMeals}
+        onSelect={(meal) => {
+          handleSelectSavedMeal(meal);
+          setSearchSheetVisible(false);
+        }}
+        onClose={() => setSearchSheetVisible(false)}
+        onDeleted={() => {
+          void refresh();
+        }}
       />
 
       {entries.map((entry) => (

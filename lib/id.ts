@@ -8,6 +8,7 @@
  * | habits              | habit  |
  * | habit_completions   | hcmp   |
  * | calorie_entries     | cal    |
+ * | saved_meals         | smeal  |
  * | workout (routine/log)| wrk   |
  * | pomodoro_sessions   | pom    |
  * | guest (app_meta)    | guest  |

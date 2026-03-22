@@ -5,8 +5,26 @@ import {
   buildWeeklyTrend,
   buildMacroDonutData,
   calculateGoalProgress,
+  filterSavedMeals,
 } from "@/features/calories/calories.domain";
 import type { DailySummary } from "@/features/calories/calories.data";
+import type { SavedMeal } from "@/core/db/types";
+
+function meal(name: string, useCount = 1): SavedMeal {
+  return {
+    id: `smeal_${name}`,
+    food_name: name,
+    calories: 200,
+    protein: 20,
+    carbs: 10,
+    fats: 5,
+    fiber: 2,
+    meal_type: "breakfast",
+    use_count: useCount,
+    last_used_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  };
+}
 
 describe("caloriesTotal", () => {
   it("sums entries correctly", () => {
@@ -97,5 +115,28 @@ describe("calculateGoalProgress", () => {
 
   it("remaining is 0 when over goal", () => {
     expect(calculateGoalProgress(2500, 2000).remaining).toBe(0);
+  });
+});
+
+describe("filterSavedMeals", () => {
+  const meals = [meal("Chicken breast"), meal("Chicken thigh"), meal("Oats"), meal("Greek yogurt")];
+
+  it("returns all meals for empty query", () => {
+    expect(filterSavedMeals(meals, "")).toHaveLength(4);
+  });
+
+  it("filters case-insensitively", () => {
+    expect(filterSavedMeals(meals, "chicken")).toHaveLength(2);
+    expect(filterSavedMeals(meals, "CHICKEN")).toHaveLength(2);
+  });
+
+  it("returns empty array when no match", () => {
+    expect(filterSavedMeals(meals, "pizza")).toHaveLength(0);
+  });
+
+  it("returns single match", () => {
+    const result = filterSavedMeals(meals, "oats");
+    expect(result).toHaveLength(1);
+    expect(result[0].food_name).toBe("Oats");
   });
 });

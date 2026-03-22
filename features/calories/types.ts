@@ -1,4 +1,4 @@
-export type { CalorieEntry } from "@/core/db/types";
+export type { CalorieEntry, SavedMeal } from "@/core/db/types";
 
 export type MealType = import("@/core/db/types").CalorieEntry["meal_type"];
 

@@ -210,6 +210,33 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
        VALUES ('db_schema_version', '7')`,
     );
   }
+  if (version < 8) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS saved_meals (
+        id          TEXT PRIMARY KEY NOT NULL,
+        food_name   TEXT NOT NULL,
+        calories    INTEGER NOT NULL,
+        protein     REAL NOT NULL DEFAULT 0,
+        carbs       REAL NOT NULL DEFAULT 0,
+        fats        REAL NOT NULL DEFAULT 0,
+        fiber       REAL NOT NULL DEFAULT 0,
+        meal_type   TEXT NOT NULL DEFAULT 'breakfast',
+        use_count   INTEGER NOT NULL DEFAULT 1,
+        last_used_at TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_meals_food_name
+      ON saved_meals (food_name COLLATE NOCASE);
+    `);
+
+    await db.runAsync(
+      `INSERT OR REPLACE INTO app_meta (key, value)
+       VALUES ('db_schema_version', '8')`,
+    );
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
