@@ -7,16 +7,16 @@ type ScreenProps = PropsWithChildren<{
 }>;
 
 export function Screen({ children, scroll = false, padded = true }: ScreenProps) {
-  const paddedClass = padded ? "bg-slate-50 px-4 py-3 pb-8" : "bg-slate-50";
+  const paddedClass = padded ? "bg-surface px-4 py-3 pb-8" : "bg-surface";
   const scrollContent = <View className={paddedClass}>{children}</View>;
   const fillContent = (
-    <View className={padded ? "flex-1 bg-slate-50 px-4 py-3" : "flex-1 bg-slate-50"}>
+    <View className={padded ? "flex-1 bg-surface px-4 py-3" : "flex-1 bg-surface"}>
       {children}
     </View>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaView className="flex-1 bg-surface">
       {scroll ? (
         <ScrollView
           className="flex-1"

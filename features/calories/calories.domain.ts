@@ -1,6 +1,7 @@
 import type { DailySummary } from "./calories.data";
 import type { SavedMeal } from "@/core/db/types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 
 function buildDateRange(days: number): string[] {
   const result: string[] = [];
@@ -88,10 +89,10 @@ export function buildMacroDonutData(
   if (totalKcal === 0) return [];
 
   const raw = [
-    { kcal: proteinKcal, color: "#4f79ff", label: "Protein" as const, grams: protein },
-    { kcal: carbsKcal, color: "#f59e0b", label: "Carbs" as const, grams: digestibleCarbs },
-    { kcal: fatsKcal, color: "#10b981", label: "Fats" as const, grams: fats },
-    { kcal: fiberKcal, color: "#8b5cf6", label: "Fiber" as const, grams: fiber },
+    { kcal: proteinKcal, color: SECTION_COLORS.todos, label: "Protein" as const, grams: protein },
+    { kcal: carbsKcal, color: SECTION_COLORS.calories, label: "Carbs" as const, grams: digestibleCarbs },
+    { kcal: fatsKcal, color: SECTION_COLORS.workout, label: "Fats" as const, grams: fats },
+    { kcal: fiberKcal, color: SECTION_COLORS.habits, label: "Fiber" as const, grams: fiber },
   ];
 
   const nonZero = raw.filter((s) => s.kcal > 0);

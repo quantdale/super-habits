@@ -1,12 +1,13 @@
 import React from "react";
 import { View } from "react-native";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import type { PlantStage } from "./pomodoro.domain";
 
 type Props = {
   progress: number; // 0–1
   stage: PlantStage;
-  accentColor?: string; // default brand-500
+  accentColor?: string; // default focus section color
   size?: number; // default 160
 };
 
@@ -23,7 +24,7 @@ type Props = {
 export function FocusSprout({
   progress,
   stage,
-  accentColor = "#4f79ff",
+  accentColor = SECTION_COLORS.focus,
   size = 160,
 }: Props) {
   // Stem height grows from 0 to 80px based on progress

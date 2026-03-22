@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, ScrollView } from "react-native";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import type { HabitGridRow, GridDateHeader } from "./habits.domain";
 
 type Props = {
@@ -31,7 +32,7 @@ export function HabitsOverviewGrid({ grid, headers, consistencyPercent }: Props)
   return (
     <View className="flex-1">
       <View className="flex-row items-center gap-2 mb-4 px-1">
-        <Text className="text-2xl font-semibold text-slate-800">{consistencyPercent}%</Text>
+        <Text className="text-2xl font-semibold text-habits">{consistencyPercent}%</Text>
         <Text className="text-sm text-slate-400">consistency — last 30 days</Text>
       </View>
 
@@ -69,7 +70,7 @@ export function HabitsOverviewGrid({ grid, headers, consistencyPercent }: Props)
                     ) : null}
                     <Text
                       style={{ fontSize: 9 }}
-                      className={h.isToday ? "text-brand-500 font-semibold" : "text-slate-300"}
+                      className={h.isToday ? "text-habits font-semibold" : "text-slate-300"}
                     >
                       {h.dayLabel}
                     </Text>
@@ -119,7 +120,7 @@ export function HabitsOverviewGrid({ grid, headers, consistencyPercent }: Props)
               width: 10,
               height: 10,
               borderRadius: 2,
-              backgroundColor: "#4f79ff55",
+              backgroundColor: `${SECTION_COLORS.habits}55`,
             }}
           />
           <Text className="text-xs text-slate-400">Partial</Text>
@@ -130,7 +131,7 @@ export function HabitsOverviewGrid({ grid, headers, consistencyPercent }: Props)
               width: 10,
               height: 10,
               borderRadius: 2,
-              backgroundColor: "#4f79ff",
+              backgroundColor: SECTION_COLORS.habits,
             }}
           />
           <Text className="text-xs text-slate-400">Done</Text>

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, ScrollView } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 
 type Props = {
   data: { dateKey: string; label: string; value: number }[];
@@ -10,7 +11,7 @@ export function WorkoutFrequencyChart({ data }: Props) {
   const chartData = [...data].reverse().map((d) => ({
     value: d.value,
     label: d.label,
-    frontColor: d.value > 0 ? "#4f79ff" : "#e2e8f0",
+    frontColor: d.value > 0 ? SECTION_COLORS.workout : "#e2e8f0",
     topLabelComponent: () =>
       d.value > 0 ? (
         <Text style={{ fontSize: 9, color: "#64748b", marginBottom: 2 }}>

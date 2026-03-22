@@ -4,6 +4,8 @@ import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
+import { PillChip } from "@/core/ui/PillChip";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   listPomodoroSessions,
   logPomodoroSession,
@@ -32,6 +34,8 @@ import { FocusSprout } from "./FocusSprout";
 import { GardenGrid } from "./GardenGrid";
 import { BackgroundWarning } from "./BackgroundWarning";
 import { PomodoroSettingsInline } from "./PomodoroSettingsInline";
+
+const COLOR = SECTION_COLORS.focus;
 
 function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   switch (mode) {
@@ -258,11 +262,14 @@ export function PomodoroScreen() {
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 
-      <Card>
-        <View className="mb-4 flex-row justify-center gap-2">
+      <Card accentColor={COLOR}>
+        <View className="mb-4 flex-row flex-wrap justify-center">
           {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
-            <Pressable
+            <PillChip
               key={mode}
+              label={getModeLabel(mode)}
+              active={currentMode === mode}
+              color={COLOR}
               onPress={() => {
                 if (isRunning) return;
                 setIsPaused(false);
@@ -275,24 +282,13 @@ export function PomodoroScreen() {
                 setStartedAt(null);
                 startedAtRef.current = null;
               }}
-              className={`rounded-full border px-3 py-1.5 ${
-                currentMode === mode ? "border-brand-500 bg-brand-500" : "border-slate-200 bg-white"
-              }`}
-            >
-              <Text
-                className={`text-xs font-medium ${
-                  currentMode === mode ? "text-white" : "text-slate-500"
-                }`}
-              >
-                {getModeLabel(mode)}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
 
         {showSprout ? (
           <View className="my-4 items-center">
-            <FocusSprout progress={growthProgress} stage={plantStage} size={160} />
+            <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
           </View>
         ) : null}
 
@@ -313,7 +309,7 @@ export function PomodoroScreen() {
             <View
               key={i}
               className={`h-2 w-2 rounded-full ${
-                i < completedFocus % settings.sessionsBeforeLongBreak ? "bg-brand-500" : "bg-slate-200"
+                i < completedFocus % settings.sessionsBeforeLongBreak ? "bg-focus" : "bg-slate-200"
               }`}
             />
           ))}
@@ -329,7 +325,7 @@ export function PomodoroScreen() {
 
         <View className="mt-4 gap-3">
           {!isRunning && !isPaused && remaining === totalSeconds ? (
-            <Button label={startLabel} onPress={start} />
+            <Button label={startLabel} onPress={start} color={COLOR} />
           ) : null}
 
           {isRunning ? (
@@ -341,13 +337,13 @@ export function PomodoroScreen() {
 
           {isPaused && !isRunning ? (
             <View className="flex-row gap-3">
-              <Button label="Resume" onPress={resume} />
+              <Button label="Resume" onPress={resume} color={COLOR} />
               <Button label="Reset" variant="ghost" onPress={reset} />
             </View>
           ) : null}
 
           {remaining === 0 && !isRunning && !isPaused ? (
-            <Button label={startLabel} onPress={start} />
+            <Button label={startLabel} onPress={start} color={COLOR} />
           ) : null}
         </View>
 
@@ -360,7 +356,7 @@ export function PomodoroScreen() {
 
       <ActivityPreviewStrip
         days={pomodoroActivityDays}
-        accentColor="#4f79ff"
+        accentColor={COLOR}
         statLabel={`${sessions.length} session${sessions.length !== 1 ? "s" : ""} in last 30 days`}
         emptyLabel="Complete a session to start your garden"
         showLabel={pomodoroStripLabelVisible}

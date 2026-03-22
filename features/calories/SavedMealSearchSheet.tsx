@@ -55,7 +55,7 @@ export function SavedMealSearchSheet({
         <View className="flex-row items-center justify-between px-4 pt-5 pb-3 border-b border-slate-100">
           <Text className="text-base font-semibold text-slate-800">Saved meals</Text>
           <Pressable onPress={onClose}>
-            <Text className="text-brand-500 text-sm">Done</Text>
+            <Text className="text-calories text-sm">Done</Text>
           </Pressable>
         </View>
 

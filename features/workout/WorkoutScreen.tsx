@@ -23,6 +23,9 @@ import { toDateKey } from "@/lib/time";
 import { RoutineDetailScreen } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
+import { SECTION_COLORS } from "@/constants/sectionColors";
+
+const COLOR = SECTION_COLORS.workout;
 
 type ViewState =
   | { type: "list" }
@@ -34,11 +37,13 @@ function RoutineSwipeRow({
   onOpenDetail,
   onCompleteWorkout,
   onRequestDelete,
+  accentColor,
 }: {
   routine: WorkoutRoutine;
   onOpenDetail: () => void;
   onCompleteWorkout: () => void;
   onRequestDelete: () => void;
+  accentColor: string;
 }) {
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -61,7 +66,7 @@ function RoutineSwipeRow({
       rightThreshold={40}
       overshootRight={false}
     >
-      <Card>
+      <Card accentColor={accentColor}>
         <Pressable onPress={onOpenDetail}>
           <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
           {routine.description ? (
@@ -69,10 +74,7 @@ function RoutineSwipeRow({
           ) : null}
         </Pressable>
         <View className="mt-3">
-          <Button
-            label="Complete workout"
-            onPress={onCompleteWorkout}
-          />
+          <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
         </View>
       </Card>
     </Swipeable>
@@ -197,7 +199,7 @@ export function WorkoutScreen() {
           </Text>
         </View>
       ) : null}
-      <Card>
+      <Card accentColor={COLOR}>
         <TextField label="Routine name" value={name} onChangeText={setName} placeholder="Push Day" />
         <TextField
           label="Description"
@@ -205,13 +207,14 @@ export function WorkoutScreen() {
           onChangeText={setDescription}
           placeholder="Bench + accessories"
         />
-        <Button label="Add routine" onPress={onCreate} />
+        <Button label="Add routine" onPress={onCreate} color={COLOR} />
       </Card>
 
       {routines.map((routine) => (
         <RoutineSwipeRow
           key={routine.id}
           routine={routine}
+          accentColor={COLOR}
           onOpenDetail={() =>
             setCurrentView({
               type: "detail",
@@ -234,7 +237,7 @@ export function WorkoutScreen() {
 
         <ActivityPreviewStrip
           days={workoutActivityDays}
-          accentColor="#4f79ff"
+          accentColor={COLOR}
           statLabel={`${workoutActivityDays.filter((d) => d.active).length} workout days in last 30 days`}
           emptyLabel="Complete a workout to start tracking"
           showLabel={workoutStripHasActivity}

@@ -6,6 +6,8 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
+import { PillChip } from "@/core/ui/PillChip";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   addCalorieEntry,
   deleteCalorieEntry,
@@ -35,6 +37,8 @@ import { WeeklyCalorieChart } from "./WeeklyCalorieChart";
 import { CalorieGoalSheet } from "./CalorieGoalSheet";
 import { SavedMealChips } from "./SavedMealChips";
 import { SavedMealSearchSheet } from "./SavedMealSearchSheet";
+
+const COLOR = SECTION_COLORS.calories;
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "breakfast", label: "Breakfast" },
@@ -178,14 +182,14 @@ export function CaloriesScreen() {
   return (
     <Screen scroll>
       <SectionTitle title="Calories" subtitle="Manual nutrition entry for MVP." />
-      <Card>
+      <Card accentColor={COLOR}>
         <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
         {allSavedMeals.length > 0 ? (
           <Pressable
             onPress={() => setSearchSheetVisible(true)}
             className="flex-row items-center gap-1 mb-3"
           >
-            <Text className="text-xs text-brand-500">
+            <Text className="text-xs text-calories">
               🔍 Search saved meals ({allSavedMeals.length})
             </Text>
           </Pressable>
@@ -217,31 +221,23 @@ export function CaloriesScreen() {
           </Text>
         </View>
         <Text className="mb-2 text-sm font-medium text-slate-700">Meal</Text>
-        <View className="mb-4 flex-row flex-wrap gap-2">
+        <View className="mb-4 flex-row flex-wrap">
           {MEAL_OPTIONS.map(({ value, label }) => (
-            <Pressable
+            <PillChip
               key={value}
+              label={label}
+              active={mealType === value}
+              color={COLOR}
               onPress={() => setMealType(value)}
-              className={`rounded-xl px-3 py-2 ${
-                mealType === value ? "bg-brand-500" : "bg-slate-200"
-              }`}
-            >
-              <Text
-                className={`text-center text-sm font-semibold ${
-                  mealType === value ? "text-white" : "text-slate-700"
-                }`}
-              >
-                {label}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
         {formError ? <Text className="mb-2 text-sm text-rose-600">{formError}</Text> : null}
-        <Button label="Add entry" onPress={onAdd} />
+        <Button label="Add entry" onPress={onAdd} color={COLOR} />
       </Card>
 
-      <Card>
-        <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-3">
+      <Card accentColor={COLOR}>
+        <View className="mb-3 items-center rounded-xl border border-calories bg-white p-3">
           <Text className="text-center text-sm font-medium text-slate-600">{consistencyText}</Text>
         </View>
 
@@ -249,14 +245,14 @@ export function CaloriesScreen() {
           <View className="mb-1 flex-row items-center justify-center gap-8">
             <Text className="text-sm text-slate-600">Today: {caloriesTotal(entries)} kcal</Text>
             <Pressable onPress={() => setGoalSheetVisible(true)}>
-              <Text className="text-sm text-brand-500">
+              <Text className="text-sm text-calories">
                 Goal: {goal.calories} kcal ✎
               </Text>
             </Pressable>
           </View>
           <View className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
             <View
-              className={`h-full rounded-full ${goalProgress.over ? "bg-rose-400" : "bg-brand-500"}`}
+              className={`h-full rounded-full ${goalProgress.over ? "bg-rose-400" : "bg-calories"}`}
               style={{ width: `${goalProgress.percent}%` }}
             />
           </View>
@@ -271,7 +267,7 @@ export function CaloriesScreen() {
 
         <ActivityPreviewStrip
           days={calorieActivityDays}
-          accentColor="#4f79ff"
+          accentColor={COLOR}
           statLabel=""
           emptyLabel="Log food to start tracking"
           showLabel={false}
@@ -302,7 +298,7 @@ export function CaloriesScreen() {
       />
 
       {entries.map((entry) => (
-        <Card key={entry.id}>
+        <Card key={entry.id} accentColor={COLOR}>
           <Text className="text-base font-semibold text-slate-900">
             {entry.food_name} - {entry.calories} kcal
           </Text>
@@ -324,7 +320,7 @@ export function CaloriesScreen() {
 
       <View className="mt-4">
         <Pressable onPress={() => setWeeklyVisible((v) => !v)}>
-          <Text className="text-xs text-brand-500 text-center py-2">
+          <Text className="text-xs text-calories text-center py-2">
             {weeklyVisible ? "▲ hide weekly trend" : "▼ weekly trend"}
           </Text>
         </Pressable>

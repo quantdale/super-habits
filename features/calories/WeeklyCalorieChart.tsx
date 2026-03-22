@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 
 type DayBar = {
   dateKey: string;
@@ -17,7 +18,7 @@ export function WeeklyCalorieChart({ data, goalKcal }: Props) {
   const barData = data.map((d) => ({
     value: d.value,
     label: d.label,
-    frontColor: d.value === 0 ? "#e2e8f0" : "#4f79ff",
+    frontColor: d.value === 0 ? "#e2e8f0" : SECTION_COLORS.calories,
     topLabelComponent: () =>
       d.value > 0 ? (
         <Text style={{ fontSize: 9, color: "#64748b", marginBottom: 2 }}>{d.value}</Text>
@@ -42,7 +43,7 @@ export function WeeklyCalorieChart({ data, goalKcal }: Props) {
         referenceLine1Config={
           goalKcal
             ? {
-                color: "#f59e0b",
+                color: SECTION_COLORS.calories,
                 dashWidth: 4,
                 dashGap: 4,
                 thickness: 1,
@@ -58,7 +59,7 @@ export function WeeklyCalorieChart({ data, goalKcal }: Props) {
       />
       {goalKcal ? (
         <View className="flex-row items-center gap-1 mt-1 px-1">
-          <View style={{ width: 16, height: 1.5, backgroundColor: "#f59e0b" }} />
+          <View style={{ width: 16, height: 1.5, backgroundColor: SECTION_COLORS.calories }} />
           <Text className="text-xs text-amber-500">Goal: {goalKcal} kcal</Text>
         </View>
       ) : null}

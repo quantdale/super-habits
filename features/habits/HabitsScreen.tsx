@@ -40,6 +40,7 @@ import {
   HABIT_COLORS,
   HABIT_ICONS,
 } from "@/features/habits/habitPresets";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 
 const CATEGORIES: HabitCategory[] = ["anytime", "morning", "afternoon", "evening"];
 const CATEGORY_LABELS: Record<HabitCategory, string> = {
@@ -49,6 +50,8 @@ const CATEGORY_LABELS: Record<HabitCategory, string> = {
   evening: "Evening",
 };
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
+const COLOR = SECTION_COLORS.habits;
+
 const CATEGORY_ICONS: Record<HabitCategory, MaterialIconName> = {
   anytime: "schedule",
   morning: "wb-sunny",
@@ -227,7 +230,7 @@ export function HabitsScreen() {
         </Pressable>
       </View>
 
-      <View className="bg-orange-50 pb-4">
+      <View className="bg-habits-light pb-4">
         {habits.length === 0 ? (
           <View className="items-center px-4 py-12">
             <View className="w-full max-w-sm items-center rounded-xl border border-slate-100 bg-white p-4">
@@ -265,7 +268,7 @@ export function HabitsScreen() {
                           <View className="mt-1 flex-row gap-1">
                             <Pressable
                               onPress={() => openEditModal(habit)}
-                              className="rounded bg-brand-500 px-2 py-1"
+                              className="rounded bg-habits px-2 py-1"
                             >
                               <Text className="text-xs font-medium text-white">Edit</Text>
                             </Pressable>
@@ -334,7 +337,7 @@ export function HabitsScreen() {
 
         <ActivityPreviewStrip
           days={habitActivityDays}
-          accentColor="#4f79ff"
+          accentColor={COLOR}
           statLabel={
             overallStreak > 0
               ? `${overallStreak} day${overallStreak !== 1 ? "s" : ""} best streak`
@@ -375,7 +378,7 @@ export function HabitsScreen() {
               showsVerticalScrollIndicator
               style={{ maxHeight: modalMaxHeight }}
             >
-              <Card>
+              <Card accentColor={COLOR}>
               <Text className="mb-3 text-lg font-semibold text-slate-900">
                 {editingHabit ? "Edit habit" : "Add habit"}
               </Text>
@@ -399,7 +402,7 @@ export function HabitsScreen() {
                     key={c}
                     onPress={() => setCategory(c)}
                     className={`rounded-lg px-3 py-2 ${
-                      category === c ? "bg-brand-500" : "bg-slate-200"
+                      category === c ? "bg-habits" : "bg-slate-200"
                     }`}
                   >
                     <Text className={`text-sm font-medium ${category === c ? "text-white" : "text-slate-700"}`}>
@@ -415,7 +418,7 @@ export function HabitsScreen() {
                     key={iconName}
                     onPress={() => setIcon(iconName)}
                     className={`items-center justify-center rounded-lg p-2 ${
-                      icon === iconName ? "bg-brand-500" : "bg-slate-200"
+                      icon === iconName ? "bg-habits" : "bg-slate-200"
                     }`}
                     style={{ width: 44, height: 44 }}
                   >
@@ -452,6 +455,7 @@ export function HabitsScreen() {
                 <Button
                   label={editingHabit ? "Save changes" : "Create habit"}
                   onPress={onSubmit}
+                  color={COLOR}
                 />
               </View>
               </Card>

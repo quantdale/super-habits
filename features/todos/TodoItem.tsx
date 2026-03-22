@@ -4,6 +4,7 @@ import type { Animated } from "react-native";
 import { Pressable, Text, View } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Card } from "@/core/ui/Card";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import { DueDateBadge } from "./DueDateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import type { Todo } from "./types";
@@ -44,7 +45,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
         rightThreshold={40}
         overshootRight={false}
       >
-        <Card>
+        <Card accentColor={SECTION_COLORS.todos}>
           <View className="flex-row items-start gap-2">
             <Pressable
               onLongPress={onLongPress}
@@ -68,8 +69,8 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
                   {todo.title}
                 </Text>
                 {todo.recurrence === "daily" ? (
-                  <View className="ml-1 self-start rounded border border-brand-200 bg-brand-50 px-1.5 py-0.5">
-                    <Text className="text-xs text-brand-500">↻ daily</Text>
+                  <View className="ml-1 self-start rounded border border-todos bg-todos-light px-1.5 py-0.5">
+                    <Text className="text-xs text-todos">↻ daily</Text>
                   </View>
                 ) : null}
               </View>

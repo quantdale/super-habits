@@ -7,6 +7,8 @@ import { Screen } from "@/core/ui/Screen";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { SectionTitle } from "@/core/ui/SectionTitle";
+import { PillChip } from "@/core/ui/PillChip";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
 import type { Todo, TodoPriority } from "./types";
 import { TodoItem } from "./TodoItem";
@@ -22,6 +24,8 @@ import {
   updateTodo,
   updateTodoOrder,
 } from "@/features/todos/todos.data";
+
+const COLOR = SECTION_COLORS.todos;
 
 export function TodosScreen() {
   const [title, setTitle] = useState("");
@@ -147,32 +151,24 @@ export function TodosScreen() {
     <View>
       <Pressable
         onPress={toggleCreate}
-        className="mb-2 flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
+        className="mb-2 flex-row items-center justify-between rounded-xl border border-todos bg-white px-4 py-3"
       >
         <Text className="text-sm font-medium text-slate-700">{editingId ? "Edit task" : "Make a Task"}</Text>
         <Text className="text-slate-400">{createExpanded ? "▲" : "▼"}</Text>
       </Pressable>
       {createExpanded ? (
-        <View className="overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
+        <View className="overflow-hidden rounded-xl border border-todos bg-white p-4">
           <TextField label="Title" value={title} onChangeText={setTitle} placeholder="Add a task..." />
           <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" />
-          <View className="mb-3 flex-row gap-2">
+          <View className="mb-3 flex-row flex-wrap">
             {(["urgent", "normal", "low"] as TodoPriority[]).map((p) => (
-              <Pressable
+              <PillChip
                 key={p}
+                label={p}
+                active={priority === p}
+                color={COLOR}
                 onPress={() => setPriority(p)}
-                className={`rounded-lg border px-3 py-1.5 ${
-                  priority === p ? "border-brand-500 bg-brand-500" : "border-slate-200 bg-white"
-                }`}
-              >
-                <Text
-                  className={`text-xs font-medium capitalize ${
-                    priority === p ? "text-white" : "text-slate-600"
-                  }`}
-                >
-                  {p}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
           {!editingId ? (
@@ -182,7 +178,7 @@ export function TodosScreen() {
             >
               <View
                 className={`h-5 w-5 items-center justify-center rounded border-2 ${
-                  isRecurring ? "border-brand-500 bg-brand-500" : "border-slate-300"
+                  isRecurring ? "border-todos bg-todos" : "border-slate-300"
                 }`}
               >
                 {isRecurring ? (
@@ -231,7 +227,7 @@ export function TodosScreen() {
           )}
           <View className="mt-3 flex-row gap-2">
             <Button label="Cancel" variant="ghost" onPress={collapseCreate} />
-            <Button label={editingId ? "Save changes" : "Add task"} onPress={onSave} />
+            <Button label={editingId ? "Save changes" : "Add task"} onPress={onSave} color={COLOR} />
           </View>
         </View>
       ) : null}
@@ -272,7 +268,7 @@ export function TodosScreen() {
                 {noPendingTasksCard}
                 {hasCompleted ? (
                   <Pressable onPress={() => setShowCompleted((v) => !v)} className="mb-2 px-1 py-2">
-                    <Text className="text-xs text-brand-500">
+                    <Text className="text-xs text-todos">
                       {showCompleted
                         ? "▲ hide completed"
                         : `▼ show completed (${items.filter((t) => t.completed === 1).length})`}
@@ -287,7 +283,7 @@ export function TodosScreen() {
               <>
                 {hasCompleted ? (
                   <Pressable onPress={() => setShowCompleted((v) => !v)} className="mb-2 px-1 py-2">
-                    <Text className="text-xs text-brand-500">
+                    <Text className="text-xs text-todos">
                       {showCompleted
                         ? "▲ hide completed"
                         : `▼ show completed (${items.filter((t) => t.completed === 1).length})`}

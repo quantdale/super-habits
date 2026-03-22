@@ -16,6 +16,9 @@ import {
 } from "./workout.data";
 import { formatWorkoutTime } from "./workout.domain";
 import type { RoutineExercise, RoutineExerciseSet } from "./types";
+import { SECTION_COLORS } from "@/constants/sectionColors";
+
+const COLOR = SECTION_COLORS.workout;
 
 type ExerciseWithSets = RoutineExercise & { sets: RoutineExerciseSet[] };
 
@@ -81,16 +84,18 @@ export function RoutineDetailScreen({
   return (
     <Screen scroll>
       <Pressable onPress={onBack} className="mb-4">
-        <Text className="text-brand-500 text-sm">← Back</Text>
+        <Text className="text-workout text-sm">← Back</Text>
       </Pressable>
 
       <SectionTitle title={routineName} />
 
-      {exercises.length > 0 && <Button label="Start workout" onPress={onStartWorkout} />}
+      {exercises.length > 0 && (
+        <Button label="Start workout" onPress={onStartWorkout} color={COLOR} />
+      )}
 
       <View className="mt-6 gap-3">
         {exercises.map((ex) => (
-          <Card key={ex.id}>
+          <Card key={ex.id} accentColor={COLOR}>
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-base font-medium text-slate-800">{ex.name}</Text>
               <Pressable onPress={() => handleDeleteExercise(ex.id, ex.name)}>
@@ -180,7 +185,7 @@ export function RoutineDetailScreen({
               }}
               className="mt-1"
             >
-              <Text className="text-xs text-brand-500">+ Add set</Text>
+              <Text className="text-xs text-workout">+ Add set</Text>
             </Pressable>
           </Card>
         ))}
@@ -197,7 +202,7 @@ export function RoutineDetailScreen({
             onSubmitEditing={handleAddExercise}
             returnKeyType="done"
           />
-          <Button label="Add" onPress={handleAddExercise} />
+          <Button label="Add" onPress={handleAddExercise} color={COLOR} />
         </View>
       </View>
     </Screen>

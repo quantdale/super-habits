@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput } from "react-native";
 import { Button } from "@/core/ui/Button";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSettings } from "./pomodoro.domain";
 
 type Props = {
@@ -52,7 +53,7 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
 
       <View className="mt-3 flex-row gap-2">
         <View className="flex-1">
-          <Button label="Save" onPress={handleSave} />
+          <Button label="Save" onPress={handleSave} color={SECTION_COLORS.focus} />
         </View>
         <View className="flex-1">
           <Button label="Cancel" variant="ghost" onPress={onCancel} />
