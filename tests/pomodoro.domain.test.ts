@@ -88,6 +88,9 @@ describe("getModeDuration", () => {
 });
 
 describe("getNextMode", () => {
+  it("focus → short_break when zero completed sessions (0 % N must not imply long break)", () => {
+    expect(getNextMode("focus", 0, DEFAULT_SETTINGS)).toBe("short_break");
+  });
   it("focus → short_break when not at long break threshold", () => {
     expect(getNextMode("focus", 1, DEFAULT_SETTINGS)).toBe("short_break");
   });

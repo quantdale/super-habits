@@ -1,19 +1,7 @@
 import type { HabitCompletion } from "./types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
-
-function buildDateRange(days: number): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    result.push(`${y}-${m}-${dd}`);
-  }
-  return result;
-}
+import { buildDateRange, buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
 
 function buildEmptyActivityDays(days: number): ActivityDay[] {
   return buildDateRange(days).map((dateKey) => ({
@@ -33,24 +21,6 @@ export function calculateHabitProgress(count: number, targetPerDay: number): num
   return Math.min(1, count / targetPerDay);
 }
 
-function localDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-/** YYYY-MM-DD keys from oldest to newest (inclusive), length = `days`. */
-function buildDateRangeOldestFirst(days: number): string[] {
-  const result: string[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    result.push(localDateKey(d));
-  }
-  return result;
-}
-
 /**
  * Build a full 30-day (or N-day) grid of DayCompletion objects
  * including days with zero completions (not just days with records).
@@ -66,19 +36,14 @@ export function buildDayCompletions(
     map.set(c.date_key, c.count);
   }
 
-  const result: DayCompletion[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateKey = localDateKey(d);
+  return buildDateRangeOldestFirst(days).map((dateKey) => {
     const count = map.get(dateKey) ?? 0;
-    result.push({
+    return {
       dateKey,
       count,
       completed: targetPerDay > 0 && count >= targetPerDay,
-    });
-  }
-  return result;
+    };
+  });
 }
 
 /**
@@ -178,7 +143,7 @@ export type GridDateHeader = {
  */
 export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
   const headers: GridDateHeader[] = [];
-  const todayKey = localDateKey(new Date());
+  const todayKey = toDateKey();
 
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
@@ -242,7 +207,7 @@ export function buildHabitGrid(
  */
 export function calculateOverallConsistency(grid: HabitGridRow[]): number {
   if (grid.length === 0) return 0;
-  const todayKey = localDateKey(new Date());
+  const todayKey = toDateKey();
   let completed = 0;
   let total = 0;
   for (const row of grid) {

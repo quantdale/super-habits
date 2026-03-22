@@ -3,7 +3,6 @@ import {
   getTodayDateKey,
   getTomorrowDateKey,
   findMissingRecurrenceIds,
-  isRecurring,
 } from "@/features/todos/todos.domain";
 
 describe("getTodayDateKey", () => {
@@ -58,15 +57,5 @@ describe("findMissingRecurrenceIds", () => {
     const missing = findMissingRecurrenceIds(todos, "2025-01-02");
     expect(missing).toHaveLength(1);
     expect(missing).toContain("rec_002");
-  });
-});
-
-describe("isRecurring", () => {
-  it("returns true for daily recurrence", () => {
-    expect(isRecurring({ recurrence: "daily" })).toBe(true);
-  });
-
-  it("returns false for null recurrence", () => {
-    expect(isRecurring({ recurrence: null })).toBe(false);
   });
 });

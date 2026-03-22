@@ -55,10 +55,3 @@ export function findMissingRecurrenceIds(
 
   return Array.from(allRecurrenceIds).filter((id) => !coveredToday.has(id));
 }
-
-/**
- * Check if a todo is part of a recurring series.
- */
-export function isRecurring(todo: { recurrence: string | null }): boolean {
-  return todo.recurrence === "daily";
-}
