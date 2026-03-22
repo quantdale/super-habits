@@ -237,6 +237,22 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
        VALUES ('db_schema_version', '8')`,
     );
   }
+  if (version < 9) {
+    try {
+      await db.runAsync(`ALTER TABLE todos ADD COLUMN recurrence TEXT`);
+    } catch {
+      // Column may already exist
+    }
+    try {
+      await db.runAsync(`ALTER TABLE todos ADD COLUMN recurrence_id TEXT`);
+    } catch {
+      // Column may already exist
+    }
+    await db.runAsync(
+      `INSERT OR REPLACE INTO app_meta (key, value)
+       VALUES ('db_schema_version', '9')`,
+    );
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

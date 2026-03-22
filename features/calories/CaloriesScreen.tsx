@@ -6,6 +6,8 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
+import { PillChip } from "@/core/ui/PillChip";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   addCalorieEntry,
   deleteCalorieEntry,
@@ -21,13 +23,14 @@ import {
 } from "@/features/calories/calories.data";
 import {
   buildCalorieActivityDays,
-  buildMacroDonutData,
+  buildCalorieHeatmapDays,
   buildWeeklyTrend,
   calculateGoalProgress,
   caloriesTotal,
   kcalFromMacros,
 } from "@/features/calories/calories.domain";
-import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
 import type { CalorieEntry, MealType, SavedMeal } from "./types";
 import { MacroDonutChart } from "./MacroDonutChart";
@@ -35,6 +38,8 @@ import { WeeklyCalorieChart } from "./WeeklyCalorieChart";
 import { CalorieGoalSheet } from "./CalorieGoalSheet";
 import { SavedMealChips } from "./SavedMealChips";
 import { SavedMealSearchSheet } from "./SavedMealSearchSheet";
+
+const COLOR = SECTION_COLORS.calories;
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "breakfast", label: "Breakfast" },
@@ -57,6 +62,7 @@ export function CaloriesScreen() {
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
   const [weeklyVisible, setWeeklyVisible] = useState(false);
   const [calorieActivityDays, setCalorieActivityDays] = useState<ActivityDay[]>([]);
+  const [calorieHeatmapDays, setCalorieHeatmapDays] = useState<HeatmapDay[]>([]);
   const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
   const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
@@ -75,12 +81,13 @@ export function CaloriesScreen() {
     const weekSummaries = await getCalorieSummaryByRange(toDateKey(start), toDateKey(new Date()));
     setWeeklyData(weekSummaries);
 
-    const start30 = new Date();
-    start30.setDate(start30.getDate() - 29);
-    const range30 = await getCalorieSummaryByRange(toDateKey(start30), toDateKey(new Date()));
+    const start364 = new Date();
+    start364.setDate(start364.getDate() - 363);
+    const range364 = await getCalorieSummaryByRange(toDateKey(start364), toDateKey(new Date()));
     const savedGoal = await getCalorieGoal();
-    const activityDays30 = buildCalorieActivityDays(range30, savedGoal.calories, 30);
-    setCalorieActivityDays(activityDays30);
+    const activityDays364 = buildCalorieActivityDays(range364, savedGoal.calories, 364);
+    setCalorieActivityDays(activityDays364);
+    setCalorieHeatmapDays(buildCalorieHeatmapDays(range364, savedGoal.calories, 364));
 
     setGoal(savedGoal);
   }, []);
@@ -101,14 +108,13 @@ export function CaloriesScreen() {
     fats: entries.reduce((s, e) => s + e.fats, 0),
     fiber: entries.reduce((s, e) => s + e.fiber, 0),
   };
-  const macroSlices = buildMacroDonutData(
-    todayTotals.protein,
-    todayTotals.carbs,
-    todayTotals.fats,
-    todayTotals.fiber,
-  );
   const weeklyTrend = buildWeeklyTrend(weeklyData, 7);
   const goalProgress = calculateGoalProgress(caloriesTotal(entries), goal.calories);
+
+  const hasCalorieStripActivity = calorieActivityDays.some((d) => d.active);
+  const consistencyText = hasCalorieStripActivity
+    ? `${goalProgress.percent}% of daily goal today`
+    : "Log food to start tracking";
 
   const computedKcal = useMemo(
     () =>
@@ -173,14 +179,54 @@ export function CaloriesScreen() {
   return (
     <Screen scroll>
       <SectionTitle title="Calories" subtitle="Manual nutrition entry for MVP." />
-      <Card>
+
+      <View className="mb-4 flex-row gap-3">
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>🍽️</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.calories,
+                  marginTop: 2,
+                }}
+              >
+                {calorieActivityDays.filter((d) => d.active).length}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>days logged</Text>
+            </View>
+          </Card>
+        </View>
+        <View className="flex-1">
+          <Card className="mb-0">
+            <View className="items-center py-1">
+              <Text style={{ fontSize: 22 }}>🎯</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  color: SECTION_COLORS.calories,
+                  marginTop: 2,
+                }}
+              >
+                {goalProgress.percent}%
+              </Text>
+              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>of goal today</Text>
+            </View>
+          </Card>
+        </View>
+      </View>
+
+      <Card accentColor={COLOR}>
         <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
         {allSavedMeals.length > 0 ? (
           <Pressable
             onPress={() => setSearchSheetVisible(true)}
             className="flex-row items-center gap-1 mb-3"
           >
-            <Text className="text-xs text-brand-500">
+            <Text className="text-xs text-calories">
               🔍 Search saved meals ({allSavedMeals.length})
             </Text>
           </Pressable>
@@ -212,59 +258,56 @@ export function CaloriesScreen() {
           </Text>
         </View>
         <Text className="mb-2 text-sm font-medium text-slate-700">Meal</Text>
-        <View className="mb-4 flex-row flex-wrap gap-2">
+        <View className="mb-4 flex-row flex-wrap">
           {MEAL_OPTIONS.map(({ value, label }) => (
-            <Pressable
+            <PillChip
               key={value}
+              label={label}
+              active={mealType === value}
+              color={COLOR}
               onPress={() => setMealType(value)}
-              className={`rounded-xl px-3 py-2 ${
-                mealType === value ? "bg-brand-500" : "bg-slate-200"
-              }`}
-            >
-              <Text
-                className={`text-center text-sm font-semibold ${
-                  mealType === value ? "text-white" : "text-slate-700"
-                }`}
-              >
-                {label}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
         {formError ? <Text className="mb-2 text-sm text-rose-600">{formError}</Text> : null}
-        <Button label="Add entry" onPress={onAdd} />
+        <Button label="Add entry" onPress={onAdd} color={COLOR} />
       </Card>
 
-      <Card>
+      <Card accentColor={COLOR}>
+        <View className="mb-3 items-center rounded-xl border border-calories bg-white p-3">
+          <Text className="text-center text-sm font-medium text-slate-600">{consistencyText}</Text>
+        </View>
+
         <View className="mb-4">
-          <View className="flex-row justify-between mb-1">
+          <View className="mb-1 flex-row items-center justify-center gap-8">
             <Text className="text-sm text-slate-600">Today: {caloriesTotal(entries)} kcal</Text>
             <Pressable onPress={() => setGoalSheetVisible(true)}>
-              <Text className="text-sm text-brand-500">
+              <Text className="text-sm text-calories">
                 Goal: {goal.calories} kcal ✎
               </Text>
             </Pressable>
           </View>
-          <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <View className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
             <View
-              className={`h-full rounded-full ${goalProgress.over ? "bg-rose-400" : "bg-brand-500"}`}
+              className={`h-full rounded-full ${goalProgress.over ? "bg-rose-400" : "bg-calories"}`}
               style={{ width: `${goalProgress.percent}%` }}
             />
           </View>
           {goalProgress.over && (
-            <Text className="text-xs text-rose-400 mt-1">
+            <Text className="text-xs text-rose-400 mt-1 text-center">
               {caloriesTotal(entries) - goal.calories} kcal over goal
             </Text>
           )}
         </View>
 
-        <MacroDonutChart slices={macroSlices} totalKcal={caloriesTotal(entries)} goalKcal={goal.calories} />
-
-        <ActivityPreviewStrip
-          days={calorieActivityDays}
-          accentColor="#4f79ff"
-          statLabel={`${goalProgress.percent}% of daily goal today`}
-          emptyLabel="Log food to start tracking"
+        <MacroDonutChart
+          totalKcal={caloriesTotal(entries)}
+          goalKcal={goal.calories}
+          protein={todayTotals.protein}
+          carbs={todayTotals.carbs}
+          fats={todayTotals.fats}
+          fiber={todayTotals.fiber}
+          sectionColor={SECTION_COLORS.calories}
         />
       </Card>
 
@@ -292,7 +335,7 @@ export function CaloriesScreen() {
       />
 
       {entries.map((entry) => (
-        <Card key={entry.id}>
+        <Card key={entry.id} accentColor={COLOR}>
           <Text className="text-base font-semibold text-slate-900">
             {entry.food_name} - {entry.calories} kcal
           </Text>
@@ -314,13 +357,22 @@ export function CaloriesScreen() {
 
       <View className="mt-4">
         <Pressable onPress={() => setWeeklyVisible((v) => !v)}>
-          <Text className="text-xs text-brand-500 text-center py-2">
+          <Text className="text-xs text-calories text-center py-2">
             {weeklyVisible ? "▲ hide weekly trend" : "▼ weekly trend"}
           </Text>
         </Pressable>
         {weeklyVisible && (
           <WeeklyCalorieChart data={weeklyTrend} goalKcal={goal.calories} />
         )}
+      </View>
+
+      <View className="mt-4">
+        <GitHubHeatmap
+          days={calorieHeatmapDays}
+          color={SECTION_COLORS.calories}
+          label="Calorie tracking — last 52 weeks"
+          weeks={52}
+        />
       </View>
     </Screen>
   );

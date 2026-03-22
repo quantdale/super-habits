@@ -2,8 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { goToTab } from "./helpers/navigation";
 import { clearDatabase } from "./helpers/db";
 
+/** Opens add-habit modal via the per–time-group + control (inline dashed border, not a Tailwind class). */
 async function openAddHabitModal(page: Page) {
-  await page.locator('[class*="border-dashed"]').first().click();
+  await page.getByText("Add", { exact: true }).first().click();
 }
 
 test.describe("Habits", () => {
@@ -14,13 +15,18 @@ test.describe("Habits", () => {
   });
 
   test("shows empty state when no habits exist", async ({ page }) => {
-    await expect(page.getByText("Add your first habit")).toBeVisible();
+    await expect(
+      page.getByText(/Pick a time of day and tap Add to create your first habit/i),
+    ).toBeVisible();
+    await expect(page.getByText("ANYTIME")).toBeVisible();
   });
 
   test("does not add habit with empty name", async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByText("Create habit", { exact: true }).click();
-    await expect(page.getByText("Add your first habit")).toBeVisible();
+    await expect(
+      page.getByText(/Pick a time of day and tap Add to create your first habit/i),
+    ).toBeVisible();
   });
 
   test("adds a new habit", async ({ page }) => {
@@ -35,7 +41,11 @@ test.describe("Habits", () => {
     await page.getByPlaceholder(/Read 20 minutes/i).fill("Meditate");
     await page.getByText("Create habit", { exact: true }).click();
     await expect(page.getByText("Meditate").first()).toBeVisible();
-    await page.getByText("Meditate", { exact: true }).locator("..").locator("> *").first().click();
+    // Ring is the preceding sibling of the label row (Pressable has no role="button" on RN Web).
+    await page
+      .getByText("Meditate", { exact: true })
+      .locator("xpath=preceding-sibling::*[1]")
+      .click();
     await expect(page.getByText("Meditate").first()).toBeVisible();
   });
 

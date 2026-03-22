@@ -2,12 +2,41 @@ import { getDatabase } from "@/core/db/client";
 import { PomodoroSession } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
+import {
+  DEFAULT_SETTINGS,
+  type PomodoroMode,
+  type PomodoroSettings,
+} from "@/features/pomodoro/pomodoro.domain";
+
+const SETTINGS_KEY = "pomodoro_settings";
+
+export async function getPomodoroSettings(): Promise<PomodoroSettings> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM app_meta WHERE key = ?`,
+    [SETTINGS_KEY],
+  );
+  if (!row) return DEFAULT_SETTINGS;
+  try {
+    return JSON.parse(row.value) as PomodoroSettings;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(`INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)`, [
+    SETTINGS_KEY,
+    JSON.stringify(settings),
+  ]);
+}
 
 export async function logPomodoroSession(
   startedAt: string,
   endedAt: string,
   durationSeconds: number,
-  type: "focus" | "break",
+  type: PomodoroMode,
 ): Promise<void> {
   const id = createId("pom");
   const createdAt = nowIso();
@@ -23,5 +52,19 @@ export async function listPomodoroSessions(limit = 20): Promise<PomodoroSession[
   return db.getAllAsync<PomodoroSession>(
     "SELECT * FROM pomodoro_sessions ORDER BY started_at DESC LIMIT ?",
     [limit],
+  );
+}
+
+/** All sessions whose start time falls in [startDateKey, endDateKey] (local calendar day bounds). */
+export async function listPomodoroSessionsForDateRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<PomodoroSession[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<PomodoroSession>(
+    `SELECT * FROM pomodoro_sessions
+     WHERE started_at >= ? AND started_at <= ?
+     ORDER BY started_at DESC`,
+    [`${startDateKey}T00:00:00`, `${endDateKey}T23:59:59.999`],
   );
 }

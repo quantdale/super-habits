@@ -12,6 +12,8 @@ type Props = {
   accentColor: string;
   statLabel: string;
   emptyLabel?: string;
+  /** When false, only the day strip is shown (no summary card / label row). */
+  showLabel?: boolean;
 };
 
 const CELL = 18;
@@ -36,14 +38,22 @@ export function ActivityPreviewStrip({
   accentColor,
   statLabel,
   emptyLabel = "No activity yet",
+  showLabel = true,
 }: Props) {
   const hasAny = days.some((d) => d.active);
+  const labelText = hasAny ? statLabel : emptyLabel;
 
   return (
     <View className="mb-3">
-      <Text className="text-xs text-slate-500 mb-1.5">
-        {hasAny ? statLabel : emptyLabel}
-      </Text>
+      {showLabel ? (
+        <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
+          <Text
+            className={`text-center ${hasAny ? "text-sm font-medium text-slate-700" : "text-sm text-slate-500"}`}
+          >
+            {labelText}
+          </Text>
+        </View>
+      ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} scrollEventThrottle={16}>
         <View className="flex-row" style={{ gap: GAP }}>

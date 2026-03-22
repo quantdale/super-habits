@@ -7,6 +7,8 @@ export type BaseEntity = {
 
 export type TodoPriority = "urgent" | "normal" | "low";
 
+export type TodoRecurrence = "daily" | null;
+
 export type Todo = BaseEntity & {
   title: string;
   notes: string | null;
@@ -14,6 +16,8 @@ export type Todo = BaseEntity & {
   due_date: string | null;
   priority: TodoPriority;
   sort_order: number;
+  recurrence: TodoRecurrence;
+  recurrence_id: string | null;
 };
 
 export type HabitCategory = "anytime" | "morning" | "afternoon" | "evening";
@@ -55,7 +59,8 @@ export type PomodoroSession = {
   started_at: string;
   ended_at: string;
   duration_seconds: number;
-  session_type: "focus" | "break";
+  /** Legacy rows may use "break"; new logs use focus / short_break / long_break as needed */
+  session_type: "focus" | "break" | "short_break" | "long_break";
   created_at: string;
 };
 

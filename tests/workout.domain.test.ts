@@ -5,7 +5,21 @@ import {
   calculateSessionDuration,
   buildTimerSequence,
   summarizeCompletedSets,
+  buildWorkoutActivityDays,
+  buildWorkoutFrequency,
+  buildWorkoutHeatmapDays,
 } from "@/features/workout/workout.domain";
+import type { WorkoutLog } from "@/core/db/types";
+
+function workoutLog(completedAt: string): WorkoutLog {
+  return {
+    id: "wrk_test1",
+    routine_id: "routine_test",
+    notes: null,
+    completed_at: completedAt,
+    created_at: completedAt,
+  };
+}
 
 describe("formatWorkoutTime", () => {
   it("formats 90 seconds as 1:30", () => {
@@ -79,6 +93,48 @@ describe("buildTimerSequence", () => {
 
   it("first phase is active", () => {
     expect(buildTimerSequence(exercises)[0].phase).toBe("active");
+  });
+});
+
+describe("buildWorkoutActivityDays", () => {
+  it("marks a day active when a log falls on that local date", () => {
+    const iso = new Date().toISOString();
+    const logs = [workoutLog(iso)];
+    const days = buildWorkoutActivityDays(logs, 30);
+    const y = new Date().getFullYear();
+    const m = String(new Date().getMonth() + 1).padStart(2, "0");
+    const d = String(new Date().getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+    const todayEntry = days.find((x) => x.dateKey === todayKey);
+    expect(todayEntry?.active).toBe(true);
+  });
+});
+
+describe("buildWorkoutFrequency", () => {
+  it("returns zero sessions per day when logs are empty", () => {
+    const freq = buildWorkoutFrequency([], 14);
+    expect(freq).toHaveLength(14);
+    expect(freq.every((f) => f.value === 0)).toBe(true);
+  });
+
+  it("counts multiple sessions on the same day", () => {
+    const iso = new Date().toISOString();
+    const freq = buildWorkoutFrequency([workoutLog(iso), workoutLog(iso)], 7);
+    expect(freq[0].value).toBe(2);
+  });
+});
+
+describe("buildWorkoutHeatmapDays", () => {
+  it("returns 30 entries and caps intensity at 3", () => {
+    const iso = new Date().toISOString();
+    const logs = [workoutLog(iso), workoutLog(iso), workoutLog(iso), workoutLog(iso)];
+    const heat = buildWorkoutHeatmapDays(logs, 30);
+    expect(heat).toHaveLength(30);
+    const y = new Date().getFullYear();
+    const m = String(new Date().getMonth() + 1).padStart(2, "0");
+    const d = String(new Date().getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+    expect(heat.find((h) => h.dateKey === todayKey)?.value).toBe(3);
   });
 });
 

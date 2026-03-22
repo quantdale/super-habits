@@ -1,1 +1,1 @@
-export type { Todo, TodoPriority } from "@/core/db/types";
+export type { Todo, TodoPriority, TodoRecurrence } from "@/core/db/types";

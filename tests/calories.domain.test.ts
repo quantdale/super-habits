@@ -6,6 +6,8 @@ import {
   buildMacroDonutData,
   calculateGoalProgress,
   filterSavedMeals,
+  buildCalorieActivityDays,
+  buildCalorieHeatmapDays,
 } from "@/features/calories/calories.domain";
 import type { DailySummary } from "@/features/calories/calories.data";
 import type { SavedMeal } from "@/core/db/types";
@@ -83,16 +85,37 @@ describe("buildMacroDonutData", () => {
     expect(buildMacroDonutData(0, 0, 0, 0)).toHaveLength(0);
   });
 
-  it("returns 4 slices when macros are non-zero", () => {
+  it("returns 4 slices, kcal from total carbs × 4, percents sum to 100 (P=30 C=50 F=10 Fi=5)", () => {
     const slices = buildMacroDonutData(30, 50, 10, 5);
     expect(slices).toHaveLength(4);
+    expect(slices.reduce((s, sl) => s + sl.value, 0)).toBe(100);
+    const p = slices.find((sl) => sl.label === "Protein");
+    const c = slices.find((sl) => sl.label === "Carbs");
+    const f = slices.find((sl) => sl.label === "Fats");
+    const fi = slices.find((sl) => sl.label === "Fiber");
+    expect(p?.kcal).toBe(120);
+    expect(p?.grams).toBe(30);
+    expect(c?.kcal).toBe(200);
+    expect(c?.grams).toBe(50);
+    expect(f?.kcal).toBe(90);
+    expect(f?.grams).toBe(10);
+    expect(fi?.kcal).toBe(10);
+    expect(fi?.grams).toBe(5);
   });
 
-  it("slice values sum to approximately 100", () => {
-    const slices = buildMacroDonutData(30, 50, 10, 5);
-    const total = slices.reduce((s, sl) => s + sl.value, 0);
-    expect(total).toBeGreaterThanOrEqual(98);
-    expect(total).toBeLessThanOrEqual(102);
+  it("includes a carbs slice when fiber >= carbs (digestible would be 0)", () => {
+    const slices = buildMacroDonutData(0, 10, 0, 10);
+    expect(slices.find((sl) => sl.label === "Carbs")).toMatchObject({
+      kcal: 40,
+      grams: 10,
+    });
+  });
+
+  it("drops macros with zero kcal from the donut list", () => {
+    const slices = buildMacroDonutData(0, 0, 10, 0);
+    expect(slices).toHaveLength(1);
+    expect(slices[0]?.label).toBe("Fats");
+    expect(slices.reduce((s, sl) => s + sl.value, 0)).toBe(100);
   });
 });
 
@@ -115,6 +138,60 @@ describe("calculateGoalProgress", () => {
 
   it("remaining is 0 when over goal", () => {
     expect(calculateGoalProgress(2500, 2000).remaining).toBe(0);
+  });
+});
+
+describe("buildCalorieActivityDays", () => {
+  it("marks days inactive with zero value when no summaries", () => {
+    const days = buildCalorieActivityDays([], 2000, 7);
+    expect(days).toHaveLength(7);
+    expect(days.every((d) => !d.active && d.value === 0)).toBe(true);
+  });
+
+  it("sets active and caps value at 1 vs goal", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const summaries: DailySummary[] = [
+      {
+        dateKey: todayKey,
+        totalCalories: 1000,
+        totalProtein: 0,
+        totalCarbs: 0,
+        totalFats: 0,
+        totalFiber: 0,
+      },
+    ];
+    const activity = buildCalorieActivityDays(summaries, 2000, 7);
+    const todayEntry = activity.find((a) => a.dateKey === todayKey);
+    expect(todayEntry?.active).toBe(true);
+    expect(todayEntry?.value).toBe(0.5);
+  });
+});
+
+describe("buildCalorieHeatmapDays", () => {
+  it("maps calorie totals to intensity buckets vs goal", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+    const summaries: DailySummary[] = [
+      {
+        dateKey: todayKey,
+        totalCalories: 500,
+        totalProtein: 0,
+        totalCarbs: 0,
+        totalFats: 0,
+        totalFiber: 0,
+      },
+    ];
+    const heat = buildCalorieHeatmapDays(summaries, 2000, 30);
+    const todayH = heat.find((h) => h.dateKey === todayKey);
+    expect(todayH?.value).toBe(1);
   });
 });
 

@@ -1,24 +1,13 @@
 import type { WorkoutLog } from "./types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
-
-function buildDateRange(days: number): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    result.push(`${y}-${m}-${dd}`);
-  }
-  return result;
-}
+import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
 
 /**
  * Build ActivityDay array from workout logs.
  * A day is "active" if at least one session was logged.
  */
-export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 30): ActivityDay[] {
+export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 364): ActivityDay[] {
   const set = new Set<string>();
   for (const log of logs) {
     const d = new Date(log.completed_at);
@@ -31,6 +20,30 @@ export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 30):
     dateKey,
     active: set.has(dateKey),
   }));
+}
+
+export function buildWorkoutHeatmapDays(logs: WorkoutLog[], days: number = 364): HeatmapDay[] {
+  const map = new Map<string, number>();
+  for (const log of logs) {
+    const d = new Date(log.completed_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return buildDateRangeOldestFirst(days).map((dateKey) => ({
+    dateKey,
+    value: Math.min(3, map.get(dateKey) ?? 0),
+  }));
+}
+
+/** Consecutive days with a workout, counting backward from today (heatmap days oldest → newest). */
+export function computeWorkoutStreakFromHeatmapDays(heatmapDays: HeatmapDay[]): number {
+  if (heatmapDays.length === 0) return 0;
+  let streak = 0;
+  for (let i = heatmapDays.length - 1; i >= 0; i--) {
+    if (heatmapDays[i].value > 0) streak++;
+    else break;
+  }
+  return streak;
 }
 
 /**

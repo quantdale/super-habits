@@ -10,6 +10,9 @@ import {
 } from "./workout.domain";
 import { logWorkoutSession } from "./workout.data";
 import type { RoutineWithExercises } from "./types";
+import { SECTION_COLORS } from "@/constants/sectionColors";
+
+const WORKOUT_COLOR = SECTION_COLORS.workout;
 
 type Props = {
   routine: RoutineWithExercises;
@@ -115,7 +118,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
           <Text className="text-sm text-slate-500 text-center">
             {routine.name} — all sets done
           </Text>
-          <Button label="Save and finish" onPress={handleFinish} />
+          <Button label="Save and finish" onPress={handleFinish} color={WORKOUT_COLOR} />
         </View>
       </Screen>
     );
@@ -148,7 +151,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
       <View
         className={`px-3 py-1 rounded-full self-center mb-2 ${
-          isActive ? "bg-brand-500" : "bg-amber-400"
+          isActive ? "bg-workout" : "bg-amber-400"
         }`}
       >
         <Text className="text-xs font-medium text-white">
@@ -169,14 +172,14 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
       <View className="h-2 bg-slate-100 rounded-full mx-6 mb-8 overflow-hidden">
         <View
-          className={`h-full rounded-full ${isActive ? "bg-brand-500" : "bg-amber-400"}`}
+          className={`h-full rounded-full ${isActive ? "bg-workout" : "bg-amber-400"}`}
           style={{ width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }}
         />
       </View>
 
       <View className="gap-3 px-6">
         {!isRunning ? (
-          <Button label="Start" onPress={handleStart} />
+          <Button label="Start" onPress={handleStart} color={WORKOUT_COLOR} />
         ) : (
           <Button label="Skip" variant="ghost" onPress={handleSkip} />
         )}

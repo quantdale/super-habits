@@ -1,18 +1,7 @@
 import type { HabitCompletion } from "./types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
-
-function buildDateRange(days: number): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    result.push(`${y}-${m}-${dd}`);
-  }
-  return result;
-}
+import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import { buildDateRange, buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
 
 function buildEmptyActivityDays(days: number): ActivityDay[] {
   return buildDateRange(days).map((dateKey) => ({
@@ -32,13 +21,6 @@ export function calculateHabitProgress(count: number, targetPerDay: number): num
   return Math.min(1, count / targetPerDay);
 }
 
-function localDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 /**
  * Build a full 30-day (or N-day) grid of DayCompletion objects
  * including days with zero completions (not just days with records).
@@ -54,19 +36,14 @@ export function buildDayCompletions(
     map.set(c.date_key, c.count);
   }
 
-  const result: DayCompletion[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateKey = localDateKey(d);
+  return buildDateRangeOldestFirst(days).map((dateKey) => {
     const count = map.get(dateKey) ?? 0;
-    result.push({
+    return {
       dateKey,
       count,
       completed: targetPerDay > 0 && count >= targetPerDay,
-    });
-  }
-  return result;
+    };
+  });
 }
 
 /**
@@ -166,7 +143,7 @@ export type GridDateHeader = {
  */
 export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
   const headers: GridDateHeader[] = [];
-  const todayKey = localDateKey(new Date());
+  const todayKey = toDateKey();
 
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
@@ -198,7 +175,7 @@ export function buildHabitGrid(
     target_per_day: number;
   }>,
   completions: Array<{ habit_id: string; date_key: string; count: number }>,
-  days: number = 30,
+  days: number = 364,
 ): HabitGridRow[] {
   const lookup = new Map<string, Map<string, number>>();
   for (const c of completions) {
@@ -208,15 +185,7 @@ export function buildHabitGrid(
     lookup.get(c.habit_id)!.set(c.date_key, c.count);
   }
 
-  const dateKeys: string[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    dateKeys.push(`${y}-${m}-${dd}`);
-  }
+  const dateKeys = buildDateRangeOldestFirst(days);
 
   return habits.map((habit) => {
     const habitMap = lookup.get(habit.id) ?? new Map<string, number>();
@@ -238,7 +207,7 @@ export function buildHabitGrid(
  */
 export function calculateOverallConsistency(grid: HabitGridRow[]): number {
   if (grid.length === 0) return 0;
-  const todayKey = localDateKey(new Date());
+  const todayKey = toDateKey();
   let completed = 0;
   let total = 0;
   for (const row of grid) {
@@ -250,6 +219,44 @@ export function calculateOverallConsistency(grid: HabitGridRow[]): number {
   }
   if (total === 0) return 0;
   return Math.round((completed / total) * 100);
+}
+
+/**
+ * Build a single aggregated HeatmapDay array for all habits.
+ * A day's value reflects how many habits were completed:
+ *   0 = no habits completed
+ *   1 = some habits completed (< 50%)
+ *   2 = most habits completed (50–99%)
+ *   3 = all habits completed (100%)
+ *
+ * Uses existing HabitGridRow data — no new DB query needed.
+ */
+export function buildAggregatedHabitHeatmap(
+  grid: HabitGridRow[],
+  days: number = 364,
+): HeatmapDay[] {
+  if (grid.length === 0) {
+    return buildDateRangeOldestFirst(days).map((dateKey) => ({
+      dateKey,
+      value: 0,
+    }));
+  }
+
+  const dateKeys = buildDateRangeOldestFirst(days);
+
+  return dateKeys.map((dateKey) => {
+    let completed = 0;
+    const total = grid.length;
+    for (const row of grid) {
+      const cell = row.cells.find((c) => c.dateKey === dateKey);
+      if (cell?.completed) completed++;
+    }
+    if (completed === 0) return { dateKey, value: 0 };
+    const pct = completed / total;
+    if (pct < 0.5) return { dateKey, value: 1 };
+    if (pct < 1.0) return { dateKey, value: 2 };
+    return { dateKey, value: 3 };
+  });
 }
 
 /**

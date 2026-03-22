@@ -1,103 +1,109 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 
 const NAV_ITEMS = [
-  { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", shortLabel: "T" },
-  { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", shortLabel: "H" },
-  { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", shortLabel: "F" },
-  { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", shortLabel: "W" },
-  { name: "calories", href: "/(tabs)/calories" as const, label: "Calories", shortLabel: "C" },
-];
+  { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", icon: "check-circle-outline", color: SECTION_COLORS.todos },
+  { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", icon: "loop", color: SECTION_COLORS.habits },
+  { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", icon: "timer", color: SECTION_COLORS.focus },
+  { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", icon: "fitness-center", color: SECTION_COLORS.workout },
+  { name: "calories", href: "/(tabs)/calories" as const, label: "Calories", icon: "restaurant-menu", color: SECTION_COLORS.calories },
+] as const;
 
-type NavItemProps = {
+/** Matches `Screen` / `bg-surface` so the active tab and tab content area read as one surface. */
+const TAB_CONTENT_SURFACE = "#f8f7ff";
+
+const TAB_RAIL_BG = "#eeecf8";
+const TAB_RAIL_BORDER = "#d4d0ee";
+
+type TopTabItemProps = {
   isFocused?: boolean;
-  onPress?: () => void;
-  onLongPress?: () => void;
   label: string;
-  shortLabel: string;
-  collapsed: boolean;
-  style?: unknown;
-} & Record<string, unknown>;
+  icon: string;
+  color: string;
+  onPress?: () => void;
+  style?: object;
+  [key: string]: unknown;
+};
 
-function NavItem({ isFocused, onPress, onLongPress, label, shortLabel, collapsed, style, ...rest }: NavItemProps) {
+/** expo-router TabTrigger may inject layout — row + center is re-applied after flatten(style). */
+function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: TopTabItemProps) {
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={onLongPress}
-      style={style ? StyleSheet.flatten(style) : undefined}
-      className={`mb-1 flex flex-row items-center rounded-lg px-3 py-2.5 ${
-        isFocused ? "bg-brand-500" : "bg-transparent"
-      } ${collapsed ? "justify-center" : ""}`}
+      style={[
+        {
+          flex: 1,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 5,
+          minWidth: 0,
+          backgroundColor: isFocused ? TAB_CONTENT_SURFACE : TAB_RAIL_BG,
+          borderBottomWidth: isFocused ? 0 : 1,
+          borderBottomColor: TAB_RAIL_BORDER,
+          borderTopLeftRadius: 8,
+          borderTopRightRadius: 8,
+          marginTop: isFocused ? 0 : 3,
+          paddingVertical: 10,
+          paddingHorizontal: 4,
+        },
+        StyleSheet.flatten(style),
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 5,
+          minWidth: 0,
+        },
+      ]}
       {...rest}
     >
+      <MaterialIcons
+        name={icon as keyof typeof MaterialIcons.glyphMap}
+        size={16}
+        color={isFocused ? color : "#94a3b8"}
+      />
       <Text
-        className={`text-sm font-medium ${isFocused ? "text-white" : "text-slate-700"}`}
+        style={{
+          fontSize: 12,
+          color: isFocused ? color : "#94a3b8",
+          fontWeight: isFocused ? "600" : "400",
+          flexShrink: 1,
+        }}
         numberOfLines={1}
       >
-        {collapsed ? shortLabel : label}
+        {label}
       </Text>
     </Pressable>
   );
 }
 
-const BURGER_STRIP_WIDTH = 56;
-const SIDEBAR_PANEL_WIDTH = 144;
-
 export default function TabsLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const panelWidth = sidebarCollapsed ? 0 : SIDEBAR_PANEL_WIDTH;
-
   return (
-    <Tabs className="flex-1 flex-row">
+    <Tabs className="flex-1 flex-col">
       <TabList
-        className="flex shrink-0 flex-col border-r border-slate-200 bg-white px-2 py-3"
         style={{
-          width: BURGER_STRIP_WIDTH + panelWidth,
-          minWidth: BURGER_STRIP_WIDTH + panelWidth,
-          maxWidth: BURGER_STRIP_WIDTH + panelWidth,
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          overflow: "hidden",
+          flexDirection: "row",
+          width: "100%",
+          alignItems: "stretch",
+          backgroundColor: TAB_RAIL_BG,
+          borderBottomWidth: 1,
+          borderBottomColor: TAB_RAIL_BORDER,
+          paddingHorizontal: 4,
+          paddingTop: 4,
+          gap: 2,
+          zIndex: 10,
         }}
       >
-        <View
-          className="flex-row items-center justify-center border-b border-slate-200 py-2.5"
-          style={{
-            width: BURGER_STRIP_WIDTH,
-            minWidth: BURGER_STRIP_WIDTH,
-            maxWidth: BURGER_STRIP_WIDTH,
-          }}
-        >
-          <Pressable
-            onPress={() => setSidebarCollapsed((c) => !c)}
-            className="flex-row items-center justify-center rounded-lg py-2.5"
-            style={{ minHeight: 44 }}
-          >
-            <MaterialIcons name="menu" size={24} color="#64748b" />
-          </Pressable>
-        </View>
         {NAV_ITEMS.map((item) => (
           <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-            <NavItem
-              label={item.label}
-              shortLabel={item.shortLabel}
-              collapsed={sidebarCollapsed}
-            />
+            <TopTabItem label={item.label} icon={item.icon} color={item.color} />
           </TabTrigger>
         ))}
-        <Pressable
-          onPress={() => setSidebarCollapsed((c) => !c)}
-          className="mt-auto border-t border-slate-200 py-3"
-          style={{ paddingHorizontal: 12 }}
-        >
-          <Text className="text-slate-500" selectable={false}>
-            «
-          </Text>
-        </Pressable>
       </TabList>
-      <TabSlot className="flex-1" />
+      <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />
     </Tabs>
   );
 }
