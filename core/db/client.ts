@@ -169,6 +169,47 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
        VALUES ('db_schema_version', '6')`,
     );
   }
+  if (version < 7) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS routine_exercises (
+        id          TEXT PRIMARY KEY NOT NULL,
+        routine_id  TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        deleted_at  TEXT
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS routine_exercise_sets (
+        id              TEXT PRIMARY KEY NOT NULL,
+        exercise_id     TEXT NOT NULL,
+        set_number      INTEGER NOT NULL,
+        active_seconds  INTEGER NOT NULL DEFAULT 40,
+        rest_seconds    INTEGER NOT NULL DEFAULT 20,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        deleted_at      TEXT
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS workout_session_exercises (
+        id              TEXT PRIMARY KEY NOT NULL,
+        log_id          TEXT NOT NULL,
+        exercise_name   TEXT NOT NULL,
+        sets_completed  INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT NOT NULL
+      );
+    `);
+
+    await db.runAsync(
+      `INSERT OR REPLACE INTO app_meta (key, value)
+       VALUES ('db_schema_version', '7')`,
+    );
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

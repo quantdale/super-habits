@@ -72,6 +72,27 @@ export type WorkoutLog = {
   created_at: string;
 };
 
+export type RoutineExercise = BaseEntity & {
+  routine_id: string;
+  name: string;
+  sort_order: number;
+};
+
+export type RoutineExerciseSet = BaseEntity & {
+  exercise_id: string;
+  set_number: number;
+  active_seconds: number;
+  rest_seconds: number;
+};
+
+export type WorkoutSessionExercise = {
+  id: string;
+  log_id: string;
+  exercise_name: string;
+  sets_completed: number;
+  created_at: string;
+};
+
 export type CalorieEntry = BaseEntity & {
   food_name: string;
   calories: number;

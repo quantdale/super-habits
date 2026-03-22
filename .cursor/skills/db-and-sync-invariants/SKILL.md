@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current stored version: **5**
-- Next migration number: **6** (add `if (version < 6) { ... }` in `runMigrations()` in `core/db/client.ts` when needed)
+- Current stored version: **7**
+- Next migration number: **8** (add `if (version < 8) { ... }` in `runMigrations()` in `core/db/client.ts` when needed)
 - Migrations live in: core/db/migrations/ (reference) + inline in client.ts
 - schema.sql is a REFERENCE ONLY — not executed at runtime
 - To add a column: add a new migration case, never alter the bootstrap DDL
