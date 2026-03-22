@@ -1,3 +1,19 @@
+import type { PomodoroSession } from "./types";
+import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+
+function buildDateRange(days: number): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${dd}`);
+  }
+  return result;
+}
+
 export type PomodoroState = "idle" | "running" | "finished";
 
 export const FOCUS_SECONDS = 25 * 60;
@@ -64,4 +80,26 @@ export function formatSessionTime(startedAt: string): string {
       day: "numeric",
     }) + ` ${time}`
   );
+}
+
+/**
+ * Build ActivityDay array from pomodoro sessions.
+ * A day is "active" if at least one session was completed.
+ */
+export function buildPomodoroActivityDays(
+  sessions: PomodoroSession[],
+  days: number = 30,
+): ActivityDay[] {
+  const set = new Set<string>();
+  for (const s of sessions) {
+    const d = new Date(s.started_at);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    set.add(`${y}-${m}-${dd}`);
+  }
+  return buildDateRange(days).map((dateKey) => ({
+    dateKey,
+    active: set.has(dateKey),
+  }));
 }

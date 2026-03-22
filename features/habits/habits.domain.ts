@@ -1,4 +1,25 @@
 import type { HabitCompletion } from "./types";
+import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+
+function buildDateRange(days: number): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${dd}`);
+  }
+  return result;
+}
+
+function buildEmptyActivityDays(days: number): ActivityDay[] {
+  return buildDateRange(days).map((dateKey) => ({
+    dateKey,
+    active: false,
+  }));
+}
 
 export type DayCompletion = {
   dateKey: string; // YYYY-MM-DD
@@ -229,4 +250,29 @@ export function calculateOverallConsistency(grid: HabitGridRow[]): number {
   }
   if (total === 0) return 0;
   return Math.round((completed / total) * 100);
+}
+
+/**
+ * Build ActivityDay array from the habits grid.
+ * A day is "active" if at least one habit was completed.
+ * value = fraction of habits completed that day (0–1).
+ */
+export function buildHabitActivityDays(grid: HabitGridRow[], days: number = 30): ActivityDay[] {
+  if (grid.length === 0) return buildEmptyActivityDays(days);
+
+  const dateKeys = grid[0].cells.map((c) => c.dateKey).reverse();
+
+  return dateKeys.map((dateKey) => {
+    let completed = 0;
+    const total = grid.length;
+    for (const row of grid) {
+      const cell = row.cells.find((c) => c.dateKey === dateKey);
+      if (cell?.completed) completed++;
+    }
+    return {
+      dateKey,
+      active: completed > 0,
+      value: total > 0 ? completed / total : 0,
+    };
+  });
 }

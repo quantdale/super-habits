@@ -20,12 +20,14 @@ import {
   type DailySummary,
 } from "@/features/calories/calories.data";
 import {
+  buildCalorieActivityDays,
   buildMacroDonutData,
   buildWeeklyTrend,
   calculateGoalProgress,
   caloriesTotal,
   kcalFromMacros,
 } from "@/features/calories/calories.domain";
+import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { toDateKey } from "@/lib/time";
 import type { CalorieEntry, MealType, SavedMeal } from "./types";
 import { MacroDonutChart } from "./MacroDonutChart";
@@ -54,6 +56,7 @@ export function CaloriesScreen() {
   const [weeklyData, setWeeklyData] = useState<DailySummary[]>([]);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
   const [weeklyVisible, setWeeklyVisible] = useState(false);
+  const [calorieActivityDays, setCalorieActivityDays] = useState<ActivityDay[]>([]);
   const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
   const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
@@ -72,7 +75,13 @@ export function CaloriesScreen() {
     const weekSummaries = await getCalorieSummaryByRange(toDateKey(start), toDateKey(new Date()));
     setWeeklyData(weekSummaries);
 
+    const start30 = new Date();
+    start30.setDate(start30.getDate() - 29);
+    const range30 = await getCalorieSummaryByRange(toDateKey(start30), toDateKey(new Date()));
     const savedGoal = await getCalorieGoal();
+    const activityDays30 = buildCalorieActivityDays(range30, savedGoal.calories, 30);
+    setCalorieActivityDays(activityDays30);
+
     setGoal(savedGoal);
   }, []);
 
@@ -251,12 +260,12 @@ export function CaloriesScreen() {
 
         <MacroDonutChart slices={macroSlices} totalKcal={caloriesTotal(entries)} goalKcal={goal.calories} />
 
-        <Pressable onPress={() => setWeeklyVisible((v) => !v)} className="py-2">
-          <Text className="text-xs text-brand-500 text-center">
-            {weeklyVisible ? "▲ hide weekly" : "▼ weekly trend"}
-          </Text>
-        </Pressable>
-        {weeklyVisible && <WeeklyCalorieChart data={weeklyTrend} goalKcal={goal.calories} />}
+        <ActivityPreviewStrip
+          days={calorieActivityDays}
+          accentColor="#4f79ff"
+          statLabel={`${goalProgress.percent}% of daily goal today`}
+          emptyLabel="Log food to start tracking"
+        />
       </Card>
 
       <CalorieGoalSheet
@@ -302,6 +311,17 @@ export function CaloriesScreen() {
           </View>
         </Card>
       ))}
+
+      <View className="mt-4">
+        <Pressable onPress={() => setWeeklyVisible((v) => !v)}>
+          <Text className="text-xs text-brand-500 text-center py-2">
+            {weeklyVisible ? "▲ hide weekly trend" : "▼ weekly trend"}
+          </Text>
+        </Pressable>
+        {weeklyVisible && (
+          <WeeklyCalorieChart data={weeklyTrend} goalKcal={goal.calories} />
+        )}
+      </View>
     </Screen>
   );
 }

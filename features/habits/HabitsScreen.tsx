@@ -23,6 +23,7 @@ import {
 import {
   buildDayCompletions,
   buildGridDateHeaders,
+  buildHabitActivityDays,
   buildHabitGrid,
   calculateCurrentStreak,
   calculateOverallConsistency,
@@ -31,6 +32,7 @@ import {
   type GridDateHeader,
   type HabitGridRow,
 } from "@/features/habits/habits.domain";
+import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { HabitCircle } from "@/features/habits/HabitCircle";
 import { HabitHeatmap } from "@/features/habits/HabitHeatmap";
 import { HabitsOverviewGrid } from "@/features/habits/HabitsOverviewGrid";
@@ -87,10 +89,11 @@ export function HabitsScreen() {
   const [category, setCategory] = useState<HabitCategory>("anytime");
   const [icon, setIcon] = useState<HabitIcon>(DEFAULT_HABIT_ICON);
   const [color, setColor] = useState(DEFAULT_HABIT_COLOR);
-  const [activeTab, setActiveTab] = useState<"today" | "overview">("today");
   const [overviewGrid, setOverviewGrid] = useState<HabitGridRow[]>([]);
   const [overviewHeaders, setOverviewHeaders] = useState<GridDateHeader[]>([]);
   const [consistencyPct, setConsistencyPct] = useState(0);
+  const [habitActivityDays, setHabitActivityDays] = useState<ActivityDay[]>([]);
+  const [overallStreak, setOverallStreak] = useState(0);
 
   const refresh = useCallback(async () => {
     const list = await listHabits();
@@ -141,6 +144,11 @@ export function HabitsScreen() {
     setOverviewHeaders(headers);
     setOverviewGrid(gridBuilt);
     setConsistencyPct(pct);
+
+    const activityDays = buildHabitActivityDays(gridBuilt, 30);
+    const bestStreak = Math.max(0, ...Object.values(streaks));
+    setHabitActivityDays(activityDays);
+    setOverallStreak(bestStreak);
   }, []);
 
   const toggleHeatmap = useCallback((habitId: string) => {
@@ -233,39 +241,7 @@ export function HabitsScreen() {
         </Pressable>
       </View>
 
-      <View className="mb-4 flex-row rounded-xl bg-slate-100 p-1">
-        <Pressable
-          onPress={() => setActiveTab("today")}
-          className={`flex-1 items-center rounded-lg py-2 ${activeTab === "today" ? "bg-white shadow-sm" : ""}`}
-        >
-          <Text
-            className={`text-sm font-medium ${activeTab === "today" ? "text-slate-800" : "text-slate-400"}`}
-          >
-            Today
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setActiveTab("overview")}
-          className={`flex-1 items-center rounded-lg py-2 ${activeTab === "overview" ? "bg-white shadow-sm" : ""}`}
-        >
-          <Text
-            className={`text-sm font-medium ${activeTab === "overview" ? "text-slate-800" : "text-slate-400"}`}
-          >
-            Overview
-          </Text>
-        </Pressable>
-      </View>
-
-      {activeTab === "overview" ? (
-        <View className="pb-8">
-          <HabitsOverviewGrid
-            grid={overviewGrid}
-            headers={overviewHeaders}
-            consistencyPercent={consistencyPct}
-          />
-        </View>
-      ) : (
-      <View className="bg-orange-50 pb-8">
+      <View className="bg-orange-50 pb-4">
         {habits.length === 0 ? (
           <View className="items-center py-12">
             <Pressable
@@ -381,8 +357,27 @@ export function HabitsScreen() {
             </View>
           ))
         )}
+
+        <ActivityPreviewStrip
+          days={habitActivityDays}
+          accentColor="#4f79ff"
+          statLabel={
+            overallStreak > 0
+              ? `${overallStreak} day${overallStreak !== 1 ? "s" : ""} best streak`
+              : `${consistencyPct}% consistency`
+          }
+          emptyLabel="Complete habits to start your streak"
+        />
       </View>
-      )}
+
+      <View className="mt-2 pb-8">
+        <Text className="text-xs text-slate-400 mb-2">30-day overview</Text>
+        <HabitsOverviewGrid
+          grid={overviewGrid}
+          headers={overviewHeaders}
+          consistencyPercent={consistencyPct}
+        />
+      </View>
 
       <Modal
         visible={modalVisible}

@@ -27,28 +27,28 @@ test.describe("Habits", () => {
     await openAddHabitModal(page);
     await page.getByPlaceholder(/Read 20 minutes/i).fill("Morning run");
     await page.getByText("Create habit", { exact: true }).click();
-    await expect(page.getByText("Morning run")).toBeVisible();
+    await expect(page.getByText("Morning run").first()).toBeVisible();
   });
 
   test("increments habit completion", async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByPlaceholder(/Read 20 minutes/i).fill("Meditate");
     await page.getByText("Create habit", { exact: true }).click();
-    await expect(page.getByText("Meditate")).toBeVisible();
+    await expect(page.getByText("Meditate").first()).toBeVisible();
     await page.getByText("Meditate", { exact: true }).locator("..").locator("> *").first().click();
-    await expect(page.getByText("Meditate")).toBeVisible();
+    await expect(page.getByText("Meditate").first()).toBeVisible();
   });
 
   test("habit persists after reload", async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByPlaceholder(/Read 20 minutes/i).fill("Drink water");
     await page.getByText("Create habit", { exact: true }).click();
-    await expect(page.getByText("Drink water")).toBeVisible();
+    await expect(page.getByText("Drink water").first()).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState("load");
     await goToTab(page, "habits");
-    await expect(page.getByText("Drink water")).toBeVisible();
+    await expect(page.getByText("Drink water").first()).toBeVisible();
   });
 
   // RN core Alert.alert only implements iOS + Android (see node_modules/react-native/Libraries/Alert/Alert.js).
@@ -59,9 +59,9 @@ test.describe("Habits", () => {
     await openAddHabitModal(page);
     await page.getByPlaceholder(/Read 20 minutes/i).fill("Delete this habit");
     await page.getByText("Create habit", { exact: true }).click();
-    await expect(page.getByText("Delete this habit")).toBeVisible();
+    await expect(page.getByText("Delete this habit").first()).toBeVisible();
     await page.locator(".mb-4.flex-row").locator(".rounded-lg.p-2").click();
     await page.getByText("Delete", { exact: true }).first().click();
-    await expect(page.getByText("Delete this habit")).toBeVisible();
+    await expect(page.getByText("Delete this habit").first()).toBeVisible();
   });
 });

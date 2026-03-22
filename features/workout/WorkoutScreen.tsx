@@ -13,8 +13,12 @@ import {
   deleteRoutine,
   getRoutineWithExercises,
   listRoutines,
-  listWorkoutLogs,
+  listWorkoutLogsForRange,
 } from "@/features/workout/workout.data";
+import { buildWorkoutActivityDays, buildWorkoutFrequency } from "@/features/workout/workout.domain";
+import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+import { WorkoutFrequencyChart } from "@/features/workout/WorkoutFrequencyChart";
+import { toDateKey } from "@/lib/time";
 import { RoutineDetailScreen } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
@@ -29,12 +33,24 @@ export function WorkoutScreen() {
   const [description, setDescription] = useState("");
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
+  const [workoutFreqData, setWorkoutFreqData] = useState<
+    { dateKey: string; label: string; value: number }[]
+  >([]);
   const [currentView, setCurrentView] = useState<ViewState>({ type: "list" });
 
   const refresh = useCallback(async () => {
-    const [r, l] = await Promise.all([listRoutines(), listWorkoutLogs(8)]);
+    const r = await listRoutines();
     setRoutines(r);
-    setLogs(l);
+
+    const start30 = new Date();
+    start30.setDate(start30.getDate() - 29);
+    const startKey = toDateKey(start30);
+    const endKey = toDateKey(new Date());
+    const allLogs = await listWorkoutLogsForRange(startKey, endKey);
+    setLogs(allLogs.slice(0, 30));
+    setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 30));
+    setWorkoutFreqData(buildWorkoutFrequency(allLogs, 30));
   }, []);
 
   useFocusEffect(
@@ -141,12 +157,21 @@ export function WorkoutScreen() {
         </Card>
       ))}
 
+      <ActivityPreviewStrip
+        days={workoutActivityDays}
+        accentColor="#4f79ff"
+        statLabel={`${workoutActivityDays.filter((d) => d.active).length} workout days in last 30 days`}
+        emptyLabel="Complete a workout to start tracking"
+      />
+
       <SectionTitle title="Recent workout logs" />
       {logs.map((log) => (
         <Card key={log.id}>
           <Text className="text-sm text-slate-700">{new Date(log.completed_at).toLocaleString()}</Text>
         </Card>
       ))}
+
+      <WorkoutFrequencyChart data={workoutFreqData} />
     </Screen>
   );
 }

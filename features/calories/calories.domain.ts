@@ -1,5 +1,19 @@
 import type { DailySummary } from "./calories.data";
 import type { SavedMeal } from "@/core/db/types";
+import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+
+function buildDateRange(days: number): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${dd}`);
+  }
+  return result;
+}
 
 /**
  * (protein × 4) + ((carbs − fiber) × 4) + (fiber × 2) + (fat × 9)
@@ -119,4 +133,29 @@ export function filterSavedMeals(meals: SavedMeal[], query: string): SavedMeal[]
   if (!query.trim()) return meals;
   const q = query.trim().toLowerCase();
   return meals.filter((m) => m.food_name.toLowerCase().includes(q));
+}
+
+/**
+ * Build ActivityDay array from daily summaries.
+ * A day is "active" if any calories were logged.
+ * value = min(1, totalCalories / goalCalories) for intensity.
+ */
+export function buildCalorieActivityDays(
+  summaries: DailySummary[],
+  goalCalories: number = 2000,
+  days: number = 30,
+): ActivityDay[] {
+  const map = new Map<string, number>();
+  for (const s of summaries) {
+    map.set(s.dateKey, s.totalCalories);
+  }
+  return buildDateRange(days).map((dateKey) => {
+    const cal = map.get(dateKey) ?? 0;
+    return {
+      dateKey,
+      active: cal > 0,
+      value:
+        goalCalories > 0 ? Math.min(1, cal / goalCalories) : cal > 0 ? 1 : 0,
+    };
+  });
 }

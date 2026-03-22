@@ -1,3 +1,65 @@
+import type { WorkoutLog } from "./types";
+import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
+
+function buildDateRange(days: number): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    result.push(`${y}-${m}-${dd}`);
+  }
+  return result;
+}
+
+/**
+ * Build ActivityDay array from workout logs.
+ * A day is "active" if at least one session was logged.
+ */
+export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 30): ActivityDay[] {
+  const set = new Set<string>();
+  for (const log of logs) {
+    const d = new Date(log.completed_at);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    set.add(`${y}-${m}-${dd}`);
+  }
+  return buildDateRange(days).map((dateKey) => ({
+    dateKey,
+    active: set.has(dateKey),
+  }));
+}
+
+/**
+ * Build workout frequency data for bar chart.
+ * Returns sessions per day for last N days, today first.
+ */
+export function buildWorkoutFrequency(
+  logs: WorkoutLog[],
+  days: number = 30,
+): { dateKey: string; label: string; value: number }[] {
+  const map = new Map<string, number>();
+  for (const log of logs) {
+    const d = new Date(log.completed_at);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const key = `${y}-${m}-${dd}`;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return buildDateRange(days).map((dateKey) => {
+    const d = new Date(`${dateKey}T00:00:00`);
+    return {
+      dateKey,
+      label: d.toLocaleDateString("en", { weekday: "short" }),
+      value: map.get(dateKey) ?? 0,
+    };
+  });
+}
+
 /**
  * Format seconds into MM:SS display string.
  * e.g. 90 → "1:30", 45 → "0:45"

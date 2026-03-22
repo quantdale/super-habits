@@ -37,11 +37,25 @@ export async function completeRoutine(routineId: string, notes?: string): Promis
   );
 }
 
-export async function listWorkoutLogs(limit = 12): Promise<WorkoutLog[]> {
+export async function listWorkoutLogs(limit: number = 30): Promise<WorkoutLog[]> {
   const db = await getDatabase();
   return db.getAllAsync<WorkoutLog>(
     "SELECT * FROM workout_logs ORDER BY completed_at DESC LIMIT ?",
     [limit],
+  );
+}
+
+export async function listWorkoutLogsForRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<WorkoutLog[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<WorkoutLog>(
+    `SELECT * FROM workout_logs
+     WHERE completed_at >= ?
+       AND completed_at <= ?
+     ORDER BY completed_at DESC`,
+    [`${startDateKey}T00:00:00`, `${endDateKey}T23:59:59.999`],
   );
 }
 

@@ -73,6 +73,9 @@ For each failed test, classify the failure type:
             e.g. expected "147 kcal" but got "0 kcal"
   Cause: App domain logic or data layer returning wrong result.
   Fix scope: features/*.domain.ts or features/*.data.ts via /fix.
+  Key signal: if removing or weakening the assertion would
+   make the test pass, it is Type B — fix the app, not the
+   test.
 
 **Type C — Infrastructure failure**
   Symptom: crossOriginIsolated is false, SW cache wrong name,
@@ -195,6 +198,13 @@ with the information needed to resolve them manually.
 
 ## Constraints
 
+- NEVER fix a test to make it pass artificially. If a test
+   failure reveals a genuine app bug, the app must be fixed —
+   not the assertion. Changing expect(x).toBe(147) to
+   expect(x).toBe(0) to force a pass is strictly forbidden.
+   Genuine app bugs are always Type B — route through /fix,
+   get plan approval, fix the app, then re-run the test to
+   confirm it now passes naturally.
 - Do not modify application source files (.ts, .tsx) without
   approval from the plan in Phase 4
 - Type A selector fixes and Type D timeout fixes in e2e/ files

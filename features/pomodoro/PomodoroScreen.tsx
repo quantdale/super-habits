@@ -15,7 +15,9 @@ import {
   nextPomodoroState,
   calculateGrowthProgress,
   getPlantStage,
+  buildPomodoroActivityDays,
 } from "./pomodoro.domain";
+import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { FocusSprout } from "./FocusSprout";
 import { GardenGrid } from "./GardenGrid";
 import { BackgroundWarning } from "./BackgroundWarning";
@@ -29,11 +31,15 @@ export function PomodoroScreen() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+  const [pomodoroActivityDays, setPomodoroActivityDays] = useState<ActivityDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    listPomodoroSessions(8).then(setSessions);
+    listPomodoroSessions(30).then((s) => {
+      setSessions(s);
+      setPomodoroActivityDays(buildPomodoroActivityDays(s, 30));
+    });
   }, [historyVersion]);
 
   useEffect(() => {
@@ -162,7 +168,13 @@ export function PomodoroScreen() {
         </View>
       </Card>
 
-      <SectionTitle title="Recent sessions" />
+      <ActivityPreviewStrip
+        days={pomodoroActivityDays}
+        accentColor="#4f79ff"
+        statLabel={`${sessions.length} session${sessions.length !== 1 ? "s" : ""} in last 30 days`}
+        emptyLabel="Complete a session to start your garden"
+      />
+
       <View className="mt-6">
         <GardenGrid sessions={sessions} />
       </View>
