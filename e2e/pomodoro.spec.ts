@@ -16,7 +16,7 @@ test.describe("Pomodoro", () => {
 
   test("shows empty session history on first load", async ({ page }) => {
     await expect(
-      page.getByText("Complete a focus session to grow your first plant"),
+      page.getByText("Complete a session to start your garden"),
     ).toBeVisible();
     await expect(page.locator("text=/ min$/")).toHaveCount(0);
   });

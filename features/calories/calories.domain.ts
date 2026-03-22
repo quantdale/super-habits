@@ -62,9 +62,13 @@ export function buildWeeklyTrend(
 }
 
 export type MacroSlice = {
+  /** Percent of total macro kcal (0–100), adjusted so slices sum to 100. */
   value: number;
+  /** Energy from this macro (same basis as kcalFromMacros). */
+  kcal: number;
   color: string;
   label: string;
+  /** Grams shown in the legend — carbs use digestible grams (carbs − fiber). */
   grams: number;
 };
 
@@ -79,36 +83,31 @@ export function buildMacroDonutData(
   const carbsKcal = digestibleCarbs * 4;
   const fiberKcal = fiber * 2;
   const fatsKcal = fats * 9;
-  const total = proteinKcal + carbsKcal + fiberKcal + fatsKcal;
+  const totalKcal = proteinKcal + carbsKcal + fiberKcal + fatsKcal;
 
-  if (total === 0) return [];
+  if (totalKcal === 0) return [];
 
-  return [
-    {
-      value: Math.round((proteinKcal / total) * 100),
-      color: "#4f79ff",
-      label: "Protein",
-      grams: protein,
-    },
-    {
-      value: Math.round((carbsKcal / total) * 100),
-      color: "#f59e0b",
-      label: "Carbs",
-      grams: carbs,
-    },
-    {
-      value: Math.round((fatsKcal / total) * 100),
-      color: "#10b981",
-      label: "Fats",
-      grams: fats,
-    },
-    {
-      value: Math.round((fiberKcal / total) * 100),
-      color: "#8b5cf6",
-      label: "Fiber",
-      grams: fiber,
-    },
+  const raw = [
+    { kcal: proteinKcal, color: "#4f79ff", label: "Protein" as const, grams: protein },
+    { kcal: carbsKcal, color: "#f59e0b", label: "Carbs" as const, grams: digestibleCarbs },
+    { kcal: fatsKcal, color: "#10b981", label: "Fats" as const, grams: fats },
+    { kcal: fiberKcal, color: "#8b5cf6", label: "Fiber" as const, grams: fiber },
   ];
+
+  const nonZero = raw.filter((s) => s.kcal > 0);
+  if (nonZero.length === 0) return [];
+
+  const slices: MacroSlice[] = nonZero.map((s) => ({
+    ...s,
+    value: Math.round((s.kcal / totalKcal) * 100),
+  }));
+
+  const pctSum = slices.reduce((acc, s) => acc + s.value, 0);
+  if (slices.length > 0 && pctSum !== 100) {
+    slices[slices.length - 1].value += 100 - pctSum;
+  }
+
+  return slices;
 }
 
 export function calculateGoalProgress(

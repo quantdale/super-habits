@@ -21,7 +21,7 @@ export function MacroDonutChart({ slices, totalKcal, goalKcal }: Props) {
   }
 
   const pieData = slices.map((s) => ({
-    value: s.value,
+    value: s.kcal,
     color: s.color,
     text: `${s.value}%`,
   }));

@@ -28,13 +28,11 @@ import {
   calculateCurrentStreak,
   calculateOverallConsistency,
   getStreakLabel,
-  type DayCompletion,
   type GridDateHeader,
   type HabitGridRow,
 } from "@/features/habits/habits.domain";
 import { ActivityPreviewStrip, type ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { HabitCircle } from "@/features/habits/HabitCircle";
-import { HabitHeatmap } from "@/features/habits/HabitHeatmap";
 import { HabitsOverviewGrid } from "@/features/habits/HabitsOverviewGrid";
 import {
   DEFAULT_HABIT_COLOR,
@@ -79,8 +77,6 @@ export function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
-  const [historyMap, setHistoryMap] = useState<Record<string, DayCompletion[]>>({});
-  const [expandedHabits, setExpandedHabits] = useState<Record<string, boolean>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -102,15 +98,12 @@ export function HabitsScreen() {
     setCompletionMap(Object.fromEntries(list.map((h, i) => [h.id, counts[i]])));
 
     const streaks: Record<string, number> = {};
-    const histories: Record<string, DayCompletion[]> = {};
     for (const habit of list) {
       const completions = await getCompletionHistory(habit.id, 30);
       const dayCompletions = buildDayCompletions(completions, habit.target_per_day, 30);
       streaks[habit.id] = calculateCurrentStreak(dayCompletions);
-      histories[habit.id] = dayCompletions;
     }
     setStreakMap(streaks);
-    setHistoryMap(histories);
 
     const start = new Date();
     start.setDate(start.getDate() - 29);
@@ -149,13 +142,6 @@ export function HabitsScreen() {
     const bestStreak = Math.max(0, ...Object.values(streaks));
     setHabitActivityDays(activityDays);
     setOverallStreak(bestStreak);
-  }, []);
-
-  const toggleHeatmap = useCallback((habitId: string) => {
-    setExpandedHabits((prev) => ({
-      ...prev,
-      [habitId]: !prev[habitId],
-    }));
   }, []);
 
   useFocusEffect(
@@ -232,7 +218,7 @@ export function HabitsScreen() {
   return (
     <Screen scroll padded>
       <View className="mb-4 flex-row items-center justify-between">
-        <SectionTitle title="Habits" subtitle="Track daily consistency." />
+        <SectionTitle title="Habits" subtitle={habits.length === 0 ? undefined : "Track daily consistency."} />
         <Pressable
           onPress={() => setEditMode((e) => !e)}
           className="rounded-lg p-2"
@@ -243,15 +229,18 @@ export function HabitsScreen() {
 
       <View className="bg-orange-50 pb-4">
         {habits.length === 0 ? (
-          <View className="items-center py-12">
-            <Pressable
-              onPress={() => openAddModal()}
-              className="items-center justify-center rounded-full border-2 border-dashed border-slate-300 bg-white"
-              style={{ width: 80, height: 80 }}
-            >
-              <MaterialIcons name="add" size={32} color="#94a3b8" />
-            </Pressable>
-            <Text className="mt-4 text-sm text-slate-600">Add your first habit</Text>
+          <View className="items-center px-4 py-12">
+            <View className="w-full max-w-sm items-center rounded-xl border border-slate-100 bg-white p-4">
+              <Text className="text-center text-sm text-slate-500">Add your first habit</Text>
+              <Text className="mt-1 text-center text-xs text-slate-400">Track daily consistency.</Text>
+              <Pressable
+                onPress={() => openAddModal()}
+                className="mt-4 items-center justify-center rounded-full border-2 border-dashed border-slate-300 bg-white"
+                style={{ width: 80, height: 80 }}
+              >
+                <MaterialIcons name="add" size={32} color="#94a3b8" />
+              </Pressable>
+            </View>
           </View>
         ) : (
           CATEGORIES.map((cat) => (
@@ -316,8 +305,8 @@ export function HabitsScreen() {
                         onIncrement={() => handleIncrement(habit.id)}
                         onDecrement={() => handleDecrement(habit.id)}
                       />
-                      <View className="mt-1 flex-row items-center justify-between px-1">
-                        {(streakMap[habit.id] ?? 0) > 0 && (
+                      {(streakMap[habit.id] ?? 0) > 0 ? (
+                        <View className="mt-1 flex-row items-center justify-center px-1">
                           <View className="flex-row items-center gap-1">
                             <Text className="text-xs text-amber-500">
                               {(streakMap[habit.id] ?? 0) > 2 ? "🔥" : "⚡"}
@@ -326,23 +315,8 @@ export function HabitsScreen() {
                               {getStreakLabel(streakMap[habit.id] ?? 0)}
                             </Text>
                           </View>
-                        )}
-                        <Pressable
-                          onPress={() => toggleHeatmap(habit.id)}
-                          className="ml-auto px-2 py-1"
-                          hitSlop={8}
-                        >
-                          <Text className="text-xs text-brand-500">
-                            {expandedHabits[habit.id] ? "▲ hide" : "▼ history"}
-                          </Text>
-                        </Pressable>
-                      </View>
-                      {expandedHabits[habit.id] && historyMap[habit.id] && (
-                        <HabitHeatmap
-                          dayCompletions={historyMap[habit.id]}
-                          accentColor={habit.color}
-                        />
-                      )}
+                        </View>
+                      ) : null}
                     </View>
                   );
                 })}

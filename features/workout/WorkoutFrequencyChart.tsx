@@ -22,10 +22,7 @@ export function WorkoutFrequencyChart({ data }: Props) {
   const maxValue = Math.max(...data.map((d) => d.value), 1);
 
   return (
-    <View className="mt-2">
-      <Text className="text-xs text-slate-400 mb-2">
-        Sessions — last 30 days
-      </Text>
+    <View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <BarChart
           data={chartData}

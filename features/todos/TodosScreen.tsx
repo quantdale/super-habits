@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
 import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
@@ -145,13 +144,16 @@ export function TodosScreen() {
   };
 
   const createDropdownContent = (
-    <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <Pressable onPress={toggleCreate} className="flex-row items-center justify-between p-4">
-        <Text className="font-medium text-slate-700">{editingId ? "Edit task" : "Make a Task"}</Text>
-        <MaterialIcons name={createExpanded ? "expand-less" : "expand-more"} size={24} color="#64748b" />
+    <View>
+      <Pressable
+        onPress={toggleCreate}
+        className="mb-2 flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
+      >
+        <Text className="text-sm font-medium text-slate-700">{editingId ? "Edit task" : "Make a Task"}</Text>
+        <Text className="text-slate-400">{createExpanded ? "▲" : "▼"}</Text>
       </Pressable>
       {createExpanded ? (
-        <View className="border-t border-slate-200 p-4">
+        <View className="overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
           <TextField label="Title" value={title} onChangeText={setTitle} placeholder="Add a task..." />
           <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" />
           <View className="mb-3 flex-row gap-2">
@@ -239,15 +241,26 @@ export function TodosScreen() {
   const emptyPending =
     pendingTasks.length === 0 && !showCompleted && items.length > 0 && hasCompleted;
   const totallyEmpty = items.length === 0;
+  const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
+
+  const noPendingTasksCard = (
+    <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
+      <Text className="text-center text-sm text-slate-500">No Pending Tasks</Text>
+      <Text className="mt-1 text-center text-xs text-slate-400">Offline-first task manager.</Text>
+    </View>
+  );
 
   return (
     <Screen>
       <View className="flex-1">
-        <SectionTitle title="To-do List" subtitle="Offline-first task manager." />
+        <SectionTitle
+          title="To-do List"
+          subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
+        />
 
         {totallyEmpty ? (
           <View className="mb-3">
-            <Text className="mb-3 text-center text-slate-600">No Pending Tasks</Text>
+            {noPendingTasksCard}
             {createDropdownContent}
           </View>
         ) : null}
@@ -256,7 +269,7 @@ export function TodosScreen() {
           <>
             {emptyPending ? (
               <View className="mb-3">
-                <Text className="mb-3 text-center text-slate-600">No Pending Tasks</Text>
+                {noPendingTasksCard}
                 {hasCompleted ? (
                   <Pressable onPress={() => setShowCompleted((v) => !v)} className="mb-2 px-1 py-2">
                     <Text className="text-xs text-brand-500">
@@ -288,6 +301,8 @@ export function TodosScreen() {
                       data={listData}
                       keyExtractor={(item) => item.id}
                       containerStyle={{ flex: 1 }}
+                      activationDistance={10}
+                      onDragBegin={() => {}}
                       onDragEnd={async ({ data }) => {
                         setItems((prev) =>
                           prev.map((item) => {
@@ -312,7 +327,9 @@ export function TodosScreen() {
                       )}
                     />
                   ) : (
-                    <Text className="py-4 text-center text-slate-500">Nothing to show here.</Text>
+                    <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
+                      <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
+                    </View>
                   )}
                 </View>
                 <View className="mt-3 shrink-0">{createDropdownContent}</View>

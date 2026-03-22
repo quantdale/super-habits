@@ -42,9 +42,9 @@ function MiniPlant({ color = "#4f79ff" }: { color?: string }) {
 export function GardenGrid({ sessions, accentColor = "#4f79ff" }: Props) {
   if (sessions.length === 0) {
     return (
-      <View className="items-center py-6">
-        <Text className="text-center text-sm text-slate-400">
-          Complete a focus session to grow your first plant
+      <View className="mx-1 my-2 items-center rounded-xl border border-slate-100 bg-white p-4">
+        <Text className="text-center text-sm text-slate-500">
+          Complete a session to start your garden
         </Text>
       </View>
     );

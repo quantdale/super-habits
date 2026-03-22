@@ -52,6 +52,7 @@ export function PomodoroScreen() {
   const [totalSeconds, setTotalSeconds] = useState(DEFAULT_SETTINGS.focusMinutes * 60);
   const [remaining, setRemaining] = useState(DEFAULT_SETTINGS.focusMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
@@ -118,6 +119,7 @@ export function PomodoroScreen() {
         if (prev <= 1) {
           clearInterval(timer);
           setIsRunning(false);
+          setIsPaused(false);
           void cancelScheduledNotification(notificationIdRef.current);
           notificationIdRef.current = null;
 
@@ -176,9 +178,6 @@ export function PomodoroScreen() {
   const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
   const seconds = String(remaining % 60).padStart(2, "0");
 
-  const canStartFresh = !isRunning && (remaining === totalSeconds || remaining === 0);
-  const canResume = !isRunning && remaining > 0 && remaining < totalSeconds;
-
   const startLabel =
     currentMode === "focus" ? "Start focus" : `Start ${getModeLabel(currentMode).toLowerCase()}`;
 
@@ -189,10 +188,11 @@ export function PomodoroScreen() {
     setTotalSeconds(duration);
     setRemaining(duration);
     setIsRunning(false);
+    setIsPaused(false);
     setShowSettings(false);
   };
 
-  const startFresh = async () => {
+  const start = async () => {
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     const now = new Date();
@@ -206,6 +206,7 @@ export function PomodoroScreen() {
     const id = await scheduleTimerEndNotification(duration, title, body);
     notificationIdRef.current = id;
     setIsRunning(true);
+    setIsPaused(false);
     setShowSettings(false);
   };
 
@@ -213,6 +214,7 @@ export function PomodoroScreen() {
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     setIsRunning(false);
+    setIsPaused(true);
   };
 
   const resume = async () => {
@@ -220,12 +222,14 @@ export function PomodoroScreen() {
     const id = await scheduleTimerEndNotification(remaining, title, body);
     notificationIdRef.current = id;
     setIsRunning(true);
+    setIsPaused(false);
   };
 
   const reset = () => {
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     setIsRunning(false);
+    setIsPaused(false);
     const duration = getModeDuration(currentMode, settings);
     setRemaining(duration);
     setTotalSeconds(duration);
@@ -241,6 +245,9 @@ export function PomodoroScreen() {
     settings,
   );
   const upNextMinutes = Math.round(getModeDuration(upNextMode, settings) / 60);
+
+  const pomodoroStripLabelVisible =
+    sessions.length > 0 || pomodoroActivityDays.some((d) => d.active);
 
   return (
     <Screen scroll>
@@ -258,6 +265,7 @@ export function PomodoroScreen() {
               key={mode}
               onPress={() => {
                 if (isRunning) return;
+                setIsPaused(false);
                 setCurrentMode(mode);
                 currentModeRef.current = mode;
                 const d = getModeDuration(mode, settings);
@@ -319,20 +327,31 @@ export function PomodoroScreen() {
           />
         ) : null}
 
-        <View className="mt-4 gap-2">
-          {canStartFresh ? <Button label={startLabel} onPress={startFresh} /> : null}
-          <View className="flex-row gap-2">
-            <View className="flex-1">
-              <Button label="Pause" variant="ghost" disabled={!isRunning} onPress={pause} />
+        <View className="mt-4 gap-3">
+          {!isRunning && !isPaused && remaining === totalSeconds ? (
+            <Button label={startLabel} onPress={start} />
+          ) : null}
+
+          {isRunning ? (
+            <View className="flex-row gap-3">
+              <Button label="Pause" variant="ghost" onPress={pause} />
+              <Button label="Reset" variant="ghost" onPress={reset} />
             </View>
-            <View className="flex-1">
-              <Button label="Resume" variant="ghost" disabled={!canResume} onPress={resume} />
+          ) : null}
+
+          {isPaused && !isRunning ? (
+            <View className="flex-row gap-3">
+              <Button label="Resume" onPress={resume} />
+              <Button label="Reset" variant="ghost" onPress={reset} />
             </View>
-          </View>
-          <Button label="Reset" variant="ghost" onPress={reset} />
+          ) : null}
+
+          {remaining === 0 && !isRunning && !isPaused ? (
+            <Button label={startLabel} onPress={start} />
+          ) : null}
         </View>
 
-        {!isRunning && remaining === getModeDuration(currentMode, settings) ? (
+        {!isRunning && !isPaused && remaining === getModeDuration(currentMode, settings) ? (
           <Text className="mt-3 text-center text-xs text-slate-400">
             Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
           </Text>
@@ -344,6 +363,7 @@ export function PomodoroScreen() {
         accentColor="#4f79ff"
         statLabel={`${sessions.length} session${sessions.length !== 1 ? "s" : ""} in last 30 days`}
         emptyLabel="Complete a session to start your garden"
+        showLabel={pomodoroStripLabelVisible}
       />
 
       <View className="mt-6">

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { goToTab } from "./helpers/navigation";
 import { clearDatabase } from "./helpers/db";
+import { clickSwipeDeleteAction, swipeLeftToRevealRowActions } from "./helpers/gestures";
 
 test.describe("Todos", () => {
   test.beforeEach(async ({ page }) => {
@@ -39,7 +40,8 @@ test.describe("Todos", () => {
     await page.getByPlaceholder(/Add a task/i).fill("Delete me");
     await page.getByText("Add task", { exact: true }).click();
     await expect(page.getByText("Delete me")).toBeVisible();
-    await page.getByText("Delete", { exact: true }).click();
+    await swipeLeftToRevealRowActions(page, "Delete me");
+    await clickSwipeDeleteAction(page);
     await expect(page.getByText("Delete me")).not.toBeVisible();
   });
 

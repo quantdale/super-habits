@@ -84,16 +84,29 @@ describe("buildMacroDonutData", () => {
     expect(buildMacroDonutData(0, 0, 0, 0)).toHaveLength(0);
   });
 
-  it("returns 4 slices when macros are non-zero", () => {
+  it("returns 4 slices, kcal from digestible carbs, percents sum to 100 (P=30 C=50 F=10 Fi=5)", () => {
     const slices = buildMacroDonutData(30, 50, 10, 5);
     expect(slices).toHaveLength(4);
+    expect(slices.reduce((s, sl) => s + sl.value, 0)).toBe(100);
+    const p = slices.find((sl) => sl.label === "Protein");
+    const c = slices.find((sl) => sl.label === "Carbs");
+    const f = slices.find((sl) => sl.label === "Fats");
+    const fi = slices.find((sl) => sl.label === "Fiber");
+    expect(p?.kcal).toBe(120);
+    expect(p?.grams).toBe(30);
+    expect(c?.kcal).toBe(180);
+    expect(c?.grams).toBe(45);
+    expect(f?.kcal).toBe(90);
+    expect(f?.grams).toBe(10);
+    expect(fi?.kcal).toBe(10);
+    expect(fi?.grams).toBe(5);
   });
 
-  it("slice values sum to approximately 100", () => {
-    const slices = buildMacroDonutData(30, 50, 10, 5);
-    const total = slices.reduce((s, sl) => s + sl.value, 0);
-    expect(total).toBeGreaterThanOrEqual(98);
-    expect(total).toBeLessThanOrEqual(102);
+  it("drops macros with zero kcal from the donut list", () => {
+    const slices = buildMacroDonutData(0, 0, 10, 0);
+    expect(slices).toHaveLength(1);
+    expect(slices[0]?.label).toBe("Fats");
+    expect(slices.reduce((s, sl) => s + sl.value, 0)).toBe(100);
   });
 });
 

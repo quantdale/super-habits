@@ -110,6 +110,11 @@ export function CaloriesScreen() {
   const weeklyTrend = buildWeeklyTrend(weeklyData, 7);
   const goalProgress = calculateGoalProgress(caloriesTotal(entries), goal.calories);
 
+  const hasCalorieStripActivity = calorieActivityDays.some((d) => d.active);
+  const consistencyText = hasCalorieStripActivity
+    ? `${goalProgress.percent}% of daily goal today`
+    : "Log food to start tracking";
+
   const computedKcal = useMemo(
     () =>
       kcalFromMacros(
@@ -236,8 +241,12 @@ export function CaloriesScreen() {
       </Card>
 
       <Card>
+        <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-3">
+          <Text className="text-center text-sm font-medium text-slate-600">{consistencyText}</Text>
+        </View>
+
         <View className="mb-4">
-          <View className="flex-row justify-between mb-1">
+          <View className="mb-1 flex-row items-center justify-center gap-8">
             <Text className="text-sm text-slate-600">Today: {caloriesTotal(entries)} kcal</Text>
             <Pressable onPress={() => setGoalSheetVisible(true)}>
               <Text className="text-sm text-brand-500">
@@ -245,14 +254,14 @@ export function CaloriesScreen() {
               </Text>
             </Pressable>
           </View>
-          <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <View className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
             <View
               className={`h-full rounded-full ${goalProgress.over ? "bg-rose-400" : "bg-brand-500"}`}
               style={{ width: `${goalProgress.percent}%` }}
             />
           </View>
           {goalProgress.over && (
-            <Text className="text-xs text-rose-400 mt-1">
+            <Text className="text-xs text-rose-400 mt-1 text-center">
               {caloriesTotal(entries) - goal.calories} kcal over goal
             </Text>
           )}
@@ -263,8 +272,9 @@ export function CaloriesScreen() {
         <ActivityPreviewStrip
           days={calorieActivityDays}
           accentColor="#4f79ff"
-          statLabel={`${goalProgress.percent}% of daily goal today`}
+          statLabel=""
           emptyLabel="Log food to start tracking"
+          showLabel={false}
         />
       </Card>
 
