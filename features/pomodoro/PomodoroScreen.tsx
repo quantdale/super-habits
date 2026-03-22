@@ -10,8 +10,15 @@ import {
   cancelScheduledNotification,
   scheduleTimerEndNotification,
 } from "@/lib/notifications";
-
-const FOCUS_SECONDS = 25 * 60;
+import {
+  FOCUS_SECONDS,
+  nextPomodoroState,
+  calculateGrowthProgress,
+  getPlantStage,
+} from "./pomodoro.domain";
+import { FocusSprout } from "./FocusSprout";
+import { GardenGrid } from "./GardenGrid";
+import { BackgroundWarning } from "./BackgroundWarning";
 
 const NOTIFY_TITLE = "Focus complete";
 const NOTIFY_BODY = "Great work. Time for a short break.";
@@ -22,11 +29,35 @@ export function PomodoroScreen() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+  const [showWarning, setShowWarning] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     listPomodoroSessions(8).then(setSessions);
   }, [historyVersion]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && isRunning) {
+        setShowWarning(true);
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+    }
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (remaining === 0 && !isRunning) {
+      setShowWarning(false);
+    }
+  }, [remaining, isRunning]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -58,11 +89,15 @@ export function PomodoroScreen() {
     return () => clearInterval(timer);
   }, [isRunning, startedAt]);
 
+  const pomodoroState = nextPomodoroState(remaining, isRunning);
+  const growthProgress = calculateGrowthProgress(remaining, FOCUS_SECONDS);
+  const plantStage = getPlantStage(growthProgress);
+  const showSprout = pomodoroState !== "idle" || remaining < FOCUS_SECONDS;
+
   const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
   const seconds = String(remaining % 60).padStart(2, "0");
 
-  const canStartFresh =
-    !isRunning && (remaining === FOCUS_SECONDS || remaining === 0);
+  const canStartFresh = !isRunning && (remaining === FOCUS_SECONDS || remaining === 0);
   const canResume = !isRunning && remaining > 0 && remaining < FOCUS_SECONDS;
 
   const startFresh = async () => {
@@ -94,19 +129,27 @@ export function PomodoroScreen() {
     setIsRunning(false);
     setRemaining(FOCUS_SECONDS);
     setStartedAt(null);
+    setShowWarning(false);
   };
 
   return (
     <Screen scroll>
       <SectionTitle title="Pomodoro" subtitle="25-minute focus block with local session logs." />
+
+      <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
+
       <Card>
-        <Text className="text-center text-6xl font-bold text-slate-900">
+        {showSprout ? (
+          <View className="my-4 items-center">
+            <FocusSprout progress={growthProgress} stage={plantStage} size={160} />
+          </View>
+        ) : null}
+
+        <Text className="my-2 text-center text-5xl font-semibold text-slate-800">
           {minutes}:{seconds}
         </Text>
         <View className="mt-4 gap-2">
-          {canStartFresh ? (
-            <Button label="Start focus" onPress={startFresh} />
-          ) : null}
+          {canStartFresh ? <Button label="Start focus" onPress={startFresh} /> : null}
           <View className="flex-row gap-2">
             <View className="flex-1">
               <Button label="Pause" variant="ghost" disabled={!isRunning} onPress={pause} />
@@ -120,13 +163,9 @@ export function PomodoroScreen() {
       </Card>
 
       <SectionTitle title="Recent sessions" />
-      {sessions.map((session) => (
-        <Card key={session.id}>
-          <Text className="text-sm text-slate-700">
-            {new Date(session.started_at).toLocaleString()} - {Math.round(session.duration_seconds / 60)} min
-          </Text>
-        </Card>
-      ))}
+      <View className="mt-6">
+        <GardenGrid sessions={sessions} />
+      </View>
     </Screen>
   );
 }

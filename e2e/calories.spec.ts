@@ -11,7 +11,7 @@ test.describe("Calories", () => {
   });
 
   test("shows empty state on first load", async ({ page }) => {
-    await expect(page.getByText("Today total: 0 kcal")).toBeVisible();
+    await expect(page.getByText("Today: 0 kcal")).toBeVisible();
   });
 
   test("does not add entry with empty food name", async ({ page }) => {
@@ -24,7 +24,7 @@ test.describe("Calories", () => {
     await page.getByText("Breakfast", { exact: true }).click();
     await page.getByText("Add entry", { exact: true }).click();
     await expect(page.getByText("Chicken breast - 147 kcal")).toBeVisible();
-    await expect(page.getByText("Today total: 147 kcal")).toBeVisible();
+    await expect(page.getByText("Today: 147 kcal")).toBeVisible();
   });
 
   test("selects different meal types", async ({ page }) => {

@@ -22,7 +22,7 @@ test.describe("Pomodoro", () => {
   test("starts timer and shows running state", async ({ page }) => {
     await page.getByText("Start focus", { exact: true }).click();
     await expect(page.getByText("Pause", { exact: true })).toBeEnabled({ timeout: 3_000 });
-    const timer = page.locator(".text-6xl").getByText(/^\d{2}:\d{2}$/);
+    const timer = page.locator(".text-5xl").getByText(/^\d{2}:\d{2}$/);
     await expect(timer).not.toHaveText("25:00", { timeout: 5_000 });
   });
 
