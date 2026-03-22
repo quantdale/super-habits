@@ -5,8 +5,12 @@ import {
   calculateCurrentStreak,
   calculateLongestStreak,
   getStreakLabel,
+  buildGridDateHeaders,
+  buildHabitGrid,
+  calculateOverallConsistency,
   type DayCompletion,
 } from "@/features/habits/habits.domain";
+import type { HabitCompletionRow } from "@/features/habits/habits.data";
 
 describe("calculateHabitProgress", () => {
   it("returns complete progress when count exceeds target", () => {
@@ -137,5 +141,91 @@ describe("getStreakLabel", () => {
   });
   it("returns 'N days' for streak > 1", () => {
     expect(getStreakLabel(7)).toBe("7 days");
+  });
+});
+
+describe("buildGridDateHeaders", () => {
+  it("returns 30 headers by default", () => {
+    expect(buildGridDateHeaders(30)).toHaveLength(30);
+  });
+
+  it("last header is today", () => {
+    const headers = buildGridDateHeaders(30);
+    const last = headers[headers.length - 1];
+    expect(last.isToday).toBe(true);
+  });
+
+  it("sets monthLabel only on the 1st of month", () => {
+    const headers = buildGridDateHeaders(30);
+    for (const h of headers) {
+      if (h.monthLabel !== null) {
+        expect(Number(h.dayLabel)).toBe(1);
+      }
+    }
+  });
+});
+
+describe("buildHabitGrid", () => {
+  const habits = [
+    { id: "h1", name: "Run", color: "#4f79ff", target_per_day: 1 },
+    { id: "h2", name: "Read", color: "#22c55e", target_per_day: 2 },
+  ];
+
+  it("returns one row per habit", () => {
+    expect(buildHabitGrid(habits, [], 30)).toHaveLength(2);
+  });
+
+  it("returns 30 cells per row", () => {
+    const grid = buildHabitGrid(habits, [], 30);
+    grid.forEach((row) => expect(row.cells).toHaveLength(30));
+  });
+
+  it("marks cell as completed when count >= target", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const completions: HabitCompletionRow[] = [{ habit_id: "h1", date_key: todayKey, count: 1 }];
+    const grid = buildHabitGrid(habits, completions, 30);
+    const h1Row = grid.find((r) => r.habit.id === "h1")!;
+    const todayCell = h1Row.cells.find((c) => c.dateKey === todayKey)!;
+    expect(todayCell.completed).toBe(true);
+    expect(todayCell.partial).toBe(false);
+  });
+
+  it("marks cell as partial when 0 < count < target", () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${y}-${m}-${d}`;
+
+    const completions: HabitCompletionRow[] = [{ habit_id: "h2", date_key: todayKey, count: 1 }];
+    const grid = buildHabitGrid(habits, completions, 30);
+    const h2Row = grid.find((r) => r.habit.id === "h2")!;
+    const todayCell = h2Row.cells.find((c) => c.dateKey === todayKey)!;
+    expect(todayCell.completed).toBe(false);
+    expect(todayCell.partial).toBe(true);
+  });
+});
+
+describe("calculateOverallConsistency", () => {
+  it("returns 0 for empty grid", () => {
+    expect(calculateOverallConsistency([])).toBe(0);
+  });
+
+  it("calculates percentage of completed past cells", () => {
+    const grid = [
+      {
+        habit: { id: "h1", name: "Run", color: "#fff", target_per_day: 1 },
+        cells: [
+          { dateKey: "2000-01-01", count: 1, completed: true, partial: false },
+          { dateKey: "2000-01-02", count: 0, completed: false, partial: false },
+        ],
+      },
+    ];
+    expect(calculateOverallConsistency(grid)).toBe(50);
   });
 });

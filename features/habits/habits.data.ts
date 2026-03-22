@@ -82,6 +82,27 @@ export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()
   return row?.count ?? 0;
 }
 
+export type HabitCompletionRow = {
+  habit_id: string;
+  date_key: string;
+  count: number;
+};
+
+export async function getAllHabitCompletionsForRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<HabitCompletionRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<HabitCompletionRow>(
+    `SELECT habit_id, date_key, count
+     FROM habit_completions
+     WHERE date_key >= ?
+       AND date_key <= ?
+     ORDER BY date_key ASC`,
+    [startDateKey, endDateKey],
+  );
+}
+
 export async function getCompletionHistory(
   habitId: string,
   days: number = 30,

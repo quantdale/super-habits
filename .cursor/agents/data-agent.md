@@ -45,7 +45,7 @@ NON-NEGOTIABLES
 - schema.sql is reference only — never execute it
 - UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed exception to soft-delete — non-synced entity, no `syncEngine.enqueue()`. See `features/habits/habits.data.ts` ~63–66 for the explanatory comment.
 - All SELECT queries include WHERE deleted_at IS NULL
-- 55 tests must pass after every change — update this count whenever tests are added or removed
+- 64 tests must pass after every change — update this count whenever tests are added or removed
 
 E2E TESTS
 When fixing data layer issues, run the relevant E2E spec after:

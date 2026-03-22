@@ -113,3 +113,120 @@ export function getStreakLabel(streak: number): string {
   if (streak === 1) return "1 day";
   return `${streak} days`;
 }
+
+export type HabitGridRow = {
+  habit: {
+    id: string;
+    name: string;
+    color: string;
+    target_per_day: number;
+  };
+  cells: DayCell[];
+};
+
+export type DayCell = {
+  dateKey: string;
+  count: number;
+  completed: boolean;
+  partial: boolean;
+};
+
+export type GridDateHeader = {
+  dateKey: string;
+  dayLabel: string;
+  monthLabel: string | null;
+  isToday: boolean;
+};
+
+/**
+ * Build the date header row for the grid.
+ * Returns 30 entries from oldest to newest.
+ * Shows month label only on the 1st of each month.
+ */
+export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
+  const headers: GridDateHeader[] = [];
+  const todayKey = localDateKey(new Date());
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const dateKey = `${y}-${m}-${dd}`;
+
+    headers.push({
+      dateKey,
+      dayLabel: String(d.getDate()),
+      monthLabel:
+        d.getDate() === 1 ? d.toLocaleDateString("en", { month: "short" }) : null,
+      isToday: dateKey === todayKey,
+    });
+  }
+  return headers;
+}
+
+/**
+ * Build the full habits × days grid for the overview.
+ */
+export function buildHabitGrid(
+  habits: Array<{
+    id: string;
+    name: string;
+    color: string;
+    target_per_day: number;
+  }>,
+  completions: Array<{ habit_id: string; date_key: string; count: number }>,
+  days: number = 30,
+): HabitGridRow[] {
+  const lookup = new Map<string, Map<string, number>>();
+  for (const c of completions) {
+    if (!lookup.has(c.habit_id)) {
+      lookup.set(c.habit_id, new Map());
+    }
+    lookup.get(c.habit_id)!.set(c.date_key, c.count);
+  }
+
+  const dateKeys: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    dateKeys.push(`${y}-${m}-${dd}`);
+  }
+
+  return habits.map((habit) => {
+    const habitMap = lookup.get(habit.id) ?? new Map<string, number>();
+    const cells: DayCell[] = dateKeys.map((dateKey) => {
+      const count = habitMap.get(dateKey) ?? 0;
+      return {
+        dateKey,
+        count,
+        completed: habit.target_per_day > 0 && count >= habit.target_per_day,
+        partial: count > 0 && count < habit.target_per_day,
+      };
+    });
+    return { habit, cells };
+  });
+}
+
+/**
+ * Overall consistency = completed cells / total possible cells (excluding future days).
+ */
+export function calculateOverallConsistency(grid: HabitGridRow[]): number {
+  if (grid.length === 0) return 0;
+  const todayKey = localDateKey(new Date());
+  let completed = 0;
+  let total = 0;
+  for (const row of grid) {
+    for (const cell of row.cells) {
+      if (cell.dateKey > todayKey) continue;
+      total++;
+      if (cell.completed) completed++;
+    }
+  }
+  if (total === 0) return 0;
+  return Math.round((completed / total) * 100);
+}

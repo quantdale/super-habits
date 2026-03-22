@@ -13,6 +13,7 @@ import {
   addHabit,
   decrementHabit,
   deleteHabit,
+  getAllHabitCompletionsForRange,
   getCompletionHistory,
   getHabitCountByDate,
   incrementHabit,
@@ -21,12 +22,18 @@ import {
 } from "@/features/habits/habits.data";
 import {
   buildDayCompletions,
+  buildGridDateHeaders,
+  buildHabitGrid,
   calculateCurrentStreak,
+  calculateOverallConsistency,
   getStreakLabel,
   type DayCompletion,
+  type GridDateHeader,
+  type HabitGridRow,
 } from "@/features/habits/habits.domain";
 import { HabitCircle } from "@/features/habits/HabitCircle";
 import { HabitHeatmap } from "@/features/habits/HabitHeatmap";
+import { HabitsOverviewGrid } from "@/features/habits/HabitsOverviewGrid";
 import {
   DEFAULT_HABIT_COLOR,
   DEFAULT_HABIT_ICON,
@@ -80,6 +87,10 @@ export function HabitsScreen() {
   const [category, setCategory] = useState<HabitCategory>("anytime");
   const [icon, setIcon] = useState<HabitIcon>(DEFAULT_HABIT_ICON);
   const [color, setColor] = useState(DEFAULT_HABIT_COLOR);
+  const [activeTab, setActiveTab] = useState<"today" | "overview">("today");
+  const [overviewGrid, setOverviewGrid] = useState<HabitGridRow[]>([]);
+  const [overviewHeaders, setOverviewHeaders] = useState<GridDateHeader[]>([]);
+  const [consistencyPct, setConsistencyPct] = useState(0);
 
   const refresh = useCallback(async () => {
     const list = await listHabits();
@@ -97,6 +108,39 @@ export function HabitsScreen() {
     }
     setStreakMap(streaks);
     setHistoryMap(histories);
+
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    const startKey = (() => {
+      const y = start.getFullYear();
+      const m = String(start.getMonth() + 1).padStart(2, "0");
+      const d = String(start.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    })();
+    const endKey = (() => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    })();
+
+    const allCompletions = await getAllHabitCompletionsForRange(startKey, endKey);
+    const headers = buildGridDateHeaders(30);
+    const gridBuilt = buildHabitGrid(
+      list.map((h) => ({
+        id: h.id,
+        name: h.name,
+        color: h.color,
+        target_per_day: h.target_per_day,
+      })),
+      allCompletions,
+      30,
+    );
+    const pct = calculateOverallConsistency(gridBuilt);
+    setOverviewHeaders(headers);
+    setOverviewGrid(gridBuilt);
+    setConsistencyPct(pct);
   }, []);
 
   const toggleHeatmap = useCallback((habitId: string) => {
@@ -189,6 +233,38 @@ export function HabitsScreen() {
         </Pressable>
       </View>
 
+      <View className="mb-4 flex-row rounded-xl bg-slate-100 p-1">
+        <Pressable
+          onPress={() => setActiveTab("today")}
+          className={`flex-1 items-center rounded-lg py-2 ${activeTab === "today" ? "bg-white shadow-sm" : ""}`}
+        >
+          <Text
+            className={`text-sm font-medium ${activeTab === "today" ? "text-slate-800" : "text-slate-400"}`}
+          >
+            Today
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setActiveTab("overview")}
+          className={`flex-1 items-center rounded-lg py-2 ${activeTab === "overview" ? "bg-white shadow-sm" : ""}`}
+        >
+          <Text
+            className={`text-sm font-medium ${activeTab === "overview" ? "text-slate-800" : "text-slate-400"}`}
+          >
+            Overview
+          </Text>
+        </Pressable>
+      </View>
+
+      {activeTab === "overview" ? (
+        <View className="pb-8">
+          <HabitsOverviewGrid
+            grid={overviewGrid}
+            headers={overviewHeaders}
+            consistencyPercent={consistencyPct}
+          />
+        </View>
+      ) : (
       <View className="bg-orange-50 pb-8">
         {habits.length === 0 ? (
           <View className="items-center py-12">
@@ -306,6 +382,7 @@ export function HabitsScreen() {
           ))
         )}
       </View>
+      )}
 
       <Modal
         visible={modalVisible}
