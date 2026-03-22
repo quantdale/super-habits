@@ -16,7 +16,101 @@ function buildDateRange(days: number): string[] {
 
 export type PomodoroState = "idle" | "running" | "finished";
 
-export const FOCUS_SECONDS = 25 * 60;
+export type PomodoroMode = "focus" | "short_break" | "long_break";
+
+export type PomodoroSettings = {
+  focusMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  sessionsBeforeLongBreak: number;
+};
+
+export const DEFAULT_SETTINGS: PomodoroSettings = {
+  focusMinutes: 25,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  sessionsBeforeLongBreak: 4,
+};
+
+/** Kept for backward compatibility with existing tests */
+export const FOCUS_SECONDS = DEFAULT_SETTINGS.focusMinutes * 60;
+
+/**
+ * Get duration in seconds for a given mode and settings.
+ */
+export function getModeDuration(mode: PomodoroMode, settings: PomodoroSettings): number {
+  switch (mode) {
+    case "focus":
+      return settings.focusMinutes * 60;
+    case "short_break":
+      return settings.shortBreakMinutes * 60;
+    case "long_break":
+      return settings.longBreakMinutes * 60;
+  }
+}
+
+/**
+ * Get the next mode in the classic Pomodoro sequence.
+ *
+ * completedFocusSessions: how many focus sessions have been
+ * completed in the current cycle (resets after long break).
+ *
+ * Sequence:
+ *   focus(1) → short_break → focus(2) → short_break →
+ *   focus(3) → short_break → focus(4) → long_break → repeat
+ */
+export function getNextMode(
+  currentMode: PomodoroMode,
+  completedFocusSessions: number,
+  settings: PomodoroSettings,
+): PomodoroMode {
+  if (currentMode === "short_break" || currentMode === "long_break") {
+    return "focus";
+  }
+  if (completedFocusSessions % settings.sessionsBeforeLongBreak === 0) {
+    return "long_break";
+  }
+  return "short_break";
+}
+
+export function getModeLabel(mode: PomodoroMode): string {
+  switch (mode) {
+    case "focus":
+      return "Focus";
+    case "short_break":
+      return "Short Break";
+    case "long_break":
+      return "Long Break";
+  }
+}
+
+/**
+ * Returns a Tailwind color class prefix for each mode.
+ * Used to tint the timer display and progress bar.
+ */
+export function getModeColor(mode: PomodoroMode): { bg: string; text: string; bar: string } {
+  switch (mode) {
+    case "focus":
+      return { bg: "bg-brand-500", text: "text-brand-500", bar: "bg-brand-500" };
+    case "short_break":
+      return { bg: "bg-emerald-500", text: "text-emerald-500", bar: "bg-emerald-500" };
+    case "long_break":
+      return { bg: "bg-violet-500", text: "text-violet-500", bar: "bg-violet-500" };
+  }
+}
+
+/**
+ * Parse "MM:SS" string into { minutes, seconds }.
+ * Returns null for invalid input.
+ */
+export function parseMinutesSeconds(input: string): { minutes: number; seconds: number } | null {
+  const parts = input.split(":");
+  if (parts.length !== 2) return null;
+  const m = parseInt(parts[0], 10);
+  const s = parseInt(parts[1], 10);
+  if (!Number.isFinite(m) || !Number.isFinite(s) || m < 0 || s < 0 || s > 59) return null;
+  return { minutes: m, seconds: s };
+}
 
 export function nextPomodoroState(remainingSeconds: number, isRunning: boolean): PomodoroState {
   if (remainingSeconds <= 0) return "finished";
@@ -33,7 +127,7 @@ export function nextPomodoroState(remainingSeconds: number, isRunning: boolean):
  */
 export function calculateGrowthProgress(
   remainingSeconds: number,
-  totalSeconds: number = FOCUS_SECONDS,
+  totalSeconds: number = DEFAULT_SETTINGS.focusMinutes * 60,
 ): number {
   if (totalSeconds <= 0) return 0;
   const elapsed = totalSeconds - remainingSeconds;

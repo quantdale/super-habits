@@ -59,7 +59,8 @@ export type PomodoroSession = {
   started_at: string;
   ended_at: string;
   duration_seconds: number;
-  session_type: "focus" | "break";
+  /** Legacy rows may use "break"; new logs use focus / short_break / long_break as needed */
+  session_type: "focus" | "break" | "short_break" | "long_break";
   created_at: string;
 };
 

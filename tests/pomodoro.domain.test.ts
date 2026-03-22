@@ -4,6 +4,11 @@ import {
   calculateGrowthProgress,
   getPlantStage,
   formatSessionTime,
+  getModeDuration,
+  getNextMode,
+  getModeLabel,
+  parseMinutesSeconds,
+  DEFAULT_SETTINGS,
 } from "@/features/pomodoro/pomodoro.domain";
 
 describe("nextPomodoroState", () => {
@@ -60,5 +65,61 @@ describe("formatSessionTime", () => {
     const past = "2025-01-15T09:30:00.000Z";
     const result = formatSessionTime(past);
     expect(result).toMatch(/\d{2}:\d{2}$/);
+  });
+});
+
+describe("getModeDuration", () => {
+  it("returns focus duration in seconds", () => {
+    expect(getModeDuration("focus", DEFAULT_SETTINGS)).toBe(25 * 60);
+  });
+  it("returns short break duration in seconds", () => {
+    expect(getModeDuration("short_break", DEFAULT_SETTINGS)).toBe(5 * 60);
+  });
+  it("returns long break duration in seconds", () => {
+    expect(getModeDuration("long_break", DEFAULT_SETTINGS)).toBe(15 * 60);
+  });
+  it("respects custom settings", () => {
+    const custom = { ...DEFAULT_SETTINGS, focusMinutes: 50 };
+    expect(getModeDuration("focus", custom)).toBe(50 * 60);
+  });
+});
+
+describe("getNextMode", () => {
+  it("focus → short_break when not at long break threshold", () => {
+    expect(getNextMode("focus", 1, DEFAULT_SETTINGS)).toBe("short_break");
+  });
+  it("focus → long_break after 4 focus sessions", () => {
+    expect(getNextMode("focus", 4, DEFAULT_SETTINGS)).toBe("long_break");
+  });
+  it("short_break → focus", () => {
+    expect(getNextMode("short_break", 1, DEFAULT_SETTINGS)).toBe("focus");
+  });
+  it("long_break → focus", () => {
+    expect(getNextMode("long_break", 4, DEFAULT_SETTINGS)).toBe("focus");
+  });
+  it("respects custom sessionsBeforeLongBreak", () => {
+    const custom = { ...DEFAULT_SETTINGS, sessionsBeforeLongBreak: 2 };
+    expect(getNextMode("focus", 2, custom)).toBe("long_break");
+    expect(getNextMode("focus", 1, custom)).toBe("short_break");
+  });
+});
+
+describe("getModeLabel", () => {
+  it("returns correct labels", () => {
+    expect(getModeLabel("focus")).toBe("Focus");
+    expect(getModeLabel("short_break")).toBe("Short Break");
+    expect(getModeLabel("long_break")).toBe("Long Break");
+  });
+});
+
+describe("parseMinutesSeconds", () => {
+  it("parses valid MM:SS", () => {
+    expect(parseMinutesSeconds("25:00")).toEqual({ minutes: 25, seconds: 0 });
+    expect(parseMinutesSeconds("5:30")).toEqual({ minutes: 5, seconds: 30 });
+  });
+  it("returns null for invalid input", () => {
+    expect(parseMinutesSeconds("abc")).toBeNull();
+    expect(parseMinutesSeconds("25")).toBeNull();
+    expect(parseMinutesSeconds("5:99")).toBeNull();
   });
 });
