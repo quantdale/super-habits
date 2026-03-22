@@ -1,32 +1,7 @@
 import type { PomodoroSession } from "./types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
-
-function buildDateRangeOldestFirst(days: number): string[] {
-  const result: string[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    result.push(`${y}-${m}-${dd}`);
-  }
-  return result;
-}
-
-function buildDateRange(days: number): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    result.push(`${y}-${m}-${dd}`);
-  }
-  return result;
-}
+import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
 
 export type PomodoroState = "idle" | "running" | "finished";
 
@@ -81,7 +56,7 @@ export function getNextMode(
   if (currentMode === "short_break" || currentMode === "long_break") {
     return "focus";
   }
-  if (completedFocusSessions % settings.sessionsBeforeLongBreak === 0) {
+  if (completedFocusSessions > 0 && completedFocusSessions % settings.sessionsBeforeLongBreak === 0) {
     return "long_break";
   }
   return "short_break";

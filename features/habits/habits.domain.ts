@@ -1,19 +1,7 @@
 import type { HabitCompletion } from "./types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
-
-function buildDateRange(days: number): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    result.push(`${y}-${m}-${dd}`);
-  }
-  return result;
-}
+import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
 
 function buildEmptyActivityDays(days: number): ActivityDay[] {
   return buildDateRange(days).map((dateKey) => ({
@@ -41,15 +29,7 @@ function localDateKey(date: Date): string {
 }
 
 /** YYYY-MM-DD keys from oldest to newest (inclusive), length = `days`. */
-function buildDateRangeOldestFirst(days: number): string[] {
-  const result: string[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    result.push(localDateKey(d));
-  }
-  return result;
-}
+// use shared helper from lib/time
 
 /**
  * Build a full 30-day (or N-day) grid of DayCompletion objects
