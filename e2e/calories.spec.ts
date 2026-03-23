@@ -24,7 +24,8 @@ test.describe("Calories", () => {
     await fillCaloriesMacros(page, "Chicken breast", "30", "0", "3", "0");
     await page.getByText("Breakfast", { exact: true }).click();
     await page.getByText("Add entry", { exact: true }).click();
-    await expect(page.getByText("Chicken breast - 147 kcal")).toBeVisible();
+    await expect(page.getByText("Chicken breast", { exact: false })).toBeVisible();
+    await expect(page.getByText("147 kcal", { exact: false })).toBeVisible();
     await expect(page.getByText("Today: 147 kcal")).toBeVisible();
   });
 
@@ -39,11 +40,13 @@ test.describe("Calories", () => {
   test("entry persists after reload", async ({ page }) => {
     await fillCaloriesMacros(page, "Oats", "10", "40", "5", "5");
     await page.getByText("Add entry", { exact: true }).click();
-    await expect(page.getByText(/Oats - \d+ kcal/)).toBeVisible();
+    await expect(page.getByText("Oats", { exact: false })).toBeVisible();
+    await expect(page.getByText("235 kcal", { exact: false })).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState("load");
     await goToTab(page, "calories");
-    await expect(page.getByText(/Oats - \d+ kcal/)).toBeVisible();
+    await expect(page.getByText("Oats", { exact: false })).toBeVisible();
+    await expect(page.getByText("235 kcal", { exact: false })).toBeVisible();
   });
 });

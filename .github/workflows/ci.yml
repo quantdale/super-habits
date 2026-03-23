@@ -72,16 +72,7 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Start web server
-        run: npm run web &
-        env:
-          EXPO_UNSTABLE_HEADLESS: 1
-
-      # Use 127.0.0.1 (not localhost): on Ubuntu runners `localhost` may resolve to ::1
-      # first while Metro binds IPv4 only, so wait-on would never connect.
-      - name: Wait for web server
-        run: npx wait-on http://127.0.0.1:8081 --timeout 120000
-
+      # Playwright starts `build:web` + scripts/serve-e2e.js via webServer in playwright.config.ts
       - name: Run E2E tests
         run: npm run e2e
 

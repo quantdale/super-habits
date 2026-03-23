@@ -10,13 +10,13 @@ export default defineConfig({
   // OPFS directories are separate per worker. Worker-level parallelization does
   // not cause SQLite lock collisions. Keep fullyParallel false so tests within a
   // file stay serial (clearDatabase() in beforeEach must not race).
-  workers: process.env.CI ? 1 : 4,
+  workers: process.env.CI ? 2 : 4,
 
   // Retry on CI only — locally you want to see failures immediately
   retries: process.env.CI ? 2 : 0,
 
   // beforeEach often does goToTab + clearDatabase (reload) + goToTab — needs
-  // headroom on Metro. Infrastructure OPFS test waits up to ~30s for isolation.
+  // headroom. Infrastructure OPFS test waits up to ~30s for isolation.
   timeout: 60_000,
   expect: { timeout: 5_000 },
 
@@ -51,8 +51,8 @@ export default defineConfig({
     trace: "on-first-retry",
 
     // Use "domcontentloaded" instead of "networkidle" by default.
-    // "networkidle" waits for ALL network activity to stop — on a
-    // Metro dev server with HMR this can add 3-5s per navigation.
+    // "networkidle" waits for ALL network activity to stop — can be slow on
+    // dev servers with HMR; static E2E build avoids that.
     // "domcontentloaded" fires as soon as the DOM is ready.
     // Individual tests can override with page.waitForLoadState("networkidle")
     // when they specifically need it.
@@ -71,4 +71,11 @@ export default defineConfig({
 
   globalSetup: "./e2e/global.setup.ts",
   globalTeardown: "./e2e/global.teardown.ts",
+
+  webServer: {
+    command: "npm run build:web && node scripts/serve-e2e.js",
+    url: "http://localhost:8081",
+    reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
+  },
 });
