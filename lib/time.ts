@@ -9,18 +9,13 @@ export function toDateKey(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Local calendar keys for the last `days` days, **today first** (most recent → older). */
-export function buildDateRange(days: number): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    result.push(toDateKey(d));
-  }
-  return result;
-}
-
-/** Local calendar keys for the last `days` days, **oldest first** (heatmap / chronological columns). */
+/**
+ * Build an array of date keys (YYYY-MM-DD) for the last N days,
+ * ordered oldest first (index 0 = N-1 days ago, last = today).
+ *
+ * Used by domain files for heatmap and activity data generation.
+ * Centralized here to avoid duplication across domain files.
+ */
 export function buildDateRangeOldestFirst(days: number): string[] {
   const result: string[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -29,4 +24,17 @@ export function buildDateRangeOldestFirst(days: number): string[] {
     result.push(toDateKey(d));
   }
   return result;
+}
+
+/**
+ * Build an array of date keys ordered today-first
+ * (index 0 = today, last = N-1 days ago).
+ */
+export function buildDateRangeTodayFirst(days: number): string[] {
+  return buildDateRangeOldestFirst(days).reverse();
+}
+
+/** Local calendar keys for the last `days` days, **today first** (most recent → older). */
+export function buildDateRange(days: number): string[] {
+  return buildDateRangeTodayFirst(days);
 }

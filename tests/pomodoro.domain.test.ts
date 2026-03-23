@@ -88,14 +88,20 @@ describe("getModeDuration", () => {
 });
 
 describe("getNextMode", () => {
-  it("focus → short_break when zero completed sessions (0 % N must not imply long break)", () => {
+  it("focus → short_break at 0 sessions (never long_break at start)", () => {
     expect(getNextMode("focus", 0, DEFAULT_SETTINGS)).toBe("short_break");
   });
-  it("focus → short_break when not at long break threshold", () => {
-    expect(getNextMode("focus", 1, DEFAULT_SETTINGS)).toBe("short_break");
+  it("focus → short_break when zero completed sessions for any sessionsBeforeLongBreak", () => {
+    for (const n of [1, 2, 3, 4, 8]) {
+      const settings = { ...DEFAULT_SETTINGS, sessionsBeforeLongBreak: n };
+      expect(getNextMode("focus", 0, settings)).toBe("short_break");
+    }
   });
-  it("focus → long_break after 4 focus sessions", () => {
+  it("focus → long_break only after 4 completed sessions", () => {
     expect(getNextMode("focus", 4, DEFAULT_SETTINGS)).toBe("long_break");
+  });
+  it("focus → short_break at 1 session", () => {
+    expect(getNextMode("focus", 1, DEFAULT_SETTINGS)).toBe("short_break");
   });
   it("short_break → focus", () => {
     expect(getNextMode("short_break", 1, DEFAULT_SETTINGS)).toBe("focus");

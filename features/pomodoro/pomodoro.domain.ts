@@ -56,7 +56,9 @@ export function getNextMode(
   if (currentMode === "short_break" || currentMode === "long_break") {
     return "focus";
   }
-  // 0 % N === 0 for all N — long break only after at least one completed focus in the cycle.
+  // currentMode === "focus"
+  // Guard: at least one session must be completed before
+  // a long break can be suggested (0 % N === 0 for all N).
   if (
     completedFocusSessions > 0 &&
     completedFocusSessions % settings.sessionsBeforeLongBreak === 0
