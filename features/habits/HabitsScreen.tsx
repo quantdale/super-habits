@@ -198,7 +198,7 @@ export function HabitsScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.habits} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>⚡</Text>
               <Text
@@ -216,7 +216,7 @@ export function HabitsScreen() {
           </Card>
         </View>
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.habits} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>📊</Text>
               <Text
@@ -246,8 +246,8 @@ export function HabitsScreen() {
           const groupHabits = habits.filter((h) => (h.category ?? "anytime") === group.key);
 
           return (
-            <View key={group.key} className="mb-6">
-              <View className="mb-3 flex-row items-center gap-2 px-1">
+            <Card key={group.key} accentColor={SECTION_COLORS.habits} className="mb-3">
+              <View className="mb-3 flex-row items-center gap-2">
                 <Text style={{ fontSize: 16 }}>{group.icon}</Text>
                 <Text
                   style={{
@@ -262,14 +262,11 @@ export function HabitsScreen() {
                 </Text>
               </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                contentContainerStyle={{
+              <View
+                style={{
                   flexDirection: "row",
-                  alignItems: "flex-start",
-                  paddingHorizontal: 4,
+                  flexWrap: "wrap",
+                  justifyContent: "center",
                   gap: 16,
                 }}
               >
@@ -320,7 +317,7 @@ export function HabitsScreen() {
                       const todayCount = completionMap[habit.id] ?? 0;
                       const streak = streakMap[habit.id] ?? 0;
                       return (
-                        <View key={habit.id} className="items-center">
+                        <View key={habit.id} className="items-center" style={{ width: 72 }}>
                           <HabitCircle
                             habit={habit}
                             todayCount={todayCount}
@@ -337,7 +334,7 @@ export function HabitsScreen() {
                               color: "#64748b",
                               marginTop: 4,
                               textAlign: "center",
-                              maxWidth: 64,
+                              width: 72,
                             }}
                             numberOfLines={2}
                           >
@@ -356,7 +353,7 @@ export function HabitsScreen() {
                 <Pressable
                   onPress={() => handleAddHabitToGroup(group.key)}
                   className="items-center justify-center"
-                  style={{ width: 64 }}
+                  style={{ width: editMode ? 88 : 72 }}
                 >
                   <View
                     style={{
@@ -386,13 +383,14 @@ export function HabitsScreen() {
                       fontSize: 11,
                       color: SECTION_COLORS.habits,
                       marginTop: 4,
+                      textAlign: "center",
                     }}
                   >
                     Add
                   </Text>
                 </Pressable>
-              </ScrollView>
-            </View>
+              </View>
+            </Card>
           );
         })}
       </View>

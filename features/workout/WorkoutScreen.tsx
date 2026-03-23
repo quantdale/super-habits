@@ -195,7 +195,7 @@ export function WorkoutScreen() {
       />
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.workout} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>💪</Text>
               <Text
@@ -213,7 +213,7 @@ export function WorkoutScreen() {
           </Card>
         </View>
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.workout} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>📅</Text>
               <Text
@@ -295,12 +295,25 @@ export function WorkoutScreen() {
         )}
 
         <View className="mt-2">
-          <GitHubHeatmap
-            days={workoutHeatmapDays}
-            color={SECTION_COLORS.workout}
-            label="Session intensity — last 52 weeks"
-            weeks={52}
-          />
+          <Card accentColor={SECTION_COLORS.workout} overflowVisible className="mb-0">
+            <View className="w-full items-center">
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#94a3b8",
+                  marginBottom: 8,
+                  alignSelf: "flex-start",
+                }}
+              >
+                Session intensity — last 52 weeks
+              </Text>
+              <GitHubHeatmap
+                days={workoutHeatmapDays}
+                color={SECTION_COLORS.workout}
+                weeks={52}
+              />
+            </View>
+          </Card>
         </View>
       </View>
     </Screen>

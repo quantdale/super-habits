@@ -182,7 +182,7 @@ export function CaloriesScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.calories} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>🍽️</Text>
               <Text
@@ -200,7 +200,7 @@ export function CaloriesScreen() {
           </Card>
         </View>
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.calories} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>🎯</Text>
               <Text
@@ -367,12 +367,25 @@ export function CaloriesScreen() {
       </View>
 
       <View className="mt-4">
-        <GitHubHeatmap
-          days={calorieHeatmapDays}
-          color={SECTION_COLORS.calories}
-          label="Calorie tracking — last 52 weeks"
-          weeks={52}
-        />
+        <Card accentColor={SECTION_COLORS.calories} overflowVisible className="mb-0">
+          <View className="w-full items-center">
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#94a3b8",
+                marginBottom: 8,
+                alignSelf: "flex-start",
+              }}
+            >
+              Calories — last 52 weeks
+            </Text>
+            <GitHubHeatmap
+              days={calorieHeatmapDays}
+              color={SECTION_COLORS.calories}
+              weeks={52}
+            />
+          </View>
+        </Card>
       </View>
     </Screen>
   );

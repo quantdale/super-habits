@@ -5,12 +5,14 @@ type CardProps = {
   children: ReactNode;
   accentColor?: string;
   className?: string;
+  /** Use for content with horizontal ScrollView (e.g. heatmaps) so the scroll area is not clipped. */
+  overflowVisible?: boolean;
 };
 
-export function Card({ children, accentColor, className }: CardProps) {
+export function Card({ children, accentColor, className, overflowVisible }: CardProps) {
   return (
     <View
-      className={`mb-3 overflow-hidden rounded-2xl bg-white ${className ?? ""}`}
+      className={`mb-3 rounded-2xl bg-white ${overflowVisible ? "" : "overflow-hidden"} ${className ?? ""}`}
       style={{
         borderWidth: 1,
         borderColor: "#e8e8f0",
@@ -19,6 +21,7 @@ export function Card({ children, accentColor, className }: CardProps) {
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 2,
+        overflow: overflowVisible ? "visible" : "hidden",
       }}
     >
       {accentColor ? (

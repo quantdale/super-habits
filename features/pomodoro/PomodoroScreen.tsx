@@ -269,7 +269,7 @@ export function PomodoroScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.focus} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>🎯</Text>
               <Text
@@ -289,7 +289,7 @@ export function PomodoroScreen() {
           </Card>
         </View>
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.focus} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>🔥</Text>
               <Text
@@ -308,7 +308,13 @@ export function PomodoroScreen() {
         </View>
       </View>
 
-      <Card accentColor={COLOR}>
+      {showSprout ? (
+        <View className="mb-4 items-center">
+          <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
+        </View>
+      ) : null}
+
+      <Card accentColor={COLOR} className="mx-1 mb-4">
         <View className="mb-4 flex-row flex-wrap justify-center">
           {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
             <PillChip
@@ -332,12 +338,6 @@ export function PomodoroScreen() {
           ))}
         </View>
 
-        {showSprout ? (
-          <View className="my-4 items-center">
-            <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
-          </View>
-        ) : null}
-
         <Pressable
           onPress={() => !isRunning && setShowSettings((v) => !v)}
           disabled={isRunning}
@@ -360,14 +360,6 @@ export function PomodoroScreen() {
             />
           ))}
         </View>
-
-        {showSettings ? (
-          <PomodoroSettingsInline
-            settings={settings}
-            onSave={handleSaveSettings}
-            onCancel={() => setShowSettings(false)}
-          />
-        ) : null}
 
         <View className="mt-4 gap-3">
           {!isRunning && !isPaused && remaining === totalSeconds ? (
@@ -400,17 +392,38 @@ export function PomodoroScreen() {
         ) : null}
       </Card>
 
+      {showSettings ? (
+        <PomodoroSettingsInline
+          settings={settings}
+          onSave={handleSaveSettings}
+          onCancel={() => setShowSettings(false)}
+        />
+      ) : null}
+
       <View className="mt-6">
         <GardenGrid sessions={sessions} />
       </View>
 
       <View className="mt-6">
-        <GitHubHeatmap
-          days={pomodoroHeatmapDays}
-          color={SECTION_COLORS.focus}
-          label="Focus — last 52 weeks"
-          weeks={52}
-        />
+        <Card accentColor={SECTION_COLORS.focus} overflowVisible className="mb-0">
+          <View className="w-full items-center">
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#94a3b8",
+                marginBottom: 8,
+                alignSelf: "flex-start",
+              }}
+            >
+              Focus — last 52 weeks
+            </Text>
+            <GitHubHeatmap
+              days={pomodoroHeatmapDays}
+              color={SECTION_COLORS.focus}
+              weeks={52}
+            />
+          </View>
+        </Card>
       </View>
     </Screen>
   );
