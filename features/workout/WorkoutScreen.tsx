@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { Swipeable } from "react-native-gesture-handler";
+import { RectButton, Swipeable } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
@@ -28,6 +28,9 @@ import { RoutineDetailScreen } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
 import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
+import { ValidationError } from "@/core/ui/ValidationError";
+import { validateRoutineName } from "@/lib/validation";
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -51,32 +54,32 @@ function RoutineSwipeRow({
 }) {
   const swipeableRef = useRef<Swipeable>(null);
 
-  const renderRightActions = () => (
-    <Pressable
-      onPress={() => {
-        swipeableRef.current?.close();
-        onRequestDelete();
-      }}
-      className="my-0.5 items-center justify-center rounded-r-xl bg-rose-500 px-6"
-    >
-      <Text className="text-sm font-medium text-white">Delete</Text>
-    </Pressable>
-  );
-
   return (
     <Swipeable
       ref={swipeableRef}
-      renderRightActions={renderRightActions}
+      renderRightActions={() => (
+        <SwipeRightActions
+          editColor={accentColor}
+          onEdit={() => {
+            swipeableRef.current?.close();
+            onOpenDetail();
+          }}
+          onDelete={() => {
+            swipeableRef.current?.close();
+            onRequestDelete();
+          }}
+        />
+      )}
       rightThreshold={40}
       overshootRight={false}
     >
       <Card accentColor={accentColor}>
-        <Pressable onPress={onOpenDetail}>
+        <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
           <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
           {routine.description ? (
             <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
           ) : null}
-        </Pressable>
+        </RectButton>
         <View className="mt-3">
           <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
         </View>
@@ -93,6 +96,7 @@ export function WorkoutScreen() {
   const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
   const [workoutHeatmapDays, setWorkoutHeatmapDays] = useState<HeatmapDay[]>([]);
   const [currentView, setCurrentView] = useState<ViewState>({ type: "list" });
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const r = await listRoutines();
@@ -115,10 +119,12 @@ export function WorkoutScreen() {
   );
 
   const onCreate = async () => {
-    if (!name.trim()) {
-      Alert.alert("Missing name", "Enter a routine name.");
+    const err = validateRoutineName(name);
+    if (err) {
+      setWorkoutError(err);
       return;
     }
+    setWorkoutError(null);
     await addRoutine(name.trim(), description.trim());
     setName("");
     setDescription("");
@@ -243,13 +249,25 @@ export function WorkoutScreen() {
         </View>
       ) : null}
       <Card accentColor={COLOR}>
-        <TextField label="Routine name" value={name} onChangeText={setName} placeholder="Push Day" />
+        <TextField
+          label="Routine name"
+          value={name}
+          onChangeText={(t) => {
+            setWorkoutError(null);
+            setName(t);
+          }}
+          placeholder="Push Day"
+        />
         <TextField
           label="Description"
           value={description}
-          onChangeText={setDescription}
+          onChangeText={(t) => {
+            setWorkoutError(null);
+            setDescription(t);
+          }}
           placeholder="Bench + accessories"
         />
+        <ValidationError message={workoutError} />
         <Button label="Add routine" onPress={onCreate} color={COLOR} />
       </Card>
 
@@ -275,7 +293,7 @@ export function WorkoutScreen() {
         />
       ))}
 
-      <View className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+      <Card accentColor={SECTION_COLORS.workout} className="mt-4">
         <Text className="mb-3 text-sm font-semibold text-slate-700">Workout history</Text>
 
         {logs.length === 0 ? (
@@ -295,8 +313,8 @@ export function WorkoutScreen() {
         )}
 
         <View className="mt-2">
-          <Card accentColor={SECTION_COLORS.workout} overflowVisible className="mb-0">
-            <View className="w-full items-center">
+          <Card accentColor={SECTION_COLORS.workout} className="mb-0">
+            <View className="w-full min-w-0 items-center">
               <Text
                 style={{
                   fontSize: 12,
@@ -315,7 +333,7 @@ export function WorkoutScreen() {
             </View>
           </Card>
         </View>
-      </View>
+      </Card>
     </Screen>
   );
 }

@@ -41,7 +41,7 @@ test.describe("Todos", () => {
     await page.getByText("Add task", { exact: true }).click();
     await expect(page.getByText("Delete me")).toBeVisible();
     await swipeLeftToRevealRowActions(page, "Delete me");
-    await clickSwipeDeleteAction(page);
+    await clickSwipeDeleteAction(page, "Delete me");
     await expect(page.getByText("Delete me")).not.toBeVisible();
   });
 

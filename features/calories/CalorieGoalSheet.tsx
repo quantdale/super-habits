@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Modal, View, Text, ScrollView } from "react-native";
 import { Button } from "@/core/ui/Button";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
+import { ValidationError } from "@/core/ui/ValidationError";
+import { validateCalorieGoal } from "@/lib/validation";
 import type { CalorieGoal } from "./calories.data";
 
 type Props = {
@@ -16,6 +18,7 @@ export function CalorieGoalSheet({ visible, currentGoal, onSave, onClose }: Prop
   const [protein, setProtein] = useState(String(currentGoal.protein));
   const [carbs, setCarbs] = useState(String(currentGoal.carbs));
   const [fats, setFats] = useState(String(currentGoal.fats));
+  const [goalError, setGoalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -23,14 +26,21 @@ export function CalorieGoalSheet({ visible, currentGoal, onSave, onClose }: Prop
     setProtein(String(currentGoal.protein));
     setCarbs(String(currentGoal.carbs));
     setFats(String(currentGoal.fats));
+    setGoalError(null);
   }, [visible, currentGoal]);
 
   const handleSave = () => {
+    const err = validateCalorieGoal(calories, protein, carbs, fats);
+    if (err) {
+      setGoalError(err);
+      return;
+    }
+    setGoalError(null);
     onSave({
-      calories: Number(calories) || 2000,
-      protein: Number(protein) || 150,
-      carbs: Number(carbs) || 200,
-      fats: Number(fats) || 65,
+      calories: Number(calories.trim()),
+      protein: Number(protein.trim()),
+      carbs: Number(carbs.trim()),
+      fats: Number(fats.trim()),
     });
     onClose();
   };
@@ -43,16 +53,54 @@ export function CalorieGoalSheet({ visible, currentGoal, onSave, onClose }: Prop
         <NumberStepperField
           label="Calories (kcal)"
           value={calories}
-          onChange={setCalories}
+          onChange={(v) => {
+            setGoalError(null);
+            setCalories(v);
+          }}
           min={500}
           max={6000}
         />
-        <NumberStepperField label="Protein (g)" value={protein} onChange={setProtein} min={0} max={500} />
-        <NumberStepperField label="Carbs (g)" value={carbs} onChange={setCarbs} min={0} max={800} />
-        <NumberStepperField label="Fats (g)" value={fats} onChange={setFats} min={0} max={400} />
+        <NumberStepperField
+          label="Protein (g)"
+          value={protein}
+          onChange={(v) => {
+            setGoalError(null);
+            setProtein(v);
+          }}
+          min={0}
+          max={999}
+        />
+        <NumberStepperField
+          label="Carbs (g)"
+          value={carbs}
+          onChange={(v) => {
+            setGoalError(null);
+            setCarbs(v);
+          }}
+          min={0}
+          max={999}
+        />
+        <NumberStepperField
+          label="Fats (g)"
+          value={fats}
+          onChange={(v) => {
+            setGoalError(null);
+            setFats(v);
+          }}
+          min={0}
+          max={999}
+        />
+        <ValidationError message={goalError} />
         <View className="gap-3 mt-6">
           <Button label="Save goals" onPress={handleSave} />
-          <Button label="Cancel" variant="ghost" onPress={onClose} />
+          <Button
+            label="Cancel"
+            variant="ghost"
+            onPress={() => {
+              setGoalError(null);
+              onClose();
+            }}
+          />
         </View>
       </ScrollView>
     </Modal>

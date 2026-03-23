@@ -15,8 +15,9 @@ test.describe("Calories", () => {
   });
 
   test("does not add entry with empty food name", async ({ page }) => {
+    await page.getByText("Add entry", { exact: true }).scrollIntoViewIfNeeded();
     await page.getByText("Add entry", { exact: true }).click();
-    await expect(page.getByText("Enter a food name.")).toBeVisible();
+    await expect(page.locator("body")).toContainText("Food name is required");
   });
 
   test("adds a calorie entry and updates daily total", async ({ page }) => {

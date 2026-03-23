@@ -400,13 +400,13 @@ export function PomodoroScreen() {
         />
       ) : null}
 
-      <View className="mt-6">
+      <Card accentColor={SECTION_COLORS.focus} className="mt-4">
         <GardenGrid sessions={sessions} />
-      </View>
+      </Card>
 
       <View className="mt-6">
-        <Card accentColor={SECTION_COLORS.focus} overflowVisible className="mb-0">
-          <View className="w-full items-center">
+        <Card accentColor={SECTION_COLORS.focus} className="mx-1 mb-0">
+          <View className="w-full min-w-0 items-center">
             <Text
               style={{
                 fontSize: 12,

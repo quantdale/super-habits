@@ -15,8 +15,8 @@ export function HabitsOverviewGrid({
 }: Props) {
   return (
     <View>
-      <Card accentColor={SECTION_COLORS.habits} overflowVisible>
-        <View className="w-full items-center">
+      <Card accentColor={SECTION_COLORS.habits}>
+        <View className="w-full min-w-0 items-center">
           <View className="mb-4 w-full flex-row items-center gap-2">
             <Text
               style={{

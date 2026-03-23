@@ -48,7 +48,7 @@ NON-NEGOTIABLES
 - Do not fix toDateKey() UTC bug silently — flag it
 - CaloriesScreen has a meal type picker — `mealType` is user-selectable (breakfast/lunch/dinner/snack). Do not revert to hard-coded `"snack"`.
 - `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
-- 96 tests must pass after every change — update this count whenever tests are added or removed
+- 141 tests must pass after every change — update this count whenever tests are added or removed
 
 E2E TESTS
 When fixing UI or domain issues, run the relevant E2E spec after:

@@ -8,6 +8,7 @@ import {
 import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
+import { validateSetTiming } from "@/lib/validation";
 
 /** Nested routine_exercises / routine_exercise_sets rows are not separate sync entities; bump parent + enqueue so remotes can refetch the full routine. */
 async function markWorkoutRoutineUpdated(
@@ -164,6 +165,8 @@ export async function addSet(input: {
   activeSeconds: number;
   restSeconds: number;
 }): Promise<string> {
+  const timingErr = validateSetTiming(input.activeSeconds, input.restSeconds);
+  if (timingErr) return "";
   const db = await getDatabase();
   const id = createId("eset");
   const now = nowIso();
@@ -205,6 +208,17 @@ export async function updateSet(
   updates: { activeSeconds?: number; restSeconds?: number },
 ): Promise<void> {
   const db = await getDatabase();
+  const row = await db.getFirstAsync<{ active_seconds: number; rest_seconds: number }>(
+    `SELECT active_seconds, rest_seconds FROM routine_exercise_sets
+     WHERE id = ? AND deleted_at IS NULL`,
+    [id],
+  );
+  if (!row) return;
+  const nextActive = updates.activeSeconds ?? row.active_seconds;
+  const nextRest = updates.restSeconds ?? row.rest_seconds;
+  const timingErr = validateSetTiming(nextActive, nextRest);
+  if (timingErr) return;
+
   const now = nowIso();
   if (updates.activeSeconds !== undefined) {
     await db.runAsync(

@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { View, Text, ScrollView } from "react-native";
+import { View, Text } from "react-native";
+import { HorizontalScrollArea } from "@/core/ui/HorizontalScrollArea";
 
 export type HeatmapDay = {
   dateKey: string; // YYYY-MM-DD
@@ -85,67 +86,71 @@ export function GitHubHeatmap({ days, color, label, weeks = DEFAULT_WEEKS }: Pro
   const weekColumns = useMemo(() => buildCalendarGrid(trimmedDays), [trimmedDays]);
   const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
 
-  return (
-    <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ flexDirection: "column" }}>
-          <View style={{ flexDirection: "row", gap: GAP, marginBottom: 4 }}>
-            <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }} />
-            {weekColumns.map((_, wi) => (
-              <View key={`m-${wi}`} style={{ width: CELL, alignItems: "center" }}>
-                <Text style={{ fontSize: 9, color: "#94a3b8" }}>{monthLabels[wi] ?? ""}</Text>
-              </View>
-            ))}
+  const grid = (
+    <View style={{ flexDirection: "column", alignSelf: "flex-start" }}>
+      <View style={{ flexDirection: "row", gap: GAP, marginBottom: 4 }}>
+        <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }} />
+        {weekColumns.map((_, wi) => (
+          <View key={`m-${wi}`} style={{ width: CELL, alignItems: "center" }}>
+            <Text style={{ fontSize: 9, color: "#94a3b8" }}>{monthLabels[wi] ?? ""}</Text>
           </View>
+        ))}
+      </View>
 
-          <View style={{ flexDirection: "row", gap: GAP }}>
-            <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }}>
-              {DAY_LABELS.map((d, i) => (
-                <View
-                  key={i}
-                  style={{
-                    height: CELL,
-                    marginBottom: GAP,
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 9, color: "#94a3b8", width: 10 }}>
-                    {i % 2 === 0 ? d : ""}
-                  </Text>
-                </View>
-              ))}
+      <View style={{ flexDirection: "row", gap: GAP }}>
+        <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }}>
+          {DAY_LABELS.map((d, i) => (
+            <View
+              key={i}
+              style={{
+                height: CELL,
+                marginBottom: GAP,
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 9, color: "#94a3b8", width: 10 }}>
+                {i % 2 === 0 ? d : ""}
+              </Text>
             </View>
+          ))}
+        </View>
 
-            {weekColumns.map((week, wi) => (
-              <View key={wi} style={{ gap: GAP }}>
-                {week.map((day, di) => (
-                  <View
-                    key={di}
-                    style={{
-                      width: CELL,
-                      height: CELL,
-                      borderRadius: 3,
-                      backgroundColor: day ? getColorForValue(day.value, color) : "transparent",
-                    }}
-                  />
-                ))}
-              </View>
+        {weekColumns.map((week, wi) => (
+          <View key={wi} style={{ gap: GAP }}>
+            {week.map((day, di) => (
+              <View
+                key={di}
+                style={{
+                  width: CELL,
+                  height: CELL,
+                  borderRadius: 3,
+                  backgroundColor: day ? getColorForValue(day.value, color) : "transparent",
+                }}
+              />
             ))}
           </View>
-        </View>
-      </ScrollView>
-
-      {label ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: "#94a3b8",
-            marginTop: 6,
-          }}
-        >
-          {label}
-        </Text>
-      ) : null}
+        ))}
+      </View>
     </View>
+  );
+
+  return (
+    <HorizontalScrollArea
+      footer={
+        label ? (
+          <Text
+            style={{
+              fontSize: 11,
+              color: "#94a3b8",
+              marginTop: 6,
+            }}
+          >
+            {label}
+          </Text>
+        ) : null
+      }
+    >
+      {grid}
+    </HorizontalScrollArea>
   );
 }

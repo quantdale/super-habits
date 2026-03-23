@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -10,6 +11,7 @@ import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   addCalorieEntry,
+  updateCalorieEntry,
   deleteCalorieEntry,
   listCalorieEntries,
   listRecentSavedMeals,
@@ -24,7 +26,6 @@ import {
 import {
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
-  buildWeeklyTrend,
   calculateGoalProgress,
   caloriesTotal,
   kcalFromMacros,
@@ -38,6 +39,9 @@ import { WeeklyCalorieChart } from "./WeeklyCalorieChart";
 import { CalorieGoalSheet } from "./CalorieGoalSheet";
 import { SavedMealChips } from "./SavedMealChips";
 import { SavedMealSearchSheet } from "./SavedMealSearchSheet";
+import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
+import { ValidationError } from "@/core/ui/ValidationError";
+import { validateCalorieComputedKcal, validateCalorieEntry } from "@/lib/validation";
 
 const COLOR = SECTION_COLORS.calories;
 
@@ -48,6 +52,76 @@ const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "snack", label: "Snack" },
 ];
 
+function buildWeeklyTotals(
+  summaries: DailySummary[],
+  weeks: number = 52,
+): { weekLabel: string; value: number }[] {
+  const buckets: number[] = Array(weeks).fill(0);
+  const today = new Date();
+
+  for (const s of summaries) {
+    const d = new Date(s.dateKey + "T00:00:00");
+    const daysAgo = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    const weekIndex = weeks - 1 - Math.floor(daysAgo / 7);
+    if (weekIndex >= 0 && weekIndex < weeks) {
+      buckets[weekIndex] += s.totalCalories;
+    }
+  }
+
+  return buckets.map((value, i) => {
+    const weeksAgo = weeks - 1 - i;
+    const d = new Date();
+    d.setDate(d.getDate() - weeksAgo * 7);
+    const label = d.toLocaleDateString("en", { month: "short", day: "numeric" });
+    return { weekLabel: label, value };
+  });
+}
+
+function CalorieEntrySwipeRow({
+  entry,
+  accentColor,
+  onEdit,
+  onDelete,
+}: {
+  entry: CalorieEntry;
+  accentColor: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const swipeableRef = useRef<Swipeable>(null);
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={() => (
+        <SwipeRightActions
+          editColor={accentColor}
+          onEdit={() => {
+            swipeableRef.current?.close();
+            onEdit();
+          }}
+          onDelete={() => {
+            swipeableRef.current?.close();
+            onDelete();
+          }}
+        />
+      )}
+      rightThreshold={40}
+      overshootRight={false}
+    >
+      <Card accentColor={accentColor}>
+        <Text className="text-base font-semibold text-slate-900">
+          {entry.food_name} - {entry.calories} kcal
+        </Text>
+        <Text className="mt-1 text-sm capitalize text-slate-600">
+          {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{" "}
+          {entry.fiber}g
+        </Text>
+      </Card>
+    </Swipeable>
+  );
+}
+
 export function CaloriesScreen() {
   const [food, setFood] = useState("");
   const [protein, setProtein] = useState("");
@@ -55,17 +129,17 @@ export function CaloriesScreen() {
   const [fats, setFats] = useState("");
   const [fiber, setFiber] = useState("");
   const [mealType, setMealType] = useState<MealType>("breakfast");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [calorieError, setCalorieError] = useState<string | null>(null);
   const [entries, setEntries] = useState<CalorieEntry[]>([]);
   const [goal, setGoal] = useState<CalorieGoal>(DEFAULT_GOAL);
-  const [weeklyData, setWeeklyData] = useState<DailySummary[]>([]);
+  const [summary364, setSummary364] = useState<DailySummary[]>([]);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
-  const [weeklyVisible, setWeeklyVisible] = useState(false);
   const [calorieActivityDays, setCalorieActivityDays] = useState<ActivityDay[]>([]);
   const [calorieHeatmapDays, setCalorieHeatmapDays] = useState<HeatmapDay[]>([]);
   const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
   const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await listCalorieEntries();
@@ -76,14 +150,10 @@ export function CaloriesScreen() {
     setRecentMeals(recent);
     setAllSavedMeals(all);
 
-    const start = new Date();
-    start.setDate(start.getDate() - 6);
-    const weekSummaries = await getCalorieSummaryByRange(toDateKey(start), toDateKey(new Date()));
-    setWeeklyData(weekSummaries);
-
     const start364 = new Date();
     start364.setDate(start364.getDate() - 363);
     const range364 = await getCalorieSummaryByRange(toDateKey(start364), toDateKey(new Date()));
+    setSummary364(range364);
     const savedGoal = await getCalorieGoal();
     const activityDays364 = buildCalorieActivityDays(range364, savedGoal.calories, 364);
     setCalorieActivityDays(activityDays364);
@@ -98,17 +168,13 @@ export function CaloriesScreen() {
     }, [refresh]),
   );
 
-  useEffect(() => {
-    setFormError(null);
-  }, [food, protein, carbs, fats, fiber, mealType]);
-
   const todayTotals = {
     protein: entries.reduce((s, e) => s + e.protein, 0),
     carbs: entries.reduce((s, e) => s + e.carbs, 0),
     fats: entries.reduce((s, e) => s + e.fats, 0),
     fiber: entries.reduce((s, e) => s + e.fiber, 0),
   };
-  const weeklyTrend = buildWeeklyTrend(weeklyData, 7);
+  const weeklyTotals = useMemo(() => buildWeeklyTotals(summary364, 52), [summary364]);
   const goalProgress = calculateGoalProgress(caloriesTotal(entries), goal.calories);
 
   const hasCalorieStripActivity = calorieActivityDays.some((d) => d.active);
@@ -128,6 +194,8 @@ export function CaloriesScreen() {
   );
 
   const handleSelectSavedMeal = (meal: SavedMeal) => {
+    setCalorieError(null);
+    setEditingEntryId(null);
     setFood(meal.food_name);
     setProtein(String(meal.protein));
     setCarbs(String(meal.carbs));
@@ -136,33 +204,68 @@ export function CaloriesScreen() {
     setMealType(meal.meal_type as MealType);
   };
 
-  const onAdd = () => {
-    void (async () => {
-      setFormError(null);
-      try {
-        if (!food.trim()) {
-          setFormError("Enter a food name.");
-          return;
-        }
-        if (!Number.isFinite(computedKcal) || computedKcal <= 0) {
-          setFormError("Calories work out to zero. Enter macro amounts that add up to energy.");
-          return;
-        }
+  const resetCalorieForm = () => {
+    setFood("");
+    setProtein("");
+    setCarbs("");
+    setFats("");
+    setFiber("");
+    setMealType("breakfast");
+    setEditingEntryId(null);
+    setCalorieError(null);
+  };
 
-        await addCalorieEntry({
-          foodName: food.trim(),
-          calories: computedKcal,
-          protein: Number(protein) || 0,
-          carbs: Number(carbs) || 0,
-          fats: Number(fats) || 0,
-          fiber: Number(fiber) || 0,
-          mealType,
-        });
-        setFood("");
-        setProtein("");
-        setCarbs("");
-        setFats("");
-        setFiber("");
+  const handleEditEntry = (entry: CalorieEntry) => {
+    setFood(entry.food_name);
+    setProtein(String(entry.protein));
+    setCarbs(String(entry.carbs));
+    setFats(String(entry.fats));
+    setFiber(String(entry.fiber ?? 0));
+    setMealType(entry.meal_type as MealType);
+    setEditingEntryId(entry.id);
+    setCalorieError(null);
+  };
+
+  const handleSubmit = () => {
+    void (async () => {
+      const entryErr = validateCalorieEntry(food, protein, carbs, fats, fiber);
+      if (entryErr) {
+        setCalorieError(entryErr);
+        return;
+      }
+      const kcalErr = validateCalorieComputedKcal(computedKcal);
+      if (kcalErr) {
+        setCalorieError(kcalErr);
+        return;
+      }
+      setCalorieError(null);
+      try {
+        const proteinN = Number(protein) || 0;
+        const carbsN = Number(carbs) || 0;
+        const fatsN = Number(fats) || 0;
+        const fiberN = Number(fiber) || 0;
+
+        if (editingEntryId) {
+          await updateCalorieEntry(editingEntryId, {
+            foodName: food.trim(),
+            protein: proteinN,
+            carbs: carbsN,
+            fats: fatsN,
+            fiber: fiberN,
+            mealType,
+          });
+        } else {
+          await addCalorieEntry({
+            foodName: food.trim(),
+            calories: computedKcal,
+            protein: proteinN,
+            carbs: carbsN,
+            fats: fatsN,
+            fiber: fiberN,
+            mealType,
+          });
+        }
+        resetCalorieForm();
         await refresh();
       } catch (e) {
         const msg =
@@ -171,7 +274,7 @@ export function CaloriesScreen() {
             : typeof e === "string"
               ? e
               : "Could not save entry.";
-        setFormError(msg);
+        setCalorieError(msg);
       }
     })();
   };
@@ -231,19 +334,60 @@ export function CaloriesScreen() {
             </Text>
           </Pressable>
         ) : null}
-        <TextField label="Food" value={food} onChangeText={setFood} placeholder="Greek yogurt" />
+        <TextField
+          label="Food"
+          value={food}
+          onChangeText={(t) => {
+            setCalorieError(null);
+            setFood(t);
+          }}
+          placeholder="Greek yogurt"
+        />
         <View className="flex-row gap-2">
           <View className="flex-1">
-            <TextField label="Protein (g)" value={protein} onChangeText={setProtein} unsignedInteger />
+            <TextField
+              label="Protein (g)"
+              value={protein}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setProtein(t);
+              }}
+              unsignedInteger
+            />
           </View>
           <View className="flex-1">
-            <TextField label="Carbs (g)" value={carbs} onChangeText={setCarbs} unsignedInteger />
+            <TextField
+              label="Carbs (g)"
+              value={carbs}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setCarbs(t);
+              }}
+              unsignedInteger
+            />
           </View>
           <View className="flex-1">
-            <TextField label="Fats (g)" value={fats} onChangeText={setFats} unsignedInteger />
+            <TextField
+              label="Fats (g)"
+              value={fats}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setFats(t);
+              }}
+              unsignedInteger
+            />
           </View>
           <View className="flex-1">
-            <TextField label="Fiber (g)" value={fiber} onChangeText={setFiber} unsignedInteger placeholder="0" />
+            <TextField
+              label="Fiber (g)"
+              value={fiber}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setFiber(t);
+              }}
+              unsignedInteger
+              placeholder="0"
+            />
           </View>
         </View>
         <View className="mb-3">
@@ -265,12 +409,19 @@ export function CaloriesScreen() {
               label={label}
               active={mealType === value}
               color={COLOR}
-              onPress={() => setMealType(value)}
+              onPress={() => {
+                setCalorieError(null);
+                setMealType(value);
+              }}
             />
           ))}
         </View>
-        {formError ? <Text className="mb-2 text-sm text-rose-600">{formError}</Text> : null}
-        <Button label="Add entry" onPress={onAdd} color={COLOR} />
+        <ValidationError message={calorieError} />
+        <Button
+          label={editingEntryId ? "Save changes" : "Add entry"}
+          onPress={handleSubmit}
+          color={COLOR}
+        />
       </Card>
 
       <Card accentColor={COLOR}>
@@ -335,40 +486,31 @@ export function CaloriesScreen() {
       />
 
       {entries.map((entry) => (
-        <Card key={entry.id} accentColor={COLOR}>
-          <Text className="text-base font-semibold text-slate-900">
-            {entry.food_name} - {entry.calories} kcal
-          </Text>
-          <Text className="mt-1 text-sm capitalize text-slate-600">
-            {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber {entry.fiber}g
-          </Text>
-          <View className="mt-3">
-            <Button
-              label="Delete"
-              variant="danger"
-              onPress={async () => {
-                await deleteCalorieEntry(entry.id);
-                await refresh();
-              }}
-            />
-          </View>
-        </Card>
+        <CalorieEntrySwipeRow
+          key={entry.id}
+          entry={entry}
+          accentColor={COLOR}
+          onEdit={() => handleEditEntry(entry)}
+          onDelete={async () => {
+            await deleteCalorieEntry(entry.id);
+            if (editingEntryId === entry.id) {
+              resetCalorieForm();
+            }
+            await refresh();
+          }}
+        />
       ))}
 
-      <View className="mt-4">
-        <Pressable onPress={() => setWeeklyVisible((v) => !v)}>
-          <Text className="text-xs text-calories text-center py-2">
-            {weeklyVisible ? "▲ hide weekly trend" : "▼ weekly trend"}
-          </Text>
-        </Pressable>
-        {weeklyVisible && (
-          <WeeklyCalorieChart data={weeklyTrend} goalKcal={goal.calories} />
-        )}
-      </View>
+      <Card accentColor={SECTION_COLORS.calories} className="mx-1 mt-4">
+        <Text style={{ fontSize: 13, fontWeight: "600", color: "#64748b", marginBottom: 8 }}>
+          Weekly trend
+        </Text>
+        <WeeklyCalorieChart data={weeklyTotals} goalKcal={goal.calories} />
+      </Card>
 
       <View className="mt-4">
-        <Card accentColor={SECTION_COLORS.calories} overflowVisible className="mb-0">
-          <View className="w-full items-center">
+        <Card accentColor={SECTION_COLORS.calories} className="mx-1 mb-0">
+          <View className="w-full min-w-0 items-center">
             <Text
               style={{
                 fontSize: 12,

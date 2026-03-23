@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
-import type { Animated } from "react-native";
 import { Pressable, Text, View } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import { RectButton, Swipeable } from "react-native-gesture-handler";
 import { Card } from "@/core/ui/Card";
+import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { DueDateBadge } from "./DueDateBadge";
 import { PriorityBadge } from "./PriorityBadge";
@@ -22,26 +22,23 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
   const done = todo.completed === 1;
   const swipeableRef = useRef<Swipeable>(null);
 
-  const renderRightActions = (
-    _progress: Animated.AnimatedInterpolation<number>,
-    _dragX: Animated.AnimatedInterpolation<number>,
-  ) => (
-    <Pressable
-      onPress={() => {
-        swipeableRef.current?.close();
-        onDelete();
-      }}
-      className="my-0.5 items-center justify-center rounded-r-xl bg-rose-500 px-6"
-    >
-      <Text className="text-sm font-medium text-white">Delete</Text>
-    </Pressable>
-  );
-
   return (
     <View style={{ opacity: isActive ? 0.85 : 1 }}>
       <Swipeable
         ref={swipeableRef}
-        renderRightActions={renderRightActions}
+        renderRightActions={() => (
+          <SwipeRightActions
+            editColor={SECTION_COLORS.todos}
+            onEdit={() => {
+              swipeableRef.current?.close();
+              onEdit();
+            }}
+            onDelete={() => {
+              swipeableRef.current?.close();
+              onDelete();
+            }}
+          />
+        )}
         rightThreshold={40}
         overshootRight={false}
       >
@@ -56,14 +53,21 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
             >
               <MaterialIcons name="drag-indicator" size={22} color="#94a3b8" />
             </Pressable>
-            <Pressable onPress={onToggle} hitSlop={8} className="pt-0.5">
+            <RectButton
+              onPress={onToggle}
+              hitSlop={8}
+              style={{ paddingTop: 2, backgroundColor: "transparent" }}
+            >
               <MaterialIcons
                 name={done ? "check-box" : "check-box-outline-blank"}
                 size={24}
                 color={done ? "#64748b" : "#0f172a"}
               />
-            </Pressable>
-            <Pressable onPress={onToggle} className="min-w-0 flex-1">
+            </RectButton>
+            <RectButton
+              onPress={onToggle}
+              style={{ flex: 1, minWidth: 0, backgroundColor: "transparent" }}
+            >
               <View className="flex-row flex-wrap items-center gap-1">
                 <Text className={`text-base ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>
                   {todo.title}
@@ -79,10 +83,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
                 {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} /> : null}
                 {todo.due_date ? <DueDateBadge dueDate={todo.due_date} /> : null}
               </View>
-            </Pressable>
-            <Pressable onPress={onEdit} hitSlop={8} className="pt-0.5">
-              <MaterialIcons name="edit" size={22} color="#64748b" />
-            </Pressable>
+            </RectButton>
           </View>
         </Card>
       </Swipeable>

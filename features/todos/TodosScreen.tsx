@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
 import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
 import { Screen } from "@/core/ui/Screen";
+import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
+import { validateTodo } from "@/lib/validation";
+import { ValidationError } from "@/core/ui/ValidationError";
 import type { Todo, TodoPriority } from "./types";
 import { TodoItem } from "./TodoItem";
 import { findMissingRecurrenceIds, getTodayDateKey } from "./todos.domain";
@@ -38,6 +41,7 @@ export function TodosScreen() {
   const [createExpanded, setCreateExpanded] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [todoError, setTodoError] = useState<string | null>(null);
 
   const pendingTasks = useMemo(() => items.filter((t) => t.completed === 0), [items]);
   const hasCompleted = useMemo(() => items.some((t) => t.completed === 1), [items]);
@@ -98,13 +102,16 @@ export function TodosScreen() {
     setIsRecurring(false);
     setEditingId(null);
     setShowDatePicker(false);
+    setTodoError(null);
   };
 
   const onSave = async () => {
-    if (!title.trim()) {
-      Alert.alert("Missing title", "Please enter a to-do title.");
+    const err = validateTodo(title, notes, dueDate);
+    if (err) {
+      setTodoError(err);
       return;
     }
+    setTodoError(null);
     if (editingId) {
       await updateTodo(editingId, {
         title: title.trim(),
@@ -148,18 +155,34 @@ export function TodosScreen() {
   };
 
   const createDropdownContent = (
-    <View>
+    <Card accentColor={SECTION_COLORS.todos}>
       <Pressable
         onPress={toggleCreate}
-        className="mb-2 flex-row items-center justify-between rounded-xl border border-todos bg-white px-4 py-3"
+        className="mb-2 flex-row items-center justify-between py-1"
       >
         <Text className="text-sm font-medium text-slate-700">{editingId ? "Edit task" : "Make a Task"}</Text>
         <Text className="text-slate-400">{createExpanded ? "▲" : "▼"}</Text>
       </Pressable>
       {createExpanded ? (
-        <View className="overflow-hidden rounded-xl border border-todos bg-white p-4">
-          <TextField label="Title" value={title} onChangeText={setTitle} placeholder="Add a task..." />
-          <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" />
+        <View className="mt-2 border-t border-slate-100 pt-3">
+          <TextField
+            label="Title"
+            value={title}
+            onChangeText={(t) => {
+              setTodoError(null);
+              setTitle(t);
+            }}
+            placeholder="Add a task..."
+          />
+          <TextField
+            label="Notes"
+            value={notes}
+            onChangeText={(t) => {
+              setTodoError(null);
+              setNotes(t);
+            }}
+            placeholder="Optional notes"
+          />
           <View className="mb-3 flex-row flex-wrap">
             {(["urgent", "normal", "low"] as TodoPriority[]).map((p) => (
               <PillChip
@@ -167,13 +190,19 @@ export function TodosScreen() {
                 label={p}
                 active={priority === p}
                 color={COLOR}
-                onPress={() => setPriority(p)}
+                onPress={() => {
+                  setTodoError(null);
+                  setPriority(p);
+                }}
               />
             ))}
           </View>
           {!editingId ? (
             <Pressable
-              onPress={() => setIsRecurring((v) => !v)}
+              onPress={() => {
+                setTodoError(null);
+                setIsRecurring((v) => !v);
+              }}
               className="mb-3 flex-row items-center gap-2 py-2"
             >
               <View
@@ -192,7 +221,10 @@ export function TodosScreen() {
             <TextField
               label="Due date (YYYY-MM-DD)"
               value={dueDate ?? ""}
-              onChangeText={(t) => setDueDate(t.trim() || null)}
+              onChangeText={(t) => {
+                setTodoError(null);
+                setDueDate(t.trim() || null);
+              }}
               placeholder="Optional"
             />
           ) : (
@@ -205,7 +237,13 @@ export function TodosScreen() {
                   {dueDate ? `Due: ${dueDate}` : "Add due date (optional)"}
                 </Text>
                 {dueDate ? (
-                  <Pressable onPress={() => setDueDate(null)} hitSlop={8}>
+                  <Pressable
+                    onPress={() => {
+                      setTodoError(null);
+                      setDueDate(null);
+                    }}
+                    hitSlop={8}
+                  >
                     <Text className="text-xs text-rose-400">✕ clear</Text>
                   </Pressable>
                 ) : null}
@@ -218,6 +256,7 @@ export function TodosScreen() {
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(false);
                     if (event.type === "set" && selectedDate) {
+                      setTodoError(null);
                       setDueDate(toDateKey(selectedDate));
                     }
                   }}
@@ -225,13 +264,14 @@ export function TodosScreen() {
               ) : null}
             </>
           )}
+          <ValidationError message={todoError} />
           <View className="mt-3 flex-row gap-2">
             <Button label="Cancel" variant="ghost" onPress={collapseCreate} />
             <Button label={editingId ? "Save changes" : "Add task"} onPress={onSave} color={COLOR} />
           </View>
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 
   const emptyPending =
@@ -240,10 +280,12 @@ export function TodosScreen() {
   const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
 
   const noPendingTasksCard = (
-    <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
-      <Text className="text-center text-sm text-slate-500">No Pending Tasks</Text>
-      <Text className="mt-1 text-center text-xs text-slate-400">Offline-first task manager.</Text>
-    </View>
+    <Card accentColor={SECTION_COLORS.todos}>
+      <View className="items-center py-4">
+        <Text className="text-sm text-slate-500 text-center">No Pending Tasks</Text>
+        <Text className="text-xs text-slate-400 text-center mt-1">Offline-first task manager.</Text>
+      </View>
+    </Card>
   );
 
   return (
@@ -323,9 +365,11 @@ export function TodosScreen() {
                       )}
                     />
                   ) : (
-                    <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
-                      <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
-                    </View>
+                    <Card accentColor={SECTION_COLORS.todos}>
+                      <View className="items-center py-4">
+                        <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
+                      </View>
+                    </Card>
                   )}
                 </View>
                 <View className="mt-3 shrink-0">{createDropdownContent}</View>

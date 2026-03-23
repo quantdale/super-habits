@@ -3,6 +3,7 @@ import { CalorieEntry, SavedMeal } from "@/core/db/types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
+import { kcalFromMacros } from "@/features/calories/calories.domain";
 
 export type DailySummary = {
   dateKey: string;
@@ -120,6 +121,55 @@ export async function addCalorieEntry(input: {
     fats: input.fats ?? 0,
     fiber: input.fiber ?? 0,
     mealType: input.mealType,
+  });
+}
+
+export async function updateCalorieEntry(
+  id: string,
+  updates: {
+    foodName: string;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+    mealType: "breakfast" | "lunch" | "dinner" | "snack";
+  },
+): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const calories = kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
+  await db.runAsync(
+    `UPDATE calorie_entries SET
+       food_name = ?,
+       calories = ?,
+       protein = ?,
+       carbs = ?,
+       fats = ?,
+       fiber = ?,
+       meal_type = ?,
+       updated_at = ?
+     WHERE id = ?`,
+    [
+      updates.foodName,
+      calories,
+      updates.protein,
+      updates.carbs,
+      updates.fats,
+      updates.fiber,
+      updates.mealType,
+      now,
+      id,
+    ],
+  );
+  syncEngine.enqueue({ entity: "calorie_entries", id, updatedAt: now, operation: "update" });
+  await upsertSavedMeal({
+    foodName: updates.foodName,
+    calories,
+    protein: updates.protein,
+    carbs: updates.carbs,
+    fats: updates.fats,
+    fiber: updates.fiber,
+    mealType: updates.mealType,
   });
 }
 

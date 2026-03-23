@@ -38,6 +38,8 @@ import {
 } from "@/features/habits/habitPresets";
 import { SECTION_COLORS, SECTION_COLORS_LIGHT } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
+import { validateHabit } from "@/lib/validation";
+import { ValidationError } from "@/core/ui/ValidationError";
 
 const TIME_GROUPS = [
   { key: "anytime" as const, label: "Anytime", icon: "🔄" },
@@ -72,6 +74,7 @@ export function HabitsScreen() {
   const [habitHeatmapDays, setHabitHeatmapDays] = useState<HeatmapDay[]>([]);
   const [consistencyPct, setConsistencyPct] = useState(0);
   const [overallStreak, setOverallStreak] = useState(0);
+  const [habitError, setHabitError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await listHabits();
@@ -124,10 +127,12 @@ export function HabitsScreen() {
     setCategory(presetCategory ?? "anytime");
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
+    setHabitError(null);
     setModalVisible(true);
   };
 
   const openEditModal = (habit: Habit) => {
+    setHabitError(null);
     setEditingHabit(habit);
     setName(habit.name);
     setTarget(String(habit.target_per_day));
@@ -138,11 +143,13 @@ export function HabitsScreen() {
   };
 
   const onSubmit = async () => {
-    if (!name.trim()) {
-      Alert.alert("Missing name", "Enter a habit name.");
+    const targetNum = Number(target);
+    const err = validateHabit(name, targetNum);
+    if (err) {
+      setHabitError(err);
       return;
     }
-    const targetNum = Math.max(1, Number(target) || 1);
+    setHabitError(null);
     if (editingHabit) {
       await updateHabit(editingHabit.id, {
         name: name.trim(),
@@ -160,6 +167,7 @@ export function HabitsScreen() {
     setCategory("anytime");
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
+    setHabitError(null);
     setModalVisible(false);
     refresh();
   };
@@ -272,7 +280,7 @@ export function HabitsScreen() {
               >
                 {editMode
                   ? groupHabits.map((habit) => (
-                      <View key={habit.id} className="items-center" style={{ width: 88 }}>
+                      <View key={habit.id} className="items-center" style={{ width: 88, alignItems: "center" }}>
                         <View
                           className="items-center justify-center rounded-full bg-slate-200"
                           style={{ width: 80, height: 80 }}
@@ -317,7 +325,11 @@ export function HabitsScreen() {
                       const todayCount = completionMap[habit.id] ?? 0;
                       const streak = streakMap[habit.id] ?? 0;
                       return (
-                        <View key={habit.id} className="items-center" style={{ width: 72 }}>
+                        <View
+                          key={habit.id}
+                          className="items-center justify-center"
+                          style={{ width: 72, alignItems: "center" }}
+                        >
                           <HabitCircle
                             habit={habit}
                             todayCount={todayCount}
@@ -353,7 +365,7 @@ export function HabitsScreen() {
                 <Pressable
                   onPress={() => handleAddHabitToGroup(group.key)}
                   className="items-center justify-center"
-                  style={{ width: editMode ? 88 : 72 }}
+                  style={{ width: editMode ? 88 : 72, alignItems: "center" }}
                 >
                   <View
                     style={{
@@ -361,7 +373,7 @@ export function HabitsScreen() {
                       height: 56,
                       borderRadius: 28,
                       borderWidth: 2,
-                      borderColor: `${SECTION_COLORS.habits}60`,
+                      borderColor: SECTION_COLORS.habits + "60",
                       borderStyle: "dashed",
                       alignItems: "center",
                       justifyContent: "center",
@@ -406,6 +418,7 @@ export function HabitsScreen() {
         onRequestClose={() => {
           setModalVisible(false);
           setEditingHabit(null);
+          setHabitError(null);
         }}
       >
         <Pressable
@@ -413,6 +426,7 @@ export function HabitsScreen() {
           onPress={() => {
             setModalVisible(false);
             setEditingHabit(null);
+            setHabitError(null);
           }}
         >
           <Pressable onPress={(e) => e.stopPropagation()} style={{ maxHeight: modalMaxHeight, width: "100%" }}>
@@ -428,14 +442,21 @@ export function HabitsScreen() {
               <TextField
                 label="Habit name"
                 value={name}
-                onChangeText={setName}
+                onChangeText={(t) => {
+                  setHabitError(null);
+                  setName(t);
+                }}
                 placeholder="Read 20 minutes"
               />
               <NumberStepperField
                 label="Target per day"
                 value={target}
-                onChange={setTarget}
+                onChange={(t) => {
+                  setHabitError(null);
+                  setTarget(t);
+                }}
                 min={1}
+                max={99}
                 placeholder="1"
               />
               <Text className="mb-1 text-sm font-medium text-slate-700">Category</Text>
@@ -443,7 +464,10 @@ export function HabitsScreen() {
                 {CATEGORIES.map((c) => (
                   <Pressable
                     key={c}
-                    onPress={() => setCategory(c)}
+                    onPress={() => {
+                      setHabitError(null);
+                      setCategory(c);
+                    }}
                     className={`rounded-lg px-3 py-2 ${
                       category === c ? "bg-habits" : "bg-slate-200"
                     }`}
@@ -459,7 +483,10 @@ export function HabitsScreen() {
                 {HABIT_ICONS.map((iconName) => (
                   <Pressable
                     key={iconName}
-                    onPress={() => setIcon(iconName)}
+                    onPress={() => {
+                      setHabitError(null);
+                      setIcon(iconName);
+                    }}
                     className={`items-center justify-center rounded-lg p-2 ${
                       icon === iconName ? "bg-habits" : "bg-slate-200"
                     }`}
@@ -478,7 +505,10 @@ export function HabitsScreen() {
                 {HABIT_COLORS.map((c) => (
                   <Pressable
                     key={c}
-                    onPress={() => setColor(c)}
+                    onPress={() => {
+                      setHabitError(null);
+                      setColor(c);
+                    }}
                     className={`rounded-full ${
                       color === c ? "ring-2 ring-slate-400 ring-offset-2" : ""
                     }`}
@@ -486,6 +516,7 @@ export function HabitsScreen() {
                   />
                 ))}
               </View>
+              <ValidationError message={habitError} />
               <View className="flex-row gap-2">
                 <Button
                   label="Cancel"
@@ -493,6 +524,7 @@ export function HabitsScreen() {
                   onPress={() => {
                     setModalVisible(false);
                     setEditingHabit(null);
+                    setHabitError(null);
                   }}
                 />
                 <Button

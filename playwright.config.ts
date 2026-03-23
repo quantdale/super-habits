@@ -3,17 +3,14 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
 
-  // Run spec files in parallel across workers.
-  // Tests within the same file still run serially by default
-  // (safe for SuperHabits — clearDatabase is in beforeEach).
+  // Tests within the same file run serially by default (fullyParallel: false).
   fullyParallel: false,
 
-  // Explicit worker count:
-  // - Locally: fixed 2 (Metro dev server saturates above 2 workers)
-  // - CI: fixed 2 (GitHub Actions ubuntu-latest has 2 vCPUs)
-  // Each worker gets its own isolated browser context + OPFS storage
-  // so SQLite DB lock conflicts do NOT occur across workers.
-  workers: process.env.CI ? 2 : 2,
+  // Playwright workers operate in isolated browser contexts/profiles, meaning
+  // OPFS directories are separate per worker. Worker-level parallelization does
+  // not cause SQLite lock collisions. Keep fullyParallel false so tests within a
+  // file stay serial (clearDatabase() in beforeEach must not race).
+  workers: process.env.CI ? 1 : 4,
 
   // Retry on CI only — locally you want to see failures immediately
   retries: process.env.CI ? 2 : 0,

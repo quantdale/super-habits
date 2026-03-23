@@ -17,6 +17,8 @@ import {
 import { formatWorkoutTime } from "./workout.domain";
 import type { RoutineExercise, RoutineExerciseSet } from "./types";
 import { SECTION_COLORS } from "@/constants/sectionColors";
+import { ValidationError } from "@/core/ui/ValidationError";
+import { validateExerciseName, validateSetTiming } from "@/lib/validation";
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -37,6 +39,7 @@ export function RoutineDetailScreen({
 }: Props) {
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
   const [newExerciseName, setNewExerciseName] = useState("");
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const exList = await listExercises(routineId);
@@ -56,7 +59,12 @@ export function RoutineDetailScreen({
   );
 
   const handleAddExercise = async () => {
-    if (!newExerciseName.trim()) return;
+    const err = validateExerciseName(newExerciseName);
+    if (err) {
+      setWorkoutError(err);
+      return;
+    }
+    setWorkoutError(null);
     const exId = await addExercise({
       routineId,
       name: newExerciseName.trim(),
@@ -112,6 +120,12 @@ export function RoutineDetailScreen({
                     <Pressable
                       onPress={async () => {
                         const next = Math.max(5, set.active_seconds - 5);
+                        const timingErr = validateSetTiming(next, set.rest_seconds);
+                        if (timingErr) {
+                          setWorkoutError(timingErr);
+                          return;
+                        }
+                        setWorkoutError(null);
                         await updateSet(set.id, { activeSeconds: next });
                         refresh();
                       }}
@@ -124,7 +138,13 @@ export function RoutineDetailScreen({
                     </Text>
                     <Pressable
                       onPress={async () => {
-                        const next = Math.min(600, set.active_seconds + 5);
+                        const next = Math.min(3600, set.active_seconds + 5);
+                        const timingErr = validateSetTiming(next, set.rest_seconds);
+                        if (timingErr) {
+                          setWorkoutError(timingErr);
+                          return;
+                        }
+                        setWorkoutError(null);
                         await updateSet(set.id, { activeSeconds: next });
                         refresh();
                       }}
@@ -141,6 +161,12 @@ export function RoutineDetailScreen({
                     <Pressable
                       onPress={async () => {
                         const next = Math.max(0, set.rest_seconds - 5);
+                        const timingErr = validateSetTiming(set.active_seconds, next);
+                        if (timingErr) {
+                          setWorkoutError(timingErr);
+                          return;
+                        }
+                        setWorkoutError(null);
                         await updateSet(set.id, { restSeconds: next });
                         refresh();
                       }}
@@ -153,7 +179,13 @@ export function RoutineDetailScreen({
                     </Text>
                     <Pressable
                       onPress={async () => {
-                        const next = Math.min(300, set.rest_seconds + 5);
+                        const next = Math.min(1800, set.rest_seconds + 5);
+                        const timingErr = validateSetTiming(set.active_seconds, next);
+                        if (timingErr) {
+                          setWorkoutError(timingErr);
+                          return;
+                        }
+                        setWorkoutError(null);
                         await updateSet(set.id, { restSeconds: next });
                         refresh();
                       }}
@@ -193,10 +225,14 @@ export function RoutineDetailScreen({
 
       <View className="mt-4">
         <Text className="text-sm text-slate-600 mb-2">Add exercise</Text>
+        <ValidationError message={workoutError} />
         <View className="flex-row gap-2">
           <TextInput
             value={newExerciseName}
-            onChangeText={setNewExerciseName}
+            onChangeText={(t) => {
+              setWorkoutError(null);
+              setNewExerciseName(t);
+            }}
             placeholder="e.g. Rows, Curls, Push-ups"
             className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800"
             onSubmitEditing={handleAddExercise}
