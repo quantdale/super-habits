@@ -9,6 +9,24 @@ import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 
+/** Nested routine_exercises / routine_exercise_sets rows are not separate sync entities; bump parent + enqueue so remotes can refetch the full routine. */
+async function markWorkoutRoutineUpdated(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  routineId: string,
+  now: string,
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE workout_routines SET updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
+    [now, routineId],
+  );
+  syncEngine.enqueue({
+    entity: "workout_routines",
+    id: routineId,
+    updatedAt: now,
+    operation: "update",
+  });
+}
+
 export async function listRoutines(): Promise<WorkoutRoutine[]> {
   const db = await getDatabase();
   return db.getAllAsync<WorkoutRoutine>(
@@ -86,6 +104,7 @@ export async function addExercise(input: {
      VALUES (?, ?, ?, ?, ?, ?, NULL)`,
     [id, input.routineId, input.name, input.sortOrder ?? 0, now, now],
   );
+  await markWorkoutRoutineUpdated(db, input.routineId, now);
   return id;
 }
 
@@ -102,6 +121,10 @@ export async function listExercises(routineId: string): Promise<RoutineExercise[
 export async function deleteExercise(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
+  const row = await db.getFirstAsync<{ routine_id: string }>(
+    `SELECT routine_id FROM routine_exercises WHERE id = ? AND deleted_at IS NULL`,
+    [id],
+  );
   await db.runAsync(
     `UPDATE routine_exercises
      SET deleted_at = ?, updated_at = ? WHERE id = ?`,
@@ -112,11 +135,17 @@ export async function deleteExercise(id: string): Promise<void> {
      SET deleted_at = ?, updated_at = ? WHERE exercise_id = ?`,
     [now, now, id],
   );
+  if (row?.routine_id) await markWorkoutRoutineUpdated(db, row.routine_id, now);
 }
 
 export async function updateExerciseOrder(orderedIds: string[]): Promise<void> {
+  if (orderedIds.length === 0) return;
   const db = await getDatabase();
   const now = nowIso();
+  const first = await db.getFirstAsync<{ routine_id: string }>(
+    `SELECT routine_id FROM routine_exercises WHERE id = ? AND deleted_at IS NULL`,
+    [orderedIds[0]],
+  );
   for (let i = 0; i < orderedIds.length; i++) {
     await db.runAsync(
       `UPDATE routine_exercises
@@ -124,6 +153,7 @@ export async function updateExerciseOrder(orderedIds: string[]): Promise<void> {
       [i + 1, now, orderedIds[i]],
     );
   }
+  if (first?.routine_id) await markWorkoutRoutineUpdated(db, first.routine_id, now);
 }
 
 // --- Sets ---
@@ -152,6 +182,11 @@ export async function addSet(input: {
       now,
     ],
   );
+  const exRow = await db.getFirstAsync<{ routine_id: string }>(
+    `SELECT routine_id FROM routine_exercises WHERE id = ? AND deleted_at IS NULL`,
+    [input.exerciseId],
+  );
+  if (exRow?.routine_id) await markWorkoutRoutineUpdated(db, exRow.routine_id, now);
   return id;
 }
 
@@ -185,16 +220,33 @@ export async function updateSet(
       [updates.restSeconds, now, id],
     );
   }
+  if (updates.activeSeconds === undefined && updates.restSeconds === undefined) return;
+  const setRow = await db.getFirstAsync<{ routine_id: string }>(
+    `SELECT e.routine_id AS routine_id
+     FROM routine_exercise_sets s
+     INNER JOIN routine_exercises e ON e.id = s.exercise_id
+     WHERE s.id = ? AND s.deleted_at IS NULL AND e.deleted_at IS NULL`,
+    [id],
+  );
+  if (setRow?.routine_id) await markWorkoutRoutineUpdated(db, setRow.routine_id, now);
 }
 
 export async function deleteSet(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
+  const setRow = await db.getFirstAsync<{ routine_id: string }>(
+    `SELECT e.routine_id AS routine_id
+     FROM routine_exercise_sets s
+     INNER JOIN routine_exercises e ON e.id = s.exercise_id
+     WHERE s.id = ? AND s.deleted_at IS NULL AND e.deleted_at IS NULL`,
+    [id],
+  );
   await db.runAsync(
     `UPDATE routine_exercise_sets
      SET deleted_at = ?, updated_at = ? WHERE id = ?`,
     [now, now, id],
   );
+  if (setRow?.routine_id) await markWorkoutRoutineUpdated(db, setRow.routine_id, now);
 }
 
 export async function addDefaultSet(exerciseId: string): Promise<void> {

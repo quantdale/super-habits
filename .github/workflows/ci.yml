@@ -77,8 +77,10 @@ jobs:
         env:
           EXPO_UNSTABLE_HEADLESS: 1
 
+      # Use 127.0.0.1 (not localhost): on Ubuntu runners `localhost` may resolve to ::1
+      # first while Metro binds IPv4 only, so wait-on would never connect.
       - name: Wait for web server
-        run: npx wait-on http://localhost:8081 --timeout 60000
+        run: npx wait-on http://127.0.0.1:8081 --timeout 120000
 
       - name: Run E2E tests
         run: npm run e2e

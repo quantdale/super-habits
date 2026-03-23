@@ -7,12 +7,39 @@ import {
   getModeDuration,
   getNextMode,
   getModeLabel,
+  getModeColor,
   parseMinutesSeconds,
   DEFAULT_SETTINGS,
   buildPomodoroHeatmapDays,
   computeFocusStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
 import type { PomodoroSession } from "@/core/db/types";
+
+describe("getModeColor", () => {
+  it("returns brand classes for focus", () => {
+    expect(getModeColor("focus")).toEqual({
+      bg: "bg-brand-500",
+      text: "text-brand-500",
+      bar: "bg-brand-500",
+    });
+  });
+
+  it("returns emerald classes for short break", () => {
+    expect(getModeColor("short_break")).toEqual({
+      bg: "bg-emerald-500",
+      text: "text-emerald-500",
+      bar: "bg-emerald-500",
+    });
+  });
+
+  it("returns violet classes for long break", () => {
+    expect(getModeColor("long_break")).toEqual({
+      bg: "bg-violet-500",
+      text: "text-violet-500",
+      bar: "bg-violet-500",
+    });
+  });
+});
 
 describe("nextPomodoroState", () => {
   it("returns finished at zero", () => {
