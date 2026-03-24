@@ -17,13 +17,15 @@ type Props = {
   onEdit: () => void;
   onDelete: () => void;
   editColor: string;
+  compact?: boolean;
 };
 
-export function SwipeRightActions({ onEdit, onDelete, editColor }: Props) {
+export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Props) {
+  const btnWidth = compact ? 56 : 80;
   const actionStyle = {
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    width: 80,
+    width: btnWidth,
     alignSelf: "stretch" as const,
     borderRadius: CARD_RADIUS,
     borderWidth: 1,

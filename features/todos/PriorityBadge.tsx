@@ -8,21 +8,23 @@ const CONFIG: Record<TodoPriority, { label: string; bg: string; text: string }> 
   low: { label: "Low", bg: "#f0fdf4", text: "#16a34a" },
 };
 
-type Props = { priority: TodoPriority };
+type Props = { priority: TodoPriority; compact?: boolean };
 
-export function PriorityBadge({ priority }: Props) {
+export function PriorityBadge({ priority, compact }: Props) {
   const cfg = CONFIG[priority];
   return (
     <View
       style={{
         backgroundColor: cfg.bg,
         borderRadius: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        paddingHorizontal: compact ? 4 : 6,
+        paddingVertical: compact ? 1 : 2,
         alignSelf: "flex-start",
       }}
     >
-      <Text style={{ fontSize: 11, fontWeight: "500", color: cfg.text }}>{cfg.label}</Text>
+      <Text style={{ fontSize: compact ? 9 : 11, fontWeight: "500", color: cfg.text }}>
+        {compact ? cfg.label[0] : cfg.label}
+      </Text>
     </View>
   );
 }

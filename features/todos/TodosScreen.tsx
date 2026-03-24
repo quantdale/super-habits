@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "expo-router";
@@ -15,7 +15,7 @@ import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
 import { validateTodo } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
-import type { Todo, TodoPriority } from "./types";
+import type { Todo, TodoPriority, TodoViewMode } from "./types";
 import { TodoItem } from "./TodoItem";
 import { findMissingRecurrenceIds, getTodayDateKey } from "./todos.domain";
 import {
@@ -29,6 +29,7 @@ import {
   updateTodo,
   updateTodoOrder,
 } from "@/features/todos/todos.data";
+import colors from "tailwindcss/colors";
 
 const COLOR = SECTION_COLORS.todos;
 
@@ -44,6 +45,10 @@ export function TodosScreen() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [todoError, setTodoError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<TodoViewMode>("content");
+  const { width: screenWidth } = useWindowDimensions();
+  // 16px screen padding each side + 2px margin each side × 4 cards
+  const gridCardWidth = (screenWidth - 32 - 16) / 4;
 
   const pendingTasks = useMemo(() => items.filter((t) => t.completed === 0), [items]);
   const completedTasks = useMemo(() => items.filter((t) => t.completed === 1), [items]);
@@ -167,12 +172,41 @@ export function TodosScreen() {
   );
 
   return (
-    <Screen>
-      <View className="flex-1">
-        <SectionTitle
-          title="To-do List"
-          subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
-        />
+    <View className="flex-1">
+      <Screen>
+        <View className="flex-1">
+        <View className="flex-row items-center justify-between mb-1">
+            <SectionTitle
+              title="To-do List"
+              subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
+            />
+            <View style={{ flexDirection: "row", gap: 4, paddingRight: 4 }}>
+              {(
+                [
+                  { mode: "content", icon: "view-agenda" },
+                  { mode: "list", icon: "format-list-bulleted" },
+                  { mode: "grid", icon: "grid-view" },
+                ] as { mode: TodoViewMode; icon: string }[]
+              ).map(({ mode, icon }) => (
+                <Pressable
+                  key={mode}
+                  onPress={() => setViewMode(mode)}
+                  style={{
+                    padding: 6,
+                    borderRadius: 8,
+                    backgroundColor: viewMode === mode ? SECTION_COLORS.todos + "22" : "transparent",
+                  }}
+                  accessibilityLabel={`${mode} view`}
+                >
+                  <MaterialIcons
+                    name={icon as any}
+                    size={22}
+                    color={viewMode === mode ? SECTION_COLORS.todos : colors.slate[400]}
+                  />
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
         {totallyEmpty ? (
           <View className="mb-3">
@@ -183,10 +217,12 @@ export function TodosScreen() {
         {!totallyEmpty ? (
           <View className="min-h-0 flex-1">
             <DraggableFlatList
+              key={viewMode}
               data={pendingTasks}
               keyExtractor={(item) => item.id}
               containerStyle={{ flex: 1 }}
               activationDistance={10}
+              numColumns={viewMode === "grid" ? 4 : 1}
               onDragBegin={() => {}}
               onDragEnd={async ({ data }) => {
                 setItems((prev) =>
@@ -229,6 +265,8 @@ export function TodosScreen() {
                             onToggle={() => toggleTodo(item).then(refresh)}
                             onDelete={() => removeTodo(item.id).then(refresh)}
                             onEdit={() => startEdit(item)}
+                            viewMode={viewMode}
+                            cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
                           />
                         ))
                       : null}
@@ -244,23 +282,15 @@ export function TodosScreen() {
                     onToggle={() => toggleTodo(item).then(refresh)}
                     onDelete={() => removeTodo(item.id).then(refresh)}
                     onEdit={() => startEdit(item)}
+                    viewMode={viewMode}
+                    cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
                   />
                 </ScaleDecorator>
               )}
             />
           </View>
         ) : null}
-
-        <Pressable
-          onPress={openNewTodoModal}
-          accessibilityRole="button"
-          accessibilityLabel="Add task"
-          className="absolute bottom-2 right-0 z-10 h-14 w-14 items-center justify-center rounded-full bg-todos shadow-lg"
-          style={{ elevation: 4 }}
-        >
-          <MaterialIcons name="add" size={28} color="#ffffff" />
-        </Pressable>
-      </View>
+        </View>
 
       <Modal
         title={editingId ? "Edit Todo" : "New Todo"}
@@ -376,5 +406,16 @@ export function TodosScreen() {
         </Card>
       </Modal>
     </Screen>
+
+    <Pressable
+      onPress={openNewTodoModal}
+      accessibilityRole="button"
+      accessibilityLabel="Add task"
+      className="absolute bottom-6 right-4 z-10 h-14 w-14 items-center justify-center rounded-full bg-todos shadow-lg"
+      style={{ elevation: 4 }}
+    >
+      <MaterialIcons name="add" size={28} color="#ffffff" />
+    </Pressable>
+    </View>
   );
 }

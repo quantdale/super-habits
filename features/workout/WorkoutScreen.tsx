@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { RectButton, Swipeable } from "react-native-gesture-handler";
+import { RectButton } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
@@ -28,7 +28,7 @@ import { RoutineDetailModal } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
 import { SECTION_COLORS } from "@/constants/sectionColors";
-import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
+import { SwipeableCard } from "@/core/ui/SwipeableCard";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateRoutineName } from "@/lib/validation";
 
@@ -51,41 +51,23 @@ function RoutineSwipeRow({
   onRequestDelete: () => void | Promise<void>;
   accentColor: string;
 }) {
-  const swipeableRef = useRef<Swipeable>(null);
-
   return (
-    <View className="mb-3">
-      <Swipeable
-        ref={swipeableRef}
-        renderRightActions={() => (
-          <SwipeRightActions
-            editColor={accentColor}
-            onEdit={() => {
-              swipeableRef.current?.close();
-              onOpenDetail();
-            }}
-            onDelete={() => {
-              swipeableRef.current?.close();
-              onRequestDelete();
-            }}
-          />
-        )}
-        rightThreshold={40}
-        overshootRight={false}
-      >
-        <Card accentColor={accentColor} className="mb-0 flex-1">
-          <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
-            <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
-            {routine.description ? (
-              <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
-            ) : null}
-          </RectButton>
-          <View className="mt-3">
-            <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
-          </View>
-        </Card>
-      </Swipeable>
-    </View>
+    <SwipeableCard
+      accentColor={accentColor}
+      style={{ marginBottom: 12 }}
+      onEdit={onOpenDetail}
+      onDelete={onRequestDelete}
+    >
+      <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
+        <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
+        {routine.description ? (
+          <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
+        ) : null}
+      </RectButton>
+      <View className="mt-3">
+        <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
+      </View>
+    </SwipeableCard>
   );
 }
 

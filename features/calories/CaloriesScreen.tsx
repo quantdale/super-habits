@@ -1,6 +1,5 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -41,7 +40,7 @@ import { CalorieGoalModal } from "./CalorieGoalModal";
 import { SavedMealChips } from "./SavedMealChips";
 import { SavedMealSearchModal } from "./SavedMealSearchModal";
 import { Modal } from "@/core/ui/Modal";
-import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
+import { SwipeableCard } from "@/core/ui/SwipeableCard";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateCalorieComputedKcal, validateCalorieEntry } from "@/lib/validation";
 
@@ -66,39 +65,21 @@ const CalorieEntrySwipeRow = memo(
     onEdit: () => void;
     onDelete: () => void;
   }) {
-  const swipeableRef = useRef<Swipeable>(null);
-
   return (
-    <View className="mb-3">
-      <Swipeable
-        ref={swipeableRef}
-        renderRightActions={() => (
-          <SwipeRightActions
-            editColor={accentColor}
-            onEdit={() => {
-              swipeableRef.current?.close();
-              onEdit();
-            }}
-            onDelete={() => {
-              swipeableRef.current?.close();
-              onDelete();
-            }}
-          />
-        )}
-        rightThreshold={40}
-        overshootRight={false}
-      >
-        <Card accentColor={accentColor} className="mb-0 flex-1">
-          <Text className="text-base font-semibold text-slate-900">
-            {entry.food_name} - {entry.calories} kcal
-          </Text>
-          <Text className="mt-1 text-sm capitalize text-slate-600">
-            {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{" "}
-            {entry.fiber}g
-          </Text>
-        </Card>
-      </Swipeable>
-    </View>
+    <SwipeableCard
+      accentColor={accentColor}
+      style={{ marginBottom: 12 }}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    >
+      <Text className="text-base font-semibold text-slate-900">
+        {entry.food_name} - {entry.calories} kcal
+      </Text>
+      <Text className="mt-1 text-sm capitalize text-slate-600">
+        {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{" "}
+        {entry.fiber}g
+      </Text>
+    </SwipeableCard>
   );
 },
 (prev, next) =>
@@ -339,6 +320,17 @@ export function CaloriesScreen() {
             </Text>
           </Pressable>
         ) : null}
+        <TextField
+          label="Food"
+          nativeID="cal-entry-food"
+          accessibilityLabel="Calories entry food"
+          value={food}
+          onChangeText={(t) => {
+            setCalorieError(null);
+            setFood(t);
+          }}
+          placeholder="Greek yogurt"
+        />
         <View className="flex-row flex-wrap gap-2">
           <View className="min-w-[140px] grow basis-[22%]">
             <TextField
@@ -394,17 +386,6 @@ export function CaloriesScreen() {
             />
           </View>
         </View>
-        <TextField
-          label="Food"
-          nativeID="cal-entry-food"
-          accessibilityLabel="Calories entry food"
-          value={food}
-          onChangeText={(t) => {
-            setCalorieError(null);
-            setFood(t);
-          }}
-          placeholder="Greek yogurt"
-        />
         <View className="mb-3">
           <View className="flex-row items-center gap-3">
             <Text className="text-sm font-medium text-slate-700">Calories (kcal)</Text>
@@ -515,6 +496,17 @@ export function CaloriesScreen() {
         }}
         scroll
       >
+        <TextField
+          label="Food"
+          nativeID="cal-edit-food"
+          accessibilityLabel="Calories edit food"
+          value={food}
+          onChangeText={(t) => {
+            setCalorieError(null);
+            setFood(t);
+          }}
+          placeholder="Greek yogurt"
+        />
         <View className="flex-row flex-wrap gap-2">
           <View className="min-w-[140px] grow basis-[22%]">
             <TextField
@@ -570,17 +562,6 @@ export function CaloriesScreen() {
             />
           </View>
         </View>
-        <TextField
-          label="Food"
-          nativeID="cal-edit-food"
-          accessibilityLabel="Calories edit food"
-          value={food}
-          onChangeText={(t) => {
-            setCalorieError(null);
-            setFood(t);
-          }}
-          placeholder="Greek yogurt"
-        />
         <View className="mb-3">
           <View className="flex-row items-center gap-3">
             <Text className="text-sm font-medium text-slate-700">Calories (kcal)</Text>

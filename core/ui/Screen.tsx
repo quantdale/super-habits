@@ -1,35 +1,62 @@
 import { PropsWithChildren } from "react";
-import { SafeAreaView, ScrollView, View } from "react-native";
+import { SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
   padded?: boolean;
 }>;
 
-export function Screen({ children, scroll = false, padded = true }: ScreenProps) {
-  const paddedClass = padded ? "bg-surface px-4 py-3 pb-8" : "bg-surface";
-  const scrollContent = <View className={paddedClass}>{children}</View>;
-  const fillContent = (
-    <View className={padded ? "flex-1 bg-surface px-4 py-3" : "flex-1 bg-surface"}>
-      {children}
-    </View>
-  );
+const SURFACE = "#f8f7ff";
 
+export function Screen({ children, scroll = false, padded = true }: ScreenProps) {
   return (
-    <SafeAreaView className="flex-1 bg-surface">
+    <SafeAreaView style={styles.root}>
       {scroll ? (
         <ScrollView
-          className="flex-1"
-          contentContainerClassName="grow"
+          style={styles.scroll}
+          contentContainerStyle={padded ? styles.scrollContentPadded : styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           nestedScrollEnabled
+          scrollEnabled
         >
-          {scrollContent}
+          {children}
         </ScrollView>
       ) : (
-        fillContent
+        <View style={padded ? [styles.fill, styles.padded] : styles.fill}>
+          {children}
+        </View>
       )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: SURFACE,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    backgroundColor: SURFACE,
+  },
+  scrollContentPadded: {
+    flexGrow: 1,
+    backgroundColor: SURFACE,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  fill: {
+    flex: 1,
+    backgroundColor: SURFACE,
+  },
+  padded: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+});
