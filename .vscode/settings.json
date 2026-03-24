@@ -1,0 +1,17 @@
+{
+  // Use the TypeScript version installed in this workspace (not VS Code's bundled one)
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // NativeWind uses className on RN components — tell Tailwind IntelliSense
+  // to provide completions in TSX files the same way it does in HTML.
+  "tailwindCSS.includeLanguages": {
+    "typescriptreact": "html"
+  },
+
+  // Vitest — point the Explorer extension at the workspace config
+  "vitest.configPath": "${workspaceFolder}/vitest.config.ts",
+
+  // Playwright — point the Test extension at the E2E config
+  "playwright.reuseBrowser": false,
+  "playwright.env": {}
+}

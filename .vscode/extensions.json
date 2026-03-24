@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    // Expo
+    "expo.vscode-expo-tools",
+
+    // NativeWind / Tailwind — className completions + hover docs in TSX
+    "bradlc.vscode-tailwindcss",
+
+    // Vitest — run / debug unit tests from the Testing sidebar
+    "vitest.explorer",
+
+    // Playwright — run / debug E2E specs from the Testing sidebar
+    "ms-playwright.playwright",
+
+    // SQLite — inspect superhabits.db directly in VS Code
+    "qwtel.sqlite-viewer"
+  ]
+}

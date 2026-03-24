@@ -1,0 +1,53 @@
+{
+  "inputs": [
+    {
+      "id": "github_pat",
+      "type": "promptString",
+      "description": "GitHub Personal Access Token (needs repo, read:org scopes)",
+      "password": true
+    }
+  ],
+  "servers": {
+    // Playwright — browser automation for E2E work and live UI inspection.
+    // Targets the Expo web dev server on localhost:8081.
+    // Docs: https://github.com/microsoft/playwright-mcp
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--browser", "chromium"]
+    },
+
+    // GitHub — official GitHub MCP server (issues, PRs, code search, etc.).
+    // Requires Docker. Token is prompted once per VS Code session.
+    // Docs: https://github.com/github/github-mcp-server
+    "github": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_pat}"
+      }
+    },
+
+    // Fetch — fetch any URL and return its content (HTML → markdown, JSON, etc.).
+    // Docs: https://github.com/modelcontextprotocol/servers/tree/main/src/fetch
+    "fetch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    },
+
+    // Lighthouse — run Lighthouse audits (performance, a11y, PWA) via MCP.
+    // Useful for auditing the SuperHabits PWA on localhost:8081.
+    // Docs: https://github.com/nicepkg/lighthouse-mcp
+    "lighthouse": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "lighthouse-mcp"]
+    }
+  }
+}
