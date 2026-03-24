@@ -282,9 +282,7 @@ export function PomodoroScreen() {
               >
                 {sessions.length}
               </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
-                sessions this year
-              </Text>
+              <Text className="mt-0.5 text-xs text-slate-400">sessions this year</Text>
             </View>
           </Card>
         </View>
@@ -302,7 +300,7 @@ export function PomodoroScreen() {
               >
                 {focusStreak}
               </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>day streak</Text>
+              <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
             </View>
           </Card>
         </View>
@@ -406,17 +404,8 @@ export function PomodoroScreen() {
 
       <View className="mt-6">
         <Card accentColor={SECTION_COLORS.focus} className="mx-1 mb-0">
-          <View className="w-full min-w-0 items-center">
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#94a3b8",
-                marginBottom: 8,
-                alignSelf: "flex-start",
-              }}
-            >
-              Focus — last 52 weeks
-            </Text>
+          <View className="w-full min-w-0 items-center justify-center">
+            <Text className="mb-2 self-start text-xs text-slate-400">Focus — last 52 weeks</Text>
             <GitHubHeatmap
               days={pomodoroHeatmapDays}
               color={SECTION_COLORS.focus}

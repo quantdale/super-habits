@@ -7,7 +7,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
-import type { WorkoutLog, WorkoutRoutine } from "./types";
+import type { WorkoutRoutine } from "./types";
 import {
   addRoutine,
   completeRoutine,
@@ -24,7 +24,7 @@ import {
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
-import { RoutineDetailScreen } from "./RoutineDetailScreen";
+import { RoutineDetailModal } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
 import { SECTION_COLORS } from "@/constants/sectionColors";
@@ -34,10 +34,9 @@ import { validateRoutineName } from "@/lib/validation";
 
 const COLOR = SECTION_COLORS.workout;
 
-type ViewState =
-  | { type: "list" }
-  | { type: "detail"; routineId: string; routineName: string }
-  | { type: "session"; routine: RoutineWithExercises };
+type ViewState = { type: "list" } | { type: "session"; routine: RoutineWithExercises };
+
+type RoutineModalState = { routineId: string; routineName: string };
 
 function RoutineSwipeRow({
   routine,
@@ -49,42 +48,44 @@ function RoutineSwipeRow({
   routine: WorkoutRoutine;
   onOpenDetail: () => void;
   onCompleteWorkout: () => void;
-  onRequestDelete: () => void;
+  onRequestDelete: () => void | Promise<void>;
   accentColor: string;
 }) {
   const swipeableRef = useRef<Swipeable>(null);
 
   return (
-    <Swipeable
-      ref={swipeableRef}
-      renderRightActions={() => (
-        <SwipeRightActions
-          editColor={accentColor}
-          onEdit={() => {
-            swipeableRef.current?.close();
-            onOpenDetail();
-          }}
-          onDelete={() => {
-            swipeableRef.current?.close();
-            onRequestDelete();
-          }}
-        />
-      )}
-      rightThreshold={40}
-      overshootRight={false}
-    >
-      <Card accentColor={accentColor}>
-        <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
-          <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
-          {routine.description ? (
-            <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
-          ) : null}
-        </RectButton>
-        <View className="mt-3">
-          <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
-        </View>
-      </Card>
-    </Swipeable>
+    <View className="mb-3">
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={() => (
+          <SwipeRightActions
+            editColor={accentColor}
+            onEdit={() => {
+              swipeableRef.current?.close();
+              onOpenDetail();
+            }}
+            onDelete={() => {
+              swipeableRef.current?.close();
+              onRequestDelete();
+            }}
+          />
+        )}
+        rightThreshold={40}
+        overshootRight={false}
+      >
+        <Card accentColor={accentColor} className="mb-0 flex-1">
+          <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
+            <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
+            {routine.description ? (
+              <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
+            ) : null}
+          </RectButton>
+          <View className="mt-3">
+            <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
+          </View>
+        </Card>
+      </Swipeable>
+    </View>
   );
 }
 
@@ -92,10 +93,10 @@ export function WorkoutScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
-  const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
   const [workoutHeatmapDays, setWorkoutHeatmapDays] = useState<HeatmapDay[]>([]);
   const [currentView, setCurrentView] = useState<ViewState>({ type: "list" });
+  const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -107,7 +108,6 @@ export function WorkoutScreen() {
     const startKey = toDateKey(start364);
     const endKey = toDateKey(new Date());
     const allLogs = await listWorkoutLogsForRange(startKey, endKey);
-    setLogs(allLogs.slice(0, 30));
     setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 364));
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
   }, []);
@@ -131,42 +131,9 @@ export function WorkoutScreen() {
     refresh();
   };
 
-  const handleDeleteRoutine = useCallback(
-    (routineId: string, routineName: string) => {
-      Alert.alert("Delete routine", `Remove "${routineName}"?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              await deleteRoutine(routineId);
-              refresh();
-            })();
-          },
-        },
-      ]);
-    },
-    [refresh],
-  );
-
-  if (currentView.type === "detail") {
-    return (
-      <RoutineDetailScreen
-        routineId={currentView.routineId}
-        routineName={currentView.routineName}
-        onBack={() => setCurrentView({ type: "list" })}
-        onStartWorkout={async () => {
-          const full = await getRoutineWithExercises(currentView.routineId);
-          if (!full || full.exercises.length === 0) {
-            Alert.alert("No exercises", "Add exercises to this routine before starting.");
-            return;
-          }
-          setCurrentView({ type: "session", routine: full });
-        }}
-      />
-    );
-  }
+  const openRoutineModal = useCallback((routineId: string, routineName: string) => {
+    setRoutineModal({ routineId, routineName });
+  }, []);
 
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
@@ -180,160 +147,152 @@ export function WorkoutScreen() {
           setCurrentView({ type: "list" });
           refresh();
         }}
-        onCancel={() =>
-          setCurrentView({
-            type: "detail",
+        onCancel={() => {
+          setCurrentView({ type: "list" });
+          setRoutineModal({
             routineId: currentView.routine.id,
             routineName: currentView.routine.name,
-          })
-        }
+          });
+        }}
       />
     );
   }
 
   return (
-    <Screen scroll>
-      <SectionTitle
-        title="Workout"
-        subtitle={
-          workoutStripHasActivity ? "Create simple routines and mark completions." : undefined
-        }
-      />
-      <View className="mb-4 flex-row gap-3">
-        <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.workout} className="mb-0">
-            <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>💪</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_COLORS.workout,
-                  marginTop: 2,
-                }}
-              >
-                {workoutDaysCount}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>workout days</Text>
-            </View>
-          </Card>
-        </View>
-        <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.workout} className="mb-0">
-            <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>📅</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_COLORS.workout,
-                  marginTop: 2,
-                }}
-              >
-                {workoutStreak}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>day streak</Text>
-            </View>
-          </Card>
-        </View>
-      </View>
-
-      {!workoutStripHasActivity ? (
-        <View className="mb-3 items-center rounded-xl border border-slate-100 bg-white p-4">
-          <Text className="text-center text-sm text-slate-500">
-            Complete a workout to start tracking
-          </Text>
-          <Text className="mt-1 text-center text-xs text-slate-400">
-            Create simple routines and mark completions.
-          </Text>
-        </View>
-      ) : null}
-      <Card accentColor={COLOR}>
-        <TextField
-          label="Routine name"
-          value={name}
-          onChangeText={(t) => {
-            setWorkoutError(null);
-            setName(t);
-          }}
-          placeholder="Push Day"
-        />
-        <TextField
-          label="Description"
-          value={description}
-          onChangeText={(t) => {
-            setWorkoutError(null);
-            setDescription(t);
-          }}
-          placeholder="Bench + accessories"
-        />
-        <ValidationError message={workoutError} />
-        <Button label="Add routine" onPress={onCreate} color={COLOR} />
-      </Card>
-
-      {routines.map((routine) => (
-        <RoutineSwipeRow
-          key={routine.id}
-          routine={routine}
-          accentColor={COLOR}
-          onOpenDetail={() =>
-            setCurrentView({
-              type: "detail",
-              routineId: routine.id,
-              routineName: routine.name,
-            })
+    <>
+      <RoutineDetailModal
+        visible={routineModal !== null}
+        routineId={routineModal?.routineId ?? ""}
+        routineName={routineModal?.routineName ?? ""}
+        onClose={() => setRoutineModal(null)}
+        onStartWorkout={async () => {
+          if (!routineModal) return;
+          const full = await getRoutineWithExercises(routineModal.routineId);
+          if (!full || full.exercises.length === 0) {
+            Alert.alert("No exercises", "Add exercises to this routine before starting.");
+            return;
           }
-          onCompleteWorkout={() => {
-            void (async () => {
-              await completeRoutine(routine.id);
-              refresh();
-            })();
-          }}
-          onRequestDelete={() => handleDeleteRoutine(routine.id, routine.name)}
+          setRoutineModal(null);
+          setCurrentView({ type: "session", routine: full });
+        }}
+      />
+      <Screen scroll>
+        <SectionTitle
+          title="Workout"
+          subtitle={
+            workoutStripHasActivity ? "Create simple routines and mark completions." : undefined
+          }
         />
-      ))}
-
-      <Card accentColor={SECTION_COLORS.workout} className="mt-4">
-        <Text className="mb-3 text-sm font-semibold text-slate-700">Workout history</Text>
-
-        {logs.length === 0 ? (
-          <View className="items-center py-4">
-            <Text className="text-center text-sm text-slate-400">
-              Complete a workout to start tracking
-            </Text>
-          </View>
-        ) : (
-          <View className="mb-4 gap-2">
-            {logs.map((log) => (
-              <View key={log.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                <Text className="text-sm text-slate-700">{new Date(log.completed_at).toLocaleString()}</Text>
+        <View className="mb-4 flex-row gap-3">
+          <View className="flex-1">
+            <Card accentColor={SECTION_COLORS.workout} className="mb-0">
+              <View className="items-center py-1">
+                <Text style={{ fontSize: 22 }}>💪</Text>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: "700",
+                    color: SECTION_COLORS.workout,
+                    marginTop: 2,
+                  }}
+                >
+                  {workoutDaysCount}
+                </Text>
+                <Text className="mt-0.5 text-xs text-slate-400">workout days</Text>
               </View>
-            ))}
+            </Card>
           </View>
-        )}
+          <View className="flex-1">
+            <Card accentColor={SECTION_COLORS.workout} className="mb-0">
+              <View className="items-center py-1">
+                <Text style={{ fontSize: 22 }}>📅</Text>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: "700",
+                    color: SECTION_COLORS.workout,
+                    marginTop: 2,
+                  }}
+                >
+                  {workoutStreak}
+                </Text>
+                <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
+              </View>
+            </Card>
+          </View>
+        </View>
 
-        <View className="mt-2">
-          <Card accentColor={SECTION_COLORS.workout} className="mb-0">
-            <View className="w-full min-w-0 items-center">
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#94a3b8",
-                  marginBottom: 8,
-                  alignSelf: "flex-start",
-                }}
-              >
-                Session intensity — last 52 weeks
+        {!workoutStripHasActivity ? (
+          <Card accentColor={SECTION_COLORS.workout} className="mb-3">
+            <View className="items-center">
+              <Text className="text-center text-sm text-slate-500">
+                Complete a workout to start tracking
               </Text>
-              <GitHubHeatmap
-                days={workoutHeatmapDays}
-                color={SECTION_COLORS.workout}
-                weeks={52}
-              />
+              <Text className="mt-1 text-center text-xs text-slate-400">
+                Create simple routines and mark completions.
+              </Text>
             </View>
           </Card>
-        </View>
-      </Card>
-    </Screen>
+        ) : null}
+        <Card accentColor={COLOR}>
+          <TextField
+            label="Routine name"
+            value={name}
+            onChangeText={(t) => {
+              setWorkoutError(null);
+              setName(t);
+            }}
+            placeholder="Push Day"
+          />
+          <TextField
+            label="Description"
+            value={description}
+            onChangeText={(t) => {
+              setWorkoutError(null);
+              setDescription(t);
+            }}
+            placeholder="Bench + accessories"
+          />
+          <ValidationError message={workoutError} />
+          <Button label="Add routine" onPress={onCreate} color={COLOR} />
+        </Card>
+
+        {routines.map((routine) => (
+          <RoutineSwipeRow
+            key={routine.id}
+            routine={routine}
+            accentColor={COLOR}
+            onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
+            onCompleteWorkout={() => {
+              void (async () => {
+                await completeRoutine(routine.id);
+                refresh();
+              })();
+            }}
+            onRequestDelete={async () => {
+              await deleteRoutine(routine.id);
+              if (routineModal?.routineId === routine.id) {
+                setRoutineModal(null);
+              }
+              await refresh();
+            }}
+          />
+        ))}
+
+        <Card accentColor={SECTION_COLORS.workout} className="mt-4">
+          <Text className="mb-3 text-sm font-semibold text-slate-700">Workout history</Text>
+          <View className="w-full min-w-0 items-center justify-center">
+            <Text className="mb-2 self-start text-xs text-slate-400">
+              Session intensity — last 52 weeks
+            </Text>
+            <GitHubHeatmap
+              days={workoutHeatmapDays}
+              color={SECTION_COLORS.workout}
+              weeks={52}
+            />
+          </View>
+        </Card>
+      </Screen>
+    </>
   );
 }

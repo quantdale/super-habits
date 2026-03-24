@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 import { RectButton, Swipeable } from "react-native-gesture-handler";
+import colors from "tailwindcss/colors";
 import { Card } from "@/core/ui/Card";
 import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
 import { SECTION_COLORS } from "@/constants/sectionColors";
@@ -23,7 +24,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
   const swipeableRef = useRef<Swipeable>(null);
 
   return (
-    <View style={{ opacity: isActive ? 0.85 : 1 }}>
+    <View className="mb-3" style={{ opacity: isActive ? 0.85 : 1 }}>
       <Swipeable
         ref={swipeableRef}
         renderRightActions={() => (
@@ -42,7 +43,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
         rightThreshold={40}
         overshootRight={false}
       >
-        <Card accentColor={SECTION_COLORS.todos}>
+        <Card accentColor={SECTION_COLORS.todos} className="mb-0 flex-1">
           <View className="flex-row items-start gap-2">
             <Pressable
               onLongPress={onLongPress}
@@ -51,7 +52,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
               className="pt-0.5"
               accessibilityLabel="Drag to reorder"
             >
-              <MaterialIcons name="drag-indicator" size={22} color="#94a3b8" />
+              <MaterialIcons name="drag-indicator" size={22} color={colors.slate[400]} />
             </Pressable>
             <RectButton
               onPress={onToggle}
@@ -61,13 +62,10 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
               <MaterialIcons
                 name={done ? "check-box" : "check-box-outline-blank"}
                 size={24}
-                color={done ? "#64748b" : "#0f172a"}
+                color={done ? colors.slate[500] : colors.slate[900]}
               />
             </RectButton>
-            <RectButton
-              onPress={onToggle}
-              style={{ flex: 1, minWidth: 0, backgroundColor: "transparent" }}
-            >
+            <View style={{ flex: 1, minWidth: 0 }}>
               <View className="flex-row flex-wrap items-center gap-1">
                 <Text className={`text-base ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>
                   {todo.title}
@@ -83,7 +81,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
                 {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} /> : null}
                 {todo.due_date ? <DueDateBadge dueDate={todo.due_date} /> : null}
               </View>
-            </RectButton>
+            </View>
           </View>
         </Card>
       </Swipeable>

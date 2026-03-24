@@ -6,11 +6,11 @@ export default defineConfig({
   // Tests within the same file run serially by default (fullyParallel: false).
   fullyParallel: false,
 
-  // Playwright workers operate in isolated browser contexts/profiles, meaning
-  // OPFS directories are separate per worker. Worker-level parallelization does
-  // not cause SQLite lock collisions. Keep fullyParallel false so tests within a
-  // file stay serial (clearDatabase() in beforeEach must not race).
-  workers: process.env.CI ? 2 : 4,
+  // OPFS + expo-sqlite hold one lock per origin; parallel workers against
+  // localhost:8081 cause flaky navigation/reload (see config comments).
+  // Keep fullyParallel false so tests within a file stay serial (clearDatabase()
+  // in beforeEach must not race).
+  workers: process.env.CI ? 2 : 1,
 
   // Retry on CI only — locally you want to see failures immediately
   retries: process.env.CI ? 2 : 0,
@@ -73,7 +73,7 @@ export default defineConfig({
   globalTeardown: "./e2e/global.teardown.ts",
 
   webServer: {
-    command: "npm run build:web && node scripts/serve-e2e.js",
+    command: "node scripts/serve-e2e.js",
     url: "http://localhost:8081",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

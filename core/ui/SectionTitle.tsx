@@ -1,4 +1,4 @@
-import { Text } from "react-native";
+import { Text, View } from "react-native";
 
 type SectionTitleProps = {
   title: string;
@@ -7,9 +7,9 @@ type SectionTitleProps = {
 
 export function SectionTitle({ title, subtitle }: SectionTitleProps) {
   return (
-    <>
+    <View>
       <Text className="text-2xl font-bold text-slate-900">{title}</Text>
       {subtitle ? <Text className="mb-4 mt-1 text-sm text-slate-600">{subtitle}</Text> : null}
-    </>
+    </View>
   );
 }

@@ -22,7 +22,7 @@ export function SavedMealChips({ meals, onSelect }: Props) {
               className="px-3 py-1.5 rounded-full border border-slate-200 bg-white flex-row items-center gap-1"
             >
               <Text className="text-sm text-slate-700">{meal.food_name}</Text>
-              <Text className="text-xs text-slate-400">{meal.calories} kcal</Text>
+              <Text className="text-xs text-slate-400">{meal.calories} cal</Text>
             </Pressable>
           ))}
         </View>

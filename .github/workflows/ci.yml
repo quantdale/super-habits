@@ -72,7 +72,10 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      # Playwright starts `build:web` + scripts/serve-e2e.js via webServer in playwright.config.ts
+      # Web export must exist before serve-e2e (Playwright webServer only runs the static server).
+      - name: Build web export for E2E
+        run: npm run build:web
+
       - name: Run E2E tests
         run: npm run e2e
 

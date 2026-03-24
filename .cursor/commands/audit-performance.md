@@ -1,8 +1,7 @@
 # audit-performance
 
 Run a full performance and PWA audit of the SuperHabits web app
-using Lighthouse and Fetch MCPs. Requires npm run web running
-on localhost:8081.
+using Lighthouse and Fetch MCPs. Requires the app on `http://localhost:8081` — e.g. `npm run web` (Metro) or `npm run build:web` then `node scripts/serve-e2e.js` (static; matches E2E).
 
 ---
 

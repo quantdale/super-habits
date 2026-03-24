@@ -44,7 +44,7 @@ function isInsideDist(candidate) {
 
 function coopCoepHeaders(extra = {}) {
   return {
-    "Cross-Origin-Embedder-Policy": "credentialless",
+    "Cross-Origin-Embedder-Policy": "require-corp",
     "Cross-Origin-Opener-Policy": "same-origin",
     ...extra,
   };

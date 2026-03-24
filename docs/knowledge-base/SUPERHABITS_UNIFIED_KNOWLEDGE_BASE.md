@@ -66,7 +66,7 @@
 | Schema version (stored) | **9** (`app_meta.db_schema_version`) |
 | Next migration | `10` (new `if (version < 10)` block in `runMigrations`) |
 | Unit tests | **141** passing (Vitest) |
-| E2E tests | **~59** Playwright tests (Chromium), `workers: 1` |
+| E2E tests | **~59** Playwright tests (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
@@ -356,7 +356,7 @@ No other features call `toDateKey()` directly.
 | `babel-preset-expo` | ^55.0.10 | Babel |
 | `cross-env` | ^10.1.0 | `EXPO_UNSTABLE_HEADLESS` for web script |
 | `patch-package` | ^8.0.1 | Post-install patches |
-| `wait-on` | ^9.0.4 | CI wait for Metro |
+| `wait-on` | ^9.0.4 | Optional dev tooling (not used by current CI E2E job) |
 
 ### MCP servers (developer environment, not npm)
 
@@ -1771,11 +1771,13 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 
 **Config file:** `playwright.config.ts`
 
+**Static bundle:** Playwright does **not** run `expo export`. Run `npm run build:web` before E2E when source changes. `webServer.command` is `node scripts/serve-e2e.js`, which serves `dist/` on port **8081** with `Cross-Origin-Embedder-Policy: require-corp` (and COOP) so `crossOriginIsolated` / OPFS SQLite work. Metro is **not** used for E2E.
+
 | Setting | Value |
 |---------|-------|
 | `testDir` | `"./e2e"` |
 | `fullyParallel` | `false` |
-| `workers` | `1` (**WARNING: Do not run multiple DB-heavy specs in parallel** — shared OPFS SQLite lock) |
+| `workers` | `1` locally (**do not** raise — shared OPFS SQLite lock). CI may use `workers: 2` in config. |
 | `retries` | `process.env.CI ? 2 : 0` |
 | `timeout` | `60_000` |
 | `expect.timeout` | `5_000` |
@@ -1791,6 +1793,7 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 | `projects` | Chromium Desktop Chrome |
 | `globalSetup` | `"./e2e/global.setup.ts"` |
 | `globalTeardown` | `"./e2e/global.teardown.ts"` |
+| `webServer` | `command: "node scripts/serve-e2e.js"`, `url: http://localhost:8081`, `reuseExistingServer: !CI` |
 
 #### `e2e/global.setup.ts`
 
@@ -1911,7 +1914,7 @@ Tests:
 | B | Logic / data bug | `features/*.domain.ts` or `*.data.ts` | Yes |
 | C | Infrastructure failure | `metro.config.js`, `app.json`, `public/sw.js`, `AppProviders.tsx` | Yes |
 | D | Test flakiness | Timeouts / waits in specs | No (auto-fix) |
-| E | Environment issue | Metro not running | N/A |
+| E | Environment issue | `dist/` missing / `serve-e2e` not running | N/A |
 
 **Critical rule:** NEVER fix a test assertion to force a pass. If a test failure reveals a genuine app bug, fix the app — not the assertion. Changing `expect(x).toBe(147)` to `expect(x).toBe(0)` to force a pass is strictly forbidden.
 
@@ -1920,7 +1923,7 @@ Tests:
 - `clearDatabase()` in `beforeEach` for all feature specs
 - `global.setup` aborts suite if `crossOriginIsolated` is false
 - Do not add `data-testid` to app components
-- E2E requires running dev server — not a substitute for unit tests
+- E2E requires the static server (`build:web` + `serve-e2e`) — not a substitute for unit tests
 - Do not run two DB-heavy spec files in parallel (shared OPFS)
 
 ---
@@ -1930,7 +1933,7 @@ Tests:
 | Job | Steps |
 |-----|-------|
 | `quality` | `actions/checkout@v4` → `actions/setup-node@v4` (Node 20, cache npm) → `npm ci` → `npm run typecheck` → `npm test` |
-| `e2e` | needs `quality`; `npm run web &` → `wait-on http://127.0.0.1:8081` → `npm run e2e`; uploads HTML report artifact |
+| `e2e` | needs `quality`; `npm run build:web` → `npm run e2e` (Playwright starts `node scripts/serve-e2e.js`); uploads HTML report artifact |
 
 **CI Node:** 20. **Devcontainer Node:** 22 (intentional mismatch).
 
@@ -1964,7 +1967,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Phases:** (1) Fetch headers COEP/COOP, (2) Lighthouse mobile, (3) desktop, (4) PWA, (5) accessibility, (6) best practices + SEO. Screenshots/reports under `.cursor/playwright-output/`.
 
-**Requires:** `npm run web` on `http://localhost:8081`.
+**Requires:** App on `http://localhost:8081` — Metro (`npm run web`) or static (`npm run build:web` then `node scripts/serve-e2e.js`).
 
 ---
 
@@ -1999,7 +2002,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Phases:** (1) Run E2E, (2) MCP report inspection, (3) Categorize A–E, (4) Fix plan + approval for app changes, (5+) Implement per plan.
 
-**Requires:** Metro on `8081`, Playwright MCP.
+**Requires:** `npm run build:web` when needed; `serve-e2e` on `8081` (via Playwright `webServer` or manual); Playwright MCP.
 
 **Critical rule:** NEVER fix a test assertion to force a pass. If a test failure reveals a genuine app bug, fix the app. Key signal: if removing or weakening the assertion would make the test pass, it is Type B — fix the app, not the test.
 
@@ -2050,7 +2053,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 - Phase 5: If CI failed → fetch logs → triage → fix locally → verify → commit + push
 - Phase 6: Confirm all green on latest run; final status bullets
 
-**Requires:** `npm run web`, Playwright MCP, GitHub MCP for CI phases.
+**Requires:** App on `8081` (Metro or static build + `serve-e2e`); Playwright MCP; GitHub MCP for CI phases.
 
 **Constraint:** E2E is NOT part of Phase 1 quality gate in pre-pr — it's handled via Playwright MCP separately.
 
@@ -2058,7 +2061,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `test.md`
 
-**Purpose:** `npm test` then `npm run e2e`; combined report. **Requires:** Metro for E2E phase.
+**Purpose:** `npm test` then `npm run e2e`; combined report. **Requires:** `npm run build:web` before E2E when app code changed; static `dist/` served by `serve-e2e`.
 
 ---
 
@@ -2145,7 +2148,7 @@ Tag phase completions: `git tag phaseN-complete`
 | Date keys via `toDateKey()` | Consistent local calendar | Manual `toISOString().slice(0, 10)` for new rows |
 | Migrations append-only | Deterministic upgrades | Editing `if (version < 5)` block |
 | `habit_completions` uniqueness | One row per habit/day | Duplicate INSERT without SELECT |
-| OPFS E2E single worker | SQLite lock | `workers: 2` in Playwright |
+| OPFS E2E single worker | SQLite lock | Raising `workers` above `1` locally |
 | Hard rejection validation | Data integrity | Silent clamping instead of error message |
 | Tests never weakened | Code quality | Changing assertion to force pass |
 
@@ -2189,7 +2192,7 @@ Tag phase completions: `git tag phaseN-complete`
 | Item | Detail | Suggested follow-up |
 |------|--------|---------------------|
 | `.cursor/skills/db-and-sync-invariants/SKILL.md` | States schema version **7** | Update to **9** + next **10** |
-| `.cursor/commands/test.md`, `check.md` | Vitest "7 tests" baseline | Update to **141** |
+| `.cursor/commands/test.md`, `check.md` | Vitest baseline | **141** (keep in sync when tests change) |
 | `.cursor/commands/audit.md` | Lists resolved/stale bugs | Refresh checklist |
 | `tests/calories.data.STUB.test.ts` | No SQLite unit tests | Add mocked DB layer tests |
 | `computeWorkoutStreakFromHeatmapDays` | No unit `it()` | Add test in `workout.domain.test.ts` |
@@ -2215,7 +2218,7 @@ Tag phase completions: `git tag phaseN-complete`
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v2, OPFS SQLite |
 | Unit tests | **141** passing (Vitest) |
-| E2E | **~59** Playwright tests (Chromium), `workers: 1` |
+| E2E | **~59** Playwright tests (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **9** |
 | Cloud sync | Stub: `NoopSyncAdapter`, `isRemoteEnabled()` false by default |
 | Validation | Hard rejection in all 5 screens via `lib/validation.ts` |
@@ -2321,7 +2324,7 @@ When the codebase changes, update:
 ### Documentation drift warnings
 
 - `.cursor/skills/db-and-sync-invariants/SKILL.md` states schema version **7** — actual is **9**
-- `.cursor/commands/test.md` and `check.md` state **7 tests** — actual is **141**
+- Cursor commands `test.md` / `check.md` baseline: **141** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
 - `HabitHeatmap.tsx` — exists but unused in `HabitsScreen`
 - `audit.md` Known bugs list — partially obsolete; verify against runtime before acting

@@ -1,20 +1,61 @@
-import { Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
 function inputAfterLabel(page: Page, label: string) {
   return page
     .getByText(label, { exact: true })
-    .locator("xpath=ancestor::div[contains(@class,'mb-3')][1]//input")
+    .locator("xpath=ancestor::*[contains(@class,'mb-3')][1]//input")
     .first();
 }
 
-/** Macro labels also exist on `CalorieGoalSheet` (Modal); scope to the entry card that contains the food field. */
-function inputAfterLabelInCalorieEntryForm(page: Page, label: string) {
-  const foodInput = page.getByPlaceholder("Greek yogurt");
-  const entryCard = foodInput.locator("xpath=ancestor::div[contains(@class,'rounded-2xl')][1]");
-  return entryCard
-    .getByText(label, { exact: true })
-    .locator("xpath=ancestor::div[contains(@class,'mb-3')][1]//input")
-    .first();
+/**
+ * Fill a calorie-entry TextField by its nativeID (becomes id= on web).
+ * After the hydration fix in goToTab the inputs are React-controlled, so
+ * force:true fills now fire onChange correctly. Using #id (direct CSS selector)
+ * rather than getByLabel saves ~250ms per fill — critical for the 20-entry
+ * boundary test (100 fill operations, 120 s budget).
+ */
+async function fillById(page: Page, id: string, value: string) {
+  await page.locator(`#${id}`).fill(value, { force: true });
+}
+
+export async function fillCalorieMacrosOnly(
+  page: Page,
+  protein: string,
+  carbs: string,
+  fats: string,
+  fiber: string,
+) {
+  await fillById(page, "cal-entry-protein", protein);
+  await fillById(page, "cal-entry-carbs", carbs);
+  await fillById(page, "cal-entry-fat", fats);
+  await fillById(page, "cal-entry-fiber", fiber);
+}
+
+/**
+ * Clicks the calories "Add entry" primary button.
+ * Uses the same pattern as habits tests: getByText on the inner Text div,
+ * then .locator("..") to reach the Pressable that has the onPress handler.
+ */
+export async function clickCaloriesAddEntry(page: Page) {
+  await page
+    .getByText("Add entry", { exact: true })
+    .locator("..")
+    .click({ force: true, timeout: 30_000 });
+}
+
+export async function fillCaloriesMacros(
+  page: Page,
+  food: string,
+  protein: string,
+  carbs: string,
+  fats: string,
+  fiber: string,
+) {
+  await fillById(page, "cal-entry-protein", protein);
+  await fillById(page, "cal-entry-carbs", carbs);
+  await fillById(page, "cal-entry-fat", fats);
+  await fillById(page, "cal-entry-fiber", fiber);
+  await fillById(page, "cal-entry-food", food);
 }
 
 /**
@@ -26,22 +67,4 @@ export async function fillRoutineName(page: Page, name: string) {
   await input.click();
   await input.fill("");
   await input.type(name, { delay: 15 });
-}
-
-export async function fillCaloriesMacros(
-  page: Page,
-  food: string,
-  protein: string,
-  carbs: string,
-  fats: string,
-  fiber: string,
-) {
-  const foodInput = page.getByPlaceholder("Greek yogurt");
-  await foodInput.click();
-  await foodInput.fill("");
-  await foodInput.fill(food);
-  await inputAfterLabelInCalorieEntryForm(page, "Protein (g)").fill(protein);
-  await inputAfterLabelInCalorieEntryForm(page, "Carbs (g)").fill(carbs);
-  await inputAfterLabelInCalorieEntryForm(page, "Fats (g)").fill(fats);
-  await inputAfterLabelInCalorieEntryForm(page, "Fiber (g)").fill(fiber);
 }

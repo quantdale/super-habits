@@ -9,7 +9,8 @@ check Actions CI on the open PR for the current branch, fix failures if
 needed, and confirm a green run before merge.
 
 Requires:
-- `npm run web` running on localhost:8081 (one tab only)
+- App reachable at `http://localhost:8081` — for parity with CI/E2E, run `npm run build:web` then `node scripts/serve-e2e.js` (static `dist/`, `require-corp` COEP). For quick UI iteration, `npm run web` (Metro) on 8081 is fine for manual inspection but does not match the static E2E bundle.
+- One tab / one origin for DB-heavy flows (OPFS lock)
 - Playwright MCP must be connected in Cursor Settings → MCP
 - **GitHub MCP** — for Phases 4–6 (CI status, logs, PR review comments in deep mode)
 - **inspect-web is no longer a separate command** — its full functionality is available via **“run pre-pr in deep mode”** (see Phase 2, §2e).
@@ -25,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-   Expected: 7 tests passing, 0 failing
+   Expected: **141** tests passing, 0 failing
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -158,7 +159,7 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 7 passing | ? | PASS/FAIL |
+| Tests | 141 passing | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
@@ -260,8 +261,7 @@ Report final status using one of:
 
 ## Reminders
 
-- Only one localhost:8081 tab open at a time — OPFS lock will cause
-  DB init failure if multiple tabs are open
+- Only one tab using the app on `localhost:8081` at a time for DB flows — OPFS lock will cause DB init failure if multiple tabs are open
 - Playwright runs headless by default — no browser window will
   appear. The check runs fully in the background. You do not need
   to keep any window visible or in focus. (Use **headed mode** only when explicitly requested — see §2e.)

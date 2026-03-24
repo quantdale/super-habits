@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   kcalFromMacros,
   caloriesTotal,
-  buildWeeklyTrend,
+  buildDailyTrend,
   buildMacroDonutData,
   calculateGoalProgress,
   filterSavedMeals,
@@ -48,13 +48,13 @@ describe("kcalFromMacros", () => {
   });
 });
 
-describe("buildWeeklyTrend", () => {
-  it("returns 7 entries", () => {
-    expect(buildWeeklyTrend([], 7)).toHaveLength(7);
+describe("buildDailyTrend", () => {
+  it("returns 365 entries by default", () => {
+    expect(buildDailyTrend([])).toHaveLength(365);
   });
 
   it("fills missing days with 0", () => {
-    const trend = buildWeeklyTrend([], 7);
+    const trend = buildDailyTrend([], 7);
     trend.forEach((d) => expect(d.value).toBe(0));
   });
 
@@ -74,7 +74,7 @@ describe("buildWeeklyTrend", () => {
         totalFiber: 0,
       },
     ];
-    const trend = buildWeeklyTrend(summaries, 7);
+    const trend = buildDailyTrend(summaries, 7);
     const todayEntry = trend.find((t) => t.dateKey === todayKey);
     expect(todayEntry?.value).toBe(1800);
   });

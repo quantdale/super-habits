@@ -10,9 +10,16 @@ type CardProps = {
 const BORDER = "#e8e8f0";
 
 export function Card({ children, accentColor, className }: CardProps) {
+  const extra = className?.trim() ?? "";
+  const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
+  const marginClass = hasConsumerVerticalMargin ? "" : "mb-3";
+  const rootClass = ["overflow-hidden", "rounded-2xl", "bg-white", marginClass, extra]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <View
-      className={`mb-3 overflow-hidden rounded-2xl bg-white ${className ?? ""}`}
+      className={rootClass}
       style={{
         borderTopWidth: 1,
         borderRightWidth: 1,

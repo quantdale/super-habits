@@ -19,6 +19,10 @@ export type HorizontalScrollAreaHandle = {
 type Props = PropsWithChildren<{
   /** Extra nodes rendered after the horizontal strip (e.g. legend) without participating in horizontal scroll. */
   footer?: ReactNode;
+  /** Web only: merged onto the inner wrapper around `children` (e.g. center heatmaps in the viewport). */
+  webInnerStyle?: ViewStyle;
+  /** Native horizontal ScrollView: merged with default `contentContainerStyle`. */
+  contentContainerStyle?: ViewStyle;
 }>;
 
 /** Web-only: extra styles; overflow uses Tailwind so horizontal scroll works in nested layouts. */
@@ -33,7 +37,7 @@ const WEB_INNER: ViewStyle = {
 };
 
 export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props>(
-  function HorizontalScrollArea({ children, footer }, ref) {
+  function HorizontalScrollArea({ children, footer, webInnerStyle, contentContainerStyle }, ref) {
     const nativeRef = useRef<ScrollView>(null);
     const webScrollId = `hscroll-${useId().replace(/:/g, "")}`;
 
@@ -61,7 +65,7 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
           className="w-full min-h-0 min-w-0 max-w-full shrink overflow-x-auto overflow-y-hidden"
           style={WEB_OUTER_EXTRA}
         >
-          <View style={WEB_INNER}>{children}</View>
+          <View style={[WEB_INNER, webInnerStyle]}>{children}</View>
         </View>
       ) : (
         <ScrollView
@@ -70,7 +74,7 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
           nestedScrollEnabled
           showsHorizontalScrollIndicator={false}
           style={HORIZONTAL_SCROLL_VIEWPORT_STYLE}
-          contentContainerStyle={HORIZONTAL_SCROLL_CONTENT}
+          contentContainerStyle={[HORIZONTAL_SCROLL_CONTENT, contentContainerStyle]}
         >
           {children}
         </ScrollView>

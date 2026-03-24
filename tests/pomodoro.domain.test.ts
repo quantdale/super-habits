@@ -4,6 +4,7 @@ import {
   calculateGrowthProgress,
   getPlantStage,
   formatSessionTime,
+  formatSessionDuration,
   getModeDuration,
   getNextMode,
   getModeLabel,
@@ -83,6 +84,18 @@ describe("getPlantStage", () => {
   it("seedling at 0.5", () => expect(getPlantStage(0.5)).toBe("seedling"));
   it("growing at 0.8", () => expect(getPlantStage(0.8)).toBe("growing"));
   it("grown at 1", () => expect(getPlantStage(1)).toBe("grown"));
+});
+
+describe("formatSessionDuration", () => {
+  it("returns minutes with m suffix when seconds >= 60", () => {
+    expect(formatSessionDuration(60)).toBe("1m");
+    expect(formatSessionDuration(1500)).toBe("25m");
+  });
+  it("returns seconds with s suffix when seconds < 60", () => {
+    expect(formatSessionDuration(0)).toBe("0s");
+    expect(formatSessionDuration(45)).toBe("45s");
+    expect(formatSessionDuration(59)).toBe("59s");
+  });
 });
 
 describe("formatSessionTime", () => {

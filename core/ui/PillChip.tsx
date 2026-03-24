@@ -13,26 +13,21 @@ export function PillChip({ label, active, color, onPress, icon }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        backgroundColor: active ? color : "#f1f0f9",
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        marginRight: 8,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        borderWidth: 1,
-        borderColor: active ? color : "#e0ddf0",
-      }}
+      className={`mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[7px] ${
+        active ? "border" : "border border-slate-200 bg-slate-100"
+      }`}
+      style={
+        active
+          ? {
+              backgroundColor: color,
+              borderColor: color,
+            }
+          : undefined
+      }
     >
-      {icon ? <Text style={{ fontSize: 13 }}>{icon}</Text> : null}
+      {icon ? <Text className="text-[13px]">{icon}</Text> : null}
       <Text
-        style={{
-          fontSize: 13,
-          fontWeight: active ? "600" : "400",
-          color: active ? "#ffffff" : "#64748b",
-        }}
+        className={`text-[13px] ${active ? "font-semibold text-white" : "font-normal text-slate-500"}`}
       >
         {label}
       </Text>

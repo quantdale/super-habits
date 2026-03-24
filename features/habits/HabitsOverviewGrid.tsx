@@ -14,9 +14,9 @@ export function HabitsOverviewGrid({
   heatmapDays,
 }: Props) {
   return (
-    <View>
-      <Card accentColor={SECTION_COLORS.habits}>
-        <View className="w-full min-w-0 items-center">
+    <View className="w-full items-center">
+      <Card accentColor={SECTION_COLORS.habits} className="w-full max-w-full">
+        <View className="w-full min-w-0 items-center justify-center">
           <View className="mb-4 w-full flex-row items-center gap-2">
             <Text
               style={{

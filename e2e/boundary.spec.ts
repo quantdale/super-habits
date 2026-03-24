@@ -1,7 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { goToTab, hardReload } from "./helpers/navigation";
+import { goToTab, hardReload, openNewTodoModal, submitTodoModal } from "./helpers/navigation";
 import { clearDatabase } from "./helpers/db";
-import { fillCaloriesMacros, fillRoutineName } from "./helpers/forms";
+import {
+  clickCaloriesAddEntry,
+  fillCalorieMacrosOnly,
+  fillCaloriesMacros,
+  fillRoutineName,
+} from "./helpers/forms";
 import { clickTodoCheckboxForTitle } from "./helpers/gestures";
 
 test.beforeEach(async ({ page }) => {
@@ -19,27 +24,27 @@ test.beforeEach(async ({ page }) => {
 test.describe("Todos — boundary inputs", () => {
   test("empty title is rejected — task is not created", async ({ page }) => {
     await goToTab(page, "todos");
-    await page.getByText("Make a Task").click();
-    await page.getByText("Add task", { exact: true }).click();
+    await openNewTodoModal(page);
+    await submitTodoModal(page);
     await expect(page.getByText("No Pending Tasks")).toBeVisible();
   });
 
   test("very long title (200 chars) saves and displays without layout break", async ({ page }) => {
     await goToTab(page, "todos");
     const longTitle = "A".repeat(200);
-    await page.getByText("Make a Task").click();
+    await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill(longTitle);
-    await page.getByText("Add task", { exact: true }).click();
+    await submitTodoModal(page);
     await expect(page.getByText("A".repeat(20))).toBeVisible();
   });
 
   test("recurring daily todo completed 5 times creates valid chain", async ({ page }) => {
     test.setTimeout(120_000);
     await goToTab(page, "todos");
-    await page.getByText("Make a Task").click();
+    await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill("Daily chain test");
     await page.getByText("Repeat daily").click();
-    await page.getByText("Add task", { exact: true }).click();
+    await submitTodoModal(page);
     await expect(page.getByText("Daily chain test", { exact: true }).first()).toBeVisible({
       timeout: 15_000,
     });
@@ -61,7 +66,7 @@ test.describe("Todos — boundary inputs", () => {
     test.setTimeout(120_000);
     await goToTab(page, "todos");
     for (let i = 1; i <= 30; i++) {
-      const openCreate = page.getByText("Make a Task", { exact: true });
+      const openCreate = page.getByRole("button", { name: "Add task" }).first();
       await openCreate.scrollIntoViewIfNeeded();
       await openCreate.click({ force: true });
       const titleInput = page.getByPlaceholder(/Add a task/i);
@@ -72,10 +77,10 @@ test.describe("Todos — boundary inputs", () => {
         await titleInput.waitFor({ state: "visible", timeout: 15_000 });
       }
       await titleInput.fill(`Task ${i}`);
-      await page.getByText("Add task", { exact: true }).click();
+      await submitTodoModal(page);
     }
     await expect(page.getByText("Task 30")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Task 1", exact: true })).toBeVisible();
+    await expect(page.getByText("Task 1", { exact: true })).toBeVisible();
   });
 });
 
@@ -86,9 +91,9 @@ test.describe("Todos — boundary inputs", () => {
 test.describe("Habits — boundary inputs", () => {
   test("habit with target_per_day = 1 shows correct progress", async ({ page }) => {
     await goToTab(page, "habits");
-    await page.getByText("Add", { exact: true }).first().click();
-    await page.getByPlaceholder(/Read 20 minutes/i).fill("One tap");
-    await page.getByText("Create habit", { exact: true }).click();
+    await page.getByText("+", { exact: true }).first().click();
+    await page.getByLabel("Habit name").fill("One tap");
+    await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("One tap").first()).toBeVisible();
     await page
       .getByText("One tap", { exact: true })
@@ -102,9 +107,13 @@ test.describe("Habits — boundary inputs", () => {
     test.setTimeout(90_000);
     await goToTab(page, "habits");
     for (let i = 0; i < 10; i++) {
-      await page.getByText("Add", { exact: true }).nth(i % 4).click();
-      await page.getByPlaceholder(/Read 20 minutes/i).fill(`Boundary habit ${i + 1}`);
-      await page.getByText("Create habit", { exact: true }).click();
+      // Stable per-group cell: one "Add" label per time group; "+" is scoped inside that cell (not global nth on all "+").
+      const groupAddCell = page.getByText("Add", { exact: true }).nth(i % 4).locator("..");
+      await groupAddCell.scrollIntoViewIfNeeded();
+      await groupAddCell.getByText("+", { exact: true }).click();
+      await expect(page.getByLabel("Habit name")).toBeVisible({ timeout: 15_000 });
+      await page.getByLabel("Habit name").fill(`Boundary habit ${i + 1}`);
+      await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     }
     await expect(page.getByText("ANYTIME").first()).toBeVisible();
     await expect(page.getByText("MORNING").first()).toBeVisible();
@@ -128,9 +137,8 @@ test.describe("Habits — boundary inputs", () => {
 test.describe("Calories — boundary inputs", () => {
   test("empty food name is rejected", async ({ page }) => {
     await goToTab(page, "calories");
-    const addEntry = page.getByText("Add entry", { exact: true });
-    await addEntry.scrollIntoViewIfNeeded();
-    await addEntry.click();
+    await fillCalorieMacrosOnly(page, "10", "0", "0", "0");
+    await clickCaloriesAddEntry(page);
     await expect(page.locator("body")).toContainText("Food name is required", {
       timeout: 10_000,
     });
@@ -141,11 +149,12 @@ test.describe("Calories — boundary inputs", () => {
     await goToTab(page, "calories");
     // Per-macro max is 999g — push total kcal near 9999 cap (validation)
     await fillCaloriesMacros(page, "Stress load", "999", "999", "222", "0");
-    await page.getByText("Breakfast", { exact: true }).click();
-    await page.getByText("Add entry", { exact: true }).click();
+    await clickCaloriesAddEntry(page);
     await page.waitForTimeout(500);
-    await expect(page.locator("body")).toContainText("Stress load", { timeout: 15_000 });
-    await expect(page.locator("body")).toContainText("9990 kcal", { timeout: 5_000 });
+    await expect(page.getByText("Stress load", { exact: false }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator("body")).toContainText("9990", { timeout: 10_000 });
     await expect(page.locator("body")).not.toContainText("Infinity");
     await expect(page.locator("body")).not.toContainText("NaN");
   });
@@ -155,8 +164,9 @@ test.describe("Calories — boundary inputs", () => {
     await goToTab(page, "calories");
     for (let i = 1; i <= 20; i++) {
       await fillCaloriesMacros(page, `Snack ${i}`, "25", "0", "0", "0");
-      await page.getByText("Add entry", { exact: true }).click();
+      await clickCaloriesAddEntry(page);
       await page.waitForTimeout(150);
+      await page.waitForTimeout(100);
     }
     await page.getByText(/Today:/).scrollIntoViewIfNeeded();
     await expect(page.locator("body")).toContainText("Today: 2000 kcal", { timeout: 20_000 });

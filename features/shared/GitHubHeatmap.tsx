@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text } from "react-native";
+import { View, Text, type ViewStyle } from "react-native";
 import { HorizontalScrollArea } from "@/core/ui/HorizontalScrollArea";
 
 export type HeatmapDay = {
@@ -87,7 +87,7 @@ export function GitHubHeatmap({ days, color, label, weeks = DEFAULT_WEEKS }: Pro
   const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
 
   const grid = (
-    <View style={{ flexDirection: "column", alignSelf: "flex-start" }}>
+    <View style={{ flexDirection: "column", alignItems: "center", width: "100%" }}>
       <View style={{ flexDirection: "row", gap: GAP, marginBottom: 4 }}>
         <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }} />
         {weekColumns.map((_, wi) => (
@@ -134,8 +134,22 @@ export function GitHubHeatmap({ days, color, label, weeks = DEFAULT_WEEKS }: Pro
     </View>
   );
 
+  const heatmapScrollContent: ViewStyle = {
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: "100%",
+  };
+
+  const heatmapWebInner: ViewStyle = {
+    alignSelf: "stretch",
+    width: "100%",
+    alignItems: "center",
+  };
+
   return (
     <HorizontalScrollArea
+      contentContainerStyle={heatmapScrollContent}
+      webInnerStyle={heatmapWebInner}
       footer={
         label ? (
           <Text

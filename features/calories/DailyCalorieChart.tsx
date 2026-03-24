@@ -6,34 +6,55 @@ import {
   HorizontalScrollArea,
   type HorizontalScrollAreaHandle,
 } from "@/core/ui/HorizontalScrollArea";
-
-type WeekBar = {
-  weekLabel: string;
-  value: number;
-};
+import type { DailyTrendPoint } from "./calories.domain";
 
 type Props = {
-  data: WeekBar[];
+  data: DailyTrendPoint[];
   goalKcal?: number;
 };
 
-const WEEKS = 52;
-const BAR_WIDTH = 20;
+/** Fixed geometry: chart scrolls horizontally (same idea as the calories heatmap strip). */
+const BAR_WIDTH = 18;
 const SPACING = 8;
-const CHART_WIDTH = WEEKS * (BAR_WIDTH + SPACING);
 
-export function WeeklyCalorieChart({ data, goalKcal }: Props) {
+/** Ignore absurd single-day totals so the Y scale and goal line stay readable. */
+const DAILY_CHART_MAX_KCAL = 12_000;
+
+function formatKcalTopLabel(kcal: number): string {
+  if (kcal <= 0) return "";
+  if (kcal < 10_000) return String(Math.round(kcal));
+  if (kcal < 1_000_000) return `${Math.round(kcal / 1000)}k`;
+  return `${(kcal / 1_000_000).toFixed(1)}M`;
+}
+
+function chartContentWidth(barCount: number): number {
+  const n = Math.max(1, barCount);
+  return n * BAR_WIDTH + (n - 1) * SPACING;
+}
+
+export function DailyCalorieChart({ data, goalKcal }: Props) {
   const scrollRef = useRef<HorizontalScrollAreaHandle>(null);
 
-  const barData = data.map((d) => ({
-    value: d.value,
-    label: d.weekLabel,
-    frontColor: d.value === 0 ? "#e2e8f0" : SECTION_COLORS.calories,
-    topLabelComponent: () =>
-      d.value > 0 ? (
-        <Text style={{ fontSize: 9, color: "#64748b", marginBottom: 2 }}>{d.value}</Text>
-      ) : null,
-  }));
+  const chartWidth = chartContentWidth(data.length);
+
+  const peakKcal = data.length ? Math.max(...data.map((d) => d.value), 0) : 0;
+  const cappedPeak = Math.min(peakKcal, DAILY_CHART_MAX_KCAL);
+  const maxValue = Math.max(goalKcal ?? 0, 500, cappedPeak);
+
+  const barData = data.map((d) => {
+    const barValue = Math.min(d.value, maxValue);
+    return {
+      value: barValue,
+      label: d.label,
+      frontColor: d.value === 0 ? "#e2e8f0" : SECTION_COLORS.calories,
+      topLabelComponent: () =>
+        d.value > 0 ? (
+          <Text style={{ fontSize: 9, color: "#64748b", marginBottom: 2 }}>
+            {formatKcalTopLabel(d.value)}
+          </Text>
+        ) : null,
+    };
+  });
 
   useLayoutEffect(() => {
     const run = () => scrollRef.current?.scrollToEnd({ animated: false });
@@ -44,10 +65,13 @@ export function WeeklyCalorieChart({ data, goalKcal }: Props) {
       return () => cancelAnimationFrame(raf);
     }
     run();
-  }, [data, goalKcal]);
+  }, [data, goalKcal, chartWidth]);
 
   return (
     <View className="w-full min-w-0 py-2">
+      <Text style={{ fontSize: 13, fontWeight: "600", color: "#64748b", marginBottom: 8 }}>
+        Year trend (daily)
+      </Text>
       <HorizontalScrollArea
         ref={scrollRef}
         footer={
@@ -68,9 +92,9 @@ export function WeeklyCalorieChart({ data, goalKcal }: Props) {
             xAxisThickness={1}
             yAxisThickness={0}
             yAxisTextStyle={{ color: "#94a3b8", fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: "#94a3b8", fontSize: 10 }}
+            xAxisLabelTextStyle={{ color: "#94a3b8", fontSize: 9 }}
             noOfSections={4}
-            maxValue={Math.max(goalKcal ?? 0, ...data.map((d) => d.value), 500)}
+            maxValue={maxValue}
             referenceLine1Position={goalKcal}
             referenceLine1Config={
               goalKcal
@@ -85,7 +109,7 @@ export function WeeklyCalorieChart({ data, goalKcal }: Props) {
             hideRules={false}
             rulesColor="#f1f5f9"
             rulesType="solid"
-            width={CHART_WIDTH}
+            width={chartWidth}
             height={160}
             isAnimated
           />

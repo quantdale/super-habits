@@ -144,6 +144,14 @@ export function getPlantStage(progress: number): PlantStage {
 }
 
 /**
+ * Format completed session length for the garden grid (e.g. "25m", "45s").
+ */
+export function formatSessionDuration(seconds: number): string {
+  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
+  return `${seconds}s`;
+}
+
+/**
  * Format a pomodoro session for display in the garden grid tooltip.
  * Returns "Today 14:30" or "Mar 21 09:15".
  */
