@@ -6,6 +6,11 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     exclude: ["e2e/**", "node_modules/**"],
+    globals: true,
+    setupFiles: ["./tests/setup.ts"],
+  },
+  define: {
+    __DEV__: "true",
   },
   resolve: {
     alias: {

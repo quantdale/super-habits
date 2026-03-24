@@ -88,6 +88,7 @@ export function formatWorkoutTime(totalSeconds: number): string {
  * Returns 0 for invalid input.
  */
 export function parseWorkoutTime(input: string): number {
+  if (input == null) return 0;
   if (input.includes(":")) {
     const [m, s] = input.split(":").map(Number);
     if (Number.isFinite(m) && Number.isFinite(s)) {

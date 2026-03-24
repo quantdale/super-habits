@@ -25,7 +25,11 @@ export function kcalFromMacros(
 }
 
 export function caloriesTotal(entries: { calories: number }[]): number {
-  return entries.reduce((sum, entry) => sum + entry.calories, 0);
+  return entries.reduce((sum, entry) => {
+    const cal = entry.calories;
+    if (!Number.isFinite(cal) || cal < 0) return sum;
+    return sum + cal;
+  }, 0);
 }
 
 export type DailyTrendPoint = {
