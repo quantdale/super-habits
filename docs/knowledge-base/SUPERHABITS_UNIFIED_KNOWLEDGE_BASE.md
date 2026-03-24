@@ -8,6 +8,28 @@
 
 ---
 
+## Audit, Error Handling, and PWA Notes
+
+### Error Handling
+- Avoid silent error swallowing, especially for DB/service worker. Log or surface errors for debugging.
+- No global error/retry customization for query clients.
+- Local-only ID generation is used; not crypto-strong. Acceptable for this use case, but documented here.
+- Soft delete exceptions are possible; see code for details.
+
+### PWA/Service Worker
+- Service worker uses network-first for dev, cache-first for prod.
+- Stale cache risk is mitigated, but see README for caveats.
+
+### Accessibility/Usability
+- No explicit accessibility/usability audit documented. Add TODO to perform and document results.
+
+### Test Coverage
+- E2E/unit tests present, but some stubs are skipped (e.g., calories.data.STUB.test.ts). Document reasons for skips.
+
+### UI/UX Patterns
+- UI validation is hard-reject only; errors are surfaced to users.
+- Add documentation on error feedback and clearing.
+
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)

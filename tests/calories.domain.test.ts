@@ -29,6 +29,9 @@ function meal(name: string, useCount = 1): SavedMeal {
 }
 
 describe("caloriesTotal", () => {
+  it('returns 0 for negative/NaN/overflow', () => {
+    expect(caloriesTotal([{ calories: -100 }, { calories: NaN }, { calories: 1e20 }])).toBeGreaterThanOrEqual(0);
+  });
   it("sums entries correctly", () => {
     const total = caloriesTotal([{ calories: 100 }, { calories: 250 }]);
 

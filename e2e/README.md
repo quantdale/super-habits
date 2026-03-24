@@ -30,6 +30,11 @@ Only one tab of localhost:8081 should be open (OPFS lock).
   calories.spec.ts       — Calories (add entry, meal type, daily total, empty state, validation, persistence)
   infrastructure.spec.ts — Cross-cutting: COEP/COOP headers, SW cache, OPFS lock, crossOriginIsolated
 
+## Audit and Failure Handling
+- E2E failures are logged; see test output for artifacts.
+- Known flaky tests or infrastructure issues are documented in the knowledge base.
+- Skipped tests are marked with reasons in the codebase and knowledge base.
+
 ## Notes
 
 - Playwright uses `workers: 1` (see `playwright.config.ts`): parallel workers hit the same OPFS SQLite lock on `localhost:8081` and time out.

@@ -165,6 +165,16 @@ describe("getModeLabel", () => {
 });
 
 describe("parseMinutesSeconds", () => {
+  it('returns null for malformed input', () => {
+    expect(parseMinutesSeconds('abc')).toBeNull();
+    expect(parseMinutesSeconds('12:')).toBeNull();
+    expect(parseMinutesSeconds(':34')).toBeNull();
+    expect(parseMinutesSeconds('12:60')).toBeNull();
+    expect(parseMinutesSeconds('-1:30')).toBeNull();
+  });
+  it('parses valid input', () => {
+    expect(parseMinutesSeconds('1:30')).toEqual({ minutes: 1, seconds: 30 });
+  });
   it("parses valid MM:SS", () => {
     expect(parseMinutesSeconds("25:00")).toEqual({ minutes: 25, seconds: 0 });
     expect(parseMinutesSeconds("5:30")).toEqual({ minutes: 5, seconds: 30 });

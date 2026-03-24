@@ -1,5 +1,11 @@
 # SuperHabits — Project Structure Map
 
+## Error Handling and Validation Flows
+- Error handling strategies are documented in README and knowledge base.
+- Validation is hard-reject; errors are surfaced to users.
+- See audit findings for more details.
+
+
 Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v9** → next migration: `if (version < 10)` in `core/db/client.ts`.
 
 ---
