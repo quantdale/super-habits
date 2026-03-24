@@ -5,7 +5,7 @@ MCP, identify every failure, and fix each one autonomously.
 Plan-first for any code changes — wait for approval before
 modifying application source files.
 
-Requires: `npm run web` running on localhost:8081.
+Requires: `npm run build:web` when app code changed (Playwright does not build). Playwright starts `node scripts/serve-e2e.js` on `localhost:8081` (serves `dist/` with `require-corp` COEP). Metro is not used for E2E.
 Requires: Playwright MCP connected in Cursor Settings → MCP.
 
 ---
@@ -93,8 +93,8 @@ For each failed test, classify the failure type:
 
 **Type E — Environment issue**
   Symptom: "ERR_CONNECTION_REFUSED" or "net::ERR_FAILED"
-  Cause: Metro dev server not running or wrong port.
-  Fix: Stop — remind user to run `npm run web` first.
+  Cause: Static E2E server not running, `dist/` missing, or wrong port.
+  Fix: Stop — remind user to run `npm run build:web`, then ensure `node scripts/serve-e2e.js` is up (or let Playwright `webServer` start it) on `localhost:8081`.
 
 ---
 
@@ -120,6 +120,41 @@ may be implemented without separate approval if confidence is HIGH
 ---
 
 ## Phase 5 — Implement fixes
+
+### Type B assertion-change gate (mandatory)
+
+Run this check on EVERY proposed spec change before writing
+any file. If Q2 is true for any change, halt that specific
+fix and report it as Type B. Continue with remaining Type A
+fixes in the same run.
+
+```
+BEFORE editing any spec file, for each proposed change,
+answer these two questions:
+
+Q1: Does this change modify a SELECTOR only?
+    (e.g. getByText("old label") → getByText("new label")
+          getByRole("button") → getByTestId("submit")
+          locator(".text-6xl") → locator(".text-5xl"))
+    → If yes: proceed. This is Type A.
+
+Q2: Does this change modify an ASSERTION VALUE?
+    (e.g. expect(x).toBe(147) → expect(x).toBe(0)
+          expect(x).toContainText("2000 kcal") → ("NaN kcal")
+          expect(x).toHaveLength(3) → toHaveLength(0)
+          removing an expect() line entirely
+          changing toBeVisible() to not.toBeVisible())
+    → If yes: STOP. This is Type B. Do NOT edit the spec.
+      The app has a bug. Route to /fix with this report:
+
+      ⚠️  TYPE B BUG DETECTED
+      File:       {spec file and line}
+      Test:       {it() description}
+      Expected:   {what the test expects}
+      Actual:     {what the app produces}
+      Verdict:    App is wrong, not the test.
+      Next step:  Fix the app via /fix before re-running E2E.
+```
 
 ### Type A — Selector fixes
 
@@ -188,7 +223,7 @@ Then run unit tests to confirm no regressions:
 
 **Failures resolved:** N
 **Failures remaining:** N (with explanation if any)
-**Unit tests:** 7 passing (unchanged)
+**Unit tests:** 141 passing (unless a fix added/changed tests)
 
 If any failures remain that could not be fixed automatically
 (LOW confidence or require human decision), list them clearly
@@ -215,3 +250,19 @@ with the information needed to resolve them manually.
 - Headless only — do not switch to headed mode during fixes
 - Re-run after every fix to confirm the specific test passes
   before moving to the next failure
+- Assertion values are NEVER changed to make a test pass.
+  Any change that would require modifying an expected value
+  (toBe, toContainText, toHaveLength, toBeVisible, etc.)
+  is a Type B bug in the app — fix the app, not the test.
+  This applies even if the change seems minor or the test
+  "doesn't matter much."
+
+- Removing an expect() line or adding a .not modifier to
+  bypass a failing assertion is also Type B treatment and
+  is forbidden.
+
+- At the end of every /e2e-fix run, output a Type B summary:
+    TYPE B BUGS FOUND: N
+    [list each one with file, test, expected vs actual]
+    [or "None detected" if clean]
+  This summary must appear even if N = 0.

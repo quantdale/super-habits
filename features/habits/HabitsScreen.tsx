@@ -1,13 +1,15 @@
 import { useCallback, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
+import { Modal } from "@/core/ui/Modal";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
+import { PillChip } from "@/core/ui/PillChip";
 import type { Habit, HabitCategory, HabitIcon } from "./types";
 import {
   addHabit,
@@ -38,6 +40,8 @@ import {
 } from "@/features/habits/habitPresets";
 import { SECTION_COLORS, SECTION_COLORS_LIGHT } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
+import { validateHabit } from "@/lib/validation";
+import { ValidationError } from "@/core/ui/ValidationError";
 
 const TIME_GROUPS = [
   { key: "anytime" as const, label: "Anytime", icon: "🔄" },
@@ -46,18 +50,9 @@ const TIME_GROUPS = [
   { key: "evening" as const, label: "Evening", icon: "🌙" },
 ] as const;
 
-const CATEGORIES: HabitCategory[] = ["anytime", "morning", "afternoon", "evening"];
-const CATEGORY_LABELS: Record<HabitCategory, string> = {
-  anytime: "Anytime",
-  morning: "Morning",
-  afternoon: "Afternoon",
-  evening: "Evening",
-};
 const COLOR = SECTION_COLORS.habits;
 
 export function HabitsScreen() {
-  const { height: windowHeight } = useWindowDimensions();
-  const modalMaxHeight = windowHeight * 0.88;
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
@@ -72,6 +67,7 @@ export function HabitsScreen() {
   const [habitHeatmapDays, setHabitHeatmapDays] = useState<HeatmapDay[]>([]);
   const [consistencyPct, setConsistencyPct] = useState(0);
   const [overallStreak, setOverallStreak] = useState(0);
+  const [habitError, setHabitError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await listHabits();
@@ -124,10 +120,12 @@ export function HabitsScreen() {
     setCategory(presetCategory ?? "anytime");
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
+    setHabitError(null);
     setModalVisible(true);
   };
 
   const openEditModal = (habit: Habit) => {
+    setHabitError(null);
     setEditingHabit(habit);
     setName(habit.name);
     setTarget(String(habit.target_per_day));
@@ -138,11 +136,13 @@ export function HabitsScreen() {
   };
 
   const onSubmit = async () => {
-    if (!name.trim()) {
-      Alert.alert("Missing name", "Enter a habit name.");
+    const targetNum = Number(target);
+    const err = validateHabit(name, targetNum);
+    if (err) {
+      setHabitError(err);
       return;
     }
-    const targetNum = Math.max(1, Number(target) || 1);
+    setHabitError(null);
     if (editingHabit) {
       await updateHabit(editingHabit.id, {
         name: name.trim(),
@@ -160,6 +160,7 @@ export function HabitsScreen() {
     setCategory("anytime");
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
+    setHabitError(null);
     setModalVisible(false);
     refresh();
   };
@@ -184,21 +185,27 @@ export function HabitsScreen() {
     openAddModal(timeOfDay);
   };
 
+  const resetModal = useCallback(() => {
+    setModalVisible(false);
+    setEditingHabit(null);
+    setHabitError(null);
+  }, []);
+
   return (
     <Screen scroll padded>
-      <View className="mb-4 flex-row items-center justify-between">
-        <SectionTitle title="Habits" subtitle={habits.length === 0 ? undefined : "Track daily consistency."} />
+      <View className="flex-row justify-between items-start">
+        <SectionTitle title="Habits" subtitle="Track daily consistency." />
         <Pressable
           onPress={() => setEditMode((e) => !e)}
           className="rounded-lg p-2"
         >
-          <MaterialIcons name={editMode ? "close" : "edit"} size={24} color="#64748b" />
+          <MaterialIcons name={editMode ? "close" : "edit"} size={24} color="#94a3b8" />
         </Pressable>
       </View>
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.habits} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>⚡</Text>
               <Text
@@ -211,12 +218,12 @@ export function HabitsScreen() {
               >
                 {overallStreak} days
               </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>best streak</Text>
+              <Text className="mt-0.5 text-xs text-slate-400">best streak</Text>
             </View>
           </Card>
         </View>
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.habits} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>📊</Text>
               <Text
@@ -229,7 +236,7 @@ export function HabitsScreen() {
               >
                 {consistencyPct}%
               </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>consistent</Text>
+              <Text className="mt-0.5 text-xs text-slate-400">consistent</Text>
             </View>
           </Card>
         </View>
@@ -246,36 +253,25 @@ export function HabitsScreen() {
           const groupHabits = habits.filter((h) => (h.category ?? "anytime") === group.key);
 
           return (
-            <View key={group.key} className="mb-6">
-              <View className="mb-3 flex-row items-center gap-2 px-1">
+            <Card key={group.key} accentColor={SECTION_COLORS.habits} className="mb-3">
+              <View className="mb-3 flex-row items-center gap-2">
                 <Text style={{ fontSize: 16 }}>{group.icon}</Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "600",
-                    color: "#64748b",
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  }}
-                >
+                <Text className="text-[13px] font-semibold uppercase tracking-wide text-slate-400">
                   {group.label}
                 </Text>
               </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                contentContainerStyle={{
+              <View
+                style={{
                   flexDirection: "row",
-                  alignItems: "flex-start",
-                  paddingHorizontal: 4,
+                  flexWrap: "wrap",
+                  justifyContent: "center",
                   gap: 16,
                 }}
               >
                 {editMode
                   ? groupHabits.map((habit) => (
-                      <View key={habit.id} className="items-center" style={{ width: 88 }}>
+                      <View key={habit.id} className="items-center" style={{ width: 88, alignItems: "center" }}>
                         <View
                           className="items-center justify-center rounded-full bg-slate-200"
                           style={{ width: 80, height: 80 }}
@@ -320,7 +316,11 @@ export function HabitsScreen() {
                       const todayCount = completionMap[habit.id] ?? 0;
                       const streak = streakMap[habit.id] ?? 0;
                       return (
-                        <View key={habit.id} className="items-center">
+                        <View
+                          key={habit.id}
+                          className="items-center justify-center"
+                          style={{ width: 72, alignItems: "center" }}
+                        >
                           <HabitCircle
                             habit={habit}
                             todayCount={todayCount}
@@ -332,13 +332,7 @@ export function HabitsScreen() {
                             onDecrement={() => handleDecrement(habit.id)}
                           />
                           <Text
-                            style={{
-                              fontSize: 11,
-                              color: "#64748b",
-                              marginTop: 4,
-                              textAlign: "center",
-                              maxWidth: 64,
-                            }}
+                            className="mt-1 w-[72px] text-center text-[11px] text-slate-400"
                             numberOfLines={2}
                           >
                             {habit.name}
@@ -346,28 +340,19 @@ export function HabitsScreen() {
                           {streak > 0 ? (
                             <View className="mt-0.5 flex-row items-center gap-0.5">
                               <Text style={{ fontSize: 10 }}>{streak > 2 ? "🔥" : "⚡"}</Text>
-                              <Text style={{ fontSize: 10, color: "#94a3b8" }}>{streak}</Text>
+                              <Text className="text-[10px] text-slate-400">{streak}</Text>
                             </View>
                           ) : null}
                         </View>
                       );
                     })}
 
-                <Pressable
-                  onPress={() => handleAddHabitToGroup(group.key)}
-                  className="items-center justify-center"
-                  style={{ width: 64 }}
-                >
-                  <View
+                <View className="items-center" style={{ width: editMode ? 88 : 72 }}>
+                  <Pressable
+                    onPress={() => handleAddHabitToGroup(group.key)}
+                    className="w-14 h-14 shrink-0 grow-0 items-center justify-center rounded-full border-2 border-dashed"
                     style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      borderWidth: 2,
-                      borderColor: `${SECTION_COLORS.habits}60`,
-                      borderStyle: "dashed",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      borderColor: SECTION_COLORS.habits + "60",
                       backgroundColor: SECTION_COLORS_LIGHT.habits,
                     }}
                   >
@@ -380,19 +365,20 @@ export function HabitsScreen() {
                     >
                       +
                     </Text>
-                  </View>
+                  </Pressable>
                   <Text
                     style={{
                       fontSize: 11,
                       color: SECTION_COLORS.habits,
                       marginTop: 4,
+                      textAlign: "center",
                     }}
                   >
                     Add
                   </Text>
-                </Pressable>
-              </ScrollView>
-            </View>
+                </View>
+              </View>
+            </Card>
           );
         })}
       </View>
@@ -402,111 +388,96 @@ export function HabitsScreen() {
       </View>
 
       <Modal
+        title={editingHabit ? "Edit Habit" : "New Habit"}
         visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setModalVisible(false);
-          setEditingHabit(null);
-        }}
+        onClose={resetModal}
+        scroll
       >
-        <Pressable
-          className="flex-1 justify-center bg-black/50 p-4"
-          onPress={() => {
-            setModalVisible(false);
-            setEditingHabit(null);
-          }}
-        >
-          <Pressable onPress={(e) => e.stopPropagation()} style={{ maxHeight: modalMaxHeight, width: "100%" }}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator
-              style={{ maxHeight: modalMaxHeight }}
-            >
-              <Card accentColor={COLOR}>
-              <Text className="mb-3 text-lg font-semibold text-slate-900">
-                {editingHabit ? "Edit habit" : "Add habit"}
-              </Text>
-              <TextField
-                label="Habit name"
-                value={name}
-                onChangeText={setName}
-                placeholder="Read 20 minutes"
+        <Card accentColor={SECTION_COLORS.habits}>
+          <TextField
+            label="Habit name"
+            value={name}
+            onChangeText={(t) => {
+              setHabitError(null);
+              setName(t);
+            }}
+            placeholder="Read 20 minutes"
+          />
+          <NumberStepperField
+            label="Target per day"
+            value={target}
+            onChange={(t) => {
+              setHabitError(null);
+              setTarget(t);
+            }}
+            min={1}
+            max={99}
+            placeholder="1"
+          />
+          <Text className="mb-1 text-sm font-medium text-slate-700">Category</Text>
+          <View className="mb-3 flex-row flex-wrap">
+            {TIME_GROUPS.map((g) => (
+              <PillChip
+                key={g.key}
+                label={g.label}
+                icon={g.icon}
+                active={category === g.key}
+                color={COLOR}
+                onPress={() => {
+                  setHabitError(null);
+                  setCategory(g.key);
+                }}
               />
-              <NumberStepperField
-                label="Target per day"
-                value={target}
-                onChange={setTarget}
-                min={1}
-                placeholder="1"
+            ))}
+          </View>
+          <Text className="mb-1 text-sm font-medium text-slate-700">Icon</Text>
+          <View className="mb-3 flex-row flex-wrap gap-2">
+            {HABIT_ICONS.map((iconName) => (
+              <Pressable
+                key={iconName}
+                onPress={() => {
+                  setHabitError(null);
+                  setIcon(iconName);
+                }}
+                className={`items-center justify-center rounded-lg p-2 ${
+                  icon === iconName ? "bg-habits" : "bg-slate-200"
+                }`}
+                style={{ width: 44, height: 44 }}
+              >
+                <MaterialIcons
+                  name={iconName}
+                  size={24}
+                  color={icon === iconName ? "white" : "#94a3b8"}
+                />
+              </Pressable>
+            ))}
+          </View>
+          <Text className="mb-1 text-sm font-medium text-slate-700">Color</Text>
+          <View className="mb-3 flex-row flex-wrap gap-2">
+            {HABIT_COLORS.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => {
+                  setHabitError(null);
+                  setColor(c);
+                }}
+                className={`rounded-full ${
+                  color === c ? "ring-2 ring-slate-400 ring-offset-2" : ""
+                }`}
+                style={{ width: 36, height: 36, backgroundColor: c }}
               />
-              <Text className="mb-1 text-sm font-medium text-slate-700">Category</Text>
-              <View className="mb-3 flex-row flex-wrap gap-2">
-                {CATEGORIES.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => setCategory(c)}
-                    className={`rounded-lg px-3 py-2 ${
-                      category === c ? "bg-habits" : "bg-slate-200"
-                    }`}
-                  >
-                    <Text className={`text-sm font-medium ${category === c ? "text-white" : "text-slate-700"}`}>
-                      {CATEGORY_LABELS[c]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text className="mb-1 text-sm font-medium text-slate-700">Icon</Text>
-              <View className="mb-3 flex-row flex-wrap gap-2">
-                {HABIT_ICONS.map((iconName) => (
-                  <Pressable
-                    key={iconName}
-                    onPress={() => setIcon(iconName)}
-                    className={`items-center justify-center rounded-lg p-2 ${
-                      icon === iconName ? "bg-habits" : "bg-slate-200"
-                    }`}
-                    style={{ width: 44, height: 44 }}
-                  >
-                    <MaterialIcons
-                      name={iconName}
-                      size={24}
-                      color={icon === iconName ? "white" : "#64748b"}
-                    />
-                  </Pressable>
-                ))}
-              </View>
-              <Text className="mb-1 text-sm font-medium text-slate-700">Color</Text>
-              <View className="mb-3 flex-row flex-wrap gap-2">
-                {HABIT_COLORS.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => setColor(c)}
-                    className={`rounded-full ${
-                      color === c ? "ring-2 ring-slate-400 ring-offset-2" : ""
-                    }`}
-                    style={{ width: 36, height: 36, backgroundColor: c }}
-                  />
-                ))}
-              </View>
-              <View className="flex-row gap-2">
-                <Button
-                  label="Cancel"
-                  variant="ghost"
-                  onPress={() => {
-                    setModalVisible(false);
-                    setEditingHabit(null);
-                  }}
-                />
-                <Button
-                  label={editingHabit ? "Save changes" : "Create habit"}
-                  onPress={onSubmit}
-                  color={COLOR}
-                />
-              </View>
-              </Card>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
+            ))}
+          </View>
+          <ValidationError message={habitError} />
+          <View className="mt-3 flex-row gap-2">
+            <Button label="Cancel" variant="ghost" onPress={resetModal} />
+            <Button
+              label={editingHabit ? "Save changes" : "Create habit"}
+              onPress={onSubmit}
+              color={COLOR}
+            />
+          </View>
+        </Card>
       </Modal>
     </Screen>
   );

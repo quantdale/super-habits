@@ -56,7 +56,7 @@ test.describe("Workout", () => {
     await page.getByText("Add routine", { exact: true }).click();
     await expect(page.getByText("Leg press")).toBeVisible();
     await swipeLeftRevealWorkoutRoutineRow(page);
-    await clickSwipeDeleteAction(page);
+    await clickSwipeDeleteAction(page, "Leg press");
     await expect(page.getByText("Leg press")).toBeVisible();
   });
 });

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -10,6 +11,7 @@ import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   addCalorieEntry,
+  updateCalorieEntry,
   deleteCalorieEntry,
   listCalorieEntries,
   listRecentSavedMeals,
@@ -24,7 +26,7 @@ import {
 import {
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
-  buildWeeklyTrend,
+  buildDailyTrend,
   calculateGoalProgress,
   caloriesTotal,
   kcalFromMacros,
@@ -34,10 +36,14 @@ import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap"
 import { toDateKey } from "@/lib/time";
 import type { CalorieEntry, MealType, SavedMeal } from "./types";
 import { MacroDonutChart } from "./MacroDonutChart";
-import { WeeklyCalorieChart } from "./WeeklyCalorieChart";
-import { CalorieGoalSheet } from "./CalorieGoalSheet";
+import { DailyCalorieChart } from "./DailyCalorieChart";
+import { CalorieGoalModal } from "./CalorieGoalModal";
 import { SavedMealChips } from "./SavedMealChips";
-import { SavedMealSearchSheet } from "./SavedMealSearchSheet";
+import { SavedMealSearchModal } from "./SavedMealSearchModal";
+import { Modal } from "@/core/ui/Modal";
+import { SwipeRightActions } from "@/core/ui/SwipeRightActions";
+import { ValidationError } from "@/core/ui/ValidationError";
+import { validateCalorieComputedKcal, validateCalorieEntry } from "@/lib/validation";
 
 const COLOR = SECTION_COLORS.calories;
 
@@ -48,6 +54,64 @@ const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "snack", label: "Snack" },
 ];
 
+const CalorieEntrySwipeRow = memo(
+  function CalorieEntrySwipeRow({
+    entry,
+    accentColor,
+    onEdit,
+    onDelete,
+  }: {
+    entry: CalorieEntry;
+    accentColor: string;
+    onEdit: () => void;
+    onDelete: () => void;
+  }) {
+  const swipeableRef = useRef<Swipeable>(null);
+
+  return (
+    <View className="mb-3">
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={() => (
+          <SwipeRightActions
+            editColor={accentColor}
+            onEdit={() => {
+              swipeableRef.current?.close();
+              onEdit();
+            }}
+            onDelete={() => {
+              swipeableRef.current?.close();
+              onDelete();
+            }}
+          />
+        )}
+        rightThreshold={40}
+        overshootRight={false}
+      >
+        <Card accentColor={accentColor} className="mb-0 flex-1">
+          <Text className="text-base font-semibold text-slate-900">
+            {entry.food_name} - {entry.calories} kcal
+          </Text>
+          <Text className="mt-1 text-sm capitalize text-slate-600">
+            {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{" "}
+            {entry.fiber}g
+          </Text>
+        </Card>
+      </Swipeable>
+    </View>
+  );
+},
+(prev, next) =>
+  prev.entry.id === next.entry.id &&
+  prev.entry.food_name === next.entry.food_name &&
+  prev.entry.calories === next.entry.calories &&
+  prev.entry.protein === next.entry.protein &&
+  prev.entry.carbs === next.entry.carbs &&
+  prev.entry.fats === next.entry.fats &&
+  prev.entry.fiber === next.entry.fiber &&
+  prev.entry.meal_type === next.entry.meal_type,
+);
+
 export function CaloriesScreen() {
   const [food, setFood] = useState("");
   const [protein, setProtein] = useState("");
@@ -55,40 +119,42 @@ export function CaloriesScreen() {
   const [fats, setFats] = useState("");
   const [fiber, setFiber] = useState("");
   const [mealType, setMealType] = useState<MealType>("breakfast");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [calorieError, setCalorieError] = useState<string | null>(null);
   const [entries, setEntries] = useState<CalorieEntry[]>([]);
   const [goal, setGoal] = useState<CalorieGoal>(DEFAULT_GOAL);
-  const [weeklyData, setWeeklyData] = useState<DailySummary[]>([]);
+  const [summary364, setSummary364] = useState<DailySummary[]>([]);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
-  const [weeklyVisible, setWeeklyVisible] = useState(false);
   const [calorieActivityDays, setCalorieActivityDays] = useState<ActivityDay[]>([]);
   const [calorieHeatmapDays, setCalorieHeatmapDays] = useState<HeatmapDay[]>([]);
   const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
   const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [entryEditModalVisible, setEntryEditModalVisible] = useState(false);
 
   const refresh = useCallback(async () => {
+    // Phase 1: update the entry list immediately so the new row appears in the DOM
+    // before saved-meal chips render. This keeps the E2E selector unambiguous and
+    // allows React.memo to skip re-rendering unchanged rows.
     const next = await listCalorieEntries();
     setEntries(next);
-
-    const recent = await listRecentSavedMeals(5);
-    const all = await searchSavedMeals("");
+    // Phase 2: fetch the remaining data concurrently and commit in one batch.
+    // Using Promise.all reduces from 4 sequential awaits to 1, cutting React renders
+    // from ~4 to 1 for the analytics section.
+    const startYear = new Date();
+    startYear.setDate(startYear.getDate() - 364);
+    const [recent, all, rangeYear, savedGoal] = await Promise.all([
+      listRecentSavedMeals(5),
+      searchSavedMeals(""),
+      getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date())),
+      getCalorieGoal(),
+    ]);
+    const activityDaysYear = buildCalorieActivityDays(rangeYear, savedGoal.calories, 365);
     setRecentMeals(recent);
     setAllSavedMeals(all);
-
-    const start = new Date();
-    start.setDate(start.getDate() - 6);
-    const weekSummaries = await getCalorieSummaryByRange(toDateKey(start), toDateKey(new Date()));
-    setWeeklyData(weekSummaries);
-
-    const start364 = new Date();
-    start364.setDate(start364.getDate() - 363);
-    const range364 = await getCalorieSummaryByRange(toDateKey(start364), toDateKey(new Date()));
-    const savedGoal = await getCalorieGoal();
-    const activityDays364 = buildCalorieActivityDays(range364, savedGoal.calories, 364);
-    setCalorieActivityDays(activityDays364);
-    setCalorieHeatmapDays(buildCalorieHeatmapDays(range364, savedGoal.calories, 364));
-
+    setSummary364(rangeYear);
+    setCalorieActivityDays(activityDaysYear);
+    setCalorieHeatmapDays(buildCalorieHeatmapDays(rangeYear, savedGoal.calories, 365));
     setGoal(savedGoal);
   }, []);
 
@@ -98,17 +164,16 @@ export function CaloriesScreen() {
     }, [refresh]),
   );
 
-  useEffect(() => {
-    setFormError(null);
-  }, [food, protein, carbs, fats, fiber, mealType]);
-
-  const todayTotals = {
-    protein: entries.reduce((s, e) => s + e.protein, 0),
-    carbs: entries.reduce((s, e) => s + e.carbs, 0),
-    fats: entries.reduce((s, e) => s + e.fats, 0),
-    fiber: entries.reduce((s, e) => s + e.fiber, 0),
-  };
-  const weeklyTrend = buildWeeklyTrend(weeklyData, 7);
+  const todayTotals = useMemo(
+    () => ({
+      protein: entries.reduce((s, e) => s + e.protein, 0),
+      carbs: entries.reduce((s, e) => s + e.carbs, 0),
+      fats: entries.reduce((s, e) => s + e.fats, 0),
+      fiber: entries.reduce((s, e) => s + e.fiber, 0),
+    }),
+    [entries],
+  );
+  const dailyTrend = useMemo(() => buildDailyTrend(summary364), [summary364]);
   const goalProgress = calculateGoalProgress(caloriesTotal(entries), goal.calories);
 
   const hasCalorieStripActivity = calorieActivityDays.some((d) => d.active);
@@ -128,6 +193,8 @@ export function CaloriesScreen() {
   );
 
   const handleSelectSavedMeal = (meal: SavedMeal) => {
+    setCalorieError(null);
+    setEditingEntryId(null);
     setFood(meal.food_name);
     setProtein(String(meal.protein));
     setCarbs(String(meal.carbs));
@@ -136,33 +203,74 @@ export function CaloriesScreen() {
     setMealType(meal.meal_type as MealType);
   };
 
-  const onAdd = () => {
-    void (async () => {
-      setFormError(null);
-      try {
-        if (!food.trim()) {
-          setFormError("Enter a food name.");
-          return;
-        }
-        if (!Number.isFinite(computedKcal) || computedKcal <= 0) {
-          setFormError("Calories work out to zero. Enter macro amounts that add up to energy.");
-          return;
-        }
+  const resetCalorieForm = () => {
+    setFood("");
+    setProtein("");
+    setCarbs("");
+    setFats("");
+    setFiber("");
+    setMealType("breakfast");
+    setEditingEntryId(null);
+    setCalorieError(null);
+  };
 
-        await addCalorieEntry({
-          foodName: food.trim(),
-          calories: computedKcal,
-          protein: Number(protein) || 0,
-          carbs: Number(carbs) || 0,
-          fats: Number(fats) || 0,
-          fiber: Number(fiber) || 0,
-          mealType,
-        });
-        setFood("");
-        setProtein("");
-        setCarbs("");
-        setFats("");
-        setFiber("");
+  const handleEditEntry = (entry: CalorieEntry) => {
+    setFood(entry.food_name);
+    setProtein(String(entry.protein));
+    setCarbs(String(entry.carbs));
+    setFats(String(entry.fats));
+    setFiber(String(entry.fiber ?? 0));
+    setMealType(entry.meal_type as MealType);
+    setEditingEntryId(entry.id);
+    setCalorieError(null);
+  };
+
+  const openEntryEditModal = (entry: CalorieEntry) => {
+    handleEditEntry(entry);
+    setEntryEditModalVisible(true);
+  };
+
+  const handleSubmit = () => {
+    const entryErr = validateCalorieEntry(food, protein, carbs, fats, fiber);
+    if (entryErr) {
+      setCalorieError(entryErr);
+      return;
+    }
+    const kcalErr = validateCalorieComputedKcal(computedKcal);
+    if (kcalErr) {
+      setCalorieError(kcalErr);
+      return;
+    }
+    setCalorieError(null);
+    void (async () => {
+      try {
+        const proteinN = Number(protein) || 0;
+        const carbsN = Number(carbs) || 0;
+        const fatsN = Number(fats) || 0;
+        const fiberN = Number(fiber) || 0;
+
+        if (editingEntryId) {
+          await updateCalorieEntry(editingEntryId, {
+            foodName: food.trim(),
+            protein: proteinN,
+            carbs: carbsN,
+            fats: fatsN,
+            fiber: fiberN,
+            mealType,
+          });
+        } else {
+          await addCalorieEntry({
+            foodName: food.trim(),
+            calories: computedKcal,
+            protein: proteinN,
+            carbs: carbsN,
+            fats: fatsN,
+            fiber: fiberN,
+            mealType,
+          });
+        }
+        resetCalorieForm();
+        setEntryEditModalVisible(false);
         await refresh();
       } catch (e) {
         const msg =
@@ -171,7 +279,7 @@ export function CaloriesScreen() {
             : typeof e === "string"
               ? e
               : "Could not save entry.";
-        setFormError(msg);
+        setCalorieError(msg);
       }
     })();
   };
@@ -182,7 +290,7 @@ export function CaloriesScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.calories} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>🍽️</Text>
               <Text
@@ -195,12 +303,12 @@ export function CaloriesScreen() {
               >
                 {calorieActivityDays.filter((d) => d.active).length}
               </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>days logged</Text>
+              <Text className="mt-0.5 text-xs text-slate-400">days logged</Text>
             </View>
           </Card>
         </View>
         <View className="flex-1">
-          <Card className="mb-0">
+          <Card accentColor={SECTION_COLORS.calories} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>🎯</Text>
               <Text
@@ -213,7 +321,7 @@ export function CaloriesScreen() {
               >
                 {goalProgress.percent}%
               </Text>
-              <Text style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>of goal today</Text>
+              <Text className="mt-0.5 text-xs text-slate-400">of goal today</Text>
             </View>
           </Card>
         </View>
@@ -231,21 +339,72 @@ export function CaloriesScreen() {
             </Text>
           </Pressable>
         ) : null}
-        <TextField label="Food" value={food} onChangeText={setFood} placeholder="Greek yogurt" />
-        <View className="flex-row gap-2">
-          <View className="flex-1">
-            <TextField label="Protein (g)" value={protein} onChangeText={setProtein} unsignedInteger />
+        <View className="flex-row flex-wrap gap-2">
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Protein (g)"
+              nativeID="cal-entry-protein"
+              accessibilityLabel="Calories entry protein"
+              value={protein}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setProtein(t);
+              }}
+              unsignedInteger
+            />
           </View>
-          <View className="flex-1">
-            <TextField label="Carbs (g)" value={carbs} onChangeText={setCarbs} unsignedInteger />
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Carbs (g)"
+              nativeID="cal-entry-carbs"
+              accessibilityLabel="Calories entry carbs"
+              value={carbs}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setCarbs(t);
+              }}
+              unsignedInteger
+            />
           </View>
-          <View className="flex-1">
-            <TextField label="Fats (g)" value={fats} onChangeText={setFats} unsignedInteger />
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Fats (g)"
+              nativeID="cal-entry-fat"
+              accessibilityLabel="Calories entry fat"
+              value={fats}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setFats(t);
+              }}
+              unsignedInteger
+            />
           </View>
-          <View className="flex-1">
-            <TextField label="Fiber (g)" value={fiber} onChangeText={setFiber} unsignedInteger placeholder="0" />
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Fiber (g)"
+              nativeID="cal-entry-fiber"
+              accessibilityLabel="Calories entry fiber"
+              value={fiber}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setFiber(t);
+              }}
+              unsignedInteger
+              placeholder="0"
+            />
           </View>
         </View>
+        <TextField
+          label="Food"
+          nativeID="cal-entry-food"
+          accessibilityLabel="Calories entry food"
+          value={food}
+          onChangeText={(t) => {
+            setCalorieError(null);
+            setFood(t);
+          }}
+          placeholder="Greek yogurt"
+        />
         <View className="mb-3">
           <View className="flex-row items-center gap-3">
             <Text className="text-sm font-medium text-slate-700">Calories (kcal)</Text>
@@ -265,12 +424,19 @@ export function CaloriesScreen() {
               label={label}
               active={mealType === value}
               color={COLOR}
-              onPress={() => setMealType(value)}
+              onPress={() => {
+                setCalorieError(null);
+                setMealType(value);
+              }}
             />
           ))}
         </View>
-        {formError ? <Text className="mb-2 text-sm text-rose-600">{formError}</Text> : null}
-        <Button label="Add entry" onPress={onAdd} color={COLOR} />
+        <ValidationError message={calorieError} />
+        <Button
+          label={editingEntryId ? "Save changes" : "Add entry"}
+          onPress={handleSubmit}
+          color={COLOR}
+        />
       </Card>
 
       <Card accentColor={COLOR}>
@@ -300,18 +466,24 @@ export function CaloriesScreen() {
           )}
         </View>
 
-        <MacroDonutChart
-          totalKcal={caloriesTotal(entries)}
-          goalKcal={goal.calories}
-          protein={todayTotals.protein}
-          carbs={todayTotals.carbs}
-          fats={todayTotals.fats}
-          fiber={todayTotals.fiber}
-          sectionColor={SECTION_COLORS.calories}
-        />
+        {useMemo(
+          () => (
+            <MacroDonutChart
+              totalKcal={caloriesTotal(entries)}
+              goalKcal={goal.calories}
+              protein={todayTotals.protein}
+              carbs={todayTotals.carbs}
+              fats={todayTotals.fats}
+              fiber={todayTotals.fiber}
+              sectionColor={SECTION_COLORS.calories}
+            />
+          ),
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          [entries, goal.calories, todayTotals],
+        )}
       </Card>
 
-      <CalorieGoalSheet
+      <CalorieGoalModal
         visible={goalSheetVisible}
         currentGoal={goal}
         onSave={async (newGoal) => {
@@ -321,7 +493,7 @@ export function CaloriesScreen() {
         onClose={() => setGoalSheetVisible(false)}
       />
 
-      <SavedMealSearchSheet
+      <SavedMealSearchModal
         visible={searchSheetVisible}
         meals={allSavedMeals}
         onSelect={(meal) => {
@@ -334,46 +506,153 @@ export function CaloriesScreen() {
         }}
       />
 
-      {entries.map((entry) => (
-        <Card key={entry.id} accentColor={COLOR}>
-          <Text className="text-base font-semibold text-slate-900">
-            {entry.food_name} - {entry.calories} kcal
-          </Text>
-          <Text className="mt-1 text-sm capitalize text-slate-600">
-            {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber {entry.fiber}g
-          </Text>
-          <View className="mt-3">
-            <Button
-              label="Delete"
-              variant="danger"
-              onPress={async () => {
-                await deleteCalorieEntry(entry.id);
-                await refresh();
+      <Modal
+        title="Edit entry"
+        visible={entryEditModalVisible}
+        onClose={() => {
+          setEntryEditModalVisible(false);
+          resetCalorieForm();
+        }}
+        scroll
+      >
+        <View className="flex-row flex-wrap gap-2">
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Protein (g)"
+              nativeID="cal-edit-protein"
+              accessibilityLabel="Calories edit protein"
+              value={protein}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setProtein(t);
               }}
+              unsignedInteger
             />
           </View>
-        </Card>
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Carbs (g)"
+              nativeID="cal-edit-carbs"
+              accessibilityLabel="Calories edit carbs"
+              value={carbs}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setCarbs(t);
+              }}
+              unsignedInteger
+            />
+          </View>
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Fats (g)"
+              nativeID="cal-edit-fat"
+              accessibilityLabel="Calories edit fat"
+              value={fats}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setFats(t);
+              }}
+              unsignedInteger
+            />
+          </View>
+          <View className="min-w-[140px] grow basis-[22%]">
+            <TextField
+              label="Fiber (g)"
+              nativeID="cal-edit-fiber"
+              accessibilityLabel="Calories edit fiber"
+              value={fiber}
+              onChangeText={(t) => {
+                setCalorieError(null);
+                setFiber(t);
+              }}
+              unsignedInteger
+              placeholder="0"
+            />
+          </View>
+        </View>
+        <TextField
+          label="Food"
+          nativeID="cal-edit-food"
+          accessibilityLabel="Calories edit food"
+          value={food}
+          onChangeText={(t) => {
+            setCalorieError(null);
+            setFood(t);
+          }}
+          placeholder="Greek yogurt"
+        />
+        <View className="mb-3">
+          <View className="flex-row items-center gap-3">
+            <Text className="text-sm font-medium text-slate-700">Calories (kcal)</Text>
+            <Text className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-base text-slate-900">
+              {computedKcal > 0 ? computedKcal : "—"}
+            </Text>
+          </View>
+          <Text className="mt-1 text-xs text-slate-500">
+            Auto-calculated from protein, carbs, fat, and fiber.
+          </Text>
+        </View>
+        <Text className="mb-2 text-sm font-medium text-slate-700">Meal</Text>
+        <View className="mb-4 flex-row flex-wrap">
+          {MEAL_OPTIONS.map(({ value, label }) => (
+            <PillChip
+              key={value}
+              label={label}
+              active={mealType === value}
+              color={COLOR}
+              onPress={() => {
+                setCalorieError(null);
+                setMealType(value);
+              }}
+            />
+          ))}
+        </View>
+        <ValidationError message={calorieError} />
+        <Button label="Save changes" onPress={handleSubmit} color={COLOR} />
+      </Modal>
+
+      {entries.map((entry) => (
+        <CalorieEntrySwipeRow
+          key={entry.id}
+          entry={entry}
+          accentColor={COLOR}
+          onEdit={() => openEntryEditModal(entry)}
+          onDelete={async () => {
+            await deleteCalorieEntry(entry.id);
+            if (editingEntryId === entry.id) {
+              resetCalorieForm();
+            }
+            await refresh();
+          }}
+        />
       ))}
 
-      <View className="mt-4">
-        <Pressable onPress={() => setWeeklyVisible((v) => !v)}>
-          <Text className="text-xs text-calories text-center py-2">
-            {weeklyVisible ? "▲ hide weekly trend" : "▼ weekly trend"}
-          </Text>
-        </Pressable>
-        {weeklyVisible && (
-          <WeeklyCalorieChart data={weeklyTrend} goalKcal={goal.calories} />
-        )}
-      </View>
+      {useMemo(
+        () => (
+          <Card accentColor={SECTION_COLORS.calories} className="mx-1 mt-4">
+            <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
+          </Card>
+        ),
+        [dailyTrend, goal.calories],
+      )}
 
-      <View className="mt-4">
-        <GitHubHeatmap
-          days={calorieHeatmapDays}
-          color={SECTION_COLORS.calories}
-          label="Calorie tracking — last 52 weeks"
-          weeks={52}
-        />
-      </View>
+      {useMemo(
+        () => (
+          <View className="mt-4">
+            <Card accentColor={SECTION_COLORS.calories} className="mx-1 mb-0">
+              <View className="w-full min-w-0 items-center justify-center">
+                <Text className="mb-2 self-start text-xs text-slate-400">Calories — last year</Text>
+                <GitHubHeatmap
+                  days={calorieHeatmapDays}
+                  color={SECTION_COLORS.calories}
+                  weeks={53}
+                />
+              </View>
+            </Card>
+          </View>
+        ),
+        [calorieHeatmapDays],
+      )}
     </Screen>
   );
 }

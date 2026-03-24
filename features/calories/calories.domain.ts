@@ -28,27 +28,35 @@ export function caloriesTotal(entries: { calories: number }[]): number {
   return entries.reduce((sum, entry) => sum + entry.calories, 0);
 }
 
-export function buildWeeklyTrend(
+export type DailyTrendPoint = {
+  value: number;
+  label: string;
+  dateKey: string;
+};
+
+/**
+ * Last `days` calendar days (oldest → newest), for bar charts.
+ * Default 365 — one year of daily points for scrolling charts.
+ * Labels are short month + day (e.g. "Mar 15") for x-axis readability.
+ */
+export function buildDailyTrend(
   summaries: DailySummary[],
-  days: number = 7,
-): { dateKey: string; value: number; label: string }[] {
+  days: number = 365,
+): DailyTrendPoint[] {
   const map = new Map<string, number>();
   for (const s of summaries) {
     map.set(s.dateKey, s.totalCalories);
   }
 
-  const result = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const dateKey = `${y}-${m}-${day}`;
-    const label = d.toLocaleDateString("en", { weekday: "short" });
-    result.push({ dateKey, value: map.get(dateKey) ?? 0, label });
-  }
-  return result;
+  return buildDateRangeOldestFirst(days).map((dateKey) => {
+    const d = new Date(`${dateKey}T12:00:00`);
+    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return {
+      dateKey,
+      value: map.get(dateKey) ?? 0,
+      label,
+    };
+  });
 }
 
 export type MacroSlice = {

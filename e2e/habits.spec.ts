@@ -2,9 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { goToTab } from "./helpers/navigation";
 import { clearDatabase } from "./helpers/db";
 
-/** Opens add-habit modal via the per–time-group + control (inline dashed border, not a Tailwind class). */
+/** Opens add-habit modal via the per–time-group + control (label "Add" is plain text; the + is pressable). */
 async function openAddHabitModal(page: Page) {
-  await page.getByText("Add", { exact: true }).first().click();
+  await page.getByText("+", { exact: true }).first().locator("..").click({ force: true });
 }
 
 test.describe("Habits", () => {
@@ -23,7 +23,7 @@ test.describe("Habits", () => {
 
   test("does not add habit with empty name", async ({ page }) => {
     await openAddHabitModal(page);
-    await page.getByText("Create habit", { exact: true }).click();
+    await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(
       page.getByText(/Pick a time of day and tap Add to create your first habit/i),
     ).toBeVisible();
@@ -31,15 +31,15 @@ test.describe("Habits", () => {
 
   test("adds a new habit", async ({ page }) => {
     await openAddHabitModal(page);
-    await page.getByPlaceholder(/Read 20 minutes/i).fill("Morning run");
-    await page.getByText("Create habit", { exact: true }).click();
+    await page.getByLabel("Habit name").fill("Morning run");
+    await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("Morning run").first()).toBeVisible();
   });
 
   test("increments habit completion", async ({ page }) => {
     await openAddHabitModal(page);
-    await page.getByPlaceholder(/Read 20 minutes/i).fill("Meditate");
-    await page.getByText("Create habit", { exact: true }).click();
+    await page.getByLabel("Habit name").fill("Meditate");
+    await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("Meditate").first()).toBeVisible();
     // Ring is the preceding sibling of the label row (Pressable has no role="button" on RN Web).
     await page
@@ -51,8 +51,8 @@ test.describe("Habits", () => {
 
   test("habit persists after reload", async ({ page }) => {
     await openAddHabitModal(page);
-    await page.getByPlaceholder(/Read 20 minutes/i).fill("Drink water");
-    await page.getByText("Create habit", { exact: true }).click();
+    await page.getByLabel("Habit name").fill("Drink water");
+    await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("Drink water").first()).toBeVisible();
 
     await page.reload();
@@ -67,10 +67,10 @@ test.describe("Habits", () => {
     page,
   }) => {
     await openAddHabitModal(page);
-    await page.getByPlaceholder(/Read 20 minutes/i).fill("Delete this habit");
-    await page.getByText("Create habit", { exact: true }).click();
+    await page.getByLabel("Habit name").fill("Delete this habit");
+    await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("Delete this habit").first()).toBeVisible();
-    await page.locator(".mb-4.flex-row").locator(".rounded-lg.p-2").click();
+    await page.locator(".flex-row.justify-between.items-start .rounded-lg.p-2").first().click();
     await page.getByText("Delete", { exact: true }).first().click();
     await expect(page.getByText("Delete this habit").first()).toBeVisible();
   });

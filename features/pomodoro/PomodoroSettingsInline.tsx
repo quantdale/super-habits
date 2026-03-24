@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { View, Text, TextInput } from "react-native";
 import { Button } from "@/core/ui/Button";
+import { ValidationError } from "@/core/ui/ValidationError";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSettings } from "./pomodoro.domain";
+import { validatePomodoroSettings } from "@/lib/validation";
 
 type Props = {
   settings: PomodoroSettings;
@@ -15,17 +17,20 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
   const [shortBrk, setShortBrk] = useState(String(settings.shortBreakMinutes));
   const [longBrk, setLongBrk] = useState(String(settings.longBreakMinutes));
   const [sessions, setSessions] = useState(String(settings.sessionsBeforeLongBreak));
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const handleSave = () => {
-    const f = Math.max(1, Math.min(99, parseInt(focus, 10) || 25));
-    const s = Math.max(1, Math.min(30, parseInt(shortBrk, 10) || 5));
-    const l = Math.max(1, Math.min(60, parseInt(longBrk, 10) || 15));
-    const n = Math.max(2, Math.min(10, parseInt(sessions, 10) || 4));
+    const err = validatePomodoroSettings(focus, shortBrk, longBrk, sessions);
+    if (err) {
+      setSettingsError(err);
+      return;
+    }
+    setSettingsError(null);
     onSave({
-      focusMinutes: f,
-      shortBreakMinutes: s,
-      longBreakMinutes: l,
-      sessionsBeforeLongBreak: n,
+      focusMinutes: Number(focus.trim()),
+      shortBreakMinutes: Number(shortBrk.trim()),
+      longBreakMinutes: Number(longBrk.trim()),
+      sessionsBeforeLongBreak: Number(sessions.trim()),
     });
   };
 
@@ -43,7 +48,10 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
           <Text className="flex-1 text-sm text-slate-600">{label}</Text>
           <TextInput
             value={value}
-            onChangeText={set}
+            onChangeText={(t) => {
+              setSettingsError(null);
+              set(t);
+            }}
             keyboardType="number-pad"
             className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-sm text-slate-800"
             selectTextOnFocus
@@ -51,12 +59,20 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
         </View>
       ))}
 
+      <ValidationError message={settingsError} />
       <View className="mt-3 flex-row gap-2">
         <View className="flex-1">
           <Button label="Save" onPress={handleSave} color={SECTION_COLORS.focus} />
         </View>
         <View className="flex-1">
-          <Button label="Cancel" variant="ghost" onPress={onCancel} />
+          <Button
+            label="Cancel"
+            variant="ghost"
+            onPress={() => {
+              setSettingsError(null);
+              onCancel();
+            }}
+          />
         </View>
       </View>
     </View>

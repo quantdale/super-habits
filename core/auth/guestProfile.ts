@@ -1,5 +1,6 @@
 import { getDatabase } from "@/core/db/client";
 import { createId } from "@/lib/id";
+import { nowIso } from "@/lib/time";
 
 type GuestProfile = {
   id: string;
@@ -16,7 +17,7 @@ export async function ensureGuestProfile(): Promise<GuestProfile> {
 
   const profile: GuestProfile = {
     id: createId("guest"),
-    createdAt: new Date().toISOString(),
+    createdAt: nowIso(),
   };
   await db.runAsync("INSERT INTO app_meta (key, value) VALUES (?, ?)", [
     "guest_profile",

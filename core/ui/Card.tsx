@@ -7,13 +7,28 @@ type CardProps = {
   className?: string;
 };
 
+const BORDER = "#e8e8f0";
+
 export function Card({ children, accentColor, className }: CardProps) {
+  const extra = className?.trim() ?? "";
+  const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
+  const marginClass = hasConsumerVerticalMargin ? "" : "mb-3";
+  const rootClass = ["overflow-hidden", "rounded-2xl", "bg-white", marginClass, extra]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <View
-      className={`mb-3 overflow-hidden rounded-2xl bg-white ${className ?? ""}`}
+      className={rootClass}
       style={{
-        borderWidth: 1,
-        borderColor: "#e8e8f0",
+        borderTopWidth: 1,
+        borderRightWidth: 1,
+        borderBottomWidth: 1,
+        borderLeftWidth: accentColor ? 4 : 1,
+        borderTopColor: BORDER,
+        borderRightColor: BORDER,
+        borderBottomColor: BORDER,
+        borderLeftColor: accentColor ?? BORDER,
         shadowColor: "#000000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
@@ -21,21 +36,7 @@ export function Card({ children, accentColor, className }: CardProps) {
         elevation: 2,
       }}
     >
-      {accentColor ? (
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 4,
-            backgroundColor: accentColor,
-            borderTopLeftRadius: 16,
-            borderBottomLeftRadius: 16,
-          }}
-        />
-      ) : null}
-      <View className={accentColor ? "py-3 pl-3 pr-4" : "px-4 py-3"}>{children}</View>
+      <View className={accentColor ? "py-3 pl-2 pr-4" : "px-4 py-3"}>{children}</View>
     </View>
   );
 }

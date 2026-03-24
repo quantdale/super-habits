@@ -4,15 +4,43 @@ import {
   calculateGrowthProgress,
   getPlantStage,
   formatSessionTime,
+  formatSessionDuration,
   getModeDuration,
   getNextMode,
   getModeLabel,
+  getModeColor,
   parseMinutesSeconds,
   DEFAULT_SETTINGS,
   buildPomodoroHeatmapDays,
   computeFocusStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
 import type { PomodoroSession } from "@/core/db/types";
+
+describe("getModeColor", () => {
+  it("returns brand classes for focus", () => {
+    expect(getModeColor("focus")).toEqual({
+      bg: "bg-brand-500",
+      text: "text-brand-500",
+      bar: "bg-brand-500",
+    });
+  });
+
+  it("returns emerald classes for short break", () => {
+    expect(getModeColor("short_break")).toEqual({
+      bg: "bg-emerald-500",
+      text: "text-emerald-500",
+      bar: "bg-emerald-500",
+    });
+  });
+
+  it("returns violet classes for long break", () => {
+    expect(getModeColor("long_break")).toEqual({
+      bg: "bg-violet-500",
+      text: "text-violet-500",
+      bar: "bg-violet-500",
+    });
+  });
+});
 
 describe("nextPomodoroState", () => {
   it("returns finished at zero", () => {
@@ -58,6 +86,18 @@ describe("getPlantStage", () => {
   it("grown at 1", () => expect(getPlantStage(1)).toBe("grown"));
 });
 
+describe("formatSessionDuration", () => {
+  it("returns minutes with m suffix when seconds >= 60", () => {
+    expect(formatSessionDuration(60)).toBe("1m");
+    expect(formatSessionDuration(1500)).toBe("25m");
+  });
+  it("returns seconds with s suffix when seconds < 60", () => {
+    expect(formatSessionDuration(0)).toBe("0s");
+    expect(formatSessionDuration(45)).toBe("45s");
+    expect(formatSessionDuration(59)).toBe("59s");
+  });
+});
+
 describe("formatSessionTime", () => {
   it("returns 'Today HH:MM' for today's session", () => {
     const now = new Date().toISOString();
@@ -88,14 +128,20 @@ describe("getModeDuration", () => {
 });
 
 describe("getNextMode", () => {
-  it("focus → short_break when zero completed sessions (0 % N must not imply long break)", () => {
+  it("focus → short_break at 0 sessions (never long_break at start)", () => {
     expect(getNextMode("focus", 0, DEFAULT_SETTINGS)).toBe("short_break");
   });
-  it("focus → short_break when not at long break threshold", () => {
-    expect(getNextMode("focus", 1, DEFAULT_SETTINGS)).toBe("short_break");
+  it("focus → short_break when zero completed sessions for any sessionsBeforeLongBreak", () => {
+    for (const n of [1, 2, 3, 4, 8]) {
+      const settings = { ...DEFAULT_SETTINGS, sessionsBeforeLongBreak: n };
+      expect(getNextMode("focus", 0, settings)).toBe("short_break");
+    }
   });
-  it("focus → long_break after 4 focus sessions", () => {
+  it("focus → long_break only after 4 completed sessions", () => {
     expect(getNextMode("focus", 4, DEFAULT_SETTINGS)).toBe("long_break");
+  });
+  it("focus → short_break at 1 session", () => {
+    expect(getNextMode("focus", 1, DEFAULT_SETTINGS)).toBe("short_break");
   });
   it("short_break → focus", () => {
     expect(getNextMode("short_break", 1, DEFAULT_SETTINGS)).toBe("focus");

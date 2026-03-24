@@ -3,7 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSession } from "./types";
-import { formatSessionTime } from "./pomodoro.domain";
+import { formatSessionDuration } from "./pomodoro.domain";
 
 type Props = {
   sessions: PomodoroSession[];
@@ -68,7 +68,7 @@ export function GardenGrid({ sessions, accentColor = SECTION_COLORS.focus }: Pro
           >
             <MiniPlant color={accentColor} />
             <Text className="mt-0.5 text-xs text-slate-400">
-              {formatSessionTime(session.started_at).replace(/Today /, "")}
+              {formatSessionDuration(session.duration_seconds)}
             </Text>
           </Pressable>
         ))}

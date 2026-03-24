@@ -1,7 +1,6 @@
 import type { PomodoroSession } from "./types";
-import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
-import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
+import { buildDateRangeOldestFirst } from "@/lib/time";
 
 export type PomodoroState = "idle" | "running" | "finished";
 
@@ -56,7 +55,9 @@ export function getNextMode(
   if (currentMode === "short_break" || currentMode === "long_break") {
     return "focus";
   }
-  // 0 % N === 0 for all N — long break only after at least one completed focus in the cycle.
+  // currentMode === "focus"
+  // Guard: at least one session must be completed before
+  // a long break can be suggested (0 % N === 0 for all N).
   if (
     completedFocusSessions > 0 &&
     completedFocusSessions % settings.sessionsBeforeLongBreak === 0
@@ -143,6 +144,14 @@ export function getPlantStage(progress: number): PlantStage {
 }
 
 /**
+ * Format completed session length for the garden grid (e.g. "25m", "45s").
+ */
+export function formatSessionDuration(seconds: number): string {
+  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
+  return `${seconds}s`;
+}
+
+/**
  * Format a pomodoro session for display in the garden grid tooltip.
  * Returns "Today 14:30" or "Mar 21 09:15".
  */
@@ -167,28 +176,6 @@ export function formatSessionTime(startedAt: string): string {
       day: "numeric",
     }) + ` ${time}`
   );
-}
-
-/**
- * Build ActivityDay array from pomodoro sessions.
- * A day is "active" if at least one session was completed.
- */
-export function buildPomodoroActivityDays(
-  sessions: PomodoroSession[],
-  days: number = 364,
-): ActivityDay[] {
-  const set = new Set<string>();
-  for (const s of sessions) {
-    const d = new Date(s.started_at);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    set.add(`${y}-${m}-${dd}`);
-  }
-  return buildDateRange(days).map((dateKey) => ({
-    dateKey,
-    active: set.has(dateKey),
-  }));
 }
 
 export function buildPomodoroHeatmapDays(

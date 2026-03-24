@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { buildDateRange, buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
+import {
+  buildDateRange,
+  buildDateRangeOldestFirst,
+  buildDateRangeTodayFirst,
+  toDateKey,
+} from "@/lib/time";
 
-describe("buildDateRange", () => {
+describe("buildDateRange / buildDateRangeTodayFirst", () => {
   it("returns today first then older days", () => {
     const today = toDateKey();
     const range = buildDateRange(3);
@@ -10,6 +15,10 @@ describe("buildDateRange", () => {
     const y = new Date();
     y.setDate(y.getDate() - 1);
     expect(range[1]).toBe(toDateKey(y));
+  });
+
+  it("buildDateRange matches buildDateRangeTodayFirst", () => {
+    expect(buildDateRangeTodayFirst(5)).toEqual(buildDateRange(5));
   });
 });
 

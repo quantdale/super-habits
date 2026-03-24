@@ -87,12 +87,12 @@ Do not wire these up without an explicit decision to do so.
 - Every new *.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 109 tests passing — **update this count whenever tests are added or removed**
+- Current count: 143 tests passing — **update this count whenever tests are added or removed**
 - No DB or component tests yet — do not block on this, but document gaps
 
 ## E2E Tests (Playwright)
 
-E2E tests live in `e2e/` at the project root. They run against the Metro dev server (`npm run web` on `localhost:8081`).
+E2E tests live in `e2e/` at the project root. They run against the **static web export** in `dist/`, served by `node scripts/serve-e2e.js` on `http://localhost:8081` with `Cross-Origin-Embedder-Policy: require-corp` (OPFS + SQLite WASM). **Playwright does not build the app:** run `npm run build:web` yourself whenever React components or web bundle output change, then run E2E. Metro (`npm run web`) is for local dev with HMR — **not** used by the E2E pipeline.
 
 **Test files:**
 - `e2e/todos.spec.ts` — Todos feature
@@ -105,7 +105,8 @@ E2E tests live in `e2e/` at the project root. They run against the Metro dev ser
 **Config:** `playwright.config.ts`
 - `headless: true` always
 - Chromium only
-- `workers: 1` and `fullyParallel: false` — OPFS + expo-sqlite hold one lock per origin; parallel workers against `localhost:8081` cause flaky navigation/reload (see config comments)
+- `workers: 1` locally (do not increase — OPFS + expo-sqlite hold one lock per origin; extra workers cause flaky navigation/reload). `fullyParallel: false` — tests in a file stay serial; `clearDatabase()` in `beforeEach` must not race.
+- `webServer.command`: `node scripts/serve-e2e.js` (serves `dist/`; ensure `npm run build:web` has been run)
 - `retries: 2` on CI, `0` locally
 - HTML report: `.cursor/playwright-output/e2e-report/`
 - Failure screenshots / traces: `.cursor/playwright-output/e2e-failures/` (`outputDir`)
@@ -126,13 +127,13 @@ E2E tests live in `e2e/` at the project root. They run against the Metro dev ser
 - Do not add `data-testid` to app components
 - Do not change assertions to make tests pass artificially
 - If a test reveals a genuine bug, fix the app not the test
-- E2E tests are NOT unit tests — they require a running dev server
+- E2E tests are NOT unit tests — they require the static server (or CI’s `build:web` + `npm run e2e`)
 
 ## CI (GitHub Actions)
 
 Two jobs (see `.github/workflows/ci.yml`):
 - **quality** — typecheck + unit tests (runs first)
-- **e2e** — Playwright Chromium tests (runs only if **quality** passes); starts `npm run web`, waits on `localhost:8081`, then `npm run e2e`
+- **e2e** — Playwright Chromium tests (runs only if **quality** passes); runs `npm run build:web`, then `npm run e2e` (Playwright starts `node scripts/serve-e2e.js` per `webServer` in `playwright.config.ts`)
 
 ## Current known bugs (do not silently fix — coordinate first)
 - Sync flush is gated on isRemoteEnabled() (lib/supabase.ts) — interval / visibility / NetInfo flush

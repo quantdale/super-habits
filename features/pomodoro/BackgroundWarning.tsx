@@ -10,10 +10,7 @@ export function BackgroundWarning({ visible, onDismiss }: Props) {
   if (!visible) return null;
 
   return (
-    <View
-      className="mx-4 mb-3 rounded-xl px-4 py-3"
-      style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca" }}
-    >
+    <View className="mx-4 mb-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
       <View className="flex-row items-start justify-between">
         <View className="flex-1">
           <Text className="text-sm font-medium text-rose-700">🍃 You left during a session</Text>

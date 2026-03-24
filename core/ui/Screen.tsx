@@ -23,6 +23,7 @@ export function Screen({ children, scroll = false, padded = true }: ScreenProps)
           contentContainerClassName="grow"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          nestedScrollEnabled
         >
           {scrollContent}
         </ScrollView>

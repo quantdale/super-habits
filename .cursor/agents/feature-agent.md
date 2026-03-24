@@ -48,9 +48,11 @@ NON-NEGOTIABLES
 - Do not fix toDateKey() UTC bug silently — flag it
 - CaloriesScreen has a meal type picker — `mealType` is user-selectable (breakfast/lunch/dinner/snack). Do not revert to hard-coded `"snack"`.
 - `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
-- 96 tests must pass after every change — update this count whenever tests are added or removed
+- 143 tests must pass after every change — update this count whenever tests are added or removed
 
 E2E TESTS
+E2E uses the **static** web bundle: run `npm run build:web` when you change screens or components, then `npm run e2e` (Playwright serves `dist/` via `node scripts/serve-e2e.js`). Metro is not used for E2E. **Keep `workers: 1` locally** for OPFS SQLite.
+
 When fixing UI or domain issues, run the relevant E2E spec after:
   npx playwright test e2e/{feature}.spec.ts
 If selectors in the spec file don't match the actual rendered DOM after a UI change, update the selectors in the spec — do not remove tests or weaken assertions.

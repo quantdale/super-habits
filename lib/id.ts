@@ -9,7 +9,11 @@
  * | habit_completions   | hcmp   |
  * | calorie_entries     | cal    |
  * | saved_meals         | smeal  |
- * | workout (routine/log)| wrk   |
+ * | workout_routine     | wrk    |
+ * | workout_log         | wrk    |
+ * | routine_exercise    | ex     |
+ * | routine_exercise_set| eset   |
+ * | workout_session_ex  | wsex   |
  * | pomodoro_sessions   | pom    |
  * | guest (app_meta)    | guest  |
  * | recurring todo ser. | rec    |

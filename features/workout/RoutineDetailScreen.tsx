@@ -1,10 +1,9 @@
-import React, { useState, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, Alert, TextInput } from "react-native";
-import { useFocusEffect } from "expo-router";
-import { Screen } from "@/core/ui/Screen";
+import { MaterialIcons } from "@expo/vector-icons";
+import { Modal } from "@/core/ui/Modal";
 import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
-import { SectionTitle } from "@/core/ui/SectionTitle";
 import {
   listExercises,
   addExercise,
@@ -17,26 +16,45 @@ import {
 import { formatWorkoutTime } from "./workout.domain";
 import type { RoutineExercise, RoutineExerciseSet } from "./types";
 import { SECTION_COLORS } from "@/constants/sectionColors";
+import { ValidationError } from "@/core/ui/ValidationError";
+import { validateExerciseName, validateSetTiming } from "@/lib/validation";
+import { NumberStepperField } from "@/core/ui/NumberStepperField";
 
 const COLOR = SECTION_COLORS.workout;
 
 type ExerciseWithSets = RoutineExercise & { sets: RoutineExerciseSet[] };
 
+function summarizeExerciseSets(sets: RoutineExerciseSet[]): string {
+  if (sets.length === 0) return "No sets";
+  const first = sets[0];
+  const allSameActive = sets.every((s) => s.active_seconds === first.active_seconds);
+  const allSameRest = sets.every((s) => s.rest_seconds === first.rest_seconds);
+  const head = `${sets.length} set${sets.length === 1 ? "" : "s"}`;
+  if (allSameActive && allSameRest) {
+    return `${head} · ${formatWorkoutTime(first.active_seconds)} / ${formatWorkoutTime(first.rest_seconds)}`;
+  }
+  return `${head} · mixed`;
+}
+
 type Props = {
+  visible: boolean;
   routineId: string;
   routineName: string;
+  onClose: () => void;
   onStartWorkout: () => void;
-  onBack: () => void;
 };
 
-export function RoutineDetailScreen({
+export function RoutineDetailModal({
+  visible,
   routineId,
   routineName,
+  onClose,
   onStartWorkout,
-  onBack,
 }: Props) {
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
   const [newExerciseName, setNewExerciseName] = useState("");
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const exList = await listExercises(routineId);
@@ -49,14 +67,22 @@ export function RoutineDetailScreen({
     setExercises(withSets);
   }, [routineId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
+  useEffect(() => {
+    if (!visible || !routineId) return;
+    void refresh();
+  }, [visible, routineId, refresh]);
+
+  useEffect(() => {
+    if (!visible) setExpandedId(null);
+  }, [visible]);
 
   const handleAddExercise = async () => {
-    if (!newExerciseName.trim()) return;
+    const err = validateExerciseName(newExerciseName);
+    if (err) {
+      setWorkoutError(err);
+      return;
+    }
+    setWorkoutError(null);
     const exId = await addExercise({
       routineId,
       name: newExerciseName.trim(),
@@ -64,7 +90,8 @@ export function RoutineDetailScreen({
     });
     await addDefaultSet(exId);
     setNewExerciseName("");
-    refresh();
+    await refresh();
+    setExpandedId(exId);
   };
 
   const handleDeleteExercise = (id: string, name: string) => {
@@ -75,136 +102,140 @@ export function RoutineDetailScreen({
         style: "destructive",
         onPress: async () => {
           await deleteExercise(id);
+          if (expandedId === id) setExpandedId(null);
           refresh();
         },
       },
     ]);
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
   return (
-    <Screen scroll>
-      <Pressable onPress={onBack} className="mb-4">
-        <Text className="text-workout text-sm">← Back</Text>
-      </Pressable>
-
-      <SectionTitle title={routineName} />
-
-      {exercises.length > 0 && (
-        <Button label="Start workout" onPress={onStartWorkout} color={COLOR} />
-      )}
-
-      <View className="mt-6 gap-3">
-        {exercises.map((ex) => (
-          <Card key={ex.id} accentColor={COLOR}>
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-base font-medium text-slate-800">{ex.name}</Text>
-              <Pressable onPress={() => handleDeleteExercise(ex.id, ex.name)}>
-                <Text className="text-rose-400 text-sm">Remove</Text>
-              </Pressable>
-            </View>
-
-            {ex.sets.map((set) => (
-              <View key={set.id} className="flex-row items-center gap-2 mb-2">
-                <Text className="text-xs text-slate-400 w-12">Set {set.set_number}</Text>
-                <View className="flex-1">
-                  <Text className="text-xs text-slate-400 mb-0.5">Active</Text>
-                  <View className="flex-row items-center gap-1">
-                    <Pressable
-                      onPress={async () => {
-                        const next = Math.max(5, set.active_seconds - 5);
-                        await updateSet(set.id, { activeSeconds: next });
-                        refresh();
-                      }}
-                      className="w-7 h-7 bg-slate-100 rounded items-center justify-center"
-                    >
-                      <Text className="text-slate-600">−</Text>
-                    </Pressable>
-                    <Text className="text-sm text-slate-700 w-12 text-center">
-                      {formatWorkoutTime(set.active_seconds)}
-                    </Text>
-                    <Pressable
-                      onPress={async () => {
-                        const next = Math.min(600, set.active_seconds + 5);
-                        await updateSet(set.id, { activeSeconds: next });
-                        refresh();
-                      }}
-                      className="w-7 h-7 bg-slate-100 rounded items-center justify-center"
-                    >
-                      <Text className="text-slate-600">+</Text>
-                    </Pressable>
+    <Modal visible={visible} onClose={onClose} title={routineName} scroll>
+      <View className="gap-3">
+        {exercises.map((ex) => {
+          const isOpen = expandedId === ex.id;
+          return (
+            <Card key={ex.id} accentColor={COLOR}>
+              <View className="flex-row items-center justify-between">
+                <Pressable
+                  onPress={() => toggleExpanded(ex.id)}
+                  className="min-w-0 flex-1 flex-row items-center gap-2"
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isOpen }}
+                >
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-base font-medium text-slate-800">{ex.name}</Text>
+                    <Text className="mt-0.5 text-xs text-slate-500">{summarizeExerciseSets(ex.sets)}</Text>
                   </View>
-                </View>
+                  <MaterialIcons
+                    name={isOpen ? "expand-less" : "expand-more"}
+                    size={24}
+                    color="#64748b"
+                  />
+                </Pressable>
+                <Pressable onPress={() => handleDeleteExercise(ex.id, ex.name)} hitSlop={8} className="ml-2">
+                  <Text className="text-sm text-rose-400">Remove</Text>
+                </Pressable>
+              </View>
 
-                <View className="flex-1">
-                  <Text className="text-xs text-slate-400 mb-0.5">Rest</Text>
-                  <View className="flex-row items-center gap-1">
-                    <Pressable
-                      onPress={async () => {
-                        const next = Math.max(0, set.rest_seconds - 5);
-                        await updateSet(set.id, { restSeconds: next });
-                        refresh();
-                      }}
-                      className="w-7 h-7 bg-slate-100 rounded items-center justify-center"
-                    >
-                      <Text className="text-slate-600">−</Text>
-                    </Pressable>
-                    <Text className="text-sm text-slate-700 w-12 text-center">
-                      {formatWorkoutTime(set.rest_seconds)}
-                    </Text>
-                    <Pressable
-                      onPress={async () => {
-                        const next = Math.min(300, set.rest_seconds + 5);
-                        await updateSet(set.id, { restSeconds: next });
-                        refresh();
-                      }}
-                      className="w-7 h-7 bg-slate-100 rounded items-center justify-center"
-                    >
-                      <Text className="text-slate-600">+</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {ex.sets.length > 1 && (
+              {isOpen ? (
+                <View className="mt-4 border-t border-slate-100 pt-3">
+                  {ex.sets.map((set) => (
+                    <View key={set.id} className="mb-4">
+                      <Text className="mb-2 text-xs font-medium text-slate-500">Set {set.set_number}</Text>
+                      <NumberStepperField
+                        label="Active (seconds)"
+                        value={String(set.active_seconds)}
+                        onChange={async (v) => {
+                          const next = Math.round(Number(v.trim()));
+                          if (!Number.isFinite(next)) return;
+                          const timingErr = validateSetTiming(next, set.rest_seconds);
+                          if (timingErr) {
+                            setWorkoutError(timingErr);
+                            return;
+                          }
+                          setWorkoutError(null);
+                          await updateSet(set.id, { activeSeconds: next });
+                          refresh();
+                        }}
+                        min={5}
+                        max={3600}
+                      />
+                      <NumberStepperField
+                        label="Rest (seconds)"
+                        value={String(set.rest_seconds)}
+                        onChange={async (v) => {
+                          const next = Math.round(Number(v.trim()));
+                          if (!Number.isFinite(next)) return;
+                          const timingErr = validateSetTiming(set.active_seconds, next);
+                          if (timingErr) {
+                            setWorkoutError(timingErr);
+                            return;
+                          }
+                          setWorkoutError(null);
+                          await updateSet(set.id, { restSeconds: next });
+                          refresh();
+                        }}
+                        min={0}
+                        max={1800}
+                      />
+                      {ex.sets.length > 1 ? (
+                        <Pressable
+                          onPress={async () => {
+                            await deleteSet(set.id);
+                            refresh();
+                          }}
+                          className="self-end"
+                          hitSlop={8}
+                        >
+                          <Text className="text-sm text-slate-400">Remove set</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
                   <Pressable
                     onPress={async () => {
-                      await deleteSet(set.id);
+                      await addDefaultSet(ex.id);
                       refresh();
                     }}
-                    hitSlop={8}
                   >
-                    <Text className="text-slate-300 text-sm">✕</Text>
+                    <Text className="text-xs text-workout">+ Add set</Text>
                   </Pressable>
-                )}
-              </View>
-            ))}
-
-            <Pressable
-              onPress={async () => {
-                await addDefaultSet(ex.id);
-                refresh();
-              }}
-              className="mt-1"
-            >
-              <Text className="text-xs text-workout">+ Add set</Text>
-            </Pressable>
-          </Card>
-        ))}
+                </View>
+              ) : null}
+            </Card>
+          );
+        })}
       </View>
 
-      <View className="mt-4">
-        <Text className="text-sm text-slate-600 mb-2">Add exercise</Text>
+      <View className="mt-6">
+        <Text className="mb-2 text-sm text-slate-600">Add exercise</Text>
+        <ValidationError message={workoutError} />
         <View className="flex-row gap-2">
           <TextInput
             value={newExerciseName}
-            onChangeText={setNewExerciseName}
+            onChangeText={(t) => {
+              setWorkoutError(null);
+              setNewExerciseName(t);
+            }}
             placeholder="e.g. Rows, Curls, Push-ups"
-            className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800"
+            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
             onSubmitEditing={handleAddExercise}
             returnKeyType="done"
           />
           <Button label="Add" onPress={handleAddExercise} color={COLOR} />
         </View>
       </View>
-    </Screen>
+
+      {exercises.length > 0 ? (
+        <View className="mt-6">
+          <Button label="Start workout" onPress={onStartWorkout} color={COLOR} />
+        </View>
+      ) : null}
+    </Modal>
   );
 }
