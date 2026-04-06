@@ -17,11 +17,11 @@ Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABI
 | **`app/`** | Expo Router only: root stack, index redirect, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
 | **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), `AppProviders`, guest profile, PWA SW registration, shared **`core/ui/`** primitives. |
 | **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. |
-| **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, `supabase` stub, notifications, horizontal scroll style. **No** `features/`, **no** DB. |
+| **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), notifications, horizontal scroll style. **No** `features/`, **no** DB. |
 | **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette). |
 | **`tests/`** | Vitest: `lib/`, `*.domain.ts`, validation; not component/DB-heavy (STUB skipped). |
 
-**Also:** `e2e/` Playwright; `public/` static + `sw.js`; `assets/` images; `patches/` patch-package.
+**Also:** `e2e/` Playwright; `public/` static + `sw.js`; `assets/` images; `patches/` patch-package; root **`vercel.json`** (web PWA: `build:web` → `dist`, COOP/COEP headers, SPA rewrites).
 
 ---
 
@@ -48,9 +48,9 @@ app/(tabs)/{name}.tsx → default export <{Name}Screen /> only
 |---------|------|--------|
 | **Persistence** | `core/db/client.ts` | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()`, WAL native-only. `schema.sql` = reference, **not** runtime. |
 | **Row shapes** | `core/db/types.ts` | TypeScript entity types consumed by data layer. |
-| **Sync** | `core/sync/sync.engine.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → `SyncAdapter` (default `NoopSyncAdapter`). **Not** duplicated elsewhere. |
+| **Sync** | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). **Not** duplicated elsewhere. |
 
-Remote flush (interval / visibility / NetInfo) only when `isRemoteEnabled()` (`lib/supabase.ts`) — wired in `AppProviders`.
+Remote flush (30s interval / visibility hidden / NetInfo reconnect) when `isRemoteEnabled()` (`lib/supabase.ts`, default **enabled**) — wired in `AppProviders` alongside **`ensureAnonymousSession()`**.
 
 ---
 

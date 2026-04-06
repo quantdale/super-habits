@@ -12,7 +12,7 @@ todos, habits, pomodoro, workout, calories.
 Stack: React Native 0.84, Expo 55, TypeScript 6, expo-router, SQLite
 (expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
 Target: Web (PWA), iOS, Android.
-Status: Active MVP. No production deployment pipeline yet.
+Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
 Current stored schema version: **9** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 10) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 ## Non-negotiable invariants — violating these causes silent data corruption
@@ -149,19 +149,20 @@ Two jobs (see `.github/workflows/ci.yml`):
 
 ## Current known bugs (do not silently fix — coordinate first)
 
-- Sync flush is gated on isRemoteEnabled() (lib/supabase.ts) — interval / visibility / NetInfo flush
-  runs only when remote is enabled. While remote is off (default), the in-memory sync queue can grow
-  with NoopSyncAdapter; this is intentional until cloud sync is turned on. Document as a tradeoff, not
-  a silent bug fix.
+- Sync flush is gated on `isRemoteEnabled()` (`lib/supabase.ts`) — interval / visibility / NetInfo flush
+  runs when remote is enabled (**default `remoteMode` is `"enabled"`**). If `setRemoteMode("disabled")` is used,
+  flush listeners are not registered and the in-memory queue can grow — intentional local-only tradeoff.
+  The exported `syncEngine` uses **`SupabaseSyncAdapter`** (push upsert); if Supabase env vars are unset,
+  `supabase` is `null` and pushes no-op without throwing. Document as tradeoff, not a silent bug fix.
 - schema.sql is out of date (reference only, not authoritative)
 
-Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
+Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true; **`ensureAnonymousSession()`** runs on bootstrap when Supabase is configured. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
 
 Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.ts` is covered by Vitest; **PomodoroScreen** currently uses inline button labels and does not import it — wire the screen to the domain helper if you want a single source of truth for `Running...` vs `Start focus`.
 
 ## Web / PWA context (not application bugs)
 
-- **COEP:** `metro.config.js` and `app.json` set `Cross-Origin-Embedder-Policy: require-corp` (was `credentialless` in some setups) to establish `crossOriginIsolated` for shared-memory WASM on web.
+- **COEP / COOP:** `metro.config.js` and `app.json` set isolation headers for dev; production static web on **Vercel** uses root **`vercel.json`** (`Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Opener-Policy: same-origin`, SPA rewrite `/(.*)` → `/index.html`) so `crossOriginIsolated` holds for SQLite WASM on web.
 - **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v3` (`CACHE_VERSION = "v3"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
 
 ## MCP tools (development)

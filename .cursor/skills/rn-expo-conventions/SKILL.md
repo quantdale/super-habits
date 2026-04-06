@@ -56,8 +56,9 @@ The following are initialized here in order:
 3. DB init (initializeDatabase / getDatabase on mount)
 4. Service worker registration (web only)
 5. Guest profile creation (core/auth/guestProfile.ts)
+6. **`ensureAnonymousSession()`** (`lib/supabase.ts`) when Supabase env is configured
 
-When **`isRemoteEnabled()`** is true (`lib/supabase.ts`), a separate effect registers **`syncEngine.flush()`** on an interval, on web visibility (hidden), and on NetInfo reconnect — **not** when remote is off (default).
+When **`isRemoteEnabled()`** is true (`lib/supabase.ts` — **`remoteMode` defaults to `"enabled"`**), a separate effect registers **`syncEngine.flush()`** on a **30s** interval, on web visibility (hidden), and on NetInfo reconnect — **not** when `setRemoteMode("disabled")` is used.
 
 Do NOT add DB calls before AppProviders initializes. Any component that
 calls a *.data.ts function must be a descendant of AppProviders.
@@ -65,8 +66,8 @@ calls a *.data.ts function must be a descendant of AppProviders.
 ## Guest profile (core/auth/guestProfile.ts)
 - Creates a guest user row in app_meta table on first launch
 - Returns existing profile on subsequent launches
-- Used as the user identity until Supabase auth is implemented
-- Do not replace this with a real auth system without a migration plan
+- Local **`app_meta`** identity for the app; **remote** backup uses **Supabase anonymous auth** + `SupabaseSyncAdapter` (separate from guest JSON)
+- Do not remove guest profile without considering onboarding / local-only flows
 
 ## TypeScript
 - Strict mode enabled (tsconfig.json)
@@ -84,6 +85,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)
+- **vercel.json** (repo root): static web deploy — same COOP/COEP on all routes + SPA rewrite to `/index.html` (see knowledge base)
 - babel.config.js: expo preset + nativewind + reanimated (order matters)
 - Do not change babel plugin order — reanimated must be last
 
@@ -91,7 +93,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - App.tsx — legacy, not used by expo-router
 - index.ts — legacy registerRootComponent, not used
 - `nextPomodoroState()` in `pomodoro.domain.ts` — **used in Vitest**; PomodoroScreen does not import it yet (labels inline)
-- lib/supabase.ts — in-memory `remoteMode` ("disabled" default); `setRemoteMode` / `isRemoteEnabled` not wired from UI; no Supabase client yet
+- lib/supabase.ts — optional Supabase client from `EXPO_PUBLIC_*`; **`remoteMode` defaults to `"enabled"`**; `ensureAnonymousSession` on bootstrap; `setRemoteMode` / `isRemoteEnabled` gate flush (not wired from product UI by default)
 
 ## MCP tools (development workflow)
 

@@ -50,8 +50,7 @@ Entities that DO sync: todos, habits, calorie_entries, workout_routines (enqueue
 Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions
 (This is intentional — local-only data.)
 
-The sync adapter is currently NoopSyncAdapter — enqueue() is a no-op.
-But the call must be there so the wiring is correct when sync is implemented.
+The exported **`syncEngine`** uses **`SupabaseSyncAdapter`** (push upsert to Supabase when the client is configured). **`NoopSyncAdapter`** remains the `SyncEngine` constructor default for tests. **`enqueue()` always runs** — it fills the in-memory queue; never skip it on writes.
 
 ## ID generation
 File: lib/id.ts
@@ -97,7 +96,7 @@ The E2E suite includes `e2e/infrastructure.spec.ts`, which verifies (among other
 - COEP is `require-corp` (not `credentialless`)
 - COOP is `same-origin`
 - `crossOriginIsolated` is `true` (required for SQLite WASM on web)
-- Service worker / shell cache behavior (e.g. `superhabits-shell-v2` / `CACHE_VERSION` in `public/sw.js` — see spec assertions)
+- Service worker / shell cache behavior (e.g. `superhabits-shell-v3` / `CACHE_VERSION` in `public/sw.js` — see spec assertions)
 - Localhost serves assets from network (SW dev bypass active)
 - OPFS lock: second context/tab surfaces lock-related errors when another holds the DB
 - No `[db] initializeDatabase failed` (or equivalent) on clean load

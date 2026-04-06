@@ -36,8 +36,8 @@ npm run build:web        # Expo web export (needed before e2e in CI)
 |------|------|
 | `app/` | Expo Router only — root stack, `(tabs)/_layout`, thin `*.tsx` per tab (each renders one `*Screen`). No business logic. |
 | `features/` | Product modules — one subdirectory per feature (see pattern below). |
-| `core/` | Cross-cutting infra: DB singleton + migrations (`core/db/client.ts`), entity types (`core/db/types.ts`), sync queue (`core/sync/sync.engine.ts`), `AppProviders`, shared `core/ui/` primitives. |
-| `lib/` | Pure/platform helpers: `id`, `time`, `validation`, `supabase` stub, notifications. No DB, no feature imports. |
+| `core/` | Cross-cutting infra: DB singleton + migrations (`core/db/client.ts`), entity types (`core/db/types.ts`), sync (`core/sync/sync.engine.ts`, `supabase.adapter.ts`), `AppProviders`, shared `core/ui/` primitives. |
+| `lib/` | Pure/platform helpers: `id`, `time`, `validation`, `supabase` (client + anonymous session + `remoteMode`), notifications. No DB, no feature imports. |
 | `constants/` | Design tokens — `sectionColors.ts` (per-tab palette). |
 | `tests/` | Vitest unit specs for `*.domain.ts` and `lib/` helpers. |
 | `e2e/` | Playwright specs + `helpers/` (`db.ts`, `navigation.ts`, `forms.ts`). |
@@ -59,7 +59,7 @@ app/(tabs)/{name}.tsx → default export <{Name}Screen /> only
 
 - **Local UI state:** `useState` per screen (forms, modals, filters).
 - **Tab-focus refresh:** `useFocusEffect` (Expo Router) to reload data when a tab gains focus.
-- **Sync state:** `SyncEngine` in `core/sync/sync.engine.ts` — custom queue, not Redux/Zustand.
+- **Sync state:** `SyncEngine` + **`SupabaseSyncAdapter`** — in-memory queue, flush upserts to Supabase when configured; not Redux/Zustand.
 - **`@tanstack/react-query`** and **`zustand`** are installed but not yet actively used in screens.
 
 ---

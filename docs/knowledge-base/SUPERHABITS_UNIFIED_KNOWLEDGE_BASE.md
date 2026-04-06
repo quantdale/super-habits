@@ -55,7 +55,7 @@
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **9**. Next migration: `if (version < 10)`.
 
-**Sync:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. `flush()` runs on interval/visibility/NetInfo **only if** `isRemoteEnabled()` (`lib/supabase.ts`); default **disabled** — queue grows in memory with `NoopSyncAdapter` until remote enabled.
+**Sync:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (one-way **push backup**; `pull` is a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and pushes no-op without throwing.
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
@@ -69,9 +69,10 @@
 | Database | `core/db/client.ts` | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase` |
 | Types | `core/db/types.ts` | Entity TypeScript shapes |
 | IDs & time | `lib/id.ts`, `lib/time.ts` | `createId`, `nowIso`, `toDateKey` (local calendar) |
-| Sync | `core/sync/sync.engine.ts` | In-memory queue; `flush` → adapter.push; noop default |
-| Bootstrap | `core/providers/AppProviders.tsx` | DB init, SW register, guest profile; second effect flushes sync when remote on |
+| Sync | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | In-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured |
+| Bootstrap | `core/providers/AppProviders.tsx` | DB init, SW register, guest profile, **`ensureAnonymousSession()`**; second effect registers sync flush when remote on |
 | PWA | `registerServiceWorker.ts`, `public/sw.js` | Workbox registration; cache-first GET handler |
+| Web deploy | Root **`vercel.json`** | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html` |
 | Styling | `tailwind.config.js`, `global.css` | Section palette + brand scale; NativeWind |
 
 ---
@@ -99,7 +100,7 @@
 | `constants/` | Shared design tokens (section colors) |
 | `core/` | DB singleton, types, sync engine, guest profile, `AppProviders`, PWA registration, shared `ui/` |
 | `features/` | Feature modules: `{name}.data.ts`, `{name}Screen.tsx`, optional `{name}.domain.ts`, `types.ts` re-exports |
-| `lib/` | Pure utilities: `id`, `time`, `validation`, `notifications`, `supabase` (remote stub), `horizontalScrollViewportStyle` |
+| `lib/` | Pure utilities: `id`, `time`, `validation`, `notifications`, **`supabase`** (client + anonymous session + `remoteMode`), `horizontalScrollViewportStyle` |
 | `public/` | Web static assets; `sw.js` service worker |
 | `tests/` | Vitest unit tests (domain-focused; one skipped data stub) |
 | `e2e/` | Playwright specs + helpers |
@@ -109,7 +110,7 @@
 | `.cursor/` | Rules, agents, commands, skills |
 | `docs/knowledge-base/` | This documentation set |
 
-**Not present:** Backend API server, Docker deploy config, monorepo workspaces.
+**Root `vercel.json`:** Vercel project config for static web PWA (build, output dir, COOP/COEP headers, SPA fallback). **Not present in-repo:** Custom backend API server (Supabase is the remote store), Docker deploy config, monorepo workspaces.
 
 ### Complete file inventory
 
@@ -151,9 +152,10 @@
 | `db/types.ts` | Entity TypeScript types |
 | `db/schema.sql` | Reference only (not executed at runtime) |
 | `db/migrations/001_initial_supabase.sql` | Reference / future Supabase |
-| `sync/sync.engine.ts` | `SyncRecord`, `SyncAdapter`, `NoopSyncAdapter`, `SyncEngine`, `syncEngine` singleton |
+| `sync/sync.engine.ts` | `SyncRecord`, `SyncAdapter`, `NoopSyncAdapter`, `SyncEngine`, **`syncEngine`** singleton (`SupabaseSyncAdapter`) |
+| `sync/supabase.adapter.ts` | `SupabaseSyncAdapter` — push upserts for synced entities |
 | `auth/guestProfile.ts` | `ensureGuestProfile` → `app_meta.guest_profile` |
-| `providers/AppProviders.tsx` | DB init, SW, guest profile, React Query, NetInfo/interval sync flush |
+| `providers/AppProviders.tsx` | DB init, SW, guest profile, **`ensureAnonymousSession`**, React Query, NetInfo/interval/visibility sync flush when remote enabled |
 | `pwa/registerServiceWorker.ts` | Workbox `/sw.js` on web |
 | `ui/Card.tsx` | Card shell + optional left accent strip |
 | `ui/Screen.tsx` | `SafeAreaView` + scroll/fill |
@@ -173,7 +175,7 @@
 | `time.ts` | `nowIso`, `toDateKey`, date range builders |
 | `id.ts` | `createId(prefix)` |
 | `validation.ts` | Form validation pure functions |
-| `supabase.ts` | `RemoteMode`, `isRemoteEnabled` stub |
+| `supabase.ts` | Optional Supabase client (`EXPO_PUBLIC_*`); **`ensureAnonymousSession`**, `RemoteMode`, `isRemoteEnabled`, `setRemoteMode` |
 | `notifications.ts` | Expo notifications for Pomodoro |
 | `horizontalScrollViewportStyle.ts` | RN horizontal scroll layout constants |
 
@@ -359,6 +361,8 @@ No other features call `toDateKey()` directly.
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `@react-native-community/netinfo` | ^12.0.1 | Connectivity; triggers `syncEngine.flush` when remote enabled |
+| `@supabase/supabase-js` | ^2.x | Remote DB client; anonymous auth; `SupabaseSyncAdapter` upserts |
+| `@react-native-async-storage/async-storage` | ^3.x | Supabase auth session persistence (browser/native; not during static export SSR) |
 
 ### State / data fetching (installed, dormant)
 
@@ -877,6 +881,17 @@ export function createId(prefix: string): string {
 
 ## 6. Core Infrastructure
 
+### Web / PWA deployment (Vercel)
+
+Production-style web hosting uses the static export in **`dist/`** (`npm run build:web`). Root **`vercel.json`** configures:
+
+- **`buildCommand`:** `npm run build:web`
+- **`outputDirectory`:** `dist`
+- **`rewrites`:** `source: "/(.*)"` → `destination: "/index.html"` (SPA client routing)
+- **`headers`:** on `/(.*)`, **`Cross-Origin-Embedder-Policy: require-corp`** and **`Cross-Origin-Opener-Policy: same-origin`** — same isolation goals as Metro / `app.json` for SQLite WASM + `crossOriginIsolated` on web
+
+Local dev still uses Metro (`npm run web`); E2E continues to use `node scripts/serve-e2e.js` against `dist/`.
+
 ### `core/db/client.ts`
 
 #### Module-level state
@@ -920,6 +935,11 @@ export interface SyncAdapter {
 #### `NoopSyncAdapter`
 - `push` — no-op resolve
 - `pull` — returns `[]`
+- Used as the **`SyncEngine` constructor default** and in tests; **not** the adapter on the exported production `syncEngine`.
+
+#### `SupabaseSyncAdapter` (`core/sync/supabase.adapter.ts`)
+- `push(records)` — groups by `entity`, loads current SQLite rows for queued ids, **`upsert`**s into Supabase (`onConflict: "id"`) for `todos`, `habits`, `calorie_entries`, `workout_routines`. No-ops if `records` empty, **`supabase` client is null** (missing env), or entity unknown.
+- `pull` — returns `[]` (restore / multi-device pull not implemented).
 
 #### `SyncEngine`
 
@@ -940,7 +960,7 @@ export interface SyncAdapter {
 **If `adapter.push` throws:** `this.queue` becomes `[...preservedForRetry, ...this.queue]` (failed batch first, then anything enqueued while the push was in flight), then the error is rethrown.
 
 #### Exported `syncEngine`
-Singleton: `new SyncEngine()` — default noop adapter.
+Singleton: **`new SyncEngine(new SupabaseSyncAdapter())`** — production path uses Supabase push when configured.
 
 ### `core/auth/guestProfile.ts`
 
@@ -964,6 +984,7 @@ Singleton: `new SyncEngine()` — default noop adapter.
 | 1 | `initializeDatabase().catch(...)` | Log only |
 | 2 | `registerServiceWorker()` | Fire-and-forget |
 | 3 | `ensureGuestProfile().catch(() => undefined)` | Swallowed |
+| 4 | `ensureAnonymousSession().catch(...)` | Log on failure — establishes **anonymous** Supabase session when env configured |
 
 **Effect 2 — sync flush (deps: `[]`):**
 1. If `!isRemoteEnabled()` → return early (no listeners)
@@ -973,7 +994,7 @@ Singleton: `new SyncEngine()` — default noop adapter.
 5. `NetInfo.addEventListener`: if connected, call `flush`
 6. Cleanup: `clearInterval`, remove visibility listener, `unsubscribeNetInfo()`
 
-**Remote default:** `remoteMode = "disabled"` — flush machinery is off until `setRemoteMode("enabled")` called.
+**Remote default:** `remoteMode = "enabled"` — flush machinery runs unless `setRemoteMode("disabled")` is used (e.g. tests or explicit local-only mode).
 
 **Tree:** `GestureHandlerRootView` → `QueryClientProvider` → `children`
 
@@ -988,9 +1009,9 @@ State: `let registered = false` — prevents double registration.
 
 ### `public/sw.js` (service worker)
 
-**Cache name:** `superhabits-shell-v2`
+**Cache name:** `superhabits-shell-v3` (`CACHE_VERSION = "v3"`)
 
-**install:** `caches.open("superhabits-shell-v2")` → `cache.addAll(["/", "/index.html"])` (errors swallowed); `skipWaiting()`
+**install:** `caches.open(CACHE_NAME)` → `cache.addAll` shell assets (errors swallowed); `skipWaiting()`
 
 **activate:** `event.waitUntil(self.clients.claim())`
 
@@ -1193,12 +1214,12 @@ Alias for `buildDateRangeTodayFirst(days)`.
 
 ### `lib/supabase.ts`
 
-- `export type RemoteMode = "disabled" | "enabled"`
-- `let remoteMode: RemoteMode = "disabled"`
-- `setRemoteMode(mode: RemoteMode): void` — assigns module-level `remoteMode`
-- `isRemoteEnabled(): boolean` — returns `remoteMode === "enabled"`
+- **`supabase`:** `SupabaseClient | null` — `createClient` when `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are both non-empty; otherwise `null` (CI / static export without secrets). Uses **AsyncStorage** for auth persistence on native/web **browser**; **SSR-safe no-op storage** during static web export when `window` is undefined.
+- **`ensureAnonymousSession()`:** If `supabase` is null → return. Else `getSession()`; if no session → `signInAnonymously()` (swallows expected “anonymous disabled” class errors). **Called from `AppProviders` on mount** so push sync has an authenticated user when the project allows anonymous sign-in.
+- **`RemoteMode`:** `"disabled" | "enabled"` — module-level **`remoteMode` defaults to `"enabled"`**.
+- **`setRemoteMode` / `isRemoteEnabled`:** Gate **`AppProviders`** sync flush effect (interval / visibility / NetInfo).
 
-**Callers:** `AppProviders` (gates sync flush listeners). No Supabase client imports at KB time.
+**Callers:** `AppProviders` (anonymous session + sync flush gating), `SupabaseSyncAdapter`.
 
 ---
 
@@ -1993,7 +2014,7 @@ Tests:
 
 **Purpose:** Read-only pass over `features/`, `core/`, `lib/`, `app/`, `tests/` for invariant violations, missing migrations, domain purity issues, dead code. **No file modifications.**
 
-Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, timestamp issues, missing migrations, domain importing DB, screens importing DB directly, domain functions without tests, and **current** tradeoffs documented in project rules (sync queue when remote off, `schema.sql` lag, etc.).
+Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, timestamp issues, missing migrations, domain importing DB, screens importing DB directly, domain functions without tests, and **current** tradeoffs documented in project rules (sync queue when `remoteMode` disabled, missing Supabase env (push no-op), `schema.sql` lag, etc.).
 
 **Note:** The command text is aligned with `.cursor/rules/superhabits-rules.mdc` — verify “known bug” claims against code before filing findings.
 
@@ -2195,7 +2216,8 @@ Tag phase completions: `git tag phaseN-complete`
 - **Shape:** `SyncRecord { entity, id, updatedAt, operation }`
 - **Enqueue after write** on: todos, habits, calorie_entries, workout_routines (including bump after nested workout structure changes)
 - **No enqueue:** pomodoro_sessions, workout_logs, habit_completions, saved_meals
-- **Remote off:** `NoopSyncAdapter`; `flush` only when `isRemoteEnabled()` — queue grows until then (documented tradeoff)
+- **Remote `disabled`:** `AppProviders` does not register flush listeners — in-memory queue can grow until `setRemoteMode("enabled")` (documented tradeoff)
+- **Adapter:** Production `syncEngine` uses **`SupabaseSyncAdapter`**; **`NoopSyncAdapter`** remains for `SyncEngine` default ctor / tests
 
 ### Migration invariants
 
@@ -2233,7 +2255,7 @@ Tag phase completions: `git tag phaseN-complete`
 | `HabitHeatmap.tsx` | Not used in `HabitsScreen` (aggregate heatmap uses `GitHubHeatmap` / `HabitsOverviewGrid`) | Wire or remove if dead |
 | `uuid` package | Unused for IDs (no imports in app source) | Remove or document future use |
 | `schema.sql` | Out of date vs runtime | Regenerate or mark deprecated |
-| Sync queue growth | Noop + remote off | Expected until real `SyncAdapter`; document tradeoff |
+| Sync queue growth | `setRemoteMode("disabled")` or offline + no flush | Queue grows until flush runs; document tradeoff |
 | `workout.data.ts` | `createId("wrk")` for both routines and logs | Document; prefix collision unlikely but IDs are namespaced by table |
 | `core/db/client.ts` migration 5 comment | References `docs/knowledge-base/03_LIB_SHARED.md` — possibly stale path | Verify path after KB reorganization |
 
@@ -2251,11 +2273,11 @@ Tag phase completions: `git tag phaseN-complete`
 | Focus | Pomodoro timer, 3 modes, classic sequence, custom durations, garden grid, yearly heatmap |
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
-| PWA / web | COOP/COEP require-corp, service worker v2, OPFS SQLite |
+| PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
 | Unit tests | **162** passing (Vitest) |
 | E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **9** |
-| Cloud sync | Stub: `NoopSyncAdapter`, `isRemoteEnabled()` false by default |
+| Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
 | Validation | Hard rejection in feature screens via `lib/validation.ts` |
 | Design system | Per-section colors, card accent strips, GitHub heatmaps, PillChips |
 
@@ -2263,7 +2285,7 @@ Tag phase completions: `git tag phaseN-complete`
 
 | Theme | What's missing | Notes |
 |-------|----------------|-------|
-| Supabase / remote sync | Real `SyncAdapter`, auth, conflict policy | `lib/supabase.ts` placeholder |
+| Pull / restore / conflict policy | Server → client sync, multi-device merge | `SupabaseSyncAdapter.pull` returns `[]` today |
 | Native background detection (7F) | Plant dies if user leaves app mid-focus | `expo-background-fetch` / `expo-task-manager` installed, unused — requires real device testing |
 | Workout nested entities sync | Only routine row enqueued today | Comment in `workout.data.ts` — bump parent for remote refetch story |
 | React Query | `QueryClientProvider` only | No cached queries in features |
@@ -2290,6 +2312,8 @@ Tag phase completions: `git tag phaseN-complete`
 | `getNextMode` guard (`completedFocusSessions > 0`) | Prevents `0 % N === 0` long-break-at-start bug |
 | Swipe-left reveals Edit + Delete (not auto-action) | User must tap a button — no accidental deletes |
 | Per-section color identity (no single brand color) | Each tab immediately identifiable by color; section color drives tab, cards, heatmap, chips |
+| Supabase anonymous session + push upsert | One-way backup without sign-up UI; restore/multi-device left to future `pull` / conflict work |
+| Vercel static hosting + `vercel.json` headers | Matches COOP/COEP + SPA routing needs of Expo web export and SQLite WASM |
 
 ---
 
@@ -2301,7 +2325,7 @@ Tag phase completions: `git tag phaseN-complete`
 | **BaseEntity** | `id`, `created_at`, `updated_at`, `deleted_at` |
 | **CalorieEntryTotals** | Type in `features/calories/types.ts`: `{ calories: number }` — minimal shape for `caloriesTotal()` rollup |
 | **CATEGORY_ORDER** | SQL `CASE` in `features/habits/habits.data.ts`: sorts by `anytime → morning → afternoon → evening → else`, then `created_at DESC` |
-| **COOP / COEP** | Cross-origin policies — Metro middleware + `app.json` expo-router plugin; enables `SharedArrayBuffer` / SQLite WASM |
+| **COOP / COEP** | Cross-origin policies — Metro + `app.json` for dev; production web also via root **`vercel.json`** headers; enables `SharedArrayBuffer` / SQLite WASM |
 | **data-agent** | Cursor agent: DB, migrations, `*.data.ts`, `lib/id`, `lib/time` |
 | **date_key** | `YYYY-MM-DD` string from `toDateKey()` (local calendar, post-migration 5) |
 | **feature-agent** | Cursor agent: screens, domain, `core/ui`, `app/` |
@@ -2315,7 +2339,8 @@ Tag phase completions: `git tag phaseN-complete`
 | **ActivityDay** | `{ dateKey: string; active: boolean; value?: number }` — input type for `ActivityPreviewStrip` |
 | **MealType** | `"breakfast" \| "lunch" \| "dinner" \| "snack"` — alias from `CalorieEntry["meal_type"]` |
 | **MEAL_OPTIONS** | Constant in `CaloriesScreen.tsx`: four `{ value, label }` pairs for meal-type `PillChip` |
-| **NoopSyncAdapter** | Default sync adapter — no-op push/pull; queue grows until remote enabled |
+| **NoopSyncAdapter** | No-op `SyncAdapter` — `SyncEngine` constructor default and tests; production **`syncEngine`** uses **`SupabaseSyncAdapter`** |
+| **SupabaseSyncAdapter** | Push path: SQLite → Supabase `upsert` for synced entities; `pull` stub |
 | **PomodoroState** | `"idle" \| "running" \| "finished"` from `nextPomodoroState` |
 | **PomodoroMode** | `"focus" \| "short_break" \| "long_break"` |
 | **SectionKey** | `keyof typeof SECTION_COLORS` — `"todos" \| "habits" \| "focus" \| "workout" \| "calories"` |
