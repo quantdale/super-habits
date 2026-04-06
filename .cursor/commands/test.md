@@ -14,11 +14,13 @@ Run: `npm test`
 Expected: **162** tests passing, 0 failing
 
 Report:
+
 - PASS / FAIL
 - If FAIL: exact test name, file, line, and failure message
 - If FAIL: stop here and do not proceed to E2E — fix unit tests first
 
 **What unit tests cover:**
+
 - `tests/habits.domain.test.ts` — calculateHabitProgress
 - `tests/pomodoro.domain.test.ts` — nextPomodoroState
 - `tests/calories.domain.test.ts` — caloriesTotal, kcalFromMacros
@@ -33,22 +35,23 @@ Report:
 Run: `npm run e2e`
 
 Expected: all tests passing across:
-  todos.spec.ts          — add, complete, delete, empty state,
-                           validation, persistence
-  habits.spec.ts         — add, increment, decrement, delete,
-                           empty state, validation, persistence
-  pomodoro.spec.ts       — timer start, running state, reset,
-                           empty history
-  workout.spec.ts        — add routine, complete, delete,
-                           empty state, validation, persistence
-  calories.spec.ts       — add entry, meal type, daily total,
-                           empty state, validation, persistence
-  infrastructure.spec.ts — COEP/COOP headers, crossOriginIsolated,
-                            SW cache name, no stale v1 cache,
-                            localhost network-first, OPFS lock,
-                            clean DB init
+todos.spec.ts — add, complete, delete, empty state,
+validation, persistence
+habits.spec.ts — add, increment, decrement, delete,
+empty state, validation, persistence
+pomodoro.spec.ts — timer start, running state, reset,
+empty history
+workout.spec.ts — add routine, complete, delete,
+empty state, validation, persistence
+calories.spec.ts — add entry, meal type, daily total,
+empty state, validation, persistence
+infrastructure.spec.ts — COEP/COOP headers, crossOriginIsolated,
+SW cache name, no stale v1 cache,
+localhost network-first, OPFS lock,
+clean DB init
 
 Report:
+
 - Total tests: passed / failed / skipped
 - If FAIL: test name, file, line, and error message for each failure
 - Screenshot path if failure screenshot was captured
@@ -57,19 +60,20 @@ Report:
 
 ## Phase 3 — Combined report
 
-| Suite | Tests | Passed | Failed | Skipped |
-|-------|-------|--------|--------|---------|
-| Unit (Vitest) | 162 | ? | ? | 0 |
-| E2E (Playwright) | ? | ? | ? | ? |
-| **Total** | ? | ? | ? | ? |
+| Suite            | Tests | Passed | Failed | Skipped |
+| ---------------- | ----- | ------ | ------ | ------- |
+| Unit (Vitest)    | 162   | ?      | ?      | 0       |
+| E2E (Playwright) | ?     | ?      | ?      | ?       |
+| **Total**        | ?     | ?      | ?      | ?       |
 
 **OVERALL: PASS or FAIL**
 
 If any failures:
+
 - List every failing test with root cause
 - Recommend fix command:
   - Logic bug → /fix (routes to correct agent)
-  - Selector mismatch in E2E → update selector in e2e/*.spec.ts
+  - Selector mismatch in E2E → update selector in e2e/\*.spec.ts
   - Infrastructure failure → /fix (COEP, SW, DB issue)
 
 ---

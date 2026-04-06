@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "cross-env EXPO_UNSTABLE_HEADLESS=1 expo start --web",
     "build:web": "npx expo export -p web",
+    "deploy:web": "npx expo export --platform web",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

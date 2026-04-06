@@ -6,6 +6,7 @@ alwaysApply: true
 # SuperHabits — Project Rules
 
 ## Project identity
+
 SuperHabits is an offline-first React Native + Expo app with 5 modules:
 todos, habits, pomodoro, workout, calories.
 Stack: React Native 0.84, Expo 55, TypeScript 6, expo-router, SQLite
@@ -56,9 +57,10 @@ Current stored schema version: **9** (see `app_meta.db_schema_version`). Next mi
    - SELECT for an existing row matching (habit_id, date_key)
    - INSERT with createId("hcmp") if none exists; UPDATE count if it does
    - On decrement to zero: DELETE that row (hard delete — allowed exception for this table)
-   Do not change this pattern without reviewing UNIQUE and sync implications.
+     Do not change this pattern without reviewing UNIQUE and sync implications.
 
 ## File naming conventions
+
 - Source files: camelCase (e.g. todoHelpers.ts)
 - React components: PascalCase (e.g. TodoCard.tsx)
 - Data layer: {feature}.data.ts (e.g. todos.data.ts)
@@ -67,24 +69,28 @@ Current stored schema version: **9** (see `app_meta.db_schema_version`). Next mi
 - Route wrappers: app/(tabs)/{feature}.tsx — thin, just renders the Screen
 
 ## Adding a new feature — required structure
+
 features/{name}/
-  {name}.data.ts      ← all SQLite CRUD, exports typed functions
-  {name}.domain.ts    ← pure logic, no DB imports, fully testable
-  {name}Screen.tsx    ← React Native UI, imports from .data and .domain
+{name}.data.ts ← all SQLite CRUD, exports typed functions
+{name}.domain.ts ← pure logic, no DB imports, fully testable
+{name}Screen.tsx ← React Native UI, imports from .data and .domain
 
 Route file: app/(tabs)/{name}.tsx → renders {Name}Screen
-Tab entry: app/(tabs)/_layout.tsx → add tab icon + href
+Tab entry: app/(tabs)/\_layout.tsx → add tab icon + href
 
 ## Unused dependencies — do NOT add usage without discussion
+
 The following are installed but intentionally unused:
+
 - zustand (state management — may be used for future global state)
 - @tanstack/react-query (no hooks used — QueryClient provided but dormant)
 - date-fns (listed in package.json, not imported anywhere in source)
 - expo-background-fetch, expo-task-manager (deferred background sync)
-Do not wire these up without an explicit decision to do so.
+  Do not wire these up without an explicit decision to do so.
 
 ## Testing requirements
-- Every new *.domain.ts function must have a Vitest unit test
+
+- Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
 - Current count: 162 tests passing — **update this count whenever tests are added or removed**
@@ -95,6 +101,7 @@ Do not wire these up without an explicit decision to do so.
 E2E tests live in `e2e/` at the project root. They run against the **static web export** in `dist/`, served by `node scripts/serve-e2e.js` on `http://localhost:8081` with `Cross-Origin-Embedder-Policy: require-corp` (OPFS + SQLite WASM). **Playwright does not build the app:** run `npm run build:web` yourself whenever React components or web bundle output change, then run E2E. Metro (`npm run web`) is for local dev with HMR — **not** used by the E2E pipeline.
 
 **Test files:**
+
 - `e2e/todos.spec.ts` — Todos feature
 - `e2e/habits.spec.ts` — Habits feature
 - `e2e/pomodoro.spec.ts` — Pomodoro feature
@@ -103,6 +110,7 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - `e2e/infrastructure.spec.ts` — Headers, SW, OPFS, DB init
 
 **Config:** `playwright.config.ts`
+
 - `headless: true` always
 - Chromium only
 - `workers: 1` locally (do not increase — OPFS + expo-sqlite hold one lock per origin; extra workers cause flaky navigation/reload). `fullyParallel: false` — tests in a file stay serial; `clearDatabase()` in `beforeEach` must not race.
@@ -112,16 +120,19 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - Failure screenshots / traces: `.cursor/playwright-output/e2e-failures/` (`outputDir`)
 
 **Commands:**
+
 - `npm run e2e` — run all E2E tests
 - `npm run e2e:report` — open HTML report
 - `npm run e2e:headed` — run with visible browser (debug only)
 - `npm run e2e:debug` — Playwright inspector
 
 **Slash commands:**
+
 - `/test` — run unit tests + E2E tests in one pass
 - `/e2e-fix` — run E2E, read report via Playwright MCP, auto-fix
 
 **E2E invariants:**
+
 - `clearDatabase()` called in `test.beforeEach` (not `afterEach`)
 - `e2e/global.setup.ts` aborts if `crossOriginIsolated` is false
 - Do not add `data-testid` to app components
@@ -132,10 +143,12 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 ## CI (GitHub Actions)
 
 Two jobs (see `.github/workflows/ci.yml`):
+
 - **quality** — typecheck + unit tests (runs first)
 - **e2e** — Playwright Chromium tests (runs only if **quality** passes); runs `npm run build:web`, then `npm run e2e` (Playwright starts `node scripts/serve-e2e.js` per `webServer` in `playwright.config.ts`)
 
 ## Current known bugs (do not silently fix — coordinate first)
+
 - Sync flush is gated on isRemoteEnabled() (lib/supabase.ts) — interval / visibility / NetInfo flush
   runs only when remote is enabled. While remote is off (default), the in-memory sync queue can grow
   with NoopSyncAdapter; this is intentional until cloud sync is turned on. Document as a tradeoff, not
@@ -147,11 +160,14 @@ Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected
 Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.ts` is covered by Vitest; **PomodoroScreen** currently uses inline button labels and does not import it — wire the screen to the domain helper if you want a single source of truth for `Running...` vs `Start focus`.
 
 ## Web / PWA context (not application bugs)
+
 - **COEP:** `metro.config.js` and `app.json` set `Cross-Origin-Embedder-Policy: require-corp` (was `credentialless` in some setups) to establish `crossOriginIsolated` for shared-memory WASM on web.
 - **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v2` (`CACHE_VERSION = "v2"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
 
 ## MCP tools (development)
+
 Configured in the user’s MCP settings (e.g. `~/.cursor/mcp.json` on Unix; equivalent on Windows). Useful servers for this repo:
+
 - **Playwright MCP** — live browser inspection; use with `/inspect-web`, `/pre-pr`, and `/e2e-fix`.
 - **Lighthouse MCP** — performance, PWA, accessibility; use with `/audit-performance`.
 - **Fetch MCP** — HTTP header verification (e.g. COOP/COEP); use in `/audit-performance` phase 1.
