@@ -64,7 +64,7 @@ State your classification and routing decision before proceeding.
 - All IDs via createId(prefix) — never raw random/uuid/Date.now()
 - All timestamps via nowIso() — all date keys via toDateKey()
 - New columns require a new migration
-  (current stored version: 4 — next: if (version < 5) block)
+  (current stored version: 9 — next: new `if (version < 10) { ... }` block when schema changes)
 - Never modify existing migration cases or bootstrap DDL
 - schema.sql is reference only — never execute it
 - habit_completions: SELECT + INSERT/UPDATE/DELETE pattern

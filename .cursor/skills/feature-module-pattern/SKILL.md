@@ -17,6 +17,11 @@ features/{featureName}/
 Route file (thin wrapper):
   app/(tabs)/{featureName}.tsx
 
+## Exceptions (current repo)
+- **`features/overview/`** — `OverviewScreen.tsx` only (dashboard tab). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
+- **`features/shared/`** — cross-feature UI (`GitHubHeatmap`, `ActivityPreviewStrip`). Not a tab-routed module.
+- **Nested screens** — e.g. `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx` alongside `WorkoutScreen.tsx` under `features/workout/` for multi-step flows.
+
 ## types.ts (feature-local barrel)
 Each feature may include `types.ts` that re-exports entity types from `@/core/db/types` and defines local types (e.g. `MealType`, `CalorieEntryTotals` in `features/calories/types.ts`). Screens import from `./types`, not from `@/core/db/types` directly, unless there is a deliberate exception.
 
@@ -70,15 +75,15 @@ Extend core/ui/ instead, or use NativeWind className directly on View/Text.
 
 ## Existing features — quick reference
 todos:
-  data: addTodo, listTodos, updateTodo, deleteTodo (soft)
-  domain: none yet
-  screen: TodosScreen — FlashList, add/edit/complete/delete
+  data: addTodo, listTodos, updateTodo, deleteTodo (soft), recurrence fields
+  domain: date keys, recurrence helpers (`getTomorrowDateKey`, `findMissingRecurrenceIds`, …)
+  screen: TodosScreen — FlashList, add/edit/complete/delete, drag reorder
   e2e: `e2e/todos.spec.ts`
 
 habits:
-  data: addHabit, listHabits, toggleCompletion, getCompletionsForDate
-  domain: calculateStreak, isCompletedToday, HABIT_PRESETS
-  screen: HabitsScreen — progress rings, daily completion
+  data: addHabit, listHabits, increment/decrement completions, soft delete, …
+  domain: streaks, grids, aggregated heatmap helpers, …
+  screen: HabitsScreen — `HabitCircle`, `HabitsOverviewGrid`, category groups
   e2e: `e2e/habits.spec.ts`
 
 pomodoro:
@@ -88,16 +93,20 @@ pomodoro:
   e2e: `e2e/pomodoro.spec.ts`
 
 workout:
-  data: addWorkoutLog, listWorkoutLogs
-  domain: none yet
-  screen: WorkoutScreen — routine list, log entry
+  data: routines, nested exercises/sets, session logs, soft delete, …
+  domain: timer sequence, heatmaps, streak helpers, …
+  screen: WorkoutScreen + RoutineDetailScreen + WorkoutSessionScreen
   e2e: `e2e/workout.spec.ts`
 
 calories:
-  data: addCalorieEntry, listCalorieEntries, getDailySummary
-  domain: caloriesTotal, kcalFromMacros
-  screen: CaloriesScreen — entry form with meal type picker (breakfast/lunch/dinner/snack); mealType is user-selectable
+  data: entries, saved meals, goals, soft delete, …
+  domain: caloriesTotal, kcalFromMacros, charts/heatmap builders, …
+  screen: CaloriesScreen — meal type picker (breakfast/lunch/dinner/snack); goal modal; saved meal search modal
   e2e: `e2e/calories.spec.ts`
+
+overview:
+  screen: OverviewScreen — dashboard tab only
+  route: `app/(tabs)/overview.tsx`
 
 ## Adding a new feature checklist
 - [ ] Create features/{name}/ directory

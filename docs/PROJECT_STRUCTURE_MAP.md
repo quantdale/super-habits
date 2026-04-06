@@ -6,7 +6,7 @@
 - See audit findings for more details.
 
 
-Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v9** → next migration: `if (version < 10)` in `core/db/client.ts`.
+Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v9** → next migration: `if (version < 10)` in `core/db/client.ts`. Top-level tabs include **Overview** (`features/overview/OverviewScreen.tsx`) plus the five feature modules.
 
 ---
 

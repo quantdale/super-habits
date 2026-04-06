@@ -20,10 +20,10 @@ Audit for:
 4. Screen files that import from DB directly (bypassing data layer)
 5. New domain functions without tests
 6. Unused imports or dead code (beyond known: App.tsx, index.ts, nextPomodoroState)
-7. Known bugs still present:
-   - toDateKey() UTC issue (lib/time.ts)
-   - meal_type hard-coded to "snack" (calories.data.ts)
-   - sync queue never flushed
+7. Known product / infra tradeoffs to verify (not assumed bugs — confirm against current code):
+   - Sync: in-memory queue with `NoopSyncAdapter` when remote is off; `flush()` runs on interval/visibility/NetInfo only when `isRemoteEnabled()` — queue growth until remote is enabled is intentional (see project rules).
+   - `schema.sql` may lag runtime DDL in `core/db/client.ts` (reference only).
+   - Any regressions called out in `.cursor/rules/superhabits-rules.mdc` (e.g. PomodoroScreen vs `nextPomodoroState` wiring).
 8. Any new issues since the last audit
 
 Output for each finding:

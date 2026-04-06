@@ -8,7 +8,7 @@ alwaysApply: true
 ## Project identity
 SuperHabits is an offline-first React Native + Expo app with 5 modules:
 todos, habits, pomodoro, workout, calories.
-Stack: React Native 0.83, Expo 55, TypeScript 5.9, expo-router, SQLite
+Stack: React Native 0.84, Expo 55, TypeScript 6, expo-router, SQLite
 (expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. No production deployment pipeline yet.

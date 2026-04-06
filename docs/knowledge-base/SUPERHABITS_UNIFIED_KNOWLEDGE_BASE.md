@@ -51,7 +51,7 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Five MVP areas: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal).
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 6**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal).
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **9**. Next migration: `if (version < 10)`.
 
@@ -59,7 +59,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality:** **141** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
+**Quality:** **155** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
 
 ### Cross-cutting concerns
 
@@ -83,12 +83,12 @@
 | Attribute | Value |
 |-----------|-------|
 | Name | `superhabits` (npm package, private) |
-| Purpose | Offline-first Expo + React Native client; five modules |
+| Purpose | Offline-first Expo + React Native client; Overview tab + five feature modules |
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **9** (`app_meta.db_schema_version`) |
 | Next migration | `10` (new `if (version < 10)` block in `runMigrations`) |
-| Unit tests | **141** passing (Vitest) |
-| E2E tests | **~59** Playwright tests (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Unit tests | **155** passing (Vitest) |
+| E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
@@ -113,13 +113,14 @@
 
 ### Complete file inventory
 
-#### `app/` (8 files)
+#### `app/` (9 files)
 
 | File | Role |
 |------|------|
 | `_layout.tsx` | Root stack; `AppProviders`, `StatusBar`, hides header |
 | `index.tsx` | Redirect to `/(tabs)/todos` |
 | `(tabs)/_layout.tsx` | Top tab bar, `TabList` / `TabTrigger` / `TabSlot` |
+| `(tabs)/overview.tsx` | Renders `OverviewScreen` |
 | `(tabs)/todos.tsx` | Renders `TodosScreen` |
 | `(tabs)/habits.tsx` | Renders `HabitsScreen` |
 | `(tabs)/pomodoro.tsx` | Renders `PomodoroScreen` |
@@ -132,7 +133,9 @@
 
 **habits:** `HabitsScreen.tsx`, `HabitCircle.tsx`, `HabitHeatmap.tsx`, `HabitsOverviewGrid.tsx`, `ProgressRing.tsx`, `habitPresets.ts`, `habits.data.ts`, `habits.domain.ts`, `types.ts`
 
-**calories:** `CaloriesScreen.tsx`, `MacroDonutChart.tsx`, `WeeklyCalorieChart.tsx`, `CalorieGoalSheet.tsx`, `SavedMealChips.tsx`, `SavedMealSearchSheet.tsx`, `calories.data.ts`, `calories.domain.ts`, `types.ts`
+**overview:** `OverviewScreen.tsx` (dashboard only — no `.data.ts` / `.domain.ts` in this folder)
+
+**calories:** `CaloriesScreen.tsx`, `MacroDonutChart.tsx`, `DailyCalorieChart.tsx`, `CalorieGoalModal.tsx`, `SavedMealChips.tsx`, `SavedMealSearchModal.tsx`, `calories.data.ts`, `calories.domain.ts`, `types.ts`
 
 **pomodoro:** `PomodoroScreen.tsx`, `FocusSprout.tsx`, `GardenGrid.tsx`, `BackgroundWarning.tsx`, `PomodoroSettingsInline.tsx`, `pomodoro.data.ts`, `pomodoro.domain.ts`, `types.ts`
 
@@ -180,10 +183,11 @@
 |------|------|
 | `sectionColors.ts` | `SECTION_COLORS`, `SECTION_COLORS_LIGHT`, `SectionKey` |
 
-#### `tests/` (8 files)
+#### `tests/` (11 files)
 
 | File | Role |
 |------|------|
+| `setup.ts` | Vitest setup |
 | `time.test.ts` | `lib/time` |
 | `validation.test.ts` | `lib/validation` |
 | `todos.domain.test.ts` | `todos.domain` |
@@ -192,8 +196,10 @@
 | `calories.data.STUB.test.ts` | Skipped placeholder |
 | `workout.domain.test.ts` | `workout.domain` |
 | `pomodoro.domain.test.ts` | `pomodoro.domain` |
+| `notifications.test.ts` | `lib/notifications` |
+| `db.client.test.ts` | `core/db/client` error-handling smoke (invalid SQL; connection placeholder) |
 
-#### `e2e/` (16 files)
+#### `e2e/` (14 files)
 
 | File | Role |
 |------|------|
@@ -305,11 +311,11 @@ No other features call `toDateKey()` directly.
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `expo` | ~55.0.5 | Expo SDK, tooling, native modules |
-| `expo-router` | ^55.0.4 | File-based navigation, tabs, stacks |
-| `react` | 19.2.0 | UI library |
-| `react-dom` | 19.2.0 | Web rendering |
-| `react-native` | 0.83.2 | Cross-platform UI primitives |
+| `expo` | ^55.0.8 | Expo SDK, tooling, native modules |
+| `expo-router` | ^55.0.7 | File-based navigation, tabs, stacks |
+| `react` | ^19.2.4 | UI library |
+| `react-dom` | ^19.2.4 | Web rendering |
+| `react-native` | ^0.84.1 | Cross-platform UI primitives |
 | `react-native-web` | ^0.21.0 | RN → DOM bridge |
 | `expo-status-bar` | ~55.0.4 | Status bar styling |
 | `@expo/metro-runtime` | ~55.0.6 (dev) | Metro web runtime |
@@ -318,16 +324,16 @@ No other features call `toDateKey()` directly.
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `nativewind` | ^4.2.2 | Tailwind-style `className` on RN |
+| `nativewind` | ^4.2.3 | Tailwind-style `className` on RN |
 | `tailwindcss` | ^3.4.19 | Tailwind compiler |
 | `@expo/vector-icons` | ^15.0.2 | Icons (MaterialIcons, etc.) |
 | `expo-linear-gradient` | ~55.0.9 | Gradients (installed) |
-| `react-native-safe-area-context` | ~5.6.2 | Safe areas |
-| `react-native-screens` | ~4.23.0 | Native screen containers |
+| `react-native-safe-area-context` | ^5.7.0 | Safe areas |
+| `react-native-screens` | ^4.24.0 | Native screen containers |
 | `react-native-gesture-handler` | ^2.30.0 | Gestures, Swipeable |
-| `react-native-reanimated` | 4.2.1 | Animations |
-| `react-native-svg` | 15.15.3 | SVG (charts, sprout) |
-| `@shopify/flash-list` | 2.0.2 | High-performance lists |
+| `react-native-reanimated` | ^4.2.3 | Animations |
+| `react-native-svg` | ^15.15.4 | SVG (charts, sprout) |
+| `@shopify/flash-list` | ^2.3.1 | High-performance lists |
 | `react-native-draggable-flatlist` | ^4.0.3 | Reorderable todo list |
 | `react-native-gifted-charts` | ^1.4.76 | Bar/pie charts (calories) |
 | `@react-native-community/datetimepicker` | ^9.1.0 | Native date picker (non-web todos) |
@@ -336,29 +342,29 @@ No other features call `toDateKey()` directly.
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `expo-sqlite` | ^55.0.10 | SQLite (native + WASM web, OPFS) |
-| `expo-file-system` | ^55.0.10 | File APIs |
+| `expo-sqlite` | ^55.0.11 | SQLite (native + WASM web, OPFS) |
+| `expo-file-system` | ^55.0.11 | File APIs |
 
 ### Notifications & background
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `expo-notifications` | ^55.0.11 | Local notifications (Pomodoro; not web) |
-| `expo-background-fetch` | ^55.0.9 | Installed; **intentionally unused** |
-| `expo-task-manager` | ^55.0.9 | Installed; **intentionally unused** |
+| `expo-notifications` | ^55.0.13 | Local notifications (Pomodoro; not web) |
+| `expo-background-fetch` | ^55.0.10 | Installed; **intentionally unused** |
+| `expo-task-manager` | ^55.0.10 | Installed; **intentionally unused** |
 
 ### Networking & sync prep
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `@react-native-community/netinfo` | 11.5.2 | Connectivity; triggers `syncEngine.flush` when remote enabled |
+| `@react-native-community/netinfo` | ^12.0.1 | Connectivity; triggers `syncEngine.flush` when remote enabled |
 
 ### State / data fetching (installed, dormant)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `@tanstack/react-query` | ^5.90.21 | `QueryClient` in `AppProviders`; **no feature hooks** |
-| `zustand` | ^5.0.11 | Reserved; **not wired** |
+| `@tanstack/react-query` | ^5.95.2 | `QueryClient` in `AppProviders`; **no feature hooks** |
+| `zustand` | ^5.0.12 | Reserved; **not wired** |
 | `date-fns` | ^4.1.0 | Listed; **not imported** in app source |
 
 ### IDs & PWA
@@ -372,10 +378,10 @@ No other features call `toDateKey()` directly.
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `typescript` | ~5.9.2 | Typecheck |
-| `vitest` | ^3.2.4 | Unit tests |
+| `typescript` | ^6.0.2 | Typecheck |
+| `vitest` | ^4.1.1 | Unit tests |
 | `@playwright/test` | ^1.58.2 | E2E (Chromium) |
-| `babel-preset-expo` | ^55.0.10 | Babel |
+| `babel-preset-expo` | ^55.0.12 | Babel |
 | `cross-env` | ^10.1.0 | `EXPO_UNSTABLE_HEADLESS` for web script |
 | `patch-package` | ^8.0.1 | Post-install patches |
 | `wait-on` | ^9.0.4 | Optional dev tooling (not used by current CI E2E job) |
@@ -404,7 +410,7 @@ No other features call `toDateKey()` directly.
 | Root layout | `app/_layout.tsx` | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; `Stack` with `headerShown: false` |
 | Index | `app/index.tsx` | `<Redirect href="/(tabs)/todos" />` — `/` → todos tab |
 | Tabs layout | `app/(tabs)/_layout.tsx` | Custom top tab bar |
-| Tab routes | `app/(tabs)/{todos,habits,pomodoro,workout,calories}.tsx` | Each renders one `*Screen` from `features/` |
+| Tab routes | `app/(tabs)/{overview,todos,habits,pomodoro,workout,calories}.tsx` | Each renders one `*Screen` from `features/` |
 
 ### `app/_layout.tsx`
 
@@ -425,11 +431,12 @@ No other features call `toDateKey()` directly.
 
 | `name` | `href` | `label` | `icon` | `color` |
 |--------|--------|---------|--------|---------|
-| `todos` | `"/(tabs)/todos"` | To Do | `check-circle-outline` | `SECTION_COLORS.todos` |
-| `habits` | `"/(tabs)/habits"` | Habits | `loop` | `SECTION_COLORS.habits` |
-| `pomodoro` | `"/(tabs)/pomodoro"` | Focus | `timer` | `SECTION_COLORS.focus` |
-| `workout` | `"/(tabs)/workout"` | Workout | `fitness-center` | `SECTION_COLORS.workout` |
-| `calories` | `"/(tabs)/calories"` | Calories | `restaurant-menu` | `SECTION_COLORS.calories` |
+| `overview` | `"/(tabs)/overview"` | Overview | `dashboard` | `#475569` |
+| `todos` | `"/(tabs)/todos"` | To Do | `check-circle-outline` | `SECTION_TEXT_COLORS.todos` |
+| `habits` | `"/(tabs)/habits"` | Habits | `loop` | `SECTION_TEXT_COLORS.habits` |
+| `pomodoro` | `"/(tabs)/pomodoro"` | Focus | `timer` | `SECTION_TEXT_COLORS.focus` |
+| `workout` | `"/(tabs)/workout"` | Workout | `fitness-center` | `SECTION_TEXT_COLORS.workout` |
+| `calories` | `"/(tabs)/calories"` | Calories | `restaurant-menu` | `SECTION_TEXT_COLORS.calories` |
 
 #### `TopTabItem` styles
 
@@ -1475,17 +1482,17 @@ Exports: `kcalFromMacros`, `caloriesTotal`, `buildWeeklyTrend`, `buildMacroDonut
 
 #### Screen — `features/calories/CaloriesScreen.tsx`
 
-Macro fields → computed kcal; `validateCalorieEntry` + `validateCalorieComputedKcal`; meal `PillChip`s; swipe rows (edit + delete); weekly bar chart (52 weeks, scrolls to newest); 52-week heatmap; goal sheet + saved meal search.
+Macro fields → computed kcal; `validateCalorieEntry` + `validateCalorieComputedKcal`; meal `PillChip`s; swipe rows (edit + delete); daily bar chart + 52-week heatmap; goal modal + saved meal search modal.
 
 #### Subcomponents
 
 | Component | Props |
 |-----------|-------|
 | `MacroDonutChart` | `totalKcal`, `goalKcal`, `protein`, `carbs`, `fats`, `fiber`, `sectionColor` |
-| `WeeklyCalorieChart` | `data`, `goalKcal?` |
-| `CalorieGoalSheet` | `visible`, `currentGoal`, `onSave`, `onClose` |
+| `DailyCalorieChart` | `data` (`DailyTrendPoint[]`), `goalKcal?` |
+| `CalorieGoalModal` | `visible`, `currentGoal`, `onSave`, `onClose` |
 | `SavedMealChips` | `meals`, `onSelect` |
-| `SavedMealSearchSheet` | `visible`, `meals`, `onSelect`, `onClose`, `onDeleted` |
+| `SavedMealSearchModal` | `visible`, `meals`, `onSelect`, `onClose`, `onDeleted` |
 
 **`MacroDonutChart`:** Progress arc style — consumed vs goal. Empty portion = `#e2e8f0` (light gray). Over goal = `#ef4444` ring. Macros shown as stat chips below ring.
 
@@ -1666,7 +1673,7 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 |---------------|--------|
 | `withNativeWind(config, { input: "./global.css" })` | NativeWind CSS processing |
 | `config.resolver.assetExts.push("wasm")` | SQLite WASM on web |
-| `config.server.enhanceMiddleware` | Sets `Cross-Origin-Embedder-Policy: credentialless` + `Cross-Origin-Opener-Policy: same-origin` |
+| `config.server.enhanceMiddleware` | Sets `Cross-Origin-Embedder-Policy: require-corp` + `Cross-Origin-Opener-Policy: same-origin` |
 
 #### `app.json`
 
@@ -1694,7 +1701,7 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run:** **141 tests passed**; **1 file skipped** (`tests/calories.data.STUB.test.ts`); **8 test files** total
+**Latest run:** **155 tests passed**; **1 file skipped** (`tests/calories.data.STUB.test.ts`); **9 test files passed + 1 skipped** (10 files total; Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -1764,8 +1771,6 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 | `buildWorkoutFrequency` | empty; double same day |
 | `buildWorkoutHeatmapDays` | length 30; cap 3 |
 | `summarizeCompletedSets` | counts first active phase |
-
-**Coverage gap:** `computeWorkoutStreakFromHeatmapDays` has no dedicated `it()`.
 
 #### `tests/pomodoro.domain.test.ts`
 
@@ -1977,9 +1982,9 @@ Tests:
 
 **Purpose:** Read-only pass over `features/`, `core/`, `lib/`, `app/`, `tests/` for invariant violations, missing migrations, domain purity issues, dead code. **No file modifications.**
 
-Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, timestamp issues, missing migrations, domain importing DB, screens importing DB directly, domain functions without tests, known bugs.
+Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, timestamp issues, missing migrations, domain importing DB, screens importing DB directly, domain functions without tests, and **current** tradeoffs documented in project rules (sync queue when remote off, `schema.sql` lag, etc.).
 
-**Note:** Command's "Known bugs" list may be partially obsolete vs current code — treat as historical checklist.
+**Note:** The command text is aligned with `.cursor/rules/superhabits-rules.mdc` — verify “known bug” claims against code before filing findings.
 
 ---
 
@@ -1995,7 +2000,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 141 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 155 passing.
 
 ---
 
@@ -2064,7 +2069,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (141 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (155 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v2`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2119,7 +2124,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 | Skill | Trigger | Provides |
 |-------|---------|----------|
-| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer | WAL, soft delete, enqueue list, ID format; **verify schema version against `client.ts`** (skill text lags — states version 7; actual is 9) |
+| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer | WAL, soft delete, enqueue list, ID format; schema **9** → next **`if (version < 10)`** (always confirm in `core/db/client.ts`) |
 | `feature-module-pattern/SKILL.md` | New features, module layout | Three-file pattern, route thin wrapper, import rules |
 | `rn-expo-conventions/SKILL.md` | UI, Expo Router, RN | Routing, NativeWind, lists, notifications, platform |
 
@@ -2213,15 +2218,11 @@ Tag phase completions: `git tag phaseN-complete`
 
 | Item | Detail | Suggested follow-up |
 |------|--------|---------------------|
-| `.cursor/skills/db-and-sync-invariants/SKILL.md` | States schema version **7** | Update to **9** + next **10** |
-| `.cursor/commands/test.md`, `check.md` | Vitest baseline | **141** (keep in sync when tests change) |
-| `.cursor/commands/audit.md` | Lists resolved/stale bugs | Refresh checklist |
 | `tests/calories.data.STUB.test.ts` | No SQLite unit tests | Add mocked DB layer tests |
-| `computeWorkoutStreakFromHeatmapDays` | No unit `it()` | Add test in `workout.domain.test.ts` |
-| `HabitHeatmap.tsx` | Not used in `HabitsScreen` | Wire or remove if dead |
-| `uuid` package | Unused for IDs | Remove or document future use |
+| `HabitHeatmap.tsx` | Not used in `HabitsScreen` (aggregate heatmap uses `GitHubHeatmap` / `HabitsOverviewGrid`) | Wire or remove if dead |
+| `uuid` package | Unused for IDs (no imports in app source) | Remove or document future use |
 | `schema.sql` | Out of date vs runtime | Regenerate or mark deprecated |
-| Sync queue growth | Noop + remote off | Expected until Supabase adapter |
+| Sync queue growth | Noop + remote off | Expected until real `SyncAdapter`; document tradeoff |
 | `workout.data.ts` | `createId("wrk")` for both routines and logs | Document; prefix collision unlikely but IDs are namespaced by table |
 | `core/db/client.ts` migration 5 comment | References `docs/knowledge-base/03_LIB_SHARED.md` — possibly stale path | Verify path after KB reorganization |
 
@@ -2233,17 +2234,18 @@ Tag phase completions: `git tag phaseN-complete`
 
 | Area | Status |
 |------|--------|
+| Overview | Cross-module dashboard tab (`OverviewScreen`); read-only / aggregate presentation |
 | Todos | List, priorities, due dates, drag reorder, daily recurrence, soft delete, swipe edit/delete |
 | Habits | Categories, icons/colors, increment/decrement, aggregate 52-week heatmap, consistency %, Avocation-style layout |
 | Focus | Pomodoro timer, 3 modes, classic sequence, custom durations, garden grid, yearly heatmap |
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v2, OPFS SQLite |
-| Unit tests | **141** passing (Vitest) |
-| E2E | **~59** Playwright tests (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
+| Unit tests | **155** passing (Vitest) |
+| E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **9** |
 | Cloud sync | Stub: `NoopSyncAdapter`, `isRemoteEnabled()` false by default |
-| Validation | Hard rejection in all 5 screens via `lib/validation.ts` |
+| Validation | Hard rejection in feature screens via `lib/validation.ts` |
 | Design system | Per-section colors, card accent strips, GitHub heatmaps, PillChips |
 
 ### Deferred / future
@@ -2338,15 +2340,14 @@ Tag phase completions: `git tag phaseN-complete`
 ## Maintenance Notes
 
 When the codebase changes, update:
-- **Test count** in `.cursor/rules/superhabits-rules.mdc`, `.cursor/agents/data-agent.md`, `.cursor/agents/feature-agent.md`
-- **Schema version** in same files + `.cursor/skills/db-and-sync-invariants/SKILL.md` + `.cursor/commands/new-migration.md`
+- **Test count** in `.cursor/rules/superhabits-rules.mdc`, `.cursor/agents/data-agent.md`, `.cursor/agents/feature-agent.md`, `.cursor/commands/check.md`, `.cursor/commands/test.md`, and this document
+- **Schema version** in same files + `.cursor/skills/db-and-sync-invariants/SKILL.md` + `.cursor/commands/new-migration.md` / `fix.md`
 - **Known technical debt table** in section 12 when items are resolved
 - **Deferred features table** in section 13 when items are implemented
 
 ### Documentation drift warnings
 
-- `.cursor/skills/db-and-sync-invariants/SKILL.md` states schema version **7** — actual is **9**
-- Cursor commands `test.md` / `check.md` baseline: **141** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **155** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- `HabitHeatmap.tsx` — exists but unused in `HabitsScreen`
-- `audit.md` Known bugs list — partially obsolete; verify against runtime before acting
+- `HabitHeatmap.tsx` — exists but unused in `HabitsScreen` (see section 12)
+- Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync
