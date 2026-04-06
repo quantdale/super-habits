@@ -124,7 +124,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     // Record the UTC→local date key cutover in app_meta.
     // Rows written before this migration used UTC date keys (toISOString().slice(0, 10)).
     // Rows written after use local calendar keys via toDateKey() in lib/time.ts.
-    // No backfill — rationale in docs/knowledge-base/03_LIB_SHARED.md.
+    // No backfill — rationale is documented in the unified knowledge base.
     const cutoverIso = new Date().toISOString();
     await db.runAsync(
       "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('date_key_format', 'local')",

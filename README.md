@@ -68,7 +68,7 @@ Schema migrations run in `core/db/client.ts` (`runMigrations`). Stored schema ve
 - Error handling: Some errors are silently swallowed (e.g., DB open failures, service worker cache errors), which can obscure real issues.
 - No global error/retry customization for query clients.
 - ID generation is not crypto-strong (local only), which is acceptable for the use case but should be documented.
-- E2E and unit tests are present and referenced, but some test stubs are skipped (e.g., calories.data.STUB.test.ts).
+- E2E and unit tests are present and referenced; calories data-layer coverage now uses mocked contract tests.
 - UI validation is hard-reject only (no silent clamping), but error messages are surfaced to users.
 - PWA: Service worker uses network-first for dev, cache-first for prod; stale cache risk is mitigated but should be documented.
 - Accessibility and usability are not explicitly documented as tested or audited.
