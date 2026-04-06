@@ -50,6 +50,21 @@ Schema migrations run in `core/db/client.ts` (`runMigrations`). Stored schema ve
 - **COEP** is set for `crossOriginIsolated` (shared-memory WASM on web); see `metro.config.js` and `app.json`.
 - **Service worker** lives under `public/sw.js` (shell cache). Local dev targets use network-first behavior to avoid stale Metro bundles.
 
+## Deploying to Vercel (static web export)
+
+Expo Router client routes (e.g. `/todos`) are not separate HTML files on disk; the host must serve `index.html` for unknown paths so the SPA can boot. This repo encodes that in [`vercel.json`](vercel.json) (`rewrites` → `/index.html`) and pins the build output.
+
+| Setting | Value |
+| ------- | ----- |
+| **Root Directory** | Repository root (the folder that contains `vercel.json`) |
+| **Build Command** | `npm run build:web` (also set in `vercel.json` as `buildCommand`) |
+| **Output Directory** | `dist` (also set in `vercel.json` as `outputDirectory`) |
+| **Framework Preset** | Other / static (avoid a framework preset that ignores `dist`) |
+
+After changing settings, redeploy and confirm the build log shows a successful `expo export` and that `dist/index.html` exists in the deployment output. Deep links such as `/todos` should return 200 (app shell), not Vercel’s `NOT_FOUND` page.
+
+**Local parity check:** `npm run build:web`, then `node scripts/serve-e2e.js` and open `http://localhost:8081/todos` (refresh should still load).
+
 ## Smoke test (manual)
 
 1. Open **web** and a **native** target; confirm tabs load.
