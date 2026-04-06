@@ -7,7 +7,7 @@ import { initializeDatabase } from "@/core/db/client";
 import { registerServiceWorker } from "@/core/pwa/registerServiceWorker";
 import { ensureGuestProfile } from "@/core/auth/guestProfile";
 import { syncEngine } from "@/core/sync/sync.engine";
-import { isRemoteEnabled } from "@/lib/supabase";
+import { ensureAnonymousSession, isRemoteEnabled } from "@/lib/supabase";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +25,9 @@ export function AppProviders({ children }: PropsWithChildren) {
     });
     registerServiceWorker();
     ensureGuestProfile().catch(() => undefined);
+    ensureAnonymousSession().catch((e) => {
+      console.error("[auth] ensureAnonymousSession failed", e);
+    });
   }, []);
 
   useEffect(() => {
