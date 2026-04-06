@@ -24,7 +24,7 @@
 - No explicit accessibility/usability audit documented. Add TODO to perform and document results.
 
 ### Test Coverage
-- E2E/unit tests present, but some stubs are skipped (e.g., calories.data.STUB.test.ts). Document reasons for skips.
+- E2E/unit tests present; calories data-layer coverage now uses mocked contract tests instead of a skipped stub.
 
 ### UI/UX Patterns
 - UI validation is hard-reject only; errors are surfaced to users.
@@ -59,7 +59,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality:** **155** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
+**Quality:** **162** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
 
 ### Cross-cutting concerns
 
@@ -87,7 +87,7 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **9** (`app_meta.db_schema_version`) |
 | Next migration | `10` (new `if (version < 10)` block in `runMigrations`) |
-| Unit tests | **155** passing (Vitest) |
+| Unit tests | **162** passing (Vitest) |
 | E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
@@ -193,11 +193,12 @@
 | `todos.domain.test.ts` | `todos.domain` |
 | `habits.domain.test.ts` | `habits.domain` |
 | `calories.domain.test.ts` | `calories.domain` |
-| `calories.data.STUB.test.ts` | Skipped placeholder |
+| `calories.data.test.ts` | Mocked calories data-layer contract tests |
 | `workout.domain.test.ts` | `workout.domain` |
 | `pomodoro.domain.test.ts` | `pomodoro.domain` |
 | `notifications.test.ts` | `lib/notifications` |
 | `db.client.test.ts` | `core/db/client` error-handling smoke (invalid SQL; connection placeholder) |
+| `sync.engine.test.ts` | `SyncEngine.flush` in-flight enqueue + failed push / adapter batch mutation recovery |
 
 #### `e2e/` (14 files)
 
@@ -287,7 +288,7 @@ No other features call `toDateKey()` directly.
 |------|---------------|------------|-------|
 | `features/todos/todos.data.ts` | `todos` | create, update, delete | After every mutating write |
 | `features/habits/habits.data.ts` | `habits` | create, update, delete | Completions **not** enqueued |
-| `features/calories/calories.data.ts` | `calorie_entries` | create, delete | |
+| `features/calories/calories.data.ts` | `calorie_entries` | create, update, delete | |
 | `features/workout/workout.data.ts` | `workout_routines` | create, delete; `markWorkoutRoutineUpdated` after nested changes | `completeRoutine` logs **not** enqueued |
 
 **Intentionally not synced:** `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `workout_session_exercises`
@@ -926,11 +927,12 @@ export interface SyncAdapter {
 
 **`async flush(): Promise<void>`:**
 1. If `queue.length === 0`, return
-2. `snapshot = [...queue]`
-3. `await this.adapter.push(snapshot)`
-4. `this.queue = []`
+2. `snapshot = [...queue]` (shallow copy — not the live queue reference)
+3. `this.queue = []` (new writes during `push` accumulate here)
+4. `preservedForRetry = [...snapshot]` — not passed to `push`; if the adapter mutates the batch array in place, recovery still restores the original records
+5. `await this.adapter.push(snapshot)`
 
-**If `adapter.push` throws:** `queue` is NOT cleared — snapshot taken but step 4 not reached; records remain for later flush attempt.
+**If `adapter.push` throws:** `this.queue` becomes `[...preservedForRetry, ...this.queue]` (failed batch first, then anything enqueued while the push was in flight), then the error is rethrown.
 
 #### Exported `syncEngine`
 Singleton: `new SyncEngine()` — default noop adapter.
@@ -1701,7 +1703,7 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run:** **155 tests passed**; **1 file skipped** (`tests/calories.data.STUB.test.ts`); **9 test files passed + 1 skipped** (10 files total; Vitest v4)
+**Latest run:** **162 tests passed**; **11 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -1788,9 +1790,13 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 | `buildPomodoroHeatmapDays` | empty shape; bucket 3 sessions |
 | `computeFocusStreakFromHeatmapDays` | consecutive; zero if today empty |
 
-#### `tests/calories.data.STUB.test.ts`
+#### `tests/calories.data.test.ts`
 
-`describe.skip` — 0 tests; placeholder for future DB mocking.
+Mocks `getDatabase()`, ID/time helpers, and `syncEngine.enqueue()` to verify calorie entry writes, saved-meal upserts, and soft-delete behavior without a live SQLite runtime.
+
+#### `tests/sync.engine.test.ts`
+
+Covers `SyncEngine.flush`: records enqueued while a push is blocked are flushed in a second batch; if `adapter.push` throws after mutating the batch array in place, the engine restores the original records (plus any enqueued during the push) for the next flush.
 
 ---
 
@@ -2000,7 +2006,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 155 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 162 passing.
 
 ---
 
@@ -2069,7 +2075,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (155 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (162 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v2`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2218,7 +2224,7 @@ Tag phase completions: `git tag phaseN-complete`
 
 | Item | Detail | Suggested follow-up |
 |------|--------|---------------------|
-| `tests/calories.data.STUB.test.ts` | No SQLite unit tests | Add mocked DB layer tests |
+| `tests/calories.data.test.ts` | Mocked data-layer coverage instead of live SQLite | Add integration coverage if SQLite-specific behavior needs validation |
 | `HabitHeatmap.tsx` | Not used in `HabitsScreen` (aggregate heatmap uses `GitHubHeatmap` / `HabitsOverviewGrid`) | Wire or remove if dead |
 | `uuid` package | Unused for IDs (no imports in app source) | Remove or document future use |
 | `schema.sql` | Out of date vs runtime | Regenerate or mark deprecated |
@@ -2241,7 +2247,7 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v2, OPFS SQLite |
-| Unit tests | **155** passing (Vitest) |
+| Unit tests | **162** passing (Vitest) |
 | E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **9** |
 | Cloud sync | Stub: `NoopSyncAdapter`, `isRemoteEnabled()` false by default |
@@ -2347,7 +2353,7 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **155** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **162** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
 - `HabitHeatmap.tsx` — exists but unused in `HabitsScreen` (see section 12)
 - Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync

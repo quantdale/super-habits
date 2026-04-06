@@ -11,8 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **155** tests passing, 0 failing
-(1 file intentionally skipped: tests/calories.data.STUB.test.ts)
+Expected: **162** tests passing, 0 failing
 
 Report:
 - PASS / FAIL
@@ -24,7 +23,8 @@ Report:
 - `tests/pomodoro.domain.test.ts` — nextPomodoroState
 - `tests/calories.domain.test.ts` — caloriesTotal, kcalFromMacros
 - `tests/workout.domain.test.ts` — timer, heatmap, `computeWorkoutStreakFromHeatmapDays`, etc.
-- `tests/calories.data.STUB.test.ts` — skipped placeholder (no DB tests yet)
+- `tests/calories.data.test.ts` — mocked calories data-layer coverage
+- `tests/sync.engine.test.ts` — `SyncEngine.flush` queue snapshot + error recovery
 
 ---
 
@@ -59,7 +59,7 @@ Report:
 
 | Suite | Tests | Passed | Failed | Skipped |
 |-------|-------|--------|--------|---------|
-| Unit (Vitest) | 155 | ? | ? | 1 |
+| Unit (Vitest) | 162 | ? | ? | 0 |
 | E2E (Playwright) | ? | ? | ? | ? |
 | **Total** | ? | ? | ? | ? |
 
@@ -76,8 +76,8 @@ If any failures:
 
 ## Known non-blocking items
 
-- tests/calories.data.STUB.test.ts — intentionally skipped,
-  no SQLite unit tests yet
+- tests/calories.data.test.ts — mocked data-layer contract coverage,
+  not a live SQLite integration suite
 - Pomodoro E2E timer tests are time-sensitive — occasional
   flakiness on slow CI machines is acceptable (retries: 2 in CI)
 

@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 // ============================================================
-// TODOS — boundary cases
+// Todos — boundary cases
 // ============================================================
 
 test.describe("Todos — boundary inputs", () => {

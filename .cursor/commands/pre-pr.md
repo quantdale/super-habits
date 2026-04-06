@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-   Expected: **155** tests passing, 0 failing
+   Expected: **162** tests passing, 0 failing
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -159,7 +159,7 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 155 passing | ? | PASS/FAIL |
+| Tests | 162 passing | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
@@ -254,7 +254,7 @@ Report final status using one of:
 
 - `toDateKey()` UTC issue — known, requires migration planning
 - Sync flush gated on isRemoteEnabled() — intentional, remote off
-- tests/calories.data.STUB.test.ts — intentional skipped placeholder
+- tests/calories.data.test.ts — mocked data-layer coverage
 - No ESLint config — not yet set up, not in CI
 
 ---

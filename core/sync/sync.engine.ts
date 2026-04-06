@@ -32,8 +32,16 @@ export class SyncEngine {
   async flush() {
     if (this.queue.length === 0) return;
     const snapshot = [...this.queue];
-    await this.adapter.push(snapshot);
     this.queue = [];
+    // Never pass this to `push` — adapters may mutate the batch array; recovery must
+    // still restore the original records.
+    const preservedForRetry = [...snapshot];
+    try {
+      await this.adapter.push(snapshot);
+    } catch (error) {
+      this.queue = [...preservedForRetry, ...this.queue];
+      throw error;
+    }
   }
 }
 
