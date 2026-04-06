@@ -1,3 +1,5 @@
+import { SupabaseSyncAdapter } from "@/core/sync/supabase.adapter";
+
 export type SyncRecord = {
   entity: string;
   id: string;
@@ -45,4 +47,4 @@ export class SyncEngine {
   }
 }
 
-export const syncEngine = new SyncEngine();
+export const syncEngine = new SyncEngine(new SupabaseSyncAdapter());

@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type RemoteMode = "disabled" | "enabled";
 
-let remoteMode: RemoteMode = "disabled";
+let remoteMode: RemoteMode = "enabled";
 
 export function setRemoteMode(mode: RemoteMode) {
   remoteMode = mode;

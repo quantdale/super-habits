@@ -24,3 +24,11 @@ vi.mock("expo-sqlite", () => ({
     closeAsync: vi.fn().mockResolvedValue(undefined),
   }),
 }));
+
+/** Avoid loading @react-native-async-storage via real `lib/supabase` when tests import sync.engine. */
+vi.mock("@/lib/supabase", () => ({
+  supabase: null,
+  setRemoteMode: vi.fn(),
+  isRemoteEnabled: vi.fn(() => true),
+  ensureAnonymousSession: vi.fn().mockResolvedValue(undefined),
+}));
