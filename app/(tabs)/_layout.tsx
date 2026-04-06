@@ -1,14 +1,18 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import type { Href } from "expo-router";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+
+const OVERVIEW_HREF = "/(tabs)/overview" as Href;
 
 const NAV_ITEMS = [
-  { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", icon: "check-circle-outline", color: SECTION_COLORS.todos },
-  { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", icon: "loop", color: SECTION_COLORS.habits },
-  { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", icon: "timer", color: SECTION_COLORS.focus },
-  { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", icon: "fitness-center", color: SECTION_COLORS.workout },
-  { name: "calories", href: "/(tabs)/calories" as const, label: "Calories", icon: "restaurant-menu", color: SECTION_COLORS.calories },
+  { name: "overview", href: OVERVIEW_HREF, label: "Overview", icon: "dashboard", color: "#475569" },
+  { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", icon: "check-circle-outline", color: SECTION_TEXT_COLORS.todos },
+  { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", icon: "loop", color: SECTION_TEXT_COLORS.habits },
+  { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", icon: "timer", color: SECTION_TEXT_COLORS.focus },
+  { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", icon: "fitness-center", color: SECTION_TEXT_COLORS.workout },
+  { name: "calories", href: "/(tabs)/calories" as const, label: "Calories", icon: "restaurant-menu", color: SECTION_TEXT_COLORS.calories },
 ] as const;
 
 /** Matches `Screen` / `bg-surface` so the active tab and tab content area read as one surface. */

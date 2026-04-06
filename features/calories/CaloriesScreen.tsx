@@ -19,9 +19,8 @@ import {
   getCalorieGoal,
   setCalorieGoal,
   DEFAULT_GOAL,
-  type CalorieGoal,
-  type DailySummary,
 } from "@/features/calories/calories.data";
+import type { CalorieGoal, DailySummary } from "@/features/calories/types";
 import {
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
@@ -271,17 +270,10 @@ export function CaloriesScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.calories} className="mb-0">
+          <Card variant="stat" accentColor={SECTION_COLORS.calories} className="mb-0">
             <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>🍽️</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_COLORS.calories,
-                  marginTop: 2,
-                }}
-              >
+              <Text className="text-[22px]">🍽️</Text>
+              <Text className="mt-0.5 text-xl font-bold text-calories">
                 {calorieActivityDays.filter((d) => d.active).length}
               </Text>
               <Text className="mt-0.5 text-xs text-slate-400">days logged</Text>
@@ -289,26 +281,17 @@ export function CaloriesScreen() {
           </Card>
         </View>
         <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.calories} className="mb-0">
+          <Card variant="stat" accentColor={SECTION_COLORS.calories} className="mb-0">
             <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>🎯</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_COLORS.calories,
-                  marginTop: 2,
-                }}
-              >
-                {goalProgress.percent}%
-              </Text>
+              <Text className="text-[22px]">🎯</Text>
+              <Text className="mt-0.5 text-xl font-bold text-calories">{goalProgress.percent}%</Text>
               <Text className="mt-0.5 text-xs text-slate-400">of goal today</Text>
             </View>
           </Card>
         </View>
       </View>
 
-      <Card accentColor={COLOR}>
+      <Card variant="header" accentColor={SECTION_COLORS.calories} headerTitle="Add Entry">
         <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
         {allSavedMeals.length > 0 ? (
           <Pressable
@@ -420,7 +403,7 @@ export function CaloriesScreen() {
         />
       </Card>
 
-      <Card accentColor={COLOR}>
+      <Card variant="standard" accentColor={SECTION_COLORS.calories}>
         <View className="mb-3 items-center rounded-xl border border-calories bg-white p-3">
           <Text className="text-center text-sm font-medium text-slate-600">{consistencyText}</Text>
         </View>
@@ -610,9 +593,12 @@ export function CaloriesScreen() {
 
       {useMemo(
         () => (
-          <Card accentColor={SECTION_COLORS.calories} className="mx-1 mt-4">
-            <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
-          </Card>
+          <View className="mt-4">
+            <Text className="mb-2 text-sm font-semibold text-slate-700">Daily calories</Text>
+            <Card variant="standard" accentColor={SECTION_COLORS.calories}>
+              <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
+            </Card>
+          </View>
         ),
         [dailyTrend, goal.calories],
       )}
@@ -620,9 +606,10 @@ export function CaloriesScreen() {
       {useMemo(
         () => (
           <View className="mt-4">
-            <Card accentColor={SECTION_COLORS.calories} className="mx-1 mb-0">
+            <Text className="mb-2 text-sm font-semibold text-slate-700">Calories — last year</Text>
+            <Text className="mb-2 text-xs text-slate-400">Rolling 53-week activity</Text>
+            <Card variant="standard" accentColor={SECTION_COLORS.calories}>
               <View className="w-full min-w-0 items-center justify-center">
-                <Text className="mb-2 self-start text-xs text-slate-400">Calories — last year</Text>
                 <GitHubHeatmap
                   days={calorieHeatmapDays}
                   color={SECTION_COLORS.calories}

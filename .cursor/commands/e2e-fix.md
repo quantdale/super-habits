@@ -223,7 +223,7 @@ Then run unit tests to confirm no regressions:
 
 **Failures resolved:** N
 **Failures remaining:** N (with explanation if any)
-**Unit tests:** 141 passing (unless a fix added/changed tests)
+**Unit tests:** 155 passing (unless a fix added/changed tests)
 
 If any failures remain that could not be fixed automatically
 (LOW confidence or require human decision), list them clearly

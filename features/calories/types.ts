@@ -7,5 +7,19 @@ export type CalorieEntryTotals = {
   calories: number;
 };
 
-export type { DailySummary, CalorieGoal } from "./calories.data";
-export type { MacroSlice } from "./calories.domain";
+/** One row per calendar day from calorie_entries aggregates. */
+export type DailySummary = {
+  dateKey: string;
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFats: number;
+  totalFiber: number;
+};
+
+export type CalorieGoal = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+};

@@ -1,5 +1,10 @@
-import React, { useMemo } from "react";
-import { View, Text, type ViewStyle } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  InteractionManager,
+  View,
+  Text,
+  type ViewStyle,
+} from "react-native";
 import { HorizontalScrollArea } from "@/core/ui/HorizontalScrollArea";
 
 export type HeatmapDay = {
@@ -21,6 +26,23 @@ const DAY_LABEL_COL_WIDTH = 14;
 const DEFAULT_WEEKS = 52;
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+
+/** Month label row (incl. marginBottom) + 7×day grid — matches real heatmap strip height. */
+const HEATMAP_STRIP_MIN_HEIGHT =
+  4 + 14 + (7 * CELL + 6 * GAP);
+
+/** Stable references for HorizontalScrollArea — avoids new object identity each render. */
+const HEATMAP_SCROLL_CONTENT: ViewStyle = {
+  justifyContent: "center",
+  alignItems: "center",
+  minWidth: "100%",
+};
+
+const HEATMAP_WEB_INNER: ViewStyle = {
+  alignSelf: "stretch",
+  width: "100%",
+  alignItems: "center",
+};
 
 function getColorForValue(value: number, color: string): string {
   if (value === 0) return "#e2e8f0";
@@ -76,7 +98,27 @@ function monthLabelsForWeeks(weeksGrid: (HeatmapDay | null)[][]): string[] {
   });
 }
 
-export function GitHubHeatmap({ days, color, label, weeks = DEFAULT_WEEKS }: Props) {
+function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props) {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) setIsReady(true);
+    }, 100);
+    const interactionHandle = InteractionManager.runAfterInteractions(() => {
+      if (!cancelled) {
+        clearTimeout(timeoutId);
+        setIsReady(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+      interactionHandle.cancel();
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
   const maxDays = weeks * 7;
   const trimmedDays = useMemo(
     () => (days.length > maxDays ? days.slice(-maxDays) : days),
@@ -85,6 +127,40 @@ export function GitHubHeatmap({ days, color, label, weeks = DEFAULT_WEEKS }: Pro
 
   const weekColumns = useMemo(() => buildCalendarGrid(trimmedDays), [trimmedDays]);
   const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
+
+  const footer =
+    label ? (
+      <Text
+        style={{
+          fontSize: 11,
+          color: "#94a3b8",
+          marginTop: 6,
+        }}
+      >
+        {label}
+      </Text>
+    ) : null;
+
+  if (!isReady) {
+    return (
+      <HorizontalScrollArea
+        stripMinHeight={HEATMAP_STRIP_MIN_HEIGHT}
+        contentContainerStyle={HEATMAP_SCROLL_CONTENT}
+        webInnerStyle={HEATMAP_WEB_INNER}
+        footer={footer}
+      >
+        <View
+          style={{
+            width: "100%",
+            minHeight: HEATMAP_STRIP_MIN_HEIGHT,
+            borderRadius: 6,
+            backgroundColor: "#f1f5f9",
+          }}
+          accessibilityLabel="Loading activity heatmap"
+        />
+      </HorizontalScrollArea>
+    );
+  }
 
   const grid = (
     <View style={{ flexDirection: "column", alignItems: "center", width: "100%" }}>
@@ -134,37 +210,16 @@ export function GitHubHeatmap({ days, color, label, weeks = DEFAULT_WEEKS }: Pro
     </View>
   );
 
-  const heatmapScrollContent: ViewStyle = {
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: "100%",
-  };
-
-  const heatmapWebInner: ViewStyle = {
-    alignSelf: "stretch",
-    width: "100%",
-    alignItems: "center",
-  };
-
   return (
     <HorizontalScrollArea
-      contentContainerStyle={heatmapScrollContent}
-      webInnerStyle={heatmapWebInner}
-      footer={
-        label ? (
-          <Text
-            style={{
-              fontSize: 11,
-              color: "#94a3b8",
-              marginTop: 6,
-            }}
-          >
-            {label}
-          </Text>
-        ) : null
-      }
+      stripMinHeight={HEATMAP_STRIP_MIN_HEIGHT}
+      contentContainerStyle={HEATMAP_SCROLL_CONTENT}
+      webInnerStyle={HEATMAP_WEB_INNER}
+      footer={footer}
     >
       {grid}
     </HorizontalScrollArea>
   );
 }
+
+export const GitHubHeatmap = React.memo(GitHubHeatmapInner);

@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import { Alert, Text, View } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { RectButton } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
@@ -167,37 +168,19 @@ export function WorkoutScreen() {
         />
         <View className="mb-4 flex-row gap-3">
           <View className="flex-1">
-            <Card accentColor={SECTION_COLORS.workout} className="mb-0">
+            <Card variant="stat" accentColor={SECTION_COLORS.workout} className="mb-0">
               <View className="items-center py-1">
-                <Text style={{ fontSize: 22 }}>💪</Text>
-                <Text
-                  style={{
-                    fontSize: 20,
-                    fontWeight: "700",
-                    color: SECTION_COLORS.workout,
-                    marginTop: 2,
-                  }}
-                >
-                  {workoutDaysCount}
-                </Text>
+                <Text className="text-[22px]">💪</Text>
+                <Text className="mt-0.5 text-xl font-bold text-workout">{workoutDaysCount}</Text>
                 <Text className="mt-0.5 text-xs text-slate-400">workout days</Text>
               </View>
             </Card>
           </View>
           <View className="flex-1">
-            <Card accentColor={SECTION_COLORS.workout} className="mb-0">
+            <Card variant="stat" accentColor={SECTION_COLORS.workout} className="mb-0">
               <View className="items-center py-1">
-                <Text style={{ fontSize: 22 }}>📅</Text>
-                <Text
-                  style={{
-                    fontSize: 20,
-                    fontWeight: "700",
-                    color: SECTION_COLORS.workout,
-                    marginTop: 2,
-                  }}
-                >
-                  {workoutStreak}
-                </Text>
+                <Text className="text-[22px]">📅</Text>
+                <Text className="mt-0.5 text-xl font-bold text-workout">{workoutStreak}</Text>
                 <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
               </View>
             </Card>
@@ -205,7 +188,7 @@ export function WorkoutScreen() {
         </View>
 
         {!workoutStripHasActivity ? (
-          <Card accentColor={SECTION_COLORS.workout} className="mb-3">
+          <Card variant="standard" accentColor={SECTION_COLORS.workout} className="mb-3">
             <View className="items-center">
               <Text className="text-center text-sm text-slate-500">
                 Complete a workout to start tracking
@@ -216,7 +199,12 @@ export function WorkoutScreen() {
             </View>
           </Card>
         ) : null}
-        <Card accentColor={COLOR}>
+        <Card
+          variant="header"
+          accentColor={SECTION_COLORS.workout}
+          headerTitle="Add new routine"
+          headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
+        >
           <TextField
             label="Routine name"
             value={name}
@@ -261,8 +249,8 @@ export function WorkoutScreen() {
           />
         ))}
 
-        <Card accentColor={SECTION_COLORS.workout} className="mt-4">
-          <Text className="mb-3 text-sm font-semibold text-slate-700">Workout history</Text>
+        <Card variant="standard" accentColor={SECTION_COLORS.workout} className="mt-4">
+          <Text className="mb-2 text-sm font-semibold text-slate-700">Workout history</Text>
           <View className="w-full min-w-0 items-center justify-center">
             <Text className="mb-2 self-start text-xs text-slate-400">
               Session intensity — last 52 weeks

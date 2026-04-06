@@ -2,9 +2,26 @@ import { test, expect, type Page } from "@playwright/test";
 import { goToTab } from "./helpers/navigation";
 import { clearDatabase } from "./helpers/db";
 
-/** Opens add-habit modal via the per–time-group + control (label "Add" is plain text; the + is pressable). */
+/** Opens add-habit modal via the first time-group + (scoped to Habit groups a11y region). */
 async function openAddHabitModal(page: Page) {
-  await page.getByText("+", { exact: true }).first().locator("..").click({ force: true });
+  await expect(page.getByText("ANYTIME").first()).toBeVisible({ timeout: 15_000 });
+  const nameField = page.getByLabel("Habit name");
+  // Click the Pressable wrapper (parent of the + text) — RN Web often rejects clicks on the raw text node.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const firstPlusPressable = page
+      .getByLabel("Habit groups")
+      .getByText("+", { exact: true })
+      .first()
+      .locator("..");
+    await firstPlusPressable.click({ force: true });
+    try {
+      await nameField.waitFor({ state: "visible", timeout: 8_000 });
+      return;
+    } catch {
+      /* retry */
+    }
+  }
+  throw new Error("Add-habit modal did not open (Habit name field never visible)");
 }
 
 test.describe("Habits", () => {
@@ -12,6 +29,7 @@ test.describe("Habits", () => {
     await goToTab(page, "habits");
     await clearDatabase(page);
     await goToTab(page, "habits");
+    await expect(page.getByText("ANYTIME").first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("shows empty state when no habits exist", async ({ page }) => {

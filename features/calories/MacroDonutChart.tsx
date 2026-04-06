@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text } from "react-native";
 import { PieChart } from "react-native-gifted-charts";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const RING_GRAY = "#e2e8f0";
 const OVER_COLOR = "#ef4444";
@@ -10,10 +11,10 @@ const MACRO_CHIPS: {
   key: "protein" | "carbs" | "fats" | "fiber";
   color: string;
 }[] = [
-  { label: "Protein", key: "protein", color: "#3B82F6" },
-  { label: "Carbs", key: "carbs", color: "#F59E0B" },
-  { label: "Fats", key: "fats", color: "#F97316" },
-  { label: "Fiber", key: "fiber", color: "#10B981" },
+  { label: "Protein", key: "protein", color: SECTION_TEXT_COLORS.todos },
+  { label: "Carbs", key: "carbs", color: SECTION_TEXT_COLORS.calories },
+  { label: "Fats", key: "fats", color: SECTION_TEXT_COLORS.workout },
+  { label: "Fiber", key: "fiber", color: SECTION_TEXT_COLORS.habits },
 ];
 
 type Props = {

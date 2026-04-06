@@ -30,3 +30,16 @@ export const SECTION_COLORS_LIGHT = {
   workout: "#FFF7ED", // orange-50
   calories: "#FFFBEB", // amber-50
 } as const;
+
+/**
+ * Darker same-family hues for text and icons on white, `SECTION_COLORS_LIGHT`,
+ * or app surface (#f8f7ff). Keeps `SECTION_COLORS` for fills, borders, and
+ * solid headers. Target ~4.5:1 contrast on light backgrounds.
+ */
+export const SECTION_TEXT_COLORS = {
+  todos: "#1D4ED8", // blue-700
+  habits: "#047857", // emerald-700
+  focus: "#6D28D9", // violet-700
+  workout: "#C2410C", // orange-700
+  calories: "#92400E", // amber-800 (deeper for yellow-50 / warm surface)
+} as const;

@@ -11,6 +11,21 @@ type Props = {
   size?: number; // default 160
 };
 
+function stemHeightFromProgress(progress: number): number {
+  return Math.max(4, Math.round(progress * 80));
+}
+
+function areFocusSproutPropsEqual(prev: Props, next: Props): boolean {
+  const prevAccent = prev.accentColor ?? SECTION_COLORS.focus;
+  const nextAccent = next.accentColor ?? SECTION_COLORS.focus;
+  const prevSize = prev.size ?? 160;
+  const nextSize = next.size ?? 160;
+  if (prev.stage !== next.stage) return false;
+  if (prevSize !== nextSize) return false;
+  if (prevAccent !== nextAccent) return false;
+  return stemHeightFromProgress(prev.progress) === stemHeightFromProgress(next.progress);
+}
+
 /**
  * SVG sprout that grows through 5 stages.
  * Each stage adds visual elements on top of previous ones.
@@ -21,7 +36,7 @@ type Props = {
  *   - Leaves: added at seedling+ stages
  *   - Crown: added at grown stage
  */
-export function FocusSprout({
+function FocusSproutInner({
   progress,
   stage,
   accentColor = SECTION_COLORS.focus,
@@ -29,7 +44,7 @@ export function FocusSprout({
 }: Props) {
   // Stem height grows from 0 to 80px based on progress
   // Minimum 4px so there's always something visible when started
-  const stemHeight = Math.max(4, Math.round(progress * 80));
+  const stemHeight = stemHeightFromProgress(progress);
   const stemTop = 128 - stemHeight; // grows upward from soil
   const stemX = 80;
 
@@ -111,3 +126,5 @@ export function FocusSprout({
     </View>
   );
 }
+
+export const FocusSprout = React.memo(FocusSproutInner, areFocusSproutPropsEqual);

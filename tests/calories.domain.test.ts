@@ -9,7 +9,7 @@ import {
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
 } from "@/features/calories/calories.domain";
-import type { DailySummary } from "@/features/calories/calories.data";
+import type { DailySummary } from "@/features/calories/types";
 import type { SavedMeal } from "@/core/db/types";
 
 function meal(name: string, useCount = 1): SavedMeal {

@@ -2,27 +2,31 @@ import React from "react";
 import { View, Text } from "react-native";
 import { Card } from "@/core/ui/Card";
 import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 type Props = {
   consistencyPercent: number;
   heatmapDays: HeatmapDay[];
 };
 
-export function HabitsOverviewGrid({
-  consistencyPercent,
-  heatmapDays,
-}: Props) {
+const HEATMAP_LEGEND: Array<{ label: string; color: string }> = [
+  { label: "None", color: "#e2e8f0" },
+  { label: "Some", color: `${SECTION_COLORS.habits}55` },
+  { label: "Most", color: `${SECTION_COLORS.habits}99` },
+  { label: "All", color: SECTION_COLORS.habits },
+];
+
+function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
   return (
     <View className="w-full items-center">
-      <Card accentColor={SECTION_COLORS.habits} className="w-full max-w-full">
+      <Card variant="standard" accentColor={SECTION_COLORS.habits} className="w-full max-w-full">
         <View className="w-full min-w-0 items-center justify-center">
           <View className="mb-4 w-full flex-row items-center gap-2">
             <Text
               style={{
                 fontSize: 28,
                 fontWeight: "700",
-                color: SECTION_COLORS.habits,
+                color: SECTION_TEXT_COLORS.habits,
               }}
             >
               {consistencyPercent}%
@@ -49,12 +53,7 @@ export function HabitsOverviewGrid({
           />
 
           <View className="mt-3 w-full flex-row flex-wrap items-center gap-3">
-            {[
-              { label: "None", color: "#e2e8f0" },
-              { label: "Some", color: `${SECTION_COLORS.habits}55` },
-              { label: "Most", color: `${SECTION_COLORS.habits}99` },
-              { label: "All", color: SECTION_COLORS.habits },
-            ].map((l) => (
+            {HEATMAP_LEGEND.map((l) => (
               <View key={l.label} className="flex-row items-center gap-1">
                 <View
                   style={{
@@ -73,3 +72,5 @@ export function HabitsOverviewGrid({
     </View>
   );
 }
+
+export const HabitsOverviewGrid = React.memo(HabitsOverviewGridInner);

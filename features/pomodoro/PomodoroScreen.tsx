@@ -269,50 +269,26 @@ export function PomodoroScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.focus} className="mb-0">
+          <Card variant="stat" accentColor={COLOR} className="mb-0">
             <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>🎯</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_COLORS.focus,
-                  marginTop: 2,
-                }}
-              >
-                {sessions.length}
-              </Text>
+              <Text className="text-[22px]">🎯</Text>
+              <Text className="mt-0.5 text-xl font-bold text-focus">{sessions.length}</Text>
               <Text className="mt-0.5 text-xs text-slate-400">sessions this year</Text>
             </View>
           </Card>
         </View>
         <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.focus} className="mb-0">
+          <Card variant="stat" accentColor={COLOR} className="mb-0">
             <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>🔥</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_COLORS.focus,
-                  marginTop: 2,
-                }}
-              >
-                {focusStreak}
-              </Text>
+              <Text className="text-[22px]">🔥</Text>
+              <Text className="mt-0.5 text-xl font-bold text-focus">{focusStreak}</Text>
               <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
             </View>
           </Card>
         </View>
       </View>
 
-      {showSprout ? (
-        <View className="mb-4 items-center">
-          <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
-        </View>
-      ) : null}
-
-      <Card accentColor={COLOR} className="mx-1 mb-4">
+      <Card variant="header" accentColor={COLOR} headerTitle="Timer" className="mb-4">
         <View className="mb-4 flex-row flex-wrap justify-center">
           {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
             <PillChip
@@ -336,17 +312,23 @@ export function PomodoroScreen() {
           ))}
         </View>
 
-        <Pressable
-          onPress={() => !isRunning && setShowSettings((v) => !v)}
-          disabled={isRunning}
-        >
-          <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
-            {minutes}:{seconds}
-          </Text>
-          {!isRunning ? (
-            <Text className="mt-0.5 text-center text-xs text-slate-400">tap to edit</Text>
+        <View className="w-full items-center justify-center py-2">
+          {showSprout ? (
+            <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
           ) : null}
-        </Pressable>
+          <Pressable
+            className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}
+            onPress={() => !isRunning && setShowSettings((v) => !v)}
+            disabled={isRunning}
+          >
+            <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
+              {minutes}:{seconds}
+            </Text>
+            {!isRunning ? (
+              <Text className="mt-0.5 text-center text-xs text-slate-400">tap to edit</Text>
+            ) : null}
+          </Pressable>
+        </View>
 
         <View className="my-3 flex-row justify-center gap-1.5">
           {Array.from({ length: settings.sessionsBeforeLongBreak }).map((_, i) => (
@@ -398,22 +380,16 @@ export function PomodoroScreen() {
         />
       ) : null}
 
-      <Card accentColor={SECTION_COLORS.focus} className="mt-4">
+      <Card variant="standard" accentColor={COLOR} className="mt-4">
         <GardenGrid sessions={sessions} />
-      </Card>
-
-      <View className="mt-6">
-        <Card accentColor={SECTION_COLORS.focus} className="mx-1 mb-0">
-          <View className="w-full min-w-0 items-center justify-center">
-            <Text className="mb-2 self-start text-xs text-slate-400">Focus — last 52 weeks</Text>
-            <GitHubHeatmap
-              days={pomodoroHeatmapDays}
-              color={SECTION_COLORS.focus}
-              weeks={52}
-            />
+        <View className="mt-6 w-full min-w-0 items-center justify-center">
+          <View className="mb-2 w-full self-start">
+            <Text className="text-base font-semibold text-slate-900">Focus history</Text>
+            <Text className="mt-0.5 text-xs text-slate-400">Last 52 weeks</Text>
           </View>
-        </Card>
-      </View>
+          <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
+        </View>
+      </Card>
     </Screen>
   );
 }

@@ -29,9 +29,9 @@ import {
   updateTodo,
   updateTodoOrder,
 } from "@/features/todos/todos.data";
-import colors from "tailwindcss/colors";
 
 const COLOR = SECTION_COLORS.todos;
+const MUTED_ICON = "#94a3b8";
 
 export function TodosScreen() {
   const [title, setTitle] = useState("");
@@ -163,10 +163,10 @@ export function TodosScreen() {
   const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
 
   const noPendingTasksCard = (
-    <Card accentColor={SECTION_COLORS.todos}>
-      <View className="items-center py-4">
-        <Text className="text-sm text-slate-500 text-center">No Pending Tasks</Text>
-        <Text className="text-xs text-slate-400 text-center mt-1">Offline-first task manager.</Text>
+    <Card variant="standard" accentColor={SECTION_COLORS.todos}>
+      <View className="items-center">
+        <Text className="text-center text-sm text-slate-500">No Pending Tasks</Text>
+        <Text className="mt-1 text-center text-xs text-slate-400">Offline-first task manager.</Text>
       </View>
     </Card>
   );
@@ -175,12 +175,12 @@ export function TodosScreen() {
     <View className="flex-1">
       <Screen>
         <View className="flex-1">
-        <View className="flex-row items-center justify-between mb-1">
+          <View className="flex-row items-start justify-between">
             <SectionTitle
-              title="To-do List"
+              title="Todos"
               subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
             />
-            <View style={{ flexDirection: "row", gap: 4, paddingRight: 4 }}>
+            <View className="flex-row gap-1">
               {(
                 [
                   { mode: "content", icon: "view-agenda" },
@@ -191,114 +191,122 @@ export function TodosScreen() {
                 <Pressable
                   key={mode}
                   onPress={() => setViewMode(mode)}
-                  style={{
-                    padding: 6,
-                    borderRadius: 8,
-                    backgroundColor: viewMode === mode ? SECTION_COLORS.todos + "22" : "transparent",
-                  }}
+                  className={`rounded-lg p-2 ${viewMode === mode ? "bg-todos-light" : ""}`}
                   accessibilityLabel={`${mode} view`}
                 >
                   <MaterialIcons
                     name={icon as any}
-                    size={22}
-                    color={viewMode === mode ? SECTION_COLORS.todos : colors.slate[400]}
+                    size={24}
+                    color={viewMode === mode ? COLOR : MUTED_ICON}
                   />
                 </Pressable>
               ))}
             </View>
           </View>
 
-        {totallyEmpty ? (
-          <View className="mb-3">
-            {noPendingTasksCard}
+          <View className="mb-4 mt-1 flex-row gap-3">
+            <View className="flex-1">
+              <Card variant="stat" accentColor={SECTION_COLORS.todos} className="mb-0">
+                <View className="items-center py-1">
+                  <Text className="text-[22px]">📋</Text>
+                  <Text className="mt-0.5 text-xl font-bold text-todos">{pendingTasks.length}</Text>
+                  <Text className="mt-0.5 text-xs text-slate-400">pending tasks</Text>
+                </View>
+              </Card>
+            </View>
           </View>
-        ) : null}
 
-        {!totallyEmpty ? (
-          <View className="min-h-0 flex-1">
-            <DraggableFlatList
-              key={viewMode}
-              data={pendingTasks}
-              keyExtractor={(item) => item.id}
-              containerStyle={{ flex: 1 }}
-              activationDistance={10}
-              numColumns={viewMode === "grid" ? 4 : 1}
-              onDragBegin={() => {}}
-              onDragEnd={async ({ data }) => {
-                setItems((prev) =>
-                  prev.map((item) => {
-                    const newIndex = data.findIndex((d) => d.id === item.id);
-                    return newIndex !== -1 ? { ...item, sort_order: newIndex + 1 } : item;
-                  }),
-                );
-                await updateTodoOrder(data.map((d) => d.id));
-                refresh();
-              }}
-              ListEmptyComponent={
-                hasCompleted ? (
-                  <View className="mb-3">{noPendingTasksCard}</View>
-                ) : (
-                  <Card accentColor={SECTION_COLORS.todos}>
-                    <View className="items-center py-4">
-                      <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
+          {totallyEmpty ? (
+            <View className="mb-3">
+              {noPendingTasksCard}
+            </View>
+          ) : null}
+
+          {!totallyEmpty ? (
+            <View className="min-h-0 flex-1">
+              <DraggableFlatList
+                key={viewMode}
+                data={pendingTasks}
+                keyExtractor={(item) => item.id}
+                containerStyle={{ flex: 1 }}
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
+                activationDistance={10}
+                numColumns={viewMode === "grid" ? 4 : 1}
+                onDragBegin={() => {}}
+                onDragEnd={async ({ data }) => {
+                  setItems((prev) =>
+                    prev.map((item) => {
+                      const newIndex = data.findIndex((d) => d.id === item.id);
+                      return newIndex !== -1 ? { ...item, sort_order: newIndex + 1 } : item;
+                    }),
+                  );
+                  await updateTodoOrder(data.map((d) => d.id));
+                  refresh();
+                }}
+                ListEmptyComponent={
+                  hasCompleted ? (
+                    <View className="mb-3">{noPendingTasksCard}</View>
+                  ) : (
+                    <Card variant="standard" accentColor={SECTION_COLORS.todos}>
+                      <View className="items-center">
+                        <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
+                      </View>
+                    </Card>
+                  )
+                }
+                ListFooterComponent={
+                  hasCompleted ? (
+                    <View>
+                      <Pressable onPress={() => setShowCompleted((v) => !v)} className="mb-2 px-1 py-2">
+                        <Text className="text-xs text-todos">
+                          {showCompleted
+                            ? "▲ hide completed"
+                            : `▼ show completed (${completedTasks.length})`}
+                        </Text>
+                      </Pressable>
+                      {showCompleted
+                        ? completedTasks.map((item) => (
+                            <TodoItem
+                              key={item.id}
+                              todo={item}
+                              onLongPress={() => {}}
+                              isActive={false}
+                              onToggle={() => toggleTodo(item).then(refresh)}
+                              onDelete={() => removeTodo(item.id).then(refresh)}
+                              onEdit={() => startEdit(item)}
+                              viewMode={viewMode}
+                              cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
+                            />
+                          ))
+                        : null}
                     </View>
-                  </Card>
-                )
-              }
-              ListFooterComponent={
-                hasCompleted ? (
-                  <View>
-                    <Pressable onPress={() => setShowCompleted((v) => !v)} className="mb-2 px-1 py-2">
-                      <Text className="text-xs text-todos">
-                        {showCompleted
-                          ? "▲ hide completed"
-                          : `▼ show completed (${completedTasks.length})`}
-                      </Text>
-                    </Pressable>
-                    {showCompleted
-                      ? completedTasks.map((item) => (
-                          <TodoItem
-                            key={item.id}
-                            todo={item}
-                            onLongPress={() => {}}
-                            isActive={false}
-                            onToggle={() => toggleTodo(item).then(refresh)}
-                            onDelete={() => removeTodo(item.id).then(refresh)}
-                            onEdit={() => startEdit(item)}
-                            viewMode={viewMode}
-                            cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
-                          />
-                        ))
-                      : null}
-                  </View>
-                ) : null
-              }
-              renderItem={({ item, drag, isActive }: RenderItemParams<Todo>) => (
-                <ScaleDecorator>
-                  <TodoItem
-                    todo={item}
-                    onLongPress={drag}
-                    isActive={isActive}
-                    onToggle={() => toggleTodo(item).then(refresh)}
-                    onDelete={() => removeTodo(item.id).then(refresh)}
-                    onEdit={() => startEdit(item)}
-                    viewMode={viewMode}
-                    cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
-                  />
-                </ScaleDecorator>
-              )}
-            />
-          </View>
-        ) : null}
+                  ) : null
+                }
+                renderItem={({ item, drag, isActive }: RenderItemParams<Todo>) => (
+                  <ScaleDecorator>
+                    <TodoItem
+                      todo={item}
+                      onLongPress={drag}
+                      isActive={isActive}
+                      onToggle={() => toggleTodo(item).then(refresh)}
+                      onDelete={() => removeTodo(item.id).then(refresh)}
+                      onEdit={() => startEdit(item)}
+                      viewMode={viewMode}
+                      cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
+                    />
+                  </ScaleDecorator>
+                )}
+              />
+            </View>
+          ) : null}
         </View>
 
-      <Modal
-        title={editingId ? "Edit Todo" : "New Todo"}
-        visible={modalVisible}
-        onClose={closeModal}
-        scroll
-      >
-        <Card accentColor={SECTION_COLORS.todos}>
+      <Modal visible={modalVisible} onClose={closeModal} scroll>
+        <Card
+          variant="header"
+          accentColor={SECTION_COLORS.todos}
+          headerTitle={editingId ? "Edit task" : "Add new task"}
+        >
           <TextField
             label="Title"
             value={title}

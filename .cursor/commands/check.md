@@ -16,7 +16,7 @@ Report for each:
 
 Expected baselines:
 - typecheck: 0 errors
-- npm test: **141** tests passing (update baseline if tests change)
+- npm test: **155** tests passing (update baseline if tests change)
 
 Final summary: overall Pass / Fail.
 If anything fails, identify root cause and suggest fix.

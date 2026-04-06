@@ -11,7 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **141** tests passing, 0 failing
+Expected: **155** tests passing, 0 failing
 (1 file intentionally skipped: tests/calories.data.STUB.test.ts)
 
 Report:
@@ -23,6 +23,7 @@ Report:
 - `tests/habits.domain.test.ts` — calculateHabitProgress
 - `tests/pomodoro.domain.test.ts` — nextPomodoroState
 - `tests/calories.domain.test.ts` — caloriesTotal, kcalFromMacros
+- `tests/workout.domain.test.ts` — timer, heatmap, `computeWorkoutStreakFromHeatmapDays`, etc.
 - `tests/calories.data.STUB.test.ts` — skipped placeholder (no DB tests yet)
 
 ---
@@ -58,7 +59,7 @@ Report:
 
 | Suite | Tests | Passed | Failed | Skipped |
 |-------|-------|--------|--------|---------|
-| Unit (Vitest) | 141 | ? | ? | 1 |
+| Unit (Vitest) | 155 | ? | ? | 1 |
 | E2E (Playwright) | ? | ? | ? | ? |
 | **Total** | ? | ? | ? | ? |
 

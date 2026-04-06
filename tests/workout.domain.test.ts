@@ -8,7 +8,9 @@ import {
   buildWorkoutActivityDays,
   buildWorkoutFrequency,
   buildWorkoutHeatmapDays,
+  computeWorkoutStreakFromHeatmapDays,
 } from "@/features/workout/workout.domain";
+import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import type { WorkoutLog } from "@/core/db/types";
 
 function workoutLog(completedAt: string): WorkoutLog {
@@ -140,6 +142,31 @@ describe("buildWorkoutHeatmapDays", () => {
     const d = String(new Date().getDate()).padStart(2, "0");
     const todayKey = `${y}-${m}-${d}`;
     expect(heat.find((h) => h.dateKey === todayKey)?.value).toBe(3);
+  });
+});
+
+describe("computeWorkoutStreakFromHeatmapDays", () => {
+  const days = (...values: number[]): HeatmapDay[] =>
+    values.map((value, i) => ({ dateKey: `2025-01-${String(i + 1).padStart(2, "0")}`, value }));
+
+  it("returns 0 for empty heatmap", () => {
+    expect(computeWorkoutStreakFromHeatmapDays([])).toBe(0);
+  });
+
+  it("counts consecutive active days from the last element (today)", () => {
+    expect(computeWorkoutStreakFromHeatmapDays(days(0, 0, 1, 1))).toBe(2);
+  });
+
+  it("returns 1 when only the last day is active", () => {
+    expect(computeWorkoutStreakFromHeatmapDays(days(0, 0, 1, 0, 1))).toBe(1);
+  });
+
+  it("returns 0 when the last day is inactive even if yesterday was active", () => {
+    expect(computeWorkoutStreakFromHeatmapDays(days(1, 0))).toBe(0);
+  });
+
+  it("treats any value > 0 as active (e.g. intensity 3)", () => {
+    expect(computeWorkoutStreakFromHeatmapDays(days(0, 3))).toBe(1);
   });
 });
 

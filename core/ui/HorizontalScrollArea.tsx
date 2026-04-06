@@ -23,6 +23,11 @@ type Props = PropsWithChildren<{
   webInnerStyle?: ViewStyle;
   /** Native horizontal ScrollView: merged with default `contentContainerStyle`. */
   contentContainerStyle?: ViewStyle;
+  /**
+   * Minimum height of the horizontal scroll viewport (strip only, not footer).
+   * Reserves space for deferred/skeleton content to avoid layout jump when real content mounts.
+   */
+  stripMinHeight?: number;
 }>;
 
 /** Web-only: extra styles; overflow uses Tailwind so horizontal scroll works in nested layouts. */
@@ -37,7 +42,10 @@ const WEB_INNER: ViewStyle = {
 };
 
 export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props>(
-  function HorizontalScrollArea({ children, footer, webInnerStyle, contentContainerStyle }, ref) {
+  function HorizontalScrollArea(
+    { children, footer, webInnerStyle, contentContainerStyle, stripMinHeight },
+    ref,
+  ) {
     const nativeRef = useRef<ScrollView>(null);
     const webScrollId = `hscroll-${useId().replace(/:/g, "")}`;
 
@@ -58,12 +66,15 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
       [webScrollId],
     );
 
+    const stripViewportStyle: ViewStyle | undefined =
+      stripMinHeight != null ? { minHeight: stripMinHeight } : undefined;
+
     const strip =
       Platform.OS === "web" ? (
         <View
           nativeID={webScrollId}
           className="w-full min-h-0 min-w-0 max-w-full shrink overflow-x-auto overflow-y-hidden"
-          style={WEB_OUTER_EXTRA}
+          style={[WEB_OUTER_EXTRA, stripViewportStyle]}
         >
           <View style={[WEB_INNER, webInnerStyle]}>{children}</View>
         </View>
@@ -73,7 +84,7 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
           horizontal
           nestedScrollEnabled
           showsHorizontalScrollIndicator={false}
-          style={HORIZONTAL_SCROLL_VIEWPORT_STYLE}
+          style={[HORIZONTAL_SCROLL_VIEWPORT_STYLE, stripViewportStyle]}
           contentContainerStyle={[HORIZONTAL_SCROLL_CONTENT, contentContainerStyle]}
         >
           {children}

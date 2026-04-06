@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from "react";
-import { Platform, View, Text } from "react-native";
+import { Dimensions, Platform, View, Text } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import {
   HorizontalScrollArea,
   type HorizontalScrollAreaHandle,
@@ -13,9 +13,12 @@ type Props = {
   goalKcal?: number;
 };
 
-/** Fixed geometry: chart scrolls horizontally (same idea as the calories heatmap strip). */
-const BAR_WIDTH = 18;
-const SPACING = 8;
+/** Padding/margins outside the scroll strip (screen + Card). */
+const HORIZONTAL_INSET = 64;
+/** One viewport shows this many daily bars at a time. */
+const DAYS_PER_VIEWPORT = 30;
+/** Show an x-axis label every N days to avoid overlap. */
+const X_LABEL_EVERY_N = 7;
 
 /** Ignore absurd single-day totals so the Y scale and goal line stay readable. */
 const DAILY_CHART_MAX_KCAL = 12_000;
@@ -27,25 +30,31 @@ function formatKcalTopLabel(kcal: number): string {
   return `${(kcal / 1_000_000).toFixed(1)}M`;
 }
 
-function chartContentWidth(barCount: number): number {
+function chartContentWidth(barCount: number, barWidth: number, spacing: number): number {
   const n = Math.max(1, barCount);
-  return n * BAR_WIDTH + (n - 1) * SPACING;
+  return n * barWidth + (n - 1) * spacing;
 }
 
 export function DailyCalorieChart({ data, goalKcal }: Props) {
   const scrollRef = useRef<HorizontalScrollAreaHandle>(null);
 
-  const chartWidth = chartContentWidth(data.length);
+  const windowWidth = Dimensions.get("window").width;
+  const availableWidth = Math.max(200, windowWidth - HORIZONTAL_INSET);
+  const slotWidth = availableWidth / DAYS_PER_VIEWPORT;
+  const barWidth = slotWidth * 0.6;
+  const spacing = slotWidth * 0.4;
+
+  const chartWidth = chartContentWidth(data.length, barWidth, spacing);
 
   const peakKcal = data.length ? Math.max(...data.map((d) => d.value), 0) : 0;
   const cappedPeak = Math.min(peakKcal, DAILY_CHART_MAX_KCAL);
   const maxValue = Math.max(goalKcal ?? 0, 500, cappedPeak);
 
-  const barData = data.map((d) => {
+  const barData = data.map((d, index) => {
     const barValue = Math.min(d.value, maxValue);
     return {
       value: barValue,
-      label: d.label,
+      label: index % X_LABEL_EVERY_N === 0 ? d.label : "",
       frontColor: d.value === 0 ? "#e2e8f0" : SECTION_COLORS.calories,
       topLabelComponent: () =>
         d.value > 0 ? (
@@ -78,7 +87,9 @@ export function DailyCalorieChart({ data, goalKcal }: Props) {
           goalKcal ? (
             <View className="mt-1 flex-row items-center gap-1 px-1">
               <View style={{ width: 16, height: 1.5, backgroundColor: SECTION_COLORS.calories }} />
-              <Text className="text-xs text-amber-500">Goal: {goalKcal} kcal</Text>
+              <Text className="text-xs" style={{ color: SECTION_TEXT_COLORS.calories }}>
+                Goal: {goalKcal} kcal
+              </Text>
             </View>
           ) : null
         }
@@ -86,8 +97,8 @@ export function DailyCalorieChart({ data, goalKcal }: Props) {
         <View style={{ alignSelf: "flex-start" }}>
           <BarChart
             data={barData}
-            barWidth={BAR_WIDTH}
-            spacing={SPACING}
+            barWidth={barWidth}
+            spacing={spacing}
             roundedTop
             xAxisThickness={1}
             yAxisThickness={0}

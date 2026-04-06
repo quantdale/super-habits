@@ -1,4 +1,4 @@
-import type { DailySummary } from "./calories.data";
+import type { DailySummary } from "@/features/calories/types";
 import type { SavedMeal } from "@/core/db/types";
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";

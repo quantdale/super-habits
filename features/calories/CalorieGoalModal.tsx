@@ -5,7 +5,7 @@ import { Button } from "@/core/ui/Button";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateCalorieGoal } from "@/lib/validation";
-import type { CalorieGoal } from "./calories.data";
+import type { CalorieGoal } from "@/features/calories/types";
 
 type Props = {
   visible: boolean;

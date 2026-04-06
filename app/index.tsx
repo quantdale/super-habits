@@ -1,5 +1,7 @@
-import { Redirect } from "expo-router";
+import { Redirect, type Href } from "expo-router";
+
+const OVERVIEW_TAB = "/(tabs)/overview" as Href;
 
 export default function Index() {
-  return <Redirect href="/(tabs)/todos" />;
+  return <Redirect href={OVERVIEW_TAB} />;
 }

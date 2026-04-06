@@ -4,15 +4,9 @@ import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { kcalFromMacros } from "@/features/calories/calories.domain";
+import type { CalorieGoal, DailySummary } from "@/features/calories/types";
 
-export type DailySummary = {
-  dateKey: string;
-  totalCalories: number;
-  totalProtein: number;
-  totalCarbs: number;
-  totalFats: number;
-  totalFiber: number;
-};
+export type { CalorieGoal, DailySummary } from "@/features/calories/types";
 
 export async function getCalorieSummaryByRange(
   startDateKey: string,
@@ -36,13 +30,6 @@ export async function getCalorieSummaryByRange(
     [startDateKey, endDateKey],
   );
 }
-
-export type CalorieGoal = {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-};
 
 const GOAL_KEY = "calorie_goal";
 export const DEFAULT_GOAL: CalorieGoal = {
@@ -249,6 +236,11 @@ export async function listRecentSavedMeals(limit: number = 5): Promise<SavedMeal
   );
 }
 
+/** Escape `\`, `%`, `_` for SQLite `LIKE ... ESCAPE '\\'`. */
+function escapeSqliteLikePattern(fragment: string): string {
+  return fragment.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 export async function searchSavedMeals(query: string): Promise<SavedMeal[]> {
   const db = await getDatabase();
   if (!query.trim()) {
@@ -257,11 +249,13 @@ export async function searchSavedMeals(query: string): Promise<SavedMeal[]> {
        ORDER BY use_count DESC, last_used_at DESC`,
     );
   }
+  const trimmed = query.trim();
+  const escaped = escapeSqliteLikePattern(trimmed);
   return db.getAllAsync<SavedMeal>(
     `SELECT * FROM saved_meals
-     WHERE food_name LIKE ? COLLATE NOCASE
+     WHERE food_name LIKE ? ESCAPE '\\' COLLATE NOCASE
      ORDER BY use_count DESC, last_used_at DESC`,
-    [`%${query.trim()}%`],
+    [`%${escaped}%`],
   );
 }
 

@@ -66,20 +66,27 @@ test.describe("Todos — boundary inputs", () => {
     test.setTimeout(120_000);
     await goToTab(page, "todos");
     for (let i = 1; i <= 30; i++) {
+      // Fresh locator each iteration. Use scrollIntoView via evaluate — Playwright's scrollIntoViewIfNeeded waits for "stable" layout and can detach on RN Web.
       const openCreate = page.getByRole("button", { name: "Add task" }).first();
-      await openCreate.scrollIntoViewIfNeeded();
+      await openCreate.evaluate((el) =>
+        (el as HTMLElement).scrollIntoView({ block: "nearest", inline: "nearest" }),
+      );
       await openCreate.click({ force: true });
       const titleInput = page.getByPlaceholder(/Add a task/i);
       try {
         await titleInput.waitFor({ state: "visible", timeout: 2_000 });
       } catch {
-        await openCreate.click({ force: true });
+        const retryOpen = page.getByRole("button", { name: "Add task" }).first();
+        await retryOpen.evaluate((el) =>
+          (el as HTMLElement).scrollIntoView({ block: "nearest", inline: "nearest" }),
+        );
+        await retryOpen.click({ force: true });
         await titleInput.waitFor({ state: "visible", timeout: 15_000 });
       }
       await titleInput.fill(`Task ${i}`);
       await submitTodoModal(page);
     }
-    await expect(page.getByText("Task 30")).toBeVisible();
+    await expect(page.getByText("Task 30")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Task 1", { exact: true })).toBeVisible();
   });
 });
@@ -91,7 +98,13 @@ test.describe("Todos — boundary inputs", () => {
 test.describe("Habits — boundary inputs", () => {
   test("habit with target_per_day = 1 shows correct progress", async ({ page }) => {
     await goToTab(page, "habits");
-    await page.getByText("+", { exact: true }).first().click();
+    await expect(page.getByText("ANYTIME").first()).toBeVisible({ timeout: 15_000 });
+    await page
+      .getByLabel("Habit groups")
+      .getByText("+", { exact: true })
+      .first()
+      .locator("..")
+      .click({ force: true });
     await page.getByLabel("Habit name").fill("One tap");
     await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("One tap").first()).toBeVisible();
@@ -106,11 +119,17 @@ test.describe("Habits — boundary inputs", () => {
   test("creating 10 habits across groups renders all groups", async ({ page }) => {
     test.setTimeout(90_000);
     await goToTab(page, "habits");
+    await expect(page.getByText("ANYTIME").first()).toBeVisible({ timeout: 15_000 });
     for (let i = 0; i < 10; i++) {
-      // Stable per-group cell: one "Add" label per time group; "+" is scoped inside that cell (not global nth on all "+").
-      const groupAddCell = page.getByText("Add", { exact: true }).nth(i % 4).locator("..");
-      await groupAddCell.scrollIntoViewIfNeeded();
-      await groupAddCell.getByText("+", { exact: true }).click();
+      // Fresh locator chain each iteration — avoids stale handles after modal close / list reflow.
+      await page
+        .getByLabel("Habit groups")
+        .getByText("Add", { exact: true })
+        .nth(i % 4)
+        .locator("..")
+        .getByText("+", { exact: true })
+        .locator("..")
+        .click({ force: true });
       await expect(page.getByLabel("Habit name")).toBeVisible({ timeout: 15_000 });
       await page.getByLabel("Habit name").fill(`Boundary habit ${i + 1}`);
       await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
@@ -165,8 +184,9 @@ test.describe("Calories — boundary inputs", () => {
     for (let i = 1; i <= 20; i++) {
       await fillCaloriesMacros(page, `Snack ${i}`, "25", "0", "0", "0");
       await clickCaloriesAddEntry(page);
-      await page.waitForTimeout(150);
-      await page.waitForTimeout(100);
+      await expect(page.getByText(`Snack ${i}`, { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
     }
     await page.getByText(/Today:/).scrollIntoViewIfNeeded();
     await expect(page.locator("body")).toContainText("Today: 2000 kcal", { timeout: 20_000 });

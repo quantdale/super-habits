@@ -38,7 +38,7 @@ import {
   HABIT_COLORS,
   HABIT_ICONS,
 } from "@/features/habits/habitPresets";
-import { SECTION_COLORS, SECTION_COLORS_LIGHT } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_COLORS_LIGHT, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
 import { validateHabit } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
@@ -51,6 +51,14 @@ const TIME_GROUPS = [
 ] as const;
 
 const COLOR = SECTION_COLORS.habits;
+
+function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].dateKey !== b[i].dateKey || a[i].value !== b[i].value) return false;
+  }
+  return true;
+}
 
 export function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -100,8 +108,11 @@ export function HabitsScreen() {
       364,
     );
     const pct = calculateOverallConsistency(gridBuilt);
-    setConsistencyPct(pct);
-    setHabitHeatmapDays(buildAggregatedHabitHeatmap(gridBuilt, 364));
+    const nextHeatmapDays = buildAggregatedHabitHeatmap(gridBuilt, 364);
+    setConsistencyPct((prev) => (prev === pct ? prev : pct));
+    setHabitHeatmapDays((prev) =>
+      heatmapDaysEqual(prev, nextHeatmapDays) ? prev : nextHeatmapDays,
+    );
 
     const bestStreak = Math.max(0, ...Object.values(streaks));
     setOverallStreak(bestStreak);
@@ -205,14 +216,14 @@ export function HabitsScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.habits} className="mb-0">
+          <Card variant="stat" accentColor={SECTION_COLORS.habits} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>⚡</Text>
               <Text
                 style={{
                   fontSize: 20,
                   fontWeight: "700",
-                  color: SECTION_COLORS.habits,
+                  color: SECTION_TEXT_COLORS.habits,
                   marginTop: 2,
                 }}
               >
@@ -223,14 +234,14 @@ export function HabitsScreen() {
           </Card>
         </View>
         <View className="flex-1">
-          <Card accentColor={SECTION_COLORS.habits} className="mb-0">
+          <Card variant="stat" accentColor={SECTION_COLORS.habits} className="mb-0">
             <View className="items-center py-1">
               <Text style={{ fontSize: 22 }}>📊</Text>
               <Text
                 style={{
                   fontSize: 20,
                   fontWeight: "700",
-                  color: SECTION_COLORS.habits,
+                  color: SECTION_TEXT_COLORS.habits,
                   marginTop: 2,
                 }}
               >
@@ -242,7 +253,7 @@ export function HabitsScreen() {
         </View>
       </View>
 
-      <View className="bg-habits-light pb-4">
+      <View className="bg-habits-light pb-4" accessibilityLabel="Habit groups">
         {habits.length === 0 ? (
           <Text className="mb-4 px-4 text-center text-sm text-slate-500">
             Pick a time of day and tap Add to create your first habit.
@@ -253,14 +264,14 @@ export function HabitsScreen() {
           const groupHabits = habits.filter((h) => (h.category ?? "anytime") === group.key);
 
           return (
-            <Card key={group.key} accentColor={SECTION_COLORS.habits} className="mb-3">
-              <View className="mb-3 flex-row items-center gap-2">
-                <Text style={{ fontSize: 16 }}>{group.icon}</Text>
-                <Text className="text-[13px] font-semibold uppercase tracking-wide text-slate-400">
-                  {group.label}
-                </Text>
-              </View>
-
+            <Card
+              key={group.key}
+              variant="header"
+              accentColor={SECTION_COLORS.habits}
+              className="mb-3"
+              headerTitle={group.label.toUpperCase()}
+              headerRight={<Text style={{ fontSize: 18 }}>{group.icon}</Text>}
+            >
               <View
                 style={{
                   flexDirection: "row",
@@ -359,7 +370,7 @@ export function HabitsScreen() {
                     <Text
                       style={{
                         fontSize: 24,
-                        color: SECTION_COLORS.habits,
+                        color: SECTION_TEXT_COLORS.habits,
                         lineHeight: 28,
                       }}
                     >
@@ -369,7 +380,7 @@ export function HabitsScreen() {
                   <Text
                     style={{
                       fontSize: 11,
-                      color: SECTION_COLORS.habits,
+                      color: SECTION_TEXT_COLORS.habits,
                       marginTop: 4,
                       textAlign: "center",
                     }}
