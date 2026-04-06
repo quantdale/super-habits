@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type RemoteMode = "disabled" | "enabled";
 
@@ -15,6 +15,7 @@ export function isRemoteEnabled() {
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 const isBrowser = typeof window !== "undefined";
 
@@ -25,21 +26,24 @@ const ssrSafeStorage = {
   removeItem: (_key: string) => Promise.resolve(),
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: (isBrowser ? AsyncStorage : ssrSafeStorage) as typeof AsyncStorage,
-    autoRefreshToken: isBrowser,
-    persistSession: isBrowser,
-    detectSessionInUrl: false,
-  },
-});
+/** `createClient` throws if the URL is empty — skip on CI/Vercel when env vars are unset. */
+export const supabase: SupabaseClient | null = supabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: (isBrowser ? AsyncStorage : ssrSafeStorage) as typeof AsyncStorage,
+        autoRefreshToken: isBrowser,
+        persistSession: isBrowser,
+        detectSessionInUrl: false,
+      },
+    })
+  : null;
 
 /**
  * Ensures a Supabase auth session exists, creating an anonymous session when none is present.
  * No-ops when Supabase env is not configured (missing URL or anon key).
  */
 export async function ensureAnonymousSession(): Promise<void> {
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabase) {
     return;
   }
 
