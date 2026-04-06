@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `superhabits-shell-${CACHE_VERSION}`;
 
 self.addEventListener("install", (event) => {
@@ -49,10 +49,13 @@ self.addEventListener("fetch", (event) => {
       if (cached) return cached;
       return fetch(event.request)
         .then((response) => {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, cloned).catch(() => Promise.resolve());
-          });
+          // Never cache error pages (e.g. old Vercel 404 for /todos); they stick until cache bump.
+          if (response.ok) {
+            const cloned = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, cloned).catch(() => Promise.resolve());
+            });
+          }
           return response;
         })
         .catch(() => cached);

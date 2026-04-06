@@ -37,7 +37,7 @@ test.describe("Infrastructure", () => {
     expect(swActive).toBe(true);
   });
 
-  test("SW cache name is superhabits-shell-v2", async ({ page }) => {
+  test("SW cache name matches superhabits-shell version", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("load");
     // On localhost, dev bypass may leave CacheStorage empty; assert the registered SW script defines the name.
@@ -46,7 +46,7 @@ test.describe("Infrastructure", () => {
       return r.text();
     });
     expect(swSource).toContain("superhabits-shell-");
-    expect(swSource).toContain('CACHE_VERSION = "v2"');
+    expect(swSource).toContain('CACHE_VERSION = "v3"');
   });
 
   test("stale v1 cache is not present", async ({ page }) => {

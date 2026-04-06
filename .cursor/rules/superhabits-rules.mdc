@@ -162,7 +162,7 @@ Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.t
 ## Web / PWA context (not application bugs)
 
 - **COEP:** `metro.config.js` and `app.json` set `Cross-Origin-Embedder-Policy: require-corp` (was `credentialless` in some setups) to establish `crossOriginIsolated` for shared-memory WASM on web.
-- **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v2` (`CACHE_VERSION = "v2"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
+- **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v3` (`CACHE_VERSION = "v3"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
 
 ## MCP tools (development)
 
