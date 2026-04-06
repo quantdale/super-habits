@@ -387,6 +387,11 @@ No other features call `toDateKey()` directly.
 | `patch-package` | ^8.0.1 | Post-install patches |
 | `wait-on` | ^9.0.4 | Optional dev tooling (not used by current CI E2E job) |
 
+### Dependency security (Snyk)
+
+- **`package.json` → `overrides.glob`**: Forced to `^9.3.5` so transitive `glob@7` chains (e.g. nested `@react-native/codegen`, `rimraf@3`, `test-exclude`) no longer pull **`inflight`** (deprecated; Snyk SNYK-JS-INFLIGHT-6095116). Glob 9 keeps callback/`glob.sync` compatibility with `rimraf@3`; `glob@10` breaks that API and is unsuitable as a blanket override here.
+- **`npm update` / lockfile**: Direct and transitive bumps (e.g. `lodash`, `node-forge`, `picomatch`, `yaml`, `@xmldom/xmldom`, `brace-expansion`) are resolved via semver ranges in the lockfile; re-run Snyk SCA after major Expo/RN upgrades.
+
 ### MCP servers (developer environment, not npm)
 
 | MCP | Package | Purpose |
