@@ -16,11 +16,11 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current stored version: **7**
-- Next migration number: **8** (add `if (version < 8) { ... }` in `runMigrations()` in `core/db/client.ts` when needed)
-- Migrations live in: core/db/migrations/ (reference) + inline in client.ts
+- Current stored version: **9** (`app_meta.db_schema_version`)
+- Next migration number: **10** (add `if (version < 10) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Migrations live in: core/db/migrations/ (reference) + inline in `runMigrations()` in `core/db/client.ts`
 - schema.sql is a REFERENCE ONLY — not executed at runtime
-- To add a column: add a new migration case, never alter the bootstrap DDL
+- To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
 
 ## Entity types (core/db/types.ts)
 BaseEntity fields (on ALL mutable entities):
@@ -29,8 +29,7 @@ BaseEntity fields (on ALL mutable entities):
   updated_at: string  — ISO 8601 UTC via nowIso()
   deleted_at: string | null — null = active, non-null = soft deleted
 
-Entities: Todo, Habit, HabitCompletion, PomodoroSession,
-          WorkoutLog, CalorieEntry, AppMeta
+Exported shapes include: **Todo**, **Habit**, **HabitCompletion**, **PomodoroSession**, **WorkoutRoutine**, **WorkoutLog**, **RoutineExercise**, **RoutineExerciseSet**, **WorkoutSessionExercise**, **CalorieEntry**, **SavedMeal** (and related unions such as **TodoPriority**, **TodoRecurrence**, **HabitCategory**, **HabitIcon**). Runtime metadata keys (e.g. `db_schema_version`) live in the **app_meta** table, not as a TS export.
 
 ## Soft delete rule
 NEVER: DELETE FROM todos WHERE id = ?
@@ -75,10 +74,10 @@ toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **loca
                        cutover used UTC calendar dates; no automatic backfill.
 
 ## Adding a new table
-1. Add TypeScript type to core/db/types.ts (extending BaseEntity)
-2. Add CREATE TABLE to a NEW migration in client.ts (next version block: if (version < 6) …)
+1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 10) { ... }` today — bump to N+1 when version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
-4. Every function: getDatabase() → soft delete for deletes → enqueue sync
+4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/
 6. Add E2E data persistence coverage: `e2e/{name}.spec.ts` should include a test that adds a row, reloads the page, and confirms the row is still visible — validates SQLite write → read → render. Run: `npx playwright test e2e/{name}.spec.ts`
 
