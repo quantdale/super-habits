@@ -25,6 +25,7 @@ import {
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
+import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { RoutineDetailModal } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
@@ -100,6 +101,7 @@ export function WorkoutScreen() {
       refresh();
     }, [refresh]),
   );
+  useForegroundRefresh(refresh);
 
   const onCreate = async () => {
     const err = validateRoutineName(name);

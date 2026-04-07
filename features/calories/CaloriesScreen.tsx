@@ -32,6 +32,7 @@ import {
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
+import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
 import type { CalorieEntry, MealType, SavedMeal } from "./types";
 import { MacroDonutChart } from "./MacroDonutChart";
 import { DailyCalorieChart } from "./DailyCalorieChart";
@@ -143,6 +144,7 @@ export function CaloriesScreen() {
       void refresh();
     }, [refresh]),
   );
+  useForegroundRefresh(refresh);
 
   const todayTotals = useMemo(
     () => ({

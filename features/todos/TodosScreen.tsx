@@ -13,6 +13,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
+import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { validateTodo } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
 import type { Todo, TodoPriority, TodoViewMode } from "./types";
@@ -86,6 +87,7 @@ export function TodosScreen() {
       void loadTodosOnFocus();
     }, [loadTodosOnFocus]),
   );
+  useForegroundRefresh(loadTodosOnFocus);
 
   useEffect(() => {
     if (!editingId) return;

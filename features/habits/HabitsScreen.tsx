@@ -40,6 +40,7 @@ import {
 } from "@/features/habits/habitPresets";
 import { SECTION_COLORS, SECTION_COLORS_LIGHT, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
+import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { validateHabit } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
 
@@ -123,6 +124,7 @@ export function HabitsScreen() {
       refresh();
     }, [refresh]),
   );
+  useForegroundRefresh(refresh);
 
   const openAddModal = (presetCategory?: HabitCategory) => {
     setEditingHabit(null);

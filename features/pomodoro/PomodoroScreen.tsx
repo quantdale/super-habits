@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View, Pressable } from "react-native";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -13,6 +13,7 @@ import {
   savePomodoroSettings,
 } from "@/features/pomodoro/pomodoro.data";
 import { toDateKey } from "@/lib/time";
+import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
 import type { PomodoroSession } from "./types";
 import {
   cancelScheduledNotification,
@@ -97,6 +98,11 @@ export function PomodoroScreen() {
       setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
     });
   }, [historyVersion]);
+
+  const refreshHistoryOnForeground = useCallback(() => {
+    setHistoryVersion((v) => v + 1);
+  }, []);
+  useForegroundRefresh(refreshHistoryOnForeground);
 
   useEffect(() => {
     if (!isRunning) return;
