@@ -10,6 +10,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
@@ -159,9 +160,22 @@ export default function TabsLayout() {
 
           if (!isDeadZone.value) {
             if ((tx > w / 3 || vx > 500) && idx > 0) {
-              runOnJS(navigateToIndex)(idx - 1);
-            } else if ((tx < -w / 3 || vx < -500) && idx < LAST_TAB_INDEX) {
-              runOnJS(navigateToIndex)(idx + 1);
+              translateX.value = withTiming(w, { duration: 150 }, () => {
+                "worklet";
+                runOnJS(navigateToIndex)(idx - 1);
+                translateX.value = -w;
+                translateX.value = withSpring(0);
+              });
+              return;
+            }
+            if ((tx < -w / 3 || vx < -500) && idx < LAST_TAB_INDEX) {
+              translateX.value = withTiming(-w, { duration: 150 }, () => {
+                "worklet";
+                runOnJS(navigateToIndex)(idx + 1);
+                translateX.value = w;
+                translateX.value = withSpring(0);
+              });
+              return;
             }
           }
 
