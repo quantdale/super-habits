@@ -1,7 +1,16 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { useCallback, useEffect, useMemo } from "react";
+import { Pressable, StyleSheet, Text, useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import type { Href } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
@@ -14,6 +23,9 @@ const NAV_ITEMS = [
   { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", icon: "fitness-center", color: SECTION_TEXT_COLORS.workout },
   { name: "calories", href: "/(tabs)/calories" as const, label: "Calories", icon: "restaurant-menu", color: SECTION_TEXT_COLORS.calories },
 ] as const;
+
+const NAV_TAB_COUNT = NAV_ITEMS.length;
+const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
 
 /** Matches `Screen` / `bg-surface` so the active tab and tab content area read as one surface. */
 const TAB_CONTENT_SURFACE = "#f8f7ff";
@@ -87,6 +99,81 @@ function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: 
 }
 
 export default function TabsLayout() {
+  const router = useRouter();
+  const segments = useSegments();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const currentIndex = useMemo(() => {
+    const segs = segments as readonly string[];
+    const tabsIdx = segs.indexOf("(tabs)");
+    const tabSegment = tabsIdx !== -1 ? segs[tabsIdx + 1] : undefined;
+    const idx = tabSegment ? NAV_ITEMS.findIndex((item) => item.name === tabSegment) : -1;
+    return idx >= 0 ? idx : 0;
+  }, [segments]);
+
+  const translateX = useSharedValue(0);
+  const isDeadZone = useSharedValue(false);
+  const tabIndex = useSharedValue(currentIndex);
+  const screenWidthSV = useSharedValue(screenWidth);
+
+  useEffect(() => {
+    tabIndex.value = currentIndex;
+  }, [currentIndex, tabIndex]);
+
+  useEffect(() => {
+    screenWidthSV.value = screenWidth;
+  }, [screenWidth, screenWidthSV]);
+
+  const navigateToIndex = useCallback((index: number) => {
+    if (index < 0 || index >= NAV_TAB_COUNT) return;
+    router.navigate(NAV_ITEMS[index].href as Href);
+  }, [router]);
+
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-30, 30])
+        .onStart((event) => {
+          "worklet";
+          const w = screenWidthSV.value;
+          isDeadZone.value = event.absoluteX < 40 || event.absoluteX > w - 40;
+        })
+        .onUpdate((event) => {
+          "worklet";
+          if (isDeadZone.value) return;
+          let tx = event.translationX;
+          const idx = tabIndex.value;
+          if (idx === 0 && tx > 0) {
+            tx *= 0.3;
+          } else if (idx === LAST_TAB_INDEX && tx < 0) {
+            tx *= 0.3;
+          }
+          translateX.value = tx;
+        })
+        .onEnd((event) => {
+          "worklet";
+          const w = screenWidthSV.value;
+          const idx = tabIndex.value;
+          const tx = event.translationX;
+          const vx = event.velocityX;
+
+          if (!isDeadZone.value) {
+            if ((tx > w / 3 || vx > 500) && idx > 0) {
+              runOnJS(navigateToIndex)(idx - 1);
+            } else if ((tx < -w / 3 || vx < -500) && idx < LAST_TAB_INDEX) {
+              runOnJS(navigateToIndex)(idx + 1);
+            }
+          }
+
+          translateX.value = withSpring(0);
+        }),
+    [navigateToIndex],
+  );
+
+  const animatedSlotStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
   return (
     <Tabs className="flex-1 flex-col">
       <TabList
@@ -109,7 +196,11 @@ export default function TabsLayout() {
           </TabTrigger>
         ))}
       </TabList>
-      <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />
+      <GestureDetector gesture={pan}>
+        <Animated.View style={[{ flex: 1 }, animatedSlotStyle]}>
+          <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />
+        </Animated.View>
+      </GestureDetector>
     </Tabs>
   );
 }
