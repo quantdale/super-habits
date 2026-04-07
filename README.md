@@ -1,106 +1,127 @@
 # SuperHabits
 
-Offline-first productivity app for **web (PWA)**, **iOS**, and **Android**. Data lives in SQLite on device; cloud sync is optional and gated behind remote mode (see `lib/supabase.ts`).
+SuperHabits is an offline-first productivity app for web and mobile with five modules: To Do, Habits, Focus (Pomodoro), Workout, and Calories. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
-## Modules
+Data is stored locally in SQLite first, then optionally pushed to Supabase as cloud backup via the app's delta-sync pipeline.
 
-| Tab        | Feature                                      |
-| ---------- | -------------------------------------------- |
-| To Do      | Task list                                    |
-| Habits     | Habit tracking and completions               |
-| Focus      | Pomodoro timer and session logging           |
-| Workout    | Routines and completion checklist          |
-| Calories   | Daily calorie log and totals                 |
+## Project Overview
 
-## Stack
+- Offline-first architecture with local SQLite as the source of truth
+- Web support with static export + service worker + OPFS-backed SQLite runtime
+- Native support through Expo for Android and iOS
+- Feature modules with strict data/domain/UI layering
+- Optional remote sync with anonymous Supabase authentication
 
-- **React Native** 0.83 · **Expo** 55 · **React** 19  
-- **TypeScript** 5.9 · **expo-router** · **NativeWind** 4 (Tailwind)  
-- **expo-sqlite** (WAL mode) · **Vitest** for unit tests  
+## Tech Stack
 
-## Prerequisites
+- Expo SDK 55 + React Native 0.84 + Expo Router
+- TypeScript 6 + NativeWind 4
+- SQLite via `expo-sqlite` (WAL on native); web runtime uses SQLite WASM + OPFS
+- Supabase (`@supabase/supabase-js`) for one-way sync backup and anonymous auth
+- Vercel for static PWA hosting (`dist/` output + SPA rewrites + COOP/COEP headers)
+- Vitest for unit tests; Playwright for E2E
 
-- [Node.js](https://nodejs.org/) (use a current LTS; Expo SDK 55 is easiest on Node 20+)
-- npm (ships with Node)
+## High-Level Architecture
 
-## Scripts
+### Delta-Sync Engine
 
-| Command              | Purpose                    |
-| -------------------- | -------------------------- |
-| `npm run start`      | Expo dev server            |
-| `npm run web`        | Web / PWA dev              |
-| `npm run android`    | Android                    |
-| `npm run ios`        | iOS                        |
-| `npm run typecheck`  | `tsc --noEmit`             |
-| `npm run test`       | Vitest (CI-style, once)    |
-| `npm run test:watch` | Vitest watch mode          |
+`syncEngine` (in `core/sync/sync.engine.ts`) is an in-memory queue that receives `SyncRecord` entries from feature data-layer writes (for synced entities). `flush()` snapshots the queue, sends it through an adapter, and restores records on adapter failure.
 
-## Project layout
+### SupabaseSyncAdapter
 
-- `features/*` — screens, `.data.ts` (SQLite), `.domain.ts` (pure logic)
-- `app/*` — routes; tab shell in `app/(tabs)/`
-- `core/*` — DB client, migrations, shared UI/sync helpers
-- `lib/*` — IDs, time helpers, remote flags
-- `tests/*` — Vitest specs (domain tests today; **19** passing tests)
+`SupabaseSyncAdapter` (in `core/sync/supabase.adapter.ts`) is the production adapter used by the exported `syncEngine`. On flush, it:
 
-Schema migrations run in `core/db/client.ts` (`runMigrations`). Stored schema version is tracked in `app_meta.db_schema_version` (currently **9**; next migration: `if (version < 10)`).
+1. Groups queued records by entity
+2. Reads current rows from local SQLite by id
+3. Upserts those rows to matching Supabase tables (`onConflict: "id"`)
 
-## Web / PWA notes
+Current sync mode is one-way push backup. `pull()` is intentionally a stub (`[]`) today.
 
-- **COEP** is set for `crossOriginIsolated` (shared-memory WASM on web); see `metro.config.js` and `app.json`.
-- **Service worker** lives under `public/sw.js` (shell cache). Local dev targets use network-first behavior to avoid stale Metro bundles.
+### Flush and Auth Lifecycle
 
-## Deploying to Vercel (static web export)
+`AppProviders` wires sync and auth bootstrap:
 
-Expo Router client routes (e.g. `/todos`) are not separate HTML files on disk; the host must serve `index.html` for unknown paths so the SPA can boot. This repo encodes that in [`vercel.json`](vercel.json) (`rewrites` → `/index.html`) and pins the build output.
+- Calls `ensureAnonymousSession()` at app startup when Supabase env vars are configured
+- Registers `syncEngine.flush()` on:
+  - 30-second interval
+  - Web `visibilitychange` when page becomes hidden
+  - NetInfo connectivity events when connected
+- Gated by `isRemoteEnabled()` (`remoteMode` defaults to `"enabled"`)
 
-| Setting | Value |
-| ------- | ----- |
-| **Root Directory** | Repository root (the folder that contains `vercel.json`) |
-| **Build Command** | `npm run build:web` (also set in `vercel.json` as `buildCommand`) |
-| **Output Directory** | `dist` (also set in `vercel.json` as `outputDirectory`) |
-| **Framework Preset** | Other / static (avoid a framework preset that ignores `dist`) |
+## Quick Start
 
-After changing settings, redeploy and confirm the build log shows a successful `expo export` and that `dist/index.html` exists in the deployment output. Deep links such as `/todos` should return 200 (app shell), not Vercel’s `NOT_FOUND` page.
+### Prerequisites
 
-**Local parity check:** `npm run build:web`, then `node scripts/serve-e2e.js` and open `http://localhost:8081/todos` (refresh should still load).
+- Node.js 20+ recommended
+- npm
 
-## Smoke test (manual)
+### Install
 
-1. Open **web** and a **native** target; confirm tabs load.
-2. **To Do:** add, complete, and remove a task; confirm list updates.
-3. **Habits:** add a habit and mark completion for today.
-4. **Focus:** run a short pomodoro to completion; confirm a session is recorded.
-5. **Workout:** create or use a routine and mark items done.
-6. **Calories:** add entries; confirm daily total changes.
-7. Force-close and reopen; confirm data persists.
+```bash
+npm install
+```
 
-## Audit Findings and Recommendations
+### Run development server
 
-### Main Issues Identified
-- No explicit audit/fix/e2e-fix documentation files found, but audit processes and known issues are referenced in `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`.
-- Some documentation (e.g., audit.md) is noted as "partially obsolete" and should be verified against runtime before acting.
-- Error handling: Some errors are silently swallowed (e.g., DB open failures, service worker cache errors), which can obscure real issues.
-- No global error/retry customization for query clients.
-- ID generation is not crypto-strong (local only), which is acceptable for the use case but should be documented.
-- E2E and unit tests are present and referenced; calories data-layer coverage now uses mocked contract tests.
-- UI validation is hard-reject only (no silent clamping), but error messages are surfaced to users.
-- PWA: Service worker uses network-first for dev, cache-first for prod; stale cache risk is mitigated but should be documented.
-- Accessibility and usability are not explicitly documented as tested or audited.
+```bash
+npx expo start
+```
 
-### Actionable Recommendations
-- Update and verify all audit/fix documentation (e.g., audit.md, fix.md) to ensure they reflect the current codebase and runtime behavior.
-- Improve error handling: Avoid silent error swallowing, especially for DB and service worker operations. Log or surface errors for debugging.
-- Add or update documentation on error handling strategies and known limitations (e.g., local ID generation, soft delete exceptions).
-- Expand accessibility and usability documentation. If audits have been performed, summarize findings and fixes; if not, add a TODO to perform them.
-- Ensure all test stubs are either implemented or clearly marked as intentionally skipped, with reasons documented.
-- Document the PWA service worker strategy and any known limitations or workarounds for stale cache issues.
-- Add a section on UI/UX patterns and validation feedback, including how errors are shown and cleared.
+Optional platform commands:
 
-See `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md` and `docs/PROJECT_STRUCTURE_MAP.md` for more details.
+- `npm run android`
+- `npm run ios`
+- `npm run web`
 
-## Contributing / data rules
+## Deployment
 
-Main entities use **soft delete** and a **sync enqueue** after writes when remote sync is enabled. Do not hard-delete synced rows or skip enqueue without reading the invariants in `.cursor/rules/superhabits-rules.mdc` (and the db/sync skill under `.cursor/skills/`).
+### Vercel PWA Deployment
 
-**Known tradeoff:** `toDateKey()` in `lib/time.ts` uses UTC, not local midnight—changing it affects historical keys; coordinate before altering.
+This repo is configured for static Expo web export.
+
+- Build command: `npm run build:web`
+- Output directory: `dist`
+- SPA rewrite: `/(.*)` -> `/index.html` (from `vercel.json`)
+- Required headers (configured in `vercel.json`):
+  - `Cross-Origin-Embedder-Policy: require-corp`
+  - `Cross-Origin-Opener-Policy: same-origin`
+
+Recommended validation after deploy:
+
+1. Confirm build output includes `dist/index.html`
+2. Open a deep link (for example `/todos`) and verify it resolves to the app shell
+
+### EAS Android APK Build (Preview)
+
+`eas.json` defines a preview profile that produces an internal APK.
+
+```bash
+eas build -p android --profile preview
+```
+
+Relevant config:
+
+- CLI version: `>= 18.5.0`
+- Profile: `preview`
+- Android build type: `apk`
+- Android package id: `com.dale16.superhabits` (from `app.json`)
+
+## Supabase Environment Variables
+
+Set these for cloud sync/auth:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+If unset, the app runs local-only and Supabase push operations no-op safely.
+
+## Quality Gates
+
+- Type checking: `npm run typecheck`
+- Unit tests: `npm test`
+- E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes)
+
+## Additional Documentation
+
+- Architecture map: `docs/PROJECT_STRUCTURE_MAP.md`
+- Unified knowledge base: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`

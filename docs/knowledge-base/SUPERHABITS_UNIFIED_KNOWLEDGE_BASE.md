@@ -59,7 +59,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality:** **162** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
+**Quality:** **180** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
 
 ### Cross-cutting concerns
 
@@ -88,7 +88,7 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **9** (`app_meta.db_schema_version`) |
 | Next migration | `10` (new `if (version < 10)` block in `runMigrations`) |
-| Unit tests | **162** passing (Vitest) |
+| Unit tests | **180** passing (Vitest) |
 | E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
@@ -295,16 +295,23 @@ No other features call `toDateKey()` directly.
 
 **Intentionally not synced:** `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `workout_session_exercises`
 
-#### `useFocusEffect` usage
+#### Foreground refresh usage
 
-| Screen | Purpose |
-|--------|---------|
-| `TodosScreen` | `listTodos` → `setItems` on tab focus |
-| `HabitsScreen` | `refresh` (habits + completion map) |
-| `WorkoutScreen` | `refresh` (routines + logs) |
-| `CaloriesScreen` | `refresh` (entries for current date key) |
+| Screen | Hook | Purpose |
+|--------|------|---------|
+| `TodosScreen` | `useForegroundRefresh` | Calls `loadTodosOnFocus` when app/tab returns to foreground |
+| `HabitsScreen` | `useForegroundRefresh` | Calls `refresh` (habits + completion map) when app/tab returns to foreground |
+| `WorkoutScreen` | `useForegroundRefresh` | Calls `refresh` (routines + logs) when app/tab returns to foreground |
+| `CaloriesScreen` | `useForegroundRefresh` | Calls `refresh` (entries for current date key) when app/tab returns to foreground |
+| `PomodoroScreen` | `useForegroundRefresh` | Calls `refreshHistoryOnForeground` (`setHistoryVersion(v => v + 1)`) to reload annual history |
 
-`PomodoroScreen` — not used; history loaded via `useEffect` on `historyVersion` only.
+#### `lib/useForegroundRefresh.ts`
+
+Shared foreground trigger used by feature screens:
+
+- Subscribes to `AppState` and fires callback when state becomes `"active"`.
+- On web, also listens to `document.visibilitychange` and fires callback when `visibilityState === "visible"`.
+- Cleans up all listeners on unmount.
 
 ---
 
@@ -450,7 +457,7 @@ No other features call `toDateKey()` directly.
 
 #### `TopTabItem` styles
 
-**Active:** `backgroundColor TAB_CONTENT_SURFACE`, `borderBottomWidth 0`, `marginTop 0`, top radii `8`, `paddingVertical 10`, `paddingHorizontal 4`, `gap 5`, `flexDirection row`, icon `16px`, label `fontSize 12`, `fontWeight 600`, color = section color.
+**Active:** `backgroundColor TAB_CONTENT_SURFACE`, `borderBottomWidth 0`, `marginTop 0`, top radii `16`, `paddingVertical 10`, `paddingHorizontal 4`, `gap 5`, `flexDirection row`, icon `16px`, label `fontSize 12`, `fontWeight 600`, color = section color.
 
 **Inactive:** `backgroundColor TAB_RAIL_BG`, `borderBottomWidth 1`, `borderColor TAB_RAIL_BORDER`, `marginTop 3`, icon/label `#94a3b8`, `fontWeight 400`.
 
@@ -459,6 +466,21 @@ No other features call `toDateKey()` directly.
 **TabSlot:** `flex 1`, `backgroundColor TAB_CONTENT_SURFACE`.
 
 **Connected tab illusion:** Active tab shares same bg as content surface (`#f8f7ff`) while rail stays `#eeecf8`; active item loses bottom border and sits flush with content.
+
+#### Swipe navigation implementation
+
+The tabs layout also supports horizontal swipe navigation between tab routes:
+
+- Uses `GestureDetector` + `Gesture.Pan()` from `react-native-gesture-handler`.
+- Uses Reanimated shared values (`translateX`, `tabIndex`, `screenWidthSV`, `isDeadZone`) for gesture state.
+- `activeOffsetX([-30, 30])` avoids accidental horizontal gestures.
+- A 40px edge dead-zone on left/right reduces conflicts with OS back/swipe gestures.
+- At first/last tabs, out-of-range drag is damped (`translationX * 0.3`) for boundary feedback.
+- On pan end, navigation commits when either:
+  - drag distance crosses one-third of screen width, or
+  - velocity crosses `±500`.
+- Route switch happens through `runOnJS(navigateToIndex)` and `router.navigate(...)`.
+- Content translation springs back with `withSpring(0)` after gesture completion.
 
 #### Tab route files (thin wrappers)
 
@@ -1408,9 +1430,19 @@ Key exports:
 
 #### Screen — `features/pomodoro/PomodoroScreen.tsx`
 
-**State:** `settings`, `currentMode`, `completedFocus`, `showSettings`, `totalSeconds`, `remaining`, `isRunning`, `isPaused`, `startedAt`, `historyVersion`, `sessions`, `pomodoroHeatmapDays`, `showWarning`, interval ref + refs mirroring state for closure safety
+**State:** `settings`, `currentMode`, `completedFocus`, `showSettings`, `totalSeconds`, `remaining`, `isRunning`, `isPaused`, `startedAt`, `historyVersion`, `sessions`, `pomodoroHeatmapDays`, `showWarning`, `lastTickTime` ref + refs mirroring state for closure safety.
 
-**Flow:** `useEffect` interval counts down; on complete logs focus session (only for focus mode), advances mode via `getNextMode`, resets long-break cycle counter. `document.visibilitychange` sets warning when hidden during run.
+**Flow:** `useEffect` interval runs every second, but remaining time is decremented with delta timing (foreground-timer behavior): `deltaSeconds = round((Date.now() - lastTickTime) / 1000)`. This catches up correctly after throttling/background delays. On complete, it logs focus session (focus mode only), advances mode via `getNextMode`, and resets long-break cycle counter as needed. A separate `document.visibilitychange` listener sets warning when hidden during an active run.
+
+#### Foreground timer (delta timing) lifecycle
+
+This project uses a delta-based foreground timer pattern inside `PomodoroScreen`:
+
+- `lastTickTime.current = Date.now()` on `start()` and `resume()`.
+- On each interval tick, subtract computed `deltaSeconds` from `remaining` instead of subtracting a fixed `1`.
+- If `deltaSeconds < 1`, skip the state update for that tick.
+- Clear `lastTickTime.current` on `pause()`, `reset()`, settings save reset, and timer completion.
+- This avoids significant timer drift when JS timers are delayed.
 
 **Controls:**
 - Before session (not running, not paused, `remaining === totalSeconds`): Show **Start Focus** only
@@ -2032,7 +2064,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 162 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 180 passing.
 
 ---
 
@@ -2274,18 +2306,18 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **162** passing (Vitest) |
+| Unit tests | **180** passing (Vitest) |
 | E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **9** |
 | Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
 | Validation | Hard rejection in feature screens via `lib/validation.ts` |
 | Design system | Per-section colors, card accent strips, GitHub heatmaps, PillChips |
 
-### Deferred / future
+### Next-phase items
 
 | Theme | What's missing | Notes |
 |-------|----------------|-------|
-| Pull / restore / conflict policy | Server → client sync, multi-device merge | `SupabaseSyncAdapter.pull` returns `[]` today |
+| Pull / restore / conflict policy | Server → client sync, multi-device merge | `SupabaseSyncAdapter.pull` currently returns `[]` |
 | Native background detection (7F) | Plant dies if user leaves app mid-focus | `expo-background-fetch` / `expo-task-manager` installed, unused — requires real device testing |
 | Workout nested entities sync | Only routine row enqueued today | Comment in `workout.data.ts` — bump parent for remote refetch story |
 | React Query | `QueryClientProvider` only | No cached queries in features |
@@ -2312,7 +2344,7 @@ Tag phase completions: `git tag phaseN-complete`
 | `getNextMode` guard (`completedFocusSessions > 0`) | Prevents `0 % N === 0` long-break-at-start bug |
 | Swipe-left reveals Edit + Delete (not auto-action) | User must tap a button — no accidental deletes |
 | Per-section color identity (no single brand color) | Each tab immediately identifiable by color; section color drives tab, cards, heatmap, chips |
-| Supabase anonymous session + push upsert | One-way backup without sign-up UI; restore/multi-device left to future `pull` / conflict work |
+| Supabase anonymous session + push upsert | One-way backup without sign-up UI; restore/multi-device is a separate planned sync phase |
 | Vercel static hosting + `vercel.json` headers | Matches COOP/COEP + SPA routing needs of Expo web export and SQLite WASM |
 
 ---
@@ -2379,11 +2411,11 @@ When the codebase changes, update:
 - **Test count** in `.cursor/rules/superhabits-rules.mdc`, `.cursor/agents/data-agent.md`, `.cursor/agents/feature-agent.md`, `.cursor/commands/check.md`, `.cursor/commands/test.md`, and this document
 - **Schema version** in same files + `.cursor/skills/db-and-sync-invariants/SKILL.md` + `.cursor/commands/new-migration.md` / `fix.md`
 - **Known technical debt table** in section 12 when items are resolved
-- **Deferred features table** in section 13 when items are implemented
+- **Next-phase table** in section 13 when items are implemented
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **162** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **180** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
 - `HabitHeatmap.tsx` — exists but unused in `HabitsScreen` (see section 12)
 - Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync

@@ -19,7 +19,6 @@ type HabitCircleProps = {
 };
 
 const DEFAULT_SIZE = 56;
-const DEFAULT_STROKE = 4;
 const DEFAULT_BG_COLOR = "#f1f5f9";
 
 export function HabitCircle({

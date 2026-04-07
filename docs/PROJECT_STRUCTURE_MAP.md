@@ -15,13 +15,13 @@ Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABI
 | Path | Role |
 |------|------|
 | **`app/`** | Expo Router only: root stack, index redirect, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
-| **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), `AppProviders`, guest profile, PWA SW registration, shared **`core/ui/`** primitives. |
+| **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), provider bootstrap (`core/providers/AppProviders.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
 | **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. |
-| **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), notifications, horizontal scroll style. **No** `features/`, **no** DB. |
+| **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB. |
 | **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette). |
-| **`tests/`** | Vitest: `lib/`, `*.domain.ts`, validation; not component/DB-heavy (STUB skipped). |
+| **`tests/`** | Vitest: `lib/`, `*.domain.ts`, validation, sync engine tests, and selected data/DB tests (`calories.data`, `db.client`). |
 
-**Also:** `e2e/` Playwright; `public/` static + `sw.js`; `assets/` images; `patches/` patch-package; root **`vercel.json`** (web PWA: `build:web` → `dist`, COOP/COEP headers, SPA rewrites).
+**Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
 
 ---
 

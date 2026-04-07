@@ -22,7 +22,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.dale16.superhabits"
     },
     "plugins": [
       [
@@ -45,6 +46,17 @@
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "headers": {
+          "Cross-Origin-Embedder-Policy": "require-corp",
+          "Cross-Origin-Opener-Policy": "same-origin"
+        }
+      },
+      "eas": {
+        "projectId": "2cfd0e33-45ee-4c75-933a-8b466b817af9"
+      }
     }
   }
 }

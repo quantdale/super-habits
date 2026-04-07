@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -40,7 +39,7 @@ import {
 } from "@/features/habits/habitPresets";
 import { SECTION_COLORS, SECTION_COLORS_LIGHT, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
-import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
+import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { validateHabit } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
 
@@ -119,12 +118,7 @@ export function HabitsScreen() {
     setOverallStreak(bestStreak);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
-  useForegroundRefresh(refresh);
+  useFocusForegroundRefresh(refresh);
 
   const openAddModal = (presetCategory?: HabitCategory) => {
     setEditingHabit(null);

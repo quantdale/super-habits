@@ -1,6 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useFocusEffect } from "expo-router";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
@@ -32,7 +31,7 @@ import {
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
-import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
+import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import type { CalorieEntry, MealType, SavedMeal } from "./types";
 import { MacroDonutChart } from "./MacroDonutChart";
 import { DailyCalorieChart } from "./DailyCalorieChart";
@@ -139,12 +138,7 @@ export function CaloriesScreen() {
     setGoal(savedGoal);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
-  useForegroundRefresh(refresh);
+  useFocusForegroundRefresh(refresh);
 
   const todayTotals = useMemo(
     () => ({

@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { Alert, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
 import { RectButton } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -25,7 +24,7 @@ import {
 import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
 import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
-import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
+import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { RoutineDetailModal } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
@@ -96,12 +95,7 @@ export function WorkoutScreen() {
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
-  useForegroundRefresh(refresh);
+  useFocusForegroundRefresh(refresh);
 
   const onCreate = async () => {
     const err = validateRoutineName(name);

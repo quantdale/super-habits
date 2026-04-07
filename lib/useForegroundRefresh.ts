@@ -1,17 +1,18 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
+import { useFocusEffect } from "expo-router";
 import { AppState, Platform } from "react-native";
 
-export function useForegroundRefresh(onRefresh: () => void) {
+export function useForegroundRefresh(onRefresh: () => void | Promise<void>) {
   useEffect(() => {
     const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
-        onRefresh();
+        void onRefresh();
       }
     });
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        onRefresh();
+        void onRefresh();
       }
     };
 
@@ -26,4 +27,13 @@ export function useForegroundRefresh(onRefresh: () => void) {
       }
     };
   }, [onRefresh]);
+}
+
+export function useFocusForegroundRefresh(onRefresh: () => void | Promise<void>) {
+  const handleRefresh = useCallback(() => {
+    void onRefresh();
+  }, [onRefresh]);
+
+  useFocusEffect(handleRefresh);
+  useForegroundRefresh(handleRefresh);
 }

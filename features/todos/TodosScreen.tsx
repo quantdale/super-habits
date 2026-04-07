@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useFocusEffect } from "expo-router";
 import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
@@ -13,7 +12,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
-import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
+import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { validateTodo } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
 import type { Todo, TodoPriority, TodoViewMode } from "./types";
@@ -33,6 +32,14 @@ import {
 
 const COLOR = SECTION_COLORS.todos;
 const MUTED_ICON = "#94a3b8";
+const VIEW_MODE_OPTIONS: ReadonlyArray<{
+  mode: TodoViewMode;
+  icon: keyof typeof MaterialIcons.glyphMap;
+}> = [
+  { mode: "content", icon: "view-agenda" },
+  { mode: "list", icon: "format-list-bulleted" },
+  { mode: "grid", icon: "grid-view" },
+];
 
 export function TodosScreen() {
   const [title, setTitle] = useState("");
@@ -82,12 +89,7 @@ export function TodosScreen() {
     setItems(list);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadTodosOnFocus();
-    }, [loadTodosOnFocus]),
-  );
-  useForegroundRefresh(loadTodosOnFocus);
+  useFocusForegroundRefresh(loadTodosOnFocus);
 
   useEffect(() => {
     if (!editingId) return;
@@ -183,13 +185,7 @@ export function TodosScreen() {
               subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
             />
             <View className="flex-row gap-1">
-              {(
-                [
-                  { mode: "content", icon: "view-agenda" },
-                  { mode: "list", icon: "format-list-bulleted" },
-                  { mode: "grid", icon: "grid-view" },
-                ] as { mode: TodoViewMode; icon: string }[]
-              ).map(({ mode, icon }) => (
+              {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
                 <Pressable
                   key={mode}
                   onPress={() => setViewMode(mode)}
@@ -197,7 +193,7 @@ export function TodosScreen() {
                   accessibilityLabel={`${mode} view`}
                 >
                   <MaterialIcons
-                    name={icon as any}
+                    name={icon}
                     size={24}
                     color={viewMode === mode ? COLOR : MUTED_ICON}
                   />
