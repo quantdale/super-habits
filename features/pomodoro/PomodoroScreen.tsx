@@ -66,6 +66,7 @@ export function PomodoroScreen() {
   const [pomodoroHeatmapDays, setPomodoroHeatmapDays] = useState<HeatmapDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
+  const lastTickTime = useRef<number | null>(null);
 
   const currentModeRef = useRef<PomodoroMode>("focus");
   const completedFocusRef = useRef(0);
@@ -132,8 +133,16 @@ export function PomodoroScreen() {
 
     const timer = setInterval(() => {
       setRemaining((prev) => {
-        if (prev <= 1) {
+        if (lastTickTime.current == null) return prev;
+        const now = Date.now();
+        const deltaSeconds = Math.round((now - lastTickTime.current) / 1000);
+        if (deltaSeconds < 1) return prev;
+        lastTickTime.current = now;
+
+        const nextRemaining = prev - deltaSeconds;
+        if (nextRemaining <= 0) {
           clearInterval(timer);
+          lastTickTime.current = null;
           setIsRunning(false);
           setIsPaused(false);
           void cancelScheduledNotification(notificationIdRef.current);
@@ -178,7 +187,7 @@ export function PomodoroScreen() {
 
           return nextDuration;
         }
-        return prev - 1;
+        return nextRemaining;
       });
     }, 1000);
 
@@ -203,6 +212,7 @@ export function PomodoroScreen() {
     const duration = getModeDuration(currentMode, newSettings);
     setTotalSeconds(duration);
     setRemaining(duration);
+    lastTickTime.current = null;
     setIsRunning(false);
     setIsPaused(false);
     setShowSettings(false);
@@ -221,6 +231,7 @@ export function PomodoroScreen() {
     const { title, body } = notifyCopy(currentMode);
     const id = await scheduleTimerEndNotification(duration, title, body);
     notificationIdRef.current = id;
+    lastTickTime.current = Date.now();
     setIsRunning(true);
     setIsPaused(false);
     setShowSettings(false);
@@ -229,6 +240,7 @@ export function PomodoroScreen() {
   const pause = () => {
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
+    lastTickTime.current = null;
     setIsRunning(false);
     setIsPaused(true);
   };
@@ -237,6 +249,7 @@ export function PomodoroScreen() {
     const { title, body } = notifyCopy(currentMode);
     const id = await scheduleTimerEndNotification(remaining, title, body);
     notificationIdRef.current = id;
+    lastTickTime.current = Date.now();
     setIsRunning(true);
     setIsPaused(false);
   };
@@ -244,6 +257,7 @@ export function PomodoroScreen() {
   const reset = () => {
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
+    lastTickTime.current = null;
     setIsRunning(false);
     setIsPaused(false);
     const duration = getModeDuration(currentMode, settings);
