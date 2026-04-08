@@ -166,6 +166,11 @@ export default function TabsLayout() {
             }
           }
 
+          translateX.value = withSpring(0, {
+            damping: 50,
+            stiffness: 300,
+            overshootClamping: true,
+          });
           translateX.value = withSpring(0, { damping: 50, stiffness: 300, overshootClamping: true });
         }),
     [navigateToIndex],
