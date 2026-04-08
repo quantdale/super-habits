@@ -5,7 +5,13 @@ import type { Href } from "expo-router";
 import { useRouter, useSegments } from "expo-router";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { runOnJS, useSharedValue } from "react-native-reanimated";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
@@ -146,6 +152,13 @@ export default function TabsLayout() {
               runOnJS(navigateToIndex)(idx + 1);
             }
           }
+
+          translateX.value = withSpring(0, {
+            damping: 50,
+            stiffness: 300,
+            overshootClamping: true,
+          });
+          translateX.value = withSpring(0, { damping: 50, stiffness: 300, overshootClamping: true });
         }),
     [navigateToIndex],
   );
