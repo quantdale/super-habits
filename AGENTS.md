@@ -2,6 +2,8 @@
 
 Read this file first in every new session before exploring or editing the repo.
 
+For Codex-based workflows, also read: docs/codex-workflow.md
+
 ## Startup
 
 1. Read `docs/PROJECT_STRUCTURE_MAP.md` first.

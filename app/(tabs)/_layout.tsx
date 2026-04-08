@@ -5,12 +5,7 @@ import type { Href } from "expo-router";
 import { useRouter, useSegments } from "expo-router";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { runOnJS, useSharedValue } from "react-native-reanimated";
 import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
@@ -111,7 +106,6 @@ export default function TabsLayout() {
     return idx >= 0 ? idx : 0;
   }, [segments]);
 
-  const translateX = useSharedValue(0);
   const isDeadZone = useSharedValue(false);
   const tabIndex = useSharedValue(currentIndex);
   const screenWidthSV = useSharedValue(screenWidth);
@@ -138,18 +132,6 @@ export default function TabsLayout() {
           const w = screenWidthSV.value;
           isDeadZone.value = event.absoluteX < 40 || event.absoluteX > w - 40;
         })
-        .onUpdate((event) => {
-          "worklet";
-          if (isDeadZone.value) return;
-          let tx = event.translationX;
-          const idx = tabIndex.value;
-          if (idx === 0 && tx > 0) {
-            tx *= 0.3;
-          } else if (idx === LAST_TAB_INDEX && tx < 0) {
-            tx *= 0.3;
-          }
-          translateX.value = tx;
-        })
         .onEnd((event) => {
           "worklet";
           const w = screenWidthSV.value;
@@ -164,15 +146,9 @@ export default function TabsLayout() {
               runOnJS(navigateToIndex)(idx + 1);
             }
           }
-
-          translateX.value = withTiming(0, { duration: 150 });
         }),
     [navigateToIndex],
   );
-
-  const animatedSlotStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
 
   return (
     <Tabs className="flex-1 flex-col">
@@ -197,9 +173,7 @@ export default function TabsLayout() {
         ))}
       </TabList>
       <GestureDetector gesture={pan}>
-        <Animated.View style={[{ flex: 1 }, animatedSlotStyle]}>
-          <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />
-        </Animated.View>
+        <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />
       </GestureDetector>
     </Tabs>
   );
