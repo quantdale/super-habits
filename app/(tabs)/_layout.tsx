@@ -9,7 +9,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
+  withSpring,
 } from "react-native-reanimated";
 import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
@@ -165,7 +165,11 @@ export default function TabsLayout() {
             }
           }
 
-          translateX.value = withTiming(0, { duration: 150 });
+          translateX.value = withSpring(0, {
+            damping: 50,
+            stiffness: 300,
+            overshootClamping: true,
+          });
         }),
     [navigateToIndex],
   );
