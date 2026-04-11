@@ -1,7 +1,8 @@
-# SuperHabits — AI Task Brief Template
+# Legacy Pointer
 
-Use this template when briefing ChatGPT or Codex for a task in this repo.
+Canonical task brief guidance lives in `docs/ai-task-template.md`.
 
+<<<<<<< HEAD
 ---
 
 ## Task
@@ -107,3 +108,6 @@ Also read all affected files completely before editing.
 ## Extra instruction
 
 Verify behavior against current code, not stale docs.
+=======
+This file remains only to avoid breaking older links. Do not maintain it as a second source of truth.
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)

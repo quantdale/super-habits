@@ -1,47 +1,35 @@
-# E2E Tests — SuperHabits
+# E2E Tests
 
 Playwright E2E tests for the SuperHabits web app.
 
-## Prerequisites
+## Runtime Model
 
-`npm run web` must be running on localhost:8081 before running E2E tests.
-Only one tab of localhost:8081 should be open (OPFS lock).
+- E2E runs against the static web export in `dist/`.
+- `playwright.config.ts` starts `node scripts/serve-e2e.js` on `http://localhost:8081`.
+- Metro (`npm run web`) is for development only and is not the E2E target.
 
-## Running tests
+## Before Running
 
-  npm run e2e              — run all tests headless
-  npm run e2e:report       — open the last HTML report
-  npm run e2e:headed       — run with visible browser (debug)
-  npm run e2e:debug        — run with Playwright inspector
+When the web bundle has changed:
+
+```bash
+npm run build:web
+```
+
+Then run:
+
+- `npm run e2e`
+- `npm run e2e:report`
+- `npm run e2e:headed`
+- `npm run e2e:debug`
+
+## Important Constraints
+
+- Local Playwright workers stay at `1` because OPFS-backed SQLite holds an origin lock.
+- `e2e/global.setup.ts` requires `crossOriginIsolated`.
+- Tests rely on static headers that mirror deployment requirements.
 
 ## Output
 
-  .cursor/playwright-output/e2e-report/   — HTML report
-  .cursor/playwright-output/e2e-failures/ — failure screenshots
-
-## Test files
-
-  helpers/forms.ts       — Shared helpers: `fillCaloriesMacros`, `fillRoutineName` (RN Web controlled `TextInput` needs click + `type` with delay, not `fill` alone)
-
-  todos.spec.ts          — Todos feature (add, complete, delete, empty state, validation, persistence)
-  habits.spec.ts         — Habits feature (add, increment, edit/delete tap — Alert is no-op on web so full delete cannot be E2E’d without app changes)
-  pomodoro.spec.ts       — Pomodoro (start timer, session log, empty history)
-  workout.spec.ts        — Workout (add routine, complete, delete, empty state, validation, persistence)
-  calories.spec.ts       — Calories (add entry, meal type, daily total, empty state, validation, persistence)
-  infrastructure.spec.ts — Cross-cutting: COEP/COOP headers, SW cache, OPFS lock, crossOriginIsolated
-
-## Audit and Failure Handling
-- E2E failures are logged; see test output for artifacts.
-- Known flaky tests or infrastructure issues are documented in the knowledge base.
-- Skipped tests are marked with reasons in the codebase and knowledge base.
-
-## Notes
-
-- Playwright uses `workers: 1` (see `playwright.config.ts`): parallel workers hit the same OPFS SQLite lock on `localhost:8081` and time out.
-- Prefer `getByText` for `Button` / `Pressable` labels — RN Web often does not expose `role=button` + accessible name the way Playwright expects.
-- Use `load` instead of `networkidle` for navigation — Metro keeps a live connection open so `networkidle` may never fire.
-- Failure screenshots and traces go to `outputDir` in `playwright.config.ts` (`.cursor/playwright-output/e2e-failures/`).
-- Tests run against the Metro dev server (not a production build)
-- OPFS lock: infrastructure.spec.ts opens two contexts to test the lock
-- Data isolation: each test file clears relevant state via page reload
-  or direct SQLite state reset where possible
+- HTML report: `.cursor/playwright-output/e2e-report/`
+- Failures and traces: `.cursor/playwright-output/e2e-failures/`

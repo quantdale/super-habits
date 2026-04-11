@@ -1,46 +1,44 @@
 # SuperHabits AI Task Template
 
-Purpose: reusable briefing templates for future ChatGPT/Codex sessions. Keep prompts concrete. Reference `docs/master-context.md` for architecture and `docs/working-rules.md` for guardrails instead of repeating them.
+Purpose: reusable task briefs for Codex or ChatGPT. Reference the canonical docs instead of copying large rule blocks.
 
-## Minimal Task Brief
-
-Use this for most tasks:
+## Minimal Brief
 
 ```md
 Read `AGENTS.md`, `docs/PROJECT_STRUCTURE_MAP.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 
-Task type: [feature | fix | refactor | migration | audit | pre-PR]
-Scope: [files/folders/features]
+Task type: [feature | fix | audit | migration | docs]
+Layer: [UI/domain | data/DB/sync | both]
+Scope: [files or folders]
 Goal: [what should change]
 
 Must preserve:
-- offline-first SQLite-first behavior
-- current layering rules
+- SQLite as source of truth
+- current layering boundaries
+- current sync model
 - [task-specific invariants]
 
+Platforms that matter:
+- [web / iOS / Android / PWA / sync]
+
+Validation:
+- [commands to run]
+
 Check against current code, not stale docs.
-If docs conflict with code, call it out explicitly.
+If docs conflict with code, call out the drift explicitly.
 ```
 
-## Feature Task
+## UI Task Addendum
 
 ```md
-Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
-
-This is feature/UI work in:
-- `features/[feature]/`
-- `app/(tabs)/[route].tsx` [only if needed]
-
-Goal:
-- [user-facing feature change]
-
 Before editing:
-- read `features/[feature]/[feature].data.ts`
-- read `features/[feature]/[feature].domain.ts` if it exists
+- read the feature's `*.data.ts`
+- read the feature's `*.domain.ts`
 
-Must preserve:
-- no direct DB access from screens/components
+Preserve:
+- no direct DB imports in UI
 - thin route wrappers
+<<<<<<< HEAD
 - existing validation and sync behavior unless explicitly changing it
 
 UI / design requirements:
@@ -53,62 +51,30 @@ Validation:
 - run `npm test`
 - if web UI changed, run `npm run build:web`
 - if web behavior changed, run `npm run e2e` after build
+=======
+- shared top-level screen structure
+- feature color identity
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)
 ```
 
-## Bug Fix Task
+## Data / Sync Task Addendum
 
 ```md
-Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
+Before editing:
+- read `core/db/client.ts`
+- read `core/db/types.ts`
+- read the affected `*.data.ts`
+- read relevant sync files
+- read `lib/id.ts` and `lib/time.ts`
 
-Bug:
-- [describe the observed behavior]
-
-Expected:
-- [describe the correct behavior]
-
-Scope:
-- [suspected files or feature]
-
-Requirements:
-- confirm root cause from code before patching
-- keep the fix minimal
-- call out any doc drift or stale comments you find
-
-Validation:
-- [tests/commands relevant to the bug]
-```
-
-## Data / Sync / Migration Task
-
-```md
-Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
-
-This is data/DB/sync work in:
-- `core/db/client.ts`
-- `core/db/types.ts`
-- `core/sync/*`
-- `features/[feature]/[feature].data.ts`
-
-Goal:
-- [migration or persistence change]
-
-Must preserve:
+Preserve:
 - `getDatabase()` as the only DB entrypoint
-- soft delete rules
-- `createId(prefix)` usage
-- `toDateKey()` usage
-- immediate sync enqueue on synced entities
 - append-only migrations
-
-If schema changes:
-- use the next migration slot documented in `docs/master-context.md`
-- do not edit older migration blocks
-- call out any required follow-up to `schema.sql` as documentation drift, not runtime authority
-
-Validation:
-- `npm test`
-- `npm run typecheck` if it becomes valid in the repo
+- immediate sync enqueue for synced entities
+- `createId(prefix)` and `toDateKey()` usage
+- push-only sync assumptions
 ```
+<<<<<<< HEAD
 
 ## Refactor Task
 
@@ -182,3 +148,5 @@ Checks:
 - whether web/PWA behavior matters
 - whether stale docs should be treated as secondary to current code
 - for UI work, whether the change matches the Overview-derived shared header/card/panel/spacing system
+=======
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)

@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   presets: [require("nativewind/preset")],
+  darkMode: "class",
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./features/**/*.{js,jsx,ts,tsx}", "./core/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
@@ -28,6 +29,7 @@ module.exports = {
 
         // App background
         surface: "#f8f7ff",
+        "surface-dark": "#0f172a",
       },
     },
   },

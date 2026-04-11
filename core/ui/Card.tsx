@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { Text, View } from "react-native";
+import { useAppTheme } from "@/core/theme";
 
 export type CardVariant = "standard" | "header" | "stat";
 
@@ -10,12 +11,9 @@ type CardProps = {
   className?: string;
   variant?: CardVariant;
   headerTitle?: string;
-  /** Shown below `headerTitle` in the accent bar (header variant only). */
   headerSubtitle?: string;
   headerRight?: ReactNode;
-  /** Merged onto the outer card `View` (border/elevation applied first). */
   style?: StyleProp<ViewStyle>;
-  /** Standard variant only: replaces default inner `p-4` when set (e.g. `p-0`). */
   innerClassName?: string;
 };
 
@@ -38,15 +36,14 @@ export function Card({
   style,
   innerClassName,
 }: CardProps) {
+  const { colors } = useAppTheme();
   const extra = className?.trim() ?? "";
   const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
   const marginClass = hasConsumerVerticalMargin ? "" : "mb-3";
-  const borderClass = accentColor ? "" : "border-[1.5px] border-slate-200";
 
   const rootBase = [
     "overflow-hidden",
     "rounded-2xl",
-    "bg-white",
     marginClass,
     "shadow-sm",
     "shadow-black/10",
@@ -55,28 +52,36 @@ export function Card({
     .filter(Boolean)
     .join(" ");
 
-  const rootStyle: StyleProp<ViewStyle> = [borderStyle(accentColor), { elevation: 2 }, style];
+  const rootStyle: StyleProp<ViewStyle> = [
+    borderStyle(accentColor),
+    {
+      elevation: 2,
+      backgroundColor: colors.card,
+      borderColor: accentColor ?? colors.border,
+      shadowColor: colors.shadow,
+    },
+    style,
+  ];
 
   if (variant === "header") {
     return (
-      <View
-        className={[rootBase, borderClass].filter(Boolean).join(" ")}
-        style={rootStyle}
-      >
+      <View className={rootBase} style={rootStyle}>
         <View
-          className={`flex-row items-center justify-between ${PAD} ${accentColor ? "" : "bg-slate-600"}`}
-          style={accentColor ? { backgroundColor: accentColor } : undefined}
+          className={`flex-row items-center justify-between ${PAD}`}
+          style={{ backgroundColor: accentColor ?? colors.surfaceMuted }}
         >
           <View className="min-w-0 flex-1 pr-2">
             <Text
-              className={`text-base font-semibold ${accentColor ? "text-white" : "text-slate-900"}`}
+              className="text-base font-semibold"
+              style={{ color: accentColor ? "#ffffff" : colors.text }}
               numberOfLines={2}
             >
               {headerTitle ?? ""}
             </Text>
             {headerSubtitle ? (
               <Text
-                className={`mt-0.5 text-sm ${accentColor ? "text-white/80" : "text-slate-600"}`}
+                className="mt-0.5 text-sm"
+                style={{ color: accentColor ? "rgba(255,255,255,0.82)" : colors.textMuted }}
                 numberOfLines={2}
               >
                 {headerSubtitle}
@@ -87,17 +92,16 @@ export function Card({
             <View className="shrink-0 flex-row items-center self-start">{headerRight}</View>
           ) : null}
         </View>
-        <View className={`${PAD} bg-white`}>{children}</View>
+        <View className={PAD} style={{ backgroundColor: colors.card }}>
+          {children}
+        </View>
       </View>
     );
   }
 
   if (variant === "stat") {
     return (
-      <View
-        className={[rootBase, borderClass].filter(Boolean).join(" ")}
-        style={rootStyle}
-      >
+      <View className={rootBase} style={rootStyle}>
         <View className="relative">
           {accentColor ? (
             <View
@@ -109,7 +113,7 @@ export function Card({
                 right: 0,
                 height: "50%",
                 backgroundColor: accentColor,
-                opacity: 0.1,
+                opacity: colors.statusBarStyle === "dark" ? 0.18 : 0.1,
               }}
             />
           ) : null}
@@ -127,10 +131,7 @@ export function Card({
   const bodyClass = innerClassName !== undefined ? innerClassName : PAD;
 
   return (
-    <View
-      className={[rootBase, borderClass].filter(Boolean).join(" ")}
-      style={rootStyle}
-    >
+    <View className={rootBase} style={rootStyle}>
       <View className={bodyClass}>{children}</View>
     </View>
   );

@@ -1,122 +1,143 @@
-# SuperHabits — Project Structure Map
+# SuperHabits Project Structure Map
 
-## Error Handling and Validation Flows
-- Error handling strategies are documented in README and knowledge base.
-- Validation is hard-reject; errors are surfaced to users.
-- See audit findings for more details.
+Purpose: structural source of truth for where code belongs. Keep this file about paths, ownership, and dependency direction. Put behavior in `docs/master-context.md` and execution rules in `docs/working-rules.md`.
 
+## Read This With
 
-Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v9** → next migration: `if (version < 10)` in `core/db/client.ts`. Top-level tabs include **Overview** (`features/overview/OverviewScreen.tsx`) plus the five feature modules.
+- `docs/master-context.md`
+- `docs/working-rules.md`
 
----
+## Top-Level Ownership
 
-## 1. Core directory roles
+| Path | Owns | Notes |
+|------|------|-------|
+| `app/` | Expo Router entry, stacks, and thin route wrappers | No business logic. Includes the top-tab shell and a standalone `settings` route. |
+| `features/` | Product modules and feature-local UI | Standard pattern is data + domain + screen. `features/overview/` is dashboard-only. `features/settings/` is a routed utility screen, not a tab module. |
+| `features/shared/` | Cross-feature presentation components | Shared activity and heatmap UI lives here. |
+| `core/db/` | SQLite bootstrap, migrations, and entity types | `core/db/client.ts` is the only DB entrypoint. |
+| `core/sync/` | Sync queue and Supabase adapter | One-way push backup only. |
+| `core/providers/` | App bootstrap and global providers | DB init, guest profile, optional anonymous session, sync flush listeners. |
+| `core/auth/` | Local guest profile bootstrap | App-level local identity only. |
+| `core/pwa/` | Web service-worker registration | Web-only runtime support. |
+| `core/ui/` | Shared UI primitives | Reuse before creating feature-local chrome. |
+| `lib/` | Pure helpers and platform utilities | No feature imports, no DB access. |
+| `constants/` | Shared visual tokens | Section colors live here. |
+| `tests/` | Vitest coverage | Domain-heavy plus selected DB/data/sync coverage. |
+| `e2e/` | Playwright specs and helpers | Runs against static `dist/` via `scripts/serve-e2e.js`. |
+| `public/` | Static PWA assets | `manifest.json`, `sw.js`. |
 
-| Path | Role |
+## Routing Map
+
+| Route area | Files | Notes |
+|-----------|-------|-------|
+| Root app shell | `app/_layout.tsx`, `app/index.tsx` | Root redirect goes to `/(tabs)/overview`. |
+| Top tabs | `app/(tabs)/_layout.tsx` | Active tabs are Overview, Todos, Habits, Pomodoro, Workout, Calories. |
+| Thin tab routes | `app/(tabs)/*.tsx` | Each route should render one screen component and nothing else. |
+| Utility route | `app/settings.tsx` | Wraps `features/settings/SettingsScreen.tsx`. Not part of the tab set. |
+
+## Feature Module Pattern
+
+Standard pattern:
+
+```text
+features/{feature}/
+  {feature}.data.ts
+  {feature}.domain.ts
+  {Feature}Screen.tsx
+  types.ts
+app/(tabs)/{feature}.tsx
+```
+
+Rules:
+
+- `{feature}.data.ts` owns SQLite reads and writes, sync enqueue, soft delete behavior, and ID/date helper usage.
+- `{feature}.domain.ts` owns pure business logic only.
+- `{Feature}Screen.tsx` owns orchestration and presentation only.
+- Route files in `app/(tabs)/` stay thin.
+
+Known exceptions:
+
+- `features/overview/OverviewScreen.tsx` has no companion data/domain files.
+- `features/workout/` includes nested screens for routine detail and session flow.
+- `features/settings/SettingsScreen.tsx` exists outside the tab module pattern.
+
+## Dependency Direction
+
+Allowed:
+
+- `app/` -> `core/providers`, `features/*Screen`, Expo Router layout code
+- `features/*Screen` -> matching `*.data.ts`, `*.domain.ts`, `core/ui`, `constants`, `lib`, `features/shared`
+- `features/*.data.ts` -> `core/db/client.ts`, `core/db/types.ts`, `core/sync/*`, `lib/id.ts`, `lib/time.ts`, `lib/validation.ts`, and pure domain helpers
+- `features/*.domain.ts` -> pure helpers such as `lib/time.ts`, constants, and types
+- `core/ui/` -> React Native, NativeWind, and small helper utilities
+
+Not allowed:
+
+- UI or route files importing `getDatabase()`
+- Domain files importing SQLite, `core/db/*`, or React
+- UI calling `syncEngine.enqueue(...)` directly
+- `lib/` importing feature code or DB code
+
+## Persistence and Sync Authority
+
+| Concern | Canonical file(s) | Notes |
+|--------|--------------------|-------|
+| SQLite entrypoint and migrations | `core/db/client.ts` | `schema.sql` is reference-only. |
+| Entity TypeScript shapes | `core/db/types.ts` | Data-layer contract types. |
+| Sync queue | `core/sync/sync.engine.ts` | Exported `syncEngine` uses `SupabaseSyncAdapter`. |
+| Remote adapter | `core/sync/supabase.adapter.ts` | Push upsert only. `pull()` is stubbed. |
+| Remote config and auth | `lib/supabase.ts` | Optional anonymous session and remote-mode gating. |
+| Flush wiring | `core/providers/AppProviders.tsx` | 30s interval, web hidden-state flush, NetInfo reconnect. |
+
+## Synced Entity Surface
+
+Currently enqueued for sync:
+
+- `todos`
+- `habits`
+- `calorie_entries`
+- `workout_routines`
+
+Currently not synced:
+
+- `pomodoro_sessions`
+- `habit_completions`
+- `workout_logs`
+- `saved_meals`
+- `routine_exercises`
+- `routine_exercise_sets`
+- `workout_session_exercises`
+
+Nested workout edits must continue to update and enqueue the parent `workout_routines` row instead of inventing nested sync records.
+
+## ID Prefix Registry
+
+`createId(prefix)` in `lib/id.ts` currently uses these prefixes:
+
+- `todo`
+- `habit`
+- `hcmp`
+- `cal`
+- `smeal`
+- `wrk`
+- `ex`
+- `eset`
+- `wsex`
+- `pom`
+- `guest`
+- `rec`
+
+## Fast File Lookup
+
+| Need | File |
 |------|------|
-| **`app/`** | Expo Router only: root stack, index redirect, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
-| **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), provider bootstrap (`core/providers/AppProviders.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
-| **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. |
-| **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB. |
-| **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette). |
-| **`tests/`** | Vitest: `lib/`, `*.domain.ts`, validation, sync engine tests, and selected data/DB tests (`calories.data`, `db.client`). |
-
-**Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
-
----
-
-## 2. Feature module pattern
-
-```
-features/{name}/
-  {name}.data.ts    ← SQLite CRUD, syncEngine.enqueue, createId/toDateKey/nowIso
-  {name}.domain.ts  ← pure logic, no DB/React (optional but preferred for rules/math)
-  {Name}Screen.tsx  ← UI: calls .data + .domain, core/ui, constants, lib/validation
-  types.ts          ← re-exports / narrow types
-app/(tabs)/{name}.tsx → default export <{Name}Screen /> only
-```
-
-- **Screen** orchestrates; **never** `getDatabase()` in screen.
-- **Data** owns writes, soft delete, `syncEngine.enqueue` where applicable.
-- **Domain** unit-tested; **data** may import **domain** pure helpers (e.g. `kcalFromMacros`, `getTomorrowDateKey`).
-
----
-
-## 3. Database & sync authority (single sources of truth)
-
-| Concern | File | Notes |
-|---------|------|--------|
-| **Persistence** | `core/db/client.ts` | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()`, WAL native-only. `schema.sql` = reference, **not** runtime. |
-| **Row shapes** | `core/db/types.ts` | TypeScript entity types consumed by data layer. |
-| **Sync** | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). **Not** duplicated elsewhere. |
-
-Remote flush (30s interval / visibility hidden / NetInfo reconnect) when `isRemoteEnabled()` (`lib/supabase.ts`, default **enabled**) — wired in `AppProviders` alongside **`ensureAnonymousSession()`**.
-
----
-
-## 4. Dependency invariants
-
-### Allowed (summary)
-
-- `app/` → `AppProviders`, `features/*Screen`, expo-router layouts.
-- `features/*Screen` → `*.data`, `*.domain`, `core/ui`, `constants`, `lib` (e.g. validation, time), `features/shared`.
-- `features/*.data` → `core/db/client`, `core/db/types`, `core/sync/sync.engine`, `lib/id`, `lib/time`, `lib/validation`; **may** import `features/*.domain` pure functions.
-- `features/*.domain` → `lib/time`, `constants`, `features/shared` types; **no** `getDatabase`, **no** React.
-- `core/ui` → RN, NativeWind; may use `lib/horizontalScrollViewportStyle`.
-- `core/db/client` → expo-sqlite, Platform; **no** feature imports.
-- `lib/` → **no** features, **no** DB.
-
-### Violations (do not)
-
-- `getDatabase` in `*Screen.tsx` or `*.domain.ts`.
-- `syncEngine.enqueue` from UI — only from **`*.data.ts`** after mutating writes.
-- `DELETE FROM` on main entity tables (soft delete + filter `deleted_at IS NULL`), except documented exceptions (`habit_completions` at count 0; `saved_meals` hard delete).
-- Edit past migration blocks; non-append schema changes.
-
----
-
-## 5. Entity prefix registry (`createId` in `lib/id.ts`)
-
-Format: `{prefix}_{ms}_{rand8}` — not crypto-strong; local IDs only.
-
-| Prefix | Entity / use |
-|--------|----------------|
-| `todo` | `todos` |
-| `habit` | `habits` |
-| `hcmp` | `habit_completions` |
-| `cal` | `calorie_entries` |
-| `smeal` | `saved_meals` |
-| `wrk` | `workout_routines`, `workout_logs`, session log ids |
-| `ex` | `routine_exercises` |
-| `eset` | `routine_exercise_sets` |
-| `wsex` | `workout_session_exercises` |
-| `pom` | `pomodoro_sessions` |
-| `guest` | guest profile (`app_meta`) |
-| `rec` | `todos.recurrence_id` (daily series) |
-
----
-
-## 6. Quick “where does X live?”
-
-| Logic type | Location |
-|------------|----------|
-| Route / tab shell | `app/` |
-| SQL, migrations, `getDatabase` | `core/db/client.ts` only |
-| Entity TS types | `core/db/types.ts` |
-| Sync queue API | `core/sync/sync.engine.ts` |
-| Reusable RN UI chrome | `core/ui/` |
-| Feature CRUD + enqueue | `features/*/*.data.ts` |
-| Pure rules, streaks, formatting | `features/*/*.domain.ts` |
-| Screens & wiring | `features/*/*Screen.tsx` |
-| IDs / date keys | `lib/id.ts`, `lib/time.ts` (`toDateKey` for YYYY-MM-DD) |
-| Form messages | `lib/validation.ts` |
-| Section colors | `constants/sectionColors.ts` |
-| Unit tests | `tests/*.test.ts` |
-
----
-
-## 7. Sync enqueue (by entity string)
-
-Enqueued after writes: **todos**, **habits** (not completions), **calorie_entries**, **workout_routines** (+ bump after nested routine edits).
-
-**Not synced:** `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `workout_session_exercises`, nested workout tables (routine row bump covers remote story).
+| SQL bootstrap and migrations | `core/db/client.ts` |
+| DB entity types | `core/db/types.ts` |
+| Shared UI primitives | `core/ui/*` |
+| Feature CRUD and sync enqueue | `features/*/*.data.ts` |
+| Pure business rules | `features/*/*.domain.ts` |
+| Top-level screens | `features/*/*Screen.tsx` |
+| ID generation | `lib/id.ts` |
+| Day-key helpers | `lib/time.ts` |
+| Validation messages | `lib/validation.ts` |
+| Web E2E static server | `scripts/serve-e2e.js` |

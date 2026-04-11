@@ -1,17 +1,20 @@
 import React from "react";
 import { Text, View } from "react-native";
+import { useAppTheme } from "@/core/theme";
 import type { TodoPriority } from "./types";
-
-const CONFIG: Record<TodoPriority, { label: string; bg: string; text: string }> = {
-  urgent: { label: "Urgent", bg: "#fef2f2", text: "#dc2626" },
-  normal: { label: "Normal", bg: "#f1f5f9", text: "#64748b" },
-  low: { label: "Low", bg: "#f0fdf4", text: "#16a34a" },
-};
 
 type Props = { priority: TodoPriority; compact?: boolean };
 
 export function PriorityBadge({ priority, compact }: Props) {
-  const cfg = CONFIG[priority];
+  const { colors } = useAppTheme();
+
+  const config: Record<TodoPriority, { label: string; bg: string; text: string }> = {
+    urgent: { label: "Urgent", bg: colors.dangerBackground, text: colors.dangerText },
+    normal: { label: "Normal", bg: colors.badgeBackground, text: colors.badgeText },
+    low: { label: "Low", bg: colors.successBackground, text: colors.successText },
+  };
+
+  const cfg = config[priority];
   return (
     <View
       style={{

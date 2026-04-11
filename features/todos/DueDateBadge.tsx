@@ -1,10 +1,12 @@
 import React from "react";
 import { Text, View } from "react-native";
+import { useAppTheme } from "@/core/theme";
 import { toDateKey } from "@/lib/time";
 
 type Props = { dueDate: string; compact?: boolean };
 
 export function DueDateBadge({ dueDate, compact }: Props) {
+  const { colors } = useAppTheme();
   const today = toDateKey();
   const isOverdue = dueDate < today;
   const isToday = dueDate === today;
@@ -16,8 +18,16 @@ export function DueDateBadge({ dueDate, compact }: Props) {
   });
 
   const label = isToday ? "Today" : isOverdue ? `Overdue · ${formatted}` : formatted;
-  const bgColor = isOverdue ? "#fef2f2" : isToday ? "#fffbeb" : "#f1f5f9";
-  const txtColor = isOverdue ? "#dc2626" : isToday ? "#d97706" : "#64748b";
+  const bgColor = isOverdue
+    ? colors.dangerBackground
+    : isToday
+      ? colors.warningBackground
+      : colors.badgeBackground;
+  const txtColor = isOverdue
+    ? colors.dangerText
+    : isToday
+      ? colors.warningText
+      : colors.badgeText;
 
   if (compact) {
     return (

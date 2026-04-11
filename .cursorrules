@@ -1,39 +1,43 @@
-# SuperHabits — Cursor / Composer rules
+# SuperHabits Cursor / Composer Rules
 
-## Primary architecture map
+## Read Order
 
-Before searching the repo for files, opening broad file trees, or proposing new paths, **read and use** `@docs/PROJECT_STRUCTURE_MAP.md` as the source of truth for directory roles, import boundaries, sync/ID rules, and where logic belongs. Prefer it over ad-hoc exploration to save context.
+Before broad repo exploration or edits, read:
 
-If a requested change would violate `PROJECT_STRUCTURE_MAP.md` (or project invariants there: soft delete, migrations, sync enqueue, `createId`/`toDateKey`), **stop and ask the user for clarification or an explicit exception** instead of silently diverging.
+1. `@AGENTS.md`
+2. `@docs/PROJECT_STRUCTURE_MAP.md`
+3. `@docs/master-context.md`
+4. `@docs/working-rules.md`
 
-## Module layering (strict)
+Trust current code over older prose if anything conflicts.
 
-- **Data** (`{feature}.data.ts`): SQLite via `getDatabase()`, `syncEngine.enqueue` after applicable writes, `lib/id`, `lib/time`. No UI.
-- **Domain** (`{feature}.domain.ts`): Pure logic only — **no** `getDatabase`, **no** `expo-sqlite`, **no** `core/db`, **no** React. May use `lib/time`, `constants`, shared types.
-- **UI** (`*Screen.tsx` and feature components): Orchestration and presentation only — call `.data` / `.domain`; **no** direct DB imports.
+## Primary Guardrails
 
-Never add DB imports to Domain files.
+- `@docs/PROJECT_STRUCTURE_MAP.md` is the structure source of truth.
+- `@docs/master-context.md` is the behavior source of truth.
+- `@docs/working-rules.md` is the execution-rule source of truth.
+- If a requested change would violate those files, stop and ask for clarification instead of silently diverging.
 
-## Context hygiene
+## Module Layering
 
-When work is scoped to **one feature** under `features/{name}/`, **do not read or modify files outside** `features/{name}/` unless the task requires it or the user **explicitly** references another path with `@` (e.g. `@core/db/client.ts`). Shared pieces: `core/ui`, `lib/`, `constants/` — only touch them when the change clearly needs them or the user `@`-mentions them.
+- Data: `{feature}.data.ts`
+  - SQLite via `getDatabase()`
+  - sync enqueue after applicable writes
+  - `lib/id.ts` and `lib/time.ts`
+  - no UI imports
+- Domain: `{feature}.domain.ts`
+  - pure logic only
+  - no `getDatabase()`
+  - no `core/db/*`
+  - no React
+- UI: `*Screen.tsx` and feature components
+  - orchestration and presentation only
+  - no direct DB imports
 
-## Naming conventions (new modules)
+## Context Hygiene
 
-For every new feature module, use:
+When work is scoped to one feature, stay inside that feature unless the task clearly requires shared infrastructure or the user explicitly names another path.
 
-- `{feature}.data.ts` — data layer
-- `{feature}.domain.ts` — domain layer (add Vitest tests in `tests/`)
-- `{Feature}Screen.tsx` — main screen (PascalCase feature prefix)
+## Pre-Edit Rule
 
-Thin route: `app/(tabs)/{feature}.tsx` exports only the screen.
-
-## Sync and IDs
-
-After **every** mutating write on synced entities (per map: todos, habits, calorie_entries, workout_routines / routine bumps), ensure the code path calls **`syncEngine.enqueue`** immediately after the DB operation, matching existing `*.data.ts` patterns.
-
-All new row IDs: **`createId(prefix)`** from `lib/id.ts` with the correct entity prefix from `PROJECT_STRUCTURE_MAP.md`. Date keys for YYYY-MM-DD: **`toDateKey()`** from `lib/time.ts` where applicable.
-
-## Pre-edit confirmation (feature logic)
-
-Before **modifying** a feature’s business or persistence behavior, **confirm in the reply** that you have read the relevant **`*.data.ts`** and/or **`*.domain.ts`** for that feature (and cite or summarize the touchpoints). If you have not read them yet, read them first, then edit.
+Before modifying feature behavior, read the relevant `*.data.ts` and `*.domain.ts` files first and use the data layer as the contract.

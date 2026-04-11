@@ -1,22 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  InteractionManager,
-  View,
-  Text,
-  type ViewStyle,
-} from "react-native";
+import { InteractionManager, View, Text, type ViewStyle } from "react-native";
 import { HorizontalScrollArea } from "@/core/ui/HorizontalScrollArea";
+import { useAppTheme } from "@/core/theme";
 
 export type HeatmapDay = {
-  dateKey: string; // YYYY-MM-DD
-  value: number; // 0 = none, 1 = low, 2 = medium, 3 = high
+  dateKey: string;
+  value: number;
 };
 
 type Props = {
   days: HeatmapDay[];
   color: string;
   label?: string;
-  /** Number of week columns; days are trimmed to at most `weeks * 7` (default 364 days). */
   weeks?: number;
 };
 
@@ -26,7 +21,10 @@ const DAY_LABEL_COL_WIDTH = 28;
 const DAY_LABEL_TEXT_WIDTH = 24;
 const DAY_LABEL_FONT_SIZE = 10;
 const DEFAULT_WEEKS = 52;
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const HEATMAP_STRIP_MIN_HEIGHT = 4 + 14 + (7 * CELL + 6 * GAP);
 
+<<<<<<< HEAD
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Month label row (incl. marginBottom) + 7×day grid — matches real heatmap strip height. */
@@ -34,6 +32,8 @@ const HEATMAP_STRIP_MIN_HEIGHT =
   4 + 14 + (7 * CELL + 6 * GAP);
 
 /** Stable references for HorizontalScrollArea — avoids new object identity each render. */
+=======
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)
 const HEATMAP_SCROLL_CONTENT: ViewStyle = {
   justifyContent: "center",
   alignItems: "center",
@@ -46,21 +46,11 @@ const HEATMAP_WEB_INNER: ViewStyle = {
   alignItems: "center",
 };
 
-function getColorForValue(value: number, color: string): string {
-  if (value === 0) return "#e2e8f0";
-  if (value === 1) return color + "55";
-  if (value === 2) return color + "99";
-  return color;
-}
-
 function parseLocalDate(dateKey: string): Date {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
-/**
- * Week columns (Mon–Sun rows). Leading slots before the window are null.
- */
 function buildCalendarGrid(days: HeatmapDay[]): (HeatmapDay | null)[][] {
   if (days.length === 0) return [];
 
@@ -101,6 +91,7 @@ function monthLabelsForWeeks(weeksGrid: (HeatmapDay | null)[][]): string[] {
 }
 
 function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props) {
+  const { colors } = useAppTheme();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -121,27 +112,21 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
     };
   }, []);
 
-  const maxDays = weeks * 7;
-  const trimmedDays = useMemo(
-    () => (days.length > maxDays ? days.slice(-maxDays) : days),
-    [days, maxDays],
-  );
+  const getColorForValue = (value: number): string => {
+    if (value === 0) return colors.progressTrack;
+    if (value === 1) return color + "55";
+    if (value === 2) return color + "99";
+    return color;
+  };
 
+  const maxDays = weeks * 7;
+  const trimmedDays = useMemo(() => (days.length > maxDays ? days.slice(-maxDays) : days), [days, maxDays]);
   const weekColumns = useMemo(() => buildCalendarGrid(trimmedDays), [trimmedDays]);
   const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
 
-  const footer =
-    label ? (
-      <Text
-        style={{
-          fontSize: 11,
-          color: "#94a3b8",
-          marginTop: 6,
-        }}
-      >
-        {label}
-      </Text>
-    ) : null;
+  const footer = label ? (
+    <Text style={{ fontSize: 11, color: colors.textSubtle, marginTop: 6 }}>{label}</Text>
+  ) : null;
 
   if (!isReady) {
     return (
@@ -156,7 +141,7 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
             width: "100%",
             minHeight: HEATMAP_STRIP_MIN_HEIGHT,
             borderRadius: 6,
-            backgroundColor: "#f1f5f9",
+            backgroundColor: colors.surfaceMuted,
           }}
           accessibilityLabel="Loading activity heatmap"
         />
@@ -164,6 +149,7 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
     );
   }
 
+<<<<<<< HEAD
   const grid = (
     <View style={{ flexDirection: "column", alignItems: "center", width: "100%" }}>
       <View style={{ flexDirection: "row", gap: GAP, marginBottom: 4 }}>
@@ -219,6 +205,8 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
     </View>
   );
 
+=======
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)
   return (
     <HorizontalScrollArea
       stripMinHeight={HEATMAP_STRIP_MIN_HEIGHT}
@@ -226,7 +214,47 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
       webInnerStyle={HEATMAP_WEB_INNER}
       footer={footer}
     >
-      {grid}
+      <View style={{ flexDirection: "column", alignItems: "center", width: "100%" }}>
+        <View style={{ flexDirection: "row", gap: GAP, marginBottom: 4 }}>
+          <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }} />
+          {weekColumns.map((_, wi) => (
+            <View key={`m-${wi}`} style={{ width: CELL, alignItems: "center" }}>
+              <Text style={{ fontSize: 9, color: colors.textSubtle }}>{monthLabels[wi] ?? ""}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ flexDirection: "row", gap: GAP }}>
+          <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }}>
+            {DAY_LABELS.map((d, i) => (
+              <View key={i} style={{ height: CELL, marginBottom: GAP, justifyContent: "center" }}>
+                <Text
+                  style={{ fontSize: DAY_LABEL_FONT_SIZE, color: colors.textSubtle, width: DAY_LABEL_TEXT_WIDTH }}
+                  numberOfLines={1}
+                >
+                  {d}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {weekColumns.map((week, wi) => (
+            <View key={wi} style={{ gap: GAP }}>
+              {week.map((day, di) => (
+                <View
+                  key={di}
+                  style={{
+                    width: CELL,
+                    height: CELL,
+                    borderRadius: 3,
+                    backgroundColor: day ? getColorForValue(day.value) : "transparent",
+                  }}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
     </HorizontalScrollArea>
   );
 }

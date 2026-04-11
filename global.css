@@ -6,3 +6,8 @@ body,
 #root {
   background-color: #f8f7ff;
 }
+
+.dark body,
+.dark #root {
+  background-color: #0b1220;
+}

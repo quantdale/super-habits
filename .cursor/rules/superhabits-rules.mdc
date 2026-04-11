@@ -1,176 +1,48 @@
 ---
-description: SuperHabits project rules — invariants, conventions, and patterns
+description: SuperHabits project rules for Cursor
 alwaysApply: true
 ---
 
-# SuperHabits — Project Rules
+# SuperHabits Project Rules
 
-## Project identity
+## Read Order
 
-SuperHabits is an offline-first React Native + Expo app with 5 modules:
-todos, habits, pomodoro, workout, calories.
-Stack: React Native 0.84, Expo 55, TypeScript 6, expo-router, SQLite
-(expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
-Target: Web (PWA), iOS, Android.
-Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
-Current stored schema version: **9** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 10) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
+Read these before acting:
 
-## Non-negotiable invariants — violating these causes silent data corruption
+1. `docs/PROJECT_STRUCTURE_MAP.md`
+2. `docs/master-context.md`
+3. `docs/working-rules.md`
 
-1. SOFT DELETE ONLY
-   Never use DELETE FROM on main entity tables (todos, habits, habit_completions
-   is the exception, workout_logs, calorie_entries, pomodoro_sessions).
-   Always set deleted_at = datetime('now') and filter WHERE deleted_at IS NULL.
-   Hard delete = data loss with no recovery path.
+Use them as the canonical sources instead of repeating repo facts from memory.
 
-2. SYNC ENQUEUE ON EVERY WRITE
-   Every INSERT/UPDATE on main entities must call syncEngine.enqueue(record)
-   immediately after the DB operation.
-   Exceptions (intentionally not synced): pomodoro_sessions, workout_logs,
-   habit_completions.
-   Missing enqueue = silent sync gap when cloud sync is enabled.
+## Project Reality
 
-3. DB SINGLETON MUST INITIALIZE BEFORE ANY DATA ACCESS
-   All data functions call await getDatabase() at the start.
-   Never open a second SQLite connection. Never access db before init.
-   Breaking the singleton breaks the entire app on cold start.
+- Offline-first Expo app for web, iOS, and Android
+- SQLite is the source of truth
+- Supabase is optional push-only backup sync
+- `app/` is Expo Router only
+- data files own persistence and sync enqueue
+- domain files stay pure
+- UI and route files do not access SQLite directly
 
-4. IDs VIA createId(prefix) ONLY
-   Never use Math.random(), crypto.randomUUID(), or raw timestamps as IDs.
-   Format: {prefix}_{timestamp}_{random8} — enforced in lib/id.ts.
-   Prefix must match the entity: "todo", "habit", "cal", "wrk", "pom".
+## Invariants
 
-5. DATE KEYS VIA toDateKey() ONLY
-   All YYYY-MM-DD date strings must come from toDateKey() in lib/time.ts.
-   Since migration 5, toDateKey() uses the device’s **local** calendar date
-   (YYYY-MM-DD). Rows written before migration 5 used UTC calendar dates;
-   see `app_meta.date_key_cutover` — no silent backfill of old rows.
+- Do not hard-delete synced main entities.
+- Call `syncEngine.enqueue(...)` from data-layer write paths for synced entities.
+- Use `createId(prefix)` for IDs.
+- Use `toDateKey()` for local day keys.
+- Keep migrations append-only in `core/db/client.ts`.
+- Treat `core/db/schema.sql` as reference-only.
+- Do not describe sync as bidirectional, realtime, or restore-capable unless the code changes.
 
-6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
-   Never modify an existing migration. Always add a new file numbered N+1.
-   Current stored version: 9. Next migration number: 10 (new `if (version < 10)` block in `runMigrations` in `core/db/client.ts`).
-   Migration logic runs in core/db/client.ts — append a new block in runMigrations() (if (version < N)).
-   schema.sql is a reference doc only — it is NOT executed at runtime.
+## Validation
 
-7. UNIQUE(habit_id, date_key) on habit_completions
-   The data layer (habits.data.ts) avoids duplicate rows by:
-   - SELECT for an existing row matching (habit_id, date_key)
-   - INSERT with createId("hcmp") if none exists; UPDATE count if it does
-   - On decrement to zero: DELETE that row (hard delete — allowed exception for this table)
-     Do not change this pattern without reviewing UNIQUE and sync implications.
+- Standard checks: `npm run typecheck`, `npm test`
+- Web runtime changes: `npm run build:web`, then `npm run e2e`
+- Known repo caveat:
+  - `npm run typecheck` currently fails because `tsconfig.json` uses `ignoreDeprecations: "6.0"` while the repo installs TypeScript `~5.9.2`
 
-## File naming conventions
+## Notes
 
-- Source files: camelCase (e.g. todoHelpers.ts)
-- React components: PascalCase (e.g. TodoCard.tsx)
-- Data layer: {feature}.data.ts (e.g. todos.data.ts)
-- Domain/pure logic: {feature}.domain.ts (e.g. habits.domain.ts)
-- Screens: {Feature}Screen.tsx (e.g. TodosScreen.tsx)
-- Route wrappers: app/(tabs)/{feature}.tsx — thin, just renders the Screen
-
-## Adding a new feature — required structure
-
-features/{name}/
-{name}.data.ts ← all SQLite CRUD, exports typed functions
-{name}.domain.ts ← pure logic, no DB imports, fully testable
-{name}Screen.tsx ← React Native UI, imports from .data and .domain
-
-Route file: app/(tabs)/{name}.tsx → renders {Name}Screen
-Tab entry: app/(tabs)/\_layout.tsx → add tab icon + href
-
-## Unused dependencies — do NOT add usage without discussion
-
-The following are installed but intentionally unused:
-
-- zustand (state management — may be used for future global state)
-- @tanstack/react-query (no hooks used — QueryClient provided but dormant)
-- date-fns (listed in package.json, not imported anywhere in source)
-- expo-background-fetch, expo-task-manager (deferred background sync)
-  Do not wire these up without an explicit decision to do so.
-
-## Testing requirements
-
-- Every new \*.domain.ts function must have a Vitest unit test
-- Test files live in tests/ directory
-- Run: npm test
-- Current count: 180 tests passing — **update this count whenever tests are added or removed**
-- No DB or component tests yet — do not block on this, but document gaps
-
-## E2E Tests (Playwright)
-
-E2E tests live in `e2e/` at the project root. They run against the **static web export** in `dist/`, served by `node scripts/serve-e2e.js` on `http://localhost:8081` with `Cross-Origin-Embedder-Policy: require-corp` (OPFS + SQLite WASM). **Playwright does not build the app:** run `npm run build:web` yourself whenever React components or web bundle output change, then run E2E. Metro (`npm run web`) is for local dev with HMR — **not** used by the E2E pipeline.
-
-**Test files:**
-
-- `e2e/todos.spec.ts` — Todos feature
-- `e2e/habits.spec.ts` — Habits feature
-- `e2e/pomodoro.spec.ts` — Pomodoro feature
-- `e2e/workout.spec.ts` — Workout feature
-- `e2e/calories.spec.ts` — Calories feature
-- `e2e/infrastructure.spec.ts` — Headers, SW, OPFS, DB init
-
-**Config:** `playwright.config.ts`
-
-- `headless: true` always
-- Chromium only
-- `workers: 1` locally (do not increase — OPFS + expo-sqlite hold one lock per origin; extra workers cause flaky navigation/reload). `fullyParallel: false` — tests in a file stay serial; `clearDatabase()` in `beforeEach` must not race.
-- `webServer.command`: `node scripts/serve-e2e.js` (serves `dist/`; ensure `npm run build:web` has been run)
-- `retries: 2` on CI, `0` locally
-- HTML report: `.cursor/playwright-output/e2e-report/`
-- Failure screenshots / traces: `.cursor/playwright-output/e2e-failures/` (`outputDir`)
-
-**Commands:**
-
-- `npm run e2e` — run all E2E tests
-- `npm run e2e:report` — open HTML report
-- `npm run e2e:headed` — run with visible browser (debug only)
-- `npm run e2e:debug` — Playwright inspector
-
-**Slash commands:**
-
-- `/test` — run unit tests + E2E tests in one pass
-- `/e2e-fix` — run E2E, read report via Playwright MCP, auto-fix
-
-**E2E invariants:**
-
-- `clearDatabase()` called in `test.beforeEach` (not `afterEach`)
-- `e2e/global.setup.ts` aborts if `crossOriginIsolated` is false
-- Do not add `data-testid` to app components
-- Do not change assertions to make tests pass artificially
-- If a test reveals a genuine bug, fix the app not the test
-- E2E tests are NOT unit tests — they require the static server (or CI’s `build:web` + `npm run e2e`)
-
-## CI (GitHub Actions)
-
-Two jobs (see `.github/workflows/ci.yml`):
-
-- **quality** — typecheck + unit tests (runs first)
-- **e2e** — Playwright Chromium tests (runs only if **quality** passes); runs `npm run build:web`, then `npm run e2e` (Playwright starts `node scripts/serve-e2e.js` per `webServer` in `playwright.config.ts`)
-
-## Current known bugs (do not silently fix — coordinate first)
-
-- Sync flush is gated on `isRemoteEnabled()` (`lib/supabase.ts`) — interval / visibility / NetInfo flush
-  runs when remote is enabled (**default `remoteMode` is `"enabled"`**). If `setRemoteMode("disabled")` is used,
-  flush listeners are not registered and the in-memory queue can grow — intentional local-only tradeoff.
-  The exported `syncEngine` uses **`SupabaseSyncAdapter`** (push upsert); if Supabase env vars are unset,
-  `supabase` is `null` and pushes no-op without throwing. Document as tradeoff, not a silent bug fix.
-- schema.sql is out of date (reference only, not authoritative)
-
-Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true; **`ensureAnonymousSession()`** runs on bootstrap when Supabase is configured. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
-
-Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.ts` is covered by Vitest; **PomodoroScreen** currently uses inline button labels and does not import it — wire the screen to the domain helper if you want a single source of truth for `Running...` vs `Start focus`.
-
-## Web / PWA context (not application bugs)
-
-- **COEP / COOP:** `metro.config.js` and `app.json` set isolation headers for dev; production static web on **Vercel** uses root **`vercel.json`** (`Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Opener-Policy: same-origin`, SPA rewrite `/(.*)` → `/index.html`) so `crossOriginIsolated` holds for SQLite WASM on web.
-- **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v3` (`CACHE_VERSION = "v3"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
-
-## MCP tools (development)
-
-Configured in the user’s MCP settings (e.g. `~/.cursor/mcp.json` on Unix; equivalent on Windows). Useful servers for this repo:
-
-- **Playwright MCP** — live browser inspection; use with `/inspect-web`, `/pre-pr`, and `/e2e-fix`.
-- **Lighthouse MCP** — performance, PWA, accessibility; use with `/audit-performance`.
-- **Fetch MCP** — HTTP header verification (e.g. COOP/COEP); use in `/audit-performance` phase 1.
-
-**Slash commands (summary):** `/inspect-web`, `/pre-pr`, `/audit-performance`, `/test` (unit + E2E), `/e2e-fix` (E2E run + report-driven fixes).
+- E2E uses the static `dist/` build served by `node scripts/serve-e2e.js`, not Metro.
+- Exact stack versions, schema version, and sync scope should be read from the canonical docs or the code before making version-sensitive claims.

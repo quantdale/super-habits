@@ -4,22 +4,20 @@ import type { Habit } from "./types";
 import { calculateHabitProgress } from "@/features/habits/habits.domain";
 import { ProgressRing } from "@/features/habits/ProgressRing";
 import { DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
+import { useAppTheme } from "@/core/theme";
 
 type HabitCircleProps = {
   habit: Habit;
   todayCount: number;
   streak: number;
   showStreak?: boolean;
-  /** When false, parent renders the habit name (e.g. Avocation-style row). */
   showName?: boolean;
-  /** Outer ring fits around this diameter (default 56). */
   size?: number;
   onIncrement: () => void;
   onDecrement: () => void;
 };
 
 const DEFAULT_SIZE = 56;
-const DEFAULT_BG_COLOR = "#f1f5f9";
 
 export function HabitCircle({
   habit,
@@ -31,9 +29,10 @@ export function HabitCircle({
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
+  const { colors } = useAppTheme();
   const progress = calculateHabitProgress(todayCount, habit.target_per_day);
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
-  const habitColor = habit.color ?? "#64748b";
+  const habitColor = habit.color ?? colors.icon;
 
   const strokeWidth = Math.max(3, Math.round(size / 14));
   const ringSize = size + strokeWidth * 2;
@@ -61,7 +60,7 @@ export function HabitCircle({
             size={ringSize}
             strokeWidth={strokeWidth}
             progress={progress}
-            backgroundColor="#e2e8f0"
+            backgroundColor={colors.progressTrack}
             progressColor={habitColor}
           />
         </View>
@@ -73,7 +72,7 @@ export function HabitCircle({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: DEFAULT_BG_COLOR,
+            backgroundColor: colors.surfaceMuted,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -82,15 +81,12 @@ export function HabitCircle({
         </View>
       </Pressable>
       {showStreak && streak > 0 && (
-        <Text className="mt-0.5 text-xs font-medium text-amber-500">
+        <Text className="mt-0.5 text-xs font-medium" style={{ color: "#f59e0b" }}>
           {streak > 2 ? "🔥" : "⚡"} {streak}
         </Text>
       )}
       {showName ? (
-        <Text
-          className="mt-2 text-center text-xs font-medium text-slate-700"
-          numberOfLines={2}
-        >
+        <Text className="mt-2 text-center text-xs font-medium" style={{ color: colors.textMuted }} numberOfLines={2}>
           {habit.name}
         </Text>
       ) : null}

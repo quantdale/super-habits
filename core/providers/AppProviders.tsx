@@ -7,13 +7,19 @@ import { initializeDatabase } from "@/core/db/client";
 import { registerServiceWorker } from "@/core/pwa/registerServiceWorker";
 import { ensureGuestProfile } from "@/core/auth/guestProfile";
 import { syncEngine } from "@/core/sync/sync.engine";
+<<<<<<< HEAD
 import { isDemoMode } from "@/lib/demo";
 import { ensureAnonymousSession, isRemoteEnabled, setRemoteMode } from "@/lib/supabase";
+=======
+import { AppThemeProvider, useAppTheme } from "@/core/theme";
+import { ensureAnonymousSession, isRemoteEnabled } from "@/lib/supabase";
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)
 
 const queryClient = new QueryClient();
 
-export function AppProviders({ children }: PropsWithChildren) {
+function AppProvidersContent({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);
+  const { colors } = useAppTheme();
 
   useEffect(() => {
     setRemoteMode(isDemoMode ? "disabled" : "enabled");
@@ -70,16 +76,29 @@ export function AppProviders({ children }: PropsWithChildren) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         {dbError ? (
-          <View className="flex-1 items-center justify-center bg-slate-50 p-8">
-            <Text className="mb-2 text-center text-lg font-semibold text-slate-800">
+          <View
+            className="flex-1 items-center justify-center p-8"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <Text className="mb-2 text-center text-lg font-semibold" style={{ color: colors.text }}>
               Unable to start
             </Text>
-            <Text className="text-center text-sm text-slate-500">{dbError}</Text>
+            <Text className="text-center text-sm" style={{ color: colors.textMuted }}>
+              {dbError}
+            </Text>
           </View>
         ) : (
           children
         )}
       </QueryClientProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export function AppProviders({ children }: PropsWithChildren) {
+  return (
+    <AppThemeProvider>
+      <AppProvidersContent>{children}</AppProvidersContent>
+    </AppThemeProvider>
   );
 }

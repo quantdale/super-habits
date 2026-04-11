@@ -1,65 +1,81 @@
 # SuperHabits Working Rules
 
-Purpose: concise implementation guardrails for contributors and AI agents. This file is operational by design. Use `docs/master-context.md` for architecture and project identity, and `docs/repo-map.md` for navigation.
+Purpose: execution guardrails for contributors and AI agents. This file is about how to work in the repo, not about repeating the full architecture.
 
 ## Read Order
 
 1. `AGENTS.md`
 2. `docs/PROJECT_STRUCTURE_MAP.md`
 3. `docs/master-context.md`
-4. Relevant feature `*.data.ts` and `*.domain.ts`
+4. The exact files you plan to touch
 
-If this file conflicts with current code, trust the code and document the conflict.
+If docs conflict with code, trust the code and document the conflict.
 
-## Layering Rules
+## Decision Boundary
 
-### Confirmed from code and docs
-- `app/` is Expo Router only.
-- `app/(tabs)/*.tsx` should stay thin route wrappers that only render screens.
-- `features/{feature}/{feature}.data.ts` owns SQLite reads/writes, soft delete behavior, ID/date helpers, and sync enqueue.
-- `features/{feature}/{feature}.domain.ts` stays pure.
-- `*Screen.tsx` and feature components orchestrate and render UI; they do not open the DB directly.
-- `lib/` stays free of feature imports and DB access.
+- UI / domain / routing work:
+  - Read the target screen
+  - Read the matching domain file
+  - Read the matching data file as the contract
+- Data / DB / sync / migration work:
+  - Read the target data file
+  - Read `core/db/client.ts`
+  - Read `core/db/types.ts`
+  - Read relevant sync files
+  - Read `lib/id.ts` and `lib/time.ts`
+- Mixed work:
+  - Treat the data layer as the source of truth first
 
-## Data and Sync Invariants
+## Core Rules
 
-### Confirmed from code and docs
 - SQLite is the source of truth.
-- `getDatabase()` in `core/db/client.ts` must remain the only DB entrypoint.
-- Main synced entities use soft delete with `deleted_at`.
+- Supabase sync is optional push-only backup, not real-time sync and not bidirectional sync.
+- `getDatabase()` in `core/db/client.ts` remains the only DB entrypoint.
+- Data-layer files own SQLite reads/writes, soft delete, and sync enqueue.
+- Domain files stay pure: no DB access, no React, no side effects.
+- UI files orchestrate and render only: no direct SQLite imports.
+- Route files stay thin.
+
+## Persistence Rules
+
 - Do not hard-delete synced main entities.
-- Enqueue sync immediately after mutating writes for synced entities:
+- Preserve the intentional hard-delete exceptions:
+  - `habit_completions` rows can be removed when count reaches zero
+  - `saved_meals` is hard-deleted by design
+- Use `createId(prefix)` from `lib/id.ts` for new IDs.
+- Use `toDateKey()` from `lib/time.ts` for local `YYYY-MM-DD` day keys.
+- Use `nowIso()` for timestamps when adding new write paths that need timestamps.
+- Do not edit historical migration blocks in `core/db/client.ts`.
+- `core/db/schema.sql` is reference-only, not runtime authority.
+
+## Sync Rules
+
+- Only data-layer code calls `syncEngine.enqueue(...)`.
+- Enqueue immediately after mutating writes for synced entities.
+- Synced entities are currently:
   - `todos`
   - `habits`
   - `calorie_entries`
   - `workout_routines`
-- `pomodoro_sessions`, `habit_completions`, `workout_logs`, nested workout tables, and `saved_meals` are not part of active Supabase sync.
-- Nested workout edits should continue to bump `workout_routines.updated_at` and enqueue the parent routine instead of inventing nested sync.
+- Preserve the current workout rule:
+  - nested workout edits update and enqueue the parent routine row
+- Do not imply pull, restore, conflict resolution, or multi-device merge behavior that the code does not implement today.
 
-## IDs, Dates, and Migrations
+## UI Rules
 
-### Confirmed from code and docs
-- Create IDs only with `createId(prefix)` from `lib/id.ts`.
-- Create day keys only with `toDateKey()` from `lib/time.ts`.
-- `toDateKey()` currently uses local calendar dates, not UTC.
-- Runtime schema version is `9`.
-- The next schema change belongs in a new `if (version < 10)` block in `core/db/client.ts`.
-- Migrations are append-only. Never edit prior migration blocks.
-- `core/db/schema.sql` is reference-only and currently stale.
+- `features/overview/OverviewScreen.tsx` is the structural reference for top-level tab screens.
+- Reuse shared primitives from `core/ui/` before adding feature-local chrome.
+- Preserve section color identity by feature.
+- Do not move business logic into screens just to simplify UI wiring.
 
-## Feature Workflow
+## Documentation Rules
 
-### Confirmed from docs
-- Before changing feature logic, read the feature’s `*.data.ts` and `*.domain.ts`.
-- If changing UI or domain behavior, treat the data layer as the contract.
-- If changing persistence, schema, or sync behavior, read:
-  - `core/db/client.ts`
-  - `core/db/types.ts`
-  - `core/sync/sync.engine.ts`
-  - `core/sync/supabase.adapter.ts`
-  - `lib/id.ts`
-  - `lib/time.ts`
+- Keep canonical guidance in one place.
+- Prefer referencing canonical docs over copying long rule blocks.
+- When you discover drift, call it out explicitly under a drift or risk section instead of silently pretending it never existed.
+- For documentation changes, trust code over older prose.
 
+<<<<<<< HEAD
 ## UI Consistency Rules
 
 ### Confirmed from current UI code
@@ -80,42 +96,27 @@ If this file conflicts with current code, trust the code and document the confli
 - Preserve feature-specific interaction patterns and content hierarchy; do not flatten modules into one generic page.
 
 ## Testing Workflow
+=======
+## Validation Guidance
+>>>>>>> a74517a (dark mode, documentatiton, blank fix)
 
-### Confirmed from code and docs
-- Standard checks:
-  - `npm run typecheck`
-  - `npm test`
-- If web UI or web bundle behavior changes:
-  - `npm run build:web`
-  - `npm run e2e`
-- Playwright runs against static `dist/` served by `node scripts/serve-e2e.js`, not Metro.
-- Web/PWA behavior depends on OPFS-compatible isolation headers.
+Standard validation targets:
 
-### Confirmed from code
-- `npm test` currently passes with `180` tests.
-- `npm run typecheck` currently fails because `tsconfig.json` has an incompatible `ignoreDeprecations` value for the installed TypeScript version.
+- `npm run typecheck`
+- `npm test`
 
-## Web / PWA Constraints
+If web UI or web runtime behavior changed:
 
-### Confirmed from code and docs
-- Web export is static.
-- OPFS-backed SQLite on web depends on:
-  - `Cross-Origin-Embedder-Policy: require-corp`
-  - `Cross-Origin-Opener-Policy: same-origin`
-- Those headers are enforced in development and in `vercel.json` for deployment.
-- E2E and production-like web testing should use the static export flow, not `npm run web`.
+- `npm run build:web`
+- `npm run e2e`
 
-## Documentation Hygiene
+Current repo caveat:
 
-### Confirmed from code and docs
-- Do not copy large sections between docs.
-- Keep authoritative values centralized:
-  - schema version and migration guidance in `docs/master-context.md`
-  - implementation guardrails here
-  - task prompts in `docs/ai-task-template.md`
-  - file navigation in `docs/repo-map.md`
+- `npm run typecheck` is expected to fail until `tsconfig.json` stops using `ignoreDeprecations: "6.0"` with TypeScript `~5.9.2`.
 
-### Known drift to keep in mind
-- `README.md` still reports planned stack versions rather than current package versions.
-- `e2e/README.md` still describes the old Metro-based E2E flow.
-- `.github/copilot-instructions.md` is stale on `toDateKey()` and E2E startup.
+## Known Drift / Risks
+
+- `core/db/schema.sql` does not match runtime migrations and must not be treated as runtime truth.
+- Sync is push-only today because `SupabaseSyncAdapter.pull()` returns `[]`.
+- `remoteMode` defaults to enabled, but missing Supabase env vars leave remote operations as safe no-ops.
+- Legacy duplicate docs still exist for compatibility and should remain thin pointers, not independent sources of truth.

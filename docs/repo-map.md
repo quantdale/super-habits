@@ -1,109 +1,70 @@
 # SuperHabits Repo Map
 
-Purpose: fast navigation to the files most likely to matter during implementation. This is a lightweight map, not a second architecture document.
-
-Use with:
-- `docs/master-context.md` for architecture and drift
-- `docs/working-rules.md` for guardrails
+Purpose: quick navigation only. Structural authority stays in `docs/PROJECT_STRUCTURE_MAP.md`.
 
 ## Start Here
 
 - `AGENTS.md`
-- `README.md`
 - `docs/PROJECT_STRUCTURE_MAP.md`
 - `docs/master-context.md`
 - `docs/working-rules.md`
 
-## App Shell and Routing
+## App Shell
 
-- `app/_layout.tsx` - root providers and stack
-- `app/index.tsx` - root redirect to overview
-- `app/(tabs)/_layout.tsx` - custom top tabs and swipe navigation
-- `app/(tabs)/*.tsx` - thin route wrappers
+- `app/_layout.tsx`
+- `app/index.tsx`
+- `app/(tabs)/_layout.tsx`
+- `app/settings.tsx`
 
-## Core Infrastructure
+## Core Infra
 
-- `core/providers/AppProviders.tsx` - DB bootstrap, service worker, guest profile, anonymous auth, sync flush lifecycle
-- `core/db/client.ts` - SQLite bootstrap, singleton, migrations
-- `core/db/types.ts` - entity types
-- `core/db/schema.sql` - stale reference snapshot only
-- `core/sync/sync.engine.ts` - queue and flush behavior
-- `core/sync/supabase.adapter.ts` - push-only Supabase upsert adapter
-- `core/auth/guestProfile.ts` - local guest metadata
-- `core/pwa/registerServiceWorker.ts` - web service worker registration
+- `core/providers/AppProviders.tsx`
+- `core/db/client.ts`
+- `core/db/types.ts`
+- `core/sync/sync.engine.ts`
+- `core/sync/supabase.adapter.ts`
+- `core/auth/guestProfile.ts`
+- `core/pwa/registerServiceWorker.ts`
 
-## Shared Utilities
+## Shared Helpers
 
-- `lib/id.ts` - ID generation
-- `lib/time.ts` - date keys and date ranges
-- `lib/validation.ts` - form/business validation messages
-- `lib/supabase.ts` - Supabase config, remote mode, anonymous session
-- `lib/useForegroundRefresh.ts` - focus/foreground refresh hooks
-- `lib/notifications.ts` - timer notifications
-- `constants/sectionColors.ts` - feature color tokens
+- `lib/id.ts`
+- `lib/time.ts`
+- `lib/validation.ts`
+- `lib/supabase.ts`
+- `lib/useForegroundRefresh.ts`
+- `lib/notifications.ts`
+- `constants/sectionColors.ts`
 
 ## Shared UI
 
 - `core/ui/Screen.tsx`
 - `core/ui/Card.tsx`
-- `core/ui/Button.tsx`
+- `core/ui/FeaturePanel.tsx`
+- `core/ui/FeatureStatCard.tsx`
 - `core/ui/Modal.tsx`
 - `core/ui/TextField.tsx`
 - `core/ui/PillChip.tsx`
 - `core/ui/SwipeableCard.tsx`
 - `core/ui/ValidationError.tsx`
 
-## Feature Modules
+## Feature Entry Points
 
-### Overview
 - `features/overview/OverviewScreen.tsx`
-
-### Todos
 - `features/todos/TodosScreen.tsx`
-- `features/todos/todos.data.ts`
-- `features/todos/todos.domain.ts`
-
-### Habits
 - `features/habits/HabitsScreen.tsx`
-- `features/habits/habits.data.ts`
-- `features/habits/habits.domain.ts`
-- `features/habits/habitPresets.ts`
-
-### Pomodoro
 - `features/pomodoro/PomodoroScreen.tsx`
-- `features/pomodoro/pomodoro.data.ts`
-- `features/pomodoro/pomodoro.domain.ts`
-
-### Workout
 - `features/workout/WorkoutScreen.tsx`
-- `features/workout/RoutineDetailScreen.tsx`
-- `features/workout/WorkoutSessionScreen.tsx`
-- `features/workout/workout.data.ts`
-- `features/workout/workout.domain.ts`
-
-### Calories
 - `features/calories/CaloriesScreen.tsx`
-- `features/calories/calories.data.ts`
-- `features/calories/calories.domain.ts`
-
-### Cross-feature visuals
-- `features/shared/GitHubHeatmap.tsx`
-- `features/shared/ActivityPreviewStrip.tsx`
+- `features/settings/SettingsScreen.tsx`
 
 ## Testing and Delivery
 
-- `tests/` - Vitest suite
-- `e2e/` - Playwright specs
-- `playwright.config.ts` - static `dist/` server flow
-- `vitest.config.ts`
-- `.github/workflows/ci.yml`
+- `tests/`
+- `e2e/`
+- `playwright.config.ts`
 - `scripts/serve-e2e.js`
+- `.github/workflows/ci.yml`
 - `vercel.json`
 - `app.json`
 - `eas.json`
-
-## Known Navigation Traps
-
-- `App.tsx` and `index.ts` are legacy Expo starter files, not the active runtime entry.
-- `core/db/schema.sql` is not the runtime schema authority.
-- `e2e/README.md` describes an older E2E flow; prefer `playwright.config.ts` and `docs/master-context.md`.
