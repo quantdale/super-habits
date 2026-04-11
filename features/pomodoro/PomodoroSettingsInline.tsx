@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { View, Text, TextInput } from "react-native";
 import { Button } from "@/core/ui/Button";
+import { FeaturePanel } from "@/core/ui/FeaturePanel";
 import { ValidationError } from "@/core/ui/ValidationError";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSettings } from "./pomodoro.domain";
 import { validatePomodoroSettings } from "@/lib/validation";
 
@@ -35,8 +36,14 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
   };
 
   return (
-    <View className="mx-4 mb-4 rounded-2xl bg-slate-50 p-4">
-      <Text className="mb-3 text-sm font-medium text-slate-700">Timer durations</Text>
+    <FeaturePanel
+      title="Timer settings"
+      subtitle="Durations are saved on this device."
+      icon="tune"
+      accentColor={SECTION_COLORS.focus}
+      textColor={SECTION_TEXT_COLORS.focus}
+      className="mb-4"
+    >
 
       {[
         { label: "Focus (min)", value: focus, set: setFocus },
@@ -75,6 +82,6 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
           />
         </View>
       </View>
-    </View>
+    </FeaturePanel>
   );
 }

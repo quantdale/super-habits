@@ -5,6 +5,7 @@ import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
@@ -200,58 +201,49 @@ export function HabitsScreen() {
 
   return (
     <Screen scroll padded>
-      <View className="flex-row justify-between items-start">
-        <SectionTitle title="Habits" subtitle="Track daily consistency." />
-        <Pressable
-          onPress={() => setEditMode((e) => !e)}
-          className="rounded-lg p-2"
-        >
-          <MaterialIcons name={editMode ? "close" : "edit"} size={24} color="#94a3b8" />
-        </Pressable>
-      </View>
+      <SectionTitle
+        title="Habits"
+        subtitle="Track daily consistency."
+        right={(
+          <Pressable
+            onPress={() => setEditMode((e) => !e)}
+            className={`rounded-lg p-2 ${editMode ? "bg-habits-light" : ""}`}
+            accessibilityLabel={editMode ? "Stop editing habits" : "Edit habits"}
+          >
+            <MaterialIcons
+              name={editMode ? "close" : "edit"}
+              size={24}
+              color={editMode ? SECTION_TEXT_COLORS.habits : "#94a3b8"}
+            />
+          </Pressable>
+        )}
+      />
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card variant="stat" accentColor={SECTION_COLORS.habits} className="mb-0">
-            <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>⚡</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_TEXT_COLORS.habits,
-                  marginTop: 2,
-                }}
-              >
-                {overallStreak} days
-              </Text>
-              <Text className="mt-0.5 text-xs text-slate-400">best streak</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            icon="bolt"
+            value={overallStreak}
+            label="Best Streak"
+            accentColor={SECTION_COLORS.habits}
+            textColor={SECTION_TEXT_COLORS.habits}
+            valueSuffix={<Text className="mb-1 text-xs font-medium text-slate-400">days</Text>}
+          />
         </View>
         <View className="flex-1">
-          <Card variant="stat" accentColor={SECTION_COLORS.habits} className="mb-0">
-            <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>📊</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_TEXT_COLORS.habits,
-                  marginTop: 2,
-                }}
-              >
-                {consistencyPct}%
-              </Text>
-              <Text className="mt-0.5 text-xs text-slate-400">consistent</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            icon="analytics"
+            value={`${consistencyPct}%`}
+            label="Consistency"
+            accentColor={SECTION_COLORS.habits}
+            textColor={SECTION_TEXT_COLORS.habits}
+          />
         </View>
       </View>
 
-      <View className="bg-habits-light pb-4" accessibilityLabel="Habit groups">
+      <View className="pb-4" accessibilityLabel="Habit groups">
         {habits.length === 0 ? (
-          <Text className="mb-4 px-4 text-center text-sm text-slate-500">
+          <Text className="mb-4 px-1 text-center text-sm text-slate-500">
             Pick a time of day and tap Add to create your first habit.
           </Text>
         ) : null}
@@ -265,7 +257,12 @@ export function HabitsScreen() {
               variant="header"
               accentColor={SECTION_COLORS.habits}
               className="mb-3"
-              headerTitle={group.label.toUpperCase()}
+              headerTitle={group.label}
+              headerSubtitle={
+                groupHabits.length === 0
+                  ? "No habits in this group yet."
+                  : `${groupHabits.length} ${groupHabits.length === 1 ? "habit" : "habits"}`
+              }
               headerRight={<Text style={{ fontSize: 18 }}>{group.icon}</Text>}
             >
               <View

@@ -43,6 +43,12 @@ Must preserve:
 - thin route wrappers
 - existing validation and sync behavior unless explicitly changing it
 
+UI / design requirements:
+- treat `features/overview/OverviewScreen.tsx` as the canonical visual reference for page structure
+- match the shared app-wide header, panel/card, spacing, and section rhythm before introducing new visual patterns
+- reuse shared UI primitives in `core/ui/` before creating one-off screen styling
+- preserve feature color identity while keeping the structural layout language consistent across tabs
+
 Validation:
 - run `npm test`
 - if web UI changed, run `npm run build:web`
@@ -120,6 +126,7 @@ Constraints:
 - preserve layering boundaries
 - preserve sync and persistence semantics
 - prefer small, reviewable edits over broad rewrites
+- for UI refactors, align to the Overview-derived shared design system and prefer shared primitives over page-specific styling drift
 
 Validation:
 - [relevant tests]
@@ -174,3 +181,4 @@ Checks:
 - required validation commands
 - whether web/PWA behavior matters
 - whether stale docs should be treated as secondary to current code
+- for UI work, whether the change matches the Overview-derived shared header/card/panel/spacing system

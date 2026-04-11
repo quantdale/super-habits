@@ -60,6 +60,25 @@ If this file conflicts with current code, trust the code and document the confli
   - `lib/id.ts`
   - `lib/time.ts`
 
+## UI Consistency Rules
+
+### Confirmed from current UI code
+- `features/overview/OverviewScreen.tsx` is the canonical visual baseline for top-level screen structure.
+- Top-level screens should share the same structural language:
+  - page header via the shared `SectionTitle` pattern
+  - summary/stat row directly below the header when the screen exposes headline metrics
+  - named panels/cards for major sections
+  - consistent vertical spacing between header, stat row, and major sections
+- Feature identity stays color-coded by section:
+  - Todos blue
+  - Habits green
+  - Focus purple
+  - Workout orange
+  - Calories amber
+- Structural consistency matters more than page-by-page novelty. New screens and refactors should inherit the shared layout/card/header/spacing system instead of inventing feature-local chrome.
+- When a header, stat card, section panel, or repeated empty-state pattern already exists in `core/ui/`, reuse it before creating screen-local styling.
+- Preserve feature-specific interaction patterns and content hierarchy; do not flatten modules into one generic page.
+
 ## Testing Workflow
 
 ### Confirmed from code and docs

@@ -36,6 +36,15 @@ Examples:
 
 [Describe the current behavior that matters for this task.]
 
+## UI / design alignment
+
+For UI work, require the change to follow the shared app-wide design language:
+
+- use `features/overview/OverviewScreen.tsx` as the canonical visual reference
+- match the shared page-header, stat-row, panel/card, and spacing rhythm
+- reuse shared `core/ui/` primitives before inventing new styling patterns
+- preserve feature section color identity while keeping the structural UI consistent
+
 ## Schema impact
 
 Choose one:

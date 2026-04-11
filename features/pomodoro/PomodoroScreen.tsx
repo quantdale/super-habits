@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View, Pressable } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
-import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
+import { FeaturePanel } from "@/core/ui/FeaturePanel";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { PillChip } from "@/core/ui/PillChip";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   listPomodoroSessionsForDateRange,
@@ -289,26 +292,48 @@ export function PomodoroScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card variant="stat" accentColor={COLOR} className="mb-0">
-            <View className="items-center py-1">
-              <Text className="text-[22px]">🎯</Text>
-              <Text className="mt-0.5 text-xl font-bold text-focus">{sessions.length}</Text>
-              <Text className="mt-0.5 text-xs text-slate-400">sessions this year</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            icon="track-changes"
+            value={sessions.length}
+            label="Sessions This Year"
+            accentColor={COLOR}
+            textColor={SECTION_TEXT_COLORS.focus}
+          />
         </View>
         <View className="flex-1">
-          <Card variant="stat" accentColor={COLOR} className="mb-0">
-            <View className="items-center py-1">
-              <Text className="text-[22px]">🔥</Text>
-              <Text className="mt-0.5 text-xl font-bold text-focus">{focusStreak}</Text>
-              <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            icon="local-fire-department"
+            value={focusStreak}
+            label="Day Streak"
+            accentColor={COLOR}
+            textColor={SECTION_TEXT_COLORS.focus}
+          />
         </View>
       </View>
 
-      <Card variant="header" accentColor={COLOR} headerTitle="Timer" className="mb-4">
+      <FeaturePanel
+        title="Timer"
+        subtitle={getModeLabel(currentMode)}
+        icon="timer"
+        accentColor={COLOR}
+        textColor={SECTION_TEXT_COLORS.focus}
+        className="mb-4"
+        headerRight={
+          !isRunning ? (
+            <Pressable
+              onPress={() => setShowSettings((v) => !v)}
+              className={`rounded-lg p-2 ${showSettings ? "bg-focus-light" : ""}`}
+              accessibilityLabel={showSettings ? "Hide timer settings" : "Show timer settings"}
+            >
+              <MaterialIcons
+                name={showSettings ? "expand-less" : "settings"}
+                size={20}
+                color={showSettings ? SECTION_TEXT_COLORS.focus : "#94a3b8"}
+              />
+            </Pressable>
+          ) : null
+        }
+      >
         <View className="mb-4 flex-row flex-wrap justify-center">
           {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
             <PillChip
@@ -336,12 +361,12 @@ export function PomodoroScreen() {
           {showSprout ? (
             <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
           ) : null}
-          <Pressable
-            className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}
-            onPress={() => !isRunning && setShowSettings((v) => !v)}
-            disabled={isRunning}
-          >
-            <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
+            <Pressable
+              className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}
+              onPress={() => !isRunning && setShowSettings((v) => !v)}
+              disabled={isRunning}
+            >
+              <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
               {minutes}:{seconds}
             </Text>
             {!isRunning ? (
@@ -390,7 +415,7 @@ export function PomodoroScreen() {
             Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
           </Text>
         ) : null}
-      </Card>
+      </FeaturePanel>
 
       {showSettings ? (
         <PomodoroSettingsInline
@@ -400,7 +425,14 @@ export function PomodoroScreen() {
         />
       ) : null}
 
-      <Card variant="standard" accentColor={COLOR} className="mt-4">
+      <FeaturePanel
+        title="Focus history"
+        subtitle="Garden and heatmap"
+        icon="eco"
+        accentColor={COLOR}
+        textColor={SECTION_TEXT_COLORS.focus}
+        className="mt-4"
+      >
         <GardenGrid sessions={sessions} />
         <View className="mt-6 w-full min-w-0 items-center justify-center">
           <View className="mb-2 w-full self-start">
@@ -409,7 +441,7 @@ export function PomodoroScreen() {
           </View>
           <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
         </View>
-      </Card>
+      </FeaturePanel>
     </Screen>
   );
 }

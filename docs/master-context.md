@@ -148,6 +148,11 @@ Companion docs in this folder:
 - Light theme app shell with `#f8f7ff` surface.
 - NativeWind `className` styling is common; inline styles are used for dynamic values and complex layout.
 - Shared primitives include `Screen`, `Card`, `Button`, `Modal`, `TextField`, `PillChip`, `SwipeableCard`, and validation UI.
+- `OverviewScreen` is the canonical structural reference for top-level tabs.
+- Shared top-level screen structure now centers on:
+  - `SectionTitle` for the page header and optional header actions
+  - a consistent stat-row treatment for headline metrics
+  - panel-style section cards for major content groups, with icon badge, title/subtitle row, and shared padding rhythm
 - Section colors are first-class and feature-specific:
   - Todos blue
   - Habits green
@@ -158,6 +163,14 @@ Companion docs in this folder:
 
 ### Confirmed from docs
 - Per-section color identity and card-based UI are explicit design conventions.
+- Future UI work should preserve color identity while matching the shared Overview-derived header/card/panel/spacing system.
+
+### Practical design DNA
+- Strong hierarchy: page title first, metrics second, major sections third.
+- Consistent spacing rhythm: one shared vertical cadence between page blocks instead of feature-specific padding stacks.
+- Cleaner section chrome: icon-led panel headers, shared card padding, and shared surface treatment on light app background.
+- Better grouping: related controls, summaries, and visualizations belong inside named panels rather than loose ad hoc containers.
+- Shared primitives first: if a pattern already exists in `core/ui/`, new screens should extend that system instead of introducing page-local visual drift.
 
 ## Database / Storage Model
 

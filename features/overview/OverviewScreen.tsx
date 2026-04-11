@@ -1,10 +1,11 @@
-import { type ReactNode, useCallback, useState } from "react";
+import { type ComponentType, type ReactNode, useCallback, useEffect, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
-import { Card } from "@/core/ui/Card";
+import { FeaturePanel } from "@/core/ui/FeaturePanel";
 import { Screen } from "@/core/ui/Screen";
+import { SectionTitle } from "@/core/ui/SectionTitle";
 import { getCalorieGoal, listCalorieEntries } from "@/features/calories/calories.data";
 import { caloriesTotal } from "@/features/calories/calories.domain";
 import {
@@ -31,6 +32,7 @@ import {
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
 } from "@/features/workout/workout.domain";
+import { isDemoMode } from "@/lib/demo";
 import { buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
 
 type ViewMode = "grid" | "column" | "list";
@@ -92,6 +94,7 @@ const GRID_ROWS: OverviewCardKey[][] = [
 const GRID_TOP_ROW_CARD_CLASS = "min-h-[248px]";
 const GRID_BOTTOM_ROW_CARD_CLASS = "min-h-[214px]";
 const MUTED_ICON = "#94a3b8";
+type OverviewDemoPanelProps = { onDataChanged: () => Promise<void> };
 
 function OverviewMetricCard({
   cardKey,
@@ -108,29 +111,17 @@ function OverviewMetricCard({
   const isDetailedView = viewMode !== "list";
 
   return (
-    <Card
+    <FeaturePanel
+      title={meta.title}
+      subtitle={meta.subtitle}
+      icon={meta.icon}
       accentColor={meta.accentColor}
+      textColor={meta.textColor}
       className={["mb-0", className].filter(Boolean).join(" ")}
-      innerClassName="p-0"
+      bodyClassName={isDetailedView ? "flex-1 justify-between" : undefined}
     >
-      <View className="flex-1 p-4">
-        <View className="flex-row items-center gap-3">
-          <View
-            className="h-11 w-11 items-center justify-center rounded-xl"
-            style={{ backgroundColor: `${meta.accentColor}18` }}
-          >
-            <MaterialIcons name={meta.icon} size={22} color={meta.textColor} />
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text className="text-base font-semibold text-slate-900">{meta.title}</Text>
-            <Text className="mt-0.5 text-sm text-slate-500">{meta.subtitle}</Text>
-          </View>
-        </View>
-        <View className={["mt-4", isDetailedView ? "flex-1 justify-between" : ""].join(" ").trim()}>
-          {children}
-        </View>
-      </View>
-    </Card>
+      {children}
+    </FeaturePanel>
   );
 }
 
@@ -147,6 +138,7 @@ export function OverviewScreen() {
   const [calorieGoal, setCalorieGoal] = useState(2000);
   const [workoutDays, setWorkoutDays] = useState(0);
   const [workoutStreak, setWorkoutStreak] = useState(0);
+  const [DemoPanelComponent, setDemoPanelComponent] = useState<ComponentType<OverviewDemoPanelProps> | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
@@ -207,6 +199,26 @@ export function OverviewScreen() {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!isDemoMode) return;
+
+    let isMounted = true;
+
+    void import("./OverviewDemoPanel")
+      .then((module) => {
+        if (isMounted) {
+          setDemoPanelComponent(() => module.OverviewDemoPanel);
+        }
+      })
+      .catch((error) => {
+        console.error("[OverviewScreen] failed to load demo panel", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useFocusEffect(
@@ -432,27 +444,31 @@ export function OverviewScreen() {
 
   return (
     <Screen scroll>
-      <View className="mb-4 flex-row items-start justify-between">
-        <Text className="text-2xl font-bold text-slate-900">Overview</Text>
-        <View className="flex-row gap-1">
-          {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-            <Pressable
-              key={mode}
-              accessibilityRole="button"
-              accessibilityState={{ selected: viewMode === mode }}
-              accessibilityLabel={`${mode} overview layout`}
-              className={`rounded-lg p-2 ${viewMode === mode ? "bg-focus-light" : ""}`}
-              onPress={() => setViewMode(mode)}
-            >
-              <MaterialIcons
-                name={icon}
-                size={24}
-                color={viewMode === mode ? SECTION_TEXT_COLORS.focus : MUTED_ICON}
-              />
-            </Pressable>
-          ))}
-        </View>
-      </View>
+      <SectionTitle
+        title="Overview"
+        right={(
+          <View className="flex-row gap-1">
+            {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
+              <Pressable
+                key={mode}
+                accessibilityRole="button"
+                accessibilityState={{ selected: viewMode === mode }}
+                accessibilityLabel={`${mode} overview layout`}
+                className={`rounded-lg p-2 ${viewMode === mode ? "bg-focus-light" : ""}`}
+                onPress={() => setViewMode(mode)}
+              >
+                <MaterialIcons
+                  name={icon}
+                  size={24}
+                  color={viewMode === mode ? SECTION_TEXT_COLORS.focus : MUTED_ICON}
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+      />
+
+      {isDemoMode && DemoPanelComponent ? <DemoPanelComponent onDataChanged={loadDashboardData} /> : null}
 
       {isLoading ? (
         <View className="min-h-[200px] items-center justify-center py-12">
