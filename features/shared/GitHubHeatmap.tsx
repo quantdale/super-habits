@@ -22,10 +22,12 @@ type Props = {
 
 const CELL = 14;
 const GAP = 3;
-const DAY_LABEL_COL_WIDTH = 14;
+const DAY_LABEL_COL_WIDTH = 28;
+const DAY_LABEL_TEXT_WIDTH = 24;
+const DAY_LABEL_FONT_SIZE = 10;
 const DEFAULT_WEEKS = 52;
 
-const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Month label row (incl. marginBottom) + 7×day grid — matches real heatmap strip height. */
 const HEATMAP_STRIP_MIN_HEIGHT =
@@ -184,8 +186,15 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 9, color: "#94a3b8", width: 10 }}>
-                {i % 2 === 0 ? d : ""}
+              <Text
+                style={{
+                  fontSize: DAY_LABEL_FONT_SIZE,
+                  color: "#94a3b8",
+                  width: DAY_LABEL_TEXT_WIDTH,
+                }}
+                numberOfLines={1}
+              >
+                {d}
               </Text>
             </View>
           ))}
