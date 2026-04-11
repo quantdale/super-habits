@@ -319,19 +319,17 @@ export function PomodoroScreen() {
         textColor={SECTION_TEXT_COLORS.focus}
         className="mb-4"
         headerRight={
-          !isRunning ? (
-            <Pressable
-              onPress={() => setShowSettings((v) => !v)}
-              className={`rounded-lg p-2 ${showSettings ? "bg-focus-light" : ""}`}
-              accessibilityLabel={showSettings ? "Hide timer settings" : "Show timer settings"}
-            >
-              <MaterialIcons
-                name={showSettings ? "expand-less" : "settings"}
-                size={20}
-                color={showSettings ? SECTION_TEXT_COLORS.focus : "#94a3b8"}
-              />
-            </Pressable>
-          ) : null
+          <Pressable
+            onPress={() => setShowSettings(true)}
+            className={`rounded-lg p-2 ${showSettings ? "bg-focus-light" : ""}`}
+            accessibilityLabel="Open timer settings"
+          >
+            <MaterialIcons
+              name="settings"
+              size={20}
+              color={showSettings ? SECTION_TEXT_COLORS.focus : "#94a3b8"}
+            />
+          </Pressable>
         }
       >
         <View className="mb-4 flex-row flex-wrap justify-center">
@@ -361,18 +359,11 @@ export function PomodoroScreen() {
           {showSprout ? (
             <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
           ) : null}
-            <Pressable
-              className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}
-              onPress={() => !isRunning && setShowSettings((v) => !v)}
-              disabled={isRunning}
-            >
-              <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
+          <View className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}>
+            <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
               {minutes}:{seconds}
             </Text>
-            {!isRunning ? (
-              <Text className="mt-0.5 text-center text-xs text-slate-400">tap to edit</Text>
-            ) : null}
-          </Pressable>
+          </View>
         </View>
 
         <View className="my-3 flex-row justify-center gap-1.5">
@@ -417,13 +408,12 @@ export function PomodoroScreen() {
         ) : null}
       </FeaturePanel>
 
-      {showSettings ? (
-        <PomodoroSettingsInline
-          settings={settings}
-          onSave={handleSaveSettings}
-          onCancel={() => setShowSettings(false)}
-        />
-      ) : null}
+      <PomodoroSettingsInline
+        visible={showSettings}
+        settings={settings}
+        onSave={handleSaveSettings}
+        onClose={() => setShowSettings(false)}
+      />
 
       <FeaturePanel
         title="Focus history"

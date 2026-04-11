@@ -12,6 +12,7 @@ test.describe("Pomodoro", () => {
   test("shows idle state on first load", async ({ page }) => {
     await expect(page.getByText("25:00")).toBeVisible();
     await expect(page.getByText("Start focus", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Open timer settings")).toBeVisible();
   });
 
   test("shows empty session history on first load", async ({ page }) => {
@@ -34,5 +35,48 @@ test.describe("Pomodoro", () => {
     await page.getByText("Reset", { exact: true }).click();
     await expect(page.getByText("25:00")).toBeVisible();
     await expect(page.getByText("Start focus", { exact: true })).toBeVisible();
+  });
+
+  test("opens settings in a modal and cancel dismisses without saving", async ({ page }) => {
+    await page.getByLabel("Open timer settings").click();
+    await expect(page.getByText("Timer settings", { exact: true })).toBeVisible();
+    await expect(page.getByText("Durations are saved on this device.")).toBeVisible();
+
+    const focusInput = page.locator('input').nth(0);
+    await focusInput.click();
+    await focusInput.fill("30");
+    await page.getByText("Cancel", { exact: true }).click();
+
+    await expect(page.getByText("Timer settings", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("25:00")).toBeVisible();
+
+    await page.getByLabel("Open timer settings").click();
+    await expect(page.locator('input').nth(0)).toHaveValue("25");
+  });
+
+  test("saves timer settings and keeps them after reload", async ({ page }) => {
+    await page.getByLabel("Open timer settings").click();
+
+    const inputs = page.locator("input");
+    await inputs.nth(0).click();
+    await inputs.nth(0).fill("30");
+    await inputs.nth(1).click();
+    await inputs.nth(1).fill("7");
+    await inputs.nth(2).click();
+    await inputs.nth(2).fill("20");
+    await inputs.nth(3).click();
+    await inputs.nth(3).fill("5");
+    await page.getByText("Save", { exact: true }).click();
+
+    await expect(page.getByText("30:00")).toBeVisible();
+    await page.reload();
+    await goToTab(page, "pomodoro");
+    await expect(page.getByText("30:00")).toBeVisible();
+
+    await page.getByLabel("Open timer settings").click();
+    await expect(page.locator("input").nth(0)).toHaveValue("30");
+    await expect(page.locator("input").nth(1)).toHaveValue("7");
+    await expect(page.locator("input").nth(2)).toHaveValue("20");
+    await expect(page.locator("input").nth(3)).toHaveValue("5");
   });
 });
