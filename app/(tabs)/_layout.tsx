@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import type { Href } from "expo-router";
 import { useRouter, useSegments } from "expo-router";
@@ -27,6 +27,9 @@ const TAB_CONTENT_SURFACE = "#f8f7ff";
 
 const TAB_RAIL_BG = "#eeecf8";
 const TAB_RAIL_BORDER = "#d4d0ee";
+const SETTINGS_ICON_COLOR = "#64748b";
+const SETTINGS_BUTTON_BG = "#f6f4ff";
+const SETTINGS_BUTTON_BORDER = "#d8d4f2";
 
 type TopTabItemProps = {
   isFocused?: boolean;
@@ -123,6 +126,10 @@ export default function TabsLayout() {
     router.navigate(NAV_ITEMS[index].href as Href);
   }, [router]);
 
+  const openSettings = useCallback(() => {
+    router.push("/settings");
+  }, [router]);
+
   const pan = useMemo(
     () =>
       Gesture.Pan()
@@ -160,17 +167,39 @@ export default function TabsLayout() {
           backgroundColor: TAB_RAIL_BG,
           borderBottomWidth: 1,
           borderBottomColor: TAB_RAIL_BORDER,
-          paddingHorizontal: 4,
+          paddingHorizontal: 8,
           paddingTop: 4,
-          gap: 2,
           zIndex: 10,
         }}
       >
-        {NAV_ITEMS.map((item) => (
-          <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-            <TopTabItem label={item.label} icon={item.icon} color={item.color} />
-          </TabTrigger>
-        ))}
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "stretch", gap: 2 }}>
+          {NAV_ITEMS.map((item) => (
+            <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
+              <TopTabItem label={item.label} icon={item.icon} color={item.color} />
+            </TabTrigger>
+          ))}
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open settings"
+          onPress={openSettings}
+          style={{
+            marginLeft: 10,
+            marginBottom: 1,
+            minWidth: 44,
+            minHeight: 44,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: SETTINGS_BUTTON_BORDER,
+            backgroundColor: SETTINGS_BUTTON_BG,
+            paddingHorizontal: 10,
+          }}
+          hitSlop={6}
+        >
+          <MaterialIcons name="settings" size={20} color={SETTINGS_ICON_COLOR} />
+        </Pressable>
       </TabList>
       <GestureDetector gesture={pan}>
         <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />

@@ -4,7 +4,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { RectButton } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
-import { Card } from "@/core/ui/Card";
+import { FeaturePanel } from "@/core/ui/FeaturePanel";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import type { WorkoutRoutine } from "./types";
@@ -28,7 +29,7 @@ import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { RoutineDetailModal } from "./RoutineDetailScreen";
 import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
 import type { RoutineWithExercises } from "./types";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { SwipeableCard } from "@/core/ui/SwipeableCard";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateRoutineName } from "@/lib/validation";
@@ -158,48 +159,35 @@ export function WorkoutScreen() {
       <Screen scroll>
         <SectionTitle
           title="Workout"
-          subtitle={
-            workoutStripHasActivity ? "Create simple routines and mark completions." : undefined
-          }
+          subtitle="Create simple routines and mark completions."
         />
         <View className="mb-4 flex-row gap-3">
           <View className="flex-1">
-            <Card variant="stat" accentColor={SECTION_COLORS.workout} className="mb-0">
-              <View className="items-center py-1">
-                <Text className="text-[22px]">💪</Text>
-                <Text className="mt-0.5 text-xl font-bold text-workout">{workoutDaysCount}</Text>
-                <Text className="mt-0.5 text-xs text-slate-400">workout days</Text>
-              </View>
-            </Card>
+            <FeatureStatCard
+              icon="fitness-center"
+              value={workoutDaysCount}
+              label="Workout Days"
+              accentColor={SECTION_COLORS.workout}
+              textColor={SECTION_TEXT_COLORS.workout}
+            />
           </View>
           <View className="flex-1">
-            <Card variant="stat" accentColor={SECTION_COLORS.workout} className="mb-0">
-              <View className="items-center py-1">
-                <Text className="text-[22px]">📅</Text>
-                <Text className="mt-0.5 text-xl font-bold text-workout">{workoutStreak}</Text>
-                <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
-              </View>
-            </Card>
+            <FeatureStatCard
+              icon="calendar-month"
+              value={workoutStreak}
+              label="Day Streak"
+              accentColor={SECTION_COLORS.workout}
+              textColor={SECTION_TEXT_COLORS.workout}
+            />
           </View>
         </View>
 
-        {!workoutStripHasActivity ? (
-          <Card variant="standard" accentColor={SECTION_COLORS.workout} className="mb-3">
-            <View className="items-center">
-              <Text className="text-center text-sm text-slate-500">
-                Complete a workout to start tracking
-              </Text>
-              <Text className="mt-1 text-center text-xs text-slate-400">
-                Create simple routines and mark completions.
-              </Text>
-            </View>
-          </Card>
-        ) : null}
-        <Card
-          variant="header"
+        <FeaturePanel
+          title="Add new routine"
+          subtitle="Create a repeatable session with simple timed sets."
+          icon="add-circle-outline"
           accentColor={SECTION_COLORS.workout}
-          headerTitle="Add new routine"
-          headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
+          textColor={SECTION_TEXT_COLORS.workout}
         >
           <TextField
             label="Routine name"
@@ -221,43 +209,81 @@ export function WorkoutScreen() {
           />
           <ValidationError message={workoutError} />
           <Button label="Add routine" onPress={onCreate} color={COLOR} />
-        </Card>
+        </FeaturePanel>
 
-        {routines.map((routine) => (
-          <RoutineSwipeRow
-            key={routine.id}
-            routine={routine}
-            accentColor={COLOR}
-            onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
-            onCompleteWorkout={() => {
-              void (async () => {
-                await completeRoutine(routine.id);
-                refresh();
-              })();
-            }}
-            onRequestDelete={async () => {
-              await deleteRoutine(routine.id);
-              if (routineModal?.routineId === routine.id) {
-                setRoutineModal(null);
-              }
-              await refresh();
-            }}
-          />
-        ))}
+        <FeaturePanel
+          title="Routines"
+          subtitle={
+            routines.length === 0
+              ? "No routines yet."
+              : `${routines.length} active ${routines.length === 1 ? "routine" : "routines"}`
+          }
+          icon="view-list"
+          accentColor={SECTION_COLORS.workout}
+          textColor={SECTION_TEXT_COLORS.workout}
+          className="mt-4"
+        >
+          {routines.length === 0 ? (
+            <View className="items-center py-6">
+              <Text className="text-center text-sm font-medium text-slate-700">
+                Add your first routine
+              </Text>
+              <Text className="mt-1 text-center text-xs text-slate-500">
+                Create a routine above, then add exercises before starting.
+              </Text>
+            </View>
+          ) : (
+            routines.map((routine) => (
+              <RoutineSwipeRow
+                key={routine.id}
+                routine={routine}
+                accentColor={COLOR}
+                onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
+                onCompleteWorkout={() => {
+                  void (async () => {
+                    await completeRoutine(routine.id);
+                    refresh();
+                  })();
+                }}
+                onRequestDelete={async () => {
+                  await deleteRoutine(routine.id);
+                  if (routineModal?.routineId === routine.id) {
+                    setRoutineModal(null);
+                  }
+                  await refresh();
+                }}
+              />
+            ))
+          )}
+        </FeaturePanel>
 
-        <Card variant="standard" accentColor={SECTION_COLORS.workout} className="mt-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Workout history</Text>
+        <FeaturePanel
+          title="Workout history"
+          subtitle="Session intensity — last 52 weeks"
+          icon="insights"
+          accentColor={SECTION_COLORS.workout}
+          textColor={SECTION_TEXT_COLORS.workout}
+          className="mt-4"
+        >
           <View className="w-full min-w-0 items-center justify-center">
-            <Text className="mb-2 self-start text-xs text-slate-400">
-              Session intensity — last 52 weeks
-            </Text>
-            <GitHubHeatmap
-              days={workoutHeatmapDays}
-              color={SECTION_COLORS.workout}
-              weeks={52}
-            />
+            {!workoutStripHasActivity ? (
+              <View className="items-center py-6">
+                <Text className="text-center text-sm font-medium text-slate-700">
+                  Complete a workout to start tracking
+                </Text>
+                <Text className="mt-1 text-center text-xs text-slate-500">
+                  Your 52-week activity view will appear here.
+                </Text>
+              </View>
+            ) : (
+              <GitHubHeatmap
+                days={workoutHeatmapDays}
+                color={SECTION_COLORS.workout}
+                weeks={52}
+              />
+            )}
           </View>
-        </Card>
+        </FeaturePanel>
       </Screen>
     </>
   );

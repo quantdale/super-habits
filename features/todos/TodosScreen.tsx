@@ -6,6 +6,8 @@ import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { Card } from "@/core/ui/Card";
+import { FeaturePanel } from "@/core/ui/FeaturePanel";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -164,64 +166,80 @@ export function TodosScreen() {
   const emptyPending =
     pendingTasks.length === 0 && !showCompleted && items.length > 0 && hasCompleted;
   const totallyEmpty = items.length === 0;
-  const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
-
-  const noPendingTasksCard = (
-    <Card variant="standard" accentColor={SECTION_COLORS.todos}>
-      <View className="items-center">
-        <Text className="text-center text-sm text-slate-500">No Pending Tasks</Text>
-        <Text className="mt-1 text-center text-xs text-slate-400">Offline-first task manager.</Text>
-      </View>
-    </Card>
-  );
+  const panelSubtitle = totallyEmpty
+    ? "Start with your first task."
+    : pendingTasks.length === 0
+      ? "Everything is clear for now."
+      : `${pendingTasks.length} pending ${pendingTasks.length === 1 ? "task" : "tasks"}`;
 
   return (
     <View className="flex-1">
       <Screen>
         <View className="flex-1">
-          <View className="flex-row items-start justify-between">
-            <SectionTitle
-              title="Todos"
-              subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
-            />
-            <View className="flex-row gap-1">
-              {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                <Pressable
-                  key={mode}
-                  onPress={() => setViewMode(mode)}
-                  className={`rounded-lg p-2 ${viewMode === mode ? "bg-todos-light" : ""}`}
-                  accessibilityLabel={`${mode} view`}
-                >
-                  <MaterialIcons
-                    name={icon}
-                    size={24}
-                    color={viewMode === mode ? COLOR : MUTED_ICON}
-                  />
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          <SectionTitle
+            title="Todos"
+            subtitle="Offline-first task manager."
+            right={(
+              <View className="flex-row gap-1">
+                {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
+                  <Pressable
+                    key={mode}
+                    onPress={() => setViewMode(mode)}
+                    className={`rounded-lg p-2 ${viewMode === mode ? "bg-todos-light" : ""}`}
+                    accessibilityLabel={`${mode} view`}
+                  >
+                    <MaterialIcons
+                      name={icon}
+                      size={24}
+                      color={viewMode === mode ? COLOR : MUTED_ICON}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          />
 
           <View className="mb-4 mt-1 flex-row gap-3">
             <View className="flex-1">
-              <Card variant="stat" accentColor={SECTION_COLORS.todos} className="mb-0">
-                <View className="items-center py-1">
-                  <Text className="text-[22px]">📋</Text>
-                  <Text className="mt-0.5 text-xl font-bold text-todos">{pendingTasks.length}</Text>
-                  <Text className="mt-0.5 text-xs text-slate-400">pending tasks</Text>
-                </View>
-              </Card>
+              <FeatureStatCard
+                icon="playlist-add-check"
+                value={pendingTasks.length}
+                label="Pending Tasks"
+                accentColor={SECTION_COLORS.todos}
+                textColor={COLOR}
+              />
+            </View>
+            <View className="flex-1">
+              <FeatureStatCard
+                icon="task-alt"
+                value={completedTasks.length}
+                label="Completed"
+                accentColor={SECTION_COLORS.todos}
+                textColor={COLOR}
+              />
             </View>
           </View>
 
-          {totallyEmpty ? (
-            <View className="mb-3">
-              {noPendingTasksCard}
-            </View>
-          ) : null}
-
-          {!totallyEmpty ? (
-            <View className="min-h-0 flex-1">
+          <FeaturePanel
+            title="Pending tasks"
+            subtitle={panelSubtitle}
+            icon="checklist"
+            accentColor={SECTION_COLORS.todos}
+            textColor={COLOR}
+            className="flex-1"
+            bodyClassName="flex-1"
+          >
+            {totallyEmpty ? (
+              <View className="flex-1 items-center justify-center py-12">
+                <Text className="text-center text-base font-medium text-slate-700">
+                  No tasks yet
+                </Text>
+                <Text className="mt-2 text-center text-sm text-slate-500">
+                  Use the add button to capture your first task.
+                </Text>
+              </View>
+            ) : (
+              <View className="min-h-0 flex-1">
               <DraggableFlatList
                 key={viewMode}
                 data={pendingTasks}
@@ -243,13 +261,18 @@ export function TodosScreen() {
                 }}
                 ListEmptyComponent={
                   hasCompleted ? (
-                    <View className="mb-3">{noPendingTasksCard}</View>
+                    <View className="items-center py-8">
+                      <Text className="text-center text-sm font-medium text-slate-700">
+                        No pending tasks
+                      </Text>
+                      <Text className="mt-1 text-center text-xs text-slate-500">
+                        Completed items are available below.
+                      </Text>
+                    </View>
                   ) : (
-                    <Card variant="standard" accentColor={SECTION_COLORS.todos}>
-                      <View className="items-center">
-                        <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
-                      </View>
-                    </Card>
+                    <View className="items-center py-8">
+                      <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
+                    </View>
                   )
                 }
                 ListFooterComponent={
@@ -295,8 +318,9 @@ export function TodosScreen() {
                   </ScaleDecorator>
                 )}
               />
-            </View>
-          ) : null}
+              </View>
+            )}
+          </FeaturePanel>
         </View>
 
       <Modal visible={modalVisible} onClose={closeModal} scroll>
