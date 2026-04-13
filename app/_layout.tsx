@@ -4,6 +4,7 @@ import Head from "expo-router/head";
 import { StatusBar } from "expo-status-bar";
 import { AppProviders } from "@/core/providers/AppProviders";
 import { useAppTheme } from "@/core/providers/ThemeProvider";
+import { InAppNoticeBanner } from "@/core/ui/InAppNoticeBanner";
 
 export default function RootLayout() {
   return (
@@ -28,6 +29,7 @@ function ThemedRoot() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
       </Stack>
+      <InAppNoticeBanner />
     </>
   );
 }

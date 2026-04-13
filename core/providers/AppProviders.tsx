@@ -7,6 +7,7 @@ import { initializeDatabase } from "@/core/db/client";
 import { registerServiceWorker } from "@/core/pwa/registerServiceWorker";
 import { ensureGuestProfile } from "@/core/auth/guestProfile";
 import { syncEngine } from "@/core/sync/sync.engine";
+import { InAppNoticeProvider } from "@/core/providers/InAppNoticeProvider";
 import { ensureAnonymousSession, isRemoteEnabled } from "@/lib/supabase";
 import { ThemeProvider, useAppTheme } from "@/core/providers/ThemeProvider";
 
@@ -67,7 +68,9 @@ export function AppProviders({ children }: PropsWithChildren) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
-          <BootstrapGate dbError={dbError}>{children}</BootstrapGate>
+          <InAppNoticeProvider>
+            <BootstrapGate dbError={dbError}>{children}</BootstrapGate>
+          </InAppNoticeProvider>
         </QueryClientProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
