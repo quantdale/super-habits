@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { type Href, useFocusEffect, useRouter } from "expo-router";
 import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { Card } from "@/core/ui/Card";
 import { Screen } from "@/core/ui/Screen";
@@ -92,6 +92,7 @@ const GRID_ROWS: OverviewCardKey[][] = [
 const GRID_TOP_ROW_CARD_CLASS = "min-h-[248px]";
 const GRID_BOTTOM_ROW_CARD_CLASS = "min-h-[214px]";
 const MUTED_ICON = "#94a3b8";
+const SETTINGS_HREF = "/settings" as Href;
 
 function OverviewMetricCard({
   cardKey,
@@ -135,6 +136,7 @@ function OverviewMetricCard({
 }
 
 export function OverviewScreen() {
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [isLoading, setIsLoading] = useState(true);
   const [pendingTodosCount, setPendingTodosCount] = useState(0);
@@ -435,6 +437,14 @@ export function OverviewScreen() {
       <View className="mb-4 flex-row items-start justify-between">
         <Text className="text-2xl font-bold text-slate-900">Overview</Text>
         <View className="flex-row gap-1">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+            className="rounded-lg p-2"
+            onPress={() => router.push(SETTINGS_HREF)}
+          >
+            <MaterialIcons name="settings" size={24} color={MUTED_ICON} />
+          </Pressable>
           {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
             <Pressable
               key={mode}
