@@ -3,7 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0", // Added to silence TS5101 for baseUrl
+    "ignoreDeprecations": "5.0", // Added to silence TS5101 for baseUrl
     "types": [
       "vitest/globals"
     ],
