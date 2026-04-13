@@ -6,7 +6,7 @@ import { useRouter, useSegments } from "expo-router";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
@@ -25,7 +25,7 @@ const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
 const NAV_TO_SECTION_KEY = {
   todos: "todos",
   habits: "habits",
-  pomodoro: "focus",
+  pomodoro: POMODORO_SECTION_KEY,
   workout: "workout",
   calories: "calories",
 } as const;

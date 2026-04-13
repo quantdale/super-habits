@@ -1,7 +1,7 @@
 import React from "react";
 import { View } from "react-native";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
 import type { PlantStage } from "./pomodoro.domain";
 
 type Props = {
@@ -16,8 +16,8 @@ function stemHeightFromProgress(progress: number): number {
 }
 
 function areFocusSproutPropsEqual(prev: Props, next: Props): boolean {
-  const prevAccent = prev.accentColor ?? SECTION_COLORS.focus;
-  const nextAccent = next.accentColor ?? SECTION_COLORS.focus;
+  const prevAccent = prev.accentColor ?? SECTION_COLORS[POMODORO_SECTION_KEY];
+  const nextAccent = next.accentColor ?? SECTION_COLORS[POMODORO_SECTION_KEY];
   const prevSize = prev.size ?? 160;
   const nextSize = next.size ?? 160;
   if (prev.stage !== next.stage) return false;
@@ -39,7 +39,7 @@ function areFocusSproutPropsEqual(prev: Props, next: Props): boolean {
 function FocusSproutInner({
   progress,
   stage,
-  accentColor = SECTION_COLORS.focus,
+  accentColor = SECTION_COLORS[POMODORO_SECTION_KEY],
   size = 160,
 }: Props) {
   // Stem height grows from 0 to 80px based on progress
