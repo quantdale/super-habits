@@ -2201,20 +2201,21 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 - **Quality gate:** `/check only` (typecheck + unit tests) for phase prompts; E2E in separate batch runs
 - **Report format:** Tables for checks; file paths for screenshots
 - **Constraints section:** Listed explicitly at end of every prompt
-- **Parallel execution:** For 2+ prompts, always provide wave notation showing file overlap
+- **Parallel execution:** For 2+ prompts, always provide wave notation, branch-per-task, and worktree ownership
 
 #### Wave notation format
 
 ```
 Wave 1 (run simultaneously):
-  - prompt-A → Session 1  [touches: fileX, fileY]
-  - prompt-B → Session 2  [touches: fileZ]
+  - task-A → Session 1  [branch: task-a] [worktree: wt-task-a] [parallel-safe because: isolated files]
+  - task-B → Session 2  [branch: task-b] [worktree: wt-task-b] [parallel-safe because: isolated files]
 
 Wave 2 (after Wave 1):
-  - prompt-C → Session 1  [depends on: fileX from prompt-A]
+  - task-C → Session 1  [depends on: task-A output]
 ```
 
-Safe to parallel: prompts touching completely different files. Must serialize: same file touched, or B depends on A's output.
+Safe to parallel: tasks in separate worktrees with separate branches that do not touch the same files or depend on each other's output.
+Must serialize: same file touched, shared contract changed, or later work depends on earlier output.
 
 #### Commit convention
 

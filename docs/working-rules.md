@@ -11,6 +11,25 @@ Purpose: concise implementation guardrails for contributors and AI agents. This 
 
 If this file conflicts with current code, trust the code and document the conflict.
 
+## Task Execution Workflow
+
+### Confirmed workflow for the recovered clean repo
+- Start each new task from updated `main`.
+- Create one branch per task.
+- Use one worktree per active task whenever tasks may proceed in parallel.
+- Keep the task scope isolated to that branch and worktree until it is ready to merge.
+
+### Wave rules
+- Group work into waves.
+- A wave may contain multiple tasks only if they are parallel-safe.
+- Do not start the next wave until the current wave is complete.
+- Re-plan before the next wave if completed work changes assumptions or file ownership.
+
+### Parallel-safe vs overlapping
+- Parallel-safe tasks do not touch the same files and do not depend on each other's output.
+- Overlapping tasks share files, shared contracts, or sequencing dependencies and must not run in the same wave.
+- If there is any doubt about overlap, treat the tasks as sequential.
+
 ## Layering Rules
 
 ### Confirmed from code and docs
@@ -95,6 +114,7 @@ If this file conflicts with current code, trust the code and document the confli
   - implementation guardrails here
   - task prompts in `docs/ai-task-template.md`
   - file navigation in `docs/repo-map.md`
+- Keep workflow guidance centralized in `docs/codex-workflow.md`; other docs should summarize it, not fork it.
 
 ### Known drift to keep in mind
 - `README.md` still reports planned stack versions rather than current package versions.
