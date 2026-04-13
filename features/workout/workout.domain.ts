@@ -1,6 +1,5 @@
 import type { WorkoutLog } from "./types";
-import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
-import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
 import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
 
 /**

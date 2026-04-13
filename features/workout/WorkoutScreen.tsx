@@ -21,8 +21,8 @@ import {
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
 } from "@/features/workout/workout.domain";
-import type { ActivityDay } from "@/features/shared/ActivityPreviewStrip";
-import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
+import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
 import { toDateKey } from "@/lib/time";
 import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { RoutineDetailModal } from "./RoutineDetailScreen";

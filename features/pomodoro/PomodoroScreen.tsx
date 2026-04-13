@@ -32,7 +32,8 @@ import {
   type PomodoroMode,
   type PomodoroSettings,
 } from "./pomodoro.domain";
-import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { HeatmapDay } from "@/features/shared/activityTypes";
+import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
 import { FocusSprout } from "./FocusSprout";
 import { GardenGrid } from "./GardenGrid";
 import { BackgroundWarning } from "./BackgroundWarning";
