@@ -1,3 +1,8 @@
+import {
+  appMetaKeys,
+  getAppMetaJsonOrDefault,
+  setAppMetaJson,
+} from "@/core/db/appMeta";
 import { getDatabase } from "@/core/db/client";
 import { CalorieEntry, SavedMeal } from "@/core/db/types";
 import { createId } from "@/lib/id";
@@ -31,7 +36,6 @@ export async function getCalorieSummaryByRange(
   );
 }
 
-const GOAL_KEY = "calorie_goal";
 export const DEFAULT_GOAL: CalorieGoal = {
   calories: 2000,
   protein: 150,
@@ -41,24 +45,12 @@ export const DEFAULT_GOAL: CalorieGoal = {
 
 export async function getCalorieGoal(): Promise<CalorieGoal> {
   const db = await getDatabase();
-  const row = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM app_meta WHERE key = ?`,
-    [GOAL_KEY],
-  );
-  if (!row) return DEFAULT_GOAL;
-  try {
-    return JSON.parse(row.value) as CalorieGoal;
-  } catch {
-    return DEFAULT_GOAL;
-  }
+  return getAppMetaJsonOrDefault<CalorieGoal>(db, appMetaKeys.calorieGoal, DEFAULT_GOAL);
 }
 
 export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(`INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)`, [
-    GOAL_KEY,
-    JSON.stringify(goal),
-  ]);
+  await setAppMetaJson(db, appMetaKeys.calorieGoal, goal);
 }
 
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {

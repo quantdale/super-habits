@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as SQLite from "expo-sqlite";
+import { appMetaKeys, getAppMetaText, setAppMetaText } from "@/core/db/appMeta";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -79,19 +80,15 @@ const bootstrapStatements = [
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
-  );
-  const version = row?.value ? parseInt(row.value, 10) : 0;
+  const schemaVersion = await getAppMetaText(db, appMetaKeys.dbSchemaVersion);
+  const version = schemaVersion ? parseInt(schemaVersion, 10) : 0;
   if (version < 2) {
     try {
       await db.execAsync("ALTER TABLE habits ADD COLUMN category TEXT NOT NULL DEFAULT 'anytime'");
     } catch {
       // Column may already exist from CREATE TABLE
     }
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '2')",
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "2");
   }
   if (version < 3) {
     try {
@@ -104,9 +101,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     } catch {
       // Column may already exist from CREATE TABLE
     }
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '3')",
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "3");
   }
   if (version < 4) {
     try {
@@ -116,9 +111,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     } catch {
       // Column may already exist from CREATE TABLE
     }
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '4')",
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "4");
   }
   if (version < 5) {
     // Record the UTC→local date key cutover in app_meta.
@@ -126,16 +119,9 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     // Rows written after use local calendar keys via toDateKey() in lib/time.ts.
     // No backfill — rationale is documented in the unified knowledge base.
     const cutoverIso = new Date().toISOString();
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('date_key_format', 'local')",
-    );
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('date_key_cutover', ?)",
-      [cutoverIso],
-    );
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('db_schema_version', '5')",
-    );
+    await setAppMetaText(db, appMetaKeys.dateKeyFormat, "local");
+    await setAppMetaText(db, appMetaKeys.dateKeyCutover, cutoverIso);
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "5");
   }
   if (version < 6) {
     try {
@@ -164,10 +150,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
            AND t2.deleted_at IS NULL
        ) WHERE deleted_at IS NULL`,
     );
-    await db.runAsync(
-      `INSERT OR REPLACE INTO app_meta (key, value)
-       VALUES ('db_schema_version', '6')`,
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "6");
   }
   if (version < 7) {
     await db.execAsync(`
@@ -205,10 +188,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.runAsync(
-      `INSERT OR REPLACE INTO app_meta (key, value)
-       VALUES ('db_schema_version', '7')`,
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "7");
   }
   if (version < 8) {
     await db.execAsync(`
@@ -232,10 +212,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       ON saved_meals (food_name COLLATE NOCASE);
     `);
 
-    await db.runAsync(
-      `INSERT OR REPLACE INTO app_meta (key, value)
-       VALUES ('db_schema_version', '8')`,
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "8");
   }
   if (version < 9) {
     try {
@@ -248,10 +225,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     } catch {
       // Column may already exist
     }
-    await db.runAsync(
-      `INSERT OR REPLACE INTO app_meta (key, value)
-       VALUES ('db_schema_version', '9')`,
-    );
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "9");
   }
 }
 
