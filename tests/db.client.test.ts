@@ -124,16 +124,23 @@ describe("core/db/client", () => {
 
     await client.getDatabase();
 
-    const dateFormatCall = db.runAsync.mock.calls.find(([sql]) =>
-      String(sql).includes("('date_key_format', 'local')"),
+    const dateFormatCall = db.runAsync.mock.calls.find(
+      ([sql, args]) =>
+        String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
+        Array.isArray(args) &&
+        args[0] === "date_key_format" &&
+        args[1] === "local",
     );
-    const cutoverCall = db.runAsync.mock.calls.find(([sql]) =>
-      String(sql).includes("('date_key_cutover', ?)"),
+    const cutoverCall = db.runAsync.mock.calls.find(
+      ([sql, args]) =>
+        String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
+        Array.isArray(args) &&
+        args[0] === "date_key_cutover",
     );
 
     expect(dateFormatCall).toBeDefined();
     expect(cutoverCall).toBeDefined();
-    expect(cutoverCall?.[1]).toEqual([expect.any(String)]);
+    expect(cutoverCall?.[1]).toEqual(["date_key_cutover", expect.any(String)]);
   });
 
   it("applies migrations from version 0 and bumps to schema version 9", async () => {
@@ -141,8 +148,12 @@ describe("core/db/client", () => {
 
     await client.getDatabase();
 
-    const hasSchemaV9Write = db.runAsync.mock.calls.some(([sql]) =>
-      String(sql).includes("('db_schema_version', '9')"),
+    const hasSchemaV9Write = db.runAsync.mock.calls.some(
+      ([sql, args]) =>
+        String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
+        Array.isArray(args) &&
+        args[0] === "db_schema_version" &&
+        args[1] === "9",
     );
     expect(hasSchemaV9Write).toBe(true);
   });

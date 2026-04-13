@@ -1,3 +1,8 @@
+import {
+  appMetaKeys,
+  getAppMetaJsonOrDefault,
+  setAppMetaJson,
+} from "@/core/db/appMeta";
 import { getDatabase } from "@/core/db/client";
 import { PomodoroSession } from "@/core/db/types";
 import { createId } from "@/lib/id";
@@ -8,28 +13,18 @@ import {
   type PomodoroSettings,
 } from "@/features/pomodoro/pomodoro.domain";
 
-const SETTINGS_KEY = "pomodoro_settings";
-
 export async function getPomodoroSettings(): Promise<PomodoroSettings> {
   const db = await getDatabase();
-  const row = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM app_meta WHERE key = ?`,
-    [SETTINGS_KEY],
+  return getAppMetaJsonOrDefault<PomodoroSettings>(
+    db,
+    appMetaKeys.pomodoroSettings,
+    DEFAULT_SETTINGS,
   );
-  if (!row) return DEFAULT_SETTINGS;
-  try {
-    return JSON.parse(row.value) as PomodoroSettings;
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
 }
 
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(`INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)`, [
-    SETTINGS_KEY,
-    JSON.stringify(settings),
-  ]);
+  await setAppMetaJson(db, appMetaKeys.pomodoroSettings, settings);
 }
 
 export async function logPomodoroSession(

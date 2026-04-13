@@ -26,6 +26,8 @@ import { nowIso, toDateKey } from "@/lib/time";
 import {
   addCalorieEntry,
   deleteCalorieEntry,
+  getCalorieGoal,
+  setCalorieGoal,
   updateCalorieEntry,
   upsertSavedMeal,
 } from "@/features/calories/calories.data";
@@ -223,5 +225,46 @@ describe("calories.data", () => {
     expect(getDatabase).not.toHaveBeenCalled();
     expect(db.getFirstAsync).not.toHaveBeenCalled();
     expect(db.runAsync).not.toHaveBeenCalled();
+  });
+
+  it("getCalorieGoal falls back to the default goal when the row is missing or invalid", async () => {
+    db.getFirstAsync.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      value: "{not valid json}",
+    });
+
+    await expect(getCalorieGoal()).resolves.toEqual({
+      calories: 2000,
+      protein: 150,
+      carbs: 200,
+      fats: 65,
+    });
+    await expect(getCalorieGoal()).resolves.toEqual({
+      calories: 2000,
+      protein: 150,
+      carbs: 200,
+      fats: 65,
+    });
+  });
+
+  it("setCalorieGoal stores the goal through app_meta JSON serialization", async () => {
+    await setCalorieGoal({
+      calories: 2300,
+      protein: 180,
+      carbs: 240,
+      fats: 70,
+    });
+
+    expect(db.runAsync).toHaveBeenCalledWith(
+      "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
+      [
+        "calorie_goal",
+        JSON.stringify({
+          calories: 2300,
+          protein: 180,
+          carbs: 240,
+          fats: 70,
+        }),
+      ],
+    );
   });
 });
