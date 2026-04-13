@@ -1,7 +1,10 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, type Href } from "expo-router";
 import { Pressable, Text, View } from "react-native";
+import { createLinkedActionsNotice } from "@/core/linked-actions/linkedActionsNotice";
+import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import { type ThemeMode, useAppTheme } from "@/core/providers/ThemeProvider";
+import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
 import { PillChip } from "@/core/ui/PillChip";
 import { Screen } from "@/core/ui/Screen";
@@ -105,9 +108,39 @@ function getAppearanceSummary(mode: ThemeMode, resolvedTheme: "light" | "dark") 
 }
 
 export function SettingsScreen() {
+  const { showNotice } = useInAppNotices();
   const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
   const settingsAccent = resolvedTheme === "dark" ? "#64748b" : SETTINGS_ACCENT;
+
+  const handleShowLinkedActionsDemo = () => {
+    showNotice(
+      createLinkedActionsNotice({
+        message: "Linked Actions updated Evening stretch.",
+        reason: "Hydrate after workout is linked to mark your recovery habit for today.",
+        source: {
+          feature: "workout",
+          entityType: "routine",
+          entityId: "demo-workout-routine",
+          label: "Hydrate after workout",
+        },
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "demo-recovery-habit",
+          label: "Evening stretch",
+        },
+        destination: {
+          kind: "linked-actions-target",
+          href: "/(tabs)/habits",
+          feature: "habits",
+          entityType: "habit",
+          entityId: "demo-recovery-habit",
+          label: "Evening stretch",
+        },
+      }),
+    );
+  };
 
   return (
     <Screen scroll>
@@ -177,6 +210,21 @@ export function SettingsScreen() {
             label="App accent"
             description="Additional display preferences can be layered onto the shared theme system later."
           />
+        </View>
+      </Card>
+
+      <Card
+        variant="header"
+        accentColor={settingsAccent}
+        headerTitle="Linked Actions"
+        headerSubtitle="Temporary internal preview for the in-app notice scaffold."
+        headerRight={<MaterialIcons name="bolt" size={22} color="#ffffff" />}
+      >
+        <View className="gap-3">
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+            This preview emits a typed Linked Actions notice with source, target, and destination metadata.
+          </Text>
+          <Button label="Show linked notice preview" onPress={handleShowLinkedActionsDemo} color={settingsAccent} />
         </View>
       </Card>
 
