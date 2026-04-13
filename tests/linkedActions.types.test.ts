@@ -1,0 +1,158 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildLinkedActionRuleRow,
+  normalizeLinkedActionRuleRow,
+  parseLinkedActionEffectPayload,
+  parseLinkedActionRuleRecord,
+  serializeLinkedActionEffectPayload,
+} from "@/core/linked-actions/linkedActions.types";
+
+describe("core/linked-actions/linkedActions.types", () => {
+  it("round-trips a normalized rule through row serialization", () => {
+    const normalized = normalizeLinkedActionRuleRow({
+      id: "link_1",
+      status: "active",
+      direction_policy: "bidirectional_peer",
+      bidirectional_group_id: "group_1",
+      source_feature: "habits",
+      source_entity_type: "habit",
+      source_entity_id: "habit_1",
+      trigger_type: "habit.completed_for_day",
+      target_feature: "todos",
+      target_entity_type: "todo",
+      target_entity_id: "todo_1",
+      effect_type: "todo.complete",
+      effect_payload: "{}",
+      created_at: "2026-04-13T00:00:00.000Z",
+      updated_at: "2026-04-13T00:00:00.000Z",
+      deleted_at: null,
+    });
+
+    expect(buildLinkedActionRuleRow(normalized)).toEqual({
+      id: "link_1",
+      status: "active",
+      direction_policy: "bidirectional_peer",
+      bidirectional_group_id: "group_1",
+      source_feature: "habits",
+      source_entity_type: "habit",
+      source_entity_id: "habit_1",
+      trigger_type: "habit.completed_for_day",
+      target_feature: "todos",
+      target_entity_type: "todo",
+      target_entity_id: "todo_1",
+      effect_type: "todo.complete",
+      effect_payload: "{}",
+      created_at: "2026-04-13T00:00:00.000Z",
+      updated_at: "2026-04-13T00:00:00.000Z",
+      deleted_at: null,
+    });
+  });
+
+  it("serializes and parses log effects with explicit payload contracts", () => {
+    const payload = serializeLinkedActionEffectPayload({
+      kind: "log",
+      type: "calorie.log",
+      dateStrategy: "source_date",
+      templateSource: "saved_meal",
+      savedMealId: "smeal_1",
+      foodName: "Protein oats",
+      calories: 420,
+      protein: 30,
+      carbs: 48,
+      fats: 12,
+      fiber: 8,
+      mealType: "breakfast",
+    });
+
+    expect(parseLinkedActionEffectPayload("calorie.log", payload)).toEqual({
+      kind: "log",
+      type: "calorie.log",
+      dateStrategy: "source_date",
+      templateSource: "saved_meal",
+      savedMealId: "smeal_1",
+      foodName: "Protein oats",
+      calories: 420,
+      protein: 30,
+      carbs: 48,
+      fats: 12,
+      fiber: 8,
+      mealType: "breakfast",
+    });
+  });
+
+  it("rejects invalid source and trigger combinations", () => {
+    expect(() =>
+      normalizeLinkedActionRuleRow({
+        id: "link_2",
+        status: "active",
+        direction_policy: "one_way",
+        bidirectional_group_id: null,
+        source_feature: "todos",
+        source_entity_type: "todo",
+        source_entity_id: "todo_1",
+        trigger_type: "habit.completed_for_day",
+        target_feature: "habits",
+        target_entity_type: "habit",
+        target_entity_id: "habit_1",
+        effect_type: "habit.increment",
+        effect_payload: JSON.stringify({
+          amount: 1,
+          dateStrategy: "today",
+        }),
+        created_at: "2026-04-13T00:00:00.000Z",
+        updated_at: "2026-04-13T00:00:00.000Z",
+        deleted_at: null,
+      }),
+    ).toThrow("Trigger habit.completed_for_day is not allowed for source entity todo");
+  });
+
+  it("parses plain object records into normalized rule definitions", () => {
+    expect(
+      parseLinkedActionRuleRecord({
+        id: "link_3",
+        status: "paused",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "pomodoro",
+          entityType: "pomodoro_timer",
+          entityId: null,
+          triggerType: "pomodoro.focus_completed",
+        },
+        target: {
+          feature: "pomodoro",
+          entityType: "pomodoro_session",
+          entityId: null,
+          effect: {
+            type: "pomodoro.log",
+            sessionType: "focus",
+            durationSeconds: 1500,
+          },
+        },
+        createdAt: "2026-04-13T00:00:00.000Z",
+        updatedAt: "2026-04-13T00:00:00.000Z",
+        deletedAt: null,
+      }),
+    ).toMatchObject({
+      id: "link_3",
+      status: "paused",
+      source: {
+        feature: "pomodoro",
+        entityType: "pomodoro_timer",
+        entityId: null,
+        triggerType: "pomodoro.focus_completed",
+      },
+      target: {
+        feature: "pomodoro",
+        entityType: "pomodoro_session",
+        entityId: null,
+        effect: {
+          kind: "log",
+          type: "pomodoro.log",
+          sessionType: "focus",
+          durationSeconds: 1500,
+        },
+      },
+    });
+  });
+});

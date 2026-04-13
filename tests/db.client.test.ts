@@ -14,7 +14,7 @@ type LoadClientOptions = {
   openDatabaseAsync?: ReturnType<typeof vi.fn>;
 };
 
-function buildDb(version: string | null = "9"): MockDatabase {
+function buildDb(version: string | null = "10"): MockDatabase {
   return {
     execAsync: vi.fn().mockResolvedValue(undefined),
     runAsync: vi.fn().mockResolvedValue(undefined),
@@ -27,7 +27,7 @@ function buildDb(version: string | null = "9"): MockDatabase {
 async function loadDbClient(options: LoadClientOptions = {}) {
   vi.resetModules();
   const platform = options.platform ?? "ios";
-  const schemaVersion = options.schemaVersion === undefined ? "9" : options.schemaVersion;
+  const schemaVersion = options.schemaVersion === undefined ? "10" : options.schemaVersion;
   const db = buildDb(schemaVersion);
   const openDatabaseAsync = options.openDatabaseAsync ?? vi.fn().mockResolvedValue(db);
 
@@ -143,28 +143,52 @@ describe("core/db/client", () => {
     expect(cutoverCall?.[1]).toEqual(["date_key_cutover", expect.any(String)]);
   });
 
-  it("applies migrations from version 0 and bumps to schema version 9", async () => {
+  it("applies migrations from version 0 and bumps to schema version 10", async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
 
-    const hasSchemaV9Write = db.runAsync.mock.calls.some(
+    const hasSchemaV10Write = db.runAsync.mock.calls.some(
       ([sql, args]) =>
         String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
         Array.isArray(args) &&
         args[0] === "db_schema_version" &&
-        args[1] === "9",
+        args[1] === "10",
     );
-    expect(hasSchemaV9Write).toBe(true);
+    expect(hasSchemaV10Write).toBe(true);
   });
 
-  it("does not rerun recurrence migration when database is already at v9", async () => {
+  it("adds linked action storage in migration 10", async () => {
     const { client, db } = await loadDbClient({ schemaVersion: "9" });
 
     await client.getDatabase();
 
-    const sqlCalls = db.runAsync.mock.calls.map(([sql]) => String(sql));
-    expect(sqlCalls.some((sql) => sql.includes("ADD COLUMN recurrence"))).toBe(false);
-    expect(sqlCalls.some((sql) => sql.includes("ADD COLUMN recurrence_id"))).toBe(false);
+    const sqlCalls = db.execAsync.mock.calls.map(([sql]) => String(sql));
+    expect(
+      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_rules")),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((sql) => sql.includes("idx_linked_action_rules_source_lookup")),
+    ).toBe(true);
+    expect(
+      db.runAsync.mock.calls.some(
+        ([sql, args]) =>
+          String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
+          Array.isArray(args) &&
+          args[0] === "db_schema_version" &&
+          args[1] === "10",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not rerun linked action migration when database is already at v10", async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: "10" });
+
+    await client.getDatabase();
+
+    const sqlCalls = db.execAsync.mock.calls.map(([sql]) => String(sql));
+    expect(
+      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_rules")),
+    ).toBe(false);
   });
 });

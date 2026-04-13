@@ -185,7 +185,7 @@ Companion docs in this folder:
   - `saved_meals`
   - `app_meta`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `9`; next migration slot is `if (version < 10)`.
+- Current runtime schema version is `10`; next migration slot is `if (version < 11)`.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
