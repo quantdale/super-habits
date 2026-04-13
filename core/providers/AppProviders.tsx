@@ -8,6 +8,7 @@ import { registerServiceWorker } from "@/core/pwa/registerServiceWorker";
 import { ensureGuestProfile } from "@/core/auth/guestProfile";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { ensureAnonymousSession, isRemoteEnabled } from "@/lib/supabase";
+import { ThemeProvider, useAppTheme } from "@/core/providers/ThemeProvider";
 
 const queryClient = new QueryClient();
 
@@ -64,18 +65,26 @@ export function AppProviders({ children }: PropsWithChildren) {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        {dbError ? (
-          <View className="flex-1 items-center justify-center bg-slate-50 p-8">
-            <Text className="mb-2 text-center text-lg font-semibold text-slate-800">
-              Unable to start
-            </Text>
-            <Text className="text-center text-sm text-slate-500">{dbError}</Text>
-          </View>
-        ) : (
-          children
-        )}
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <BootstrapGate dbError={dbError}>{children}</BootstrapGate>
+        </QueryClientProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
+  );
+}
+
+function BootstrapGate({ dbError, children }: PropsWithChildren<{ dbError: string | null }>) {
+  const { tokens } = useAppTheme();
+
+  if (!dbError) return children;
+
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: tokens.background, padding: 32 }}>
+      <Text style={{ marginBottom: 8, textAlign: "center", fontSize: 18, fontWeight: "600", color: tokens.text }}>
+        Unable to start
+      </Text>
+      <Text style={{ textAlign: "center", fontSize: 14, color: tokens.textMuted }}>{dbError}</Text>
+    </View>
   );
 }

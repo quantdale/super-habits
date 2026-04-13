@@ -1,4 +1,5 @@
 import { Pressable, Text } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 type ButtonProps = {
   label: string;
@@ -10,27 +11,39 @@ type ButtonProps = {
 };
 
 export function Button({ label, onPress, variant = "primary", disabled = false, color }: ButtonProps) {
+  const { tokens } = useAppTheme();
   const useCustomPrimary = Boolean(color) && variant === "primary";
-  const styles =
+  const className =
     variant === "primary"
       ? useCustomPrimary
         ? ""
         : "bg-brand-500"
       : variant === "danger"
-        ? "bg-rose-500"
-        : "bg-slate-200 dark:bg-slate-700";
-  const labelStyles =
+        ? ""
+        : "";
+  const labelClassName =
     variant === "primary" || variant === "danger"
       ? "text-white"
-      : "text-slate-900 dark:text-slate-100";
+      : "";
+  const style =
+    variant === "primary"
+      ? useCustomPrimary
+        ? { backgroundColor: color }
+        : undefined
+      : variant === "danger"
+        ? { backgroundColor: "#ef4444" }
+        : { backgroundColor: tokens.surfaceElevated, borderColor: tokens.border, borderWidth: 1 };
+
   return (
     <Pressable
       disabled={disabled}
-      className={`rounded-xl px-4 py-3 ${styles} ${disabled ? "opacity-40" : ""}`}
-      style={useCustomPrimary ? { backgroundColor: color } : undefined}
+      className={`rounded-xl px-4 py-3 ${className} ${disabled ? "opacity-40" : ""}`}
+      style={style}
       onPress={onPress}
     >
-      <Text className={`text-center font-semibold ${labelStyles}`}>{label}</Text>
+      <Text className={`text-center font-semibold ${labelClassName}`} style={variant === "ghost" ? { color: tokens.text } : undefined}>
+        {label}
+      </Text>
     </Pressable>
   );
 }

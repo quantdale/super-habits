@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Modal as RNModal, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 export type ModalProps = {
   visible: boolean;
@@ -12,12 +13,13 @@ export type ModalProps = {
 };
 
 export function Modal({ visible, onClose, title, children, scroll = false }: ModalProps) {
+  const { tokens } = useAppTheme();
   const { height: windowHeight } = useWindowDimensions();
   const scrollMaxHeight = windowHeight * 0.88;
 
   return (
     <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View className="flex-1 items-center justify-center bg-black/50 p-4">
+      <View className="flex-1 items-center justify-center p-4" style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Dismiss dialog"
@@ -25,12 +27,15 @@ export function Modal({ visible, onClose, title, children, scroll = false }: Mod
           onPress={onClose}
         />
         <Pressable onPress={(e) => e.stopPropagation()} className="w-full max-w-md">
-          <View className="w-full max-w-md overflow-hidden rounded-2xl bg-[#f8f7ff]">
+          <View
+            className="w-full max-w-md overflow-hidden rounded-2xl"
+            style={{ backgroundColor: tokens.background, borderColor: tokens.border, borderWidth: 1 }}
+          >
             <View
               className={`flex-row items-center px-4 pb-3 pt-4 ${title ? "justify-between" : "justify-end"}`}
             >
               {title ? (
-                <Text className="flex-1 pr-2 text-xl font-bold text-slate-900">{title}</Text>
+                <Text className="flex-1 pr-2 text-xl font-bold" style={{ color: tokens.text }}>{title}</Text>
               ) : null}
               <Pressable
                 onPress={onClose}
@@ -38,7 +43,7 @@ export function Modal({ visible, onClose, title, children, scroll = false }: Mod
                 accessibilityLabel="Close"
                 hitSlop={8}
               >
-                <MaterialIcons name="close" size={24} color="#94a3b8" />
+                <MaterialIcons name="close" size={24} color={tokens.iconMuted} />
               </Pressable>
             </View>
             {scroll ? (

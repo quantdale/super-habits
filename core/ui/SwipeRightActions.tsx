@@ -1,10 +1,10 @@
 import { Pressable, Text, View } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 const DELETE_RED = "#ef4444";
 
 /** Align with `Card` (rounded-2xl, border, shadow). */
 const CARD_RADIUS = 16;
-const CARD_BORDER = "#e8e8f0";
 const CARD_SHADOW = {
   shadowColor: "#000000",
   shadowOffset: { width: 0, height: 2 },
@@ -21,6 +21,7 @@ type Props = {
 };
 
 export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Props) {
+  const { tokens } = useAppTheme();
   const btnWidth = compact ? 56 : 80;
   const actionStyle = {
     justifyContent: "center" as const,
@@ -29,7 +30,7 @@ export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Prop
     alignSelf: "stretch" as const,
     borderRadius: CARD_RADIUS,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: tokens.border,
     ...CARD_SHADOW,
   };
 

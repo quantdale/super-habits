@@ -6,7 +6,8 @@ import { useRouter, useSegments } from "expo-router";
 import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
-import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
 
@@ -21,25 +22,42 @@ const NAV_ITEMS = [
 
 const NAV_TAB_COUNT = NAV_ITEMS.length;
 const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
-
-/** Matches `Screen` / `bg-surface` so the active tab and tab content area read as one surface. */
-const TAB_CONTENT_SURFACE = "#f8f7ff";
-
-const TAB_RAIL_BG = "#eeecf8";
-const TAB_RAIL_BORDER = "#d4d0ee";
+const NAV_TO_SECTION_KEY = {
+  todos: "todos",
+  habits: "habits",
+  pomodoro: "focus",
+  workout: "workout",
+  calories: "calories",
+} as const;
 
 type TopTabItemProps = {
   isFocused?: boolean;
   label: string;
   icon: string;
   color: string;
+  surfaceColor: string;
+  tabRailColor: string;
+  tabRailBorderColor: string;
+  inactiveColor: string;
   onPress?: () => void;
   style?: object;
   [key: string]: unknown;
 };
 
 /** expo-router TabTrigger may inject layout — row + center is re-applied after flatten(style). */
-function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: TopTabItemProps) {
+function TopTabItem({
+  isFocused,
+  label,
+  icon,
+  color,
+  surfaceColor,
+  tabRailColor,
+  tabRailBorderColor,
+  inactiveColor,
+  onPress,
+  style,
+  ...rest
+}: TopTabItemProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -51,9 +69,9 @@ function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: 
           justifyContent: "center",
           gap: 5,
           minWidth: 0,
-          backgroundColor: isFocused ? TAB_CONTENT_SURFACE : TAB_RAIL_BG,
+          backgroundColor: isFocused ? surfaceColor : tabRailColor,
           borderBottomWidth: isFocused ? 0 : 1,
-          borderBottomColor: TAB_RAIL_BORDER,
+          borderBottomColor: tabRailBorderColor,
           borderTopLeftRadius: isFocused ? 16 : 8,
           borderTopRightRadius: isFocused ? 16 : 8,
           marginTop: isFocused ? 0 : 3,
@@ -76,12 +94,12 @@ function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: 
       <MaterialIcons
         name={icon as keyof typeof MaterialIcons.glyphMap}
         size={16}
-        color={isFocused ? color : "#94a3b8"}
+        color={isFocused ? color : inactiveColor}
       />
       <Text
         style={{
           fontSize: 12,
-          color: isFocused ? color : "#94a3b8",
+          color: isFocused ? color : inactiveColor,
           fontWeight: isFocused ? "600" : "400",
           flexShrink: 1,
         }}
@@ -94,9 +112,11 @@ function TopTabItem({ isFocused, label, icon, color, onPress, style, ...rest }: 
 }
 
 export default function TabsLayout() {
+  const { tokens, resolvedTheme } = useAppTheme();
   const router = useRouter();
   const segments = useSegments();
   const { width: screenWidth } = useWindowDimensions();
+  const overviewColor = resolvedTheme === "dark" ? tokens.textMuted : "#475569";
 
   const currentIndex = useMemo(() => {
     const segs = segments as readonly string[];
@@ -157,9 +177,9 @@ export default function TabsLayout() {
           flexDirection: "row",
           width: "100%",
           alignItems: "stretch",
-          backgroundColor: TAB_RAIL_BG,
+          backgroundColor: tokens.tabRail,
           borderBottomWidth: 1,
-          borderBottomColor: TAB_RAIL_BORDER,
+          borderBottomColor: tokens.tabRailBorder,
           paddingHorizontal: 4,
           paddingTop: 4,
           gap: 2,
@@ -168,12 +188,26 @@ export default function TabsLayout() {
       >
         {NAV_ITEMS.map((item) => (
           <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-            <TopTabItem label={item.label} icon={item.icon} color={item.color} />
+            <TopTabItem
+              label={item.label}
+              icon={item.icon}
+              color={
+                item.name === "overview"
+                  ? overviewColor
+                  : resolvedTheme === "dark"
+                    ? SECTION_COLORS[NAV_TO_SECTION_KEY[item.name]]
+                    : item.color
+              }
+              surfaceColor={tokens.background}
+              tabRailColor={tokens.tabRail}
+              tabRailBorderColor={tokens.tabRailBorder}
+              inactiveColor={tokens.iconMuted}
+            />
           </TabTrigger>
         ))}
       </TabList>
       <GestureDetector gesture={pan}>
-        <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: TAB_CONTENT_SURFACE }} />
+        <TabSlot className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }} />
       </GestureDetector>
     </Tabs>
   );

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { Text, View } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 export type CardVariant = "standard" | "header" | "stat";
 
@@ -38,6 +39,7 @@ export function Card({
   style,
   innerClassName,
 }: CardProps) {
+  const { tokens } = useAppTheme();
   const extra = className?.trim() ?? "";
   const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
   const marginClass = hasConsumerVerticalMargin ? "" : "mb-3";
@@ -46,7 +48,6 @@ export function Card({
   const rootBase = [
     "overflow-hidden",
     "rounded-2xl",
-    "bg-white",
     marginClass,
     "shadow-sm",
     "shadow-black/10",
@@ -55,7 +56,11 @@ export function Card({
     .filter(Boolean)
     .join(" ");
 
-  const rootStyle: StyleProp<ViewStyle> = [borderStyle(accentColor), { elevation: 2 }, style];
+  const rootStyle: StyleProp<ViewStyle> = [
+    borderStyle(accentColor),
+    { elevation: 2, backgroundColor: tokens.surface, borderColor: accentColor ? undefined : tokens.border },
+    style,
+  ];
 
   if (variant === "header") {
     return (
@@ -64,19 +69,21 @@ export function Card({
         style={rootStyle}
       >
         <View
-          className={`flex-row items-center justify-between ${PAD} ${accentColor ? "" : "bg-slate-600"}`}
-          style={accentColor ? { backgroundColor: accentColor } : undefined}
+          className={`flex-row items-center justify-between ${PAD}`}
+          style={{ backgroundColor: accentColor ?? tokens.surfaceElevated }}
         >
           <View className="min-w-0 flex-1 pr-2">
             <Text
-              className={`text-base font-semibold ${accentColor ? "text-white" : "text-slate-900"}`}
+              className="text-base font-semibold"
+              style={{ color: accentColor ? "#ffffff" : tokens.text }}
               numberOfLines={2}
             >
               {headerTitle ?? ""}
             </Text>
             {headerSubtitle ? (
               <Text
-                className={`mt-0.5 text-sm ${accentColor ? "text-white/80" : "text-slate-600"}`}
+                className="mt-0.5 text-sm"
+                style={{ color: accentColor ? "rgba(255,255,255,0.8)" : tokens.textMuted }}
                 numberOfLines={2}
               >
                 {headerSubtitle}
@@ -87,7 +94,7 @@ export function Card({
             <View className="shrink-0 flex-row items-center self-start">{headerRight}</View>
           ) : null}
         </View>
-        <View className={`${PAD} bg-white`}>{children}</View>
+        <View className={PAD} style={{ backgroundColor: tokens.surface }}>{children}</View>
       </View>
     );
   }

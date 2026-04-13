@@ -1,20 +1,24 @@
 import { PropsWithChildren } from "react";
 import { SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
   padded?: boolean;
 }>;
 
-const SURFACE = "#f8f7ff";
-
 export function Screen({ children, scroll = false, padded = true }: ScreenProps) {
+  const { tokens } = useAppTheme();
+
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={[styles.root, { backgroundColor: tokens.background }]}>
       {scroll ? (
         <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={padded ? styles.scrollContentPadded : styles.scrollContent}
+          style={[styles.scroll, { backgroundColor: tokens.background }]}
+          contentContainerStyle={[
+            padded ? styles.scrollContentPadded : styles.scrollContent,
+            { backgroundColor: tokens.background },
+          ]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           nestedScrollEnabled
@@ -23,7 +27,12 @@ export function Screen({ children, scroll = false, padded = true }: ScreenProps)
           {children}
         </ScrollView>
       ) : (
-        <View style={padded ? [styles.fill, styles.padded] : styles.fill}>
+        <View
+          style={[
+            padded ? [styles.fill, styles.padded] : styles.fill,
+            { backgroundColor: tokens.background },
+          ]}
+        >
           {children}
         </View>
       )}
@@ -34,25 +43,21 @@ export function Screen({ children, scroll = false, padded = true }: ScreenProps)
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: SURFACE,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    backgroundColor: SURFACE,
   },
   scrollContentPadded: {
     flexGrow: 1,
-    backgroundColor: SURFACE,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 32,
   },
   fill: {
     flex: 1,
-    backgroundColor: SURFACE,
   },
   padded: {
     paddingHorizontal: 16,
