@@ -1,0 +1,112 @@
+import { MaterialIcons } from "@expo/vector-icons";
+import { Link, type Href } from "expo-router";
+import { Pressable, Text, View } from "react-native";
+import { Card } from "@/core/ui/Card";
+import { Screen } from "@/core/ui/Screen";
+import { SectionTitle } from "@/core/ui/SectionTitle";
+
+const OVERVIEW_HREF = "/(tabs)/overview" as Href;
+const SETTINGS_ACCENT = "#475569";
+
+type PlaceholderItem = {
+  label: string;
+  description: string;
+};
+
+type PlaceholderSection = {
+  title: string;
+  subtitle: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+  items: PlaceholderItem[];
+};
+
+const SECTIONS: PlaceholderSection[] = [
+  {
+    title: "Appearance",
+    subtitle: "Visual preferences will live here once settings are wired up.",
+    icon: "palette",
+    items: [
+      { label: "Theme", description: "Placeholder for light and dark mode controls." },
+      { label: "App accent", description: "Placeholder for future color and display preferences." },
+    ],
+  },
+  {
+    title: "Account",
+    subtitle: "Profile and backup options will be added here later.",
+    icon: "person-outline",
+    items: [
+      { label: "Profile", description: "Placeholder for account details and identity settings." },
+      { label: "Backup & sync", description: "Placeholder for future cloud and device sync controls." },
+    ],
+  },
+  {
+    title: "About",
+    subtitle: "App details and support links will appear in this section.",
+    icon: "info-outline",
+    items: [
+      { label: "Version", description: "Placeholder for build details and release information." },
+      { label: "Privacy", description: "Placeholder for privacy notes and acknowledgements." },
+    ],
+  },
+];
+
+function SettingsPlaceholderRow({ label, description }: PlaceholderItem) {
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <View className="min-w-0 flex-1">
+        <Text className="text-base font-semibold text-slate-900">{label}</Text>
+        <Text className="mt-1 text-sm text-slate-500">{description}</Text>
+      </View>
+      <View className="items-end">
+        <Text className="mb-1 text-xs font-semibold uppercase tracking-[1px] text-slate-400">
+          Soon
+        </Text>
+        <MaterialIcons name="chevron-right" size={20} color="#94a3b8" />
+      </View>
+    </View>
+  );
+}
+
+export function SettingsScreen() {
+  return (
+    <Screen scroll>
+      <View className="mb-4 flex-row items-center justify-between">
+        <SectionTitle
+          title="Settings"
+          subtitle="Navigation is in place. Preferences and account controls are placeholders for now."
+        />
+        <Link href={OVERVIEW_HREF} asChild>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to overview"
+            className="ml-4 flex-row items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2"
+          >
+            <MaterialIcons name="arrow-back" size={18} color={SETTINGS_ACCENT} />
+            <Text className="text-sm font-semibold text-slate-700">Back</Text>
+          </Pressable>
+        </Link>
+      </View>
+
+      {SECTIONS.map((section) => (
+        <Card
+          key={section.title}
+          variant="header"
+          accentColor={SETTINGS_ACCENT}
+          headerTitle={section.title}
+          headerSubtitle={section.subtitle}
+          headerRight={<MaterialIcons name={section.icon} size={22} color="#ffffff" />}
+        >
+          <View className="gap-3">
+            {section.items.map((item) => (
+              <SettingsPlaceholderRow
+                key={item.label}
+                label={item.label}
+                description={item.description}
+              />
+            ))}
+          </View>
+        </Card>
+      ))}
+    </Screen>
+  );
+}
