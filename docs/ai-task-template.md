@@ -12,6 +12,11 @@ Read `AGENTS.md`, `docs/PROJECT_STRUCTURE_MAP.md`, `docs/master-context.md`, and
 Task type: [feature | fix | refactor | migration | audit | pre-PR]
 Scope: [files/folders/features]
 Goal: [what should change]
+Branch/worktree plan:
+- branch: [one branch for this task]
+- worktree: [dedicated worktree if running alongside other tasks]
+Wave:
+- [Wave N only, or explain why this is parallel-safe with other work]
 
 Must preserve:
 - offline-first SQLite-first behavior
@@ -170,6 +175,8 @@ Checks:
 
 - target files or feature area
 - whether this is UI/domain work or data/sync work
+- branch/worktree assignment when parallel work is active
+- wave assignment and whether the task is parallel-safe
 - explicit invariants that must not change
 - required validation commands
 - whether web/PWA behavior matters

@@ -62,6 +62,14 @@ Companion docs in this folder:
 ### Inferred / uncertain
 - The app is beyond prototype stage, but cloud sync, restore, and some operational polish are incomplete.
 
+## Current Repo Workflow State
+
+### Confirmed from current documentation
+- The repo is being operated as a recovered clean baseline.
+- New work should branch from current `main`, not from stale task branches.
+- Active parallel work should use separate worktrees and separate branches per task.
+- Parallel execution is wave-based: only parallel-safe tasks share a wave, and later waves wait for earlier waves to finish.
+
 ## Tech Stack
 
 ### Confirmed from code
