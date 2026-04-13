@@ -1,4 +1,5 @@
 import { Platform, Text, TextInput, View } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 
 type TextFieldProps = {
   label: string;
@@ -24,6 +25,7 @@ export function TextField({
   accessibilityLabel: accessibilityLabelProp,
   nativeID,
 }: TextFieldProps) {
+  const { tokens } = useAppTheme();
   const resolvedKeyboardType = unsignedInteger ? "number-pad" : keyboardType;
 
   const handleChangeText = (text: string) => {
@@ -36,14 +38,16 @@ export function TextField({
 
   return (
     <View className="mb-3">
-      <Text className="mb-1 text-sm font-medium text-slate-700">{label}</Text>
+      <Text className="mb-1 text-sm font-medium" style={{ color: tokens.textMuted }}>{label}</Text>
       <TextInput
         nativeID={nativeID}
         accessibilityLabel={accessibilityLabelProp ?? label}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900"
+        className="rounded-xl border px-3 py-2"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface, color: tokens.text }}
         value={value}
         onChangeText={handleChangeText}
         placeholder={placeholder}
+        placeholderTextColor={tokens.textMuted}
         keyboardType={resolvedKeyboardType}
         {...(Platform.OS === "web" && nativeID ? { id: nativeID } : {})}
       />
