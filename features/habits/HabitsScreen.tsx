@@ -28,7 +28,7 @@ import {
   calculateCurrentStreak,
   calculateOverallConsistency,
 } from "@/features/habits/habits.domain";
-import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { HeatmapDay } from "@/features/shared/activityTypes";
 import { HabitCircle } from "@/features/habits/HabitCircle";
 import { HabitsOverviewGrid } from "@/features/habits/HabitsOverviewGrid";
 import {

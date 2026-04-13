@@ -1,11 +1,6 @@
 import React from "react";
 import { View, Text, ScrollView } from "react-native";
-
-export type ActivityDay = {
-  dateKey: string;
-  active: boolean;
-  value?: number;
-};
+import type { ActivityDay } from "./activityTypes";
 
 type Props = {
   days: ActivityDay[];

@@ -10,7 +10,7 @@ import {
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
 } from "@/features/workout/workout.domain";
-import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { HeatmapDay } from "@/features/shared/activityTypes";
 import type { WorkoutLog } from "@/core/db/types";
 
 function workoutLog(completedAt: string): WorkoutLog {

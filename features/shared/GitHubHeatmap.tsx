@@ -6,11 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { HorizontalScrollArea } from "@/core/ui/HorizontalScrollArea";
-
-export type HeatmapDay = {
-  dateKey: string; // YYYY-MM-DD
-  value: number; // 0 = none, 1 = low, 2 = medium, 3 = high
-};
+import type { HeatmapDay } from "./activityTypes";
 
 type Props = {
   days: HeatmapDay[];

@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { Card } from "@/core/ui/Card";
-import { GitHubHeatmap, type HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { HeatmapDay } from "@/features/shared/activityTypes";
+import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
 import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 type Props = {

@@ -1,5 +1,5 @@
 import type { PomodoroSession } from "./types";
-import type { HeatmapDay } from "@/features/shared/GitHubHeatmap";
+import type { HeatmapDay } from "@/features/shared/activityTypes";
 import { buildDateRangeOldestFirst } from "@/lib/time";
 
 export type PomodoroState = "idle" | "running" | "finished";
