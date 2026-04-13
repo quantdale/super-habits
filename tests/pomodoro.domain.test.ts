@@ -12,7 +12,7 @@ import {
   parseMinutesSeconds,
   DEFAULT_SETTINGS,
   buildPomodoroHeatmapDays,
-  computeFocusStreakFromHeatmapDays,
+  computePomodoroStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
 import type { PomodoroSession } from "@/core/db/types";
 
@@ -220,10 +220,10 @@ describe("buildPomodoroHeatmapDays", () => {
   });
 });
 
-describe("computeFocusStreakFromHeatmapDays", () => {
+describe("computePomodoroStreakFromHeatmapDays", () => {
   it("counts consecutive days with activity from today backward", () => {
     expect(
-      computeFocusStreakFromHeatmapDays([
+      computePomodoroStreakFromHeatmapDays([
         { dateKey: "2025-01-01", value: 0 },
         { dateKey: "2025-01-02", value: 1 },
         { dateKey: "2025-01-03", value: 1 },
@@ -233,7 +233,7 @@ describe("computeFocusStreakFromHeatmapDays", () => {
 
   it("returns 0 when today has no activity", () => {
     expect(
-      computeFocusStreakFromHeatmapDays([
+      computePomodoroStreakFromHeatmapDays([
         { dateKey: "2025-01-01", value: 1 },
         { dateKey: "2025-01-02", value: 0 },
       ]),

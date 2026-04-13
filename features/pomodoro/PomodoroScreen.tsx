@@ -5,7 +5,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
 import { PillChip } from "@/core/ui/PillChip";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
 import {
   listPomodoroSessionsForDateRange,
   logPomodoroSession,
@@ -22,7 +22,7 @@ import {
 import {
   buildPomodoroHeatmapDays,
   calculateGrowthProgress,
-  computeFocusStreakFromHeatmapDays,
+  computePomodoroStreakFromHeatmapDays,
   DEFAULT_SETTINGS,
   getModeColor,
   getModeDuration,
@@ -38,7 +38,7 @@ import { GardenGrid } from "./GardenGrid";
 import { BackgroundWarning } from "./BackgroundWarning";
 import { PomodoroSettingsInline } from "./PomodoroSettingsInline";
 
-const COLOR = SECTION_COLORS.focus;
+const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
 
 function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   switch (mode) {
@@ -276,7 +276,7 @@ export function PomodoroScreen() {
   );
   const upNextMinutes = Math.round(getModeDuration(upNextMode, settings) / 60);
 
-  const focusStreak = computeFocusStreakFromHeatmapDays(pomodoroHeatmapDays);
+  const pomodoroStreak = computePomodoroStreakFromHeatmapDays(pomodoroHeatmapDays);
 
   return (
     <Screen scroll>
@@ -301,7 +301,7 @@ export function PomodoroScreen() {
           <Card variant="stat" accentColor={COLOR} className="mb-0">
             <View className="items-center py-1">
               <Text className="text-[22px]">🔥</Text>
-              <Text className="mt-0.5 text-xl font-bold text-focus">{focusStreak}</Text>
+              <Text className="mt-0.5 text-xl font-bold text-focus">{pomodoroStreak}</Text>
               <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
             </View>
           </Card>

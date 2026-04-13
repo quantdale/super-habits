@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSession } from "./types";
 import { formatSessionDuration } from "./pomodoro.domain";
 
@@ -14,7 +14,7 @@ type Props = {
  * Small plant icon for the garden grid.
  * Simplified version of FocusSprout at 32×32.
  */
-function MiniPlant({ color = SECTION_COLORS.focus }: { color?: string }) {
+function MiniPlant({ color = SECTION_COLORS[POMODORO_SECTION_KEY] }: { color?: string }) {
   return (
     <Svg width={32} height={32} viewBox="0 0 32 32">
       {/* Soil */}
@@ -40,7 +40,7 @@ function MiniPlant({ color = SECTION_COLORS.focus }: { color?: string }) {
   );
 }
 
-export function GardenGrid({ sessions, accentColor = SECTION_COLORS.focus }: Props) {
+export function GardenGrid({ sessions, accentColor = SECTION_COLORS[POMODORO_SECTION_KEY] }: Props) {
   if (sessions.length === 0) {
     return (
       <View className="mx-1 my-2 items-center rounded-xl border border-slate-100 bg-white p-4">

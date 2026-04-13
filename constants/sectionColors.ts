@@ -7,6 +7,10 @@
  * Focus:    Deep Purple — concentration, calm, introspection
  * Workout:  Red-Orange  — physical energy, drive, power
  * Calories: Warm Amber  — warmth, nutrition, appetite awareness
+ *
+ * Naming boundary:
+ * - "pomodoro" remains the canonical internal feature/module key
+ * - "focus" remains the user-facing section label and accent namespace
  */
 export const SECTION_COLORS = {
   todos: "#3B82F6", // Calm Blue
@@ -17,6 +21,9 @@ export const SECTION_COLORS = {
 } as const;
 
 export type SectionKey = keyof typeof SECTION_COLORS;
+
+/** User-facing section token used by the pomodoro feature/tab. */
+export const POMODORO_SECTION_KEY = "focus" as const satisfies SectionKey;
 
 /**
  * Light tinted background for each section — used for

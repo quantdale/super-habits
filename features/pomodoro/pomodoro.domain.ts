@@ -198,7 +198,7 @@ export function buildPomodoroHeatmapDays(
 }
 
 /** Consecutive days with activity, counting from today backward (uses heatmap values). */
-export function computeFocusStreakFromHeatmapDays(heatmapDays: HeatmapDay[]): number {
+export function computePomodoroStreakFromHeatmapDays(heatmapDays: HeatmapDay[]): number {
   if (heatmapDays.length === 0) return 0;
   let streak = 0;
   for (let i = heatmapDays.length - 1; i >= 0; i--) {

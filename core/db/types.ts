@@ -54,6 +54,7 @@ export type HabitCompletion = {
   updated_at: string;
 };
 
+/** Pomodoro is the feature/module; session_type remains the timer mode shown to users. */
 export type PomodoroSession = {
   id: string;
   started_at: string;

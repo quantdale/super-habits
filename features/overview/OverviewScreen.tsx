@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { Card } from "@/core/ui/Card";
 import { Screen } from "@/core/ui/Screen";
 import { getCalorieGoal, listCalorieEntries } from "@/features/calories/calories.data";
@@ -21,7 +21,7 @@ import {
 import { listPomodoroSessionsForDateRange } from "@/features/pomodoro/pomodoro.data";
 import {
   buildPomodoroHeatmapDays,
-  computeFocusStreakFromHeatmapDays,
+  computePomodoroStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
 import { listTodos } from "@/features/todos/todos.data";
 import type { Todo } from "@/features/todos/types";
@@ -34,7 +34,7 @@ import {
 import { buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
 
 type ViewMode = "grid" | "column" | "list";
-type OverviewCardKey = "focus" | "habits" | "calories" | "todos" | "workout";
+type OverviewCardKey = "pomodoro" | "habits" | "calories" | "todos" | "workout";
 type OverviewCardTone = {
   title: string;
   subtitle: string;
@@ -49,12 +49,12 @@ const VIEW_MODE_OPTIONS: { mode: ViewMode; icon: keyof typeof MaterialIcons.glyp
   { mode: "list", icon: "view-list" },
 ];
 const OVERVIEW_CARD_META: Record<OverviewCardKey, OverviewCardTone> = {
-  focus: {
+  pomodoro: {
     title: "Focus",
     subtitle: "This year",
     icon: "timer",
-    accentColor: SECTION_COLORS.focus,
-    textColor: SECTION_TEXT_COLORS.focus,
+    accentColor: SECTION_COLORS[POMODORO_SECTION_KEY],
+    textColor: SECTION_TEXT_COLORS[POMODORO_SECTION_KEY],
   },
   habits: {
     title: "Habits",
@@ -86,7 +86,7 @@ const OVERVIEW_CARD_META: Record<OverviewCardKey, OverviewCardTone> = {
   },
 };
 const GRID_ROWS: OverviewCardKey[][] = [
-  ["focus", "habits"],
+  ["pomodoro", "habits"],
   ["calories", "todos", "workout"],
 ];
 const GRID_TOP_ROW_CARD_CLASS = "min-h-[248px]";
@@ -143,8 +143,8 @@ export function OverviewScreen() {
   const [topPendingTodos, setTopPendingTodos] = useState<Todo[]>([]);
   const [bestHabitStreak, setBestHabitStreak] = useState(0);
   const [habitConsistency, setHabitConsistency] = useState(0);
-  const [focusSessions, setFocusSessions] = useState(0);
-  const [focusStreak, setFocusStreak] = useState(0);
+  const [pomodoroSessions, setPomodoroSessions] = useState(0);
+  const [pomodoroStreak, setPomodoroStreak] = useState(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [calorieGoal, setCalorieGoal] = useState(2000);
   const [workoutDays, setWorkoutDays] = useState(0);
@@ -176,8 +176,8 @@ export function OverviewScreen() {
       setCalorieGoal(goal.calories);
 
       const pomHeatmap = buildPomodoroHeatmapDays(pomodoroSessions, 364);
-      setFocusSessions(pomodoroSessions.length);
-      setFocusStreak(computeFocusStreakFromHeatmapDays(pomHeatmap));
+      setPomodoroSessions(pomodoroSessions.length);
+      setPomodoroStreak(computePomodoroStreakFromHeatmapDays(pomHeatmap));
 
       const workoutActivity = buildWorkoutActivityDays(workoutLogs, 364);
       const workoutHeatmap = buildWorkoutHeatmapDays(workoutLogs, 364);
@@ -222,16 +222,16 @@ export function OverviewScreen() {
   const renderCard = useCallback(
     (cardKey: OverviewCardKey, className?: string) => {
       switch (cardKey) {
-        case "focus":
+        case "pomodoro":
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
                 <View className="flex-row items-center justify-between gap-3">
                   <View className="min-w-0 flex-1">
                     <Text className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-                      {focusSessions} sessions
+                      {pomodoroSessions} sessions
                     </Text>
-                    <Text className="mt-1 text-sm text-slate-500">{focusStreak} day streak</Text>
+                    <Text className="mt-1 text-sm text-slate-500">{pomodoroStreak} day streak</Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
@@ -251,10 +251,10 @@ export function OverviewScreen() {
                 <>
                   <View className="items-center">
                     <Text className="text-center text-5xl font-bold tabular-nums tracking-tight text-slate-900">
-                      {focusSessions}
+                      {pomodoroSessions}
                     </Text>
                     <Text className="mt-1 text-base font-semibold text-slate-700">sessions this year</Text>
-                    <Text className="mt-2 text-sm text-slate-500">{focusStreak} day streak</Text>
+                    <Text className="mt-2 text-sm text-slate-500">{pomodoroStreak} day streak</Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
@@ -420,8 +420,8 @@ export function OverviewScreen() {
       bestHabitStreak,
       calorieGoal,
       caloriesConsumed,
-      focusSessions,
-      focusStreak,
+      pomodoroSessions,
+      pomodoroStreak,
       habitConsistency,
       isListView,
       pendingTodosCount,
@@ -490,7 +490,7 @@ export function OverviewScreen() {
             </View>
           ) : (
             <View className="flex-col gap-3">
-              {(["focus", "habits", "calories", "todos", "workout"] as OverviewCardKey[]).map(
+              {(["pomodoro", "habits", "calories", "todos", "workout"] as OverviewCardKey[]).map(
                 (cardKey) => renderCard(cardKey),
               )}
             </View>
