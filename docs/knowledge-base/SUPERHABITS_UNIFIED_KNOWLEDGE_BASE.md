@@ -53,13 +53,13 @@
 
 **SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 6**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal).
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **9**. Next migration: `if (version < 10)`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **10**. Next migration: `if (version < 11)`.
 
 **Sync:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (one-way **push backup**; `pull` is a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and pushes no-op without throwing.
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality:** **180** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
+**Quality:** **194** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
 
 ### Cross-cutting concerns
 
@@ -86,9 +86,9 @@
 | Name | `superhabits` (npm package, private) |
 | Purpose | Offline-first Expo + React Native client; Overview tab + five feature modules |
 | Entry | `package.json` → `"main": "expo-router/entry"` |
-| Schema version (stored) | **9** (`app_meta.db_schema_version`) |
-| Next migration | `10` (new `if (version < 10)` block in `runMigrations`) |
-| Unit tests | **180** passing (Vitest) |
+| Schema version (stored) | **10** (`app_meta.db_schema_version`) |
+| Next migration | `11` (new `if (version < 11)` block in `runMigrations`) |
+| Unit tests | **194** passing (Vitest) |
 | E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
@@ -503,7 +503,7 @@ Each file: import `*Screen` from `@/features/...`; default export returns `<XxxS
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **9**. Next migration: `if (version < 10)` in `runMigrations()`.
+Current `app_meta.db_schema_version`: **10**. Next migration: `if (version < 11)` in `runMigrations()`.
 
 ### Bootstrap DDL (verbatim)
 
@@ -2166,7 +2166,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 | Out of scope | Screens, `app/`, `core/ui/` |
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
 | Workflow | Read → plan → approval → implement → typecheck + test → report |
-| Schema | Current version **9**, next migration `version < 10` |
+| Schema | Current version **10**, next migration `version < 11` |
 
 #### `feature-agent.md`
 
@@ -2188,7 +2188,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 | Skill | Trigger | Provides |
 |-------|---------|----------|
-| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer | WAL, soft delete, enqueue list, ID format; schema **9** → next **`if (version < 10)`** (always confirm in `core/db/client.ts`) |
+| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer | WAL, soft delete, enqueue list, ID format; schema **10** → next **`if (version < 11)`** (always confirm in `core/db/client.ts`) |
 | `feature-module-pattern/SKILL.md` | New features, module layout | Three-file pattern, route thin wrapper, import rules |
 | `rn-expo-conventions/SKILL.md` | UI, Expo Router, RN | Routing, NativeWind, lists, notifications, platform |
 
@@ -2416,7 +2416,7 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **180** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **194** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
 - `HabitHeatmap.tsx` — exists but unused in `HabitsScreen` (see section 12)
 - Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync

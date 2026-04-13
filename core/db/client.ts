@@ -227,6 +227,46 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     }
     await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "9");
   }
+  if (version < 10) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS linked_action_rules (
+        id                      TEXT PRIMARY KEY NOT NULL,
+        status                  TEXT NOT NULL,
+        direction_policy        TEXT NOT NULL,
+        bidirectional_group_id  TEXT,
+        source_feature          TEXT NOT NULL,
+        source_entity_type      TEXT NOT NULL,
+        source_entity_id        TEXT,
+        trigger_type            TEXT NOT NULL,
+        target_feature          TEXT NOT NULL,
+        target_entity_type      TEXT NOT NULL,
+        target_entity_id        TEXT,
+        effect_type             TEXT NOT NULL,
+        effect_payload          TEXT NOT NULL,
+        created_at              TEXT NOT NULL,
+        updated_at              TEXT NOT NULL,
+        deleted_at              TEXT
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_linked_action_rules_source_lookup
+      ON linked_action_rules (
+        status,
+        source_feature,
+        source_entity_type,
+        source_entity_id,
+        trigger_type
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_linked_action_rules_bidirectional_group
+      ON linked_action_rules (bidirectional_group_id);
+    `);
+
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "10");
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

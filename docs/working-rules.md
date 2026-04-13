@@ -61,8 +61,8 @@ If this file conflicts with current code, trust the code and document the confli
 - Create IDs only with `createId(prefix)` from `lib/id.ts`.
 - Create day keys only with `toDateKey()` from `lib/time.ts`.
 - `toDateKey()` currently uses local calendar dates, not UTC.
-- Runtime schema version is `9`.
-- The next schema change belongs in a new `if (version < 10)` block in `core/db/client.ts`.
+- Runtime schema version is `10`.
+- The next schema change belongs in a new `if (version < 11)` block in `core/db/client.ts`.
 - Migrations are append-only. Never edit prior migration blocks.
 - `core/db/schema.sql` is reference-only and currently stale.
 
@@ -92,7 +92,7 @@ If this file conflicts with current code, trust the code and document the confli
 - Web/PWA behavior depends on OPFS-compatible isolation headers.
 
 ### Confirmed from code
-- `npm test` currently passes with `180` tests.
+- `npm test` currently passes with `194` tests.
 - `npm run typecheck` currently fails because `tsconfig.json` has an incompatible `ignoreDeprecations` value for the installed TypeScript version.
 
 ## Web / PWA Constraints

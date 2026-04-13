@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current stored version: **9** (`app_meta.db_schema_version`)
-- Next migration number: **10** (add `if (version < 10) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Current stored version: **10** (`app_meta.db_schema_version`)
+- Next migration number: **11** (add `if (version < 11) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations live in: core/db/migrations/ (reference) + inline in `runMigrations()` in `core/db/client.ts`
 - schema.sql is a REFERENCE ONLY — not executed at runtime
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
@@ -74,7 +74,7 @@ toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **loca
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 10) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 11) { ... }` today — bump to N+1 when version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/
