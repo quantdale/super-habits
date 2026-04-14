@@ -35,3 +35,24 @@ export function createLinkedActionsNotice({
     },
   };
 }
+
+export function createLinkedActionsNoticeFromPayload(
+  payload: LinkedActionsNoticePayload,
+  onPress?: () => void,
+): AppNotice {
+  return {
+    id: createInAppNoticeId(),
+    createdAt: new Date().toISOString(),
+    onPress,
+    payload,
+  };
+}
+
+export function reportLinkedActionsNotices(
+  notices: AppNotice[],
+  showNotice: (notice: AppNotice) => void,
+) {
+  for (const notice of notices) {
+    showNotice(notice);
+  }
+}

@@ -5,6 +5,7 @@ import {
 } from "@/core/db/appMeta";
 import { getDatabase } from "@/core/db/client";
 import { PomodoroSession } from "@/core/db/types";
+import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 import {
@@ -62,4 +63,56 @@ export async function listPomodoroSessionsForDateRange(
      ORDER BY started_at DESC`,
     [`${startDateKey}T00:00:00`, `${endDateKey}T23:59:59.999`],
   );
+}
+
+export async function logPomodoroSessionFromLinkedAction(input: {
+  id: string;
+  durationSeconds: number;
+  type: PomodoroMode;
+}): Promise<LinkedActionEffectAdapterResult> {
+  const db = await getDatabase();
+  const existing = await db.getFirstAsync<Pick<PomodoroSession, "id" | "session_type">>(
+    `SELECT id, session_type
+     FROM pomodoro_sessions
+     WHERE id = ?`,
+    [input.id],
+  );
+
+  if (existing) {
+    return {
+      status: "applied",
+      targetLabel: existing.session_type,
+      producedEntityType: "pomodoro_session",
+      producedEntityId: existing.id,
+    };
+  }
+
+  const endedAt = new Date();
+  const startedAt = new Date(endedAt.getTime() - Math.max(0, input.durationSeconds) * 1000);
+  const createdAt = nowIso();
+  await db.runAsync(
+    `INSERT INTO pomodoro_sessions (
+       id,
+       started_at,
+       ended_at,
+       duration_seconds,
+       session_type,
+       created_at
+     ) VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      input.id,
+      startedAt.toISOString(),
+      endedAt.toISOString(),
+      input.durationSeconds,
+      input.type,
+      createdAt,
+    ],
+  );
+
+  return {
+    status: "applied",
+    targetLabel: input.type,
+    producedEntityType: "pomodoro_session",
+    producedEntityId: input.id,
+  };
 }
