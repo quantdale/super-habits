@@ -3,8 +3,11 @@ import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 import {
   type CreateLinkedActionRuleInput,
+  type LinkedActionFeature,
   type LinkedActionRuleDefinition,
   type LinkedActionRuleRow,
+  type LinkedActionSourceEntityType,
+  type LinkedActionTriggerType,
   buildLinkedActionRuleRow,
   normalizeLinkedActionRuleRow,
 } from "@/core/linked-actions/linkedActions.types";
@@ -32,6 +35,28 @@ export async function getLinkedActionRule(
     [id],
   );
   return row ? normalizeLinkedActionRuleRow(row) : null;
+}
+
+export async function listActiveLinkedActionRulesForSource(input: {
+  feature: LinkedActionFeature;
+  entityType: LinkedActionSourceEntityType;
+  entityId: string;
+  triggerType: LinkedActionTriggerType;
+}): Promise<LinkedActionRuleDefinition[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<LinkedActionRuleRow>(
+    `SELECT *
+     FROM linked_action_rules
+     WHERE deleted_at IS NULL
+       AND status = 'active'
+       AND source_feature = ?
+       AND source_entity_type = ?
+       AND source_entity_id = ?
+       AND trigger_type = ?
+     ORDER BY created_at DESC`,
+    [input.feature, input.entityType, input.entityId, input.triggerType],
+  );
+  return rows.map(normalizeLinkedActionRuleRow);
 }
 
 export async function createLinkedActionRule(

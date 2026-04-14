@@ -3,6 +3,7 @@ import {
   createLinkedActionRule,
   deleteLinkedActionRule,
   getLinkedActionRule,
+  listActiveLinkedActionRulesForSource,
   listLinkedActionRules,
   updateLinkedActionRuleStatus,
 } from "@/core/linked-actions/linkedActions.data";
@@ -147,6 +148,48 @@ describe("core/linked-actions/linkedActions.data", () => {
       2,
       expect.stringContaining("SET deleted_at = ?, updated_at = ?"),
       [expect.any(String), expect.any(String), "link_1"],
+    );
+  });
+
+  it("filters active rules by exact source entity and trigger", async () => {
+    const row: LinkedActionRuleRow = {
+      id: "link_2",
+      status: "active",
+      direction_policy: "one_way",
+      bidirectional_group_id: null,
+      source_feature: "habits",
+      source_entity_type: "habit",
+      source_entity_id: "habit_1",
+      trigger_type: "habit.completed_for_day",
+      target_feature: "habits",
+      target_entity_type: "habit",
+      target_entity_id: "habit_2",
+      effect_type: "habit.increment",
+      effect_payload: JSON.stringify({
+        amount: 1,
+        dateStrategy: "today",
+      }),
+      created_at: "2026-04-13T00:00:00.000Z",
+      updated_at: "2026-04-13T00:00:00.000Z",
+      deleted_at: null,
+    };
+    const db = {
+      getAllAsync: vi.fn().mockResolvedValue([row]),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(
+      listActiveLinkedActionRulesForSource({
+        feature: "habits",
+        entityType: "habit",
+        entityId: "habit_1",
+        triggerType: "habit.completed_for_day",
+      }),
+    ).resolves.toHaveLength(1);
+
+    expect(db.getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining("status = 'active'"),
+      ["habits", "habit", "habit_1", "habit.completed_for_day"],
     );
   });
 });
