@@ -1,20 +1,24 @@
 import { getDatabase } from "@/core/db/client";
 import { Habit, HabitCategory, HabitCompletion, HabitIcon } from "@/core/db/types";
-import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
+import type {
+  LinkedActionEffectAdapterResult,
+  LinkedActionProcessResult,
+} from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
-import {
-  linkedActionsEngine,
-  type LinkedActionsDispatchResult,
-} from "@/core/linked-actions/linkedActions.engine";
+import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
 import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
 
 const CATEGORY_ORDER = "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
 
+export type LinkedActionsDispatchResult = Pick<
+  LinkedActionProcessResult,
+  "matchedRuleCount" | "notices"
+>;
+
 const EMPTY_LINKED_ACTIONS_RESULT: LinkedActionsDispatchResult = {
   matchedRuleCount: 0,
-  dryRunRuleIds: [],
   notices: [],
 };
 
@@ -88,21 +92,19 @@ export async function incrementHabit(
     };
   }
 
-  const linkedActions = await linkedActionsEngine.handleSourceEvent({
+  const processResult = await linkedActionsEngine.processSourceAction({
     occurredAt: now,
+    feature: "habits",
+    entityType: "habit",
+    entityId: habitId,
+    triggerType: "habit.completed_for_day",
+    label: habit.name,
+    sourceDateKey: dateKey,
+    sourceRecordId: completionId,
     origin: {
       originKind: "user",
       originRuleId: null,
       originEventId: null,
-    },
-    source: {
-      feature: "habits",
-      entityType: "habit",
-      entityId: habitId,
-      label: habit.name,
-      triggerType: "habit.completed_for_day",
-      dateKey,
-      recordId: completionId,
     },
     payload: {
       previousCount,
@@ -110,6 +112,10 @@ export async function incrementHabit(
       targetPerDay: habit.target_per_day,
     },
   });
+  const linkedActions: LinkedActionsDispatchResult = {
+    matchedRuleCount: processResult.matchedRuleCount,
+    notices: processResult.notices,
+  };
 
   return {
     count: nextCount,
