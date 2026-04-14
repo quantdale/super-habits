@@ -34,6 +34,8 @@ type Props = {
   onClose: () => void;
   onSelect: (selection: LinkedActionTargetPickerSelection) => void;
   initialFeature?: LinkedActionFeature;
+  allowedFeatures?: LinkedActionFeature[];
+  allowCreateNew?: boolean;
 };
 
 const MODULES = getLinkedActionTargetPickerProviders();
@@ -61,9 +63,18 @@ export function LinkedActionTargetPickerModal({
   onClose,
   onSelect,
   initialFeature = "todos",
+  allowedFeatures,
+  allowCreateNew = true,
 }: Props) {
   const { tokens } = useAppTheme();
-  const [selectedFeature, setSelectedFeature] = useState<LinkedActionFeature>(initialFeature);
+  const availableModules = useMemo(() => {
+    if (!allowedFeatures || allowedFeatures.length === 0) {
+      return MODULES;
+    }
+    return MODULES.filter((module) => allowedFeatures.includes(module.feature));
+  }, [allowedFeatures]);
+  const defaultFeature = availableModules[0]?.feature ?? initialFeature;
+  const [selectedFeature, setSelectedFeature] = useState<LinkedActionFeature>(defaultFeature);
   const [selectedExistingId, setSelectedExistingId] = useState<string | null>(null);
   const [candidateState, setCandidateState] = useState<CandidateState>({
     status: "idle",
@@ -73,9 +84,12 @@ export function LinkedActionTargetPickerModal({
 
   useEffect(() => {
     if (!visible) return;
-    setSelectedFeature(initialFeature);
+    const nextFeature = availableModules.some((module) => module.feature === initialFeature)
+      ? initialFeature
+      : defaultFeature;
+    setSelectedFeature(nextFeature);
     setSelectedExistingId(null);
-  }, [initialFeature, visible]);
+  }, [availableModules, defaultFeature, initialFeature, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -153,11 +167,9 @@ export function LinkedActionTargetPickerModal({
 
   return (
     <Modal visible={visible} onClose={onClose} title="Linked Actions target picker" scroll>
-      <Card variant="header" accentColor={accentColor} headerTitle="Version 1 scaffold">
+      <Card variant="header" accentColor={accentColor} headerTitle="Pick a target item">
         <Text className="text-sm" style={{ color: tokens.textMuted }}>
-          Choose a target module first, then either select an existing item or take an explicit
-          create-new handoff. This foundation keeps the branch clear without pretending the full
-          module-specific create flows are already wired.
+          Choose a target module, then select the existing item this rule should affect.
         </Text>
       </Card>
 
@@ -166,7 +178,7 @@ export function LinkedActionTargetPickerModal({
           Target module
         </Text>
         <View className="flex-row flex-wrap">
-          {MODULES.map((module) => (
+          {availableModules.map((module) => (
             <PillChip
               key={module.feature}
               label={module.moduleLabel}
@@ -275,31 +287,33 @@ export function LinkedActionTargetPickerModal({
         )}
       </Card>
 
-      <Card
-        variant="header"
-        accentColor={accentColor}
-        headerTitle={provider.createNew.title}
-        headerSubtitle="Explicit handoff only in Version 1"
-      >
-        <View
-          className="rounded-2xl border px-4 py-3"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+      {allowCreateNew ? (
+        <Card
+          variant="header"
+          accentColor={accentColor}
+          headerTitle={provider.createNew.title}
+          headerSubtitle="Create the target in its own module first"
         >
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            {createNewHandoff.title}
-          </Text>
-          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            {provider.createNew.description}
-          </Text>
-          <Text className="mt-2 text-xs uppercase" style={{ color: textColor }}>
-            Next step lives in {provider.moduleLabel}
-          </Text>
-        </View>
+          <View
+            className="rounded-2xl border px-4 py-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              {createNewHandoff.title}
+            </Text>
+            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              {provider.createNew.description}
+            </Text>
+            <Text className="mt-2 text-xs uppercase" style={{ color: textColor }}>
+              Next step lives in {provider.moduleLabel}
+            </Text>
+          </View>
 
-        <View className="mt-3">
-          <Button label="Use create-new handoff" onPress={handleCreateNew} color={accentColor} />
-        </View>
-      </Card>
+          <View className="mt-3">
+            <Button label="Use create-new handoff" onPress={handleCreateNew} color={accentColor} />
+          </View>
+        </Card>
+      ) : null}
     </Modal>
   );
 }

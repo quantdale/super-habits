@@ -3,11 +3,17 @@ import { Habit, HabitCategory, HabitCompletion, HabitIcon } from "@/core/db/type
 import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
+  LinkedActionRuleDefinition,
+  SaveLinkedActionRuleForSourceInput,
 } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
+import {
+  listLinkedActionRulesForSourceEntity,
+  replaceLinkedActionRulesForSourceEntity,
+} from "@/core/linked-actions/linkedActions.data";
 import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
 
 const CATEGORY_ORDER = "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
@@ -35,7 +41,7 @@ export async function addHabit(
   category: HabitCategory = "anytime",
   icon: HabitIcon = DEFAULT_HABIT_ICON,
   color: string = DEFAULT_HABIT_COLOR,
-): Promise<void> {
+): Promise<string> {
   const id = createId("habit");
   const now = nowIso();
   const db = await getDatabase();
@@ -44,6 +50,7 @@ export async function addHabit(
     [id, name, targetPerDay, category, icon, color, now, now],
   );
   syncEngine.enqueue({ entity: "habits", id, updatedAt: now, operation: "create" });
+  return id;
 }
 
 export type IncrementHabitResult = {
@@ -222,10 +229,33 @@ export async function updateHabit(
   syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "update" });
 }
 
+export async function listHabitLinkedActionRules(
+  habitId: string,
+): Promise<LinkedActionRuleDefinition[]> {
+  return listLinkedActionRulesForSourceEntity({
+    feature: "habits",
+    entityType: "habit",
+    entityId: habitId,
+  });
+}
+
+export async function saveHabitLinkedActionRules(
+  habitId: string,
+  rules: SaveLinkedActionRuleForSourceInput[],
+): Promise<void> {
+  await replaceLinkedActionRulesForSourceEntity({
+    feature: "habits",
+    entityType: "habit",
+    entityId: habitId,
+    rules,
+  });
+}
+
 export async function deleteHabit(habitId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync("UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, habitId]);
+  await saveHabitLinkedActionRules(habitId, []);
   syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "delete" });
 }
 

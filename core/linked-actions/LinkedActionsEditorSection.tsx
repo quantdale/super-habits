@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { useAppTheme } from "@/core/providers/ThemeProvider";
@@ -18,7 +18,10 @@ import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
 } from "@/core/linked-actions/linkedActionsEditor.types";
-import type { LinkedActionFeature } from "@/core/linked-actions/linkedActions.types";
+import type {
+  LinkedActionFeature,
+  LinkedActionTriggerType,
+} from "@/core/linked-actions/linkedActions.types";
 import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
 import { PillChip } from "@/core/ui/PillChip";
@@ -33,8 +36,15 @@ import {
 type Props = {
   sourceOptions: LinkedActionEditorSourceOption[];
   selectedSourceKey: string;
-  onSourceKeyChange: (key: string) => void;
-  initialRows: LinkedActionEditorRowDraft[];
+  rows: LinkedActionEditorRowDraft[];
+  onRowsChange: (rows: LinkedActionEditorRowDraft[]) => void;
+  onSourceKeyChange?: (key: string) => void;
+  allowSourceSelection?: boolean;
+  allowedTargetFeatures?: LinkedActionFeature[];
+  allowedTriggerTypes?: LinkedActionTriggerType[];
+  allowCreateNewTarget?: boolean;
+  introTitle?: string;
+  introDescription?: string;
 };
 
 type TargetPickerState = {
@@ -65,16 +75,23 @@ function RuleRow({
   onChange,
   onOpenTargetPicker,
   onRemove,
+  allowedTargetFeatures,
+  allowedTriggerTypes,
+  allowCreateNewTarget,
 }: {
   row: LinkedActionEditorRowDraft;
   onChange: (next: LinkedActionEditorRowDraft) => void;
   onOpenTargetPicker: (rowId: string, feature: LinkedActionFeature) => void;
   onRemove: (rowId: string) => void;
+  allowedTargetFeatures: LinkedActionFeature[];
+  allowedTriggerTypes?: LinkedActionTriggerType[];
+  allowCreateNewTarget: boolean;
 }) {
   const { tokens } = useAppTheme();
   const router = useRouter();
-  const triggerOptions = getLinkedActionTriggerOptions(row.sourceFeature);
-  const targetFeatures = ["todos", "habits", "calories", "workout", "pomodoro"] as const;
+  const triggerOptions = getLinkedActionTriggerOptions(row.sourceFeature).filter((option) =>
+    allowedTriggerTypes ? allowedTriggerTypes.includes(option.value) : true,
+  );
   const selectedTargetFeature = row.targetFeature;
   const effectOptions = selectedTargetFeature
     ? getLinkedActionEffectOptions(selectedTargetFeature)
@@ -90,7 +107,9 @@ function RuleRow({
           targetFeature: row.targetFeature ? null : "Select a target feature.",
           targetSelection: row.targetSelection
             ? null
-            : "Choose an existing target item or a create-new handoff.",
+            : allowCreateNewTarget
+              ? "Choose an existing target item or a create-new handoff."
+              : "Choose an existing target item.",
           effectType: row.effectType ? null : "Select an effect.",
         },
   ).filter((value): value is string => Boolean(value));
@@ -127,11 +146,11 @@ function RuleRow({
     <Card
       variant="header"
       accentColor={getFeatureAccentColor(row.sourceFeature)}
-      headerTitle={row.mode === "existing" ? "Existing linked rule" : "New linked rule"}
+      headerTitle={row.mode === "existing" ? "Linked rule" : "New linked rule"}
       headerSubtitle={
         row.triggerType
           ? `When ${getLinkedActionTriggerLabel(row.triggerType).toLowerCase()}, apply one explicit effect.`
-          : "Build one manual rule at a time."
+          : "Build one explicit rule at a time."
       }
       headerRight={
         <Pressable onPress={() => onRemove(row.id)} hitSlop={8}>
@@ -164,7 +183,7 @@ function RuleRow({
             Target feature
           </Text>
           <View className="flex-row flex-wrap">
-            {targetFeatures.map((feature) => (
+            {allowedTargetFeatures.map((feature) => (
               <PillChip
                 key={feature}
                 label={getLinkedActionFeatureLabel(feature)}
@@ -185,7 +204,9 @@ function RuleRow({
           </Text>
           <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
             {targetSelectionSummary?.description ??
-              "Pick an existing target item or take the explicit Version 1 create-new handoff."}
+              (allowCreateNewTarget
+                ? "Pick an existing target item or use the create-new handoff."
+                : "Pick an existing target item from the target feature.")}
           </Text>
           {targetSelectionSummary ? (
             <>
@@ -206,7 +227,7 @@ function RuleRow({
           <View className="mt-3">
             <Button
               label={row.targetSelection ? "Change target item" : "Choose target item"}
-              onPress={() => onOpenTargetPicker(row.id, row.targetFeature ?? "todos")}
+              onPress={() => onOpenTargetPicker(row.id, row.targetFeature ?? allowedTargetFeatures[0])}
               disabled={!row.targetFeature}
               color={row.targetFeature ? getFeatureAccentColor(row.targetFeature) : undefined}
             />
@@ -269,11 +290,17 @@ function RuleRow({
 export function LinkedActionsEditorSection({
   sourceOptions,
   selectedSourceKey,
+  rows,
+  onRowsChange,
   onSourceKeyChange,
-  initialRows,
+  allowSourceSelection = true,
+  allowedTargetFeatures = ["todos", "habits", "calories", "workout", "pomodoro"],
+  allowedTriggerTypes,
+  allowCreateNewTarget = true,
+  introTitle = "Linked Actions",
+  introDescription = "Build explicit rules by choosing a trigger, target item, and effect.",
 }: Props) {
   const { tokens } = useAppTheme();
-  const [rows, setRows] = useState<LinkedActionEditorRowDraft[]>(initialRows);
   const [targetPickerState, setTargetPickerState] = useState<TargetPickerState>(null);
 
   const selectedSource = useMemo(
@@ -281,24 +308,20 @@ export function LinkedActionsEditorSection({
     [selectedSourceKey, sourceOptions],
   );
 
-  useEffect(() => {
-    setRows(initialRows);
-  }, [initialRows, selectedSourceKey]);
-
   if (!selectedSource) {
     return null;
   }
 
   const handleUpdateRow = (rowId: string, next: LinkedActionEditorRowDraft) => {
-    setRows((current) => current.map((row) => (row.id === rowId ? next : row)));
+    onRowsChange(rows.map((row) => (row.id === rowId ? next : row)));
   };
 
   const handleRemoveRow = (rowId: string) => {
-    setRows((current) => current.filter((row) => row.id !== rowId));
+    onRowsChange(rows.filter((row) => row.id !== rowId));
   };
 
   const handleAddRow = () => {
-    setRows((current) => [...current, createEmptyLinkedActionEditorRow(selectedSource)]);
+    onRowsChange([...rows, createEmptyLinkedActionEditorRow(selectedSource)]);
   };
 
   const handleTargetSelected = (
@@ -306,8 +329,8 @@ export function LinkedActionsEditorSection({
     feature: LinkedActionFeature,
     targetSelection: NonNullable<LinkedActionEditorRowDraft["targetSelection"]>,
   ) => {
-    setRows((current) =>
-      current.map((row) =>
+    onRowsChange(
+      rows.map((row) =>
         row.id === rowId
           ? {
               ...applyLinkedActionTargetFeature(row, feature),
@@ -319,13 +342,16 @@ export function LinkedActionsEditorSection({
   };
 
   const readyRuleCount = rows.filter((row) => countLinkedActionEditorRowErrors(row) === 0).length;
+  const showSourceCard = allowSourceSelection || sourceOptions.length > 1;
 
   return (
     <View className="gap-3">
       <LinkedActionTargetPickerModal
         visible={targetPickerState !== null}
         onClose={() => setTargetPickerState(null)}
-        initialFeature={targetPickerState?.initialFeature ?? "todos"}
+        initialFeature={targetPickerState?.initialFeature ?? allowedTargetFeatures[0]}
+        allowedFeatures={allowedTargetFeatures}
+        allowCreateNew={allowCreateNewTarget}
         onSelect={(targetSelection) => {
           if (!targetPickerState) return;
           const feature =
@@ -342,45 +368,48 @@ export function LinkedActionsEditorSection({
         style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
       >
         <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-          Version 1 editor scaffold
+          {introTitle}
         </Text>
         <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-          Explicit, manual, and rule-based. This preview keeps linked actions local to the editor
-          and intentionally defers the full effect-detail flows.
+          {introDescription}
         </Text>
       </View>
 
-      <Card
-        variant="header"
-        accentColor={getFeatureAccentColor(selectedSource.feature)}
-        headerTitle="Source item"
-        headerSubtitle="Switch the source feature to inspect a different manual rule context."
-      >
-        <View className="gap-3">
-          <View className="flex-row flex-wrap">
-            {sourceOptions.map((option) => (
-              <PillChip
-                key={option.key}
-                label={getLinkedActionFeatureLabel(option.feature)}
-                active={selectedSource.key === option.key}
-                color={getFeatureAccentColor(option.feature)}
-                onPress={() => onSourceKeyChange(option.key)}
-              />
-            ))}
+      {showSourceCard ? (
+        <Card
+          variant="header"
+          accentColor={getFeatureAccentColor(selectedSource.feature)}
+          headerTitle="Source item"
+          headerSubtitle="Rules below are scoped to this source item."
+        >
+          <View className="gap-3">
+            {sourceOptions.length > 1 && allowSourceSelection && onSourceKeyChange ? (
+              <View className="flex-row flex-wrap">
+                {sourceOptions.map((option) => (
+                  <PillChip
+                    key={option.key}
+                    label={getLinkedActionFeatureLabel(option.feature)}
+                    active={selectedSource.key === option.key}
+                    color={getFeatureAccentColor(option.feature)}
+                    onPress={() => onSourceKeyChange(option.key)}
+                  />
+                ))}
+              </View>
+            ) : null}
+            <View
+              className="rounded-2xl border px-4 py-3"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+            >
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                {selectedSource.label}
+              </Text>
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                {selectedSource.description}
+              </Text>
+            </View>
           </View>
-          <View
-            className="rounded-2xl border px-4 py-3"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-          >
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              {selectedSource.label}
-            </Text>
-            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-              {selectedSource.description}
-            </Text>
-          </View>
-        </View>
-      </Card>
+        </Card>
+      ) : null}
 
       {rows.length === 0 ? (
         <Card accentColor={getFeatureAccentColor(selectedSource.feature)}>
@@ -388,7 +417,7 @@ export function LinkedActionsEditorSection({
             No linked rules yet
           </Text>
           <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            Add the first explicit rule for this source item.
+            Add the first linked rule for this source item.
           </Text>
         </Card>
       ) : null}
@@ -402,6 +431,9 @@ export function LinkedActionsEditorSection({
             setTargetPickerState({ rowId, initialFeature: feature })
           }
           onRemove={handleRemoveRow}
+          allowedTargetFeatures={allowedTargetFeatures}
+          allowedTriggerTypes={allowedTriggerTypes}
+          allowCreateNewTarget={allowCreateNewTarget}
         />
       ))}
 
@@ -416,8 +448,8 @@ export function LinkedActionsEditorSection({
           Draft validation
         </Text>
         <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-          {readyRuleCount} of {rows.length} rules currently have the minimum required fields:
-          trigger, target feature, target item, and effect.
+          {readyRuleCount} of {rows.length} rules currently have the required trigger, target
+          feature, target item, and effect.
         </Text>
       </Card>
     </View>

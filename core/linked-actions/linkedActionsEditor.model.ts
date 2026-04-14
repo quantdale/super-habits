@@ -5,6 +5,8 @@ import {
   LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY,
   type LinkedActionEffectType,
   type LinkedActionFeature,
+  type LinkedActionRuleTarget,
+  type SaveLinkedActionRuleForSourceInput,
   type LinkedActionSourceEntityType,
   type LinkedActionTargetEntityType,
   type LinkedActionTriggerType,
@@ -171,6 +173,84 @@ export function createLinkedActionEditorRowFromRule(
     targetEntityType: input.rule.target.entityType,
     targetSelection: input.targetSelection,
     effectType: input.rule.target.effect.type,
+  };
+}
+
+function buildLinkedActionRuleTargetFromEditorRow(
+  row: LinkedActionEditorRowDraft,
+): LinkedActionRuleTarget {
+  if (!row.targetFeature || !row.targetEntityType || !row.effectType) {
+    throw new Error("Linked action row is missing a target feature, entity, or effect.");
+  }
+
+  if (row.targetSelection?.kind !== "existing") {
+    throw new Error("Choose an existing target item before saving this linked action.");
+  }
+
+  switch (row.effectType) {
+    case "todo.complete":
+      return {
+        feature: row.targetFeature,
+        entityType: row.targetEntityType,
+        entityId: row.targetSelection.candidate.id,
+        effect: {
+          kind: "binary",
+          type: "todo.complete",
+        },
+      };
+    case "habit.increment":
+      return {
+        feature: row.targetFeature,
+        entityType: row.targetEntityType,
+        entityId: row.targetSelection.candidate.id,
+        effect: {
+          kind: "progress",
+          type: "habit.increment",
+          amount: 1,
+          dateStrategy: "source_date",
+        },
+      };
+    case "habit.ensure_daily_target":
+      return {
+        feature: row.targetFeature,
+        entityType: row.targetEntityType,
+        entityId: row.targetSelection.candidate.id,
+        effect: {
+          kind: "progress",
+          type: "habit.ensure_daily_target",
+          minimumCount: "target_per_day",
+          dateStrategy: "source_date",
+        },
+      };
+    case "workout.log":
+      return {
+        feature: row.targetFeature,
+        entityType: row.targetEntityType,
+        entityId: row.targetSelection.candidate.id,
+        effect: {
+          kind: "log",
+          type: "workout.log",
+          notes: null,
+        },
+      };
+    default:
+      throw new Error(`The ${row.effectType} effect is not supported in this editor yet.`);
+  }
+}
+
+export function createSaveLinkedActionRuleInputFromEditorRow(
+  row: LinkedActionEditorRowDraft,
+): SaveLinkedActionRuleForSourceInput {
+  if (!row.triggerType) {
+    throw new Error("Select a trigger before saving this linked action.");
+  }
+
+  return {
+    existingRuleId: row.existingRuleId,
+    status: row.status,
+    directionPolicy: row.directionPolicy,
+    triggerType: row.triggerType,
+    target: buildLinkedActionRuleTargetFromEditorRow(row),
   };
 }
 
