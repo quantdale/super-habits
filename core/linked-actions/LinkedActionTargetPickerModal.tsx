@@ -234,7 +234,10 @@ export function LinkedActionTargetPickerModal({
                         backgroundColor: selected ? lightColor : tokens.surface,
                       }}
                     >
-                      <Text className="text-sm font-semibold" style={{ color: selected ? textColor : tokens.text }}>
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: selected ? textColor : tokens.text }}
+                      >
                         {candidate.title}
                       </Text>
                       {candidate.subtitle ? (
