@@ -7,7 +7,7 @@ const { getDatabase } = vi.hoisted(() => ({
 
 const { linkedActionsEngine } = vi.hoisted(() => ({
   linkedActionsEngine: {
-    handleSourceEvent: vi.fn(),
+    processSourceAction: vi.fn(),
   },
 }));
 
@@ -22,9 +22,8 @@ vi.mock("@/core/linked-actions/linkedActions.engine", () => ({
 describe("features/habits/habits.data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    linkedActionsEngine.handleSourceEvent.mockResolvedValue({
+    linkedActionsEngine.processSourceAction.mockResolvedValue({
       matchedRuleCount: 0,
-      dryRunRuleIds: [],
       notices: [],
     });
   });
@@ -51,21 +50,19 @@ describe("features/habits/habits.data", () => {
       "UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?",
       [2, expect.any(String), "hcmp_1"],
     );
-    expect(linkedActionsEngine.handleSourceEvent).toHaveBeenCalledWith({
+    expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith({
       occurredAt: expect.any(String),
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_1",
+      triggerType: "habit.completed_for_day",
+      label: "Hydrate",
+      sourceDateKey: "2026-04-14",
+      sourceRecordId: "hcmp_1",
       origin: {
         originKind: "user",
         originRuleId: null,
         originEventId: null,
-      },
-      source: {
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_1",
-        label: "Hydrate",
-        triggerType: "habit.completed_for_day",
-        dateKey: "2026-04-14",
-        recordId: "hcmp_1",
       },
       payload: {
         previousCount: 1,
@@ -95,12 +92,11 @@ describe("features/habits/habits.data", () => {
     const result = await incrementHabit("habit_1", "2026-04-14");
 
     expect(db.runAsync).toHaveBeenCalledTimes(1);
-    expect(linkedActionsEngine.handleSourceEvent).not.toHaveBeenCalled();
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result).toEqual({
       count: 2,
       linkedActions: {
         matchedRuleCount: 0,
-        dryRunRuleIds: [],
         notices: [],
       },
     });
@@ -128,7 +124,7 @@ describe("features/habits/habits.data", () => {
       "UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?",
       [3, expect.any(String), "hcmp_1"],
     );
-    expect(linkedActionsEngine.handleSourceEvent).not.toHaveBeenCalled();
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result.count).toBe(3);
   });
 });
