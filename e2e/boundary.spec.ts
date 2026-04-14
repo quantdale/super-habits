@@ -84,7 +84,7 @@ test.describe("Todos — boundary inputs", () => {
         await titleInput.waitFor({ state: "visible", timeout: 15_000 });
       }
       await titleInput.fill(`Task ${i}`);
-      await submitTodoModal(page);
+      await submitTodoModal(page, { waitForClose: true });
     }
     await expect(page.getByText("Task 30")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Task 1", { exact: true })).toBeVisible();
