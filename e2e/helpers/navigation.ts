@@ -24,8 +24,16 @@ export async function openNewTodoModal(page: Page) {
  * Primary action in the new-todo modal. The FAB has no visible "Add task" text (icon + a11y label only),
  * so `getByText("Add task")` resolves to the modal button. Force avoids pointer interception on long lists.
  */
-export async function submitTodoModal(page: Page) {
-  await page.getByText("Add task", { exact: true }).click({ force: true });
+export async function submitTodoModal(
+  page: Page,
+  options?: { waitForClose?: boolean },
+) {
+  const titleInput = page.getByPlaceholder(/Add a task/i);
+  // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+  await page.getByText("Add task", { exact: true }).locator("..").click({ force: true });
+  if (options?.waitForClose) {
+    await titleInput.waitFor({ state: "hidden", timeout: 15_000 });
+  }
 }
 
 export async function goToTab(page: Page, tab: keyof typeof TABS) {
