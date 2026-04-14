@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createLinkedActionRule,
   deleteLinkedActionRule,
+  getAppliedHabitDayCalorieExecution,
   getLinkedActionRule,
   listActiveLinkedActionRulesForSource,
   listLinkedActionRulesForSourceEntity,
@@ -195,6 +196,29 @@ describe("core/linked-actions/linkedActions.data", () => {
     );
   });
 
+  it("looks up prior applied calorie executions for the same habit and day", async () => {
+    const executionRow = {
+      id: "lexec_1",
+      rule_id: "link_calorie",
+      source_event_id: "levt_1",
+      chain_id: "lchain_1",
+      root_event_id: "levt_1",
+      origin_rule_id: null,
+      effect_type: "calorie.log",
+      effect_fingerprint: "fingerprint",
+      status: "applied",
+      target_feature: "calories",
+      target_entity_type: "calorie_log",
+      target_entity_id: null,
+      produced_entity_type: "calorie_log",
+      produced_entity_id: "cal_1",
+      notice_payload: null,
+      error_message: null,
+      created_at: "2026-04-14T00:00:00.000Z",
+      updated_at: "2026-04-14T00:00:00.000Z",
+    };
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValue(executionRow),
   it("lists all non-deleted rules for a source entity across triggers", async () => {
     const db = {
       getAllAsync: vi.fn().mockResolvedValue([
@@ -221,6 +245,16 @@ describe("core/linked-actions/linkedActions.data", () => {
     getDatabase.mockResolvedValue(db);
 
     await expect(
+      getAppliedHabitDayCalorieExecution("link_calorie", "habit_1", "2026-04-14"),
+    ).resolves.toMatchObject({
+      id: "lexec_1",
+      effectType: "calorie.log",
+      producedEntityId: "cal_1",
+    });
+
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining("ev.source_date_key = ?"),
+      ["link_calorie", "habit_1", "2026-04-14"],
       listLinkedActionRulesForSourceEntity({
         feature: "habits",
         entityType: "habit",
