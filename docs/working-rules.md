@@ -45,6 +45,7 @@ If this file conflicts with current code, trust the code and document the confli
 ### Confirmed from code and docs
 - SQLite is the source of truth.
 - `getDatabase()` in `core/db/client.ts` must remain the only DB entrypoint.
+- Linked Actions foundation tables are live in schema migrations: `linked_action_rules`, `linked_action_events`, and `linked_action_executions`.
 - Main synced entities use soft delete with `deleted_at`.
 - Do not hard-delete synced main entities.
 - Enqueue sync immediately after mutating writes for synced entities:
@@ -61,8 +62,8 @@ If this file conflicts with current code, trust the code and document the confli
 - Create IDs only with `createId(prefix)` from `lib/id.ts`.
 - Create day keys only with `toDateKey()` from `lib/time.ts`.
 - `toDateKey()` currently uses local calendar dates, not UTC.
-- Runtime schema version is `10`.
-- The next schema change belongs in a new `if (version < 11)` block in `core/db/client.ts`.
+- Runtime schema version is `11`.
+- The next schema change belongs in a new `if (version < 12)` block in `core/db/client.ts`.
 - Migrations are append-only. Never edit prior migration blocks.
 - `core/db/schema.sql` is reference-only and currently stale.
 
@@ -92,8 +93,11 @@ If this file conflicts with current code, trust the code and document the confli
 - Web/PWA behavior depends on OPFS-compatible isolation headers.
 
 ### Confirmed from code
-- `npm test` currently passes with `194` tests.
-- `npm run typecheck` currently fails because `tsconfig.json` has an incompatible `ignoreDeprecations` value for the installed TypeScript version.
+- Validation baseline on April 14, 2026:
+  - `npm run typecheck` passes.
+  - `npm test` passes with `213` tests.
+  - `npm run build:web` passes.
+  - `npm run e2e` passes with `59` tests.
 
 ## Web / PWA Constraints
 
@@ -118,5 +122,5 @@ If this file conflicts with current code, trust the code and document the confli
 
 ### Known drift to keep in mind
 - `README.md` still reports planned stack versions rather than current package versions.
-- `e2e/README.md` still describes the old Metro-based E2E flow.
-- `.github/copilot-instructions.md` is stale on `toDateKey()` and E2E startup.
+- `core/db/schema.sql` is reference-only and intentionally lags runtime migrations.
+- Some deep historical sections in `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md` may lag and should be cross-checked against current code before edits.

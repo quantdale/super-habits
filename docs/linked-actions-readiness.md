@@ -1,5 +1,9 @@
 # Linked Actions Readiness
 
+> Status note (April 14, 2026): this file is a pre-implementation readiness/proposal document.
+> Runtime truth now lives in code: `core/linked-actions/*`, linked-actions migrations in `core/db/client.ts` (`version < 10` and `version < 11`), habits source dispatch in `features/habits/habits.data.ts`, and the Settings preview scaffold in `features/settings/SettingsScreen.tsx`.
+> Use this doc for design rationale and constraints, not as a complete list of what is still missing.
+
 ## 1. Executive Summary
 
 SuperHabits is ready for a safe Version 1 of Linked Actions only if it is implemented as a new centralized engine with explicit trigger/effect registries, persistent execution metadata, and idempotent target wrappers.
