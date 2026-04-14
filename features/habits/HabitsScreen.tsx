@@ -9,6 +9,7 @@ import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
 import { PillChip } from "@/core/ui/PillChip";
+import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import type { Habit, HabitCategory, HabitIcon } from "./types";
 import {
   addHabit,
@@ -61,6 +62,7 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
 }
 
 export function HabitsScreen() {
+  const { showNotice } = useInAppNotices();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
@@ -174,10 +176,13 @@ export function HabitsScreen() {
 
   const handleIncrement = useCallback(
     async (habitId: string) => {
-      await incrementHabit(habitId);
+      const result = await incrementHabit(habitId);
+      for (const notice of result.linkedActions.notices) {
+        showNotice(notice);
+      }
       refresh();
     },
-    [refresh],
+    [refresh, showNotice],
   );
 
   const handleDecrement = useCallback(
