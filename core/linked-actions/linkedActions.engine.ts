@@ -2,6 +2,7 @@ import { createId } from "@/lib/id";
 import {
   createLinkedActionEvent,
   createLinkedActionExecution,
+  getAppliedHabitDayCalorieExecution,
   getLinkedActionEvent,
   getLinkedActionExecutionByChainFingerprint,
   getLinkedActionExecutionByRuleAndSourceEvent,
@@ -162,6 +163,46 @@ function buildNoticePayload(
     plan.plannedProducedEntityId ??
     featureLabel(plan.rule.target.feature);
 
+  if (plan.rule.target.effect.type === "calorie.log") {
+    return {
+      kind: "linked-actions",
+      message:
+        status === "planned"
+          ? `Linked Actions will log ${resolvedTargetLabel}.`
+          : `Linked Actions logged ${resolvedTargetLabel}.`,
+      reason:
+        status === "planned"
+          ? `${sourceLabel} will add a calorie entry when it completes for the day.`
+          : `${sourceLabel} completed for the day and added a calorie entry.`,
+      source: {
+        feature: plan.rule.source.feature,
+        entityType: plan.rule.source.entityType,
+        entityId: plan.sourceEvent.entityId ?? undefined,
+        label: sourceLabel,
+      },
+      target: {
+        feature: plan.rule.target.feature,
+        entityType: plan.rule.target.entityType,
+        entityId:
+          plan.rule.target.entityId ??
+          plan.plannedProducedEntityId ??
+          undefined,
+        label: resolvedTargetLabel,
+      },
+      destination: {
+        kind: "linked-actions-target",
+        href: TAB_HREF_BY_FEATURE[plan.rule.target.feature],
+        feature: plan.rule.target.feature,
+        entityType: plan.rule.target.entityType,
+        entityId:
+          plan.rule.target.entityId ??
+          plan.plannedProducedEntityId ??
+          undefined,
+        label: resolvedTargetLabel,
+      },
+    };
+  }
+
   const verb = status === "planned" ? "planned" : "updated";
   const reasonVerb = status === "planned" ? "will apply" : "applied";
 
@@ -196,6 +237,29 @@ function buildNoticePayload(
       label: resolvedTargetLabel,
     },
   };
+}
+
+async function findPriorAppliedExecutionForFirstRealPath(
+  plan: LinkedActionEffectPlan,
+): Promise<LinkedActionExecutionRecord | null> {
+  if (plan.rule.target.effect.type !== "calorie.log") {
+    return null;
+  }
+  if (
+    plan.sourceEvent.feature !== "habits" ||
+    plan.sourceEvent.entityType !== "habit" ||
+    plan.sourceEvent.triggerType !== "habit.completed_for_day" ||
+    !plan.sourceEvent.entityId ||
+    !plan.sourceEvent.sourceDateKey
+  ) {
+    return null;
+  }
+
+  return getAppliedHabitDayCalorieExecution(
+    plan.rule.id,
+    plan.sourceEvent.entityId,
+    plan.sourceEvent.sourceDateKey,
+  );
 }
 
 function buildPlan(
@@ -323,6 +387,18 @@ export class LinkedActionsEngine {
       if (chainGuardHit) {
         effects.push(
           mapExecutionToDuplicateResult(chainGuardHit, plan, "chain_guard_duplicate"),
+        );
+        continue;
+      }
+
+      const priorAppliedExecution = await findPriorAppliedExecutionForFirstRealPath(plan);
+      if (priorAppliedExecution) {
+        effects.push(
+          mapExecutionToDuplicateResult(
+            priorAppliedExecution,
+            plan,
+            "habit_day_already_logged",
+          ),
         );
         continue;
       }

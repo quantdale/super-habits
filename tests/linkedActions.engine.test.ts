@@ -8,6 +8,7 @@ import type {
 const dataMocks = vi.hoisted(() => ({
   createLinkedActionEvent: vi.fn(),
   createLinkedActionExecution: vi.fn(),
+  getAppliedHabitDayCalorieExecution: vi.fn(),
   getLinkedActionEvent: vi.fn(),
   getLinkedActionExecutionByChainFingerprint: vi.fn(),
   getLinkedActionExecutionByRuleAndSourceEvent: vi.fn(),
@@ -52,6 +53,7 @@ function buildRule(
 describe("core/linked-actions/linkedActions.engine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dataMocks.getAppliedHabitDayCalorieExecution.mockResolvedValue(null);
     dataMocks.getLinkedActionEvent.mockResolvedValue(null);
     dataMocks.getLinkedActionExecutionByRuleAndSourceEvent.mockResolvedValue(null);
     dataMocks.getLinkedActionExecutionByChainFingerprint.mockResolvedValue(null);
@@ -215,6 +217,176 @@ describe("core/linked-actions/linkedActions.engine", () => {
       target: {
         feature: "calories",
       },
+    });
+  });
+
+  it("logs a calorie notice with path-specific copy for habit completions", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
+      buildRule({
+        id: "link_calorie",
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_1",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "calories",
+          entityType: "calorie_log",
+          entityId: null,
+          effect: {
+            kind: "log",
+            type: "calorie.log",
+            dateStrategy: "source_date",
+            templateSource: "inline",
+            savedMealId: null,
+            foodName: "Protein shake",
+            calories: 240,
+            protein: 30,
+            carbs: 12,
+            fats: 6,
+            fiber: 2,
+            mealType: "snack",
+          },
+        },
+      }),
+    ]);
+
+    const executor = vi.fn().mockResolvedValue({
+      status: "applied",
+      targetLabel: "Protein shake",
+      producedEntityType: "calorie_log",
+      producedEntityId: "cal_123",
+    });
+    const engine = new LinkedActionsEngine({
+      effectRegistry: { "calorie.log": executor },
+    });
+
+    const result = await engine.processSourceAction({
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_1",
+      triggerType: "habit.completed_for_day",
+      label: "Hydrate",
+      sourceDateKey: "2026-04-14",
+    });
+
+    expect(dataMocks.getAppliedHabitDayCalorieExecution).toHaveBeenCalledWith(
+      "link_calorie",
+      "habit_1",
+      "2026-04-14",
+    );
+    expect(result.effects[0]).toMatchObject({
+      status: "applied",
+      effectType: "calorie.log",
+      producedEntityId: "cal_123",
+    });
+    expect(result.notices[0]?.payload).toMatchObject({
+      message: "Linked Actions logged Protein shake.",
+      reason: "Hydrate completed for the day and added a calorie entry.",
+      target: {
+        feature: "calories",
+      },
+    });
+  });
+
+  it("dedupes repeated habit-day calorie executions before creating another execution", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
+      buildRule({
+        id: "link_calorie",
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_1",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "calories",
+          entityType: "calorie_log",
+          entityId: null,
+          effect: {
+            kind: "log",
+            type: "calorie.log",
+            dateStrategy: "source_date",
+            templateSource: "inline",
+            savedMealId: null,
+            foodName: "Protein shake",
+            calories: 240,
+            protein: 30,
+            carbs: 12,
+            fats: 6,
+            fiber: 2,
+            mealType: "snack",
+          },
+        },
+      }),
+    ]);
+    dataMocks.getAppliedHabitDayCalorieExecution.mockResolvedValue({
+      id: "lexec_existing",
+      ruleId: "link_calorie",
+      sourceEventId: "levt_existing",
+      chainId: "lchain_existing",
+      rootEventId: "levt_existing",
+      originRuleId: null,
+      effectType: "calorie.log",
+      effectFingerprint: "fingerprint",
+      status: "applied",
+      targetFeature: "calories",
+      targetEntityType: "calorie_log",
+      targetEntityId: null,
+      producedEntityType: "calorie_log",
+      producedEntityId: "cal_existing",
+      noticePayload: {
+        kind: "linked-actions",
+        message: "Linked Actions logged Protein shake.",
+        reason: "Hydrate completed for the day and added a calorie entry.",
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_1",
+          label: "Hydrate",
+        },
+        target: {
+          feature: "calories",
+          entityType: "calorie_log",
+          entityId: "cal_existing",
+          label: "Protein shake",
+        },
+        destination: {
+          kind: "linked-actions-target",
+          href: "/(tabs)/calories",
+          feature: "calories",
+          entityType: "calorie_log",
+          entityId: "cal_existing",
+          label: "Protein shake",
+        },
+      },
+      errorMessage: null,
+      createdAt: "2026-04-14T00:00:00.000Z",
+      updatedAt: "2026-04-14T00:00:00.000Z",
+    });
+
+    const executor = vi.fn();
+    const engine = new LinkedActionsEngine({
+      effectRegistry: { "calorie.log": executor },
+    });
+
+    const result = await engine.processSourceAction({
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_1",
+      triggerType: "habit.completed_for_day",
+      label: "Hydrate",
+      sourceDateKey: "2026-04-14",
+    });
+
+    expect(dataMocks.createLinkedActionExecution).not.toHaveBeenCalled();
+    expect(executor).not.toHaveBeenCalled();
+    expect(result.effects[0]).toMatchObject({
+      status: "duplicate",
+      reason: "habit_day_already_logged",
+      executionId: "lexec_existing",
+      producedEntityId: "cal_existing",
     });
   });
 });
