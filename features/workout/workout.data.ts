@@ -5,6 +5,7 @@ import {
   WorkoutLog,
   WorkoutRoutine,
 } from "@/core/db/types";
+import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -342,4 +343,45 @@ export async function logWorkoutSession(input: {
       [exId, logId, ex.exerciseName, ex.setsCompleted, now],
     );
   }
+}
+
+export async function logWorkoutFromLinkedAction(input: {
+  id: string;
+  routineId: string;
+  notes?: string | null;
+}): Promise<LinkedActionEffectAdapterResult> {
+  const db = await getDatabase();
+  const routine = await db.getFirstAsync<Pick<WorkoutRoutine, "id" | "name" | "deleted_at">>(
+    `SELECT id, name, deleted_at
+     FROM workout_routines
+     WHERE id = ?`,
+    [input.routineId],
+  );
+
+  if (!routine || routine.deleted_at !== null) {
+    return { status: "skipped", reason: "target_missing" };
+  }
+
+  const existing = await db.getFirstAsync<Pick<WorkoutLog, "id">>(
+    `SELECT id
+     FROM workout_logs
+     WHERE id = ?`,
+    [input.id],
+  );
+
+  if (!existing) {
+    const now = nowIso();
+    await db.runAsync(
+      `INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [input.id, input.routineId, input.notes ?? null, now, now],
+    );
+  }
+
+  return {
+    status: "applied",
+    targetLabel: routine.name,
+    producedEntityType: "workout_log",
+    producedEntityId: input.id,
+  };
 }

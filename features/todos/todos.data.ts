@@ -1,5 +1,6 @@
 import { getDatabase } from "@/core/db/client";
 import type { Todo, TodoPriority, TodoRecurrence } from "@/core/db/types";
+import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -234,4 +235,48 @@ export async function removeTodo(id: string): Promise<void> {
   const now = nowIso();
   await db.runAsync("UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, id]);
   syncEngine.enqueue({ entity: "todos", id, updatedAt: now, operation: "delete" });
+}
+
+export async function completeTodoFromLinkedAction(
+  todoId: string,
+): Promise<LinkedActionEffectAdapterResult> {
+  const db = await getDatabase();
+  const todo = await db.getFirstAsync<Pick<Todo, "id" | "title" | "completed" | "deleted_at">>(
+    `SELECT id, title, completed, deleted_at
+     FROM todos
+     WHERE id = ?`,
+    [todoId],
+  );
+
+  if (!todo || todo.deleted_at !== null) {
+    return { status: "skipped", reason: "target_missing" };
+  }
+
+  if (todo.completed === 1) {
+    return {
+      status: "skipped",
+      reason: "already_completed",
+      targetLabel: todo.title,
+    };
+  }
+
+  const now = nowIso();
+  await db.runAsync(
+    `UPDATE todos
+     SET completed = 1, updated_at = ?
+     WHERE id = ?
+       AND deleted_at IS NULL`,
+    [now, todoId],
+  );
+  syncEngine.enqueue({
+    entity: "todos",
+    id: todoId,
+    updatedAt: now,
+    operation: "update",
+  });
+
+  return {
+    status: "applied",
+    targetLabel: todo.title,
+  };
 }

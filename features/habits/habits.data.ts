@@ -1,5 +1,6 @@
 import { getDatabase } from "@/core/db/client";
 import { Habit, HabitCategory, HabitCompletion, HabitIcon } from "@/core/db/types";
+import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -220,4 +221,123 @@ export async function deleteHabit(habitId: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, habitId]);
   syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "delete" });
+}
+
+async function getLinkedActionHabitTarget(habitId: string) {
+  const db = await getDatabase();
+  const habit = await db.getFirstAsync<Pick<Habit, "id" | "name" | "target_per_day" | "deleted_at">>(
+    `SELECT id, name, target_per_day, deleted_at
+     FROM habits
+     WHERE id = ?`,
+    [habitId],
+  );
+  return { db, habit };
+}
+
+export async function incrementHabitFromLinkedAction(input: {
+  habitId: string;
+  amount: number;
+  dateKey: string;
+}): Promise<LinkedActionEffectAdapterResult> {
+  const { db, habit } = await getLinkedActionHabitTarget(input.habitId);
+  if (!habit || habit.deleted_at !== null) {
+    return { status: "skipped", reason: "target_missing" };
+  }
+
+  if (input.amount <= 0) {
+    return {
+      status: "skipped",
+      reason: "invalid_amount",
+      targetLabel: habit.name,
+    };
+  }
+
+  const now = nowIso();
+  const existing = await db.getFirstAsync<{ id: string; count: number }>(
+    `SELECT id, count
+     FROM habit_completions
+     WHERE habit_id = ?
+       AND date_key = ?`,
+    [input.habitId, input.dateKey],
+  );
+
+  if (existing) {
+    await db.runAsync(
+      `UPDATE habit_completions
+       SET count = ?, updated_at = ?
+       WHERE id = ?`,
+      [existing.count + input.amount, now, existing.id],
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [createId("hcmp"), input.habitId, input.dateKey, input.amount, now, now],
+    );
+  }
+
+  return {
+    status: "applied",
+    targetLabel: habit.name,
+  };
+}
+
+export async function ensureHabitDailyTargetFromLinkedAction(input: {
+  habitId: string;
+  minimumCount: number | "target_per_day";
+  dateKey: string;
+}): Promise<LinkedActionEffectAdapterResult> {
+  const { db, habit } = await getLinkedActionHabitTarget(input.habitId);
+  if (!habit || habit.deleted_at !== null) {
+    return { status: "skipped", reason: "target_missing" };
+  }
+
+  const desiredCount = Math.max(
+    0,
+    input.minimumCount === "target_per_day" ? habit.target_per_day : input.minimumCount,
+  );
+  if (desiredCount === 0) {
+    return {
+      status: "skipped",
+      reason: "already_satisfied",
+      targetLabel: habit.name,
+    };
+  }
+
+  const now = nowIso();
+  const existing = await db.getFirstAsync<{ id: string; count: number }>(
+    `SELECT id, count
+     FROM habit_completions
+     WHERE habit_id = ?
+       AND date_key = ?`,
+    [input.habitId, input.dateKey],
+  );
+
+  if (existing && existing.count >= desiredCount) {
+    return {
+      status: "skipped",
+      reason: "already_satisfied",
+      targetLabel: habit.name,
+    };
+  }
+
+  if (existing) {
+    await db.runAsync(
+      `UPDATE habit_completions
+       SET count = ?, updated_at = ?
+       WHERE id = ?`,
+      [desiredCount, now, existing.id],
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [createId("hcmp"), input.habitId, input.dateKey, desiredCount, now, now],
+    );
+  }
+
+  return {
+    status: "applied",
+    targetLabel: habit.name,
+  };
 }

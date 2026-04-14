@@ -1,3 +1,5 @@
+import type { AppNotice, LinkedActionsNoticePayload } from "@/core/notifications/inAppNotices.types";
+
 export const LINKED_ACTION_RULE_STATUSES = ["active", "paused"] as const;
 export type LinkedActionRuleStatus = (typeof LINKED_ACTION_RULE_STATUSES)[number];
 
@@ -603,4 +605,308 @@ export function parseLinkedActionRuleRecord(value: unknown): LinkedActionRuleDef
     updated_at: expectString(raw.updatedAt, "linked action updatedAt"),
     deleted_at: expectNullableString(raw.deletedAt, "linked action deletedAt"),
   });
+}
+
+export const LINKED_ACTION_EXECUTION_STATUSES = [
+  "planned",
+  "applied",
+  "skipped",
+  "duplicate",
+  "failed",
+] as const;
+export type LinkedActionExecutionStatus =
+  (typeof LINKED_ACTION_EXECUTION_STATUSES)[number];
+
+export type LinkedActionEffectProducedEntityType =
+  | LinkedActionTargetEntityType
+  | "workout_log";
+
+export type LinkedActionSourceActionInput = {
+  eventId?: string;
+  feature: LinkedActionFeature;
+  entityType: LinkedActionSourceEntityType;
+  entityId: string | null;
+  triggerType: LinkedActionTriggerType;
+  sourceRecordId?: string | null;
+  sourceDateKey?: string | null;
+  occurredAt?: string;
+  label?: string;
+  payload?: Record<string, unknown>;
+  origin?: Partial<LinkedActionOriginMetadata>;
+  chain?: Partial<LinkedActionChainMetadata>;
+};
+
+export type LinkedActionSourceAction = {
+  eventId: string;
+  feature: LinkedActionFeature;
+  entityType: LinkedActionSourceEntityType;
+  entityId: string | null;
+  triggerType: LinkedActionTriggerType;
+  sourceRecordId: string | null;
+  sourceDateKey: string | null;
+  occurredAt: string;
+  label: string | null;
+  payload: Record<string, unknown>;
+  origin: LinkedActionOriginMetadata;
+  chain: LinkedActionChainMetadata;
+};
+
+export type LinkedActionEventRecord = LinkedActionSourceAction;
+
+export type LinkedActionEventRow = {
+  id: string;
+  chain_id: string;
+  root_event_id: string;
+  parent_event_id: string | null;
+  chain_depth: number;
+  origin_kind: string;
+  origin_rule_id: string | null;
+  origin_event_id: string | null;
+  source_feature: string;
+  source_entity_type: string;
+  source_entity_id: string | null;
+  trigger_type: string;
+  source_record_id: string | null;
+  source_date_key: string | null;
+  source_label: string | null;
+  occurred_at: string;
+  payload: string;
+  created_at: string;
+};
+
+export type LinkedActionEffectPlan = {
+  sourceEvent: LinkedActionEventRecord;
+  rule: LinkedActionRuleDefinition;
+  chain: LinkedActionChainMetadata;
+  origin: LinkedActionOriginMetadata;
+  effectFingerprint: string;
+  plannedProducedEntityType: LinkedActionEffectProducedEntityType | null;
+  plannedProducedEntityId: string | null;
+  noticePreview: LinkedActionsNoticePayload | null;
+};
+
+export type LinkedActionEffectAdapterResult = {
+  status: "applied" | "skipped";
+  reason?: string | null;
+  targetLabel?: string | null;
+  producedEntityType?: LinkedActionEffectProducedEntityType | null;
+  producedEntityId?: string | null;
+};
+
+export type LinkedActionExecutionRecord = {
+  id: string;
+  ruleId: string;
+  sourceEventId: string;
+  chainId: string;
+  rootEventId: string;
+  originRuleId: string | null;
+  effectType: LinkedActionEffectType;
+  effectFingerprint: string;
+  status: LinkedActionExecutionStatus;
+  targetFeature: LinkedActionFeature;
+  targetEntityType: LinkedActionTargetEntityType;
+  targetEntityId: string | null;
+  producedEntityType: LinkedActionEffectProducedEntityType | null;
+  producedEntityId: string | null;
+  noticePayload: LinkedActionsNoticePayload | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LinkedActionExecutionRow = {
+  id: string;
+  rule_id: string;
+  source_event_id: string;
+  chain_id: string;
+  root_event_id: string;
+  origin_rule_id: string | null;
+  effect_type: string;
+  effect_fingerprint: string;
+  status: string;
+  target_feature: string;
+  target_entity_type: string;
+  target_entity_id: string | null;
+  produced_entity_type: string | null;
+  produced_entity_id: string | null;
+  notice_payload: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LinkedActionEffectResult = {
+  executionId: string | null;
+  ruleId: string;
+  status: LinkedActionExecutionStatus;
+  effectType: LinkedActionEffectType;
+  effectFingerprint: string;
+  targetFeature: LinkedActionFeature;
+  targetEntityType: LinkedActionTargetEntityType;
+  targetEntityId: string | null;
+  producedEntityType: LinkedActionEffectProducedEntityType | null;
+  producedEntityId: string | null;
+  reason: string | null;
+  errorMessage: string | null;
+  notice: AppNotice | null;
+  noticePreview: LinkedActionsNoticePayload | null;
+};
+
+export type LinkedActionProcessMode = "plan" | "apply";
+
+export type LinkedActionProcessResult = {
+  mode: LinkedActionProcessMode;
+  sourceEvent: LinkedActionEventRecord;
+  matchedRuleCount: number;
+  effects: LinkedActionEffectResult[];
+  notices: AppNotice[];
+};
+
+export function isLinkedActionExecutionStatus(
+  value: string,
+): value is LinkedActionExecutionStatus {
+  return isStringArrayMember(LINKED_ACTION_EXECUTION_STATUSES, value);
+}
+
+export function buildLinkedActionEventRow(
+  event: LinkedActionEventRecord,
+  createdAt: string,
+): LinkedActionEventRow {
+  return {
+    id: event.eventId,
+    chain_id: event.chain.chainId,
+    root_event_id: event.chain.rootEventId,
+    parent_event_id: event.chain.parentEventId,
+    chain_depth: event.chain.depth,
+    origin_kind: event.origin.originKind,
+    origin_rule_id: event.origin.originRuleId,
+    origin_event_id: event.origin.originEventId,
+    source_feature: event.feature,
+    source_entity_type: event.entityType,
+    source_entity_id: event.entityId,
+    trigger_type: event.triggerType,
+    source_record_id: event.sourceRecordId,
+    source_date_key: event.sourceDateKey,
+    source_label: event.label,
+    occurred_at: event.occurredAt,
+    payload: JSON.stringify(event.payload),
+    created_at: createdAt,
+  };
+}
+
+export function normalizeLinkedActionEventRow(
+  row: LinkedActionEventRow,
+): LinkedActionEventRecord {
+  if (!isLinkedActionFeature(row.source_feature)) {
+    throw new Error(`Unknown linked action event source feature: ${row.source_feature}`);
+  }
+  if (!isLinkedActionSourceEntityType(row.source_entity_type)) {
+    throw new Error(
+      `Unknown linked action event source entity type: ${row.source_entity_type}`,
+    );
+  }
+  if (!isLinkedActionTriggerType(row.trigger_type)) {
+    throw new Error(`Unknown linked action event trigger type: ${row.trigger_type}`);
+  }
+  if (!["user", "linked_action", "system"].includes(row.origin_kind)) {
+    throw new Error(`Unknown linked action event origin kind: ${row.origin_kind}`);
+  }
+
+  const payload = JSON.parse(row.payload);
+  const parsedPayload =
+    typeof payload === "object" && payload !== null && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+
+  return {
+    eventId: row.id,
+    feature: row.source_feature,
+    entityType: row.source_entity_type,
+    entityId: row.source_entity_id,
+    triggerType: row.trigger_type,
+    sourceRecordId: row.source_record_id,
+    sourceDateKey: row.source_date_key,
+    occurredAt: row.occurred_at,
+    label: row.source_label,
+    payload: parsedPayload,
+    origin: {
+      originKind: row.origin_kind as LinkedActionOriginKind,
+      originRuleId: row.origin_rule_id,
+      originEventId: row.origin_event_id,
+    },
+    chain: {
+      chainId: row.chain_id,
+      rootEventId: row.root_event_id,
+      parentEventId: row.parent_event_id,
+      depth: row.chain_depth,
+    },
+  };
+}
+
+export function buildLinkedActionExecutionRow(
+  execution: LinkedActionExecutionRecord,
+): LinkedActionExecutionRow {
+  return {
+    id: execution.id,
+    rule_id: execution.ruleId,
+    source_event_id: execution.sourceEventId,
+    chain_id: execution.chainId,
+    root_event_id: execution.rootEventId,
+    origin_rule_id: execution.originRuleId,
+    effect_type: execution.effectType,
+    effect_fingerprint: execution.effectFingerprint,
+    status: execution.status,
+    target_feature: execution.targetFeature,
+    target_entity_type: execution.targetEntityType,
+    target_entity_id: execution.targetEntityId,
+    produced_entity_type: execution.producedEntityType,
+    produced_entity_id: execution.producedEntityId,
+    notice_payload: execution.noticePayload ? JSON.stringify(execution.noticePayload) : null,
+    error_message: execution.errorMessage,
+    created_at: execution.createdAt,
+    updated_at: execution.updatedAt,
+  };
+}
+
+export function normalizeLinkedActionExecutionRow(
+  row: LinkedActionExecutionRow,
+): LinkedActionExecutionRecord {
+  if (!isLinkedActionEffectType(row.effect_type)) {
+    throw new Error(`Unknown linked action execution effect type: ${row.effect_type}`);
+  }
+  if (!isLinkedActionExecutionStatus(row.status)) {
+    throw new Error(`Unknown linked action execution status: ${row.status}`);
+  }
+  if (!isLinkedActionFeature(row.target_feature)) {
+    throw new Error(`Unknown linked action execution target feature: ${row.target_feature}`);
+  }
+  if (!isLinkedActionTargetEntityType(row.target_entity_type)) {
+    throw new Error(
+      `Unknown linked action execution target entity type: ${row.target_entity_type}`,
+    );
+  }
+
+  return {
+    id: row.id,
+    ruleId: row.rule_id,
+    sourceEventId: row.source_event_id,
+    chainId: row.chain_id,
+    rootEventId: row.root_event_id,
+    originRuleId: row.origin_rule_id,
+    effectType: row.effect_type,
+    effectFingerprint: row.effect_fingerprint,
+    status: row.status,
+    targetFeature: row.target_feature,
+    targetEntityType: row.target_entity_type,
+    targetEntityId: row.target_entity_id,
+    producedEntityType:
+      (row.produced_entity_type as LinkedActionEffectProducedEntityType | null) ?? null,
+    producedEntityId: row.produced_entity_id,
+    noticePayload: row.notice_payload
+      ? (JSON.parse(row.notice_payload) as LinkedActionsNoticePayload)
+      : null,
+    errorMessage: row.error_message,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }

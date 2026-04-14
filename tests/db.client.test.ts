@@ -14,7 +14,7 @@ type LoadClientOptions = {
   openDatabaseAsync?: ReturnType<typeof vi.fn>;
 };
 
-function buildDb(version: string | null = "10"): MockDatabase {
+function buildDb(version: string | null = "11"): MockDatabase {
   return {
     execAsync: vi.fn().mockResolvedValue(undefined),
     runAsync: vi.fn().mockResolvedValue(undefined),
@@ -27,7 +27,7 @@ function buildDb(version: string | null = "10"): MockDatabase {
 async function loadDbClient(options: LoadClientOptions = {}) {
   vi.resetModules();
   const platform = options.platform ?? "ios";
-  const schemaVersion = options.schemaVersion === undefined ? "10" : options.schemaVersion;
+  const schemaVersion = options.schemaVersion === undefined ? "11" : options.schemaVersion;
   const db = buildDb(schemaVersion);
   const openDatabaseAsync = options.openDatabaseAsync ?? vi.fn().mockResolvedValue(db);
 
@@ -143,7 +143,7 @@ describe("core/db/client", () => {
     expect(cutoverCall?.[1]).toEqual(["date_key_cutover", expect.any(String)]);
   });
 
-  it("applies migrations from version 0 and bumps to schema version 10", async () => {
+  it("applies migrations from version 0 and bumps to schema version 11", async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
@@ -153,22 +153,28 @@ describe("core/db/client", () => {
         String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
         Array.isArray(args) &&
         args[0] === "db_schema_version" &&
-        args[1] === "10",
+        args[1] === "11",
     );
     expect(hasSchemaV10Write).toBe(true);
   });
 
-  it("adds linked action storage in migration 10", async () => {
-    const { client, db } = await loadDbClient({ schemaVersion: "9" });
+  it("adds linked action execution storage in migration 11", async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: "10" });
 
     await client.getDatabase();
 
     const sqlCalls = db.execAsync.mock.calls.map(([sql]) => String(sql));
     expect(
-      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_rules")),
+      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_events")),
     ).toBe(true);
     expect(
       sqlCalls.some((sql) => sql.includes("idx_linked_action_rules_source_lookup")),
+    ).toBe(false);
+    expect(
+      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_executions")),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((sql) => sql.includes("idx_linked_action_executions_chain_guard")),
     ).toBe(true);
     expect(
       db.runAsync.mock.calls.some(
@@ -176,19 +182,19 @@ describe("core/db/client", () => {
           String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
           Array.isArray(args) &&
           args[0] === "db_schema_version" &&
-          args[1] === "10",
+          args[1] === "11",
       ),
     ).toBe(true);
   });
 
-  it("does not rerun linked action migration when database is already at v10", async () => {
-    const { client, db } = await loadDbClient({ schemaVersion: "10" });
+  it("does not rerun linked action execution migration when database is already at v11", async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: "11" });
 
     await client.getDatabase();
 
     const sqlCalls = db.execAsync.mock.calls.map(([sql]) => String(sql));
     expect(
-      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_rules")),
+      sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_events")),
     ).toBe(false);
   });
 });

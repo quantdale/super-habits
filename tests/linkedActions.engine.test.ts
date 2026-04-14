@@ -1,179 +1,220 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LinkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
+import type {
+  LinkedActionExecutionRecord,
+  LinkedActionRuleDefinition,
+} from "@/core/linked-actions/linkedActions.types";
 
-const { listActiveLinkedActionRulesForSource } = vi.hoisted(() => ({
-  listActiveLinkedActionRulesForSource: vi.fn(),
+const dataMocks = vi.hoisted(() => ({
+  createLinkedActionEvent: vi.fn(),
+  createLinkedActionExecution: vi.fn(),
+  getLinkedActionEvent: vi.fn(),
+  getLinkedActionExecutionByChainFingerprint: vi.fn(),
+  getLinkedActionExecutionByRuleAndSourceEvent: vi.fn(),
+  listMatchingLinkedActionRules: vi.fn(),
+  updateLinkedActionExecution: vi.fn(),
 }));
 
-const { getDatabase } = vi.hoisted(() => ({
-  getDatabase: vi.fn(),
-}));
+vi.mock("@/core/linked-actions/linkedActions.data", () => dataMocks);
 
-vi.mock("@/core/linked-actions/linkedActions.data", () => ({
-  listActiveLinkedActionRulesForSource,
-}));
-
-vi.mock("@/core/db/client", () => ({
-  getDatabase,
-}));
+function buildRule(
+  overrides: Partial<LinkedActionRuleDefinition> = {},
+): LinkedActionRuleDefinition {
+  return {
+    id: "link_1",
+    status: "active",
+    directionPolicy: "one_way",
+    bidirectionalGroupId: null,
+    source: {
+      feature: "todos",
+      entityType: "todo",
+      entityId: "todo_1",
+      triggerType: "todo.completed",
+    },
+    target: {
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_1",
+      effect: {
+        kind: "progress",
+        type: "habit.increment",
+        amount: 1,
+        dateStrategy: "today",
+      },
+    },
+    createdAt: "2026-04-14T00:00:00.000Z",
+    updatedAt: "2026-04-14T00:00:00.000Z",
+    deletedAt: null,
+    ...overrides,
+  };
+}
 
 describe("core/linked-actions/linkedActions.engine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dataMocks.getLinkedActionEvent.mockResolvedValue(null);
+    dataMocks.getLinkedActionExecutionByRuleAndSourceEvent.mockResolvedValue(null);
+    dataMocks.getLinkedActionExecutionByChainFingerprint.mockResolvedValue(null);
+    dataMocks.updateLinkedActionExecution.mockResolvedValue(undefined);
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([]);
+    dataMocks.createLinkedActionEvent.mockImplementation(async (event) => event);
+    dataMocks.createLinkedActionExecution.mockImplementation(async (execution) => ({
+      id: execution.id ?? "lexec_1",
+      createdAt: "2026-04-14T00:00:00.000Z",
+      updatedAt: "2026-04-14T00:00:00.000Z",
+      ...execution,
+    }));
   });
 
-  it("builds a habits dry-run notice for the supported Version 1 slice", async () => {
-    listActiveLinkedActionRulesForSource.mockResolvedValue([
-      {
-        id: "link_1",
-        status: "active",
-        directionPolicy: "one_way",
-        bidirectionalGroupId: null,
+  it("creates a new root chain and applies a matching effect", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([buildRule()]);
+
+    const executor = vi.fn().mockResolvedValue({
+      status: "applied",
+      targetLabel: "Hydrate",
+    });
+    const engine = new LinkedActionsEngine({
+      effectRegistry: { "habit.increment": executor },
+    });
+
+    const result = await engine.processSourceAction({
+      feature: "todos",
+      entityType: "todo",
+      entityId: "todo_1",
+      triggerType: "todo.completed",
+      label: "Morning todo",
+      sourceDateKey: "2026-04-14",
+    });
+
+    expect(dataMocks.createLinkedActionEvent).toHaveBeenCalledTimes(1);
+    const persistedEvent = dataMocks.createLinkedActionEvent.mock.calls[0][0];
+    expect(persistedEvent.chain.chainId).toMatch(/^lchain_/);
+    expect(persistedEvent.chain.rootEventId).toBe(persistedEvent.eventId);
+    expect(persistedEvent.chain.depth).toBe(0);
+
+    expect(dataMocks.createLinkedActionExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ruleId: "link_1",
+        sourceEventId: persistedEvent.eventId,
+        chainId: persistedEvent.chain.chainId,
+        status: "planned",
+      }),
+    );
+    expect(executor).toHaveBeenCalledTimes(1);
+    expect(result.matchedRuleCount).toBe(1);
+    expect(result.effects[0]).toMatchObject({
+      status: "applied",
+      ruleId: "link_1",
+      effectType: "habit.increment",
+    });
+    expect(result.notices[0]?.payload.message).toContain("Linked Actions updated");
+  });
+
+  it("returns duplicate results when the same source event already executed a rule", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([buildRule()]);
+    const priorExecution: LinkedActionExecutionRecord = {
+      id: "lexec_existing",
+      ruleId: "link_1",
+      sourceEventId: "levt_existing",
+      chainId: "lchain_existing",
+      rootEventId: "levt_existing",
+      originRuleId: null,
+      effectType: "habit.increment",
+      effectFingerprint: "fingerprint",
+      status: "applied",
+      targetFeature: "habits",
+      targetEntityType: "habit",
+      targetEntityId: "habit_1",
+      producedEntityType: null,
+      producedEntityId: null,
+      noticePayload: null,
+      errorMessage: null,
+      createdAt: "2026-04-14T00:00:00.000Z",
+      updatedAt: "2026-04-14T00:00:00.000Z",
+    };
+    dataMocks.getLinkedActionExecutionByRuleAndSourceEvent.mockResolvedValue(priorExecution);
+
+    const executor = vi.fn();
+    const engine = new LinkedActionsEngine({
+      effectRegistry: { "habit.increment": executor },
+    });
+
+    const result = await engine.processSourceAction({
+      eventId: "levt_existing",
+      feature: "todos",
+      entityType: "todo",
+      entityId: "todo_1",
+      triggerType: "todo.completed",
+    });
+
+    expect(dataMocks.createLinkedActionExecution).not.toHaveBeenCalled();
+    expect(executor).not.toHaveBeenCalled();
+    expect(result.effects[0]).toMatchObject({
+      status: "duplicate",
+      reason: "source_event_already_executed",
+      executionId: "lexec_existing",
+    });
+  });
+
+  it("returns planned effect metadata without persisting events or executions", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
+      buildRule({
+        id: "link_cal",
         source: {
-          feature: "habits",
-          entityType: "habit",
-          entityId: "habit_source",
-          triggerType: "habit.completed_for_day",
+          feature: "workout",
+          entityType: "workout_routine",
+          entityId: "wrk_1",
+          triggerType: "workout.completed",
         },
         target: {
-          feature: "habits",
-          entityType: "habit",
-          entityId: "habit_target",
+          feature: "calories",
+          entityType: "calorie_log",
+          entityId: null,
           effect: {
-            kind: "progress",
-            type: "habit.ensure_daily_target",
-            minimumCount: "target_per_day",
-            dateStrategy: "today",
+            kind: "log",
+            type: "calorie.log",
+            dateStrategy: "source_date",
+            templateSource: "inline",
+            savedMealId: null,
+            foodName: "Protein shake",
+            calories: 240,
+            protein: 30,
+            carbs: 12,
+            fats: 6,
+            fiber: 2,
+            mealType: "snack",
           },
         },
-        createdAt: "2026-04-13T00:00:00.000Z",
-        updatedAt: "2026-04-13T00:00:00.000Z",
-        deletedAt: null,
-      },
-    ]);
-    getDatabase.mockResolvedValue({
-      getFirstAsync: vi.fn().mockResolvedValue({
-        id: "habit_target",
-        name: "Evening stretch",
       }),
-    });
+    ]);
 
     const engine = new LinkedActionsEngine();
-    const result = await engine.handleSourceEvent({
-      occurredAt: "2026-04-14T10:00:00.000Z",
-      origin: {
-        originKind: "user",
-        originRuleId: null,
-        originEventId: null,
+    const result = await engine.processSourceAction(
+      {
+        feature: "workout",
+        entityType: "workout_routine",
+        entityId: "wrk_1",
+        triggerType: "workout.completed",
+        label: "Full body",
+        sourceDateKey: "2026-04-14",
       },
-      source: {
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_source",
-        label: "Hydrate",
-        triggerType: "habit.completed_for_day",
-        dateKey: "2026-04-14",
-        recordId: "hcmp_1",
-      },
-      payload: {
-        previousCount: 0,
-        currentCount: 1,
-        targetPerDay: 1,
-      },
+      "plan",
+    );
+
+    expect(dataMocks.createLinkedActionEvent).not.toHaveBeenCalled();
+    expect(dataMocks.createLinkedActionExecution).not.toHaveBeenCalled();
+    expect(result.mode).toBe("plan");
+    expect(result.effects[0]).toMatchObject({
+      status: "planned",
+      effectType: "calorie.log",
+      producedEntityType: "calorie_log",
     });
-
-    expect(result.matchedRuleCount).toBe(1);
-    expect(result.dryRunRuleIds).toEqual(["link_1"]);
-    expect(result.notices).toHaveLength(1);
-    expect(result.notices[0]?.payload.message).toContain("Hydrate");
-    expect(result.notices[0]?.payload.reason).toContain("Version 1 previews");
-    expect(result.notices[0]?.payload.target.label).toBe("Evening stretch");
-  });
-
-  it("skips unsupported targets and non-user origin events", async () => {
-    listActiveLinkedActionRulesForSource
-      .mockResolvedValueOnce([
-        {
-          id: "link_2",
-          status: "active",
-          directionPolicy: "one_way",
-          bidirectionalGroupId: null,
-          source: {
-            feature: "habits",
-            entityType: "habit",
-            entityId: "habit_source",
-            triggerType: "habit.completed_for_day",
-          },
-          target: {
-            feature: "todos",
-            entityType: "todo",
-            entityId: "todo_1",
-            effect: {
-              kind: "binary",
-              type: "todo.complete",
-            },
-          },
-          createdAt: "2026-04-13T00:00:00.000Z",
-          updatedAt: "2026-04-13T00:00:00.000Z",
-          deletedAt: null,
-        },
-      ])
-      .mockResolvedValueOnce([]);
-
-    const engine = new LinkedActionsEngine();
-
-    const unsupportedTarget = await engine.handleSourceEvent({
-      occurredAt: "2026-04-14T10:00:00.000Z",
-      origin: {
-        originKind: "user",
-        originRuleId: null,
-        originEventId: null,
+    expect(result.effects[0].producedEntityId).toMatch(/^cal_/);
+    expect(result.effects[0].noticePreview).toMatchObject({
+      kind: "linked-actions",
+      target: {
+        feature: "calories",
       },
-      source: {
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_source",
-        label: "Hydrate",
-        triggerType: "habit.completed_for_day",
-        dateKey: "2026-04-14",
-        recordId: "hcmp_1",
-      },
-      payload: {
-        previousCount: 0,
-        currentCount: 1,
-        targetPerDay: 1,
-      },
-    });
-
-    const linkedOrigin = await engine.handleSourceEvent({
-      occurredAt: "2026-04-14T10:00:00.000Z",
-      origin: {
-        originKind: "linked_action",
-        originRuleId: "link_1",
-        originEventId: "event_1",
-      },
-      source: {
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_source",
-        label: "Hydrate",
-        triggerType: "habit.completed_for_day",
-        dateKey: "2026-04-14",
-        recordId: "hcmp_1",
-      },
-      payload: {
-        previousCount: 0,
-        currentCount: 1,
-        targetPerDay: 1,
-      },
-    });
-
-    expect(unsupportedTarget.matchedRuleCount).toBe(1);
-    expect(unsupportedTarget.notices).toHaveLength(0);
-    expect(linkedOrigin).toEqual({
-      matchedRuleCount: 0,
-      dryRunRuleIds: [],
-      notices: [],
     });
   });
 });
