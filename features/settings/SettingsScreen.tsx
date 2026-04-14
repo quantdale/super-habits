@@ -350,7 +350,6 @@ function getAppearanceSummary(mode: ThemeMode, resolvedTheme: "light" | "dark") 
 }
 
 export function SettingsScreen() {
-  const router = useRouter();
   const { showNotice } = useInAppNotices();
   const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
   const [selectedLinkedActionSourceKey, setSelectedLinkedActionSourceKey] = useState(
@@ -395,27 +394,8 @@ export function SettingsScreen() {
     );
   };
 
-  const currentTargetProvider =
-    targetSelection?.kind === "existing"
-      ? getLinkedActionTargetPickerProvider(targetSelection.feature)
-      : targetSelection?.kind === "create_new"
-        ? getLinkedActionTargetPickerProvider(targetSelection.handoff.feature)
-        : null;
-
   return (
     <Screen scroll>
-      <LinkedActionTargetPickerModal
-        visible={targetPickerVisible}
-        onClose={() => setTargetPickerVisible(false)}
-        onSelect={setTargetSelection}
-        initialFeature={
-          targetSelection?.kind === "existing"
-            ? targetSelection.feature
-            : targetSelection?.kind === "create_new"
-              ? targetSelection.handoff.feature
-              : "todos"
-        }
-      />
       <View className="mb-4 flex-row items-center justify-between">
         <SectionTitle
           title="Settings"

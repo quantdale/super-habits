@@ -51,15 +51,17 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 6**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal).
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal).
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **10**. Next migration: `if (version < 11)`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **11**. Next migration: `if (version < 12)`.
 
 **Sync:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (one-way **push backup**; `pull` is a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and pushes no-op without throwing.
 
+**Linked Actions (foundation):** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, and the first source entrypoint is wired from habits completion (`habit.completed_for_day`).
+
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality:** **194** Vitest tests (domain + lib + validation). CI: typecheck then test on Node 20.
+**Quality (April 14, 2026):** `npm run typecheck` passes; `npm test` passes with **213** tests; `npm run build:web` passes; `npm run e2e` passes with **59** tests. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -86,9 +88,9 @@
 | Name | `superhabits` (npm package, private) |
 | Purpose | Offline-first Expo + React Native client; Overview tab + five feature modules |
 | Entry | `package.json` → `"main": "expo-router/entry"` |
-| Schema version (stored) | **10** (`app_meta.db_schema_version`) |
-| Next migration | `11` (new `if (version < 11)` block in `runMigrations`) |
-| Unit tests | **194** passing (Vitest) |
+| Schema version (stored) | **11** (`app_meta.db_schema_version`) |
+| Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
+| Unit tests | **213** passing (Vitest) |
 | E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
@@ -185,7 +187,7 @@
 |------|------|
 | `sectionColors.ts` | `SECTION_COLORS`, `SECTION_COLORS_LIGHT`, `SectionKey` |
 
-#### `tests/` (11 files)
+#### `tests/` (20 files)
 
 | File | Role |
 |------|------|
@@ -390,7 +392,7 @@ Shared foreground trigger used by feature screens:
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `typescript` | ^6.0.2 | Typecheck |
+| `typescript` | ~5.9.2 | Typecheck |
 | `vitest` | ^4.1.1 | Unit tests |
 | `@playwright/test` | ^1.58.2 | E2E (Chromium) |
 | `babel-preset-expo` | ^55.0.12 | Babel |
@@ -490,7 +492,7 @@ Each file: import `*Screen` from `@/features/...`; default export returns `<XxxS
 
 | Path | Screen |
 |------|--------|
-| `/` | Redirect → `/(tabs)/todos` |
+| `/` | Redirect → `/(tabs)/overview` |
 | `/(tabs)/todos` | Todos |
 | `/(tabs)/habits` | Habits |
 | `/(tabs)/pomodoro` | Pomodoro |
@@ -503,7 +505,7 @@ Each file: import `*Screen` from `@/features/...`; default export returns `<XxxS
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **10**. Next migration: `if (version < 11)` in `runMigrations()`.
+Current `app_meta.db_schema_version`: **11**. Next migration: `if (version < 12)` in `runMigrations()`.
 
 ### Bootstrap DDL (verbatim)
 
@@ -1761,7 +1763,7 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run:** **162 tests passed**; **11 test files passed** (Vitest v4)
+**Latest run (April 14, 2026):** **213 tests passed**; **20 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -2058,13 +2060,13 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Phases:** (1) Fetch headers COEP/COOP, (2) Lighthouse mobile, (3) desktop, (4) PWA, (5) accessibility, (6) best practices + SEO. Screenshots/reports under `.cursor/playwright-output/`.
 
-**Requires:** App on `http://localhost:8081` — Metro (`npm run web`) or static (`npm run build:web` then `node scripts/serve-e2e.js`).
+**Requires:** App on `http://localhost:8081` — use static export flow (`npm run build:web` then `node scripts/serve-e2e.js`).
 
 ---
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 180 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 213 passing.
 
 ---
 
@@ -2125,7 +2127,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Add only new `if (version < N)` block; never edit old migrations or bootstrap DDL; update `core/db/types.ts`.
 
-**Current version:** 9 → next 10.
+**Current version:** 11 → next 12.
 
 ---
 
@@ -2133,9 +2135,9 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (162 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (213 tests)
 
-**Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v2`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
+**Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
 **Deep mode:** Transfer size, `window.__dbReady`, per-tab body text, Lighthouse, headed mode, Bugbot comments via GitHub MCP
 
@@ -2166,7 +2168,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 | Out of scope | Screens, `app/`, `core/ui/` |
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
 | Workflow | Read → plan → approval → implement → typecheck + test → report |
-| Schema | Current version **10**, next migration `version < 11` |
+| Schema | Current version **11**, next migration `version < 12` |
 
 #### `feature-agent.md`
 
@@ -2188,7 +2190,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 | Skill | Trigger | Provides |
 |-------|---------|----------|
-| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer | WAL, soft delete, enqueue list, ID format; schema **10** → next **`if (version < 11)`** (always confirm in `core/db/client.ts`) |
+| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer | WAL, soft delete, enqueue list, ID format; schema **11** → next **`if (version < 12)`** (always confirm in `core/db/client.ts`) |
 | `feature-module-pattern/SKILL.md` | New features, module layout | Three-file pattern, route thin wrapper, import rules |
 | `rn-expo-conventions/SKILL.md` | UI, Expo Router, RN | Routing, NativeWind, lists, notifications, platform |
 
@@ -2307,9 +2309,10 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **180** passing (Vitest) |
+| Unit tests | **213** passing (Vitest) |
 | E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
-| Schema version | **9** |
+| Schema version | **11** |
+| Linked Actions | Foundation merged: schema tables + engine/effects + Settings scaffold + habits source entrypoint |
 | Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
 | Validation | Hard rejection in feature screens via `lib/validation.ts` |
 | Design system | Per-section colors, card accent strips, GitHub heatmaps, PillChips |
@@ -2416,7 +2419,7 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **194** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **213** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
 - `HabitHeatmap.tsx` — exists but unused in `HabitsScreen` (see section 12)
 - Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync

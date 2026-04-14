@@ -52,7 +52,7 @@ Companion docs in this folder:
 ### Confirmed from code
 - Local-first SQLite app is implemented and bootstrapped at startup.
 - Optional Supabase client, anonymous auth bootstrap, and push-only sync adapter exist.
-- Vitest suite currently passes: `180` tests passed when run on April 8, 2026.
+- Linked Actions foundation is merged: schema tables, engine + effect registry, notice scaffold, Settings preview scaffold, and first habits source entrypoint.
 - Playwright E2E infrastructure is configured for static web export served from `dist/`.
 
 ### Confirmed from docs
@@ -131,6 +131,21 @@ Companion docs in this folder:
 - `schema.sql` is reference-only, not runtime authority.
 - Migrations are append-only and live in `core/db/client.ts`.
 
+## Linked Actions Snapshot
+
+### Confirmed from code
+- `core/db/client.ts` includes linked actions migrations through schema version `11`:
+  - `linked_action_rules`
+  - `linked_action_events`
+  - `linked_action_executions`
+- `core/linked-actions/linkedActions.engine.ts` persists source events/executions and enforces dedupe via rule/source and chain fingerprint checks.
+- `core/linked-actions/linkedActions.effects.ts` maps effect types to feature-owned data-layer wrappers.
+- `features/habits/habits.data.ts` dispatches `habit.completed_for_day` to the linked actions engine on threshold crossing.
+- `features/settings/SettingsScreen.tsx` exposes a Linked Actions editor preview scaffold plus notice preview UI.
+
+### Confirmed from docs
+- `docs/linked-actions-readiness.md` is a planning/proposal document and should be read as design context, not runtime truth.
+
 ## State Management Approach
 
 ### Confirmed from code
@@ -182,10 +197,13 @@ Companion docs in this folder:
   - `routine_exercise_sets`
   - `workout_session_exercises`
   - `calorie_entries`
-  - `saved_meals`
-  - `app_meta`
+- `saved_meals`
+- `app_meta`
+- `linked_action_rules`
+- `linked_action_events`
+- `linked_action_executions`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `10`; next migration slot is `if (version < 11)`.
+- Current runtime schema version is `11`; next migration slot is `if (version < 12)`.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
@@ -292,9 +310,11 @@ Companion docs in this folder:
 - `npm run e2e:headed`
 - `npm run e2e:debug`
 
-### Confirmed from code on April 8, 2026
-- `npm test`: passes with `180` tests.
-- `npm run typecheck`: currently fails because `tsconfig.json` uses invalid `ignoreDeprecations: "6.0"` with the installed TypeScript version.
+### Confirmed from code on April 14, 2026
+- `npm run typecheck`: passes.
+- `npm test`: passes with `213` tests.
+- `npm run build:web`: passes.
+- `npm run e2e`: passes with `59` tests.
 
 ### Confirmed from code
 - No lint script or lint config was found.
@@ -315,13 +335,9 @@ Companion docs in this folder:
 ## Known Gaps, Ambiguities, and Outdated Docs
 
 ### Confirmed from code vs docs
-- `core/db/schema.sql` is stale: it still says schema version `4`, while runtime code is version `9`.
-- `e2e/README.md` is stale: it says E2E runs against `npm run web`, but `playwright.config.ts` actually serves static `dist/` via `node scripts/serve-e2e.js`.
-- `.github/copilot-instructions.md` is stale in at least two places:
-  - says `toDateKey()` uses UTC, but current code uses local dates
-  - says E2E work starts from `npm run web`, which conflicts with actual Playwright config
+- `core/db/schema.sql` is stale: it still says schema version `4`, while runtime code is version `11`.
 - Multiple docs/rules say React Native `0.84` and TypeScript `6`, but `package.json` currently uses React Native `0.83.4` and TypeScript `5.9.2`.
-- Repo guidance treats `npm run typecheck` as a standard quality gate, but it currently fails due to an invalid `tsconfig.json` `ignoreDeprecations` value with the installed TypeScript version.
+- Some docs still describe Linked Actions as "planned" even though schema + engine + first entrypoint are already merged on `main`.
 
 ### Confirmed from code
 - `App.tsx` and `index.ts` are legacy Expo starter files and are not the active app entry because `package.json` points to `expo-router/entry`.

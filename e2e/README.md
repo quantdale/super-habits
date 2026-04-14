@@ -4,7 +4,8 @@ Playwright E2E tests for the SuperHabits web app.
 
 ## Prerequisites
 
-`npm run web` must be running on localhost:8081 before running E2E tests.
+Build static web output first with `npm run build:web`.
+`npm run e2e` starts `node scripts/serve-e2e.js` automatically (serves `dist/` on localhost:8081).
 Only one tab of localhost:8081 should be open (OPFS lock).
 
 ## Running tests
@@ -41,7 +42,7 @@ Only one tab of localhost:8081 should be open (OPFS lock).
 - Prefer `getByText` for `Button` / `Pressable` labels — RN Web often does not expose `role=button` + accessible name the way Playwright expects.
 - Use `load` instead of `networkidle` for navigation — Metro keeps a live connection open so `networkidle` may never fire.
 - Failure screenshots and traces go to `outputDir` in `playwright.config.ts` (`.cursor/playwright-output/e2e-failures/`).
-- Tests run against the Metro dev server (not a production build)
+- Tests run against the static web export (`dist/`) served by `scripts/serve-e2e.js`.
 - OPFS lock: infrastructure.spec.ts opens two contexts to test the lock
 - Data isolation: each test file clears relevant state via page reload
   or direct SQLite state reset where possible

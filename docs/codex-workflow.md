@@ -52,7 +52,7 @@ Cursor rule files (for example `.cursorrules` and `.cursor/rules/superhabits-rul
 - For business logic changes: `npm test`; run targeted tests if relevant.
 - For web/UI changes: `npm run build:web`; run impacted Playwright specs; run full `npm run e2e` when web infra or cross-cutting UI behavior changed.
 - For pre-PR validation: `npm test`, `npm run build:web`, `npm run e2e`, `npm run typecheck`.
-- Temporary note: until the repo-level typecheck config issue is fixed, `npm run typecheck` is informational if it fails only with the known config issue. Any new or different type errors are blockers.
+- If the worktree is fresh and tools are missing (for example `tsc` not found), run `npm ci` first, then rerun the full validation sequence.
 
 ## Reporting Expectations
 For each task, report:

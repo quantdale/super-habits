@@ -1,6 +1,6 @@
 # SuperHabits — Copilot Instructions
 
-Offline-first productivity app (To Do, Habits, Focus/Pomodoro, Workout, Calories) targeting web (PWA), iOS, and Android. Stack: React Native 0.84 · Expo 55 · React 19 · TypeScript 5.9 · Expo Router · NativeWind 4 · expo-sqlite (WAL; OPFS on web).
+Offline-first productivity app (To Do, Habits, Focus/Pomodoro, Workout, Calories) targeting web (PWA), iOS, and Android. Stack: React Native 0.83.4 · Expo 55 · React 19 · TypeScript 5.9 · Expo Router · NativeWind 4 · expo-sqlite (WAL; OPFS on web).
 
 ---
 
@@ -84,7 +84,7 @@ After **every** mutating write on synced entities, call `syncEngine.enqueue` imm
 
 ```ts
 import { createId } from "@/lib/id";   // createId("todo") → "todo_<ms>_<rand8>"
-import { toDateKey } from "@/lib/time"; // toDateKey() → "YYYY-MM-DD" (UTC)
+import { toDateKey } from "@/lib/time"; // toDateKey() → "YYYY-MM-DD" (local calendar date)
 ```
 
 **Entity prefix registry:**
@@ -103,11 +103,11 @@ import { toDateKey } from "@/lib/time"; // toDateKey() → "YYYY-MM-DD" (UTC)
 | `pom` | pomodoro_sessions |
 | `rec` | todos.recurrence_id |
 
-`toDateKey()` uses UTC — do not change without coordinating (affects historical keys).
+`toDateKey()` uses local calendar dates since migration 5. Preserve this behavior for new writes.
 
 ### Schema migrations
 
-All migrations live in `core/db/client.ts` (`runMigrations`). They are **append-only** — never edit past `if (version < N)` blocks. Current schema: **v9**; next migration uses `if (version < 10)`. `core/db/schema.sql` is a reference, not runtime.
+All migrations live in `core/db/client.ts` (`runMigrations`). They are **append-only** — never edit past `if (version < N)` blocks. Current schema: **v11**; next migration uses `if (version < 12)`. `core/db/schema.sql` is a reference, not runtime.
 
 ### Styling
 
@@ -144,7 +144,7 @@ Use `getByText` for `Button`/`Pressable` labels (RN Web doesn't always expose `r
 | **fetch** | Fetch external URLs, docs, or APIs and return them as markdown/JSON |
 | **lighthouse** | Run PWA / performance / accessibility audits against `localhost:8081` |
 
-E2E work: start `npm run web` first, then use the **playwright** MCP to drive the browser in parallel with Playwright specs.
+E2E work: run `npm run build:web` before Playwright; `npm run e2e` serves `dist/` via `node scripts/serve-e2e.js`.
 
 ---
 
