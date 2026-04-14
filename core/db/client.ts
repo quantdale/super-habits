@@ -267,6 +267,86 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
 
     await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "10");
   }
+  if (version < 11) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS linked_action_events (
+        id                  TEXT PRIMARY KEY NOT NULL,
+        chain_id            TEXT NOT NULL,
+        root_event_id       TEXT NOT NULL,
+        parent_event_id     TEXT,
+        chain_depth         INTEGER NOT NULL DEFAULT 0,
+        origin_kind         TEXT NOT NULL,
+        origin_rule_id      TEXT,
+        origin_event_id     TEXT,
+        source_feature      TEXT NOT NULL,
+        source_entity_type  TEXT NOT NULL,
+        source_entity_id    TEXT,
+        trigger_type        TEXT NOT NULL,
+        source_record_id    TEXT,
+        source_date_key     TEXT,
+        source_label        TEXT,
+        occurred_at         TEXT NOT NULL,
+        payload             TEXT NOT NULL,
+        created_at          TEXT NOT NULL
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_linked_action_events_chain
+      ON linked_action_events (chain_id, created_at DESC);
+    `);
+
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_linked_action_events_source_lookup
+      ON linked_action_events (
+        source_feature,
+        source_entity_type,
+        source_entity_id,
+        trigger_type,
+        occurred_at DESC
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS linked_action_executions (
+        id                    TEXT PRIMARY KEY NOT NULL,
+        rule_id               TEXT NOT NULL,
+        source_event_id       TEXT NOT NULL,
+        chain_id              TEXT NOT NULL,
+        root_event_id         TEXT NOT NULL,
+        origin_rule_id        TEXT,
+        effect_type           TEXT NOT NULL,
+        effect_fingerprint    TEXT NOT NULL,
+        status                TEXT NOT NULL,
+        target_feature        TEXT NOT NULL,
+        target_entity_type    TEXT NOT NULL,
+        target_entity_id      TEXT,
+        produced_entity_type  TEXT,
+        produced_entity_id    TEXT,
+        notice_payload        TEXT,
+        error_message         TEXT,
+        created_at            TEXT NOT NULL,
+        updated_at            TEXT NOT NULL
+      );
+    `);
+
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_linked_action_executions_source_rule
+      ON linked_action_executions (rule_id, source_event_id);
+    `);
+
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_linked_action_executions_chain_guard
+      ON linked_action_executions (chain_id, rule_id, effect_fingerprint);
+    `);
+
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_linked_action_executions_chain
+      ON linked_action_executions (chain_id, created_at DESC);
+    `);
+
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "11");
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

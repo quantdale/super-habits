@@ -5,6 +5,7 @@ import {
 } from "@/core/db/appMeta";
 import { getDatabase } from "@/core/db/client";
 import { CalorieEntry, SavedMeal } from "@/core/db/types";
+import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -261,4 +262,86 @@ export async function deleteCalorieEntry(id: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, id]);
   syncEngine.enqueue({ entity: "calorie_entries", id, updatedAt: now, operation: "delete" });
+}
+
+export async function addCalorieEntryFromLinkedAction(input: {
+  id: string;
+  foodName: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  mealType: "breakfast" | "lunch" | "dinner" | "snack";
+  consumedOn: string;
+}): Promise<LinkedActionEffectAdapterResult> {
+  const db = await getDatabase();
+  const existing = await db.getFirstAsync<Pick<CalorieEntry, "id" | "food_name">>(
+    `SELECT id, food_name
+     FROM calorie_entries
+     WHERE id = ?`,
+    [input.id],
+  );
+
+  if (existing) {
+    return {
+      status: "applied",
+      targetLabel: existing.food_name,
+      producedEntityType: "calorie_log",
+      producedEntityId: existing.id,
+    };
+  }
+
+  const now = nowIso();
+  await db.runAsync(
+    `INSERT INTO calorie_entries (
+       id,
+       food_name,
+       calories,
+       protein,
+       carbs,
+       fats,
+       fiber,
+       meal_type,
+       consumed_on,
+       created_at,
+       updated_at,
+       deleted_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    [
+      input.id,
+      input.foodName,
+      input.calories,
+      input.protein,
+      input.carbs,
+      input.fats,
+      input.fiber,
+      input.mealType,
+      input.consumedOn,
+      now,
+      now,
+    ],
+  );
+  syncEngine.enqueue({
+    entity: "calorie_entries",
+    id: input.id,
+    updatedAt: now,
+    operation: "create",
+  });
+  await upsertSavedMeal({
+    foodName: input.foodName,
+    calories: input.calories,
+    protein: input.protein,
+    carbs: input.carbs,
+    fats: input.fats,
+    fiber: input.fiber,
+    mealType: input.mealType,
+  });
+
+  return {
+    status: "applied",
+    targetLabel: input.foodName,
+    producedEntityType: "calorie_log",
+    producedEntityId: input.id,
+  };
 }

@@ -3,9 +3,18 @@ import { createId } from "@/lib/id";
 import { nowIso } from "@/lib/time";
 import {
   type CreateLinkedActionRuleInput,
+  type LinkedActionEventRecord,
+  type LinkedActionEventRow,
+  type LinkedActionExecutionRecord,
+  type LinkedActionExecutionRow,
   type LinkedActionRuleDefinition,
   type LinkedActionRuleRow,
+  type LinkedActionSourceAction,
+  buildLinkedActionEventRow,
+  buildLinkedActionExecutionRow,
   buildLinkedActionRuleRow,
+  normalizeLinkedActionEventRow,
+  normalizeLinkedActionExecutionRow,
   normalizeLinkedActionRuleRow,
 } from "@/core/linked-actions/linkedActions.types";
 
@@ -16,6 +25,25 @@ export async function listLinkedActionRules(): Promise<LinkedActionRuleDefinitio
      FROM linked_action_rules
      WHERE deleted_at IS NULL
      ORDER BY created_at DESC`,
+  );
+  return rows.map(normalizeLinkedActionRuleRow);
+}
+
+export async function listMatchingLinkedActionRules(
+  source: Pick<LinkedActionSourceAction, "feature" | "entityType" | "entityId" | "triggerType">,
+): Promise<LinkedActionRuleDefinition[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<LinkedActionRuleRow>(
+    `SELECT *
+     FROM linked_action_rules
+     WHERE deleted_at IS NULL
+       AND status = 'active'
+       AND source_feature = ?
+       AND source_entity_type = ?
+       AND trigger_type = ?
+       AND (source_entity_id = ? OR source_entity_id IS NULL)
+     ORDER BY created_at ASC`,
+    [source.feature, source.entityType, source.triggerType, source.entityId],
   );
   return rows.map(normalizeLinkedActionRuleRow);
 }
@@ -117,5 +145,221 @@ export async function deleteLinkedActionRule(id: string): Promise<void> {
      WHERE id = ?
        AND deleted_at IS NULL`,
     [now, now, id],
+  );
+}
+
+export async function getLinkedActionEvent(
+  eventId: string,
+): Promise<LinkedActionEventRecord | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<LinkedActionEventRow>(
+    `SELECT *
+     FROM linked_action_events
+     WHERE id = ?`,
+    [eventId],
+  );
+  return row ? normalizeLinkedActionEventRow(row) : null;
+}
+
+export async function createLinkedActionEvent(
+  event: LinkedActionEventRecord,
+): Promise<LinkedActionEventRecord> {
+  const row = buildLinkedActionEventRow(event, nowIso());
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO linked_action_events (
+       id,
+       chain_id,
+       root_event_id,
+       parent_event_id,
+       chain_depth,
+       origin_kind,
+       origin_rule_id,
+       origin_event_id,
+       source_feature,
+       source_entity_type,
+       source_entity_id,
+       trigger_type,
+       source_record_id,
+       source_date_key,
+       source_label,
+       occurred_at,
+       payload,
+       created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.chain_id,
+      row.root_event_id,
+      row.parent_event_id,
+      row.chain_depth,
+      row.origin_kind,
+      row.origin_rule_id,
+      row.origin_event_id,
+      row.source_feature,
+      row.source_entity_type,
+      row.source_entity_id,
+      row.trigger_type,
+      row.source_record_id,
+      row.source_date_key,
+      row.source_label,
+      row.occurred_at,
+      row.payload,
+      row.created_at,
+    ],
+  );
+  return event;
+}
+
+export async function getLinkedActionExecutionByRuleAndSourceEvent(
+  ruleId: string,
+  sourceEventId: string,
+): Promise<LinkedActionExecutionRecord | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<LinkedActionExecutionRow>(
+    `SELECT *
+     FROM linked_action_executions
+     WHERE rule_id = ?
+       AND source_event_id = ?`,
+    [ruleId, sourceEventId],
+  );
+  return row ? normalizeLinkedActionExecutionRow(row) : null;
+}
+
+export async function getLinkedActionExecutionByChainFingerprint(
+  chainId: string,
+  ruleId: string,
+  effectFingerprint: string,
+): Promise<LinkedActionExecutionRecord | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<LinkedActionExecutionRow>(
+    `SELECT *
+     FROM linked_action_executions
+     WHERE chain_id = ?
+       AND rule_id = ?
+       AND effect_fingerprint = ?`,
+    [chainId, ruleId, effectFingerprint],
+  );
+  return row ? normalizeLinkedActionExecutionRow(row) : null;
+}
+
+export async function createLinkedActionExecution(
+  execution: Omit<LinkedActionExecutionRecord, "id" | "createdAt" | "updatedAt"> & {
+    id?: string;
+  },
+): Promise<LinkedActionExecutionRecord> {
+  const now = nowIso();
+  const record: LinkedActionExecutionRecord = {
+    id: execution.id ?? createId("lexec"),
+    ruleId: execution.ruleId,
+    sourceEventId: execution.sourceEventId,
+    chainId: execution.chainId,
+    rootEventId: execution.rootEventId,
+    originRuleId: execution.originRuleId,
+    effectType: execution.effectType,
+    effectFingerprint: execution.effectFingerprint,
+    status: execution.status,
+    targetFeature: execution.targetFeature,
+    targetEntityType: execution.targetEntityType,
+    targetEntityId: execution.targetEntityId,
+    producedEntityType: execution.producedEntityType,
+    producedEntityId: execution.producedEntityId,
+    noticePayload: execution.noticePayload,
+    errorMessage: execution.errorMessage,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const row = buildLinkedActionExecutionRow(record);
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO linked_action_executions (
+       id,
+       rule_id,
+       source_event_id,
+       chain_id,
+       root_event_id,
+       origin_rule_id,
+       effect_type,
+       effect_fingerprint,
+       status,
+       target_feature,
+       target_entity_type,
+       target_entity_id,
+       produced_entity_type,
+       produced_entity_id,
+       notice_payload,
+       error_message,
+       created_at,
+       updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.rule_id,
+      row.source_event_id,
+      row.chain_id,
+      row.root_event_id,
+      row.origin_rule_id,
+      row.effect_type,
+      row.effect_fingerprint,
+      row.status,
+      row.target_feature,
+      row.target_entity_type,
+      row.target_entity_id,
+      row.produced_entity_type,
+      row.produced_entity_id,
+      row.notice_payload,
+      row.error_message,
+      row.created_at,
+      row.updated_at,
+    ],
+  );
+  return record;
+}
+
+export async function updateLinkedActionExecution(
+  id: string,
+  updates: Partial<
+    Pick<
+      LinkedActionExecutionRecord,
+      | "status"
+      | "producedEntityType"
+      | "producedEntityId"
+      | "noticePayload"
+      | "errorMessage"
+    >
+  >,
+): Promise<void> {
+  const db = await getDatabase();
+  const fields: string[] = ["updated_at = ?"];
+  const values: Array<string | null> = [nowIso()];
+
+  if (updates.status !== undefined) {
+    fields.push("status = ?");
+    values.push(updates.status);
+  }
+  if (updates.producedEntityType !== undefined) {
+    fields.push("produced_entity_type = ?");
+    values.push(updates.producedEntityType);
+  }
+  if (updates.producedEntityId !== undefined) {
+    fields.push("produced_entity_id = ?");
+    values.push(updates.producedEntityId);
+  }
+  if (updates.noticePayload !== undefined) {
+    fields.push("notice_payload = ?");
+    values.push(updates.noticePayload ? JSON.stringify(updates.noticePayload) : null);
+  }
+  if (updates.errorMessage !== undefined) {
+    fields.push("error_message = ?");
+    values.push(updates.errorMessage);
+  }
+
+  values.push(id);
+  await db.runAsync(
+    `UPDATE linked_action_executions
+     SET ${fields.join(", ")}
+     WHERE id = ?`,
+    values,
   );
 }
