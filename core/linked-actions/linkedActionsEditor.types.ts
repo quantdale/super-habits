@@ -44,5 +44,5 @@ export type LinkedActionEditorRowValidation = {
 
 export type LinkedActionExistingRuleAdapterInput = {
   rule: LinkedActionRuleDefinition;
-  targetSelection: LinkedActionTargetPickerSelection;
+  targetSelection: LinkedActionTargetPickerSelection | null;
 };

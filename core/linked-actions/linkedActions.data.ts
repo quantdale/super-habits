@@ -10,6 +10,7 @@ import {
   type LinkedActionFeature,
   type LinkedActionRuleDefinition,
   type LinkedActionRuleRow,
+  type SaveLinkedActionRuleForSourceInput,
   type LinkedActionSourceEntityType,
   type LinkedActionSourceAction,
   type LinkedActionTriggerType,
@@ -20,6 +21,91 @@ import {
   normalizeLinkedActionExecutionRow,
   normalizeLinkedActionRuleRow,
 } from "@/core/linked-actions/linkedActions.types";
+
+async function insertLinkedActionRuleRow(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  row: LinkedActionRuleRow,
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO linked_action_rules (
+       id,
+       status,
+       direction_policy,
+       bidirectional_group_id,
+       source_feature,
+       source_entity_type,
+       source_entity_id,
+       trigger_type,
+       target_feature,
+       target_entity_type,
+       target_entity_id,
+       effect_type,
+       effect_payload,
+       created_at,
+       updated_at,
+       deleted_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.status,
+      row.direction_policy,
+      row.bidirectional_group_id,
+      row.source_feature,
+      row.source_entity_type,
+      row.source_entity_id,
+      row.trigger_type,
+      row.target_feature,
+      row.target_entity_type,
+      row.target_entity_id,
+      row.effect_type,
+      row.effect_payload,
+      row.created_at,
+      row.updated_at,
+      row.deleted_at,
+    ],
+  );
+}
+
+async function updateLinkedActionRuleRow(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  row: LinkedActionRuleRow,
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE linked_action_rules
+     SET status = ?,
+         direction_policy = ?,
+         bidirectional_group_id = ?,
+         source_feature = ?,
+         source_entity_type = ?,
+         source_entity_id = ?,
+         trigger_type = ?,
+         target_feature = ?,
+         target_entity_type = ?,
+         target_entity_id = ?,
+         effect_type = ?,
+         effect_payload = ?,
+         updated_at = ?,
+         deleted_at = ?
+     WHERE id = ?`,
+    [
+      row.status,
+      row.direction_policy,
+      row.bidirectional_group_id,
+      row.source_feature,
+      row.source_entity_type,
+      row.source_entity_id,
+      row.trigger_type,
+      row.target_feature,
+      row.target_entity_type,
+      row.target_entity_id,
+      row.effect_type,
+      row.effect_payload,
+      row.updated_at,
+      row.deleted_at,
+      row.id,
+    ],
+  );
+}
 
 export async function listLinkedActionRules(): Promise<LinkedActionRuleDefinition[]> {
   const db = await getDatabase();
@@ -87,6 +173,25 @@ export async function listActiveLinkedActionRulesForSource(input: {
   return rows.map(normalizeLinkedActionRuleRow);
 }
 
+export async function listLinkedActionRulesForSourceEntity(input: {
+  feature: LinkedActionFeature;
+  entityType: LinkedActionSourceEntityType;
+  entityId: string;
+}): Promise<LinkedActionRuleDefinition[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<LinkedActionRuleRow>(
+    `SELECT *
+     FROM linked_action_rules
+     WHERE deleted_at IS NULL
+       AND source_feature = ?
+       AND source_entity_type = ?
+       AND source_entity_id = ?
+     ORDER BY created_at DESC`,
+    [input.feature, input.entityType, input.entityId],
+  );
+  return rows.map(normalizeLinkedActionRuleRow);
+}
+
 export async function createLinkedActionRule(
   input: CreateLinkedActionRuleInput,
 ): Promise<LinkedActionRuleDefinition> {
@@ -105,46 +210,88 @@ export async function createLinkedActionRule(
 
   const row = buildLinkedActionRuleRow(rule);
   const db = await getDatabase();
-  await db.runAsync(
-    `INSERT INTO linked_action_rules (
-       id,
-       status,
-       direction_policy,
-       bidirectional_group_id,
-       source_feature,
-       source_entity_type,
-       source_entity_id,
-       trigger_type,
-       target_feature,
-       target_entity_type,
-       target_entity_id,
-       effect_type,
-       effect_payload,
-       created_at,
-       updated_at,
-       deleted_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      row.id,
-      row.status,
-      row.direction_policy,
-      row.bidirectional_group_id,
-      row.source_feature,
-      row.source_entity_type,
-      row.source_entity_id,
-      row.trigger_type,
-      row.target_feature,
-      row.target_entity_type,
-      row.target_entity_id,
-      row.effect_type,
-      row.effect_payload,
-      row.created_at,
-      row.updated_at,
-      row.deleted_at,
-    ],
-  );
+  await insertLinkedActionRuleRow(db, row);
 
   return rule;
+}
+
+export async function replaceLinkedActionRulesForSourceEntity(input: {
+  feature: LinkedActionFeature;
+  entityType: LinkedActionSourceEntityType;
+  entityId: string;
+  rules: SaveLinkedActionRuleForSourceInput[];
+}): Promise<void> {
+  const db = await getDatabase();
+  const existingRows = await db.getAllAsync<LinkedActionRuleRow>(
+    `SELECT *
+     FROM linked_action_rules
+     WHERE deleted_at IS NULL
+       AND source_feature = ?
+       AND source_entity_type = ?
+       AND source_entity_id = ?`,
+    [input.feature, input.entityType, input.entityId],
+  );
+  const existingById = new Map(
+    existingRows.map((row) => [row.id, normalizeLinkedActionRuleRow(row)]),
+  );
+  const keptRuleIds = new Set<string>();
+  const now = nowIso();
+
+  for (const ruleInput of input.rules) {
+    const source = {
+      feature: input.feature,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      triggerType: ruleInput.triggerType,
+    };
+    const existingRule =
+      ruleInput.existingRuleId ? existingById.get(ruleInput.existingRuleId) : undefined;
+
+    if (existingRule) {
+      const updatedRule: LinkedActionRuleDefinition = {
+        id: existingRule.id,
+        status: ruleInput.status ?? existingRule.status,
+        directionPolicy: ruleInput.directionPolicy ?? existingRule.directionPolicy,
+        bidirectionalGroupId:
+          ruleInput.bidirectionalGroupId ?? existingRule.bidirectionalGroupId,
+        source,
+        target: ruleInput.target,
+        createdAt: existingRule.createdAt,
+        updatedAt: now,
+        deletedAt: null,
+      };
+      await updateLinkedActionRuleRow(db, buildLinkedActionRuleRow(updatedRule));
+      keptRuleIds.add(existingRule.id);
+      continue;
+    }
+
+    const createdRule: LinkedActionRuleDefinition = {
+      id: createId("link"),
+      status: ruleInput.status ?? "active",
+      directionPolicy: ruleInput.directionPolicy ?? "one_way",
+      bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? null,
+      source,
+      target: ruleInput.target,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    await insertLinkedActionRuleRow(db, buildLinkedActionRuleRow(createdRule));
+    keptRuleIds.add(createdRule.id);
+  }
+
+  for (const existingRow of existingRows) {
+    if (keptRuleIds.has(existingRow.id)) {
+      continue;
+    }
+    await db.runAsync(
+      `UPDATE linked_action_rules
+       SET deleted_at = ?, updated_at = ?
+       WHERE id = ?
+         AND deleted_at IS NULL`,
+      [now, now, existingRow.id],
+    );
+  }
 }
 
 export async function updateLinkedActionRuleStatus(

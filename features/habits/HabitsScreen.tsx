@@ -1,6 +1,26 @@
 import { useCallback, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
+import {
+  createLinkedActionEditorRowFromRule,
+  createSaveLinkedActionRuleInputFromEditorRow,
+} from "@/core/linked-actions/linkedActionsEditor.model";
+import type {
+  LinkedActionEditorRowDraft,
+  LinkedActionEditorSourceOption,
+} from "@/core/linked-actions/linkedActionsEditor.types";
+import {
+  createLinkedActionTargetExistingSelection,
+  type LinkedActionTargetPickerCandidate,
+} from "@/core/linked-actions/linkedActionsTargetPicker.types";
+import {
+  getLinkedActionTargetPickerProvider,
+} from "@/core/linked-actions/linkedActionsTargetProviders";
+import type {
+  LinkedActionFeature,
+  LinkedActionRuleDefinition,
+} from "@/core/linked-actions/linkedActions.types";
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -19,7 +39,9 @@ import {
   getCompletionHistory,
   getHabitCountByDate,
   incrementHabit,
+  listHabitLinkedActionRules,
   listHabits,
+  saveHabitLinkedActionRules,
   updateHabit,
 } from "@/features/habits/habits.data";
 import {
@@ -52,6 +74,13 @@ const TIME_GROUPS = [
 ] as const;
 
 const COLOR = SECTION_COLORS.habits;
+const HABIT_LINKED_ACTION_SOURCE_KEY = "habit-linked-actions-source";
+const HABIT_LINKED_ACTION_ALLOWED_TARGETS: LinkedActionFeature[] = [
+  "todos",
+  "habits",
+  "workout",
+];
+const HABIT_LINKED_ACTION_ALLOWED_TRIGGERS = ["habit.completed_for_day"] as const;
 
 function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
   if (a.length !== b.length) return false;
@@ -59,6 +88,42 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
     if (a[i].dateKey !== b[i].dateKey || a[i].value !== b[i].value) return false;
   }
   return true;
+}
+
+async function buildLinkedActionEditorRows(
+  rules: LinkedActionRuleDefinition[],
+): Promise<LinkedActionEditorRowDraft[]> {
+  const candidatesByFeature = new Map<
+    LinkedActionFeature,
+    Promise<LinkedActionTargetPickerCandidate[]>
+  >();
+
+  return Promise.all(
+    rules.map(async (rule) => {
+      let targetSelection = null;
+
+      if (rule.target.entityId) {
+        const provider = getLinkedActionTargetPickerProvider(rule.target.feature);
+        if (provider.existing.supported) {
+          let candidatesPromise = candidatesByFeature.get(rule.target.feature);
+          if (!candidatesPromise) {
+            candidatesPromise = provider.existing.loadCandidates();
+            candidatesByFeature.set(rule.target.feature, candidatesPromise);
+          }
+          const candidates = await candidatesPromise;
+          const candidate = candidates.find((item) => item.id === rule.target.entityId) ?? null;
+          targetSelection = candidate
+            ? createLinkedActionTargetExistingSelection(provider, candidate)
+            : null;
+        }
+      }
+
+      return createLinkedActionEditorRowFromRule({
+        rule,
+        targetSelection,
+      });
+    }),
+  );
 }
 
 export function HabitsScreen() {
@@ -78,6 +143,9 @@ export function HabitsScreen() {
   const [consistencyPct, setConsistencyPct] = useState(0);
   const [overallStreak, setOverallStreak] = useState(0);
   const [habitError, setHabitError] = useState<string | null>(null);
+  const [linkedActionRows, setLinkedActionRows] = useState<LinkedActionEditorRowDraft[]>([]);
+  const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
+  const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     const list = await listHabits();
@@ -130,11 +198,17 @@ export function HabitsScreen() {
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
     setHabitError(null);
+    setLinkedActionRows([]);
+    setLinkedActionsError(null);
+    setLinkedActionsLoading(false);
     setModalVisible(true);
   };
 
-  const openEditModal = (habit: Habit) => {
+  const openEditModal = async (habit: Habit) => {
     setHabitError(null);
+    setLinkedActionsError(null);
+    setLinkedActionRows([]);
+    setLinkedActionsLoading(true);
     setEditingHabit(habit);
     setName(habit.name);
     setTarget(String(habit.target_per_day));
@@ -142,6 +216,17 @@ export function HabitsScreen() {
     setIcon((HABIT_ICONS.includes(habit.icon as HabitIcon) ? habit.icon : DEFAULT_HABIT_ICON) as HabitIcon);
     setColor(HABIT_COLORS.includes(habit.color) ? habit.color : DEFAULT_HABIT_COLOR);
     setModalVisible(true);
+
+    try {
+      const rules = await listHabitLinkedActionRules(habit.id);
+      setLinkedActionRows(await buildLinkedActionEditorRows(rules));
+    } catch (error) {
+      setLinkedActionsError(
+        error instanceof Error ? error.message : "Could not load linked actions for this habit.",
+      );
+    } finally {
+      setLinkedActionsLoading(false);
+    }
   };
 
   const onSubmit = async () => {
@@ -152,6 +237,20 @@ export function HabitsScreen() {
       return;
     }
     setHabitError(null);
+    setLinkedActionsError(null);
+
+    let linkedActionRules;
+    try {
+      linkedActionRules = linkedActionRows.map(createSaveLinkedActionRuleInputFromEditorRow);
+    } catch (error) {
+      setLinkedActionsError(
+        error instanceof Error
+          ? error.message
+          : "Finish or remove incomplete linked actions before saving this habit.",
+      );
+      return;
+    }
+
     if (editingHabit) {
       await updateHabit(editingHabit.id, {
         name: name.trim(),
@@ -160,8 +259,10 @@ export function HabitsScreen() {
         icon,
         color,
       });
+      await saveHabitLinkedActionRules(editingHabit.id, linkedActionRules);
     } else {
-      await addHabit(name.trim(), targetNum, category, icon, color);
+      const habitId = await addHabit(name.trim(), targetNum, category, icon, color);
+      await saveHabitLinkedActionRules(habitId, linkedActionRules);
     }
     setEditingHabit(null);
     setName("");
@@ -170,6 +271,9 @@ export function HabitsScreen() {
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
     setHabitError(null);
+    setLinkedActionRows([]);
+    setLinkedActionsError(null);
+    setLinkedActionsLoading(false);
     setModalVisible(false);
     refresh();
   };
@@ -201,7 +305,19 @@ export function HabitsScreen() {
     setModalVisible(false);
     setEditingHabit(null);
     setHabitError(null);
+    setLinkedActionRows([]);
+    setLinkedActionsError(null);
+    setLinkedActionsLoading(false);
   }, []);
+
+  const linkedActionSource: LinkedActionEditorSourceOption = {
+    key: HABIT_LINKED_ACTION_SOURCE_KEY,
+    feature: "habits",
+    entityType: "habit",
+    entityId: editingHabit?.id ?? "draft-habit",
+    label: name.trim() || "This habit",
+    description: "Rules below run when this habit completes for the day.",
+  };
 
   return (
     <Screen scroll padded>
@@ -293,7 +409,9 @@ export function HabitsScreen() {
                           </Text>
                           <View className="mt-1 flex-row gap-1">
                             <Pressable
-                              onPress={() => openEditModal(habit)}
+                              onPress={() => {
+                                void openEditModal(habit);
+                              }}
                               className="rounded bg-habits px-2 py-1"
                             >
                               <Text className="text-xs font-medium text-white">Edit</Text>
@@ -481,6 +599,37 @@ export function HabitsScreen() {
             ))}
           </View>
           <ValidationError message={habitError} />
+        </Card>
+
+        <Card
+          variant="header"
+          accentColor={SECTION_COLORS.habits}
+          headerTitle="Linked Actions"
+          headerSubtitle="Optional explicit rules that run when this habit completes for the day."
+        >
+          {linkedActionsLoading ? (
+            <Text className="text-sm" style={{ color: SECTION_TEXT_COLORS.habits }}>
+              Loading linked actions...
+            </Text>
+          ) : (
+            <LinkedActionsEditorSection
+              sourceOptions={[linkedActionSource]}
+              selectedSourceKey={HABIT_LINKED_ACTION_SOURCE_KEY}
+              rows={linkedActionRows}
+              onRowsChange={(rows) => {
+                setLinkedActionsError(null);
+                setLinkedActionRows(rows);
+              }}
+              allowSourceSelection={false}
+              allowedTargetFeatures={HABIT_LINKED_ACTION_ALLOWED_TARGETS}
+              allowedTriggerTypes={[...HABIT_LINKED_ACTION_ALLOWED_TRIGGERS]}
+              allowCreateNewTarget={false}
+              introTitle="Habit completion rules"
+              introDescription="Choose a target item in Todos, Habits, or Workout and the effect that should run when this habit reaches its daily target."
+            />
+          )}
+          <ValidationError message={linkedActionsError} />
+
           <View className="mt-3 flex-row gap-2">
             <Button label="Cancel" variant="ghost" onPress={resetModal} />
             <Button

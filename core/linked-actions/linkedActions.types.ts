@@ -161,6 +161,15 @@ export type CreateLinkedActionRuleInput = {
   target: LinkedActionRuleTarget;
 };
 
+export type SaveLinkedActionRuleForSourceInput = {
+  existingRuleId?: string | null;
+  status?: LinkedActionRuleStatus;
+  directionPolicy?: LinkedActionDirectionPolicy;
+  bidirectionalGroupId?: string | null;
+  triggerType: LinkedActionTriggerType;
+  target: LinkedActionRuleTarget;
+};
+
 export type LinkedActionRuleRow = {
   id: string;
   status: string;

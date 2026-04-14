@@ -4,6 +4,7 @@ import {
   countLinkedActionEditorRowErrors,
   createEmptyLinkedActionEditorRow,
   createLinkedActionEditorRowFromRule,
+  createSaveLinkedActionRuleInputFromEditorRow,
   getLinkedActionEffectOptions,
   getLinkedActionTriggerOptions,
   validateLinkedActionEditorRow,
@@ -140,5 +141,93 @@ describe("linkedActionsEditor.model", () => {
     expect(errors.targetSelection).toBeDefined();
     expect(errors.effectType).toBeDefined();
     expect(countLinkedActionEditorRowErrors(row)).toBe(4);
+  });
+
+  it("creates a save payload with the default effect details for supported rows", () => {
+    const row = createLinkedActionEditorRowFromRule({
+      rule: {
+        id: "rule_demo",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_source",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_target",
+          effect: {
+            kind: "progress",
+            type: "habit.ensure_daily_target",
+            minimumCount: "target_per_day",
+            dateStrategy: "source_date",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: createLinkedActionTargetExistingSelection(
+        { feature: "habits", entityType: "habit" },
+        { id: "habit_target", title: "Evening stretch" },
+      ),
+    });
+
+    expect(createSaveLinkedActionRuleInputFromEditorRow(row)).toEqual({
+      existingRuleId: "rule_demo",
+      status: "active",
+      directionPolicy: "one_way",
+      triggerType: "habit.completed_for_day",
+      target: {
+        feature: "habits",
+        entityType: "habit",
+        entityId: "habit_target",
+        effect: {
+          kind: "progress",
+          type: "habit.ensure_daily_target",
+          minimumCount: "target_per_day",
+          dateStrategy: "source_date",
+        },
+      },
+    });
+  });
+
+  it("keeps an existing rule invalid when its target can no longer be resolved", () => {
+    const row = createLinkedActionEditorRowFromRule({
+      rule: {
+        id: "rule_demo",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "todos",
+          entityType: "todo",
+          entityId: "todo_demo",
+          triggerType: "todo.completed",
+        },
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_missing",
+          effect: {
+            kind: "progress",
+            type: "habit.increment",
+            amount: 1,
+            dateStrategy: "source_date",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: null,
+    });
+
+    expect(row.targetSelection).toBeNull();
+    expect(validateLinkedActionEditorRow(row).targetSelection).toBeDefined();
   });
 });
