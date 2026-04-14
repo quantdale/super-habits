@@ -1,7 +1,11 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { Link, type Href } from "expo-router";
+import { Link, type Href, useRouter } from "expo-router";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { LinkedActionTargetPickerModal } from "@/core/linked-actions/LinkedActionTargetPickerModal";
 import { createLinkedActionsNotice } from "@/core/linked-actions/linkedActionsNotice";
+import { getLinkedActionTargetPickerProvider } from "@/core/linked-actions/linkedActionsTargetProviders";
+import type { LinkedActionTargetPickerSelection } from "@/core/linked-actions/linkedActionsTargetPicker.types";
 import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import { type ThemeMode, useAppTheme } from "@/core/providers/ThemeProvider";
 import { Button } from "@/core/ui/Button";
@@ -108,8 +112,13 @@ function getAppearanceSummary(mode: ThemeMode, resolvedTheme: "light" | "dark") 
 }
 
 export function SettingsScreen() {
+  const router = useRouter();
   const { showNotice } = useInAppNotices();
   const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
+  const [targetPickerVisible, setTargetPickerVisible] = useState(false);
+  const [targetSelection, setTargetSelection] = useState<LinkedActionTargetPickerSelection | null>(
+    null,
+  );
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
   const settingsAccent = resolvedTheme === "dark" ? "#64748b" : SETTINGS_ACCENT;
 
@@ -142,8 +151,27 @@ export function SettingsScreen() {
     );
   };
 
+  const currentTargetProvider =
+    targetSelection?.kind === "existing"
+      ? getLinkedActionTargetPickerProvider(targetSelection.feature)
+      : targetSelection?.kind === "create_new"
+        ? getLinkedActionTargetPickerProvider(targetSelection.handoff.feature)
+        : null;
+
   return (
     <Screen scroll>
+      <LinkedActionTargetPickerModal
+        visible={targetPickerVisible}
+        onClose={() => setTargetPickerVisible(false)}
+        onSelect={setTargetSelection}
+        initialFeature={
+          targetSelection?.kind === "existing"
+            ? targetSelection.feature
+            : targetSelection?.kind === "create_new"
+              ? targetSelection.handoff.feature
+              : "todos"
+        }
+      />
       <View className="mb-4 flex-row items-center justify-between">
         <SectionTitle
           title="Settings"
@@ -222,9 +250,60 @@ export function SettingsScreen() {
       >
         <View className="gap-3">
           <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            This preview emits a typed Linked Actions notice with source, target, and destination metadata.
+            This preview now includes the Version 1 target-selection scaffold: pick a module, choose
+            an existing target item when available, or take an explicit create-new handoff.
           </Text>
-          <Button label="Show linked notice preview" onPress={handleShowLinkedActionsDemo} color={settingsAccent} />
+
+          <Button
+            label="Open target picker scaffold"
+            onPress={() => setTargetPickerVisible(true)}
+            color={settingsAccent}
+          />
+
+          {targetSelection && currentTargetProvider ? (
+            <View
+              className="rounded-2xl border px-4 py-3"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+            >
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Current scaffolded target
+              </Text>
+
+              {targetSelection.kind === "existing" ? (
+                <>
+                  <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
+                    Existing {currentTargetProvider.targetLabel}: {targetSelection.candidate.title}
+                  </Text>
+                  <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                    {targetSelection.candidate.subtitle ??
+                      `Selected from ${currentTargetProvider.moduleLabel}.`}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
+                    {targetSelection.handoff.title}
+                  </Text>
+                  <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                    {targetSelection.handoff.description}
+                  </Text>
+                  <View className="mt-3">
+                    <Button
+                      label={targetSelection.handoff.ctaLabel}
+                      onPress={() => router.push(targetSelection.handoff.destinationHref)}
+                      color={settingsAccent}
+                    />
+                  </View>
+                </>
+              )}
+            </View>
+          ) : null}
+
+          <Button
+            label="Show linked notice preview"
+            onPress={handleShowLinkedActionsDemo}
+            variant="ghost"
+          />
         </View>
       </Card>
 
