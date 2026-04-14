@@ -1,7 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, type Href } from "expo-router";
+import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
+import { createLinkedActionEditorRowFromRule } from "@/core/linked-actions/linkedActionsEditor.model";
+import type { LinkedActionEditorSourceOption } from "@/core/linked-actions/linkedActionsEditor.types";
 import { createLinkedActionsNotice } from "@/core/linked-actions/linkedActionsNotice";
+import { createLinkedActionTargetExistingSelection } from "@/core/linked-actions/linkedActionsTargetPicker.types";
+import type { LinkedActionRuleDefinition } from "@/core/linked-actions/linkedActions.types";
 import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import { type ThemeMode, useAppTheme } from "@/core/providers/ThemeProvider";
 import { Button } from "@/core/ui/Button";
@@ -68,6 +74,242 @@ const SECTIONS: PlaceholderSection[] = [
   },
 ];
 
+const DEMO_SOURCE_OPTIONS: LinkedActionEditorSourceOption[] = [
+  {
+    key: "todos-demo",
+    feature: "todos",
+    entityType: "todo",
+    entityId: "demo-todo-source",
+    label: "Finish inbox zero",
+    description: "Demo source task for the Version 1 linked-actions editor scaffold.",
+  },
+  {
+    key: "habits-demo",
+    feature: "habits",
+    entityType: "habit",
+    entityId: "demo-habit-source",
+    label: "Nightly mobility",
+    description: "Demo source habit for reviewing explicit trigger and effect choices.",
+  },
+  {
+    key: "calories-demo",
+    feature: "calories",
+    entityType: "calorie_log",
+    entityId: "demo-calorie-source",
+    label: "Post-workout shake",
+    description: "Demo source calorie entry showing cross-feature rule scaffolding.",
+  },
+  {
+    key: "workout-demo",
+    feature: "workout",
+    entityType: "workout_routine",
+    entityId: "demo-workout-source",
+    label: "Hydrate after workout",
+    description: "Demo source routine used to preview the Linked Actions editor for Version 1.",
+  },
+  {
+    key: "pomodoro-demo",
+    feature: "pomodoro",
+    entityType: "pomodoro_timer",
+    entityId: "demo-pomodoro-source",
+    label: "Deep work timer",
+    description: "Demo source timer for manual focus-session linked rules.",
+  },
+];
+
+const DEMO_RULES_BY_SOURCE: Record<
+  LinkedActionEditorSourceOption["key"],
+  Array<{
+    rule: LinkedActionRuleDefinition;
+    targetSelection: ReturnType<typeof createLinkedActionTargetExistingSelection>;
+  }>
+> = {
+  "todos-demo": [
+    {
+      rule: {
+        id: "demo_rule_todo_to_habit",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "todos",
+          entityType: "todo",
+          entityId: "demo-todo-source",
+          triggerType: "todo.completed",
+        },
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "demo-hydration-habit",
+          effect: {
+            kind: "progress",
+            type: "habit.increment",
+            amount: 1,
+            dateStrategy: "source_date",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: createLinkedActionTargetExistingSelection(
+        { feature: "habits", entityType: "habit" },
+        {
+          id: "demo-hydration-habit",
+          title: "Hydration check-in",
+          subtitle: "Anytime · target 1/day",
+        },
+      ),
+    },
+  ],
+  "habits-demo": [
+    {
+      rule: {
+        id: "demo_rule_habit_to_todo",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "demo-habit-source",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "todos",
+          entityType: "todo",
+          entityId: "demo-pack-gym-bag",
+          effect: {
+            kind: "binary",
+            type: "todo.complete",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: createLinkedActionTargetExistingSelection(
+        { feature: "todos", entityType: "todo" },
+        {
+          id: "demo-pack-gym-bag",
+          title: "Pack gym bag",
+          subtitle: "Due tomorrow",
+        },
+      ),
+    },
+  ],
+  "calories-demo": [
+    {
+      rule: {
+        id: "demo_rule_calories_to_todo",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "calories",
+          entityType: "calorie_log",
+          entityId: "demo-calorie-source",
+          triggerType: "calorie.entry_logged",
+        },
+        target: {
+          feature: "todos",
+          entityType: "todo",
+          entityId: "demo-log-meal-photo",
+          effect: {
+            kind: "binary",
+            type: "todo.complete",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: createLinkedActionTargetExistingSelection(
+        { feature: "todos", entityType: "todo" },
+        {
+          id: "demo-log-meal-photo",
+          title: "Log meal photo",
+          subtitle: "Low priority",
+        },
+      ),
+    },
+  ],
+  "workout-demo": [
+    {
+      rule: {
+        id: "demo_rule_workout_to_habit",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "workout",
+          entityType: "workout_routine",
+          entityId: "demo-workout-source",
+          triggerType: "workout.completed",
+        },
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "demo-recovery-habit",
+          effect: {
+            kind: "progress",
+            type: "habit.ensure_daily_target",
+            minimumCount: "target_per_day",
+            dateStrategy: "source_date",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: createLinkedActionTargetExistingSelection(
+        { feature: "habits", entityType: "habit" },
+        {
+          id: "demo-recovery-habit",
+          title: "Evening stretch",
+          subtitle: "Evening · target 1/day",
+        },
+      ),
+    },
+  ],
+  "pomodoro-demo": [
+    {
+      rule: {
+        id: "demo_rule_pomodoro_to_todo",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "pomodoro",
+          entityType: "pomodoro_timer",
+          entityId: "demo-pomodoro-source",
+          triggerType: "pomodoro.focus_completed",
+        },
+        target: {
+          feature: "todos",
+          entityType: "todo",
+          entityId: "demo-review-notes",
+          effect: {
+            kind: "binary",
+            type: "todo.complete",
+          },
+        },
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: createLinkedActionTargetExistingSelection(
+        { feature: "todos", entityType: "todo" },
+        {
+          id: "demo-review-notes",
+          title: "Review session notes",
+          subtitle: "Repeats daily",
+        },
+      ),
+    },
+  ],
+};
+
 function SettingsPlaceholderRow({ label, description }: PlaceholderItem) {
   const { tokens } = useAppTheme();
 
@@ -110,8 +352,18 @@ function getAppearanceSummary(mode: ThemeMode, resolvedTheme: "light" | "dark") 
 export function SettingsScreen() {
   const { showNotice } = useInAppNotices();
   const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
+  const [selectedLinkedActionSourceKey, setSelectedLinkedActionSourceKey] = useState(
+    DEMO_SOURCE_OPTIONS[3].key,
+  );
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
   const settingsAccent = resolvedTheme === "dark" ? "#64748b" : SETTINGS_ACCENT;
+  const linkedActionInitialRows = useMemo(
+    () =>
+      DEMO_RULES_BY_SOURCE[selectedLinkedActionSourceKey].map((input) =>
+        createLinkedActionEditorRowFromRule(input),
+      ),
+    [selectedLinkedActionSourceKey],
+  );
 
   const handleShowLinkedActionsDemo = () => {
     showNotice(
@@ -217,14 +469,25 @@ export function SettingsScreen() {
         variant="header"
         accentColor={settingsAccent}
         headerTitle="Linked Actions"
-        headerSubtitle="Temporary internal preview for the in-app notice scaffold."
+        headerSubtitle="Temporary internal preview for the Version 1 editor scaffold."
         headerRight={<MaterialIcons name="bolt" size={22} color="#ffffff" />}
       >
         <View className="gap-3">
           <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            This preview emits a typed Linked Actions notice with source, target, and destination metadata.
+            This preview keeps Linked Actions explicit and manual: one source item, one or more
+            rule rows, and an explicit target selection flow with no AI behavior.
           </Text>
-          <Button label="Show linked notice preview" onPress={handleShowLinkedActionsDemo} color={settingsAccent} />
+          <LinkedActionsEditorSection
+            sourceOptions={DEMO_SOURCE_OPTIONS}
+            selectedSourceKey={selectedLinkedActionSourceKey}
+            onSourceKeyChange={setSelectedLinkedActionSourceKey}
+            initialRows={linkedActionInitialRows}
+          />
+          <Button
+            label="Show linked notice preview"
+            onPress={handleShowLinkedActionsDemo}
+            variant="ghost"
+          />
         </View>
       </Card>
 
