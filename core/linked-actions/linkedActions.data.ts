@@ -203,6 +203,11 @@ export async function createLinkedActionRule(
     bidirectionalGroupId: input.bidirectionalGroupId ?? null,
     source: input.source,
     target: input.target,
+    isUnsupported: false,
+    unsupportedReason: null,
+    rawTargetFeature: input.target.feature,
+    rawTargetEntityType: input.target.entityType,
+    rawEffectType: input.target.effect.type,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -248,6 +253,12 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
       ruleInput.existingRuleId ? existingById.get(ruleInput.existingRuleId) : undefined;
 
     if (existingRule) {
+      if (existingRule.isUnsupported) {
+        throw new Error(
+          "Unsupported linked action rules must be removed or replaced before saving.",
+        );
+      }
+
       const updatedRule: LinkedActionRuleDefinition = {
         id: existingRule.id,
         status: ruleInput.status ?? existingRule.status,
@@ -256,6 +267,11 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
           ruleInput.bidirectionalGroupId ?? existingRule.bidirectionalGroupId,
         source,
         target: ruleInput.target,
+        isUnsupported: false,
+        unsupportedReason: null,
+        rawTargetFeature: ruleInput.target.feature,
+        rawTargetEntityType: ruleInput.target.entityType,
+        rawEffectType: ruleInput.target.effect.type,
         createdAt: existingRule.createdAt,
         updatedAt: now,
         deletedAt: null,
@@ -272,6 +288,11 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
       bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? null,
       source,
       target: ruleInput.target,
+      isUnsupported: false,
+      unsupportedReason: null,
+      rawTargetFeature: ruleInput.target.feature,
+      rawTargetEntityType: ruleInput.target.entityType,
+      rawEffectType: ruleInput.target.effect.type,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

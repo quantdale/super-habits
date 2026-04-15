@@ -68,6 +68,35 @@ export type LinkedActionEffectType = ValueOfConstArrays<
   typeof LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY
 >;
 
+export const LINKED_ACTION_SUPPORTED_TRIGGER_TYPES = [
+  "habit.completed_for_day",
+] as const satisfies readonly LinkedActionTriggerType[];
+
+export const LINKED_ACTION_SUPPORTED_TARGET_FEATURES = [
+  "todos",
+  "habits",
+  "workout",
+] as const satisfies readonly LinkedActionFeature[];
+
+export const LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE = {
+  todos: ["todo"],
+  habits: ["habit"],
+  workout: ["workout_routine"],
+} as const satisfies Partial<
+  Record<LinkedActionFeature, readonly LinkedActionTargetEntityType[]>
+>;
+
+export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY = {
+  todo: ["todo.complete"],
+  habit: ["habit.increment", "habit.ensure_daily_target"],
+  workout_routine: ["workout.log"],
+} as const satisfies Partial<
+  Record<LinkedActionTargetEntityType, readonly LinkedActionEffectType[]>
+>;
+
+export const LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE =
+  "This linked action uses an unsupported target and must be removed or replaced.";
+
 export type LinkedActionDateStrategy = "today" | "source_date";
 export type LinkedActionMealType = "breakfast" | "lunch" | "dinner" | "snack";
 export type LinkedActionPomodoroSessionType = "focus" | "short_break" | "long_break";
@@ -141,17 +170,52 @@ export type LinkedActionRuleTarget = {
   effect: LinkedActionEffectDefinition;
 };
 
-export type LinkedActionRuleDefinition = {
+export type LinkedActionUnsupportedEffectDefinition = {
+  kind: "unsupported";
+  type: string;
+  rawPayload: string;
+};
+
+export type LinkedActionUnsupportedRuleTarget = {
+  feature: string;
+  entityType: string;
+  entityId: string | null;
+  effect: LinkedActionUnsupportedEffectDefinition;
+};
+
+type LinkedActionRuleDefinitionBase = {
   id: string;
   status: LinkedActionRuleStatus;
   directionPolicy: LinkedActionDirectionPolicy;
   bidirectionalGroupId: string | null;
-  source: LinkedActionRuleSource;
-  target: LinkedActionRuleTarget;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
 };
+
+export type LinkedActionSupportedRuleDefinition = LinkedActionRuleDefinitionBase & {
+  source: LinkedActionRuleSource;
+  target: LinkedActionRuleTarget;
+  isUnsupported: false;
+  unsupportedReason: null;
+  rawTargetFeature: LinkedActionFeature;
+  rawTargetEntityType: LinkedActionTargetEntityType;
+  rawEffectType: LinkedActionEffectType;
+};
+
+export type LinkedActionUnsupportedRuleDefinition = LinkedActionRuleDefinitionBase & {
+  source: LinkedActionRuleSource;
+  target: LinkedActionUnsupportedRuleTarget;
+  isUnsupported: true;
+  unsupportedReason: string;
+  rawTargetFeature: string;
+  rawTargetEntityType: string;
+  rawEffectType: string;
+};
+
+export type LinkedActionRuleDefinition =
+  | LinkedActionSupportedRuleDefinition
+  | LinkedActionUnsupportedRuleDefinition;
 
 export type CreateLinkedActionRuleInput = {
   status?: LinkedActionRuleStatus;
@@ -253,12 +317,19 @@ const ALL_LINKED_ACTION_TRIGGER_TYPES = flattenConstArrays(
 const ALL_LINKED_ACTION_EFFECT_TYPES = flattenConstArrays(
   LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY,
 );
+const ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES = flattenConstArrays(
+  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
+);
 
 function expectObject(value: unknown, context: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${context} must be a JSON object`);
   }
   return value as Record<string, unknown>;
+}
+
+function expectJsonObject(value: string, context: string): Record<string, unknown> {
+  return expectObject(JSON.parse(value), context);
 }
 
 function expectString(value: unknown, context: string): string {
@@ -338,6 +409,18 @@ export function isLinkedActionEffectType(value: string): value is LinkedActionEf
   return ALL_LINKED_ACTION_EFFECT_TYPES.includes(value as LinkedActionEffectType);
 }
 
+export function isSupportedLinkedActionTriggerType(
+  value: string,
+): value is LinkedActionTriggerType {
+  return (LINKED_ACTION_SUPPORTED_TRIGGER_TYPES as readonly string[]).includes(value);
+}
+
+export function isSupportedLinkedActionTargetFeature(
+  value: string,
+): value is LinkedActionFeature {
+  return (LINKED_ACTION_SUPPORTED_TARGET_FEATURES as readonly string[]).includes(value);
+}
+
 export function isAllowedLinkedActionSourceEntity(
   feature: LinkedActionFeature,
   entityType: LinkedActionSourceEntityType,
@@ -366,11 +449,53 @@ export function isAllowedLinkedActionEffect(
   return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[entityType].includes(effectType as never);
 }
 
+export function isSupportedLinkedActionTargetEntity(
+  feature: LinkedActionFeature,
+  entityType: LinkedActionTargetEntityType,
+): boolean {
+  if (!isSupportedLinkedActionTargetFeature(feature)) {
+    return false;
+  }
+
+  const supportedEntityTypes =
+    LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE[
+      feature as keyof typeof LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE
+    ];
+
+  return (
+    supportedEntityTypes?.includes(entityType as never) ?? false
+  );
+}
+
+export function isSupportedLinkedActionEffect(
+  entityType: LinkedActionTargetEntityType,
+  effectType: LinkedActionEffectType,
+): boolean {
+  if (!(ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES as readonly string[]).includes(effectType)) {
+    return false;
+  }
+
+  const supportedEffectTypes =
+    LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY[
+      entityType as keyof typeof LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY
+    ];
+
+  return (
+    supportedEffectTypes?.includes(effectType as never) ?? false
+  );
+}
+
+export function isSupportedLinkedActionRule(
+  rule: LinkedActionRuleDefinition,
+): rule is LinkedActionSupportedRuleDefinition {
+  return !rule.isUnsupported;
+}
+
 export function parseLinkedActionEffectPayload(
   effectType: LinkedActionEffectType,
   rawPayload: string,
 ): LinkedActionEffectDefinition {
-  const parsed = expectObject(JSON.parse(rawPayload), `${effectType} payload`);
+  const parsed = expectJsonObject(rawPayload, `${effectType} payload`);
 
   switch (effectType) {
     case "todo.complete":
@@ -488,14 +613,27 @@ export function assertValidLinkedActionRuleShape(
       `Trigger ${source.triggerType} is not allowed for source entity ${source.entityType}`,
     );
   }
+  if (!isSupportedLinkedActionTriggerType(source.triggerType)) {
+    throw new Error(`Trigger ${source.triggerType} is not currently supported.`);
+  }
   if (!isAllowedLinkedActionTargetEntity(target.feature, target.entityType)) {
     throw new Error(
       `Target entity type ${target.entityType} is not allowed for feature ${target.feature}`,
     );
   }
+  if (!isSupportedLinkedActionTargetEntity(target.feature, target.entityType)) {
+    throw new Error(
+      `Target entity type ${target.entityType} is not currently supported for feature ${target.feature}`,
+    );
+  }
   if (!isAllowedLinkedActionEffect(target.entityType, target.effect.type)) {
     throw new Error(
       `Effect ${target.effect.type} is not allowed for target entity ${target.entityType}`,
+    );
+  }
+  if (!isSupportedLinkedActionEffect(target.entityType, target.effect.type)) {
+    throw new Error(
+      `Effect ${target.effect.type} is not currently supported for target entity ${target.entityType}`,
     );
   }
 }
@@ -518,15 +656,6 @@ export function normalizeLinkedActionRuleRow(
   if (!isLinkedActionTriggerType(row.trigger_type)) {
     throw new Error(`Unknown linked action trigger type: ${row.trigger_type}`);
   }
-  if (!isLinkedActionFeature(row.target_feature)) {
-    throw new Error(`Unknown linked action target feature: ${row.target_feature}`);
-  }
-  if (!isLinkedActionTargetEntityType(row.target_entity_type)) {
-    throw new Error(`Unknown linked action target entity type: ${row.target_entity_type}`);
-  }
-  if (!isLinkedActionEffectType(row.effect_type)) {
-    throw new Error(`Unknown linked action effect type: ${row.effect_type}`);
-  }
 
   const source: LinkedActionRuleSource = {
     feature: row.source_feature,
@@ -535,31 +664,111 @@ export function normalizeLinkedActionRuleRow(
     triggerType: row.trigger_type,
   };
 
-  const target: LinkedActionRuleTarget = {
-    feature: row.target_feature,
-    entityType: row.target_entity_type,
-    entityId: row.target_entity_id,
-    effect: parseLinkedActionEffectPayload(row.effect_type, row.effect_payload),
-  };
+  if (!isAllowedLinkedActionSourceEntity(source.feature, source.entityType)) {
+    throw new Error(
+      `Source entity type ${source.entityType} is not allowed for feature ${source.feature}`,
+    );
+  }
+  if (!isAllowedLinkedActionTrigger(source.entityType, source.triggerType)) {
+    throw new Error(
+      `Trigger ${source.triggerType} is not allowed for source entity ${source.entityType}`,
+    );
+  }
 
-  assertValidLinkedActionRuleShape(source, target);
-
-  return {
+  const unsupportedRule = (reason: string): LinkedActionUnsupportedRuleDefinition => ({
     id: row.id,
-    status: row.status,
-    directionPolicy: row.direction_policy,
+    status: row.status as LinkedActionRuleStatus,
+    directionPolicy: row.direction_policy as LinkedActionDirectionPolicy,
     bidirectionalGroupId: row.bidirectional_group_id,
     source,
-    target,
+    target: {
+      feature: row.target_feature,
+      entityType: row.target_entity_type,
+      entityId: row.target_entity_id,
+      effect: {
+        kind: "unsupported",
+        type: row.effect_type,
+        rawPayload: row.effect_payload,
+      },
+    },
+    isUnsupported: true,
+    unsupportedReason: reason,
+    rawTargetFeature: row.target_feature,
+    rawTargetEntityType: row.target_entity_type,
+    rawEffectType: row.effect_type,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
-  };
+  });
+
+  if (!isLinkedActionFeature(row.target_feature)) {
+    return unsupportedRule(`Unknown linked action target feature: ${row.target_feature}`);
+  }
+  if (!isLinkedActionTargetEntityType(row.target_entity_type)) {
+    return unsupportedRule(
+      `Unknown linked action target entity type: ${row.target_entity_type}`,
+    );
+  }
+  if (!isAllowedLinkedActionTargetEntity(row.target_feature, row.target_entity_type)) {
+    return unsupportedRule(
+      `Target entity type ${row.target_entity_type} is not allowed for feature ${row.target_feature}`,
+    );
+  }
+  if (!isLinkedActionEffectType(row.effect_type)) {
+    return unsupportedRule(`Unknown linked action effect type: ${row.effect_type}`);
+  }
+  if (!isAllowedLinkedActionEffect(row.target_entity_type, row.effect_type)) {
+    return unsupportedRule(
+      `Effect ${row.effect_type} is not allowed for target entity ${row.target_entity_type}`,
+    );
+  }
+  if (
+    !isSupportedLinkedActionTargetEntity(row.target_feature, row.target_entity_type) ||
+    !isSupportedLinkedActionEffect(row.target_entity_type, row.effect_type)
+  ) {
+    return unsupportedRule(LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE);
+  }
+
+  try {
+    const target: LinkedActionRuleTarget = {
+      feature: row.target_feature,
+      entityType: row.target_entity_type,
+      entityId: row.target_entity_id,
+      effect: parseLinkedActionEffectPayload(row.effect_type, row.effect_payload),
+    };
+
+    assertValidLinkedActionRuleShape(source, target);
+
+    return {
+      id: row.id,
+      status: row.status,
+      directionPolicy: row.direction_policy,
+      bidirectionalGroupId: row.bidirectional_group_id,
+      source,
+      target,
+      isUnsupported: false,
+      unsupportedReason: null,
+      rawTargetFeature: row.target_feature,
+      rawTargetEntityType: row.target_entity_type,
+      rawEffectType: row.effect_type,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      deletedAt: row.deleted_at,
+    };
+  } catch (error) {
+    return unsupportedRule(
+      error instanceof Error ? error.message : LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE,
+    );
+  }
 }
 
 export function buildLinkedActionRuleRow(
   rule: LinkedActionRuleDefinition,
 ): LinkedActionRuleRow {
+  if (rule.isUnsupported) {
+    throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
+  }
+
   assertValidLinkedActionRuleShape(rule.source, rule.target);
 
   return {
@@ -588,10 +797,6 @@ export function parseLinkedActionRuleRecord(value: unknown): LinkedActionRuleDef
   const target = expectObject(raw.target, "linked action target");
   const effect = expectObject(target.effect, "linked action effect");
   const effectType = expectString(effect.type, "linked action effect type");
-
-  if (!isLinkedActionEffectType(effectType)) {
-    throw new Error(`Unknown linked action effect type: ${effectType}`);
-  }
 
   return normalizeLinkedActionRuleRow({
     id: expectString(raw.id, "linked action id"),
@@ -685,7 +890,7 @@ export type LinkedActionEventRow = {
 
 export type LinkedActionEffectPlan = {
   sourceEvent: LinkedActionEventRecord;
-  rule: LinkedActionRuleDefinition;
+  rule: LinkedActionSupportedRuleDefinition;
   chain: LinkedActionChainMetadata;
   origin: LinkedActionOriginMetadata;
   effectFingerprint: string;
@@ -748,10 +953,10 @@ export type LinkedActionEffectResult = {
   executionId: string | null;
   ruleId: string;
   status: LinkedActionExecutionStatus;
-  effectType: LinkedActionEffectType;
+  effectType: string;
   effectFingerprint: string;
-  targetFeature: LinkedActionFeature;
-  targetEntityType: LinkedActionTargetEntityType;
+  targetFeature: string;
+  targetEntityType: string;
   targetEntityId: string | null;
   producedEntityType: LinkedActionEffectProducedEntityType | null;
   producedEntityId: string | null;

@@ -10,16 +10,53 @@ import {
   validateLinkedActionEditorRow,
 } from "@/core/linked-actions/linkedActionsEditor.model";
 import { createLinkedActionTargetExistingSelection } from "@/core/linked-actions/linkedActionsTargetPicker.types";
-import type { LinkedActionRuleDefinition } from "@/core/linked-actions/linkedActions.types";
+import type {
+  LinkedActionRuleDefinition,
+  LinkedActionSupportedRuleDefinition,
+} from "@/core/linked-actions/linkedActions.types";
+
+function buildSupportedRule(
+  overrides: Partial<LinkedActionSupportedRuleDefinition>,
+): LinkedActionSupportedRuleDefinition {
+  return {
+    id: "rule_demo",
+    status: "active",
+    directionPolicy: "one_way",
+    bidirectionalGroupId: null,
+    source: {
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_source",
+      triggerType: "habit.completed_for_day",
+    },
+    target: {
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_target",
+      effect: {
+        kind: "progress",
+        type: "habit.increment",
+        amount: 1,
+        dateStrategy: "source_date",
+      },
+    },
+    isUnsupported: false,
+    unsupportedReason: null,
+    rawTargetFeature: "habits",
+    rawTargetEntityType: "habit",
+    rawEffectType: "habit.increment",
+    createdAt: "2026-04-14T00:00:00.000Z",
+    updatedAt: "2026-04-14T00:00:00.000Z",
+    deletedAt: null,
+    ...overrides,
+  };
+}
 
 describe("linkedActionsEditor.model", () => {
   it("returns the expected trigger options for habits", () => {
     const options = getLinkedActionTriggerOptions("habits");
 
-    expect(options.map((option) => option.value)).toEqual([
-      "habit.progress_incremented",
-      "habit.completed_for_day",
-    ]);
+    expect(options.map((option) => option.value)).toEqual(["habit.completed_for_day"]);
   });
 
   it("creates an empty editor row from a source option", () => {
@@ -39,11 +76,7 @@ describe("linkedActionsEditor.model", () => {
   });
 
   it("adapts an existing linked rule into editor state", () => {
-    const rule: LinkedActionRuleDefinition = {
-      id: "rule_demo",
-      status: "active",
-      directionPolicy: "one_way",
-      bidirectionalGroupId: null,
+    const rule: LinkedActionRuleDefinition = buildSupportedRule({
       source: {
         feature: "workout",
         entityType: "workout_routine",
@@ -61,10 +94,13 @@ describe("linkedActionsEditor.model", () => {
           dateStrategy: "source_date",
         },
       },
+      rawTargetFeature: "habits",
+      rawTargetEntityType: "habit",
+      rawEffectType: "habit.ensure_daily_target",
       createdAt: "2026-04-14T00:00:00.000Z",
       updatedAt: "2026-04-14T00:00:00.000Z",
       deletedAt: null,
-    };
+    });
 
     const row = createLinkedActionEditorRowFromRule({
       rule,
@@ -82,11 +118,7 @@ describe("linkedActionsEditor.model", () => {
 
   it("resets target selection and effect when the target feature changes", () => {
     const baseRow = createLinkedActionEditorRowFromRule({
-      rule: {
-        id: "rule_demo",
-        status: "active",
-        directionPolicy: "one_way",
-        bidirectionalGroupId: null,
+      rule: buildSupportedRule({
         source: {
           feature: "todos",
           entityType: "todo",
@@ -104,10 +136,10 @@ describe("linkedActionsEditor.model", () => {
             dateStrategy: "source_date",
           },
         },
-        createdAt: "2026-04-14T00:00:00.000Z",
-        updatedAt: "2026-04-14T00:00:00.000Z",
-        deletedAt: null,
-      },
+        rawTargetFeature: "habits",
+        rawTargetEntityType: "habit",
+        rawEffectType: "habit.increment",
+      }),
       targetSelection: createLinkedActionTargetExistingSelection(
         { feature: "habits", entityType: "habit" },
         { id: "habit_demo", title: "Drink water" },
@@ -145,11 +177,7 @@ describe("linkedActionsEditor.model", () => {
 
   it("creates a save payload with the default effect details for supported rows", () => {
     const row = createLinkedActionEditorRowFromRule({
-      rule: {
-        id: "rule_demo",
-        status: "active",
-        directionPolicy: "one_way",
-        bidirectionalGroupId: null,
+      rule: buildSupportedRule({
         source: {
           feature: "habits",
           entityType: "habit",
@@ -167,10 +195,10 @@ describe("linkedActionsEditor.model", () => {
             dateStrategy: "source_date",
           },
         },
-        createdAt: "2026-04-14T00:00:00.000Z",
-        updatedAt: "2026-04-14T00:00:00.000Z",
-        deletedAt: null,
-      },
+        rawTargetFeature: "habits",
+        rawTargetEntityType: "habit",
+        rawEffectType: "habit.ensure_daily_target",
+      }),
       targetSelection: createLinkedActionTargetExistingSelection(
         { feature: "habits", entityType: "habit" },
         { id: "habit_target", title: "Evening stretch" },
@@ -198,11 +226,7 @@ describe("linkedActionsEditor.model", () => {
 
   it("keeps an existing rule invalid when its target can no longer be resolved", () => {
     const row = createLinkedActionEditorRowFromRule({
-      rule: {
-        id: "rule_demo",
-        status: "active",
-        directionPolicy: "one_way",
-        bidirectionalGroupId: null,
+      rule: buildSupportedRule({
         source: {
           feature: "todos",
           entityType: "todo",
@@ -220,6 +244,46 @@ describe("linkedActionsEditor.model", () => {
             dateStrategy: "source_date",
           },
         },
+        rawTargetFeature: "habits",
+        rawTargetEntityType: "habit",
+        rawEffectType: "habit.increment",
+      }),
+      targetSelection: null,
+    });
+
+    expect(row.targetSelection).toBeNull();
+    expect(validateLinkedActionEditorRow(row).targetSelection).toBeDefined();
+  });
+
+  it("marks unsupported persisted rows as disabled legacy entries", () => {
+    const row = createLinkedActionEditorRowFromRule({
+      rule: {
+        id: "rule_legacy",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_source",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "pomodoro",
+          entityType: "pomodoro_session",
+          entityId: null,
+          effect: {
+            kind: "unsupported",
+            type: "pomodoro.log",
+            rawPayload: "{\"sessionType\":\"focus\"}",
+          },
+        },
+        isUnsupported: true,
+        unsupportedReason:
+          "This linked action uses an unsupported target and must be removed or replaced.",
+        rawTargetFeature: "pomodoro",
+        rawTargetEntityType: "pomodoro_session",
+        rawEffectType: "pomodoro.log",
         createdAt: "2026-04-14T00:00:00.000Z",
         updatedAt: "2026-04-14T00:00:00.000Z",
         deletedAt: null,
@@ -227,7 +291,55 @@ describe("linkedActionsEditor.model", () => {
       targetSelection: null,
     });
 
-    expect(row.targetSelection).toBeNull();
-    expect(validateLinkedActionEditorRow(row).targetSelection).toBeDefined();
+    expect(row.isUnsupported).toBe(true);
+    expect(row.unsupportedTarget).toMatchObject({
+      feature: "pomodoro",
+      entityType: "pomodoro_session",
+      effectType: "pomodoro.log",
+    });
+    expect(validateLinkedActionEditorRow(row).unsupported).toBe(
+      "This linked action uses an unsupported target and must be removed or replaced.",
+    );
+  });
+
+  it("refuses to save unsupported rows", () => {
+    const row = createLinkedActionEditorRowFromRule({
+      rule: {
+        id: "rule_legacy",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_source",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "pomodoro",
+          entityType: "pomodoro_session",
+          entityId: null,
+          effect: {
+            kind: "unsupported",
+            type: "pomodoro.log",
+            rawPayload: "{}",
+          },
+        },
+        isUnsupported: true,
+        unsupportedReason:
+          "This linked action uses an unsupported target and must be removed or replaced.",
+        rawTargetFeature: "pomodoro",
+        rawTargetEntityType: "pomodoro_session",
+        rawEffectType: "pomodoro.log",
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+      targetSelection: null,
+    });
+
+    expect(() => createSaveLinkedActionRuleInputFromEditorRow(row)).toThrow(
+      "Unsupported linked action rules must be removed or replaced before saving.",
+    );
   });
 });

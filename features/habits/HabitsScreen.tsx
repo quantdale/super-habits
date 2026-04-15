@@ -102,7 +102,7 @@ async function buildLinkedActionEditorRows(
     rules.map(async (rule) => {
       let targetSelection = null;
 
-      if (rule.target.entityId) {
+      if (!rule.isUnsupported && rule.target.entityId) {
         const provider = getLinkedActionTargetPickerProvider(rule.target.feature);
         if (provider.existing.supported) {
           let candidatesPromise = candidatesByFeature.get(rule.target.feature);

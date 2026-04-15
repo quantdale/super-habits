@@ -33,6 +33,15 @@ export type LinkedActionEditorRowDraft = {
   targetEntityType: LinkedActionTargetEntityType | null;
   targetSelection: LinkedActionTargetPickerSelection | null;
   effectType: LinkedActionEffectType | null;
+  isUnsupported: boolean;
+  unsupportedTarget:
+    | {
+        feature: string;
+        entityType: string;
+        effectType: string;
+        message: string;
+      }
+    | null;
 };
 
 export type LinkedActionEditorRowValidation = {
@@ -40,6 +49,7 @@ export type LinkedActionEditorRowValidation = {
   targetFeature?: string;
   targetSelection?: string;
   effectType?: string;
+  unsupported?: string;
 };
 
 export type LinkedActionExistingRuleAdapterInput = {

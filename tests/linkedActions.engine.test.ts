@@ -3,6 +3,7 @@ import { LinkedActionsEngine } from "@/core/linked-actions/linkedActions.engine"
 import type {
   LinkedActionExecutionRecord,
   LinkedActionRuleDefinition,
+  LinkedActionSupportedRuleDefinition,
 } from "@/core/linked-actions/linkedActions.types";
 
 const dataMocks = vi.hoisted(() => ({
@@ -19,8 +20,8 @@ const dataMocks = vi.hoisted(() => ({
 vi.mock("@/core/linked-actions/linkedActions.data", () => dataMocks);
 
 function buildRule(
-  overrides: Partial<LinkedActionRuleDefinition> = {},
-): LinkedActionRuleDefinition {
+  overrides: Partial<LinkedActionSupportedRuleDefinition> = {},
+): LinkedActionSupportedRuleDefinition {
   return {
     id: "link_1",
     status: "active",
@@ -43,6 +44,11 @@ function buildRule(
         dateStrategy: "today",
       },
     },
+    isUnsupported: false,
+    unsupportedReason: null,
+    rawTargetFeature: "habits",
+    rawTargetEntityType: "habit",
+    rawEffectType: "habit.increment",
     createdAt: "2026-04-14T00:00:00.000Z",
     updatedAt: "2026-04-14T00:00:00.000Z",
     deletedAt: null,
@@ -158,10 +164,10 @@ describe("core/linked-actions/linkedActions.engine", () => {
     });
   });
 
-  it("returns planned effect metadata without persisting events or executions", async () => {
+  it("returns planned effect metadata for supported rules without persisting events or executions", async () => {
     dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
       buildRule({
-        id: "link_cal",
+        id: "link_workout",
         source: {
           feature: "workout",
           entityType: "workout_routine",
@@ -169,24 +175,18 @@ describe("core/linked-actions/linkedActions.engine", () => {
           triggerType: "workout.completed",
         },
         target: {
-          feature: "calories",
-          entityType: "calorie_log",
-          entityId: null,
+          feature: "workout",
+          entityType: "workout_routine",
+          entityId: "wrk_target",
           effect: {
             kind: "log",
-            type: "calorie.log",
-            dateStrategy: "source_date",
-            templateSource: "inline",
-            savedMealId: null,
-            foodName: "Protein shake",
-            calories: 240,
-            protein: 30,
-            carbs: 12,
-            fats: 6,
-            fiber: 2,
-            mealType: "snack",
+            type: "workout.log",
+            notes: null,
           },
         },
+        rawTargetFeature: "workout",
+        rawTargetEntityType: "workout_routine",
+        rawEffectType: "workout.log",
       }),
     ]);
 
@@ -208,22 +208,25 @@ describe("core/linked-actions/linkedActions.engine", () => {
     expect(result.mode).toBe("plan");
     expect(result.effects[0]).toMatchObject({
       status: "planned",
-      effectType: "calorie.log",
-      producedEntityType: "calorie_log",
+      effectType: "workout.log",
+      producedEntityType: "workout_log",
     });
-    expect(result.effects[0].producedEntityId).toMatch(/^cal_/);
+    expect(result.effects[0].producedEntityId).toMatch(/^wrk_/);
     expect(result.effects[0].noticePreview).toMatchObject({
       kind: "linked-actions",
       target: {
-        feature: "calories",
+        feature: "workout",
       },
     });
   });
 
-  it("logs a calorie notice with path-specific copy for habit completions", async () => {
+  it("skips unsupported legacy target rules without executing effects", async () => {
     dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
-      buildRule({
-        id: "link_calorie",
+      {
+        id: "link_legacy",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
         source: {
           feature: "habits",
           entityType: "habit",
@@ -231,145 +234,29 @@ describe("core/linked-actions/linkedActions.engine", () => {
           triggerType: "habit.completed_for_day",
         },
         target: {
-          feature: "calories",
-          entityType: "calorie_log",
+          feature: "pomodoro",
+          entityType: "pomodoro_session",
           entityId: null,
           effect: {
-            kind: "log",
-            type: "calorie.log",
-            dateStrategy: "source_date",
-            templateSource: "inline",
-            savedMealId: null,
-            foodName: "Protein shake",
-            calories: 240,
-            protein: 30,
-            carbs: 12,
-            fats: 6,
-            fiber: 2,
-            mealType: "snack",
+            kind: "unsupported",
+            type: "pomodoro.log",
+            rawPayload: "{\"sessionType\":\"focus\",\"durationSeconds\":1500}",
           },
         },
-      }),
-    ]);
-
-    const executor = vi.fn().mockResolvedValue({
-      status: "applied",
-      targetLabel: "Protein shake",
-      producedEntityType: "calorie_log",
-      producedEntityId: "cal_123",
-    });
-    const engine = new LinkedActionsEngine({
-      effectRegistry: { "calorie.log": executor },
-    });
-
-    const result = await engine.processSourceAction({
-      feature: "habits",
-      entityType: "habit",
-      entityId: "habit_1",
-      triggerType: "habit.completed_for_day",
-      label: "Hydrate",
-      sourceDateKey: "2026-04-14",
-    });
-
-    expect(dataMocks.getAppliedHabitDayCalorieExecution).toHaveBeenCalledWith(
-      "link_calorie",
-      "habit_1",
-      "2026-04-14",
-    );
-    expect(result.effects[0]).toMatchObject({
-      status: "applied",
-      effectType: "calorie.log",
-      producedEntityId: "cal_123",
-    });
-    expect(result.notices[0]?.payload).toMatchObject({
-      message: "Linked Actions logged Protein shake.",
-      reason: "Hydrate completed for the day and added a calorie entry.",
-      target: {
-        feature: "calories",
+        isUnsupported: true,
+        unsupportedReason:
+          "This linked action uses an unsupported target and must be removed or replaced.",
+        rawTargetFeature: "pomodoro",
+        rawTargetEntityType: "pomodoro_session",
+        rawEffectType: "pomodoro.log",
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
       },
-    });
-  });
-
-  it("dedupes repeated habit-day calorie executions before creating another execution", async () => {
-    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
-      buildRule({
-        id: "link_calorie",
-        source: {
-          feature: "habits",
-          entityType: "habit",
-          entityId: "habit_1",
-          triggerType: "habit.completed_for_day",
-        },
-        target: {
-          feature: "calories",
-          entityType: "calorie_log",
-          entityId: null,
-          effect: {
-            kind: "log",
-            type: "calorie.log",
-            dateStrategy: "source_date",
-            templateSource: "inline",
-            savedMealId: null,
-            foodName: "Protein shake",
-            calories: 240,
-            protein: 30,
-            carbs: 12,
-            fats: 6,
-            fiber: 2,
-            mealType: "snack",
-          },
-        },
-      }),
     ]);
-    dataMocks.getAppliedHabitDayCalorieExecution.mockResolvedValue({
-      id: "lexec_existing",
-      ruleId: "link_calorie",
-      sourceEventId: "levt_existing",
-      chainId: "lchain_existing",
-      rootEventId: "levt_existing",
-      originRuleId: null,
-      effectType: "calorie.log",
-      effectFingerprint: "fingerprint",
-      status: "applied",
-      targetFeature: "calories",
-      targetEntityType: "calorie_log",
-      targetEntityId: null,
-      producedEntityType: "calorie_log",
-      producedEntityId: "cal_existing",
-      noticePayload: {
-        kind: "linked-actions",
-        message: "Linked Actions logged Protein shake.",
-        reason: "Hydrate completed for the day and added a calorie entry.",
-        source: {
-          feature: "habits",
-          entityType: "habit",
-          entityId: "habit_1",
-          label: "Hydrate",
-        },
-        target: {
-          feature: "calories",
-          entityType: "calorie_log",
-          entityId: "cal_existing",
-          label: "Protein shake",
-        },
-        destination: {
-          kind: "linked-actions-target",
-          href: "/(tabs)/calories",
-          feature: "calories",
-          entityType: "calorie_log",
-          entityId: "cal_existing",
-          label: "Protein shake",
-        },
-      },
-      errorMessage: null,
-      createdAt: "2026-04-14T00:00:00.000Z",
-      updatedAt: "2026-04-14T00:00:00.000Z",
-    });
 
     const executor = vi.fn();
-    const engine = new LinkedActionsEngine({
-      effectRegistry: { "calorie.log": executor },
-    });
+    const engine = new LinkedActionsEngine({ effectRegistry: { "pomodoro.log": executor } });
 
     const result = await engine.processSourceAction({
       feature: "habits",
@@ -383,10 +270,68 @@ describe("core/linked-actions/linkedActions.engine", () => {
     expect(dataMocks.createLinkedActionExecution).not.toHaveBeenCalled();
     expect(executor).not.toHaveBeenCalled();
     expect(result.effects[0]).toMatchObject({
-      status: "duplicate",
-      reason: "habit_day_already_logged",
-      executionId: "lexec_existing",
-      producedEntityId: "cal_existing",
+      status: "skipped",
+      ruleId: "link_legacy",
+      effectType: "pomodoro.log",
+      targetFeature: "pomodoro",
+      reason: "unsupported_rule",
+      errorMessage:
+        "This linked action uses an unsupported target and must be removed or replaced.",
     });
+    expect(result.notices).toEqual([]);
+  });
+
+  it("reports unsupported rules during plan mode too", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
+      {
+        id: "link_legacy",
+        status: "active",
+        directionPolicy: "one_way",
+        bidirectionalGroupId: null,
+        source: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_1",
+          triggerType: "habit.completed_for_day",
+        },
+        target: {
+          feature: "pomodoro",
+          entityType: "pomodoro_session",
+          entityId: null,
+          effect: {
+            kind: "unsupported",
+            type: "pomodoro.log",
+            rawPayload: "{}",
+          },
+        },
+        isUnsupported: true,
+        unsupportedReason:
+          "This linked action uses an unsupported target and must be removed or replaced.",
+        rawTargetFeature: "pomodoro",
+        rawTargetEntityType: "pomodoro_session",
+        rawEffectType: "pomodoro.log",
+        createdAt: "2026-04-14T00:00:00.000Z",
+        updatedAt: "2026-04-14T00:00:00.000Z",
+        deletedAt: null,
+      },
+    ]);
+
+    const engine = new LinkedActionsEngine();
+    const result = await engine.processSourceAction(
+      {
+        feature: "habits",
+        entityType: "habit",
+        entityId: "habit_1",
+        triggerType: "habit.completed_for_day",
+      },
+      "plan",
+    );
+
+    expect(result.effects[0]).toMatchObject({
+      status: "skipped",
+      reason: "unsupported_rule",
+      targetFeature: "pomodoro",
+    });
+    expect(dataMocks.createLinkedActionEvent).not.toHaveBeenCalled();
   });
 });
