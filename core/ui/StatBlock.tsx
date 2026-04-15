@@ -29,6 +29,10 @@ export function StatBlock({
     <Card variant="stat" accentColor={accentColor} className={["mb-0", className].filter(Boolean).join(" ")}>
       <View className={[alignClassName, "py-1"].join(" ")}>
         {icon ? <View className="mb-0.5">{icon}</View> : null}
+        <Text
+          className="text-xl font-bold tabular-nums"
+          style={{ color: accentColor }}
+        >
         <Text className="text-xl font-bold tabular-nums" style={{ color: accentColor }}>
           {value}
         </Text>
