@@ -22,15 +22,10 @@ export function DueDateBadge({ dueDate, compact }: Props) {
   if (compact) {
     return (
       <View
-        style={{
-          backgroundColor: bgColor,
-          borderRadius: 4,
-          paddingHorizontal: 4,
-          paddingVertical: 1,
-          alignSelf: "flex-start",
-        }}
+        className="self-start rounded-full px-2 py-1"
+        style={{ backgroundColor: bgColor }}
       >
-        <Text style={{ fontSize: 9, fontWeight: "500", color: txtColor }}>
+        <Text className="text-[10px] font-semibold" style={{ color: txtColor }}>
           {isOverdue ? "⚠" : isToday ? "•" : formatted}
         </Text>
       </View>
@@ -39,15 +34,10 @@ export function DueDateBadge({ dueDate, compact }: Props) {
 
   return (
     <View
-      style={{
-        backgroundColor: bgColor,
-        borderRadius: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        alignSelf: "flex-start",
-      }}
+      className="self-start rounded-full px-2.5 py-1.5"
+      style={{ backgroundColor: bgColor }}
     >
-      <Text style={{ fontSize: 11, fontWeight: "500", color: txtColor }}>
+      <Text className="text-[11px] font-semibold" style={{ color: txtColor }}>
         {isOverdue ? "⚠ " : "📅 "}
         {label}
       </Text>

@@ -19,7 +19,16 @@ type Props = {
   cardWidth?: number;
 };
 
-export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEdit, viewMode = "content", cardWidth }: Props) {
+export function TodoItem({
+  todo,
+  onLongPress,
+  isActive,
+  onToggle,
+  onDelete,
+  onEdit,
+  viewMode = "content",
+  cardWidth,
+}: Props) {
   const done = todo.completed === 1;
 
   if (viewMode === "grid") {
@@ -31,33 +40,37 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
         onEdit={onEdit}
         onDelete={onDelete}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <View className="flex-row items-start gap-2">
           <Pressable
             onLongPress={onLongPress}
             delayLongPress={180}
             hitSlop={6}
             accessibilityLabel="Drag to reorder"
+            className="pt-0.5"
           >
             <MaterialIcons name="drag-indicator" size={18} color={colors.slate[400]} />
           </Pressable>
-          <RectButton
-            onPress={onToggle}
-            hitSlop={6}
-            style={{ backgroundColor: "transparent" }}
-          >
+          <RectButton onPress={onToggle} hitSlop={6} style={{ backgroundColor: "transparent" }}>
             <MaterialIcons
               name={done ? "check-box" : "check-box-outline-blank"}
               size={18}
               color={done ? colors.slate[500] : colors.slate[900]}
             />
           </RectButton>
-          <Text
-            numberOfLines={2}
-            style={{ flex: 1, fontSize: 12, color: done ? colors.slate[400] : colors.slate[800] }}
-            className={done ? "line-through" : ""}
-          >
-            {todo.title}
-          </Text>
+          <View className="min-w-0 flex-1 gap-1">
+            <Text
+              numberOfLines={2}
+              className={`text-xs leading-4 ${done ? "text-slate-400 line-through" : "text-slate-800"}`}
+            >
+              {todo.title}
+            </Text>
+            {todo.priority !== "normal" || todo.due_date ? (
+              <View className="flex-row flex-wrap gap-1">
+                {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} compact /> : null}
+                {todo.due_date ? <DueDateBadge dueDate={todo.due_date} compact /> : null}
+              </View>
+            ) : null}
+          </View>
         </View>
       </SwipeableCard>
     );
@@ -67,11 +80,11 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
     return (
       <SwipeableCard
         accentColor={SECTION_COLORS.todos}
-        style={{ marginBottom: 6, opacity: isActive ? 0.85 : 1 }}
+        style={{ marginBottom: 8, opacity: isActive ? 0.85 : 1 }}
         onEdit={onEdit}
         onDelete={onDelete}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View className="flex-row items-center gap-2">
           <Pressable
             onLongPress={onLongPress}
             delayLongPress={180}
@@ -98,9 +111,11 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
           >
             {todo.title}
           </Text>
-          <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+          <View className="flex-row items-center gap-1">
             {todo.recurrence === "daily" ? (
-              <Text style={{ fontSize: 10, color: colors.slate[400] }}>↻</Text>
+              <View className="rounded-full bg-todos-light px-2 py-1">
+                <Text className="text-[10px] font-semibold text-todos">↻</Text>
+              </View>
             ) : null}
             {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} compact /> : null}
             {todo.due_date ? <DueDateBadge dueDate={todo.due_date} compact /> : null}
@@ -114,7 +129,7 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
   return (
     <SwipeableCard
       accentColor={SECTION_COLORS.todos}
-      style={{ marginBottom: 12, opacity: isActive ? 0.85 : 1 }}
+      style={{ marginBottom: 10, opacity: isActive ? 0.85 : 1 }}
       onEdit={onEdit}
       onDelete={onDelete}
     >
@@ -140,13 +155,15 @@ export function TodoItem({ todo, onLongPress, isActive, onToggle, onDelete, onEd
           />
         </RectButton>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View className="flex-row flex-wrap items-center gap-1">
-            <Text className={`text-base ${done ? "text-slate-400 line-through" : "text-slate-900"}`}>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Text
+              className={`text-[15px] font-semibold ${done ? "text-slate-400 line-through" : "text-slate-900"}`}
+            >
               {todo.title}
             </Text>
             {todo.recurrence === "daily" ? (
-              <View className="ml-1 self-start rounded border border-todos bg-todos-light px-1.5 py-0.5">
-                <Text className="text-xs text-todos">↻ daily</Text>
+              <View className="self-start rounded-full bg-todos-light px-2.5 py-1">
+                <Text className="text-[11px] font-semibold text-todos">↻ daily</Text>
               </View>
             ) : null}
           </View>

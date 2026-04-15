@@ -33,6 +33,7 @@ export function StatBlock({
           className="text-xl font-bold tabular-nums"
           style={{ color: accentColor }}
         >
+        <Text className="text-xl font-bold tabular-nums" style={{ color: accentColor }}>
           {value}
         </Text>
         <Text className="mt-0.5 text-xs uppercase tracking-[0.6px]" style={{ color: tokens.textMuted }}>
