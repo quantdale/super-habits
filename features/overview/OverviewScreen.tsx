@@ -4,7 +4,10 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
 import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { Card } from "@/core/ui/Card";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { PageHeader } from "@/core/ui/PageHeader";
 import { Screen } from "@/core/ui/Screen";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 import { getCalorieGoal, listCalorieEntries } from "@/features/calories/calories.data";
 import { caloriesTotal } from "@/features/calories/calories.domain";
 import {
@@ -93,6 +96,7 @@ const GRID_TOP_ROW_CARD_CLASS = "min-h-[248px]";
 const GRID_BOTTOM_ROW_CARD_CLASS = "min-h-[214px]";
 const MUTED_ICON = "#94a3b8";
 const SETTINGS_HREF = "/settings" as Href;
+const OVERVIEW_CARD_ORDER: OverviewCardKey[] = ["pomodoro", "habits", "calories", "todos", "workout"];
 
 function OverviewMetricCard({
   cardKey,
@@ -434,42 +438,47 @@ export function OverviewScreen() {
 
   return (
     <Screen scroll>
-      <View className="mb-4 flex-row items-start justify-between">
-        <Text className="text-2xl font-bold text-slate-900">Overview</Text>
-        <View className="flex-row gap-1">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open settings"
-            className="rounded-lg p-2"
-            onPress={() => router.push(SETTINGS_HREF)}
-          >
-            <MaterialIcons name="settings" size={24} color={MUTED_ICON} />
-          </Pressable>
-          {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-            <Pressable
-              key={mode}
-              accessibilityRole="button"
-              accessibilityState={{ selected: viewMode === mode }}
-              accessibilityLabel={`${mode} overview layout`}
-              className={`rounded-lg p-2 ${viewMode === mode ? "bg-focus-light" : ""}`}
-              onPress={() => setViewMode(mode)}
-            >
-              <MaterialIcons
-                name={icon}
-                size={24}
-                color={viewMode === mode ? SECTION_TEXT_COLORS.focus : MUTED_ICON}
-              />
-            </Pressable>
-          ))}
-        </View>
-      </View>
+      <ScreenSection>
+        <PageHeader
+          title="Overview"
+          subtitle="A compact snapshot of focus, habits, calories, todos, and workouts."
+          actions={
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open settings"
+                className="rounded-lg p-2"
+                onPress={() => router.push(SETTINGS_HREF)}
+              >
+                <MaterialIcons name="settings" size={24} color={MUTED_ICON} />
+              </Pressable>
+              {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
+                <Pressable
+                  key={mode}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: viewMode === mode }}
+                  accessibilityLabel={`${mode} overview layout`}
+                  className={`rounded-lg p-2 ${viewMode === mode ? "bg-focus-light" : ""}`}
+                  onPress={() => setViewMode(mode)}
+                >
+                  <MaterialIcons
+                    name={icon}
+                    size={24}
+                    color={viewMode === mode ? SECTION_TEXT_COLORS.focus : MUTED_ICON}
+                  />
+                </Pressable>
+              ))}
+            </>
+          }
+        />
+      </ScreenSection>
 
       {isLoading ? (
-        <View className="min-h-[200px] items-center justify-center py-12">
+        <ScreenSection className="min-h-[200px] items-center justify-center py-12">
           <ActivityIndicator size="large" color={SECTION_TEXT_COLORS.focus} />
-        </View>
+        </ScreenSection>
       ) : (
-        <>
+        <ScreenSection>
           {viewMode === "grid" ? (
             <View className="gap-3">
               <View className="flex-row gap-3">
@@ -490,13 +499,26 @@ export function OverviewScreen() {
             </View>
           ) : (
             <View className="flex-col gap-3">
-              {(["pomodoro", "habits", "calories", "todos", "workout"] as OverviewCardKey[]).map(
-                (cardKey) => renderCard(cardKey),
-              )}
+              {OVERVIEW_CARD_ORDER.map((cardKey) => renderCard(cardKey))}
             </View>
           )}
-        </>
+        </ScreenSection>
       )}
+
+      {!isLoading &&
+      topPendingTodos.length === 0 &&
+      pendingTodosCount === 0 &&
+      pomodoroSessions === 0 &&
+      bestHabitStreak === 0 &&
+      workoutDays === 0 &&
+      caloriesConsumed === 0 ? (
+        <EmptyStateCard
+          accentColor={SECTION_COLORS.focus}
+          title="Nothing tracked yet"
+          description="Start with any feature and this dashboard will begin filling in automatically."
+          icon={<MaterialIcons name="auto-graph" size={24} color={SECTION_TEXT_COLORS.focus} />}
+        />
+      ) : null}
 
       <View className="h-2" />
     </Screen>
