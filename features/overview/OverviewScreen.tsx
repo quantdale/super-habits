@@ -8,7 +8,7 @@ import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { Screen } from "@/core/ui/Screen";
 import { ScreenSection } from "@/core/ui/ScreenSection";
-import { getCalorieGoal, listCalorieEntries } from "@/features/calories/calories.data";
+import { getCalorieGoal, hasAnyCalorieEntries, listCalorieEntries } from "@/features/calories/calories.data";
 import { caloriesTotal } from "@/features/calories/calories.domain";
 import {
   getAllHabitCompletionsForRange,
@@ -21,14 +21,14 @@ import {
   calculateCurrentStreak,
   calculateOverallConsistency,
 } from "@/features/habits/habits.domain";
-import { listPomodoroSessionsForDateRange } from "@/features/pomodoro/pomodoro.data";
+import { listPomodoroSessions, listPomodoroSessionsForDateRange } from "@/features/pomodoro/pomodoro.data";
 import {
   buildPomodoroHeatmapDays,
   computePomodoroStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
 import { listTodos } from "@/features/todos/todos.data";
 import type { Todo } from "@/features/todos/types";
-import { listWorkoutLogsForRange } from "@/features/workout/workout.data";
+import { listRoutines, listWorkoutLogs, listWorkoutLogsForRange } from "@/features/workout/workout.data";
 import {
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
@@ -96,7 +96,9 @@ const GRID_TOP_ROW_CARD_CLASS = "min-h-[248px]";
 const GRID_BOTTOM_ROW_CARD_CLASS = "min-h-[214px]";
 const MUTED_ICON = "#94a3b8";
 const SETTINGS_HREF = "/settings" as Href;
+const CALORIES_HREF = "/(tabs)/calories" as Href;
 const OVERVIEW_CARD_ORDER: OverviewCardKey[] = ["pomodoro", "habits", "calories", "todos", "workout"];
+const POMODORO_HREF = "/(tabs)/pomodoro" as Href;
 
 function OverviewMetricCard({
   cardKey,
@@ -151,6 +153,7 @@ export function OverviewScreen() {
   const [pomodoroStreak, setPomodoroStreak] = useState(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [calorieGoal, setCalorieGoal] = useState(2000);
+  const [hasAnyTrackedData, setHasAnyTrackedData] = useState(false);
   const [workoutDays, setWorkoutDays] = useState(0);
   const [workoutStreak, setWorkoutStreak] = useState(0);
 
@@ -161,12 +164,28 @@ export function OverviewScreen() {
       const yearRange = buildDateRangeOldestFirst(364);
       const startDate = yearRange[0];
 
-      const [todos, calorieEntries, goal, pomodoroSessions, workoutLogs, habits, allHabitCompletions] =
+      const [
+        todos,
+        calorieEntries,
+        hasCalorieEntries,
+        goal,
+        recentPomodoroSessions,
+        pomodoroSessions,
+        routines,
+        recentWorkoutLogs,
+        workoutLogs,
+        habits,
+        allHabitCompletions,
+      ] =
         await Promise.all([
           listTodos(),
           listCalorieEntries(today),
+          hasAnyCalorieEntries(),
           getCalorieGoal(),
+          listPomodoroSessions(1),
           listPomodoroSessionsForDateRange(startDate, today),
+          listRoutines(),
+          listWorkoutLogs(1),
           listWorkoutLogsForRange(startDate, today),
           listHabits(),
           getAllHabitCompletionsForRange(startDate, today),
@@ -178,6 +197,14 @@ export function OverviewScreen() {
 
       setCaloriesConsumed(caloriesTotal(calorieEntries));
       setCalorieGoal(goal.calories);
+      setHasAnyTrackedData(
+        todos.length > 0 ||
+          habits.length > 0 ||
+          hasCalorieEntries ||
+          recentPomodoroSessions.length > 0 ||
+          recentWorkoutLogs.length > 0 ||
+          routines.length > 0,
+      );
 
       const pomHeatmap = buildPomodoroHeatmapDays(pomodoroSessions, 364);
       setPomodoroSessions(pomodoroSessions.length);
@@ -242,6 +269,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Start focus session"
                     className="rounded-xl px-3 py-2 active:opacity-80"
                     style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
+                    onPress={() => router.push(POMODORO_HREF)}
                   >
                     <Text
                       className="text-sm font-semibold"
@@ -265,6 +293,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Start focus session"
                     className="mt-5 w-full items-center rounded-xl py-3.5 active:opacity-80"
                     style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
+                    onPress={() => router.push(POMODORO_HREF)}
                   >
                     <Text
                       className="text-base font-semibold"
@@ -315,6 +344,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Add calorie entry"
                     className="rounded-xl border-2 px-3 py-2 active:opacity-80"
                     style={{ borderColor: SECTION_COLORS.calories }}
+                    onPress={() => router.push(CALORIES_HREF)}
                   >
                     <Text
                       className="text-sm font-semibold"
@@ -334,6 +364,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Add calorie entry"
                     className="mt-4 self-start rounded-xl border-2 px-4 py-2.5 active:opacity-80"
                     style={{ borderColor: SECTION_COLORS.calories }}
+                    onPress={() => router.push(CALORIES_HREF)}
                   >
                     <Text
                       className="text-sm font-semibold"
@@ -505,13 +536,7 @@ export function OverviewScreen() {
         </ScreenSection>
       )}
 
-      {!isLoading &&
-      topPendingTodos.length === 0 &&
-      pendingTodosCount === 0 &&
-      pomodoroSessions === 0 &&
-      bestHabitStreak === 0 &&
-      workoutDays === 0 &&
-      caloriesConsumed === 0 ? (
+      {!isLoading && !hasAnyTrackedData ? (
         <EmptyStateCard
           accentColor={SECTION_COLORS.focus}
           title="Nothing tracked yet"

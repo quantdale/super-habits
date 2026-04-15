@@ -4,9 +4,10 @@ import { Pressable, Text, View } from "react-native";
 import { type ThemeMode, useAppTheme } from "@/core/providers/ThemeProvider";
 import { Card } from "@/core/ui/Card";
 import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
+import { PageHeader } from "@/core/ui/PageHeader";
 import { PillChip } from "@/core/ui/PillChip";
 import { Screen } from "@/core/ui/Screen";
-import { SectionTitle } from "@/core/ui/SectionTitle";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
 const SETTINGS_ACCENT = "#475569";
@@ -162,23 +163,25 @@ export function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <View className="mb-4 flex-row items-center justify-between">
-        <SectionTitle
+      <ScreenSection>
+        <PageHeader
           title="Settings"
           subtitle="Appearance is live. The rest of this screen documents the current shipped behavior instead of placeholder previews."
+          actions={
+            <Link href={OVERVIEW_HREF} asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Back to overview"
+                className="ml-4 flex-row items-center gap-1 rounded-xl border px-3 py-2"
+                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+              >
+                <MaterialIcons name="arrow-back" size={18} color={settingsAccent} />
+                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>Back</Text>
+              </Pressable>
+            </Link>
+          }
         />
-        <Link href={OVERVIEW_HREF} asChild>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to overview"
-            className="ml-4 flex-row items-center gap-1 rounded-xl border px-3 py-2"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-          >
-            <MaterialIcons name="arrow-back" size={18} color={settingsAccent} />
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>Back</Text>
-          </Pressable>
-        </Link>
-      </View>
+      </ScreenSection>
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">

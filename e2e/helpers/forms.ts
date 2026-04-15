@@ -33,14 +33,14 @@ export async function fillCalorieMacrosOnly(
 
 /**
  * Clicks the calories "Add entry" primary button.
- * Uses the same pattern as habits tests: getByText on the inner Text div,
- * then .locator("..") to reach the Pressable that has the onPress handler.
+ * RN Web exposes the submit Pressable as a generic clickable node, not a semantic button.
+ * The header title matches the same copy, so target the last exact text match.
  */
 export async function clickCaloriesAddEntry(page: Page) {
-  await page
-    .getByText("Add entry", { exact: true })
-    .locator("..")
-    .click({ force: true, timeout: 30_000 });
+  await page.getByText("Add entry", { exact: true }).last().click({
+    force: true,
+    timeout: 30_000,
+  });
 }
 
 export async function fillCaloriesMacros(
