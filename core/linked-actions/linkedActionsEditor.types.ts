@@ -42,6 +42,16 @@ export type LinkedActionEditorRowDraft = {
         message: string;
       }
     | null;
+  isOrphaned: boolean;
+  orphanedTarget:
+    | {
+        feature: string;
+        entityType: string;
+        entityId: string | null;
+        effectType: string;
+        message: string;
+      }
+    | null;
 };
 
 export type LinkedActionEditorRowValidation = {

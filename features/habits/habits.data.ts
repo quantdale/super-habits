@@ -11,6 +11,7 @@ import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
 import {
+  deleteLinkedActionRulesForTargetEntity,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
 } from "@/core/linked-actions/linkedActions.data";
@@ -256,6 +257,12 @@ export async function deleteHabit(habitId: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, habitId]);
   await saveHabitLinkedActionRules(habitId, []);
+  await deleteLinkedActionRulesForTargetEntity({
+    feature: "habits",
+    entityType: "habit",
+    entityId: habitId,
+    deletedAt: now,
+  });
   syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "delete" });
 }
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createLinkedActionRule,
+  deleteLinkedActionRulesForTargetEntity,
   deleteLinkedActionRule,
   getAppliedHabitDayCalorieExecution,
   getLinkedActionRule,
@@ -153,6 +154,31 @@ describe("core/linked-actions/linkedActions.data", () => {
       2,
       expect.stringContaining("SET deleted_at = ?, updated_at = ?"),
       [expect.any(String), expect.any(String), "link_1"],
+    );
+  });
+
+  it("soft deletes rules when a linked target entity is removed", async () => {
+    const db = {
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await deleteLinkedActionRulesForTargetEntity({
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_target",
+      deletedAt: "2026-04-15T00:00:00.000Z",
+    });
+
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("target_feature = ?"),
+      [
+        "2026-04-15T00:00:00.000Z",
+        "2026-04-15T00:00:00.000Z",
+        "habits",
+        "habit",
+        "habit_target",
+      ],
     );
   });
 

@@ -6,6 +6,7 @@ import {
   WorkoutRoutine,
 } from "@/core/db/types";
 import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
+import { deleteLinkedActionRulesForTargetEntity } from "@/core/linked-actions/linkedActions.data";
 import { createId } from "@/lib/id";
 import { getUtcIsoRangeForLocalDateKeys, nowIso } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -91,6 +92,12 @@ export async function deleteRoutine(routineId: string): Promise<void> {
     now,
     routineId,
   ]);
+  await deleteLinkedActionRulesForTargetEntity({
+    feature: "workout",
+    entityType: "workout_routine",
+    entityId: routineId,
+    deletedAt: now,
+  });
   syncEngine.enqueue({ entity: "workout_routines", id: routineId, updatedAt: now, operation: "delete" });
 }
 

@@ -13,6 +13,7 @@ import {
   type SaveLinkedActionRuleForSourceInput,
   type LinkedActionSourceEntityType,
   type LinkedActionSourceAction,
+  type LinkedActionTargetEntityType,
   type LinkedActionTriggerType,
   buildLinkedActionEventRow,
   buildLinkedActionExecutionRow,
@@ -338,6 +339,25 @@ export async function deleteLinkedActionRule(id: string): Promise<void> {
      WHERE id = ?
        AND deleted_at IS NULL`,
     [now, now, id],
+  );
+}
+
+export async function deleteLinkedActionRulesForTargetEntity(input: {
+  feature: LinkedActionFeature;
+  entityType: LinkedActionTargetEntityType;
+  entityId: string;
+  deletedAt?: string;
+}): Promise<void> {
+  const db = await getDatabase();
+  const now = input.deletedAt ?? nowIso();
+  await db.runAsync(
+    `UPDATE linked_action_rules
+     SET deleted_at = ?, updated_at = ?
+     WHERE deleted_at IS NULL
+       AND target_feature = ?
+       AND target_entity_type = ?
+       AND target_entity_id = ?`,
+    [now, now, input.feature, input.entityType, input.entityId],
   );
 }
 

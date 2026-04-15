@@ -24,6 +24,9 @@ import type {
 
 let rowCounter = 0;
 
+const LINKED_ACTION_ORPHANED_RULE_MESSAGE =
+  "This linked action points to a deleted or unavailable target. Choose a replacement or remove the rule.";
+
 type LinkedActionOption<TValue extends string> = {
   value: TValue;
   label: string;
@@ -172,6 +175,8 @@ export function createEmptyLinkedActionEditorRow(
     effectType: null,
     isUnsupported: false,
     unsupportedTarget: null,
+    isOrphaned: false,
+    orphanedTarget: null,
   };
 }
 
@@ -200,8 +205,12 @@ export function createLinkedActionEditorRowFromRule(
         effectType: input.rule.rawEffectType,
         message: LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE,
       },
+      isOrphaned: false,
+      orphanedTarget: null,
     };
   }
+
+  const isOrphaned = input.targetSelection?.kind !== "existing";
 
   return {
     id: nextEditorRowId(),
@@ -219,6 +228,16 @@ export function createLinkedActionEditorRowFromRule(
     effectType: input.rule.target.effect.type,
     isUnsupported: false,
     unsupportedTarget: null,
+    isOrphaned,
+    orphanedTarget: isOrphaned
+      ? {
+          feature: input.rule.rawTargetFeature,
+          entityType: input.rule.rawTargetEntityType,
+          entityId: input.rule.target.entityId,
+          effectType: input.rule.rawEffectType,
+          message: LINKED_ACTION_ORPHANED_RULE_MESSAGE,
+        }
+      : null,
   };
 }
 
@@ -227,6 +246,9 @@ function buildLinkedActionRuleTargetFromEditorRow(
 ): LinkedActionRuleTarget {
   if (row.isUnsupported) {
     throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
+  }
+  if (row.isOrphaned && row.targetSelection?.kind !== "existing") {
+    throw new Error(LINKED_ACTION_ORPHANED_RULE_MESSAGE);
   }
 
   if (!row.targetFeature || !row.targetEntityType || !row.effectType) {
@@ -294,6 +316,9 @@ export function createSaveLinkedActionRuleInputFromEditorRow(
   if (row.isUnsupported) {
     throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
   }
+  if (row.isOrphaned && row.targetSelection?.kind !== "existing") {
+    throw new Error(LINKED_ACTION_ORPHANED_RULE_MESSAGE);
+  }
 
   if (!row.triggerType) {
     throw new Error("Select a trigger before saving this linked action.");
@@ -312,14 +337,17 @@ export function applyLinkedActionTargetFeature(
   row: LinkedActionEditorRowDraft,
   targetFeature: LinkedActionFeature,
 ): LinkedActionEditorRowDraft {
+  const targetFeatureChanged = row.targetFeature !== targetFeature;
   return {
     ...row,
     targetFeature,
     targetEntityType: getLinkedActionTargetEntityTypeForFeature(targetFeature),
-    targetSelection: null,
-    effectType: null,
+    targetSelection: targetFeatureChanged ? null : row.targetSelection,
+    effectType: targetFeatureChanged ? null : row.effectType,
     isUnsupported: false,
     unsupportedTarget: null,
+    isOrphaned: false,
+    orphanedTarget: null,
   };
 }
 
@@ -340,7 +368,9 @@ export function validateLinkedActionEditorRow(
     errors.targetFeature = "Select a target feature.";
   }
   if (!row.targetSelection) {
-    errors.targetSelection = "Choose an existing target item or an explicit create-new handoff.";
+    errors.targetSelection = row.isOrphaned
+      ? LINKED_ACTION_ORPHANED_RULE_MESSAGE
+      : "Choose an existing target item or an explicit create-new handoff.";
   }
   if (!row.effectType) {
     errors.effectType = "Select an effect.";
