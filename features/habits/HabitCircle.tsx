@@ -34,6 +34,7 @@ export function HabitCircle({
   const progress = calculateHabitProgress(todayCount, habit.target_per_day);
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
   const habitColor = habit.color ?? "#64748b";
+  const iconTint = `${habitColor}18`;
 
   const strokeWidth = Math.max(3, Math.round(size / 14));
   const ringSize = size + strokeWidth * 2;
@@ -73,7 +74,7 @@ export function HabitCircle({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: DEFAULT_BG_COLOR,
+            backgroundColor: iconTint || DEFAULT_BG_COLOR,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -88,7 +89,7 @@ export function HabitCircle({
       )}
       {showName ? (
         <Text
-          className="mt-2 text-center text-xs font-medium text-slate-700"
+          className="mt-2 text-center text-xs font-medium leading-4 text-slate-700"
           numberOfLines={2}
         >
           {habit.name}
