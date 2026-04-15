@@ -7,7 +7,7 @@ import { getDatabase } from "@/core/db/client";
 import { PomodoroSession } from "@/core/db/types";
 import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
-import { nowIso } from "@/lib/time";
+import { getUtcIsoRangeForLocalDateKeys, nowIso } from "@/lib/time";
 import {
   DEFAULT_SETTINGS,
   type PomodoroMode,
@@ -57,11 +57,15 @@ export async function listPomodoroSessionsForDateRange(
   endDateKey: string,
 ): Promise<PomodoroSession[]> {
   const db = await getDatabase();
+  const { startUtcIso, endUtcExclusiveIso } = getUtcIsoRangeForLocalDateKeys(
+    startDateKey,
+    endDateKey,
+  );
   return db.getAllAsync<PomodoroSession>(
     `SELECT * FROM pomodoro_sessions
-     WHERE started_at >= ? AND started_at <= ?
+     WHERE started_at >= ? AND started_at < ?
      ORDER BY started_at DESC`,
-    [`${startDateKey}T00:00:00`, `${endDateKey}T23:59:59.999`],
+    [startUtcIso, endUtcExclusiveIso],
   );
 }
 

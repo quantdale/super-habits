@@ -7,7 +7,7 @@ import {
 } from "@/core/db/types";
 import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
 import { createId } from "@/lib/id";
-import { nowIso } from "@/lib/time";
+import { getUtcIsoRangeForLocalDateKeys, nowIso } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { validateSetTiming } from "@/lib/validation";
 
@@ -70,12 +70,16 @@ export async function listWorkoutLogsForRange(
   endDateKey: string,
 ): Promise<WorkoutLog[]> {
   const db = await getDatabase();
+  const { startUtcIso, endUtcExclusiveIso } = getUtcIsoRangeForLocalDateKeys(
+    startDateKey,
+    endDateKey,
+  );
   return db.getAllAsync<WorkoutLog>(
     `SELECT * FROM workout_logs
      WHERE completed_at >= ?
-       AND completed_at <= ?
+       AND completed_at < ?
      ORDER BY completed_at DESC`,
-    [`${startDateKey}T00:00:00`, `${endDateKey}T23:59:59.999`],
+    [startUtcIso, endUtcExclusiveIso],
   );
 }
 

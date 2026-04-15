@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   formatWorkoutTime,
   parseWorkoutTime,
@@ -12,6 +12,7 @@ import {
 } from "@/features/workout/workout.domain";
 import type { HeatmapDay } from "@/features/shared/activityTypes";
 import type { WorkoutLog } from "@/core/db/types";
+import { toDateKey } from "@/lib/time";
 
 function workoutLog(completedAt: string): WorkoutLog {
   return {
@@ -142,6 +143,32 @@ describe("buildWorkoutHeatmapDays", () => {
     const d = String(new Date().getDate()).padStart(2, "0");
     const todayKey = `${y}-${m}-${d}`;
     expect(heat.find((h) => h.dateKey === todayKey)?.value).toBe(3);
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 2, 12, 0, 0, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps logs on opposite sides of local midnight on separate days", () => {
+    const jan1Key = toDateKey(new Date(2026, 0, 1, 12, 0, 0, 0));
+    const jan2Key = toDateKey(new Date(2026, 0, 2, 12, 0, 0, 0));
+    const heat = buildWorkoutHeatmapDays(
+      [
+        workoutLog(new Date(2026, 0, 1, 23, 30, 0, 0).toISOString()),
+        workoutLog(new Date(2026, 0, 2, 0, 30, 0, 0).toISOString()),
+      ],
+      2,
+    );
+
+    expect(heat).toEqual([
+      { dateKey: jan1Key, value: 1 },
+      { dateKey: jan2Key, value: 1 },
+    ]);
   });
 });
 
