@@ -34,21 +34,19 @@ function buildRule(
       triggerType: "todo.completed",
     },
     target: {
-      feature: "habits",
-      entityType: "habit",
-      entityId: "habit_1",
+      feature: "todos",
+      entityType: "todo",
+      entityId: "todo_2",
       effect: {
-        kind: "progress",
-        type: "habit.increment",
-        amount: 1,
-        dateStrategy: "today",
+        kind: "binary",
+        type: "todo.complete",
       },
     },
     isUnsupported: false,
     unsupportedReason: null,
-    rawTargetFeature: "habits",
-    rawTargetEntityType: "habit",
-    rawEffectType: "habit.increment",
+    rawTargetFeature: "todos",
+    rawTargetEntityType: "todo",
+    rawEffectType: "todo.complete",
     createdAt: "2026-04-14T00:00:00.000Z",
     updatedAt: "2026-04-14T00:00:00.000Z",
     deletedAt: null,
@@ -82,7 +80,7 @@ describe("core/linked-actions/linkedActions.engine", () => {
       targetLabel: "Hydrate",
     });
     const engine = new LinkedActionsEngine({
-      effectRegistry: { "habit.increment": executor },
+      effectRegistry: { "todo.complete": executor },
     });
 
     const result = await engine.processSourceAction({
@@ -113,7 +111,7 @@ describe("core/linked-actions/linkedActions.engine", () => {
     expect(result.effects[0]).toMatchObject({
       status: "applied",
       ruleId: "link_1",
-      effectType: "habit.increment",
+      effectType: "todo.complete",
     });
     expect(result.notices[0]?.payload.message).toContain("Linked Actions updated");
   });
@@ -127,12 +125,12 @@ describe("core/linked-actions/linkedActions.engine", () => {
       chainId: "lchain_existing",
       rootEventId: "levt_existing",
       originRuleId: null,
-      effectType: "habit.increment",
+      effectType: "todo.complete",
       effectFingerprint: "fingerprint",
       status: "applied",
-      targetFeature: "habits",
-      targetEntityType: "habit",
-      targetEntityId: "habit_1",
+      targetFeature: "todos",
+      targetEntityType: "todo",
+      targetEntityId: "todo_2",
       producedEntityType: null,
       producedEntityId: null,
       noticePayload: null,
@@ -144,7 +142,7 @@ describe("core/linked-actions/linkedActions.engine", () => {
 
     const executor = vi.fn();
     const engine = new LinkedActionsEngine({
-      effectRegistry: { "habit.increment": executor },
+      effectRegistry: { "todo.complete": executor },
     });
 
     const result = await engine.processSourceAction({

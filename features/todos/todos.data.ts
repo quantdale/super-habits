@@ -1,11 +1,31 @@
 import { getDatabase } from "@/core/db/client";
 import type { Todo, TodoPriority, TodoRecurrence } from "@/core/db/types";
-import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
-import { deleteLinkedActionRulesForTargetEntity } from "@/core/linked-actions/linkedActions.data";
+import type {
+  LinkedActionEffectAdapterResult,
+  LinkedActionProcessResult,
+  LinkedActionRuleDefinition,
+  SaveLinkedActionRuleForSourceInput,
+} from "@/core/linked-actions/linkedActions.types";
+import {
+  deleteLinkedActionRulesForTargetEntity,
+  listLinkedActionRulesForSourceEntity,
+  replaceLinkedActionRulesForSourceEntity,
+} from "@/core/linked-actions/linkedActions.data";
+import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { getTomorrowDateKey } from "./todos.domain";
+
+export type LinkedActionsDispatchResult = Pick<
+  LinkedActionProcessResult,
+  "matchedRuleCount" | "notices"
+>;
+
+const EMPTY_LINKED_ACTIONS_RESULT: LinkedActionsDispatchResult = {
+  matchedRuleCount: 0,
+  notices: [],
+};
 
 export async function listTodos(): Promise<Todo[]> {
   const db = await getDatabase();
@@ -203,12 +223,41 @@ export async function updateTodo(
   });
 }
 
-export async function toggleTodo(todo: Todo): Promise<void> {
+export async function toggleTodo(todo: Todo): Promise<LinkedActionsDispatchResult> {
   const db = await getDatabase();
   const now = nowIso();
   const next = todo.completed === 1 ? 0 : 1;
   await db.runAsync("UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?", [next, now, todo.id]);
   syncEngine.enqueue({ entity: "todos", id: todo.id, updatedAt: now, operation: "update" });
+
+  let linkedActions = EMPTY_LINKED_ACTIONS_RESULT;
+  if (next === 1) {
+    const processResult = await linkedActionsEngine.processSourceAction({
+      occurredAt: now,
+      feature: "todos",
+      entityType: "todo",
+      entityId: todo.id,
+      triggerType: "todo.completed",
+      label: todo.title,
+      sourceDateKey: toDateKey(),
+      sourceRecordId: todo.id,
+      origin: {
+        originKind: "user",
+        originRuleId: null,
+        originEventId: null,
+      },
+      payload: {
+        previousCompleted: todo.completed,
+        currentCompleted: next,
+        recurrence: todo.recurrence,
+        dueDate: todo.due_date,
+      },
+    });
+    linkedActions = {
+      matchedRuleCount: processResult.matchedRuleCount,
+      notices: processResult.notices,
+    };
+  }
 
   if (next === 1 && todo.recurrence === "daily" && todo.recurrence_id) {
     const tomorrow = getTomorrowDateKey();
@@ -229,12 +278,37 @@ export async function toggleTodo(todo: Todo): Promise<void> {
       });
     }
   }
+
+  return linkedActions;
+}
+
+export async function listTodoLinkedActionRules(
+  todoId: string,
+): Promise<LinkedActionRuleDefinition[]> {
+  return listLinkedActionRulesForSourceEntity({
+    feature: "todos",
+    entityType: "todo",
+    entityId: todoId,
+  });
+}
+
+export async function saveTodoLinkedActionRules(
+  todoId: string,
+  rules: SaveLinkedActionRuleForSourceInput[],
+): Promise<void> {
+  await replaceLinkedActionRulesForSourceEntity({
+    feature: "todos",
+    entityType: "todo",
+    entityId: todoId,
+    rules,
+  });
 }
 
 export async function removeTodo(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
   await db.runAsync("UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, id]);
+  await saveTodoLinkedActionRules(id, []);
   await deleteLinkedActionRulesForTargetEntity({
     feature: "todos",
     entityType: "todo",
