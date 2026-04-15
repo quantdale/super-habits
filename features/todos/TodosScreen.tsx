@@ -6,9 +6,11 @@ import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { Card } from "@/core/ui/Card";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { PageHeader } from "@/core/ui/PageHeader";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
-import { SectionTitle } from "@/core/ui/SectionTitle";
 import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
@@ -31,6 +33,7 @@ import {
 } from "@/features/todos/todos.data";
 
 const COLOR = SECTION_COLORS.todos;
+const COLOR_TEXT = "#1D4ED8";
 const MUTED_ICON = "#94a3b8";
 const VIEW_MODE_OPTIONS: ReadonlyArray<{
   mode: TodoViewMode;
@@ -55,12 +58,20 @@ export function TodosScreen() {
   const [todoError, setTodoError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<TodoViewMode>("content");
   const { width: screenWidth } = useWindowDimensions();
-  // 16px screen padding each side + 2px margin each side × 4 cards
-  const gridCardWidth = (screenWidth - 32 - 16) / 4;
+  const gridColumns = screenWidth >= 1200 ? 4 : screenWidth >= 768 ? 3 : 2;
+  const gridCardWidth = (screenWidth - 32 - 4 * (gridColumns * 2)) / gridColumns;
 
   const pendingTasks = useMemo(() => items.filter((t) => t.completed === 0), [items]);
   const completedTasks = useMemo(() => items.filter((t) => t.completed === 1), [items]);
   const hasCompleted = useMemo(() => completedTasks.length > 0, [completedTasks]);
+  const recurringTasksCount = useMemo(
+    () => pendingTasks.filter((todo) => todo.recurrence === "daily").length,
+    [pendingTasks],
+  );
+  const overdueTasksCount = useMemo(() => {
+    const today = toDateKey();
+    return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
+  }, [pendingTasks]);
 
   const refresh = useCallback(() => {
     listTodos().then(setItems);
@@ -167,61 +178,111 @@ export function TodosScreen() {
   const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
 
   const noPendingTasksCard = (
-    <Card variant="standard" accentColor={SECTION_COLORS.todos}>
-      <View className="items-center">
-        <Text className="text-center text-sm text-slate-500">No Pending Tasks</Text>
-        <Text className="mt-1 text-center text-xs text-slate-400">Offline-first task manager.</Text>
-      </View>
-    </Card>
+    <EmptyStateCard
+      accentColor={SECTION_COLORS.todos}
+      className="mb-0"
+      icon={<MaterialIcons name="checklist" size={22} color={COLOR_TEXT} />}
+      title="No pending tasks"
+      description="Offline-first task manager."
+    />
   );
 
   return (
     <View className="flex-1">
       <Screen>
         <View className="flex-1">
-          <View className="flex-row items-start justify-between">
-            <SectionTitle
+          <ScreenSection>
+            <PageHeader
               title="Todos"
               subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
+              actions={
+                <>
+                  {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
+                    <Pressable
+                      key={mode}
+                      onPress={() => setViewMode(mode)}
+                      className={`rounded-lg p-2 ${viewMode === mode ? "bg-todos-light" : ""}`}
+                      accessibilityState={{ selected: viewMode === mode }}
+                      accessibilityLabel={`${mode} view`}
+                    >
+                      <MaterialIcons
+                        name={icon}
+                        size={24}
+                        color={viewMode === mode ? COLOR : MUTED_ICON}
+                      />
+                    </Pressable>
+                  ))}
+                </>
+              }
             />
-            <View className="flex-row gap-1">
-              {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                <Pressable
-                  key={mode}
-                  onPress={() => setViewMode(mode)}
-                  className={`rounded-lg p-2 ${viewMode === mode ? "bg-todos-light" : ""}`}
-                  accessibilityLabel={`${mode} view`}
-                >
-                  <MaterialIcons
-                    name={icon}
-                    size={24}
-                    color={viewMode === mode ? COLOR : MUTED_ICON}
-                  />
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          </ScreenSection>
 
-          <View className="mb-4 mt-1 flex-row gap-3">
-            <View className="flex-1">
-              <Card variant="stat" accentColor={SECTION_COLORS.todos} className="mb-0">
-                <View className="items-center py-1">
-                  <Text className="text-[22px]">📋</Text>
-                  <Text className="mt-0.5 text-xl font-bold text-todos">{pendingTasks.length}</Text>
-                  <Text className="mt-0.5 text-xs text-slate-400">pending tasks</Text>
+          <ScreenSection>
+            <Card accentColor={SECTION_COLORS.todos} className="mb-0" innerClassName="p-0">
+              <View className="p-4">
+                <View className="flex-row items-start gap-3">
+                  <View
+                    className="h-11 w-11 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: `${COLOR}18` }}
+                  >
+                    <MaterialIcons name="checklist" size={22} color={COLOR_TEXT} />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-base font-semibold text-slate-900">Today&apos;s queue</Text>
+                    <Text className="mt-0.5 text-sm text-slate-500">
+                      {pendingTasks.length} pending, {completedTasks.length} completed
+                    </Text>
+                  </View>
                 </View>
-              </Card>
-            </View>
-          </View>
+                <View className="mt-4 flex-row flex-wrap gap-2">
+                  <View className="rounded-full bg-slate-100 px-3 py-1.5">
+                    <Text className="text-xs font-semibold text-slate-600">
+                      {pendingTasks.length} open
+                    </Text>
+                  </View>
+                  <View className="rounded-full bg-slate-100 px-3 py-1.5">
+                    <Text className="text-xs font-semibold text-slate-600">
+                      {recurringTasksCount} daily
+                    </Text>
+                  </View>
+                  {overdueTasksCount > 0 ? (
+                    <View className="rounded-full bg-rose-50 px-3 py-1.5">
+                      <Text className="text-xs font-semibold text-rose-600">
+                        {overdueTasksCount} overdue
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </Card>
+          </ScreenSection>
 
           {totallyEmpty ? (
-            <View className="mb-3">
+            <ScreenSection>
               {noPendingTasksCard}
-            </View>
+            </ScreenSection>
           ) : null}
 
           {!totallyEmpty ? (
-            <View className="min-h-0 flex-1">
+            <ScreenSection className="min-h-0 mb-0 flex-1">
+              <View className="mb-3 flex-row items-center justify-between gap-3 px-1">
+                <View>
+                  <Text className="text-sm font-semibold text-slate-900">Pending</Text>
+                  <Text className="mt-0.5 text-xs text-slate-500">
+                    Swipe to edit or delete. Drag to reorder.
+                  </Text>
+                </View>
+                {hasCompleted ? (
+                  <Pressable
+                    onPress={() => setShowCompleted((v) => !v)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-2"
+                  >
+                    <Text className="text-xs font-semibold text-slate-600">
+                      {showCompleted ? "Hide" : "Show"} completed ({completedTasks.length})
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
               <DraggableFlatList
                 key={viewMode}
                 data={pendingTasks}
@@ -229,7 +290,7 @@ export function TodosScreen() {
                 containerStyle={{ flex: 1 }}
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
                 activationDistance={10}
-                numColumns={viewMode === "grid" ? 4 : 1}
+                numColumns={viewMode === "grid" ? gridColumns : 1}
                 onDragBegin={() => {}}
                 onDragEnd={async ({ data }) => {
                   setItems((prev) =>
@@ -245,37 +306,43 @@ export function TodosScreen() {
                   hasCompleted ? (
                     <View className="mb-3">{noPendingTasksCard}</View>
                   ) : (
-                    <Card variant="standard" accentColor={SECTION_COLORS.todos}>
-                      <View className="items-center">
-                        <Text className="text-center text-sm text-slate-500">Nothing to show here.</Text>
-                      </View>
-                    </Card>
+                    <EmptyStateCard
+                      accentColor={SECTION_COLORS.todos}
+                      className="mb-0"
+                      title="Nothing to show here"
+                    />
                   )
                 }
                 ListFooterComponent={
                   hasCompleted ? (
-                    <View>
-                      <Pressable onPress={() => setShowCompleted((v) => !v)} className="mb-2 px-1 py-2">
-                        <Text className="text-xs text-todos">
-                          {showCompleted
-                            ? "▲ hide completed"
-                            : `▼ show completed (${completedTasks.length})`}
-                        </Text>
-                      </Pressable>
+                    <View className="pt-2">
                       {showCompleted
-                        ? completedTasks.map((item) => (
-                            <TodoItem
-                              key={item.id}
-                              todo={item}
-                              onLongPress={() => {}}
-                              isActive={false}
-                              onToggle={() => toggleTodo(item).then(refresh)}
-                              onDelete={() => removeTodo(item.id).then(refresh)}
-                              onEdit={() => startEdit(item)}
-                              viewMode={viewMode}
-                              cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
-                            />
-                          ))
+                        ? [
+                            <View
+                              key="completed-header"
+                              className="mb-3 flex-row items-center justify-between gap-3 px-1"
+                            >
+                              <View>
+                                <Text className="text-sm font-semibold text-slate-900">Completed</Text>
+                                <Text className="mt-0.5 text-xs text-slate-500">
+                                  Completed tasks stay here until you toggle them back.
+                                </Text>
+                              </View>
+                            </View>,
+                            ...completedTasks.map((item) => (
+                              <TodoItem
+                                key={item.id}
+                                todo={item}
+                                onLongPress={() => {}}
+                                isActive={false}
+                                onToggle={() => toggleTodo(item).then(refresh)}
+                                onDelete={() => removeTodo(item.id).then(refresh)}
+                                onEdit={() => startEdit(item)}
+                                viewMode={viewMode}
+                                cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
+                              />
+                            )),
+                          ]
                         : null}
                     </View>
                   ) : null
@@ -295,7 +362,7 @@ export function TodosScreen() {
                   </ScaleDecorator>
                 )}
               />
-            </View>
+            </ScreenSection>
           ) : null}
         </View>
 

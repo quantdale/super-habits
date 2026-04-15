@@ -23,8 +23,11 @@ import type {
 } from "@/core/linked-actions/linkedActions.types";
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
-import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { PageHeader } from "@/core/ui/PageHeader";
+import { ScreenSection } from "@/core/ui/ScreenSection";
+import { StatBlock } from "@/core/ui/StatBlock";
 import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
@@ -339,60 +342,84 @@ export function HabitsScreen() {
 
   return (
     <Screen scroll padded>
-      <View className="flex-row justify-between items-start">
-        <SectionTitle title="Habits" subtitle="Track daily consistency." />
-        <Pressable
-          onPress={() => setEditMode((e) => !e)}
-          className="rounded-lg p-2"
-        >
-          <MaterialIcons name={editMode ? "close" : "edit"} size={24} color="#94a3b8" />
-        </Pressable>
-      </View>
+      <ScreenSection>
+        <PageHeader
+          title="Habits"
+          subtitle="Track daily consistency."
+          actions={
+            <Pressable
+              onPress={() => setEditMode((e) => !e)}
+              className={`rounded-lg p-2 ${editMode ? "bg-habits-light" : ""}`}
+              accessibilityRole="button"
+              accessibilityLabel={editMode ? "Exit habit edit mode" : "Enter habit edit mode"}
+              accessibilityState={{ selected: editMode }}
+            >
+              <MaterialIcons
+                name={editMode ? "close" : "edit"}
+                size={24}
+                color={editMode ? SECTION_TEXT_COLORS.habits : "#94a3b8"}
+              />
+            </Pressable>
+          }
+        />
+      </ScreenSection>
 
-      <View className="mb-4 flex-row gap-3">
-        <View className="flex-1">
-          <Card variant="stat" accentColor={SECTION_COLORS.habits} className="mb-0">
-            <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>⚡</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_TEXT_COLORS.habits,
-                  marginTop: 2,
-                }}
+      <ScreenSection>
+        <Card accentColor={SECTION_COLORS.habits} className="mb-0" innerClassName="p-0">
+          <View className="p-4">
+            <View className="flex-row items-start gap-3">
+              <View
+                className="h-11 w-11 items-center justify-center rounded-xl"
+                style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
               >
-                {overallStreak} days
-              </Text>
-              <Text className="mt-0.5 text-xs text-slate-400">best streak</Text>
+                <MaterialIcons
+                  name="track-changes"
+                  size={22}
+                  color={SECTION_TEXT_COLORS.habits}
+                />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-base font-semibold text-slate-900">Today&apos;s rhythm</Text>
+                <Text className="mt-0.5 text-sm text-slate-500">
+                  {habits.length} habits across your daily routine
+                </Text>
+              </View>
             </View>
-          </Card>
-        </View>
-        <View className="flex-1">
-          <Card variant="stat" accentColor={SECTION_COLORS.habits} className="mb-0">
-            <View className="items-center py-1">
-              <Text style={{ fontSize: 22 }}>📊</Text>
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: SECTION_TEXT_COLORS.habits,
-                  marginTop: 2,
-                }}
-              >
-                {consistencyPct}%
-              </Text>
-              <Text className="mt-0.5 text-xs text-slate-400">consistent</Text>
-            </View>
-          </Card>
-        </View>
-      </View>
 
-      <View className="bg-habits-light pb-4" accessibilityLabel="Habit groups">
+            <View className="mt-4 flex-row gap-3">
+              <StatBlock
+                accentColor={SECTION_COLORS.habits}
+                className="flex-1"
+                icon={<Text style={{ fontSize: 20 }}>⚡</Text>}
+                value={overallStreak}
+                label="Best streak"
+                detail="days in a row"
+              />
+              <StatBlock
+                accentColor={SECTION_COLORS.habits}
+                className="flex-1"
+                icon={<Text style={{ fontSize: 20 }}>📊</Text>}
+                value={`${consistencyPct}%`}
+                label="Consistency"
+                detail="over the last year"
+              />
+            </View>
+          </View>
+        </Card>
+      </ScreenSection>
+
+      <ScreenSection className="gap-3 pb-4" accessibilityLabel="Habit groups">
         {habits.length === 0 ? (
-          <Text className="mb-4 px-4 text-center text-sm text-slate-500">
-            Pick a time of day and tap Add to create your first habit.
-          </Text>
+          <EmptyStateCard
+            accentColor={SECTION_COLORS.habits}
+            title="No habits yet"
+            description="Pick a time of day and tap Add to create your first habit."
+            icon={
+              <View className="h-11 w-11 items-center justify-center rounded-xl bg-habits-light">
+                <MaterialIcons name="track-changes" size={22} color={SECTION_TEXT_COLORS.habits} />
+              </View>
+            }
+          />
         ) : null}
 
         {TIME_GROUPS.map((group) => {
@@ -401,125 +428,142 @@ export function HabitsScreen() {
           return (
             <Card
               key={group.key}
-              variant="header"
               accentColor={SECTION_COLORS.habits}
-              className="mb-3"
-              headerTitle={group.label.toUpperCase()}
-              headerRight={<Text style={{ fontSize: 18 }}>{group.icon}</Text>}
+              className="mb-0"
+              innerClassName="p-0"
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                  gap: 16,
-                }}
-              >
-                {editMode
-                  ? groupHabits.map((habit) => (
-                      <View key={habit.id} className="items-center" style={{ width: 88, alignItems: "center" }}>
-                        <View
-                          className="items-center justify-center rounded-full bg-slate-200"
-                          style={{ width: 80, height: 80 }}
-                        >
-                          <Text className="text-center text-xs font-medium text-slate-700">
-                            {habit.name}
-                          </Text>
-                          <View className="mt-1 flex-row gap-1">
-                            <Pressable
-                              onPress={() => {
-                                void openEditModal(habit);
-                              }}
-                              className="rounded bg-habits px-2 py-1"
-                            >
-                              <Text className="text-xs font-medium text-white">Edit</Text>
-                            </Pressable>
-                            <Pressable
-                              onPress={() => {
-                                void handleDeleteHabit(habit);
-                              }}
-                              className="rounded bg-rose-500 px-2 py-1"
-                            >
-                              <Text className="text-xs font-medium text-white">Delete</Text>
-                            </Pressable>
-                          </View>
-                        </View>
-                      </View>
-                    ))
-                  : groupHabits.map((habit) => {
-                      const todayCount = completionMap[habit.id] ?? 0;
-                      const streak = streakMap[habit.id] ?? 0;
-                      return (
+              <View className="p-4">
+                <View className="mb-4 flex-row items-center justify-between gap-3">
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-habits-light">
+                      <Text style={{ fontSize: 18 }}>{group.icon}</Text>
+                    </View>
+                    <View>
+                      <Text className="text-base font-semibold text-slate-900">{group.label}</Text>
+                      <Text className="mt-0.5 text-sm text-slate-500">
+                        {groupHabits.length} {groupHabits.length === 1 ? "habit" : "habits"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View className="flex-row flex-wrap justify-center gap-x-4 gap-y-5">
+                  {editMode
+                    ? groupHabits.map((habit) => (
                         <View
                           key={habit.id}
-                          className="items-center justify-center"
-                          style={{ width: 72, alignItems: "center" }}
+                          className="items-center"
+                          style={{ width: 104, alignItems: "center" }}
                         >
-                          <HabitCircle
-                            habit={habit}
-                            todayCount={todayCount}
-                            streak={streak}
-                            size={56}
-                            showName={false}
-                            showStreak={false}
-                            onIncrement={() => handleIncrement(habit.id)}
-                            onDecrement={() => handleDecrement(habit.id)}
-                          />
-                          <Text
-                            className="mt-1 w-[72px] text-center text-[11px] text-slate-400"
-                            numberOfLines={2}
-                          >
-                            {habit.name}
-                          </Text>
-                          {streak > 0 ? (
-                            <View className="mt-0.5 flex-row items-center gap-0.5">
-                              <Text style={{ fontSize: 10 }}>{streak > 2 ? "🔥" : "⚡"}</Text>
-                              <Text className="text-[10px] text-slate-400">{streak}</Text>
+                          <View className="w-full items-center rounded-2xl border border-slate-200 bg-white px-3 py-4">
+                            <View
+                              className="mb-3 h-14 w-14 items-center justify-center rounded-full"
+                              style={{ backgroundColor: `${habit.color ?? DEFAULT_HABIT_COLOR}18` }}
+                            >
+                              <MaterialIcons
+                                name={habit.icon ?? DEFAULT_HABIT_ICON}
+                                size={24}
+                                color={habit.color ?? DEFAULT_HABIT_COLOR}
+                              />
                             </View>
-                          ) : null}
+                            <Text
+                              className="text-center text-xs font-medium text-slate-700"
+                              numberOfLines={2}
+                            >
+                              {habit.name}
+                            </Text>
+                            <View className="mt-3 flex-row gap-1">
+                              <Pressable
+                                onPress={() => {
+                                  void openEditModal(habit);
+                                }}
+                                className="rounded-full bg-habits px-3 py-1.5"
+                              >
+                                <Text className="text-xs font-medium text-white">Edit</Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={() => {
+                                  void handleDeleteHabit(habit);
+                                }}
+                                className="rounded-full bg-rose-500 px-3 py-1.5"
+                              >
+                                <Text className="text-xs font-medium text-white">Delete</Text>
+                              </Pressable>
+                            </View>
+                          </View>
                         </View>
-                      );
-                    })}
+                      ))
+                    : groupHabits.map((habit) => {
+                        const todayCount = completionMap[habit.id] ?? 0;
+                        const streak = streakMap[habit.id] ?? 0;
+                        return (
+                          <View
+                            key={habit.id}
+                            className="items-center justify-center"
+                            style={{ width: 84, alignItems: "center" }}
+                          >
+                            <HabitCircle
+                              habit={habit}
+                              todayCount={todayCount}
+                              streak={streak}
+                              size={60}
+                              showName={false}
+                              showStreak={false}
+                              onIncrement={() => handleIncrement(habit.id)}
+                              onDecrement={() => handleDecrement(habit.id)}
+                            />
+                            <Text
+                              className="mt-2 w-[84px] text-center text-[11px] font-medium leading-4 text-slate-500"
+                              numberOfLines={2}
+                            >
+                              {habit.name}
+                            </Text>
+                            {streak > 0 ? (
+                              <View className="mt-1 flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1">
+                                <Text style={{ fontSize: 10 }}>{streak > 2 ? "🔥" : "⚡"}</Text>
+                                <Text className="text-[10px] font-semibold text-amber-600">{streak}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        );
+                      })}
 
-                <View className="items-center" style={{ width: editMode ? 88 : 72 }}>
-                  <Pressable
-                    onPress={() => handleAddHabitToGroup(group.key)}
-                    className="w-14 h-14 shrink-0 grow-0 items-center justify-center rounded-full border-2 border-dashed"
-                    style={{
-                      borderColor: SECTION_COLORS.habits + "60",
-                      backgroundColor: SECTION_COLORS_LIGHT.habits,
-                    }}
-                  >
-                    <Text
+                  <View className="items-center" style={{ width: editMode ? 104 : 84 }}>
+                    <Pressable
+                      onPress={() => handleAddHabitToGroup(group.key)}
+                      className="h-[68px] w-[68px] shrink-0 grow-0 items-center justify-center rounded-2xl border-2 border-dashed"
                       style={{
-                        fontSize: 24,
-                        color: SECTION_TEXT_COLORS.habits,
-                        lineHeight: 28,
+                        borderColor: SECTION_COLORS.habits + "60",
+                        backgroundColor: SECTION_COLORS_LIGHT.habits,
                       }}
                     >
-                      +
+                      <Text
+                        style={{
+                          fontSize: 24,
+                          color: SECTION_TEXT_COLORS.habits,
+                          lineHeight: 28,
+                        }}
+                      >
+                        +
+                      </Text>
+                    </Pressable>
+                    <Text
+                      className="mt-2 text-[11px] font-semibold"
+                      style={{ color: SECTION_TEXT_COLORS.habits }}
+                    >
+                      Add
                     </Text>
-                  </Pressable>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: SECTION_TEXT_COLORS.habits,
-                      marginTop: 4,
-                      textAlign: "center",
-                    }}
-                  >
-                    Add
-                  </Text>
+                  </View>
                 </View>
               </View>
             </Card>
           );
         })}
-      </View>
+      </ScreenSection>
 
-      <View className="mt-2 pb-8">
+      <ScreenSection className="mt-2 pb-8">
         <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
-      </View>
+      </ScreenSection>
 
       <Modal
         title={editingHabit ? "Edit Habit" : "New Habit"}

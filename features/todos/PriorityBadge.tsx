@@ -14,15 +14,13 @@ export function PriorityBadge({ priority, compact }: Props) {
   const cfg = CONFIG[priority];
   return (
     <View
-      style={{
-        backgroundColor: cfg.bg,
-        borderRadius: 4,
-        paddingHorizontal: compact ? 4 : 6,
-        paddingVertical: compact ? 1 : 2,
-        alignSelf: "flex-start",
-      }}
+      className={`self-start rounded-full ${compact ? "px-2 py-1" : "px-2.5 py-1.5"}`}
+      style={{ backgroundColor: cfg.bg }}
     >
-      <Text style={{ fontSize: compact ? 9 : 11, fontWeight: "500", color: cfg.text }}>
+      <Text
+        className={compact ? "text-[10px] font-semibold" : "text-[11px] font-semibold"}
+        style={{ color: cfg.text }}
+      >
         {compact ? cfg.label[0] : cfg.label}
       </Text>
     </View>

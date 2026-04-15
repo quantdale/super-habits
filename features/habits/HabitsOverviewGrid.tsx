@@ -1,4 +1,5 @@
 import React from "react";
+import { MaterialIcons } from "@expo/vector-icons";
 import { View, Text } from "react-native";
 import { Card } from "@/core/ui/Card";
 import type { HeatmapDay } from "@/features/shared/activityTypes";
@@ -20,31 +21,40 @@ const HEATMAP_LEGEND: Array<{ label: string; color: string }> = [
 function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
   return (
     <View className="w-full items-center">
-      <Card variant="standard" accentColor={SECTION_COLORS.habits} className="w-full max-w-full">
-        <View className="w-full min-w-0 items-center justify-center">
-          <View className="mb-4 w-full flex-row items-center gap-2">
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: "700",
-                color: SECTION_TEXT_COLORS.habits,
-              }}
+      <Card
+        variant="standard"
+        accentColor={SECTION_COLORS.habits}
+        className="w-full max-w-full"
+        innerClassName="p-0"
+      >
+        <View className="w-full min-w-0 p-4">
+          <View className="mb-4 flex-row items-start gap-3">
+            <View
+              className="h-11 w-11 items-center justify-center rounded-xl"
+              style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
             >
-              {consistencyPercent}%
-            </Text>
-            <Text style={{ fontSize: 14, color: "#94a3b8" }}>consistency — last year</Text>
+              <MaterialIcons
+                name="track-changes"
+                size={22}
+                color={SECTION_TEXT_COLORS.habits}
+              />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text className="text-base font-semibold text-slate-900">Consistency</Text>
+              <Text className="mt-0.5 text-sm text-slate-500">All habits over the last 52 weeks</Text>
+            </View>
+            <View className="items-end">
+              <Text
+                style={{
+                  fontSize: 28,
+                  fontWeight: "700",
+                  color: SECTION_TEXT_COLORS.habits,
+                }}
+              >
+                {consistencyPercent}%
+              </Text>
+            </View>
           </View>
-
-          <Text
-            style={{
-              fontSize: 12,
-              color: "#94a3b8",
-              marginBottom: 8,
-              alignSelf: "flex-start",
-            }}
-          >
-            Habits — last 52 weeks
-          </Text>
 
           <GitHubHeatmap
             days={heatmapDays}
