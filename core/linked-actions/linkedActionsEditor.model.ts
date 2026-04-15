@@ -1,4 +1,8 @@
 import {
+  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
+  LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
+  LINKED_ACTION_SUPPORTED_TRIGGER_TYPES,
+  LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE,
   LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY,
   LINKED_ACTION_SOURCE_ENTITY_TYPES_BY_FEATURE,
   LINKED_ACTION_TARGET_ENTITY_TYPES_BY_FEATURE,
@@ -113,27 +117,40 @@ export function getLinkedActionTriggerOptions(
   feature: LinkedActionFeature,
 ): Array<LinkedActionOption<LinkedActionTriggerType>> {
   const entityType = getLinkedActionSourceEntityTypeForFeature(feature);
-  return LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY[entityType].map((triggerType) => ({
-    value: triggerType,
-    label: getLinkedActionTriggerLabel(triggerType),
-    description:
-      triggerType === "habit.completed_for_day"
-        ? "Fires when the selected habit reaches its target for the day."
-        : triggerType === "habit.progress_incremented"
-          ? "Fires on every successful increment."
+  return LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY[entityType]
+    .filter((triggerType) =>
+      (LINKED_ACTION_SUPPORTED_TRIGGER_TYPES as readonly string[]).includes(triggerType),
+    )
+    .map((triggerType) => ({
+      value: triggerType,
+      label: getLinkedActionTriggerLabel(triggerType),
+      description:
+        triggerType === "habit.completed_for_day"
+          ? "Fires when the selected habit reaches its target for the day."
           : `Fires when ${getLinkedActionTriggerLabel(triggerType).toLowerCase()}.`,
-  }));
+    }));
 }
 
 export function getLinkedActionEffectOptions(
   feature: LinkedActionFeature,
 ): Array<LinkedActionOption<LinkedActionEffectType>> {
+  if (!(LINKED_ACTION_SUPPORTED_TARGET_FEATURES as readonly string[]).includes(feature)) {
+    return [];
+  }
+
   const entityType = getLinkedActionTargetEntityTypeForFeature(feature);
-  return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[entityType].map((effectType) => ({
-    value: effectType,
-    label: getLinkedActionEffectLabel(effectType),
-    description: getLinkedActionEffectDescription(effectType),
-  }));
+  return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[entityType]
+    .filter(
+      (effectType) =>
+        LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY[
+          entityType as keyof typeof LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY
+        ]?.includes(effectType as never) ?? false,
+    )
+    .map((effectType) => ({
+      value: effectType,
+      label: getLinkedActionEffectLabel(effectType),
+      description: getLinkedActionEffectDescription(effectType),
+    }));
 }
 
 export function createEmptyLinkedActionEditorRow(
@@ -153,12 +170,39 @@ export function createEmptyLinkedActionEditorRow(
     targetEntityType: null,
     targetSelection: null,
     effectType: null,
+    isUnsupported: false,
+    unsupportedTarget: null,
   };
 }
 
 export function createLinkedActionEditorRowFromRule(
   input: LinkedActionExistingRuleAdapterInput,
 ): LinkedActionEditorRowDraft {
+  if (input.rule.isUnsupported) {
+    return {
+      id: nextEditorRowId(),
+      mode: "existing",
+      existingRuleId: input.rule.id,
+      status: input.rule.status,
+      directionPolicy: input.rule.directionPolicy,
+      sourceFeature: input.rule.source.feature,
+      sourceEntityType: input.rule.source.entityType,
+      sourceEntityId: input.rule.source.entityId ?? "",
+      triggerType: input.rule.source.triggerType,
+      targetFeature: null,
+      targetEntityType: null,
+      targetSelection: null,
+      effectType: null,
+      isUnsupported: true,
+      unsupportedTarget: {
+        feature: input.rule.rawTargetFeature,
+        entityType: input.rule.rawTargetEntityType,
+        effectType: input.rule.rawEffectType,
+        message: LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE,
+      },
+    };
+  }
+
   return {
     id: nextEditorRowId(),
     mode: "existing",
@@ -173,12 +217,18 @@ export function createLinkedActionEditorRowFromRule(
     targetEntityType: input.rule.target.entityType,
     targetSelection: input.targetSelection,
     effectType: input.rule.target.effect.type,
+    isUnsupported: false,
+    unsupportedTarget: null,
   };
 }
 
 function buildLinkedActionRuleTargetFromEditorRow(
   row: LinkedActionEditorRowDraft,
 ): LinkedActionRuleTarget {
+  if (row.isUnsupported) {
+    throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
+  }
+
   if (!row.targetFeature || !row.targetEntityType || !row.effectType) {
     throw new Error("Linked action row is missing a target feature, entity, or effect.");
   }
@@ -241,6 +291,10 @@ function buildLinkedActionRuleTargetFromEditorRow(
 export function createSaveLinkedActionRuleInputFromEditorRow(
   row: LinkedActionEditorRowDraft,
 ): SaveLinkedActionRuleForSourceInput {
+  if (row.isUnsupported) {
+    throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
+  }
+
   if (!row.triggerType) {
     throw new Error("Select a trigger before saving this linked action.");
   }
@@ -264,6 +318,8 @@ export function applyLinkedActionTargetFeature(
     targetEntityType: getLinkedActionTargetEntityTypeForFeature(targetFeature),
     targetSelection: null,
     effectType: null,
+    isUnsupported: false,
+    unsupportedTarget: null,
   };
 }
 
@@ -271,6 +327,11 @@ export function validateLinkedActionEditorRow(
   row: LinkedActionEditorRowDraft,
 ): LinkedActionEditorRowValidation {
   const errors: LinkedActionEditorRowValidation = {};
+
+  if (row.isUnsupported) {
+    errors.unsupported = LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE;
+    return errors;
+  }
 
   if (!row.triggerType) {
     errors.triggerType = "Select a trigger.";

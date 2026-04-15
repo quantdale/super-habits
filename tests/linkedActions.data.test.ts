@@ -33,20 +33,18 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     const created = await createLinkedActionRule({
       source: {
-        feature: "todos",
-        entityType: "todo",
-        entityId: "todo_1",
-        triggerType: "todo.completed",
-      },
-      target: {
         feature: "habits",
         entityType: "habit",
         entityId: "habit_1",
+        triggerType: "habit.completed_for_day",
+      },
+      target: {
+        feature: "todos",
+        entityType: "todo",
+        entityId: "todo_1",
         effect: {
-          kind: "progress",
-          type: "habit.increment",
-          amount: 1,
-          dateStrategy: "today",
+          kind: "binary",
+          type: "todo.complete",
         },
       },
       directionPolicy: "bidirectional_peer",
@@ -61,10 +59,10 @@ describe("core/linked-actions/linkedActions.data", () => {
     expect(args[1]).toBe("active");
     expect(args[2]).toBe("bidirectional_peer");
     expect(args[3]).toBe("group_1");
-    expect(args[12]).toBe(JSON.stringify({ amount: 1, dateStrategy: "today" }));
+    expect(args[12]).toBe(JSON.stringify({}));
   });
 
-  it("normalizes stored rows when listing or fetching rules", async () => {
+  it("normalizes stored rows when listing or fetching rules without crashing on legacy targets", async () => {
     const row: LinkedActionRuleRow = {
       id: "link_1",
       status: "active",
@@ -110,12 +108,20 @@ describe("core/linked-actions/linkedActions.data", () => {
           entityType: "pomodoro_session",
           entityId: null,
           effect: {
-            kind: "log",
+            kind: "unsupported",
             type: "pomodoro.log",
-            sessionType: "focus",
-            durationSeconds: 900,
+            rawPayload: JSON.stringify({
+              sessionType: "focus",
+              durationSeconds: 900,
+            }),
           },
         },
+        isUnsupported: true,
+        unsupportedReason:
+          "This linked action uses an unsupported target and must be removed or replaced.",
+        rawTargetFeature: "pomodoro",
+        rawTargetEntityType: "pomodoro_session",
+        rawEffectType: "pomodoro.log",
         createdAt: "2026-04-13T00:00:00.000Z",
         updatedAt: "2026-04-13T00:00:00.000Z",
         deletedAt: null,
@@ -124,12 +130,8 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     await expect(getLinkedActionRule("link_1")).resolves.toMatchObject({
       id: "link_1",
-      target: {
-        effect: {
-          type: "pomodoro.log",
-          durationSeconds: 900,
-        },
-      },
+      isUnsupported: true,
+      rawTargetFeature: "pomodoro",
     });
   });
 
@@ -385,5 +387,58 @@ describe("core/linked-actions/linkedActions.data", () => {
       expect.stringContaining("SET deleted_at = ?, updated_at = ?"),
       [expect.any(String), expect.any(String), "link_removed"],
     );
+  });
+
+  it("refuses to overwrite an unsupported existing rule", async () => {
+    const db = {
+      getAllAsync: vi.fn().mockResolvedValue([
+        {
+          id: "link_legacy",
+          status: "active",
+          direction_policy: "one_way",
+          bidirectional_group_id: null,
+          source_feature: "habits",
+          source_entity_type: "habit",
+          source_entity_id: "habit_1",
+          trigger_type: "habit.completed_for_day",
+          target_feature: "pomodoro",
+          target_entity_type: "pomodoro_session",
+          target_entity_id: null,
+          effect_type: "pomodoro.log",
+          effect_payload: JSON.stringify({
+            sessionType: "focus",
+            durationSeconds: 1500,
+          }),
+          created_at: "2026-04-13T00:00:00.000Z",
+          updated_at: "2026-04-13T00:00:00.000Z",
+          deleted_at: null,
+        },
+      ]),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(
+      replaceLinkedActionRulesForSourceEntity({
+        feature: "habits",
+        entityType: "habit",
+        entityId: "habit_1",
+        rules: [
+          {
+            existingRuleId: "link_legacy",
+            triggerType: "habit.completed_for_day",
+            target: {
+              feature: "todos",
+              entityType: "todo",
+              entityId: "todo_1",
+              effect: {
+                kind: "binary",
+                type: "todo.complete",
+              },
+            },
+          },
+        ],
+      }),
+    ).rejects.toThrow("Unsupported linked action rules must be removed or replaced before saving.");
   });
 });

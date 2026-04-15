@@ -19,6 +19,7 @@ import {
 import {
   isAllowedLinkedActionSourceEntity,
   isAllowedLinkedActionTrigger,
+  isSupportedLinkedActionRule,
   serializeLinkedActionEffectPayload,
   type LinkedActionEffectPlan,
   type LinkedActionEffectResult,
@@ -27,6 +28,7 @@ import {
   type LinkedActionProcessMode,
   type LinkedActionProcessResult,
   type LinkedActionRuleDefinition,
+  type LinkedActionSupportedRuleDefinition,
   type LinkedActionSourceAction,
   type LinkedActionSourceActionInput,
 } from "@/core/linked-actions/linkedActions.types";
@@ -61,7 +63,7 @@ function featureLabel(feature: keyof typeof TAB_HREF_BY_FEATURE) {
 }
 
 function inferProducedEntityPlan(
-  rule: LinkedActionRuleDefinition,
+  rule: LinkedActionSupportedRuleDefinition,
 ): Pick<LinkedActionEffectPlan, "plannedProducedEntityType" | "plannedProducedEntityId"> {
   switch (rule.target.effect.type) {
     case "calorie.log":
@@ -87,7 +89,7 @@ function inferProducedEntityPlan(
   }
 }
 
-function buildEffectFingerprint(rule: LinkedActionRuleDefinition) {
+function buildEffectFingerprint(rule: LinkedActionSupportedRuleDefinition) {
   return [
     rule.id,
     rule.target.feature,
@@ -264,7 +266,7 @@ async function findPriorAppliedExecutionForFirstRealPath(
 
 function buildPlan(
   sourceEvent: LinkedActionSourceAction,
-  rule: LinkedActionRuleDefinition,
+  rule: LinkedActionSupportedRuleDefinition,
 ): LinkedActionEffectPlan {
   const produced = inferProducedEntityPlan(rule);
   const plan: LinkedActionEffectPlan = {
@@ -281,6 +283,42 @@ function buildPlan(
   return {
     ...plan,
     noticePreview: buildNoticePayload(plan, "planned"),
+  };
+}
+
+function buildUnsupportedRuleEffectFingerprint(rule: LinkedActionRuleDefinition) {
+  return [
+    rule.id,
+    rule.rawTargetFeature,
+    rule.rawTargetEntityType,
+    rule.target.entityId ?? "none",
+    rule.rawEffectType,
+  ].join("|");
+}
+
+function buildUnsupportedRuleResult(rule: LinkedActionRuleDefinition): LinkedActionEffectResult {
+  console.warn("Skipping unsupported linked action rule", {
+    ruleId: rule.id,
+    targetFeature: rule.rawTargetFeature,
+    targetEntityType: rule.rawTargetEntityType,
+    effectType: rule.rawEffectType,
+  });
+
+  return {
+    executionId: null,
+    ruleId: rule.id,
+    status: "skipped",
+    effectType: rule.rawEffectType,
+    effectFingerprint: buildUnsupportedRuleEffectFingerprint(rule),
+    targetFeature: rule.rawTargetFeature,
+    targetEntityType: rule.rawTargetEntityType,
+    targetEntityId: rule.target.entityId,
+    producedEntityType: null,
+    producedEntityId: null,
+    reason: "unsupported_rule",
+    errorMessage: rule.unsupportedReason,
+    notice: null,
+    noticePreview: null,
   };
 }
 
@@ -333,15 +371,19 @@ export class LinkedActionsEngine {
         : normalizedEvent;
 
     const rules = await listMatchingLinkedActionRules(sourceEvent);
-    const plans = rules.map((rule) => buildPlan(sourceEvent, rule));
+    const effects: LinkedActionEffectResult[] = [];
+    const notices: AppNotice[] = [];
 
-    if (mode === "plan") {
-      return {
-        mode,
-        sourceEvent,
-        matchedRuleCount: rules.length,
-        notices: [],
-        effects: plans.map((plan) => ({
+    for (const rule of rules) {
+      if (!isSupportedLinkedActionRule(rule)) {
+        effects.push(buildUnsupportedRuleResult(rule));
+        continue;
+      }
+
+      const plan = buildPlan(sourceEvent, rule);
+
+      if (mode === "plan") {
+        effects.push({
           executionId: null,
           ruleId: plan.rule.id,
           status: "planned",
@@ -356,14 +398,10 @@ export class LinkedActionsEngine {
           errorMessage: null,
           notice: null,
           noticePreview: plan.noticePreview,
-        })),
-      };
-    }
+        });
+        continue;
+      }
 
-    const effects: LinkedActionEffectResult[] = [];
-    const notices: AppNotice[] = [];
-
-    for (const plan of plans) {
       const priorExecution = await getLinkedActionExecutionByRuleAndSourceEvent(
         plan.rule.id,
         sourceEvent.eventId,

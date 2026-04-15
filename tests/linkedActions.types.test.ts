@@ -28,6 +28,7 @@ describe("core/linked-actions/linkedActions.types", () => {
       deleted_at: null,
     });
 
+    expect(normalized.isUnsupported).toBe(false);
     expect(buildLinkedActionRuleRow(normalized)).toEqual({
       id: "link_1",
       status: "active",
@@ -106,7 +107,7 @@ describe("core/linked-actions/linkedActions.types", () => {
     ).toThrow("Trigger habit.completed_for_day is not allowed for source entity todo");
   });
 
-  it("parses plain object records into normalized rule definitions", () => {
+  it("marks legacy pomodoro targets unsupported instead of throwing", () => {
     expect(
       parseLinkedActionRuleRecord({
         id: "link_3",
@@ -135,24 +136,41 @@ describe("core/linked-actions/linkedActions.types", () => {
       }),
     ).toMatchObject({
       id: "link_3",
-      status: "paused",
-      source: {
-        feature: "pomodoro",
-        entityType: "pomodoro_timer",
-        entityId: null,
-        triggerType: "pomodoro.focus_completed",
-      },
-      target: {
-        feature: "pomodoro",
-        entityType: "pomodoro_session",
-        entityId: null,
-        effect: {
-          kind: "log",
-          type: "pomodoro.log",
-          sessionType: "focus",
-          durationSeconds: 1500,
-        },
-      },
+      isUnsupported: true,
+      rawTargetFeature: "pomodoro",
+      rawTargetEntityType: "pomodoro_session",
+      rawEffectType: "pomodoro.log",
+      unsupportedReason:
+        "This linked action uses an unsupported target and must be removed or replaced.",
+    });
+  });
+
+  it("keeps unknown target features parseable for persisted rows", () => {
+    expect(
+      normalizeLinkedActionRuleRow({
+        id: "link_legacy",
+        status: "active",
+        direction_policy: "one_way",
+        bidirectional_group_id: null,
+        source_feature: "habits",
+        source_entity_type: "habit",
+        source_entity_id: "habit_1",
+        trigger_type: "habit.completed_for_day",
+        target_feature: "journals",
+        target_entity_type: "journal_entry",
+        target_entity_id: "journal_1",
+        effect_type: "journal.append",
+        effect_payload: "{\"template\":\"done\"}",
+        created_at: "2026-04-13T00:00:00.000Z",
+        updated_at: "2026-04-13T00:00:00.000Z",
+        deleted_at: null,
+      }),
+    ).toMatchObject({
+      id: "link_legacy",
+      isUnsupported: true,
+      rawTargetFeature: "journals",
+      rawTargetEntityType: "journal_entry",
+      rawEffectType: "journal.append",
     });
   });
 });

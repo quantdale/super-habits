@@ -22,6 +22,9 @@ import type {
   LinkedActionFeature,
   LinkedActionTriggerType,
 } from "@/core/linked-actions/linkedActions.types";
+import {
+  LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
+} from "@/core/linked-actions/linkedActions.types";
 import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
 import { PillChip } from "@/core/ui/PillChip";
@@ -89,6 +92,63 @@ function RuleRow({
 }) {
   const { tokens } = useAppTheme();
   const router = useRouter();
+
+  if (row.isUnsupported) {
+    const unsupportedTargetSummary = row.unsupportedTarget
+      ? `${row.unsupportedTarget.feature} / ${row.unsupportedTarget.entityType} / ${row.unsupportedTarget.effectType}`
+      : "Stored target unavailable";
+
+    return (
+      <Card
+        variant="header"
+        accentColor={getFeatureAccentColor(row.sourceFeature)}
+        headerTitle="Unsupported linked rule"
+        headerSubtitle="Legacy rule kept for visibility only."
+        headerRight={
+          <Pressable onPress={() => onRemove(row.id)} hitSlop={8}>
+            <Text className="text-xs font-semibold uppercase tracking-[1px]" style={{ color: "#ffffff" }}>
+              Remove
+            </Text>
+          </Pressable>
+        }
+      >
+        <View className="gap-4">
+          <View
+            className="rounded-2xl border px-4 py-3"
+            style={{
+              borderColor: tokens.dangerBorder,
+              backgroundColor: tokens.dangerBackground,
+            }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.dangerText }}>
+              {row.unsupportedTarget?.message}
+            </Text>
+            <Text className="mt-2 text-sm" style={{ color: tokens.dangerText }}>
+              Stored target: {unsupportedTargetSummary}
+            </Text>
+          </View>
+
+          <View>
+            <Text className="mb-2 text-sm font-medium" style={{ color: tokens.text }}>
+              Trigger
+            </Text>
+            <View
+              className="rounded-2xl border px-4 py-3"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+            >
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                {row.triggerType ? getLinkedActionTriggerLabel(row.triggerType) : "Unknown trigger"}
+              </Text>
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                This row is disabled. Remove it, then add a new supported rule if needed.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Card>
+    );
+  }
+
   const triggerOptions = getLinkedActionTriggerOptions(row.sourceFeature).filter((option) =>
     allowedTriggerTypes ? allowedTriggerTypes.includes(option.value) : true,
   );
@@ -294,7 +354,7 @@ export function LinkedActionsEditorSection({
   onRowsChange,
   onSourceKeyChange,
   allowSourceSelection = true,
-  allowedTargetFeatures = ["todos", "habits", "calories", "workout", "pomodoro"],
+  allowedTargetFeatures = [...LINKED_ACTION_SUPPORTED_TARGET_FEATURES],
   allowedTriggerTypes,
   allowCreateNewTarget = true,
   introTitle = "Linked Actions",
