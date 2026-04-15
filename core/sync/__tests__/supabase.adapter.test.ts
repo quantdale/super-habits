@@ -64,14 +64,13 @@ describe("SupabaseSyncAdapter", () => {
     expect(getDatabase).not.toHaveBeenCalled();
   });
 
-  it("warns and skips unknown entities", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  it("throws for unknown entities so the sync engine retains the batch", async () => {
     const { adapter, db, from } = await setupAdapter({});
-    db.getAllAsync.mockResolvedValue([]);
 
-    await adapter.push([record("unknown_table", "row_1")]);
+    await expect(adapter.push([record("unknown_table", "row_1")])).rejects.toThrow(
+      "[sync] Unknown entity in queue: unknown_table",
+    );
 
-    expect(warnSpy).toHaveBeenCalledWith("[sync] skip unknown entity: unknown_table");
     expect(db.getAllAsync).not.toHaveBeenCalled();
     expect(from).not.toHaveBeenCalled();
   });
@@ -103,11 +102,24 @@ describe("SupabaseSyncAdapter", () => {
     expect(upsert).toHaveBeenCalledWith(rows, { onConflict: "id" });
   });
 
-  it("skips upsert when the local SELECT returns no rows", async () => {
+  it("throws when the local SELECT returns no rows for a queued record", async () => {
     const { adapter, db, from } = await setupAdapter({});
     db.getAllAsync.mockResolvedValue([]);
 
-    await adapter.push([record("todos", "todo_1")]);
+    await expect(adapter.push([record("todos", "todo_1")])).rejects.toThrow(
+      "[sync] Missing local rows for todos: todo_1",
+    );
+
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("throws when only part of a queued entity batch can be loaded locally", async () => {
+    const { adapter, db, from } = await setupAdapter({});
+    db.getAllAsync.mockResolvedValue([{ id: "todo_1", title: "Only one row" }]);
+
+    await expect(
+      adapter.push([record("todos", "todo_1"), record("todos", "todo_2")]),
+    ).rejects.toThrow("[sync] Missing local rows for todos: todo_2");
 
     expect(from).not.toHaveBeenCalled();
   });
