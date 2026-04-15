@@ -264,6 +264,19 @@ async function findPriorAppliedExecutionForFirstRealPath(
   );
 }
 
+function isSelfTargetNoop(plan: LinkedActionEffectPlan): boolean {
+  if (plan.rule.target.effect.type !== "todo.complete") {
+    return false;
+  }
+
+  return (
+    plan.sourceEvent.feature === "todos" &&
+    plan.sourceEvent.entityType === "todo" &&
+    Boolean(plan.sourceEvent.entityId) &&
+    plan.sourceEvent.entityId === plan.rule.target.entityId
+  );
+}
+
 function buildPlan(
   sourceEvent: LinkedActionSourceAction,
   rule: LinkedActionSupportedRuleDefinition,
@@ -438,6 +451,26 @@ export class LinkedActionsEngine {
             "habit_day_already_logged",
           ),
         );
+        continue;
+      }
+
+      if (isSelfTargetNoop(plan)) {
+        effects.push({
+          executionId: null,
+          ruleId: plan.rule.id,
+          status: "skipped",
+          effectType: plan.rule.target.effect.type,
+          effectFingerprint: plan.effectFingerprint,
+          targetFeature: plan.rule.target.feature,
+          targetEntityType: plan.rule.target.entityType,
+          targetEntityId: plan.rule.target.entityId,
+          producedEntityType: null,
+          producedEntityId: null,
+          reason: "self_target_noop",
+          errorMessage: null,
+          notice: null,
+          noticePreview: null,
+        });
         continue;
       }
 
