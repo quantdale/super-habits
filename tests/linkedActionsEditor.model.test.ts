@@ -252,7 +252,16 @@ describe("linkedActionsEditor.model", () => {
     });
 
     expect(row.targetSelection).toBeNull();
-    expect(validateLinkedActionEditorRow(row).targetSelection).toBeDefined();
+    expect(row.isOrphaned).toBe(true);
+    expect(row.orphanedTarget).toMatchObject({
+      feature: "habits",
+      entityType: "habit",
+      entityId: "habit_missing",
+      effectType: "habit.increment",
+    });
+    expect(validateLinkedActionEditorRow(row).targetSelection).toBe(
+      "This linked action points to a deleted or unavailable target. Choose a replacement or remove the rule.",
+    );
   });
 
   it("marks unsupported persisted rows as disabled legacy entries", () => {
@@ -341,5 +350,34 @@ describe("linkedActionsEditor.model", () => {
     expect(() => createSaveLinkedActionRuleInputFromEditorRow(row)).toThrow(
       "Unsupported linked action rules must be removed or replaced before saving.",
     );
+  });
+
+  it("preserves the effect when replacing an orphaned target inside the same feature", () => {
+    const orphanedRow = createLinkedActionEditorRowFromRule({
+      rule: buildSupportedRule({
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_missing",
+          effect: {
+            kind: "progress",
+            type: "habit.ensure_daily_target",
+            minimumCount: "target_per_day",
+            dateStrategy: "source_date",
+          },
+        },
+        rawTargetFeature: "habits",
+        rawTargetEntityType: "habit",
+        rawEffectType: "habit.ensure_daily_target",
+      }),
+      targetSelection: null,
+    });
+
+    const repairedRow = applyLinkedActionTargetFeature(orphanedRow, "habits");
+
+    expect(repairedRow.isOrphaned).toBe(false);
+    expect(repairedRow.orphanedTarget).toBeNull();
+    expect(repairedRow.effectType).toBe("habit.ensure_daily_target");
+    expect(repairedRow.targetFeature).toBe("habits");
   });
 });

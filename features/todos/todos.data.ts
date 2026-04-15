@@ -1,6 +1,7 @@
 import { getDatabase } from "@/core/db/client";
 import type { Todo, TodoPriority, TodoRecurrence } from "@/core/db/types";
 import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
+import { deleteLinkedActionRulesForTargetEntity } from "@/core/linked-actions/linkedActions.data";
 import { createId } from "@/lib/id";
 import { nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
@@ -234,6 +235,12 @@ export async function removeTodo(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
   await db.runAsync("UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, id]);
+  await deleteLinkedActionRulesForTargetEntity({
+    feature: "todos",
+    entityType: "todo",
+    entityId: id,
+    deletedAt: now,
+  });
   syncEngine.enqueue({ entity: "todos", id, updatedAt: now, operation: "delete" });
 }
 

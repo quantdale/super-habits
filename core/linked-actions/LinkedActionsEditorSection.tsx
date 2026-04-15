@@ -13,6 +13,7 @@ import {
   getLinkedActionFeatureLabel,
   getLinkedActionTriggerLabel,
   getLinkedActionTriggerOptions,
+  validateLinkedActionEditorRow,
 } from "@/core/linked-actions/linkedActionsEditor.model";
 import type {
   LinkedActionEditorRowDraft,
@@ -159,19 +160,21 @@ function RuleRow({
   const selectedEffectDescription = row.effectType
     ? getLinkedActionEffectDescription(row.effectType)
     : null;
-  const validationErrors = Object.values(
+  const rowValidation =
     row.mode === "existing" && countLinkedActionEditorRowErrors(row) === 0
       ? {}
       : {
-          triggerType: row.triggerType ? null : "Select a trigger.",
-          targetFeature: row.targetFeature ? null : "Select a target feature.",
-          targetSelection: row.targetSelection
-            ? null
-            : allowCreateNewTarget
-              ? "Choose an existing target item or a create-new handoff."
-              : "Choose an existing target item.",
-          effectType: row.effectType ? null : "Select an effect.",
-        },
+          ...validateLinkedActionEditorRow(row),
+          targetSelection:
+            !allowCreateNewTarget &&
+            !row.isOrphaned &&
+            !row.targetSelection &&
+            validateLinkedActionEditorRow(row).targetSelection
+              ? "Choose an existing target item."
+              : validateLinkedActionEditorRow(row).targetSelection,
+        };
+  const validationErrors = Object.values(
+    rowValidation,
   ).filter((value): value is string => Boolean(value));
 
   let targetSelectionSummary:
@@ -201,6 +204,14 @@ function RuleRow({
       actionPress: () => router.push(handoff.destinationHref),
     };
   }
+  const orphanedTargetSummary = row.orphanedTarget
+    ? [
+        row.orphanedTarget.feature,
+        row.orphanedTarget.entityType,
+        row.orphanedTarget.entityId ?? "unknown-target",
+        row.orphanedTarget.effectType,
+      ].join(" / ")
+    : "Stored target unavailable";
 
   return (
     <Card
@@ -221,6 +232,23 @@ function RuleRow({
       }
     >
       <View className="gap-4">
+        {row.isOrphaned ? (
+          <View
+            className="rounded-2xl border px-4 py-3"
+            style={{
+              borderColor: tokens.dangerBorder,
+              backgroundColor: tokens.dangerBackground,
+            }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.dangerText }}>
+              {row.orphanedTarget?.message}
+            </Text>
+            <Text className="mt-2 text-sm" style={{ color: tokens.dangerText }}>
+              Stored target: {orphanedTargetSummary}
+            </Text>
+          </View>
+        ) : null}
+
         <View>
           <Text className="mb-2 text-sm font-medium" style={{ color: tokens.text }}>
             Trigger
@@ -263,10 +291,12 @@ function RuleRow({
             Target item
           </Text>
           <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            {targetSelectionSummary?.description ??
-              (allowCreateNewTarget
-                ? "Pick an existing target item or use the create-new handoff."
-                : "Pick an existing target item from the target feature.")}
+            {row.isOrphaned
+              ? row.orphanedTarget?.message
+              : (targetSelectionSummary?.description ??
+                  (allowCreateNewTarget
+                    ? "Pick an existing target item or use the create-new handoff."
+                    : "Pick an existing target item from the target feature."))}
           </Text>
           {targetSelectionSummary ? (
             <>
@@ -286,7 +316,13 @@ function RuleRow({
           ) : null}
           <View className="mt-3">
             <Button
-              label={row.targetSelection ? "Change target item" : "Choose target item"}
+              label={
+                row.isOrphaned
+                  ? "Choose replacement target"
+                  : row.targetSelection
+                    ? "Change target item"
+                    : "Choose target item"
+              }
               onPress={() => onOpenTargetPicker(row.id, row.targetFeature ?? allowedTargetFeatures[0])}
               disabled={!row.targetFeature}
               color={row.targetFeature ? getFeatureAccentColor(row.targetFeature) : undefined}
