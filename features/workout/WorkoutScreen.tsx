@@ -194,67 +194,75 @@ export function WorkoutScreen() {
           />
         </ScreenSection>
 
-        <View className="mb-4 flex-row gap-3">
-          <View className="flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={TEXT_COLOR}
-              icon="fitness-center"
-              title="Workout days"
-              value={workoutDaysCount}
-              subtitle="Last 52 weeks"
-              note={workoutStripHasActivity ? "Sessions logged this year" : "No sessions logged yet"}
-            />
+        <ScreenSection>
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={TEXT_COLOR}
+                icon="fitness-center"
+                title="Workout days"
+                value={workoutDaysCount}
+                subtitle="Last 52 weeks"
+                note={workoutStripHasActivity ? "Sessions logged this year" : "No sessions logged yet"}
+              />
+            </View>
+            <View className="flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={TEXT_COLOR}
+                icon="calendar-today"
+                title="Current streak"
+                value={workoutStreak}
+                subtitle="Back-to-back workout days"
+                note={workoutStreak > 0 ? "Keep the run alive today" : "Your next session starts the streak"}
+              />
+            </View>
           </View>
-          <View className="flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={TEXT_COLOR}
-              icon="calendar-today"
-              title="Current streak"
-              value={workoutStreak}
-              subtitle="Back-to-back workout days"
-              note={workoutStreak > 0 ? "Keep the run alive today" : "Your next session starts the streak"}
-            />
-          </View>
-        </View>
+        </ScreenSection>
 
         {!workoutStripHasActivity ? (
-          <EmptyStateCard
-            accentColor={COLOR}
-            title="Complete a workout to start tracking"
-            description="Your routine history and yearly intensity map will appear here once you log a session."
-            icon={<MaterialIcons name="self-improvement" size={26} color={TEXT_COLOR} />}
-          />
+          <ScreenSection>
+            <EmptyStateCard
+              accentColor={COLOR}
+              className="mb-0"
+              title="Complete a workout to start tracking"
+              description="Your routine history and yearly intensity map will appear here once you log a session."
+              icon={<MaterialIcons name="self-improvement" size={26} color={TEXT_COLOR} />}
+            />
+          </ScreenSection>
         ) : null}
-        <Card
-          variant="header"
-          accentColor={COLOR}
-          headerTitle="Add new routine"
-          headerSubtitle="Keep names short and descriptions specific so routines stay scannable."
-          headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
-        >
-          <TextField
-            label="Routine name"
-            value={name}
-            onChangeText={(t) => {
-              setWorkoutError(null);
-              setName(t);
-            }}
-            placeholder="Push Day"
-          />
-          <TextField
-            label="Description"
-            value={description}
-            onChangeText={(t) => {
-              setWorkoutError(null);
-              setDescription(t);
-            }}
-            placeholder="Bench + accessories"
-          />
-          <ValidationError message={workoutError} />
-          <Button label="Add routine" onPress={onCreate} color={COLOR} />
-        </Card>
+        <ScreenSection>
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Add new routine"
+            headerSubtitle="Keep names short and descriptions specific so routines stay scannable."
+            headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
+            className="mb-0"
+          >
+            <TextField
+              label="Routine name"
+              value={name}
+              onChangeText={(t) => {
+                setWorkoutError(null);
+                setName(t);
+              }}
+              placeholder="Push Day"
+            />
+            <TextField
+              label="Description"
+              value={description}
+              onChangeText={(t) => {
+                setWorkoutError(null);
+                setDescription(t);
+              }}
+              placeholder="Bench + accessories"
+            />
+            <ValidationError message={workoutError} />
+            <Button label="Add routine" onPress={onCreate} color={COLOR} />
+          </Card>
+        </ScreenSection>
 
         {routines.length > 0 ? (
           <View className="mb-3 mt-1">
@@ -283,22 +291,24 @@ export function WorkoutScreen() {
           />
         ))}
 
-        <Card
-          variant="header"
-          accentColor={COLOR}
-          headerTitle="Workout history"
-          headerSubtitle="Session intensity over the last 52 weeks."
-          headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
-          className="mt-4"
-        >
-          <View className="w-full min-w-0 items-center justify-center">
-            <GitHubHeatmap
-              days={workoutHeatmapDays}
-              color={COLOR}
-              weeks={52}
-            />
-          </View>
-        </Card>
+        <ScreenSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Workout history"
+            headerSubtitle="Session intensity over the last 52 weeks."
+            headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+            className="mb-0"
+          >
+            <View className="w-full min-w-0 items-center justify-center">
+              <GitHubHeatmap
+                days={workoutHeatmapDays}
+                color={COLOR}
+                weeks={52}
+              />
+            </View>
+          </Card>
+        </ScreenSection>
       </Screen>
     </>
   );

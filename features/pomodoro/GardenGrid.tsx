@@ -1,7 +1,9 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSession } from "./types";
 import { formatSessionDuration } from "./pomodoro.domain";
 
@@ -43,14 +45,13 @@ function MiniPlant({ color = SECTION_COLORS[POMODORO_SECTION_KEY] }: { color?: s
 export function GardenGrid({ sessions, accentColor = SECTION_COLORS[POMODORO_SECTION_KEY] }: Props) {
   if (sessions.length === 0) {
     return (
-      <View className="my-2 items-center rounded-2xl border border-slate-200 bg-white px-4 py-6">
-        <Text className="text-center text-base font-semibold text-slate-900">
-          Complete a session to start your garden
-        </Text>
-        <Text className="mt-2 text-center text-sm text-slate-500">
-          Each completed focus block grows a new plant in this timeline.
-        </Text>
-      </View>
+      <EmptyStateCard
+        accentColor={accentColor}
+        className="mb-0"
+        title="Complete a session to start your garden"
+        description="Each completed focus block grows a new plant in this timeline."
+        icon={<MiniPlant color={SECTION_TEXT_COLORS[POMODORO_SECTION_KEY]} />}
+      />
     );
   }
 

@@ -267,7 +267,7 @@ export function OverviewScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Start focus session"
-                    className="rounded-xl px-3 py-2 active:opacity-80"
+                    className="rounded-xl px-3.5 py-2.5 active:opacity-80"
                     style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
                     onPress={() => router.push(POMODORO_HREF)}
                   >
@@ -291,7 +291,7 @@ export function OverviewScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Start focus session"
-                    className="mt-5 w-full items-center rounded-xl py-3.5 active:opacity-80"
+                    className="mt-5 w-full items-center rounded-xl px-4 py-3.5 active:opacity-80"
                     style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
                     onPress={() => router.push(POMODORO_HREF)}
                   >
@@ -342,7 +342,7 @@ export function OverviewScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Add calorie entry"
-                    className="rounded-xl border-2 px-3 py-2 active:opacity-80"
+                    className="rounded-xl border-2 px-3.5 py-2.5 active:opacity-80"
                     style={{ borderColor: SECTION_COLORS.calories }}
                     onPress={() => router.push(CALORIES_HREF)}
                   >
@@ -362,7 +362,7 @@ export function OverviewScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Add calorie entry"
-                    className="mt-4 self-start rounded-xl border-2 px-4 py-2.5 active:opacity-80"
+                    className="mt-4 self-start rounded-xl border-2 px-4 py-3 active:opacity-80"
                     style={{ borderColor: SECTION_COLORS.calories }}
                     onPress={() => router.push(CALORIES_HREF)}
                   >
@@ -537,12 +537,15 @@ export function OverviewScreen() {
       )}
 
       {!isLoading && !hasAnyTrackedData ? (
-        <EmptyStateCard
-          accentColor={SECTION_COLORS.focus}
-          title="Nothing tracked yet"
-          description="Start with any feature and this dashboard will begin filling in automatically."
-          icon={<MaterialIcons name="auto-graph" size={24} color={SECTION_TEXT_COLORS.focus} />}
-        />
+        <ScreenSection className="mb-0">
+          <EmptyStateCard
+            accentColor={SECTION_COLORS.focus}
+            className="mb-0"
+            title="Nothing tracked yet"
+            description="Start with any feature and this dashboard will begin filling in automatically."
+            icon={<MaterialIcons name="auto-graph" size={24} color={SECTION_TEXT_COLORS.focus} />}
+          />
+        </ScreenSection>
       ) : null}
 
       <View className="h-2" />

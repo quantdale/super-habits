@@ -92,15 +92,21 @@ export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Prop
       />
       <ValidationError message={goalError} />
       <View className="gap-3 mt-6">
-        <Button label="Save goals" onPress={handleSave} color={SECTION_COLORS.calories} />
-        <Button
-          label="Cancel"
-          variant="ghost"
-          onPress={() => {
-            setGoalError(null);
-            onClose();
-          }}
-        />
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Button label="Save goals" onPress={handleSave} color={SECTION_COLORS.calories} />
+          </View>
+          <View className="flex-1">
+            <Button
+              label="Cancel"
+              variant="ghost"
+              onPress={() => {
+                setGoalError(null);
+                onClose();
+              }}
+            />
+          </View>
+        </View>
       </View>
     </Modal>
   );

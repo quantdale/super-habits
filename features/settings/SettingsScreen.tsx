@@ -183,38 +183,42 @@ export function SettingsScreen() {
         />
       </ScreenSection>
 
-      <View className="mb-4 flex-row gap-3">
-        <View className="flex-1">
-          <FeatureStatCard
-            accentColor={settingsAccent}
-            textColor={settingsTextColor}
-            icon="palette"
-            title="Theme mode"
-            value={mode[0].toUpperCase() + mode.slice(1)}
-            subtitle="Current selection"
-            note={`Resolved as ${resolvedTheme} right now`}
-          />
+      <ScreenSection>
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <FeatureStatCard
+              accentColor={settingsAccent}
+              textColor={settingsTextColor}
+              icon="palette"
+              title="Theme mode"
+              value={mode[0].toUpperCase() + mode.slice(1)}
+              subtitle="Current selection"
+              note={`Resolved as ${resolvedTheme} right now`}
+            />
+          </View>
+          <View className="flex-1">
+            <FeatureStatCard
+              accentColor={settingsAccent}
+              textColor={settingsTextColor}
+              icon="rule"
+              title="Documented areas"
+              value={SECTIONS.length}
+              subtitle="Status sections below"
+              note="Linked actions, sync, and maintenance facts"
+            />
+          </View>
         </View>
-        <View className="flex-1">
-          <FeatureStatCard
-            accentColor={settingsAccent}
-            textColor={settingsTextColor}
-            icon="rule"
-            title="Documented areas"
-            value={SECTIONS.length}
-            subtitle="Status sections below"
-            note="Linked actions, sync, and maintenance facts"
-          />
-        </View>
-      </View>
+      </ScreenSection>
 
-      <Card
-        variant="header"
-        accentColor={settingsAccent}
-        headerTitle="Appearance"
-        headerSubtitle={appearanceCopy.subtitle}
-        headerRight={<MaterialIcons name="palette" size={22} color="#ffffff" />}
-      >
+      <ScreenSection>
+        <Card
+          variant="header"
+          accentColor={settingsAccent}
+          headerTitle="Appearance"
+          headerSubtitle={appearanceCopy.subtitle}
+          headerRight={<MaterialIcons name="palette" size={22} color="#ffffff" />}
+          className="mb-0"
+        >
         <View className="gap-3">
           <View>
             <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -258,28 +262,34 @@ export function SettingsScreen() {
             statusLabel="Live"
           />
         </View>
-      </Card>
+        </Card>
+      </ScreenSection>
 
       {SECTIONS.map((section) => (
-        <Card
+        <ScreenSection
           key={section.title}
-          variant="header"
-          accentColor={settingsAccent}
-          headerTitle={section.title}
-          headerSubtitle={section.subtitle}
-          headerRight={<MaterialIcons name={section.icon} size={22} color="#ffffff" />}
+          className={section.title === SECTIONS[SECTIONS.length - 1].title ? "mb-0" : undefined}
         >
-          <View className="gap-3">
-            {section.items.map((item) => (
-              <SettingsInfoRow
-                key={item.label}
-                label={item.label}
-                description={item.description}
-                statusLabel={item.statusLabel}
-              />
-            ))}
-          </View>
-        </Card>
+          <Card
+            variant="header"
+            accentColor={settingsAccent}
+            headerTitle={section.title}
+            headerSubtitle={section.subtitle}
+            headerRight={<MaterialIcons name={section.icon} size={22} color="#ffffff" />}
+            className="mb-0"
+          >
+            <View className="gap-3">
+              {section.items.map((item) => (
+                <SettingsInfoRow
+                  key={item.label}
+                  label={item.label}
+                  description={item.description}
+                  statusLabel={item.statusLabel}
+                />
+              ))}
+            </View>
+          </Card>
+        </ScreenSection>
       ))}
     </Screen>
   );

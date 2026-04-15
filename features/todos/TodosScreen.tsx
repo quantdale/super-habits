@@ -473,8 +473,12 @@ export function TodosScreen() {
           )}
           <ValidationError message={todoError} />
           <View className="mt-3 flex-row gap-2">
-            <Button label="Cancel" variant="ghost" onPress={closeModal} />
-            <Button label={editingId ? "Save changes" : "Add task"} onPress={onSave} color={COLOR} />
+            <View className="flex-1">
+              <Button label="Cancel" variant="ghost" onPress={closeModal} />
+            </View>
+            <View className="flex-1">
+              <Button label={editingId ? "Save changes" : "Add task"} onPress={onSave} color={COLOR} />
+            </View>
           </View>
         </Card>
       </Modal>

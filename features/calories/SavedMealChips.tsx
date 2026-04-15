@@ -21,10 +21,10 @@ export function SavedMealChips({ meals, onSelect }: Props) {
             <Pressable
               key={meal.id}
               onPress={() => onSelect(meal)}
-              className="flex-row items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5"
+              className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
             >
-              <Text className="text-sm text-slate-700">{meal.food_name}</Text>
-              <Text className="text-xs text-slate-400">{meal.calories} cal</Text>
+              <Text className="text-sm font-medium text-slate-700">{meal.food_name}</Text>
+              <Text className="text-xs text-slate-400">{meal.calories} kcal</Text>
             </Pressable>
           ))}
         </View>

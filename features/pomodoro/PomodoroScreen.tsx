@@ -294,38 +294,41 @@ export function PomodoroScreen() {
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 
-      <View className="mb-4 flex-row gap-3">
-        <View className="flex-1">
-          <FeatureStatCard
-            accentColor={COLOR}
-            textColor={TEXT_COLOR}
-            icon="timer"
-            title="Focus sessions"
-            value={sessions.length}
-            subtitle="This year"
-            note={sessions.length > 0 ? "Completed focus sessions" : "No sessions logged yet"}
-          />
+      <ScreenSection>
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
+              icon="timer"
+              title="Focus sessions"
+              value={sessions.length}
+              subtitle="This year"
+              note={sessions.length > 0 ? "Completed focus sessions" : "No sessions logged yet"}
+            />
+          </View>
+          <View className="flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
+              icon="local-fire-department"
+              title="Current streak"
+              value={pomodoroStreak}
+              subtitle="Consecutive focus days"
+              note={pomodoroStreak > 0 ? "Keep the streak alive" : "Your next session starts the streak"}
+            />
+          </View>
         </View>
-        <View className="flex-1">
-          <FeatureStatCard
-            accentColor={COLOR}
-            textColor={TEXT_COLOR}
-            icon="local-fire-department"
-            title="Current streak"
-            value={pomodoroStreak}
-            subtitle="Consecutive focus days"
-            note={pomodoroStreak > 0 ? "Keep the streak alive" : "Your next session starts the streak"}
-          />
-        </View>
-      </View>
+      </ScreenSection>
 
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Timer"
-        headerSubtitle="Classic focus and break sequence with live progress."
-        className="mb-4"
-      >
+      <ScreenSection>
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Timer"
+          headerSubtitle="Classic focus and break sequence with live progress."
+          className="mb-0"
+        >
         <View className="mb-4 flex-row flex-wrap justify-center">
           {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
             <PillChip
@@ -385,15 +388,23 @@ export function PomodoroScreen() {
 
           {isRunning ? (
             <View className="flex-row gap-3">
-              <Button label="Pause" variant="ghost" onPress={pause} />
-              <Button label="Reset" variant="ghost" onPress={reset} />
+              <View className="flex-1">
+                <Button label="Pause" variant="ghost" onPress={pause} />
+              </View>
+              <View className="flex-1">
+                <Button label="Reset" variant="ghost" onPress={reset} />
+              </View>
             </View>
           ) : null}
 
           {isPaused && !isRunning ? (
             <View className="flex-row gap-3">
-              <Button label="Resume" onPress={resume} color={COLOR} />
-              <Button label="Reset" variant="ghost" onPress={reset} />
+              <View className="flex-1">
+                <Button label="Resume" onPress={resume} color={COLOR} />
+              </View>
+              <View className="flex-1">
+                <Button label="Reset" variant="ghost" onPress={reset} />
+              </View>
             </View>
           ) : null}
 
@@ -407,28 +418,33 @@ export function PomodoroScreen() {
             Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
           </Text>
         ) : null}
-      </Card>
+        </Card>
+      </ScreenSection>
 
       {showSettings ? (
-        <PomodoroSettingsInline
-          settings={settings}
-          onSave={handleSaveSettings}
-          onCancel={() => setShowSettings(false)}
-        />
+        <ScreenSection>
+          <PomodoroSettingsInline
+            settings={settings}
+            onSave={handleSaveSettings}
+            onCancel={() => setShowSettings(false)}
+          />
+        </ScreenSection>
       ) : null}
 
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Focus history"
-        headerSubtitle="Garden view plus the last 52 weeks of activity."
-        className="mt-4"
-      >
-        <GardenGrid sessions={sessions} />
-        <View className="mt-6 w-full min-w-0 items-center justify-center">
-          <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
-        </View>
-      </Card>
+      <ScreenSection className="mb-0">
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Focus history"
+          headerSubtitle="Garden view plus the last 52 weeks of activity."
+          className="mb-0"
+        >
+          <GardenGrid sessions={sessions} />
+          <View className="mt-6 w-full min-w-0 items-center justify-center">
+            <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
+          </View>
+        </Card>
+      </ScreenSection>
     </Screen>
   );
 }
