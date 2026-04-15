@@ -84,4 +84,35 @@ describe("SyncEngine", () => {
     expect(batchesAtPushStart[0]).toEqual([first]);
     expect(batchesAtPushStart[1]).toEqual([first, during]);
   });
+
+  it("retries failed records on the next flush", async () => {
+    const recordForRetry: SyncRecord = {
+      entity: "todos",
+      id: "todo_retry",
+      updatedAt: "2026-04-06T10:00:00.000Z",
+      operation: "update",
+    };
+
+    const pushedBatches: SyncRecord[][] = [];
+    let attempt = 0;
+    const adapter = {
+      push: vi.fn(async (records: SyncRecord[]) => {
+        attempt += 1;
+        pushedBatches.push([...records]);
+        if (attempt === 1) {
+          throw new Error("transient failure");
+        }
+      }),
+      pull: vi.fn(async () => []),
+    };
+
+    const engine = new SyncEngine(adapter);
+    engine.enqueue(recordForRetry);
+
+    await expect(engine.flush()).rejects.toThrow("transient failure");
+    await engine.flush();
+
+    expect(adapter.push).toHaveBeenCalledTimes(2);
+    expect(pushedBatches).toEqual([[recordForRetry], [recordForRetry]]);
+  });
 });

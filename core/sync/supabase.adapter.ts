@@ -43,19 +43,15 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       const placeholders = ids.map(() => "?").join(", ");
       const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
 
-      try {
-        const rows = await db.getAllAsync<Record<string, unknown>>(sql, ids);
-        if (rows.length === 0) continue;
+      const rows = await db.getAllAsync<Record<string, unknown>>(sql, ids);
+      if (rows.length === 0) continue;
 
-        const { error } = await supabase.from(entity).upsert(rows, {
-          onConflict: "id",
-        });
+      const { error } = await supabase.from(entity).upsert(rows, {
+        onConflict: "id",
+      });
 
-        if (error) {
-          console.error(`[sync] Supabase upsert failed for ${entity}`, error);
-        }
-      } catch (e) {
-        console.error(`[sync] push failed for ${entity}`, e);
+      if (error) {
+        throw new Error(`[sync] Supabase upsert failed for ${entity}: ${error.message}`);
       }
     }
   }
