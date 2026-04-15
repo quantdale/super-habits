@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
 import {
@@ -28,6 +28,7 @@ import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
+import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
 import { PillChip } from "@/core/ui/PillChip";
 import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import type { Habit, HabitCategory, HabitIcon } from "./types";
@@ -128,6 +129,7 @@ async function buildLinkedActionEditorRows(
 
 export function HabitsScreen() {
   const { showNotice } = useInAppNotices();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
@@ -301,6 +303,22 @@ export function HabitsScreen() {
     openAddModal(timeOfDay);
   };
 
+  const handleDeleteHabit = useCallback(
+    async (habit: Habit) => {
+      const confirmed = await confirm({
+        title: "Remove habit",
+        message: `Remove "${habit.name}"?`,
+        confirmLabel: "Delete habit",
+        confirmVariant: "danger",
+      });
+      if (!confirmed) return;
+
+      await deleteHabit(habit.id);
+      await refresh();
+    },
+    [confirm, refresh],
+  );
+
   const resetModal = useCallback(() => {
     setModalVisible(false);
     setEditingHabit(null);
@@ -418,21 +436,7 @@ export function HabitsScreen() {
                             </Pressable>
                             <Pressable
                               onPress={() => {
-                                Alert.alert(
-                                  "Delete habit",
-                                  `Remove "${habit.name}"?`,
-                                  [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                      text: "Delete",
-                                      style: "destructive",
-                                      onPress: async () => {
-                                        await deleteHabit(habit.id);
-                                        refresh();
-                                      },
-                                    },
-                                  ],
-                                );
+                                void handleDeleteHabit(habit);
                               }}
                               className="rounded bg-rose-500 px-2 py-1"
                             >
@@ -640,6 +644,7 @@ export function HabitsScreen() {
           </View>
         </Card>
       </Modal>
+      {confirmationDialog}
     </Screen>
   );
 }

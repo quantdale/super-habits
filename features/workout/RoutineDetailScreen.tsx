@@ -19,6 +19,7 @@ import { SECTION_COLORS } from "@/constants/sectionColors";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateExerciseName, validateSetTiming } from "@/lib/validation";
 import { NumberStepperField } from "@/core/ui/NumberStepperField";
+import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -51,6 +52,7 @@ export function RoutineDetailModal({
   onClose,
   onStartWorkout,
 }: Props) {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [workoutError, setWorkoutError] = useState<string | null>(null);
@@ -94,148 +96,153 @@ export function RoutineDetailModal({
     setExpandedId(exId);
   };
 
-  const handleDeleteExercise = (id: string, name: string) => {
-    Alert.alert("Remove exercise", `Remove "${name}" and all its sets?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          await deleteExercise(id);
-          if (expandedId === id) setExpandedId(null);
-          refresh();
-        },
-      },
-    ]);
-  };
+  const handleDeleteExercise = useCallback(
+    async (id: string, name: string) => {
+      const confirmed = await confirm({
+        title: "Remove exercise",
+        message: `Remove "${name}" and all its sets?`,
+        confirmLabel: "Remove exercise",
+        confirmVariant: "danger",
+      });
+      if (!confirmed) return;
+
+      await deleteExercise(id);
+      if (expandedId === id) setExpandedId(null);
+      await refresh();
+    },
+    [confirm, expandedId, refresh],
+  );
 
   const toggleExpanded = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title={routineName} scroll>
-      <View className="gap-3">
-        {exercises.map((ex) => {
-          const isOpen = expandedId === ex.id;
-          return (
-            <Card key={ex.id} accentColor={COLOR}>
-              <View className="flex-row items-center justify-between">
-                <Pressable
-                  onPress={() => toggleExpanded(ex.id)}
-                  className="min-w-0 flex-1 flex-row items-center gap-2"
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: isOpen }}
-                >
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-base font-medium text-slate-800">{ex.name}</Text>
-                    <Text className="mt-0.5 text-xs text-slate-500">{summarizeExerciseSets(ex.sets)}</Text>
-                  </View>
-                  <MaterialIcons
-                    name={isOpen ? "expand-less" : "expand-more"}
-                    size={24}
-                    color="#64748b"
-                  />
-                </Pressable>
-                <Pressable onPress={() => handleDeleteExercise(ex.id, ex.name)} hitSlop={8} className="ml-2">
-                  <Text className="text-sm text-rose-400">Remove</Text>
-                </Pressable>
-              </View>
-
-              {isOpen ? (
-                <View className="mt-4 border-t border-slate-100 pt-3">
-                  {ex.sets.map((set) => (
-                    <View key={set.id} className="mb-4">
-                      <Text className="mb-2 text-xs font-medium text-slate-500">Set {set.set_number}</Text>
-                      <NumberStepperField
-                        label="Active (seconds)"
-                        value={String(set.active_seconds)}
-                        onChange={async (v) => {
-                          const next = Math.round(Number(v.trim()));
-                          if (!Number.isFinite(next)) return;
-                          const timingErr = validateSetTiming(next, set.rest_seconds);
-                          if (timingErr) {
-                            setWorkoutError(timingErr);
-                            return;
-                          }
-                          setWorkoutError(null);
-                          await updateSet(set.id, { activeSeconds: next });
-                          refresh();
-                        }}
-                        min={5}
-                        max={3600}
-                      />
-                      <NumberStepperField
-                        label="Rest (seconds)"
-                        value={String(set.rest_seconds)}
-                        onChange={async (v) => {
-                          const next = Math.round(Number(v.trim()));
-                          if (!Number.isFinite(next)) return;
-                          const timingErr = validateSetTiming(set.active_seconds, next);
-                          if (timingErr) {
-                            setWorkoutError(timingErr);
-                            return;
-                          }
-                          setWorkoutError(null);
-                          await updateSet(set.id, { restSeconds: next });
-                          refresh();
-                        }}
-                        min={0}
-                        max={1800}
-                      />
-                      {ex.sets.length > 1 ? (
-                        <Pressable
-                          onPress={async () => {
-                            await deleteSet(set.id);
-                            refresh();
-                          }}
-                          className="self-end"
-                          hitSlop={8}
-                        >
-                          <Text className="text-sm text-slate-400">Remove set</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  ))}
+    <>
+      <Modal visible={visible} onClose={onClose} title={routineName} scroll>
+        <View className="gap-3">
+          {exercises.map((ex) => {
+            const isOpen = expandedId === ex.id;
+            return (
+              <Card key={ex.id} accentColor={COLOR}>
+                <View className="flex-row items-center justify-between">
                   <Pressable
-                    onPress={async () => {
-                      await addDefaultSet(ex.id);
-                      refresh();
-                    }}
+                    onPress={() => toggleExpanded(ex.id)}
+                    className="min-w-0 flex-1 flex-row items-center gap-2"
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: isOpen }}
                   >
-                    <Text className="text-xs text-workout">+ Add set</Text>
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-base font-medium text-slate-800">{ex.name}</Text>
+                      <Text className="mt-0.5 text-xs text-slate-500">{summarizeExerciseSets(ex.sets)}</Text>
+                    </View>
+                    <MaterialIcons
+                      name={isOpen ? "expand-less" : "expand-more"}
+                      size={24}
+                      color="#64748b"
+                    />
+                  </Pressable>
+                  <Pressable onPress={() => void handleDeleteExercise(ex.id, ex.name)} hitSlop={8} className="ml-2">
+                    <Text className="text-sm text-rose-400">Remove</Text>
                   </Pressable>
                 </View>
-              ) : null}
-            </Card>
-          );
-        })}
-      </View>
 
-      <View className="mt-6">
-        <Text className="mb-2 text-sm text-slate-600">Add exercise</Text>
-        <ValidationError message={workoutError} />
-        <View className="flex-row gap-2">
-          <TextInput
-            value={newExerciseName}
-            onChangeText={(t) => {
-              setWorkoutError(null);
-              setNewExerciseName(t);
-            }}
-            placeholder="e.g. Rows, Curls, Push-ups"
-            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
-            onSubmitEditing={handleAddExercise}
-            returnKeyType="done"
-          />
-          <Button label="Add" onPress={handleAddExercise} color={COLOR} />
+                {isOpen ? (
+                  <View className="mt-4 border-t border-slate-100 pt-3">
+                    {ex.sets.map((set) => (
+                      <View key={set.id} className="mb-4">
+                        <Text className="mb-2 text-xs font-medium text-slate-500">Set {set.set_number}</Text>
+                        <NumberStepperField
+                          label="Active (seconds)"
+                          value={String(set.active_seconds)}
+                          onChange={async (v) => {
+                            const next = Math.round(Number(v.trim()));
+                            if (!Number.isFinite(next)) return;
+                            const timingErr = validateSetTiming(next, set.rest_seconds);
+                            if (timingErr) {
+                              setWorkoutError(timingErr);
+                              return;
+                            }
+                            setWorkoutError(null);
+                            await updateSet(set.id, { activeSeconds: next });
+                            refresh();
+                          }}
+                          min={5}
+                          max={3600}
+                        />
+                        <NumberStepperField
+                          label="Rest (seconds)"
+                          value={String(set.rest_seconds)}
+                          onChange={async (v) => {
+                            const next = Math.round(Number(v.trim()));
+                            if (!Number.isFinite(next)) return;
+                            const timingErr = validateSetTiming(set.active_seconds, next);
+                            if (timingErr) {
+                              setWorkoutError(timingErr);
+                              return;
+                            }
+                            setWorkoutError(null);
+                            await updateSet(set.id, { restSeconds: next });
+                            refresh();
+                          }}
+                          min={0}
+                          max={1800}
+                        />
+                        {ex.sets.length > 1 ? (
+                          <Pressable
+                            onPress={async () => {
+                              await deleteSet(set.id);
+                              refresh();
+                            }}
+                            className="self-end"
+                            hitSlop={8}
+                          >
+                            <Text className="text-sm text-slate-400">Remove set</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ))}
+                    <Pressable
+                      onPress={async () => {
+                        await addDefaultSet(ex.id);
+                        refresh();
+                      }}
+                    >
+                      <Text className="text-xs text-workout">+ Add set</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </Card>
+            );
+          })}
         </View>
-      </View>
 
-      {exercises.length > 0 ? (
         <View className="mt-6">
-          <Button label="Start workout" onPress={onStartWorkout} color={COLOR} />
+          <Text className="mb-2 text-sm text-slate-600">Add exercise</Text>
+          <ValidationError message={workoutError} />
+          <View className="flex-row gap-2">
+            <TextInput
+              value={newExerciseName}
+              onChangeText={(t) => {
+                setWorkoutError(null);
+                setNewExerciseName(t);
+              }}
+              placeholder="e.g. Rows, Curls, Push-ups"
+              className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+              onSubmitEditing={handleAddExercise}
+              returnKeyType="done"
+            />
+            <Button label="Add" onPress={handleAddExercise} color={COLOR} />
+          </View>
         </View>
-      ) : null}
-    </Modal>
+
+        {exercises.length > 0 ? (
+          <View className="mt-6">
+            <Button label="Start workout" onPress={onStartWorkout} color={COLOR} />
+          </View>
+        ) : null}
+      </Modal>
+      {confirmationDialog}
+    </>
   );
 }
