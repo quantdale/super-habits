@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { View, Text, TextInput, Pressable, Alert } from "react-native";
 import { Modal } from "@/core/ui/Modal";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { filterSavedMeals } from "./calories.domain";
 import { deleteSavedMeal } from "./calories.data";
 import type { SavedMeal } from "./types";
@@ -59,14 +61,13 @@ export function SavedMealSearchModal({
       </View>
 
       {filtered.length === 0 ? (
-        <View className="items-center py-12">
-          <Text className="text-base font-semibold text-slate-900">
-            {query ? "No meals match your search" : "No saved meals yet"}
-          </Text>
-          <Text className="mt-2 text-center text-sm text-slate-500">
-            {query ? "Try a shorter search term." : "Meals you reuse will show up here."}
-          </Text>
-        </View>
+        <EmptyStateCard
+          accentColor={SECTION_COLORS.calories}
+          className="mb-0"
+          title={query ? "No meals match your search" : "No saved meals yet"}
+          description={query ? "Try a shorter search term." : "Meals you reuse will show up here."}
+          icon={<Text style={{ fontSize: 22, color: SECTION_TEXT_COLORS.calories }}>⌕</Text>}
+        />
       ) : (
         <View className="gap-2 pb-2">
           {filtered.map((meal) => (
@@ -78,7 +79,7 @@ export function SavedMealSearchModal({
               }}
               onLongPress={() => handleDelete(meal)}
               delayLongPress={500}
-              className="flex-row items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100"
+              className="flex-row items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
             >
               <View className="flex-1">
                 <Text className="text-sm font-medium text-slate-800">{meal.food_name}</Text>
@@ -87,7 +88,9 @@ export function SavedMealSearchModal({
                   {meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ""}
                 </Text>
               </View>
-              <Text className="text-xs text-slate-300 ml-2">×{meal.use_count}</Text>
+              <View className="ml-3 rounded-full bg-white px-2.5 py-1">
+                <Text className="text-[11px] font-semibold text-slate-400">×{meal.use_count}</Text>
+              </View>
             </Pressable>
           ))}
         </View>

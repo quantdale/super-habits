@@ -32,7 +32,7 @@ export function Modal({ visible, onClose, title, children, scroll = false }: Mod
             style={{ backgroundColor: tokens.background, borderColor: tokens.border, borderWidth: 1 }}
           >
             <View
-              className={`flex-row items-center px-4 pb-3 pt-4 ${title ? "justify-between" : "justify-end"}`}
+              className={`flex-row items-center px-5 pb-4 pt-5 ${title ? "justify-between" : "justify-end"}`}
             >
               {title ? (
                 <Text className="flex-1 pr-2 text-xl font-bold" style={{ color: tokens.text }}>{title}</Text>
@@ -52,10 +52,10 @@ export function Modal({ visible, onClose, title, children, scroll = false }: Mod
                 showsVerticalScrollIndicator
                 style={{ maxHeight: scrollMaxHeight }}
               >
-                <View className="px-4 pb-4">{children}</View>
+                <View className="px-5 pb-5">{children}</View>
               </ScrollView>
             ) : (
-              <View className="px-4 pb-4">{children}</View>
+              <View className="px-5 pb-5">{children}</View>
             )}
           </View>
         </Pressable>

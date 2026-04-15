@@ -3,6 +3,8 @@ import { View, Text, Pressable, Alert } from "react-native";
 import { Screen } from "@/core/ui/Screen";
 import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 import {
   buildTimerSequence,
   formatWorkoutTime,
@@ -133,9 +135,18 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
   if (!currentPhase || sequence.length === 0) {
     return (
-      <Screen>
-        <Text className="text-slate-400 text-center mt-10">No exercises in this routine.</Text>
-        <Button label="Back" variant="ghost" onPress={onCancel} />
+      <Screen scroll>
+        <ScreenSection className="flex-1 justify-center">
+          <EmptyStateCard
+            accentColor={WORKOUT_COLOR}
+            title="No exercises in this routine"
+            description="Add at least one exercise before starting the workout timer."
+            icon={<Text style={{ fontSize: 24 }}>🏋️</Text>}
+          />
+        </ScreenSection>
+        <ScreenSection className="mb-0">
+          <Button label="Back" variant="ghost" onPress={onCancel} />
+        </ScreenSection>
       </Screen>
     );
   }

@@ -323,37 +323,41 @@ export function CaloriesScreen() {
         <PageHeader title="Calories" subtitle="Manual nutrition entry for MVP." />
       </ScreenSection>
 
-      <View className="mb-4 flex-row gap-3">
-        <View className="flex-1">
-          <FeatureStatCard
-            accentColor={COLOR}
-            textColor={TEXT_COLOR}
-            icon="restaurant-menu"
-            title="Days logged"
-            value={calorieActivityDays.filter((d) => d.active).length}
-            subtitle="Rolling year"
-            note={hasCalorieStripActivity ? "Daily intake history is active" : "No intake history yet"}
-          />
+      <ScreenSection>
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
+              icon="restaurant-menu"
+              title="Days logged"
+              value={calorieActivityDays.filter((d) => d.active).length}
+              subtitle="Rolling year"
+              note={hasCalorieStripActivity ? "Daily intake history is active" : "No intake history yet"}
+            />
+          </View>
+          <View className="flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
+              icon="track-changes"
+              title="Goal progress"
+              value={`${goalProgress.percent}%`}
+              subtitle="Today"
+              note={goalProgress.over ? "You are over goal" : `${goalProgress.remaining} kcal remaining`}
+            />
+          </View>
         </View>
-        <View className="flex-1">
-          <FeatureStatCard
-            accentColor={COLOR}
-            textColor={TEXT_COLOR}
-            icon="track-changes"
-            title="Goal progress"
-            value={`${goalProgress.percent}%`}
-            subtitle="Today"
-            note={goalProgress.over ? "You are over goal" : `${goalProgress.remaining} kcal remaining`}
-          />
-        </View>
-      </View>
+      </ScreenSection>
 
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Add entry"
-        headerSubtitle="Log macros once and reuse recent meals when they repeat."
-      >
+      <ScreenSection>
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Add entry"
+          headerSubtitle="Log macros once and reuse recent meals when they repeat."
+          className="mb-0"
+        >
         <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
         {allSavedMeals.length > 0 ? (
           <Pressable
@@ -463,15 +467,18 @@ export function CaloriesScreen() {
           onPress={handleSubmit}
           color={COLOR}
         />
-      </Card>
+        </Card>
+      </ScreenSection>
 
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Today"
-        headerSubtitle="Live totals, goal progress, and macro split."
-        headerRight={<MaterialIcons name="pie-chart" size={22} color="#ffffff" />}
-      >
+      <ScreenSection>
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Today"
+          headerSubtitle="Live totals, goal progress, and macro split."
+          headerRight={<MaterialIcons name="pie-chart" size={22} color="#ffffff" />}
+          className="mb-0"
+        >
         <View className="mb-3 items-center rounded-xl border border-calories bg-white p-3">
           <Text className="text-center text-sm font-medium text-slate-600">{consistencyText}</Text>
         </View>
@@ -499,7 +506,8 @@ export function CaloriesScreen() {
         </View>
 
         {macroDonut}
-      </Card>
+        </Card>
+      </ScreenSection>
 
       <CalorieGoalModal
         visible={goalSheetVisible}
@@ -626,7 +634,21 @@ export function CaloriesScreen() {
           ))}
         </View>
         <ValidationError message={calorieError} />
-        <Button label="Save changes" onPress={handleSubmit} color={COLOR} />
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Button
+              label="Cancel"
+              variant="ghost"
+              onPress={() => {
+                setEntryEditModalVisible(false);
+                resetCalorieForm();
+              }}
+            />
+          </View>
+          <View className="flex-1">
+            <Button label="Save changes" onPress={handleSubmit} color={COLOR} />
+          </View>
+        </View>
       </Modal>
 
       {entries.map((entry) => (

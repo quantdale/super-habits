@@ -455,7 +455,11 @@ export function HabitsScreen() {
                           className="items-center"
                           style={{ width: 104, alignItems: "center" }}
                         >
-                          <View className="w-full items-center rounded-2xl border border-slate-200 bg-white px-3 py-4">
+                          <Card
+                            accentColor={habit.color ?? DEFAULT_HABIT_COLOR}
+                            className="mb-0 w-full"
+                            innerClassName="items-center px-3 py-4"
+                          >
                             <View
                               className="mb-3 h-14 w-14 items-center justify-center rounded-full"
                               style={{ backgroundColor: `${habit.color ?? DEFAULT_HABIT_COLOR}18` }}
@@ -490,7 +494,7 @@ export function HabitsScreen() {
                                 <Text className="text-xs font-medium text-white">Delete</Text>
                               </Pressable>
                             </View>
-                          </View>
+                          </Card>
                         </View>
                       ))
                     : groupHabits.map((habit) => {
@@ -679,12 +683,16 @@ export function HabitsScreen() {
           <ValidationError message={linkedActionsError} />
 
           <View className="mt-3 flex-row gap-2">
-            <Button label="Cancel" variant="ghost" onPress={resetModal} />
-            <Button
-              label={editingHabit ? "Save changes" : "Create habit"}
-              onPress={onSubmit}
-              color={COLOR}
-            />
+            <View className="flex-1">
+              <Button label="Cancel" variant="ghost" onPress={resetModal} />
+            </View>
+            <View className="flex-1">
+              <Button
+                label={editingHabit ? "Save changes" : "Create habit"}
+                onPress={onSubmit}
+                color={COLOR}
+              />
+            </View>
           </View>
         </Card>
       </Modal>
