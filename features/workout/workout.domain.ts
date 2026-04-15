@@ -1,6 +1,11 @@
 import type { WorkoutLog } from "./types";
 import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
-import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
+import {
+  buildDateRange,
+  buildDateRangeOldestFirst,
+  dateKeyToLocalDate,
+  timestampToLocalDateKey,
+} from "@/lib/time";
 
 /**
  * Build ActivityDay array from workout logs.
@@ -9,11 +14,7 @@ import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
 export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 364): ActivityDay[] {
   const set = new Set<string>();
   for (const log of logs) {
-    const d = new Date(log.completed_at);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    set.add(`${y}-${m}-${dd}`);
+    set.add(timestampToLocalDateKey(log.completed_at));
   }
   return buildDateRange(days).map((dateKey) => ({
     dateKey,
@@ -24,8 +25,7 @@ export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 364)
 export function buildWorkoutHeatmapDays(logs: WorkoutLog[], days: number = 364): HeatmapDay[] {
   const map = new Map<string, number>();
   for (const log of logs) {
-    const d = new Date(log.completed_at);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const key = timestampToLocalDateKey(log.completed_at);
     map.set(key, (map.get(key) ?? 0) + 1);
   }
   return buildDateRangeOldestFirst(days).map((dateKey) => ({
@@ -55,15 +55,11 @@ export function buildWorkoutFrequency(
 ): { dateKey: string; label: string; value: number }[] {
   const map = new Map<string, number>();
   for (const log of logs) {
-    const d = new Date(log.completed_at);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const key = `${y}-${m}-${dd}`;
+    const key = timestampToLocalDateKey(log.completed_at);
     map.set(key, (map.get(key) ?? 0) + 1);
   }
   return buildDateRange(days).map((dateKey) => {
-    const d = new Date(`${dateKey}T00:00:00`);
+    const d = dateKeyToLocalDate(dateKey);
     return {
       dateKey,
       label: d.toLocaleDateString("en", { weekday: "short" }),

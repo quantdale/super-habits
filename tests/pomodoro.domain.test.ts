@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   nextPomodoroState,
   calculateGrowthProgress,
@@ -15,6 +15,7 @@ import {
   computePomodoroStreakFromHeatmapDays,
 } from "@/features/pomodoro/pomodoro.domain";
 import type { PomodoroSession } from "@/core/db/types";
+import { toDateKey } from "@/lib/time";
 
 describe("getModeColor", () => {
   it("returns brand classes for focus", () => {
@@ -217,6 +218,32 @@ describe("buildPomodoroHeatmapDays", () => {
     const todayKey = `${y}-${m}-${dd}`;
     const today = days.find((d) => d.dateKey === todayKey);
     expect(today?.value).toBe(3);
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 2, 12, 0, 0, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps sessions on opposite sides of local midnight on separate days", () => {
+    const jan1Key = toDateKey(new Date(2026, 0, 1, 12, 0, 0, 0));
+    const jan2Key = toDateKey(new Date(2026, 0, 2, 12, 0, 0, 0));
+    const days = buildPomodoroHeatmapDays(
+      [
+        pomSession(new Date(2026, 0, 1, 23, 30, 0, 0).toISOString()),
+        pomSession(new Date(2026, 0, 2, 0, 30, 0, 0).toISOString()),
+      ],
+      2,
+    );
+
+    expect(days).toEqual([
+      { dateKey: jan1Key, value: 1 },
+      { dateKey: jan2Key, value: 1 },
+    ]);
   });
 });
 

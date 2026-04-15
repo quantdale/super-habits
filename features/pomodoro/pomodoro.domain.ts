@@ -1,6 +1,6 @@
 import type { PomodoroSession } from "./types";
 import type { HeatmapDay } from "@/features/shared/activityTypes";
-import { buildDateRangeOldestFirst } from "@/lib/time";
+import { buildDateRangeOldestFirst, timestampToLocalDateKey } from "@/lib/time";
 
 export type PomodoroState = "idle" | "running" | "finished";
 
@@ -184,8 +184,7 @@ export function buildPomodoroHeatmapDays(
 ): HeatmapDay[] {
   const map = new Map<string, number>();
   for (const s of sessions) {
-    const d = new Date(s.started_at);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const key = timestampToLocalDateKey(s.started_at);
     map.set(key, (map.get(key) ?? 0) + 1);
   }
   return buildDateRangeOldestFirst(days).map((dateKey) => {
