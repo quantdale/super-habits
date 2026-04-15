@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View, Pressable } from "react-native";
 import { Screen } from "@/core/ui/Screen";
-import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
 import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
+import { PageHeader } from "@/core/ui/PageHeader";
 import { PillChip } from "@/core/ui/PillChip";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
 import {
   listPomodoroSessionsForDateRange,
@@ -284,10 +285,12 @@ export function PomodoroScreen() {
 
   return (
     <Screen scroll>
-      <SectionTitle
-        title="Pomodoro"
-        subtitle="Classic sequence: focus → short breaks → long break — durations saved on device."
-      />
+      <ScreenSection>
+        <PageHeader
+          title="Pomodoro"
+          subtitle="Classic sequence: focus → short breaks → long break — durations saved on device."
+        />
+      </ScreenSection>
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 

@@ -3,8 +3,10 @@ import { Alert, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { RectButton } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
-import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
+import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { PageHeader } from "@/core/ui/PageHeader";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
@@ -181,14 +183,16 @@ export function WorkoutScreen() {
       />
       {confirmationDialog}
       <Screen scroll>
-        <SectionTitle
-          title="Workout"
-          subtitle={
-            workoutStripHasActivity
-              ? "Create simple routines, update exercises, and mark completions without leaving the tab."
-              : "Create simple routines and mark completions."
-          }
-        />
+        <ScreenSection>
+          <PageHeader
+            title="Workout"
+            subtitle={
+              workoutStripHasActivity
+                ? "Create simple routines, update exercises, and mark completions without leaving the tab."
+                : "Create simple routines and mark completions."
+            }
+          />
+        </ScreenSection>
 
         <View className="mb-4 flex-row gap-3">
           <View className="flex-1">
@@ -216,17 +220,12 @@ export function WorkoutScreen() {
         </View>
 
         {!workoutStripHasActivity ? (
-          <Card variant="standard" accentColor={COLOR}>
-            <View className="items-center py-2">
-              <MaterialIcons name="self-improvement" size={26} color={TEXT_COLOR} />
-              <Text className="mt-3 text-center text-base font-semibold text-slate-900">
-                Complete a workout to start tracking
-              </Text>
-              <Text className="mt-2 text-center text-sm text-slate-500">
-                Your routine history and yearly intensity map will appear here once you log a session.
-              </Text>
-            </View>
-          </Card>
+          <EmptyStateCard
+            accentColor={COLOR}
+            title="Complete a workout to start tracking"
+            description="Your routine history and yearly intensity map will appear here once you log a session."
+            icon={<MaterialIcons name="self-improvement" size={26} color={TEXT_COLOR} />}
+          />
         ) : null}
         <Card
           variant="header"

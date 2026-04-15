@@ -26,7 +26,7 @@ test.describe("Todos — boundary inputs", () => {
     await goToTab(page, "todos");
     await openNewTodoModal(page);
     await submitTodoModal(page);
-    await expect(page.getByText("No Pending Tasks")).toBeVisible();
+    await expect(page.getByText(/No pending tasks/i)).toBeVisible();
   });
 
   test("very long title (200 chars) saves and displays without layout break", async ({ page }) => {

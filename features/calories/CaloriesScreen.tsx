@@ -1,12 +1,13 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Screen } from "@/core/ui/Screen";
-import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
+import { PageHeader } from "@/core/ui/PageHeader";
 import { PillChip } from "@/core/ui/PillChip";
+import { ScreenSection } from "@/core/ui/ScreenSection";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
   addCalorieEntry,
@@ -155,6 +156,58 @@ export function CaloriesScreen() {
   );
   const dailyTrend = useMemo(() => buildDailyTrend(summary364), [summary364]);
   const goalProgress = calculateGoalProgress(caloriesTotal(entries), goal.calories);
+  const macroDonut = useMemo(
+    () => (
+      <MacroDonutChart
+        totalKcal={caloriesTotal(entries)}
+        goalKcal={goal.calories}
+        protein={todayTotals.protein}
+        carbs={todayTotals.carbs}
+        fats={todayTotals.fats}
+        fiber={todayTotals.fiber}
+        sectionColor={SECTION_COLORS.calories}
+      />
+    ),
+    [entries, goal.calories, todayTotals],
+  );
+  const dailyCaloriesSection = useMemo(
+    () => (
+      <View className="mt-4">
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Daily calories"
+          headerSubtitle="Year trend with your current goal overlaid."
+          headerRight={<MaterialIcons name="bar-chart" size={22} color="#ffffff" />}
+        >
+          <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
+        </Card>
+      </View>
+    ),
+    [dailyTrend, goal.calories],
+  );
+  const calorieHistorySection = useMemo(
+    () => (
+      <View className="mt-4">
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Calories history"
+          headerSubtitle="Rolling 53-week activity."
+          headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+        >
+          <View className="w-full min-w-0 items-center justify-center">
+            <GitHubHeatmap
+              days={calorieHeatmapDays}
+              color={COLOR}
+              weeks={53}
+            />
+          </View>
+        </Card>
+      </View>
+    ),
+    [calorieHeatmapDays],
+  );
 
   const hasCalorieStripActivity = calorieActivityDays.some((d) => d.active);
   const consistencyText = hasCalorieStripActivity
@@ -266,7 +319,9 @@ export function CaloriesScreen() {
 
   return (
     <Screen scroll>
-      <SectionTitle title="Calories" subtitle="Manual nutrition entry for MVP." />
+      <ScreenSection>
+        <PageHeader title="Calories" subtitle="Manual nutrition entry for MVP." />
+      </ScreenSection>
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
@@ -443,21 +498,7 @@ export function CaloriesScreen() {
           )}
         </View>
 
-        {useMemo(
-          () => (
-            <MacroDonutChart
-              totalKcal={caloriesTotal(entries)}
-              goalKcal={goal.calories}
-              protein={todayTotals.protein}
-              carbs={todayTotals.carbs}
-              fats={todayTotals.fats}
-              fiber={todayTotals.fiber}
-              sectionColor={SECTION_COLORS.calories}
-            />
-          ),
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          [entries, goal.calories, todayTotals],
-        )}
+        {macroDonut}
       </Card>
 
       <CalorieGoalModal
@@ -604,45 +645,8 @@ export function CaloriesScreen() {
         />
       ))}
 
-      {useMemo(
-        () => (
-          <View className="mt-4">
-            <Card
-              variant="header"
-              accentColor={COLOR}
-              headerTitle="Daily calories"
-              headerSubtitle="Year trend with your current goal overlaid."
-              headerRight={<MaterialIcons name="bar-chart" size={22} color="#ffffff" />}
-            >
-              <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
-            </Card>
-          </View>
-        ),
-        [dailyTrend, goal.calories],
-      )}
-
-      {useMemo(
-        () => (
-          <View className="mt-4">
-            <Card
-              variant="header"
-              accentColor={COLOR}
-              headerTitle="Calories history"
-              headerSubtitle="Rolling 53-week activity."
-              headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
-            >
-              <View className="w-full min-w-0 items-center justify-center">
-                <GitHubHeatmap
-                  days={calorieHeatmapDays}
-                  color={COLOR}
-                  weeks={53}
-                />
-              </View>
-            </Card>
-          </View>
-        ),
-        [calorieHeatmapDays],
-      )}
+      {dailyCaloriesSection}
+      {calorieHistorySection}
     </Screen>
   );
 }

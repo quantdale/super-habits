@@ -11,13 +11,13 @@ test.describe("Todos", () => {
   });
 
   test("shows empty state when no todos exist", async ({ page }) => {
-    await expect(page.getByText("No Pending Tasks")).toBeVisible();
+    await expect(page.getByText(/No pending tasks/i)).toBeVisible();
   });
 
   test("does not add todo with empty title", async ({ page }) => {
     await openNewTodoModal(page);
     await submitTodoModal(page);
-    await expect(page.getByText("No Pending Tasks")).toBeVisible();
+    await expect(page.getByText(/No pending tasks/i)).toBeVisible();
   });
 
   test("adds a new todo", async ({ page }) => {
