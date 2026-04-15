@@ -93,7 +93,7 @@ The following are installed but intentionally unused:
 - Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 213 tests passing — **update this count whenever tests are added or removed**
+- Current count: 234 tests passing — **update this count whenever tests are added or removed**
 - No DB or component tests yet — do not block on this, but document gaps
 
 ## E2E Tests (Playwright)

@@ -95,7 +95,7 @@ If this file conflicts with current code, trust the code and document the confli
 ### Confirmed from code
 - Validation baseline on April 14, 2026:
   - `npm run typecheck` passes.
-  - `npm test` passes with `213` tests.
+  - `npm test` passes with `234` tests.
   - `npm run build:web` passes.
   - `npm run e2e` passes with `59` tests.
 

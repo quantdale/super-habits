@@ -52,7 +52,7 @@ Companion docs in this folder:
 ### Confirmed from code
 - Local-first SQLite app is implemented and bootstrapped at startup.
 - Optional Supabase client, anonymous auth bootstrap, and push-only sync adapter exist.
-- Linked Actions foundation is merged: schema tables, engine + effect registry, notice scaffold, Settings preview scaffold, and first habits source entrypoint.
+- Linked Actions foundation is merged: schema tables, engine + effect registry, in-app notice banner, habit editor integration, and the first habits source entrypoint.
 - Playwright E2E infrastructure is configured for static web export served from `dist/`.
 
 ### Confirmed from docs
@@ -141,7 +141,7 @@ Companion docs in this folder:
 - `core/linked-actions/linkedActions.engine.ts` persists source events/executions and enforces dedupe via rule/source and chain fingerprint checks.
 - `core/linked-actions/linkedActions.effects.ts` maps effect types to feature-owned data-layer wrappers.
 - `features/habits/habits.data.ts` dispatches `habit.completed_for_day` to the linked actions engine on threshold crossing.
-- `features/settings/SettingsScreen.tsx` exposes a Linked Actions editor preview scaffold plus notice preview UI.
+- `features/habits/HabitsScreen.tsx` exposes the current Linked Actions editor flow for habit-completion rules, and applied rules surface through the global in-app notice banner.
 
 ### Confirmed from docs
 - `docs/linked-actions-readiness.md` is a planning/proposal document and should be read as design context, not runtime truth.
@@ -312,7 +312,7 @@ Companion docs in this folder:
 
 ### Confirmed from code on April 14, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `213` tests.
+- `npm test`: passes with `234` tests.
 - `npm run build:web`: passes.
 - `npm run e2e`: passes with `59` tests.
 
@@ -341,7 +341,6 @@ Companion docs in this folder:
 
 ### Confirmed from code
 - `App.tsx` and `index.ts` are legacy Expo starter files and are not the active app entry because `package.json` points to `expo-router/entry`.
-- `HabitHeatmap.tsx` exists but the active habits overview uses `GitHubHeatmap` / `HabitsOverviewGrid`.
 
 ### Inferred / uncertain
 - Some repo instructions were updated ahead of package/config changes, so version-sensitive guidance should be verified against code before editing.

@@ -105,7 +105,7 @@ Known intentional exceptions exist for some non-synced or special tables such as
 When schema changes are required:
 
 - add a new migration block only
-- current next slot is version 10
+- current next slot is version 12
 - update runtime types accordingly
 - do not rewrite history
 - verify downstream data-layer impact
