@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Alert, Platform, Text, View } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 
@@ -17,6 +18,7 @@ type PendingConfirmation = ConfirmationOptions & {
 };
 
 export function useConfirmationDialog() {
+  const { tokens } = useAppTheme();
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
 
   const confirm = useCallback((options: ConfirmationOptions) => {
@@ -58,7 +60,9 @@ export function useConfirmationDialog() {
       onClose={() => resolvePendingConfirmation(false)}
       title={pendingConfirmation?.title}
     >
-      <Text className="text-sm text-slate-600">{pendingConfirmation?.message}</Text>
+      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+        {pendingConfirmation?.message}
+      </Text>
       <View className="mt-4 flex-row gap-2">
         <Button
           label={pendingConfirmation?.cancelLabel ?? "Cancel"}

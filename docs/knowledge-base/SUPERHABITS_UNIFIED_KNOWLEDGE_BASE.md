@@ -61,7 +61,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality (April 14, 2026):** `npm run typecheck` passes; `npm test` passes with **213** tests; `npm run build:web` passes; `npm run e2e` passes with **59** tests. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (April 14, 2026):** `npm run typecheck` passes; `npm test` passes with **234** tests; `npm run build:web` passes; `npm run e2e` passes with **59** tests. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -90,7 +90,7 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`) |
 | Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
-| Unit tests | **213** passing (Vitest) |
+| Unit tests | **234** passing (Vitest) |
 | E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
@@ -134,7 +134,7 @@
 
 **todos:** `TodosScreen.tsx`, `TodoItem.tsx`, `DueDateBadge.tsx`, `PriorityBadge.tsx`, `todos.data.ts`, `todos.domain.ts`, `types.ts`
 
-**habits:** `HabitsScreen.tsx`, `HabitCircle.tsx`, `HabitHeatmap.tsx`, `HabitsOverviewGrid.tsx`, `ProgressRing.tsx`, `habitPresets.ts`, `habits.data.ts`, `habits.domain.ts`, `types.ts`
+**habits:** `HabitsScreen.tsx`, `HabitCircle.tsx`, `HabitsOverviewGrid.tsx`, `ProgressRing.tsx`, `habitPresets.ts`, `habits.data.ts`, `habits.domain.ts`, `types.ts`
 
 **overview:** `OverviewScreen.tsx` (dashboard only — no `.data.ts` / `.domain.ts` in this folder)
 
@@ -144,7 +144,7 @@
 
 **workout:** `WorkoutScreen.tsx`, `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx`, `workout.data.ts`, `workout.domain.ts`, `types.ts`
 
-**shared:** `GitHubHeatmap.tsx`, `ActivityPreviewStrip.tsx`
+**shared:** `GitHubHeatmap.tsx`, `activityTypes.ts`
 
 #### `core/` (21 logical paths)
 
@@ -325,9 +325,9 @@ Shared foreground trigger used by feature screens:
 |---------|---------|---------|
 | `expo` | ^55.0.8 | Expo SDK, tooling, native modules |
 | `expo-router` | ^55.0.7 | File-based navigation, tabs, stacks |
-| `react` | ^19.2.4 | UI library |
-| `react-dom` | ^19.2.4 | Web rendering |
-| `react-native` | ^0.84.1 | Cross-platform UI primitives |
+| `react` | 19.2.0 | UI library |
+| `react-dom` | 19.2.0 | Web rendering |
+| `react-native` | 0.83.4 | Cross-platform UI primitives |
 | `react-native-web` | ^0.21.0 | RN → DOM bridge |
 | `expo-status-bar` | ~55.0.4 | Status bar styling |
 | `@expo/metro-runtime` | ~55.0.6 (dev) | Metro web runtime |
@@ -340,15 +340,15 @@ Shared foreground trigger used by feature screens:
 | `tailwindcss` | ^3.4.19 | Tailwind compiler |
 | `@expo/vector-icons` | ^15.0.2 | Icons (MaterialIcons, etc.) |
 | `expo-linear-gradient` | ~55.0.9 | Gradients (installed) |
-| `react-native-safe-area-context` | ^5.7.0 | Safe areas |
-| `react-native-screens` | ^4.24.0 | Native screen containers |
+| `react-native-safe-area-context` | ~5.6.2 | Safe areas |
+| `react-native-screens` | ~4.23.0 | Native screen containers |
 | `react-native-gesture-handler` | ^2.30.0 | Gestures, Swipeable |
-| `react-native-reanimated` | ^4.2.3 | Animations |
+| `react-native-reanimated` | 4.2.1 | Animations |
 | `react-native-svg` | ^15.15.4 | SVG (charts, sprout) |
-| `@shopify/flash-list` | ^2.3.1 | High-performance lists |
+| `@shopify/flash-list` | 2.0.2 | High-performance lists |
 | `react-native-draggable-flatlist` | ^4.0.3 | Reorderable todo list |
 | `react-native-gifted-charts` | ^1.4.76 | Bar/pie charts (calories) |
-| `@react-native-community/datetimepicker` | ^9.1.0 | Native date picker (non-web todos) |
+| `@react-native-community/datetimepicker` | 8.6.0 | Native date picker (non-web todos) |
 
 ### Database & files
 
@@ -1382,7 +1382,6 @@ Types: `DayCompletion`, `HabitGridRow`, `DayCell`, `GridDateHeader`
 | Component | Props | Notes |
 |-----------|-------|-------|
 | `HabitCircle` | `habit`, `todayCount`, `streak`, `showStreak?`, `showName?`, `size?`, `onIncrement`, `onDecrement` | Tap + long-press decrement; 56px default |
-| `HabitHeatmap` | `dayCompletions`, `accentColor` | 6×5 grid; **not wired** in `HabitsScreen` currently |
 | `HabitsOverviewGrid` | `consistencyPercent`, `heatmapDays` | Card + `GitHubHeatmap` (52 weeks) |
 | `ProgressRing` | `size`, `strokeWidth`, `progress`, colors | SVG ring |
 
@@ -1601,32 +1600,20 @@ export type HeatmapDay = {
 
 **`weeks` prop:** Trims to last `weeks * 7` days via `days.slice(-maxDays)`.
 
-#### `ActivityPreviewStrip.tsx`
+#### `activityTypes.ts`
 
 ```ts
-type Props = {
-  days: ActivityDay[];
-  accentColor: string;
-  statLabel: string;
-  emptyLabel?: string;
-  showLabel?: boolean;
-};
-
 export type ActivityDay = {
   dateKey: string;
   active: boolean;
-  value?: number;  // 0–1 for intensity blending
+  value?: number;
+};
+
+export type HeatmapDay = {
+  dateKey: string;
+  value: number;
 };
 ```
-
-| Constant | Value |
-|----------|-------|
-| `CELL` | `18` |
-| `GAP` | `3` |
-
-**`blendAccent`:** Parses `#RRGGBB`; blends toward neutral `#e2e8f0` with `t = 0.4 + value * 0.6`.
-
-**Today marker:** First cell (`i === 0`) gets `borderWidth 1.5`, `borderColor accentColor`.
 
 ---
 
@@ -1717,10 +1704,6 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 | Workout | Session timer `text-7xl`, active pill `bg-workout`, rest `bg-amber-400`, ±5s steppers |
 | Calories | Macro row fields, donut `PieChart` radius 80 inner 55, weekly bars `BAR_WIDTH 20` `SPACING 8` |
 
-### `HabitHeatmap` (per-habit mini grid — currently unused in screen)
-
-Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 2`. Available but not wired in `HabitsScreen`.
-
 ### Root configs
 
 #### `tailwind.config.js`
@@ -1763,7 +1746,7 @@ Cell `28×28`, `gap 1`, `borderRadius 4`; legend squares `10×10` `borderRadius 
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (April 14, 2026):** **213 tests passed**; **20 test files passed** (Vitest v4)
+**Latest run (April 14, 2026):** **234 tests passed**; **22 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -2066,7 +2049,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 213 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 234 passing.
 
 ---
 
@@ -2135,7 +2118,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (213 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (234 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2287,7 +2270,6 @@ Tag phase completions: `git tag phaseN-complete`
 | Item | Detail | Suggested follow-up |
 |------|--------|---------------------|
 | `tests/calories.data.test.ts` | Mocked data-layer coverage instead of live SQLite | Add integration coverage if SQLite-specific behavior needs validation |
-| `HabitHeatmap.tsx` | Not used in `HabitsScreen` (aggregate heatmap uses `GitHubHeatmap` / `HabitsOverviewGrid`) | Wire or remove if dead |
 | `uuid` package | Unused for IDs (no imports in app source) | Remove or document future use |
 | `schema.sql` | Out of date vs runtime | Regenerate or mark deprecated |
 | Sync queue growth | `setRemoteMode("disabled")` or offline + no flush | Queue grows until flush runs; document tradeoff |
@@ -2309,10 +2291,10 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **213** passing (Vitest) |
+| Unit tests | **234** passing (Vitest) |
 | E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **11** |
-| Linked Actions | Foundation merged: schema tables + engine/effects + Settings scaffold + habits source entrypoint |
+| Linked Actions | Foundation merged: schema tables + engine/effects + in-app notice banner + habit editor integration + habits source entrypoint |
 | Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
 | Validation | Hard rejection in feature screens via `lib/validation.ts` |
 | Design system | Per-section colors, card accent strips, GitHub heatmaps, PillChips |
@@ -2338,8 +2320,8 @@ Tag phase completions: `git tag phaseN-complete`
 | Strict habit completion | `count >= target_per_day` for "completed"; partial state for heatmap cells |
 | Hard validation vs silent clamping | `lib/validation.ts` returns errors; user must fix invalid inputs |
 | Scroll-down reward pattern | Stats + primary actions above fold; history/charts as reward for scrolling |
-| Aggregate habit heatmap vs per-habit rows | `buildAggregatedHabitHeatmap` drives single 52-week view; per-habit `HabitHeatmap` component exists but unused |
-| GitHub-style grid (weeks as columns) vs activity strip | Heatmap for year view; `ActivityPreviewStrip` available but being phased out in favor of `GitHubHeatmap` |
+| Aggregate habit heatmap | `buildAggregatedHabitHeatmap` drives the single 52-week GitHub-style view used in habits |
+| GitHub-style grid (weeks as columns) | Yearly activity uses `GitHubHeatmap` across habits, pomodoro, workout, and calories |
 | Local `date_key` (migration 5) | `date_key_format: 'local'` + cutover without backfill |
 | Soft delete everywhere | Recovery / sync compatibility |
 | `habit_completions` hard delete at zero | Toggle-off semantics; high-churn; not synced |
@@ -2372,7 +2354,7 @@ Tag phase completions: `git tag phaseN-complete`
 | **HABIT_COLORS** | Readonly array of hex strings in `habitPresets.ts` — palette for habit color dots |
 | **HABIT_ICONS** | Readonly array of `HabitIcon` literals in `habitPresets.ts` — Material icon names |
 | **HeatmapDay** | `{ dateKey: string; value: number }` — input type for `GitHubHeatmap` |
-| **ActivityDay** | `{ dateKey: string; active: boolean; value?: number }` — input type for `ActivityPreviewStrip` |
+| **ActivityDay** | `{ dateKey: string; active: boolean; value?: number }` — shared day-level activity input used by domain rollups |
 | **MealType** | `"breakfast" \| "lunch" \| "dinner" \| "snack"` — alias from `CalorieEntry["meal_type"]` |
 | **MEAL_OPTIONS** | Constant in `CaloriesScreen.tsx`: four `{ value, label }` pairs for meal-type `PillChip` |
 | **NoopSyncAdapter** | No-op `SyncAdapter` — `SyncEngine` constructor default and tests; production **`syncEngine`** uses **`SupabaseSyncAdapter`** |
@@ -2419,7 +2401,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **213** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **234** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- `HabitHeatmap.tsx` — exists but unused in `HabitsScreen` (see section 12)
 - Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync

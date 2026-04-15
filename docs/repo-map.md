@@ -88,7 +88,6 @@ Use with:
 
 ### Cross-feature visuals
 - `features/shared/GitHubHeatmap.tsx`
-- `features/shared/ActivityPreviewStrip.tsx`
 
 ## Testing and Delivery
 
@@ -106,4 +105,4 @@ Use with:
 
 - `App.tsx` and `index.ts` are legacy Expo starter files, not the active runtime entry.
 - `core/db/schema.sql` is not the runtime schema authority.
-- `e2e/README.md` describes an older E2E flow; prefer `playwright.config.ts` and `docs/master-context.md`.
+- E2E runs against static `dist/` via `scripts/serve-e2e.js`; verify details in `playwright.config.ts` and `e2e/README.md`.

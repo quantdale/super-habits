@@ -116,7 +116,7 @@ const LINKED_ACTION_TARGET_PICKER_PROVIDERS: LinkedActionTargetPickerProvider[] 
     createNew: {
       title: "Create a new task",
       description:
-        "Version 1 uses an explicit handoff: open Todos, add the task there, then return and pick it.",
+        "The current linked-actions flow uses an explicit handoff: open Todos, add the task there, then return and pick it.",
       buildHandoff: () =>
         createModuleHandoff({
           feature: "todos",
@@ -143,7 +143,7 @@ const LINKED_ACTION_TARGET_PICKER_PROVIDERS: LinkedActionTargetPickerProvider[] 
     createNew: {
       title: "Create a new habit",
       description:
-        "Version 1 hands off to the Habits module instead of opening the creation modal from inside Linked Actions.",
+        "The current linked-actions flow hands off to the Habits module instead of opening the creation modal inside the editor.",
       buildHandoff: () =>
         createModuleHandoff({
           feature: "habits",
@@ -170,7 +170,7 @@ const LINKED_ACTION_TARGET_PICKER_PROVIDERS: LinkedActionTargetPickerProvider[] 
     createNew: {
       title: "Create a new workout routine",
       description:
-        "Version 1 keeps the workout routine editor in the Workout module and only hands off to it from Linked Actions.",
+        "The current linked-actions flow keeps the workout routine editor in the Workout module and hands off to it explicitly.",
       buildHandoff: () =>
         createModuleHandoff({
           feature: "workout",
@@ -192,20 +192,20 @@ const LINKED_ACTION_TARGET_PICKER_PROVIDERS: LinkedActionTargetPickerProvider[] 
       title: "Choose an existing calorie log",
       emptyTitle: "This target creates a new log entry",
       emptyDescription:
-        "Calorie targets do not point at a long-lived existing item in Version 1. The linked action will create a fresh calorie entry.",
+        "Calorie targets do not point at a long-lived existing item in the current flow. The linked action creates a fresh calorie entry.",
       loadCandidates: async () => [],
     },
     createNew: {
       title: "Start a calorie-entry handoff",
       description:
-        "Version 1 keeps calorie entry creation inside the Calories screen and exposes that step as an explicit handoff.",
+        "Calorie entry creation stays inside the Calories screen and is exposed here as an explicit handoff.",
       buildHandoff: () =>
         createModuleHandoff({
           feature: "calories",
           entityType: "calorie_log",
           title: "Start a calorie-entry handoff",
           description:
-            "Open Calories to create the entry details. Full inline creation is intentionally deferred from this first linked-actions scaffold.",
+            "Open Calories to create the entry details. Full inline creation is intentionally outside the current linked-actions flow.",
           ctaLabel: "Open Calories",
         }),
     },
@@ -220,20 +220,20 @@ const LINKED_ACTION_TARGET_PICKER_PROVIDERS: LinkedActionTargetPickerProvider[] 
       title: "Choose an existing session",
       emptyTitle: "This target creates a new session log",
       emptyDescription:
-        "Pomodoro targets create a new session record, so there is no reusable existing target item in Version 1.",
+        "Pomodoro targets create a new session record, so there is no reusable existing target item in the current flow.",
       loadCandidates: async () => [],
     },
     createNew: {
       title: "Start a pomodoro handoff",
       description:
-        "Version 1 keeps session creation in the Pomodoro module and makes the handoff explicit here.",
+        "Session creation stays in the Pomodoro module and the handoff is explicit here.",
       buildHandoff: () =>
         createModuleHandoff({
           feature: "pomodoro",
           entityType: "pomodoro_session",
           title: "Start a pomodoro handoff",
           description:
-            "Open Pomodoro to define or run the session context. Full inline creation is intentionally deferred from this first linked-actions scaffold.",
+            "Open Pomodoro to define or run the session context. Full inline creation is intentionally outside the current linked-actions flow.",
           ctaLabel: "Open Pomodoro",
         }),
     },

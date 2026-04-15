@@ -108,11 +108,11 @@ export function getLinkedActionEffectDescription(effectType: LinkedActionEffectT
     case "habit.ensure_daily_target":
       return "Brings the selected habit up to its daily target for the source date.";
     case "calorie.log":
-      return "Creates a new calorie log entry. Detailed field editing stays deferred from this scaffold.";
+      return "Creates a new calorie log entry. Detailed field editing stays outside the current habits-linked flow.";
     case "workout.log":
       return "Creates a workout completion log for the selected routine.";
     case "pomodoro.log":
-      return "Creates a pomodoro session log. Session template editing stays deferred from this scaffold.";
+      return "Creates a pomodoro session log. Session template editing stays outside the current habits-linked flow.";
   }
 }
 

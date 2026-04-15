@@ -82,7 +82,7 @@ describe("linked actions target picker providers", () => {
     });
   });
 
-  it("marks calories as create-new only in the first scaffold", async () => {
+  it("marks calories as create-new only in the current handoff flow", async () => {
     const provider = getLinkedActionTargetPickerProvider("calories");
 
     expect(provider.existing.supported).toBe(false);

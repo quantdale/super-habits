@@ -29,6 +29,7 @@ Only one tab of localhost:8081 should be open (OPFS lock).
   pomodoro.spec.ts       — Pomodoro (start timer, session log, empty history)
   workout.spec.ts        — Workout (add routine, complete, delete, empty state, validation, persistence)
   calories.spec.ts       — Calories (add entry, meal type, daily total, empty state, validation, persistence)
+  boundary.spec.ts       — Cross-feature boundary and regression cases
   infrastructure.spec.ts — Cross-cutting: COEP/COOP headers, SW cache, OPFS lock, crossOriginIsolated
 
 ## Audit and Failure Handling

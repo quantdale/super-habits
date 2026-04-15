@@ -6,7 +6,7 @@
 - See audit findings for more details.
 
 
-Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v11** → next migration: `if (version < 12)` in `core/db/client.ts`. Linked Actions foundation is merged on `main` (rules/events/executions schema, engine/effects contracts, notice scaffold, settings preview scaffold, first habits source entrypoint).
+Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v11** → next migration: `if (version < 12)` in `core/db/client.ts`. Linked Actions foundation is merged on `main` (rules/events/executions schema, engine/effects contracts, in-app notice banner, habit editor integration, first habits source entrypoint).
 
 ---
 

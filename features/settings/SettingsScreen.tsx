@@ -10,16 +10,17 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
 const SETTINGS_ACCENT = "#475569";
 
-type PlaceholderItem = {
+type SettingsInfoItem = {
   label: string;
   description: string;
+  statusLabel?: string;
 };
 
-type PlaceholderSection = {
+type SettingsInfoSection = {
   title: string;
   subtitle: string;
   icon: keyof typeof MaterialIcons.glyphMap;
-  items: PlaceholderItem[];
+  items: SettingsInfoItem[];
 };
 
 const THEME_OPTIONS: Array<{
@@ -44,28 +45,72 @@ const THEME_OPTIONS: Array<{
   },
 ];
 
-const SECTIONS: PlaceholderSection[] = [
+const SECTIONS: SettingsInfoSection[] = [
   {
-    title: "Account",
-    subtitle: "Profile and backup options will be added here later.",
-    icon: "person-outline",
+    title: "Linked Actions",
+    subtitle: "Current shipped scope for linked triggers, targets, and notices.",
+    icon: "bolt",
     items: [
-      { label: "Profile", description: "Placeholder for account details and identity settings." },
-      { label: "Backup & sync", description: "Placeholder for future cloud and device sync controls." },
+      {
+        label: "Where it lives",
+        description:
+          "Create or edit a habit to manage linked rules. Settings no longer hosts a separate Linked Actions preview.",
+        statusLabel: "Current",
+      },
+      {
+        label: "Supported path",
+        description:
+          "Rules currently run when a habit reaches its daily target and can affect Todos, Habits, or Workout.",
+        statusLabel: "Live",
+      },
+      {
+        label: "Notice delivery",
+        description:
+          "Applied rules surface through the in-app notice banner at the top of the app.",
+        statusLabel: "Live",
+      },
+    ],
+  },
+  {
+    title: "Sync & backup",
+    subtitle: "What the current remote path does today.",
+    icon: "cloud-queue",
+    items: [
+      {
+        label: "Backup mode",
+        description:
+          "Optional anonymous Supabase backup runs when env vars are configured. SQLite remains the source of truth.",
+        statusLabel: "Current",
+      },
+      {
+        label: "Current limits",
+        description:
+          "Pull/restore, conflict handling, and in-app sync controls are not implemented yet.",
+        statusLabel: "Limited",
+      },
     ],
   },
   {
     title: "About",
-    subtitle: "App details and support links will appear in this section.",
+    subtitle: "Current maintenance facts instead of generic placeholders.",
     icon: "info-outline",
     items: [
-      { label: "Version", description: "Placeholder for build details and release information." },
-      { label: "Privacy", description: "Placeholder for privacy notes and acknowledgements." },
+      {
+        label: "Schema & package",
+        description: "Package version 1.0.0 with runtime schema version 11.",
+        statusLabel: "Current",
+      },
+      {
+        label: "Validation gate",
+        description:
+          "Maintenance changes are expected to clear typecheck, Vitest, build:web, and Playwright E2E.",
+        statusLabel: "Required",
+      },
     ],
   },
 ];
 
-function SettingsPlaceholderRow({ label, description }: PlaceholderItem) {
+function SettingsInfoRow({ label, description, statusLabel }: SettingsInfoItem) {
   const { tokens } = useAppTheme();
 
   return (
@@ -77,15 +122,19 @@ function SettingsPlaceholderRow({ label, description }: PlaceholderItem) {
         <Text className="text-base font-semibold" style={{ color: tokens.text }}>{label}</Text>
         <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>{description}</Text>
       </View>
-      <View className="items-end">
-        <Text
-          className="mb-1 text-xs font-semibold uppercase tracking-[1px]"
-          style={{ color: tokens.iconMuted }}
+      {statusLabel ? (
+        <View
+          className="rounded-full px-3 py-1"
+          style={{ backgroundColor: tokens.surface }}
         >
-          Soon
-        </Text>
-        <MaterialIcons name="chevron-right" size={20} color={tokens.iconMuted} />
-      </View>
+          <Text
+            className="text-[11px] font-semibold uppercase tracking-[1px]"
+            style={{ color: tokens.iconMuted }}
+          >
+            {statusLabel}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -114,7 +163,7 @@ export function SettingsScreen() {
       <View className="mb-4 flex-row items-center justify-between">
         <SectionTitle
           title="Settings"
-          subtitle="Appearance is live. Other preference areas stay in place for future settings work."
+          subtitle="Appearance is live. The rest of this screen documents the current shipped behavior instead of placeholder previews."
         />
         <Link href={OVERVIEW_HREF} asChild>
           <Pressable
@@ -173,9 +222,10 @@ export function SettingsScreen() {
             </Text>
           </View>
 
-          <SettingsPlaceholderRow
-            label="App accent"
-            description="Additional display preferences can be layered onto the shared theme system later."
+          <SettingsInfoRow
+            label="Theme coverage"
+            description="Theme mode, status bar styling, tab rail colors, and shared UI tokens update immediately. Some feature-specific colors still stay section-driven by design."
+            statusLabel="Live"
           />
         </View>
       </Card>
@@ -191,10 +241,11 @@ export function SettingsScreen() {
         >
           <View className="gap-3">
             {section.items.map((item) => (
-              <SettingsPlaceholderRow
+              <SettingsInfoRow
                 key={item.label}
                 label={item.label}
                 description={item.description}
+                statusLabel={item.statusLabel}
               />
             ))}
           </View>

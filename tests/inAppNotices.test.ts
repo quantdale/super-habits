@@ -8,7 +8,7 @@ import {
   MAX_IN_APP_NOTICES,
 } from "@/core/notifications/inAppNotices.store";
 
-describe("in-app notice scaffold", () => {
+describe("in-app notice store", () => {
   it("creates typed linked action notices with source, target, and destination metadata", () => {
     const notice = createLinkedActionsNotice({
       message: "Linked Actions updated Evening stretch.",
