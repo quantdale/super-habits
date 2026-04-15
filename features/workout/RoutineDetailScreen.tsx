@@ -120,6 +120,13 @@ export function RoutineDetailModal({
   return (
     <>
       <Modal visible={visible} onClose={onClose} title={routineName} scroll>
+        <View className="mb-4 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
+          <Text className="text-sm font-semibold text-orange-900">Routine builder</Text>
+          <Text className="mt-1 text-sm text-orange-700">
+            Add exercises, tune work and rest intervals, then start the routine when it is ready.
+          </Text>
+        </View>
+
         <View className="gap-3">
           {exercises.map((ex) => {
             const isOpen = expandedId === ex.id;
@@ -218,7 +225,10 @@ export function RoutineDetailModal({
         </View>
 
         <View className="mt-6">
-          <Text className="mb-2 text-sm text-slate-600">Add exercise</Text>
+          <Text className="mb-2 text-sm font-semibold text-slate-900">Add exercise</Text>
+          <Text className="mb-3 text-sm text-slate-500">
+            New exercises start with one default set so you can edit timing immediately.
+          </Text>
           <ValidationError message={workoutError} />
           <View className="flex-row gap-2">
             <TextInput

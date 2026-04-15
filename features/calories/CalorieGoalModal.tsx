@@ -6,6 +6,7 @@ import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateCalorieGoal } from "@/lib/validation";
 import type { CalorieGoal } from "@/features/calories/types";
+import { SECTION_COLORS } from "@/constants/sectionColors";
 
 type Props = {
   visible: boolean;
@@ -48,7 +49,7 @@ export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Prop
 
   return (
     <Modal title="Daily goals" visible={visible} onClose={onClose} scroll>
-      <Text className="text-sm text-slate-400 mb-6">Set your daily calorie and macro targets.</Text>
+      <Text className="mb-6 text-sm text-slate-500">Set your daily calorie and macro targets.</Text>
       <NumberStepperField
         label="Calories (kcal)"
         value={calories}
@@ -91,7 +92,7 @@ export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Prop
       />
       <ValidationError message={goalError} />
       <View className="gap-3 mt-6">
-        <Button label="Save goals" onPress={handleSave} />
+        <Button label="Save goals" onPress={handleSave} color={SECTION_COLORS.calories} />
         <Button
           label="Cancel"
           variant="ghost"

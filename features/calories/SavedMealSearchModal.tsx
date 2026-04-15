@@ -60,8 +60,11 @@ export function SavedMealSearchModal({
 
       {filtered.length === 0 ? (
         <View className="items-center py-12">
-          <Text className="text-slate-400 text-sm">
+          <Text className="text-base font-semibold text-slate-900">
             {query ? "No meals match your search" : "No saved meals yet"}
+          </Text>
+          <Text className="mt-2 text-center text-sm text-slate-500">
+            {query ? "Try a shorter search term." : "Meals you reuse will show up here."}
           </Text>
         </View>
       ) : (
@@ -90,7 +93,7 @@ export function SavedMealSearchModal({
         </View>
       )}
 
-      <Text className="text-xs text-slate-300 text-center mt-4">Long press a meal to remove it</Text>
+      <Text className="mt-4 text-center text-xs text-slate-400">Long press a meal to remove it</Text>
     </Modal>
   );
 }
