@@ -219,6 +219,23 @@ describe("core/linked-actions/linkedActions.data", () => {
     };
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue(executionRow),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(
+      getAppliedHabitDayCalorieExecution("link_calorie", "habit_1", "2026-04-14"),
+    ).resolves.toMatchObject({
+      id: "lexec_1",
+      effectType: "calorie.log",
+      producedEntityId: "cal_1",
+    });
+
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining("ev.source_date_key = ?"),
+      ["link_calorie", "habit_1", "2026-04-14"],
+    );
+  });
+
   it("lists all non-deleted rules for a source entity across triggers", async () => {
     const db = {
       getAllAsync: vi.fn().mockResolvedValue([
@@ -245,16 +262,6 @@ describe("core/linked-actions/linkedActions.data", () => {
     getDatabase.mockResolvedValue(db);
 
     await expect(
-      getAppliedHabitDayCalorieExecution("link_calorie", "habit_1", "2026-04-14"),
-    ).resolves.toMatchObject({
-      id: "lexec_1",
-      effectType: "calorie.log",
-      producedEntityId: "cal_1",
-    });
-
-    expect(db.getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining("ev.source_date_key = ?"),
-      ["link_calorie", "habit_1", "2026-04-14"],
       listLinkedActionRulesForSourceEntity({
         feature: "habits",
         entityType: "habit",
