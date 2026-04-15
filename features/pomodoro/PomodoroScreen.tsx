@@ -4,6 +4,7 @@ import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { Button } from "@/core/ui/Button";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { PillChip } from "@/core/ui/PillChip";
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
 import {
@@ -38,8 +39,10 @@ import { FocusSprout } from "./FocusSprout";
 import { GardenGrid } from "./GardenGrid";
 import { BackgroundWarning } from "./BackgroundWarning";
 import { PomodoroSettingsInline } from "./PomodoroSettingsInline";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
+const TEXT_COLOR = SECTION_TEXT_COLORS[POMODORO_SECTION_KEY];
 
 function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   switch (mode) {
@@ -290,26 +293,36 @@ export function PomodoroScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card variant="stat" accentColor={COLOR} className="mb-0">
-            <View className="items-center py-1">
-              <Text className="text-[22px]">🎯</Text>
-              <Text className="mt-0.5 text-xl font-bold text-focus">{sessions.length}</Text>
-              <Text className="mt-0.5 text-xs text-slate-400">sessions this year</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            accentColor={COLOR}
+            textColor={TEXT_COLOR}
+            icon="timer"
+            title="Focus sessions"
+            value={sessions.length}
+            subtitle="This year"
+            note={sessions.length > 0 ? "Completed focus sessions" : "No sessions logged yet"}
+          />
         </View>
         <View className="flex-1">
-          <Card variant="stat" accentColor={COLOR} className="mb-0">
-            <View className="items-center py-1">
-              <Text className="text-[22px]">🔥</Text>
-              <Text className="mt-0.5 text-xl font-bold text-focus">{pomodoroStreak}</Text>
-              <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            accentColor={COLOR}
+            textColor={TEXT_COLOR}
+            icon="local-fire-department"
+            title="Current streak"
+            value={pomodoroStreak}
+            subtitle="Consecutive focus days"
+            note={pomodoroStreak > 0 ? "Keep the streak alive" : "Your next session starts the streak"}
+          />
         </View>
       </View>
 
-      <Card variant="header" accentColor={COLOR} headerTitle="Timer" className="mb-4">
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Timer"
+        headerSubtitle="Classic focus and break sequence with live progress."
+        className="mb-4"
+      >
         <View className="mb-4 flex-row flex-wrap justify-center">
           {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
             <PillChip
@@ -401,13 +414,15 @@ export function PomodoroScreen() {
         />
       ) : null}
 
-      <Card variant="standard" accentColor={COLOR} className="mt-4">
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Focus history"
+        headerSubtitle="Garden view plus the last 52 weeks of activity."
+        className="mt-4"
+      >
         <GardenGrid sessions={sessions} />
         <View className="mt-6 w-full min-w-0 items-center justify-center">
-          <View className="mb-2 w-full self-start">
-            <Text className="text-base font-semibold text-slate-900">Focus history</Text>
-            <Text className="mt-0.5 text-xs text-slate-400">Last 52 weeks</Text>
-          </View>
           <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
         </View>
       </Card>

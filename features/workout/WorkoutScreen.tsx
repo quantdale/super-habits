@@ -7,6 +7,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import type { WorkoutRoutine } from "./types";
 import {
   addRoutine,
@@ -33,8 +34,10 @@ import { SwipeableCard } from "@/core/ui/SwipeableCard";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
 import { validateRoutineName } from "@/lib/validation";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const COLOR = SECTION_COLORS.workout;
+const TEXT_COLOR = SECTION_TEXT_COLORS.workout;
 
 type ViewState = { type: "list" } | { type: "session"; routine: RoutineWithExercises };
 
@@ -66,7 +69,7 @@ function RoutineSwipeRow({
           <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
         ) : null}
       </RectButton>
-      <View className="mt-3">
+      <View className="mt-4">
         <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
       </View>
     </SwipeableCard>
@@ -181,46 +184,55 @@ export function WorkoutScreen() {
         <SectionTitle
           title="Workout"
           subtitle={
-            workoutStripHasActivity ? "Create simple routines and mark completions." : undefined
+            workoutStripHasActivity
+              ? "Create simple routines, update exercises, and mark completions without leaving the tab."
+              : "Create simple routines and mark completions."
           }
         />
+
         <View className="mb-4 flex-row gap-3">
           <View className="flex-1">
-            <Card variant="stat" accentColor={SECTION_COLORS.workout} className="mb-0">
-              <View className="items-center py-1">
-                <Text className="text-[22px]">💪</Text>
-                <Text className="mt-0.5 text-xl font-bold text-workout">{workoutDaysCount}</Text>
-                <Text className="mt-0.5 text-xs text-slate-400">workout days</Text>
-              </View>
-            </Card>
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
+              icon="fitness-center"
+              title="Workout days"
+              value={workoutDaysCount}
+              subtitle="Last 52 weeks"
+              note={workoutStripHasActivity ? "Sessions logged this year" : "No sessions logged yet"}
+            />
           </View>
           <View className="flex-1">
-            <Card variant="stat" accentColor={SECTION_COLORS.workout} className="mb-0">
-              <View className="items-center py-1">
-                <Text className="text-[22px]">📅</Text>
-                <Text className="mt-0.5 text-xl font-bold text-workout">{workoutStreak}</Text>
-                <Text className="mt-0.5 text-xs text-slate-400">day streak</Text>
-              </View>
-            </Card>
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
+              icon="calendar-today"
+              title="Current streak"
+              value={workoutStreak}
+              subtitle="Back-to-back workout days"
+              note={workoutStreak > 0 ? "Keep the run alive today" : "Your next session starts the streak"}
+            />
           </View>
         </View>
 
         {!workoutStripHasActivity ? (
-          <Card variant="standard" accentColor={SECTION_COLORS.workout} className="mb-3">
-            <View className="items-center">
-              <Text className="text-center text-sm text-slate-500">
+          <Card variant="standard" accentColor={COLOR}>
+            <View className="items-center py-2">
+              <MaterialIcons name="self-improvement" size={26} color={TEXT_COLOR} />
+              <Text className="mt-3 text-center text-base font-semibold text-slate-900">
                 Complete a workout to start tracking
               </Text>
-              <Text className="mt-1 text-center text-xs text-slate-400">
-                Create simple routines and mark completions.
+              <Text className="mt-2 text-center text-sm text-slate-500">
+                Your routine history and yearly intensity map will appear here once you log a session.
               </Text>
             </View>
           </Card>
         ) : null}
         <Card
           variant="header"
-          accentColor={SECTION_COLORS.workout}
+          accentColor={COLOR}
           headerTitle="Add new routine"
+          headerSubtitle="Keep names short and descriptions specific so routines stay scannable."
           headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
         >
           <TextField
@@ -245,6 +257,15 @@ export function WorkoutScreen() {
           <Button label="Add routine" onPress={onCreate} color={COLOR} />
         </Card>
 
+        {routines.length > 0 ? (
+          <View className="mb-3 mt-1">
+            <Text className="text-sm font-semibold text-slate-900">Your routines</Text>
+            <Text className="mt-1 text-sm text-slate-500">
+              Swipe to edit or delete. Open a routine to manage exercises and sets.
+            </Text>
+          </View>
+        ) : null}
+
         {routines.map((routine) => (
           <RoutineSwipeRow
             key={routine.id}
@@ -263,15 +284,18 @@ export function WorkoutScreen() {
           />
         ))}
 
-        <Card variant="standard" accentColor={SECTION_COLORS.workout} className="mt-4">
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Workout history</Text>
+        <Card
+          variant="header"
+          accentColor={COLOR}
+          headerTitle="Workout history"
+          headerSubtitle="Session intensity over the last 52 weeks."
+          headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+          className="mt-4"
+        >
           <View className="w-full min-w-0 items-center justify-center">
-            <Text className="mb-2 self-start text-xs text-slate-400">
-              Session intensity — last 52 weeks
-            </Text>
             <GitHubHeatmap
               days={workoutHeatmapDays}
-              color={SECTION_COLORS.workout}
+              color={COLOR}
               weeks={52}
             />
           </View>

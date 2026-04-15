@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, Pressable, Alert } from "react-native";
 import { Screen } from "@/core/ui/Screen";
 import { Button } from "@/core/ui/Button";
+import { Card } from "@/core/ui/Card";
 import {
   buildTimerSequence,
   formatWorkoutTime,
@@ -110,15 +111,21 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   if (isComplete) {
     return (
       <Screen>
-        <View className="flex-1 items-center justify-center gap-6 px-6">
-          <Text className="text-4xl">🎉</Text>
-          <Text className="text-2xl font-semibold text-slate-800 text-center">
-            Workout complete!
-          </Text>
-          <Text className="text-sm text-slate-500 text-center">
-            {routine.name} — all sets done
-          </Text>
-          <Button label="Save and finish" onPress={handleFinish} color={WORKOUT_COLOR} />
+        <View className="flex-1 justify-center">
+          <Card accentColor={WORKOUT_COLOR}>
+            <View className="items-center gap-4 py-4">
+              <Text className="text-4xl">🎉</Text>
+              <Text className="text-center text-2xl font-semibold text-slate-800">
+                Workout complete!
+              </Text>
+              <Text className="text-center text-sm text-slate-500">
+                {routine.name} is done. Save this session to update your history.
+              </Text>
+              <View className="w-full">
+                <Button label="Save and finish" onPress={handleFinish} color={WORKOUT_COLOR} />
+              </View>
+            </View>
+          </Card>
         </View>
       </Screen>
     );
@@ -139,9 +146,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
   return (
     <Screen>
-      <View className="flex-row items-center justify-between mb-6">
+      <View className="mb-4 flex-row items-center justify-between">
         <Pressable onPress={handleCancel}>
-          <Text className="text-slate-400 text-sm">End</Text>
+          <Text className="text-sm text-slate-400">End</Text>
         </Pressable>
         <Text className="text-sm text-slate-500">{routine.name}</Text>
         <Text className="text-xs text-slate-300">
@@ -149,50 +156,52 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
         </Text>
       </View>
 
-      <View
-        className={`px-3 py-1 rounded-full self-center mb-2 ${
-          isActive ? "bg-workout" : "bg-amber-400"
-        }`}
-      >
-        <Text className="text-xs font-medium text-white">
-          {isActive ? "ACTIVE" : "REST"}
-        </Text>
-      </View>
-
-      <Text className="text-2xl font-semibold text-slate-800 text-center mb-1">
-        {currentPhase.exerciseName}
-      </Text>
-      <Text className="text-sm text-slate-400 text-center mb-8">
-        Set {currentPhase.setNumber} of {currentPhase.totalSets}
-      </Text>
-
-      <Text className="text-7xl font-semibold text-slate-800 text-center mb-8">
-        {formatWorkoutTime(remaining)}
-      </Text>
-
-      <View className="h-2 bg-slate-100 rounded-full mx-6 mb-8 overflow-hidden">
+      <Card accentColor={WORKOUT_COLOR}>
         <View
-          className={`h-full rounded-full ${isActive ? "bg-workout" : "bg-amber-400"}`}
-          style={{ width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }}
-        />
-      </View>
+          className={`self-center rounded-full px-3 py-1 ${
+            isActive ? "bg-workout" : "bg-amber-400"
+          }`}
+        >
+          <Text className="text-xs font-medium text-white">
+            {isActive ? "ACTIVE" : "REST"}
+          </Text>
+        </View>
 
-      <View className="gap-3 px-6">
-        {!isRunning ? (
-          <Button label="Start" onPress={handleStart} color={WORKOUT_COLOR} />
-        ) : (
-          <Button label="Skip" variant="ghost" onPress={handleSkip} />
-        )}
-      </View>
-
-      {currentIndex + 1 < sequence.length && (
-        <Text className="text-xs text-slate-300 text-center mt-6">
-          Next:{" "}
-          {sequence[currentIndex + 1].phase === "rest"
-            ? `Rest ${formatWorkoutTime(sequence[currentIndex + 1].durationSeconds)}`
-            : `${sequence[currentIndex + 1].exerciseName} — Set ${sequence[currentIndex + 1].setNumber}`}
+        <Text className="mt-4 text-center text-2xl font-semibold text-slate-800">
+          {currentPhase.exerciseName}
         </Text>
-      )}
+        <Text className="mt-1 text-center text-sm text-slate-400">
+          Set {currentPhase.setNumber} of {currentPhase.totalSets}
+        </Text>
+
+        <Text className="my-8 text-center text-7xl font-semibold text-slate-800">
+          {formatWorkoutTime(remaining)}
+        </Text>
+
+        <View className="mb-8 h-2 overflow-hidden rounded-full bg-slate-100">
+          <View
+            className={`h-full rounded-full ${isActive ? "bg-workout" : "bg-amber-400"}`}
+            style={{ width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }}
+          />
+        </View>
+
+        <View className="gap-3">
+          {!isRunning ? (
+            <Button label="Start" onPress={handleStart} color={WORKOUT_COLOR} />
+          ) : (
+            <Button label="Skip" variant="ghost" onPress={handleSkip} />
+          )}
+        </View>
+
+        {currentIndex + 1 < sequence.length ? (
+          <Text className="mt-6 text-center text-xs text-slate-400">
+            Next:{" "}
+            {sequence[currentIndex + 1].phase === "rest"
+              ? `Rest ${formatWorkoutTime(sequence[currentIndex + 1].durationSeconds)}`
+              : `${sequence[currentIndex + 1].exerciseName} — Set ${sequence[currentIndex + 1].setNumber}`}
+          </Text>
+        ) : null}
+      </Card>
     </Screen>
   );
 }

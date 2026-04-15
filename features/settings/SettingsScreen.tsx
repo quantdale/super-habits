@@ -3,6 +3,7 @@ import { Link, type Href } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { type ThemeMode, useAppTheme } from "@/core/providers/ThemeProvider";
 import { Card } from "@/core/ui/Card";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { PillChip } from "@/core/ui/PillChip";
 import { Screen } from "@/core/ui/Screen";
 import { SectionTitle } from "@/core/ui/SectionTitle";
@@ -157,6 +158,7 @@ export function SettingsScreen() {
   const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
   const settingsAccent = resolvedTheme === "dark" ? "#64748b" : SETTINGS_ACCENT;
+  const settingsTextColor = resolvedTheme === "dark" ? "#cbd5e1" : "#334155";
 
   return (
     <Screen scroll>
@@ -176,6 +178,31 @@ export function SettingsScreen() {
             <Text className="text-sm font-semibold" style={{ color: tokens.text }}>Back</Text>
           </Pressable>
         </Link>
+      </View>
+
+      <View className="mb-4 flex-row gap-3">
+        <View className="flex-1">
+          <FeatureStatCard
+            accentColor={settingsAccent}
+            textColor={settingsTextColor}
+            icon="palette"
+            title="Theme mode"
+            value={mode[0].toUpperCase() + mode.slice(1)}
+            subtitle="Current selection"
+            note={`Resolved as ${resolvedTheme} right now`}
+          />
+        </View>
+        <View className="flex-1">
+          <FeatureStatCard
+            accentColor={settingsAccent}
+            textColor={settingsTextColor}
+            icon="rule"
+            title="Documented areas"
+            value={SECTIONS.length}
+            subtitle="Status sections below"
+            note="Linked actions, sync, and maintenance facts"
+          />
+        </View>
       </View>
 
       <Card

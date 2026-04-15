@@ -43,9 +43,12 @@ function MiniPlant({ color = SECTION_COLORS[POMODORO_SECTION_KEY] }: { color?: s
 export function GardenGrid({ sessions, accentColor = SECTION_COLORS[POMODORO_SECTION_KEY] }: Props) {
   if (sessions.length === 0) {
     return (
-      <View className="mx-1 my-2 items-center rounded-xl border border-slate-100 bg-white p-4">
-        <Text className="text-center text-sm text-slate-500">
+      <View className="my-2 items-center rounded-2xl border border-slate-200 bg-white px-4 py-6">
+        <Text className="text-center text-base font-semibold text-slate-900">
           Complete a session to start your garden
+        </Text>
+        <Text className="mt-2 text-center text-sm text-slate-500">
+          Each completed focus block grows a new plant in this timeline.
         </Text>
       </View>
     );

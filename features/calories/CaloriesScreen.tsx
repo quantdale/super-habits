@@ -5,6 +5,7 @@ import { SectionTitle } from "@/core/ui/SectionTitle";
 import { Card } from "@/core/ui/Card";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
+import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { PillChip } from "@/core/ui/PillChip";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import {
@@ -42,8 +43,11 @@ import { Modal } from "@/core/ui/Modal";
 import { SwipeableCard } from "@/core/ui/SwipeableCard";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { validateCalorieComputedKcal, validateCalorieEntry } from "@/lib/validation";
+import { MaterialIcons } from "@expo/vector-icons";
+import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 
 const COLOR = SECTION_COLORS.calories;
+const TEXT_COLOR = SECTION_TEXT_COLORS.calories;
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: "breakfast", label: "Breakfast" },
@@ -266,28 +270,35 @@ export function CaloriesScreen() {
 
       <View className="mb-4 flex-row gap-3">
         <View className="flex-1">
-          <Card variant="stat" accentColor={SECTION_COLORS.calories} className="mb-0">
-            <View className="items-center py-1">
-              <Text className="text-[22px]">🍽️</Text>
-              <Text className="mt-0.5 text-xl font-bold text-calories">
-                {calorieActivityDays.filter((d) => d.active).length}
-              </Text>
-              <Text className="mt-0.5 text-xs text-slate-400">days logged</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            accentColor={COLOR}
+            textColor={TEXT_COLOR}
+            icon="restaurant-menu"
+            title="Days logged"
+            value={calorieActivityDays.filter((d) => d.active).length}
+            subtitle="Rolling year"
+            note={hasCalorieStripActivity ? "Daily intake history is active" : "No intake history yet"}
+          />
         </View>
         <View className="flex-1">
-          <Card variant="stat" accentColor={SECTION_COLORS.calories} className="mb-0">
-            <View className="items-center py-1">
-              <Text className="text-[22px]">🎯</Text>
-              <Text className="mt-0.5 text-xl font-bold text-calories">{goalProgress.percent}%</Text>
-              <Text className="mt-0.5 text-xs text-slate-400">of goal today</Text>
-            </View>
-          </Card>
+          <FeatureStatCard
+            accentColor={COLOR}
+            textColor={TEXT_COLOR}
+            icon="track-changes"
+            title="Goal progress"
+            value={`${goalProgress.percent}%`}
+            subtitle="Today"
+            note={goalProgress.over ? "You are over goal" : `${goalProgress.remaining} kcal remaining`}
+          />
         </View>
       </View>
 
-      <Card variant="header" accentColor={SECTION_COLORS.calories} headerTitle="Add Entry">
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Add entry"
+        headerSubtitle="Log macros once and reuse recent meals when they repeat."
+      >
         <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
         {allSavedMeals.length > 0 ? (
           <Pressable
@@ -399,7 +410,13 @@ export function CaloriesScreen() {
         />
       </Card>
 
-      <Card variant="standard" accentColor={SECTION_COLORS.calories}>
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Today"
+        headerSubtitle="Live totals, goal progress, and macro split."
+        headerRight={<MaterialIcons name="pie-chart" size={22} color="#ffffff" />}
+      >
         <View className="mb-3 items-center rounded-xl border border-calories bg-white p-3">
           <Text className="text-center text-sm font-medium text-slate-600">{consistencyText}</Text>
         </View>
@@ -590,8 +607,13 @@ export function CaloriesScreen() {
       {useMemo(
         () => (
           <View className="mt-4">
-            <Text className="mb-2 text-sm font-semibold text-slate-700">Daily calories</Text>
-            <Card variant="standard" accentColor={SECTION_COLORS.calories}>
+            <Card
+              variant="header"
+              accentColor={COLOR}
+              headerTitle="Daily calories"
+              headerSubtitle="Year trend with your current goal overlaid."
+              headerRight={<MaterialIcons name="bar-chart" size={22} color="#ffffff" />}
+            >
               <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
             </Card>
           </View>
@@ -602,13 +624,17 @@ export function CaloriesScreen() {
       {useMemo(
         () => (
           <View className="mt-4">
-            <Text className="mb-2 text-sm font-semibold text-slate-700">Calories — last year</Text>
-            <Text className="mb-2 text-xs text-slate-400">Rolling 53-week activity</Text>
-            <Card variant="standard" accentColor={SECTION_COLORS.calories}>
+            <Card
+              variant="header"
+              accentColor={COLOR}
+              headerTitle="Calories history"
+              headerSubtitle="Rolling 53-week activity."
+              headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+            >
               <View className="w-full min-w-0 items-center justify-center">
                 <GitHubHeatmap
                   days={calorieHeatmapDays}
-                  color={SECTION_COLORS.calories}
+                  color={COLOR}
                   weeks={53}
                 />
               </View>

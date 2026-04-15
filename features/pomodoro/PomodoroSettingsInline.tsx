@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput } from "react-native";
 import { Button } from "@/core/ui/Button";
+import { Card } from "@/core/ui/Card";
 import { ValidationError } from "@/core/ui/ValidationError";
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
 import type { PomodoroSettings } from "./pomodoro.domain";
@@ -35,8 +36,15 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
   };
 
   return (
-    <View className="mx-4 mb-4 rounded-2xl bg-slate-50 p-4">
-      <Text className="mb-3 text-sm font-medium text-slate-700">Timer durations</Text>
+    <Card
+      accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
+      className="mb-4"
+      innerClassName="p-4"
+    >
+      <Text className="text-base font-semibold text-slate-900">Timer durations</Text>
+      <Text className="mb-4 mt-1 text-sm text-slate-500">
+        Changes apply immediately and reset the current timer state.
+      </Text>
 
       {[
         { label: "Focus (min)", value: focus, set: setFocus },
@@ -75,6 +83,6 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
           />
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
