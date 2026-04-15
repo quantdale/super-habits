@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLinkedActionRuleRow,
+  isSupportedLinkedActionTriggerType,
   normalizeLinkedActionRuleRow,
   parseLinkedActionEffectPayload,
   parseLinkedActionRuleRecord,
@@ -172,5 +173,12 @@ describe("core/linked-actions/linkedActions.types", () => {
       rawTargetEntityType: "journal_entry",
       rawEffectType: "journal.append",
     });
+  });
+
+  it("keeps workout and pomodoro triggers engine-supported while hidden from current authoring", () => {
+    expect(isSupportedLinkedActionTriggerType("workout.completed")).toBe(true);
+    expect(isSupportedLinkedActionTriggerType("pomodoro.focus_completed")).toBe(true);
+    expect(isSupportedLinkedActionTriggerType("habit.completed_for_day")).toBe(true);
+    expect(isSupportedLinkedActionTriggerType("todo.completed")).toBe(false);
   });
 });

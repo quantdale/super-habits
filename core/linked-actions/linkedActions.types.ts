@@ -1,4 +1,21 @@
 import type { AppNotice, LinkedActionsNoticePayload } from "@/core/notifications/inAppNotices.types";
+import {
+  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
+  LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE,
+  LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
+  LINKED_ACTION_SUPPORTED_TRIGGER_TYPES,
+  isLinkedActionEffectEngineSupported,
+  isLinkedActionTargetEntityEngineSupported,
+  isLinkedActionTargetFeatureEngineSupported,
+  isLinkedActionTriggerEngineSupported,
+  supportsLinkedActionDirectionPolicy,
+} from "@/core/linked-actions/linkedActions.policy";
+export {
+  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
+  LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE,
+  LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
+  LINKED_ACTION_SUPPORTED_TRIGGER_TYPES,
+};
 
 export const LINKED_ACTION_RULE_STATUSES = ["active", "paused"] as const;
 export type LinkedActionRuleStatus = (typeof LINKED_ACTION_RULE_STATUSES)[number];
@@ -66,32 +83,6 @@ export const LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY = {
 
 export type LinkedActionEffectType = ValueOfConstArrays<
   typeof LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY
->;
-
-export const LINKED_ACTION_SUPPORTED_TRIGGER_TYPES = [
-  "habit.completed_for_day",
-] as const satisfies readonly LinkedActionTriggerType[];
-
-export const LINKED_ACTION_SUPPORTED_TARGET_FEATURES = [
-  "todos",
-  "habits",
-  "workout",
-] as const satisfies readonly LinkedActionFeature[];
-
-export const LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE = {
-  todos: ["todo"],
-  habits: ["habit"],
-  workout: ["workout_routine"],
-} as const satisfies Partial<
-  Record<LinkedActionFeature, readonly LinkedActionTargetEntityType[]>
->;
-
-export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY = {
-  todo: ["todo.complete"],
-  habit: ["habit.increment", "habit.ensure_daily_target"],
-  workout_routine: ["workout.log"],
-} as const satisfies Partial<
-  Record<LinkedActionTargetEntityType, readonly LinkedActionEffectType[]>
 >;
 
 export const LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE =
@@ -317,10 +308,6 @@ const ALL_LINKED_ACTION_TRIGGER_TYPES = flattenConstArrays(
 const ALL_LINKED_ACTION_EFFECT_TYPES = flattenConstArrays(
   LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY,
 );
-const ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES = flattenConstArrays(
-  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
-);
-
 function expectObject(value: unknown, context: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${context} must be a JSON object`);
@@ -412,13 +399,19 @@ export function isLinkedActionEffectType(value: string): value is LinkedActionEf
 export function isSupportedLinkedActionTriggerType(
   value: string,
 ): value is LinkedActionTriggerType {
-  return (LINKED_ACTION_SUPPORTED_TRIGGER_TYPES as readonly string[]).includes(value);
+  if (!isLinkedActionTriggerType(value)) {
+    return false;
+  }
+  return isLinkedActionTriggerEngineSupported(value);
 }
 
 export function isSupportedLinkedActionTargetFeature(
   value: string,
 ): value is LinkedActionFeature {
-  return (LINKED_ACTION_SUPPORTED_TARGET_FEATURES as readonly string[]).includes(value);
+  if (!isLinkedActionFeature(value)) {
+    return false;
+  }
+  return isLinkedActionTargetFeatureEngineSupported(value);
 }
 
 export function isAllowedLinkedActionSourceEntity(
@@ -471,7 +464,10 @@ export function isSupportedLinkedActionEffect(
   entityType: LinkedActionTargetEntityType,
   effectType: LinkedActionEffectType,
 ): boolean {
-  if (!(ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES as readonly string[]).includes(effectType)) {
+  if (!isLinkedActionTargetEntityEngineSupported(entityType)) {
+    return false;
+  }
+  if (!isLinkedActionEffectEngineSupported(effectType)) {
     return false;
   }
 
@@ -602,6 +598,7 @@ export function serializeLinkedActionEffectPayload(
 export function assertValidLinkedActionRuleShape(
   source: LinkedActionRuleSource,
   target: LinkedActionRuleTarget,
+  directionPolicy: LinkedActionDirectionPolicy = "one_way",
 ): void {
   if (!isAllowedLinkedActionSourceEntity(source.feature, source.entityType)) {
     throw new Error(
@@ -634,6 +631,17 @@ export function assertValidLinkedActionRuleShape(
   if (!isSupportedLinkedActionEffect(target.entityType, target.effect.type)) {
     throw new Error(
       `Effect ${target.effect.type} is not currently supported for target entity ${target.entityType}`,
+    );
+  }
+  if (
+    !supportsLinkedActionDirectionPolicy({
+      directionPolicy,
+      triggerType: source.triggerType,
+      effectType: target.effect.type,
+    })
+  ) {
+    throw new Error(
+      `Direction policy ${directionPolicy} is not supported for trigger ${source.triggerType} and effect ${target.effect.type}.`,
     );
   }
 }
@@ -737,7 +745,7 @@ export function normalizeLinkedActionRuleRow(
       effect: parseLinkedActionEffectPayload(row.effect_type, row.effect_payload),
     };
 
-    assertValidLinkedActionRuleShape(source, target);
+    assertValidLinkedActionRuleShape(source, target, row.direction_policy);
 
     return {
       id: row.id,
@@ -769,7 +777,7 @@ export function buildLinkedActionRuleRow(
     throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
   }
 
-  assertValidLinkedActionRuleShape(rule.source, rule.target);
+  assertValidLinkedActionRuleShape(rule.source, rule.target, rule.directionPolicy);
 
   return {
     id: rule.id,

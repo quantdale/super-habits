@@ -59,6 +59,11 @@ describe("linkedActionsEditor.model", () => {
     expect(options.map((option) => option.value)).toEqual(["habit.completed_for_day"]);
   });
 
+  it("keeps workout and pomodoro triggers hidden from current authoring options", () => {
+    expect(getLinkedActionTriggerOptions("workout")).toEqual([]);
+    expect(getLinkedActionTriggerOptions("pomodoro")).toEqual([]);
+  });
+
   it("creates an empty editor row from a source option", () => {
     const row = createEmptyLinkedActionEditorRow({
       key: "habit-demo",
