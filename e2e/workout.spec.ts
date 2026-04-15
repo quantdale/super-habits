@@ -4,9 +4,6 @@ import { clearDatabase } from "./helpers/db";
 import { fillRoutineName } from "./helpers/forms";
 import { clickSwipeDeleteAction, swipeLeftRevealWorkoutRoutineRow } from "./helpers/gestures";
 
-// RN Alert.alert has no web implementation (see e2e/habits.spec.ts). Swipe Delete calls Alert;
-// on Chromium E2E the confirmation never runs, so deleteRoutine is not invoked.
-
 test.describe("Workout", () => {
   test.beforeEach(async ({ page }) => {
     await goToTab(page, "workout");
@@ -49,14 +46,13 @@ test.describe("Workout", () => {
     await expect(page.getByText("Leg day")).toBeVisible();
   });
 
-  test("swipe delete: no confirmation on web (Alert.alert no-op), routine remains", async ({
-    page,
-  }) => {
+  test("swipe delete removes the routine after web confirmation", async ({ page }) => {
     await fillRoutineName(page, "Leg press");
     await page.getByText("Add routine", { exact: true }).click();
     await expect(page.getByText("Leg press")).toBeVisible();
     await swipeLeftRevealWorkoutRoutineRow(page);
     await clickSwipeDeleteAction(page, "Leg press");
-    await expect(page.getByText("Leg press")).toBeVisible();
+    await page.getByText("Delete routine", { exact: true }).click({ force: true });
+    await expect(page.getByText("Leg press")).not.toBeVisible();
   });
 });

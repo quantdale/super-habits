@@ -31,6 +31,7 @@ import type { RoutineWithExercises } from "./types";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { SwipeableCard } from "@/core/ui/SwipeableCard";
 import { ValidationError } from "@/core/ui/ValidationError";
+import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
 import { validateRoutineName } from "@/lib/validation";
 
 const COLOR = SECTION_COLORS.workout;
@@ -73,6 +74,7 @@ function RoutineSwipeRow({
 }
 
 export function WorkoutScreen() {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
@@ -113,6 +115,25 @@ export function WorkoutScreen() {
   const openRoutineModal = useCallback((routineId: string, routineName: string) => {
     setRoutineModal({ routineId, routineName });
   }, []);
+
+  const handleDeleteRoutine = useCallback(
+    async (routine: WorkoutRoutine) => {
+      const confirmed = await confirm({
+        title: "Remove routine",
+        message: `Remove "${routine.name}"?`,
+        confirmLabel: "Delete routine",
+        confirmVariant: "danger",
+      });
+      if (!confirmed) return;
+
+      await deleteRoutine(routine.id);
+      if (routineModal?.routineId === routine.id) {
+        setRoutineModal(null);
+      }
+      await refresh();
+    },
+    [confirm, refresh, routineModal],
+  );
 
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
@@ -155,6 +176,7 @@ export function WorkoutScreen() {
           setCurrentView({ type: "session", routine: full });
         }}
       />
+      {confirmationDialog}
       <Screen scroll>
         <SectionTitle
           title="Workout"
@@ -236,11 +258,7 @@ export function WorkoutScreen() {
               })();
             }}
             onRequestDelete={async () => {
-              await deleteRoutine(routine.id);
-              if (routineModal?.routineId === routine.id) {
-                setRoutineModal(null);
-              }
-              await refresh();
+              await handleDeleteRoutine(routine);
             }}
           />
         ))}

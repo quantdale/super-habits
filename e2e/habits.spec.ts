@@ -79,17 +79,14 @@ test.describe("Habits", () => {
     await expect(page.getByText("Drink water").first()).toBeVisible();
   });
 
-  // RN core Alert.alert only implements iOS + Android (see node_modules/react-native/Libraries/Alert/Alert.js).
-  // On web there is no branch — the call is a no-op, so no confirmation UI appears and the habit cannot be removed here.
-  test("delete in edit mode: no confirmation on web (Alert.alert no-op), habit remains", async ({
-    page,
-  }) => {
+  test("deletes a habit in edit mode after web confirmation", async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByLabel("Habit name").fill("Delete this habit");
     await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("Delete this habit").first()).toBeVisible();
     await page.locator(".flex-row.justify-between.items-start .rounded-lg.p-2").first().click();
     await page.getByText("Delete", { exact: true }).first().click();
-    await expect(page.getByText("Delete this habit").first()).toBeVisible();
+    await page.getByText("Delete habit", { exact: true }).last().click({ force: true });
+    await expect(page.getByText("Delete this habit").first()).not.toBeVisible();
   });
 });
