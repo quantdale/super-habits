@@ -112,36 +112,36 @@ describe("SupabaseSyncAdapter", () => {
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("logs Supabase upsert errors without throwing", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("throws Supabase upsert errors so the sync engine can retry the batch", async () => {
     const upsertError = new Error("timeout");
     const supabase = { from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: upsertError }) }) };
     const { adapter, db } = await setupAdapter({ supabase });
     db.getAllAsync.mockResolvedValue([{ id: "todo_1" }]);
 
-    await expect(adapter.push([record("todos", "todo_1")])).resolves.toBeUndefined();
-    expect(errorSpy).toHaveBeenCalledWith("[sync] Supabase upsert failed for todos", upsertError);
+    await expect(adapter.push([record("todos", "todo_1")])).rejects.toThrow(
+      "[sync] Supabase upsert failed for todos: timeout",
+    );
   });
 
-  it("handles thrown push errors (like network timeout) without crashing", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("rethrows transport failures (like network timeout)", async () => {
     const timeoutError = new Error("network timeout");
     const supabase = { from: vi.fn().mockReturnValue({ upsert: vi.fn().mockRejectedValue(timeoutError) }) };
     const { adapter, db } = await setupAdapter({ supabase });
     db.getAllAsync.mockResolvedValue([{ id: "habit_1" }]);
 
-    await expect(adapter.push([record("habits", "habit_1")])).resolves.toBeUndefined();
-    expect(errorSpy).toHaveBeenCalledWith("[sync] push failed for habits", timeoutError);
+    await expect(adapter.push([record("habits", "habit_1")])).rejects.toThrow(
+      "network timeout",
+    );
   });
 
-  it("handles database read failures without crashing", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("rethrows database read failures", async () => {
     const dbError = new Error("db read failed");
     const { adapter, db, from } = await setupAdapter({});
     db.getAllAsync.mockRejectedValue(dbError);
 
-    await expect(adapter.push([record("todos", "todo_1")])).resolves.toBeUndefined();
-    expect(errorSpy).toHaveBeenCalledWith("[sync] push failed for todos", dbError);
+    await expect(adapter.push([record("todos", "todo_1")])).rejects.toThrow(
+      "db read failed",
+    );
     expect(from).not.toHaveBeenCalled();
   });
 
