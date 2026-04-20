@@ -8,33 +8,16 @@ const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
 }));
 
-const { linkedActionsEngine } = vi.hoisted(() => ({
-  linkedActionsEngine: {
-    processSourceAction: vi.fn(),
-  },
-}));
-
 vi.mock("@/core/db/client", () => ({
   getDatabase,
 }));
 
-vi.mock("@/core/linked-actions/linkedActions.engine", () => ({
-  linkedActionsEngine,
-}));
-
-describe("features/pomodoro/pomodoro.data linked-actions source dispatch", () => {
+describe("features/pomodoro/pomodoro.data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    linkedActionsEngine.processSourceAction.mockResolvedValue({
-      mode: "apply",
-      sourceEvent: {},
-      matchedRuleCount: 0,
-      effects: [],
-      notices: [],
-    });
   });
 
-  it("emits pomodoro.focus_completed for manual focus sessions", async () => {
+  it("writes pomodoro sessions for manual logs", async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue(null),
       runAsync: vi.fn().mockResolvedValue(undefined),
@@ -59,16 +42,9 @@ describe("features/pomodoro/pomodoro.data linked-actions source dispatch", () =>
         expect.any(String),
       ],
     );
-    expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        feature: "pomodoro",
-        entityType: "pomodoro_timer",
-        triggerType: "pomodoro.focus_completed",
-      }),
-    );
   });
 
-  it("does not emit for manual break sessions", async () => {
+  it("writes pomodoro break sessions with the provided session type", async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue(null),
       runAsync: vi.fn().mockResolvedValue(undefined),
@@ -82,10 +58,13 @@ describe("features/pomodoro/pomodoro.data linked-actions source dispatch", () =>
       "short_break",
     );
 
-    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO pomodoro_sessions"),
+      expect.arrayContaining(["short_break"]),
+    );
   });
 
-  it("does not re-emit for linked_action-origin sessions", async () => {
+  it("applies linked-action pomodoro writes without source re-dispatch", async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue(null),
       runAsync: vi.fn().mockResolvedValue(undefined),
@@ -102,7 +81,5 @@ describe("features/pomodoro/pomodoro.data linked-actions source dispatch", () =>
       status: "applied",
       producedEntityId: "pom_123",
     });
-
-    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 });

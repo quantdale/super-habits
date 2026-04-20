@@ -9,33 +9,16 @@ const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
 }));
 
-const { linkedActionsEngine } = vi.hoisted(() => ({
-  linkedActionsEngine: {
-    processSourceAction: vi.fn(),
-  },
-}));
-
 vi.mock("@/core/db/client", () => ({
   getDatabase,
 }));
 
-vi.mock("@/core/linked-actions/linkedActions.engine", () => ({
-  linkedActionsEngine,
-}));
-
-describe("features/workout/workout.data linked-actions source dispatch", () => {
+describe("features/workout/workout.data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    linkedActionsEngine.processSourceAction.mockResolvedValue({
-      mode: "apply",
-      sourceEvent: {},
-      matchedRuleCount: 0,
-      effects: [],
-      notices: [],
-    });
   });
 
-  it("emits workout.completed after manual quick completion", async () => {
+  it("writes a workout log for manual quick completion", async () => {
     const db = {
       getFirstAsync: vi
         .fn()
@@ -61,18 +44,9 @@ describe("features/workout/workout.data linked-actions source dispatch", () => {
         expect.any(String),
       ],
     );
-    expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        feature: "workout",
-        entityType: "workout_routine",
-        entityId: "routine_1",
-        triggerType: "workout.completed",
-        sourceRecordId: expect.stringMatching(/^wrk_/),
-      }),
-    );
   });
 
-  it("emits workout.completed after session flow completion", async () => {
+  it("writes workout session exercise rows for session flow completion", async () => {
     const db = {
       getFirstAsync: vi
         .fn()
@@ -105,16 +79,9 @@ describe("features/workout/workout.data linked-actions source dispatch", () => {
         expect.any(String),
       ],
     );
-    expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        feature: "workout",
-        triggerType: "workout.completed",
-        entityId: "routine_2",
-      }),
-    );
   });
 
-  it("does not re-emit from linked_action-origin workout writes", async () => {
+  it("applies linked-action workout log writes without source re-dispatch", async () => {
     const db = {
       getFirstAsync: vi
         .fn()
@@ -138,7 +105,5 @@ describe("features/workout/workout.data linked-actions source dispatch", () => {
       status: "applied",
       producedEntityId: "wrk_123",
     });
-
-    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 });
