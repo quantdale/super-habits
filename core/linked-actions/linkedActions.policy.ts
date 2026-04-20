@@ -60,8 +60,8 @@ type LinkedActionEffectPolicy = {
 
 const LINKED_ACTION_TRIGGER_POLICIES: Record<LinkedActionTriggerType, LinkedActionTriggerPolicy> = {
   "todo.completed": {
-    engineSupport: "deferred",
-    authoringSupport: "hidden",
+    engineSupport: "implemented",
+    authoringSupport: "visible",
     progressSemantics: "completion_only",
     retriggerPolicy: "suppress_linked_action_origin",
     directionSupport: { oneWay: true, bidirectionalPeer: false },

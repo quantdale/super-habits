@@ -4,10 +4,6 @@ import {
   LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE,
   LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
   LINKED_ACTION_SUPPORTED_TRIGGER_TYPES,
-  isLinkedActionEffectEngineSupported,
-  isLinkedActionTargetEntityEngineSupported,
-  isLinkedActionTargetFeatureEngineSupported,
-  isLinkedActionTriggerEngineSupported,
   supportsLinkedActionDirectionPolicy,
 } from "@/core/linked-actions/linkedActions.policy";
 export {
@@ -83,33 +79,6 @@ export const LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY = {
 
 export type LinkedActionEffectType = ValueOfConstArrays<
   typeof LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY
->;
-
-export const LINKED_ACTION_SUPPORTED_TRIGGER_TYPES = [
-  "todo.completed",
-  "habit.completed_for_day",
-] as const satisfies readonly LinkedActionTriggerType[];
-
-export const LINKED_ACTION_SUPPORTED_TARGET_FEATURES = [
-  "todos",
-  "habits",
-  "workout",
-] as const satisfies readonly LinkedActionFeature[];
-
-export const LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE = {
-  todos: ["todo"],
-  habits: ["habit"],
-  workout: ["workout_routine"],
-} as const satisfies Partial<
-  Record<LinkedActionFeature, readonly LinkedActionTargetEntityType[]>
->;
-
-export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY = {
-  todo: ["todo.complete"],
-  habit: ["habit.increment", "habit.ensure_daily_target"],
-  workout_routine: ["workout.log"],
-} as const satisfies Partial<
-  Record<LinkedActionTargetEntityType, readonly LinkedActionEffectType[]>
 >;
 
 export const LINKED_ACTION_SUPPORTED_RULE_PATHS = [
@@ -385,6 +354,9 @@ const ALL_LINKED_ACTION_TRIGGER_TYPES = flattenConstArrays(
 const ALL_LINKED_ACTION_EFFECT_TYPES = flattenConstArrays(
   LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY,
 );
+const ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES = Object.values(
+  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
+).flatMap((value) => (value ? [...value] : []));
 function expectObject(value: unknown, context: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${context} must be a JSON object`);
@@ -476,19 +448,13 @@ export function isLinkedActionEffectType(value: string): value is LinkedActionEf
 export function isSupportedLinkedActionTriggerType(
   value: string,
 ): value is LinkedActionTriggerType {
-  if (!isLinkedActionTriggerType(value)) {
-    return false;
-  }
-  return isLinkedActionTriggerEngineSupported(value);
+  return (LINKED_ACTION_SUPPORTED_TRIGGER_TYPES as readonly string[]).includes(value);
 }
 
 export function isSupportedLinkedActionTargetFeature(
   value: string,
 ): value is LinkedActionFeature {
-  if (!isLinkedActionFeature(value)) {
-    return false;
-  }
-  return isLinkedActionTargetFeatureEngineSupported(value);
+  return (LINKED_ACTION_SUPPORTED_TARGET_FEATURES as readonly string[]).includes(value);
 }
 
 export function isAllowedLinkedActionSourceEntity(
@@ -541,10 +507,7 @@ export function isSupportedLinkedActionEffect(
   entityType: LinkedActionTargetEntityType,
   effectType: LinkedActionEffectType,
 ): boolean {
-  if (!isLinkedActionTargetEntityEngineSupported(entityType)) {
-    return false;
-  }
-  if (!isLinkedActionEffectEngineSupported(effectType)) {
+  if (!(ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES as readonly string[]).includes(effectType)) {
     return false;
   }
 
@@ -735,6 +698,7 @@ export function assertValidLinkedActionRuleShape(
     throw new Error(
       `Direction policy ${directionPolicy} is not supported for trigger ${source.triggerType} and effect ${target.effect.type}.`,
     );
+  }
   if (!isSupportedLinkedActionRulePath(source, target)) {
     throw new Error(LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE);
   }

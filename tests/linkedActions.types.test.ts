@@ -209,10 +209,10 @@ describe("core/linked-actions/linkedActions.types", () => {
     });
   });
 
-  it("keeps workout and pomodoro triggers engine-supported while hidden from current authoring", () => {
-    expect(isSupportedLinkedActionTriggerType("workout.completed")).toBe(true);
-    expect(isSupportedLinkedActionTriggerType("pomodoro.focus_completed")).toBe(true);
+  it("keeps only shipped trigger sources as supported", () => {
+    expect(isSupportedLinkedActionTriggerType("todo.completed")).toBe(true);
     expect(isSupportedLinkedActionTriggerType("habit.completed_for_day")).toBe(true);
-    expect(isSupportedLinkedActionTriggerType("todo.completed")).toBe(false);
+    expect(isSupportedLinkedActionTriggerType("workout.completed")).toBe(false);
+    expect(isSupportedLinkedActionTriggerType("pomodoro.focus_completed")).toBe(false);
   });
 });
