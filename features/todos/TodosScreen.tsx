@@ -3,6 +3,26 @@ import { Platform, Pressable, Text, View, useWindowDimensions } from "react-nati
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
+import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
+import {
+  createLinkedActionEditorRowFromRule,
+  createSaveLinkedActionRuleInputFromEditorRow,
+} from "@/core/linked-actions/linkedActionsEditor.model";
+import type {
+  LinkedActionEditorRowDraft,
+  LinkedActionEditorSourceOption,
+} from "@/core/linked-actions/linkedActionsEditor.types";
+import {
+  createLinkedActionTargetExistingSelection,
+  type LinkedActionTargetPickerCandidate,
+} from "@/core/linked-actions/linkedActionsTargetPicker.types";
+import { getLinkedActionTargetPickerProvider } from "@/core/linked-actions/linkedActionsTargetProviders";
+import type {
+  LinkedActionFeature,
+  LinkedActionRuleDefinition,
+  SaveLinkedActionRuleForSourceInput,
+} from "@/core/linked-actions/linkedActions.types";
+import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { Card } from "@/core/ui/Card";
@@ -25,8 +45,10 @@ import {
   createRecurringInstance,
   getRecurringTodosByIds,
   listAllActiveTodosForRecurrence,
+  listTodoLinkedActionRules,
   listTodos,
   removeTodo,
+  saveTodoLinkedActionRules,
   toggleTodo,
   updateTodo,
   updateTodoOrder,
@@ -44,7 +66,35 @@ const VIEW_MODE_OPTIONS: ReadonlyArray<{
   { mode: "grid", icon: "grid-view" },
 ];
 
+const TODO_LINKED_ACTION_SOURCE_KEY = "todo-linked-actions-source";
+const TODO_LINKED_ACTION_ALLOWED_TARGETS: LinkedActionFeature[] = ["todos"];
+const TODO_LINKED_ACTION_ALLOWED_TRIGGERS = ["todo.completed"] as const;
+
+async function buildLinkedActionEditorRows(
+  rules: LinkedActionRuleDefinition[],
+): Promise<LinkedActionEditorRowDraft[]> {
+  const provider = getLinkedActionTargetPickerProvider("todos");
+  const candidates = provider.existing.supported
+    ? await provider.existing.loadCandidates()
+    : [];
+
+  return rules.map((rule) => {
+    const candidate =
+      !rule.isUnsupported && rule.target.entityId
+        ? candidates.find((item) => item.id === rule.target.entityId) ?? null
+        : null;
+
+    return createLinkedActionEditorRowFromRule({
+      rule,
+      targetSelection: candidate
+        ? createLinkedActionTargetExistingSelection(provider, candidate)
+        : null,
+    });
+  });
+}
+
 export function TodosScreen() {
+  const { showNotice } = useInAppNotices();
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [dueDate, setDueDate] = useState<string | null>(null);
@@ -56,6 +106,9 @@ export function TodosScreen() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [todoError, setTodoError] = useState<string | null>(null);
+  const [linkedActionRows, setLinkedActionRows] = useState<LinkedActionEditorRowDraft[]>([]);
+  const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
+  const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<TodoViewMode>("content");
   const { width: screenWidth } = useWindowDimensions();
   const gridColumns = screenWidth >= 1200 ? 4 : screenWidth >= 768 ? 3 : 2;
@@ -122,6 +175,9 @@ export function TodosScreen() {
     setEditingId(null);
     setShowDatePicker(false);
     setTodoError(null);
+    setLinkedActionRows([]);
+    setLinkedActionsError(null);
+    setLinkedActionsLoading(false);
   };
 
   const closeModal = () => {
@@ -141,6 +197,22 @@ export function TodosScreen() {
       return;
     }
     setTodoError(null);
+    setLinkedActionsError(null);
+
+    let linkedActionRules: SaveLinkedActionRuleForSourceInput[] = [];
+    if (editingId) {
+      try {
+        linkedActionRules = linkedActionRows.map(createSaveLinkedActionRuleInputFromEditorRow);
+      } catch (error) {
+        setLinkedActionsError(
+          error instanceof Error
+            ? error.message
+            : "Finish or remove incomplete linked actions before saving this task.",
+        );
+        return;
+      }
+    }
+
     if (editingId) {
       await updateTodo(editingId, {
         title: title.trim(),
@@ -148,6 +220,7 @@ export function TodosScreen() {
         dueDate: dueDate ?? null,
         priority,
       });
+      await saveTodoLinkedActionRules(editingId, linkedActionRules);
     } else {
       await addTodo({
         title: title.trim(),
@@ -162,14 +235,48 @@ export function TodosScreen() {
     refresh();
   };
 
-  const startEdit = (todo: Todo) => {
+  const startEdit = async (todo: Todo) => {
     setEditingId(todo.id);
     setTitle(todo.title);
     setNotes(todo.notes ?? "");
     setDueDate(todo.due_date);
     setPriority(todo.priority);
     setTodoError(null);
+    setLinkedActionsError(null);
+    setLinkedActionRows([]);
+    setLinkedActionsLoading(true);
     setModalVisible(true);
+
+    try {
+      const rules = await listTodoLinkedActionRules(todo.id);
+      setLinkedActionRows(await buildLinkedActionEditorRows(rules));
+    } catch (error) {
+      setLinkedActionsError(
+        error instanceof Error ? error.message : "Could not load linked actions for this task.",
+      );
+    } finally {
+      setLinkedActionsLoading(false);
+    }
+  };
+
+  const handleToggle = useCallback(
+    async (todo: Todo) => {
+      const result = await toggleTodo(todo);
+      for (const notice of result.notices) {
+        showNotice(notice);
+      }
+      await refresh();
+    },
+    [refresh, showNotice],
+  );
+
+  const linkedActionSource: LinkedActionEditorSourceOption = {
+    key: TODO_LINKED_ACTION_SOURCE_KEY,
+    feature: "todos",
+    entityType: "todo",
+    entityId: editingId ?? "draft-todo",
+    label: title.trim() || "This task",
+    description: "Rules below run when this task is completed.",
   };
 
   const emptyPending =
@@ -335,9 +442,11 @@ export function TodosScreen() {
                                 todo={item}
                                 onLongPress={() => {}}
                                 isActive={false}
-                                onToggle={() => toggleTodo(item).then(refresh)}
+                                onToggle={() => handleToggle(item)}
                                 onDelete={() => removeTodo(item.id).then(refresh)}
-                                onEdit={() => startEdit(item)}
+                                onEdit={() => {
+                                  void startEdit(item);
+                                }}
                                 viewMode={viewMode}
                                 cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
                               />
@@ -353,9 +462,11 @@ export function TodosScreen() {
                       todo={item}
                       onLongPress={drag}
                       isActive={isActive}
-                      onToggle={() => toggleTodo(item).then(refresh)}
+                      onToggle={() => handleToggle(item)}
                       onDelete={() => removeTodo(item.id).then(refresh)}
-                      onEdit={() => startEdit(item)}
+                      onEdit={() => {
+                        void startEdit(item);
+                      }}
                       viewMode={viewMode}
                       cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
                     />
@@ -365,8 +476,8 @@ export function TodosScreen() {
             </ScreenSection>
           ) : null}
         </View>
-
       <Modal visible={modalVisible} onClose={closeModal} scroll>
+        <>
         <Card
           variant="header"
           accentColor={SECTION_COLORS.todos}
@@ -472,6 +583,39 @@ export function TodosScreen() {
             </>
           )}
           <ValidationError message={todoError} />
+        </Card>
+        <Card
+          variant="header"
+          accentColor={SECTION_COLORS.todos}
+          headerTitle="Linked Actions"
+          headerSubtitle="Optional explicit rules that run when this task is completed."
+        >
+          {editingId ? (
+            linkedActionsLoading ? (
+              <Text className="text-sm text-slate-600">Loading linked actions...</Text>
+            ) : (
+              <LinkedActionsEditorSection
+                sourceOptions={[linkedActionSource]}
+                selectedSourceKey={TODO_LINKED_ACTION_SOURCE_KEY}
+                rows={linkedActionRows}
+                onRowsChange={(rows) => {
+                  setLinkedActionsError(null);
+                  setLinkedActionRows(rows);
+                }}
+                allowSourceSelection={false}
+                allowedTargetFeatures={TODO_LINKED_ACTION_ALLOWED_TARGETS}
+                allowedTriggerTypes={[...TODO_LINKED_ACTION_ALLOWED_TRIGGERS]}
+                allowCreateNewTarget={false}
+                introTitle="Task completion rules"
+                introDescription="Choose another existing task to complete when this one is marked done."
+              />
+            )
+          ) : (
+            <Text className="text-sm text-slate-600">
+              Create the task first, then edit it to attach linked actions.
+            </Text>
+          )}
+          <ValidationError message={linkedActionsError} />
           <View className="mt-3 flex-row gap-2">
             <View className="flex-1">
               <Button label="Cancel" variant="ghost" onPress={closeModal} />
@@ -481,6 +625,7 @@ export function TodosScreen() {
             </View>
           </View>
         </Card>
+        </>
       </Modal>
     </Screen>
 
