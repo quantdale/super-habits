@@ -88,14 +88,14 @@ const LINKED_ACTION_TRIGGER_POLICIES: Record<LinkedActionTriggerType, LinkedActi
     directionSupport: { oneWay: true, bidirectionalPeer: false },
   },
   "workout.completed": {
-    engineSupport: "implemented",
+    engineSupport: "deferred",
     authoringSupport: "hidden",
     progressSemantics: "completion_only",
     retriggerPolicy: "suppress_linked_action_origin",
     directionSupport: { oneWay: true, bidirectionalPeer: true },
   },
   "pomodoro.focus_completed": {
-    engineSupport: "implemented",
+    engineSupport: "deferred",
     authoringSupport: "hidden",
     progressSemantics: "completion_only",
     retriggerPolicy: "suppress_linked_action_origin",

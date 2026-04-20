@@ -4,6 +4,9 @@ import {
   LINKED_ACTION_SOURCE_ENTITY_TYPES_BY_FEATURE,
   LINKED_ACTION_TARGET_ENTITY_TYPES_BY_FEATURE,
   LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY,
+  isSupportedLinkedActionEffect,
+  isSupportedLinkedActionTargetFeature,
+  isSupportedLinkedActionTriggerType,
   type LinkedActionEffectType,
   type LinkedActionFeature,
   type LinkedActionRuleTarget,
@@ -12,11 +15,6 @@ import {
   type LinkedActionTargetEntityType,
   type LinkedActionTriggerType,
 } from "@/core/linked-actions/linkedActions.types";
-import {
-  isLinkedActionEffectAuthoringSupported,
-  isLinkedActionTargetFeatureAuthoringSupported,
-  isLinkedActionTriggerAuthoringSupported,
-} from "@/core/linked-actions/linkedActions.policy";
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorRowValidation,
@@ -123,7 +121,7 @@ export function getLinkedActionTriggerOptions(
 ): Array<LinkedActionOption<LinkedActionTriggerType>> {
   const entityType = getLinkedActionSourceEntityTypeForFeature(feature);
   return LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY[entityType]
-    .filter((triggerType) => isLinkedActionTriggerAuthoringSupported(triggerType))
+    .filter((triggerType) => isSupportedLinkedActionTriggerType(triggerType))
     .map((triggerType) => ({
       value: triggerType,
       label: getLinkedActionTriggerLabel(triggerType),
@@ -137,13 +135,13 @@ export function getLinkedActionTriggerOptions(
 export function getLinkedActionEffectOptions(
   feature: LinkedActionFeature,
 ): Array<LinkedActionOption<LinkedActionEffectType>> {
-  if (!isLinkedActionTargetFeatureAuthoringSupported(feature)) {
+  if (!isSupportedLinkedActionTargetFeature(feature)) {
     return [];
   }
 
   const entityType = getLinkedActionTargetEntityTypeForFeature(feature);
   return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[entityType]
-    .filter((effectType) => isLinkedActionEffectAuthoringSupported(effectType))
+    .filter((effectType) => isSupportedLinkedActionEffect(entityType, effectType))
     .map((effectType) => ({
       value: effectType,
       label: getLinkedActionEffectLabel(effectType),
