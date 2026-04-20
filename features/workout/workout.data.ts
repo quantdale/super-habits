@@ -5,10 +5,14 @@ import {
   WorkoutLog,
   WorkoutRoutine,
 } from "@/core/db/types";
-import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
+import type {
+  LinkedActionEffectAdapterResult,
+  LinkedActionOriginMetadata,
+} from "@/core/linked-actions/linkedActions.types";
 import { deleteLinkedActionRulesForTargetEntity } from "@/core/linked-actions/linkedActions.data";
+import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
 import { createId } from "@/lib/id";
-import { getUtcIsoRangeForLocalDateKeys, nowIso } from "@/lib/time";
+import { getUtcIsoRangeForLocalDateKeys, nowIso, toDateKey } from "@/lib/time";
 import { syncEngine } from "@/core/sync/sync.engine";
 import { validateSetTiming } from "@/lib/validation";
 
@@ -30,6 +34,92 @@ async function markWorkoutRoutineUpdated(
   });
 }
 
+function normalizeLinkedActionOrigin(
+  origin: Partial<LinkedActionOriginMetadata> | undefined,
+): LinkedActionOriginMetadata {
+  return {
+    originKind: origin?.originKind ?? "user",
+    originRuleId: origin?.originRuleId ?? null,
+    originEventId: origin?.originEventId ?? null,
+  };
+}
+
+async function emitWorkoutCompletedSourceAction(input: {
+  routineId: string;
+  routineName: string | null;
+  logId: string;
+  completedAtIso: string;
+  origin: LinkedActionOriginMetadata;
+  payload: Record<string, unknown>;
+}): Promise<void> {
+  if (input.origin.originKind === "linked_action") {
+    return;
+  }
+
+  await linkedActionsEngine.processSourceAction({
+    occurredAt: input.completedAtIso,
+    feature: "workout",
+    entityType: "workout_routine",
+    entityId: input.routineId,
+    triggerType: "workout.completed",
+    label: input.routineName ?? undefined,
+    sourceDateKey: toDateKey(new Date(input.completedAtIso)),
+    sourceRecordId: input.logId,
+    origin: input.origin,
+    payload: input.payload,
+  });
+}
+
+async function insertWorkoutLogRecord(input: {
+  db: Awaited<ReturnType<typeof getDatabase>>;
+  logId: string;
+  routineId: string;
+  notes: string | null;
+  completedAtIso: string;
+  createdAtIso: string;
+  requireActiveRoutine: boolean;
+}): Promise<{
+  status: "applied" | "skipped";
+  reason: string | null;
+  routineName: string | null;
+}> {
+  const routine = await input.db.getFirstAsync<Pick<WorkoutRoutine, "id" | "name" | "deleted_at">>(
+    `SELECT id, name, deleted_at
+     FROM workout_routines
+     WHERE id = ?`,
+    [input.routineId],
+  );
+
+  if (input.requireActiveRoutine && (!routine || routine.deleted_at !== null)) {
+    return {
+      status: "skipped",
+      reason: "target_missing",
+      routineName: null,
+    };
+  }
+
+  const existing = await input.db.getFirstAsync<Pick<WorkoutLog, "id">>(
+    `SELECT id
+     FROM workout_logs
+     WHERE id = ?`,
+    [input.logId],
+  );
+
+  if (!existing) {
+    await input.db.runAsync(
+      `INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [input.logId, input.routineId, input.notes, input.completedAtIso, input.createdAtIso],
+    );
+  }
+
+  return {
+    status: "applied",
+    reason: null,
+    routineName: routine?.name ?? null,
+  };
+}
+
 export async function listRoutines(): Promise<WorkoutRoutine[]> {
   const db = await getDatabase();
   return db.getAllAsync<WorkoutRoutine>(
@@ -49,13 +139,36 @@ export async function addRoutine(name: string, description: string): Promise<voi
 }
 
 export async function completeRoutine(routineId: string, notes?: string): Promise<void> {
-  const id = createId("wrk");
-  const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync(
-    "INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at) VALUES (?, ?, ?, ?, ?)",
-    [id, routineId, notes ?? null, now, now],
-  );
+  const logId = createId("wrk");
+  const now = nowIso();
+  const origin = normalizeLinkedActionOrigin(undefined);
+
+  const record = await insertWorkoutLogRecord({
+    db,
+    logId,
+    routineId,
+    notes: notes ?? null,
+    completedAtIso: now,
+    createdAtIso: now,
+    requireActiveRoutine: false,
+  });
+
+  if (record.status !== "applied") {
+    return;
+  }
+
+  await emitWorkoutCompletedSourceAction({
+    routineId,
+    routineName: record.routineName,
+    logId,
+    completedAtIso: now,
+    origin,
+    payload: {
+      completionMode: "quick_complete",
+      notesProvided: Boolean(notes?.trim()),
+    },
+  });
 }
 
 export async function listWorkoutLogs(limit: number = 30): Promise<WorkoutLog[]> {
@@ -337,14 +450,23 @@ export async function logWorkoutSession(input: {
   const db = await getDatabase();
   const logId = createId("wrk");
   const now = nowIso();
+  const origin = normalizeLinkedActionOrigin(undefined);
 
-  await db.runAsync(
-    `INSERT INTO workout_logs
-       (id, routine_id, notes, completed_at, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [logId, input.routineId, input.notes ?? null, now, now],
-  );
+  const record = await insertWorkoutLogRecord({
+    db,
+    logId,
+    routineId: input.routineId,
+    notes: input.notes ?? null,
+    completedAtIso: now,
+    createdAtIso: now,
+    requireActiveRoutine: false,
+  });
 
+  if (record.status !== "applied") {
+    return;
+  }
+
+  let totalSetsCompleted = 0;
   for (const ex of input.exercises) {
     const exId = createId("wsex");
     await db.runAsync(
@@ -353,7 +475,22 @@ export async function logWorkoutSession(input: {
        VALUES (?, ?, ?, ?, ?)`,
       [exId, logId, ex.exerciseName, ex.setsCompleted, now],
     );
+    totalSetsCompleted += ex.setsCompleted;
   }
+
+  await emitWorkoutCompletedSourceAction({
+    routineId: input.routineId,
+    routineName: record.routineName,
+    logId,
+    completedAtIso: now,
+    origin,
+    payload: {
+      completionMode: "session_flow",
+      exerciseCount: input.exercises.length,
+      totalSetsCompleted,
+      notesProvided: Boolean(input.notes?.trim()),
+    },
+  });
 }
 
 export async function logWorkoutFromLinkedAction(input: {
@@ -362,36 +499,38 @@ export async function logWorkoutFromLinkedAction(input: {
   notes?: string | null;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  const routine = await db.getFirstAsync<Pick<WorkoutRoutine, "id" | "name" | "deleted_at">>(
-    `SELECT id, name, deleted_at
-     FROM workout_routines
-     WHERE id = ?`,
-    [input.routineId],
-  );
+  const now = nowIso();
+  const origin = normalizeLinkedActionOrigin({
+    originKind: "linked_action",
+  });
+  const record = await insertWorkoutLogRecord({
+    db,
+    logId: input.id,
+    routineId: input.routineId,
+    notes: input.notes ?? null,
+    completedAtIso: now,
+    createdAtIso: now,
+    requireActiveRoutine: true,
+  });
 
-  if (!routine || routine.deleted_at !== null) {
-    return { status: "skipped", reason: "target_missing" };
+  if (record.status !== "applied") {
+    return { status: "skipped", reason: record.reason ?? "target_missing" };
   }
 
-  const existing = await db.getFirstAsync<Pick<WorkoutLog, "id">>(
-    `SELECT id
-     FROM workout_logs
-     WHERE id = ?`,
-    [input.id],
-  );
-
-  if (!existing) {
-    const now = nowIso();
-    await db.runAsync(
-      `INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [input.id, input.routineId, input.notes ?? null, now, now],
-    );
-  }
+  await emitWorkoutCompletedSourceAction({
+    routineId: input.routineId,
+    routineName: record.routineName,
+    logId: input.id,
+    completedAtIso: now,
+    origin,
+    payload: {
+      completionMode: "linked_action",
+    },
+  });
 
   return {
     status: "applied",
-    targetLabel: routine.name,
+    targetLabel: record.routineName ?? undefined,
     producedEntityType: "workout_log",
     producedEntityId: input.id,
   };

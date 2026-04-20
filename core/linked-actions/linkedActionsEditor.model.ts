@@ -1,7 +1,4 @@
 import {
-  LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
-  LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
-  LINKED_ACTION_SUPPORTED_TRIGGER_TYPES,
   LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE,
   LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY,
   LINKED_ACTION_SOURCE_ENTITY_TYPES_BY_FEATURE,
@@ -15,6 +12,11 @@ import {
   type LinkedActionTargetEntityType,
   type LinkedActionTriggerType,
 } from "@/core/linked-actions/linkedActions.types";
+import {
+  isLinkedActionEffectAuthoringSupported,
+  isLinkedActionTargetFeatureAuthoringSupported,
+  isLinkedActionTriggerAuthoringSupported,
+} from "@/core/linked-actions/linkedActions.policy";
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorRowValidation,
@@ -121,9 +123,7 @@ export function getLinkedActionTriggerOptions(
 ): Array<LinkedActionOption<LinkedActionTriggerType>> {
   const entityType = getLinkedActionSourceEntityTypeForFeature(feature);
   return LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY[entityType]
-    .filter((triggerType) =>
-      (LINKED_ACTION_SUPPORTED_TRIGGER_TYPES as readonly string[]).includes(triggerType),
-    )
+    .filter((triggerType) => isLinkedActionTriggerAuthoringSupported(triggerType))
     .map((triggerType) => ({
       value: triggerType,
       label: getLinkedActionTriggerLabel(triggerType),
@@ -137,18 +137,13 @@ export function getLinkedActionTriggerOptions(
 export function getLinkedActionEffectOptions(
   feature: LinkedActionFeature,
 ): Array<LinkedActionOption<LinkedActionEffectType>> {
-  if (!(LINKED_ACTION_SUPPORTED_TARGET_FEATURES as readonly string[]).includes(feature)) {
+  if (!isLinkedActionTargetFeatureAuthoringSupported(feature)) {
     return [];
   }
 
   const entityType = getLinkedActionTargetEntityTypeForFeature(feature);
   return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[entityType]
-    .filter(
-      (effectType) =>
-        LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY[
-          entityType as keyof typeof LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY
-        ]?.includes(effectType as never) ?? false,
-    )
+    .filter((effectType) => isLinkedActionEffectAuthoringSupported(effectType))
     .map((effectType) => ({
       value: effectType,
       label: getLinkedActionEffectLabel(effectType),

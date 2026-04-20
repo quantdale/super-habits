@@ -59,6 +59,14 @@ describe("linkedActionsEditor.model", () => {
     expect(options.map((option) => option.value)).toEqual(["habit.completed_for_day"]);
   });
 
+  it("keeps workout and pomodoro triggers hidden from current authoring options", () => {
+    expect(getLinkedActionTriggerOptions("workout")).toEqual([]);
+    expect(getLinkedActionTriggerOptions("pomodoro")).toEqual([]);
+  });
+
+  it("keeps workout and pomodoro triggers hidden from current authoring options", () => {
+    expect(getLinkedActionTriggerOptions("workout")).toEqual([]);
+    expect(getLinkedActionTriggerOptions("pomodoro")).toEqual([]);
   it("returns only todo.completed as the trigger option for todos", () => {
     const options = getLinkedActionTriggerOptions("todos");
 
