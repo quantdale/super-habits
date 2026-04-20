@@ -28,7 +28,7 @@ If this file conflicts with the documents above, follow the more specific author
 ## Architecture
 
 - `app/`: Expo Router only. Thin route wrappers and layouts. No business logic.
-- `features/`: Feature modules with `{feature}.data.ts`, `{feature}.domain.ts`, `*Screen.tsx` (exception: `features/overview/` is `OverviewScreen.tsx` only; `features/shared/` holds cross-feature components).
+- `features/`: Feature modules with `{feature}.data.ts`, `{feature}.domain.ts`, `*Screen.tsx` (exceptions: `features/overview/` is `OverviewScreen.tsx` only, `features/settings/` is `SettingsScreen.tsx` only, and `features/shared/` holds cross-feature components).
 - `core/`: DB client, migrations, sync engine, providers, shared UI primitives.
 - `lib/`: Pure helpers only. No DB access. No feature imports.
 
@@ -58,6 +58,7 @@ If this file conflicts with the documents above, follow the more specific author
 
 - Thin route files only:
   - `app/(tabs)/{feature}.tsx` should render the screen and nothing else.
+  - `app/settings.tsx` should render the screen and nothing else.
 
 ## Feature Workflow
 

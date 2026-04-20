@@ -5,7 +5,7 @@ description: Feature module structure for SuperHabits. Use when adding or modify
 
 # FEATURE MODULE PATTERN — SuperHabits
 
-Every feature in SuperHabits follows a strict three-file structure.
+Every feature in SuperHabits follows a strict three-file structure unless it is one of the current screen-only exceptions listed below.
 Apply this pattern for all new features and when modifying existing ones.
 
 ## Directory structure
@@ -19,6 +19,7 @@ Route file (thin wrapper):
 
 ## Exceptions (current repo)
 - **`features/overview/`** — `OverviewScreen.tsx` only (dashboard tab). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
+- **`features/settings/`** — `SettingsScreen.tsx` only. It is a utility route rendered by `app/settings.tsx`, not a tab module.
 - **`features/shared/`** — cross-feature UI (`GitHubHeatmap`, `ActivityPreviewStrip`). Not a tab-routed module.
 - **Nested screens** — e.g. `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx` alongside `WorkoutScreen.tsx` under `features/workout/` for multi-step flows.
 

@@ -1,6 +1,6 @@
 # SuperHabits
 
-SuperHabits is an offline-first productivity app for web and mobile with five modules: To Do, Habits, Focus (Pomodoro), Workout, and Calories. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
+SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, five core modules, and a lightweight settings screen for appearance and current platform status. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
 Data is stored locally in SQLite first, then optionally pushed to Supabase as cloud backup via the app's delta-sync pipeline.
 
@@ -14,8 +14,8 @@ Data is stored locally in SQLite first, then optionally pushed to Supabase as cl
 
 ## Tech Stack
 
-- Expo SDK 55 + React Native 0.84 + Expo Router
-- TypeScript 6 + NativeWind 4
+- Expo SDK 55 + React Native 0.83.4 + Expo Router
+- TypeScript 5.9 + NativeWind 4
 - SQLite via `expo-sqlite` (WAL on native); web runtime uses SQLite WASM + OPFS
 - Supabase (`@supabase/supabase-js`) for one-way sync backup and anonymous auth
 - Vercel for static PWA hosting (`dist/` output + SPA rewrites + COOP/COEP headers)

@@ -51,7 +51,7 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal).
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal), plus a non-tab **settings** route for theme mode and current shipped-scope status.
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **11**. Next migration: `if (version < 12)`.
 
@@ -61,7 +61,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality (April 14, 2026):** `npm run typecheck` passes; `npm test` passes with **234** tests; `npm run build:web` passes; `npm run e2e` passes with **59** tests. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (April 20, 2026):** `npm run typecheck` passes; `npm test` passes with **252** tests; `npm run build:web` passes; `npm run e2e` passes with **61** tests. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -90,14 +90,14 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`) |
 | Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
-| Unit tests | **234** passing (Vitest) |
-| E2E tests | **59** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Unit tests | **252** passing (Vitest) |
+| E2E tests | **61** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
 | Path | Role |
 |------|------|
-| `app/` | Expo Router routes: root layout, index redirect, `(tabs)` layout + thin tab route files |
+| `app/` | Expo Router routes: root layout, index redirect, `settings.tsx`, `(tabs)` layout + thin tab route files |
 | `assets/` | Icons, splash, favicon (referenced from `app.json`) |
 | `constants/` | Shared design tokens (section colors) |
 | `core/` | DB singleton, types, sync engine, guest profile, `AppProviders`, PWA registration, shared `ui/` |
@@ -116,12 +116,13 @@
 
 ### Complete file inventory
 
-#### `app/` (9 files)
+#### `app/` (10 files)
 
 | File | Role |
 |------|------|
 | `_layout.tsx` | Root stack; `AppProviders`, `StatusBar`, hides header |
-| `index.tsx` | Redirect to `/(tabs)/todos` |
+| `index.tsx` | Redirect to `/(tabs)/overview` |
+| `settings.tsx` | Renders `SettingsScreen` |
 | `(tabs)/_layout.tsx` | Top tab bar, `TabList` / `TabTrigger` / `TabSlot` |
 | `(tabs)/overview.tsx` | Renders `OverviewScreen` |
 | `(tabs)/todos.tsx` | Renders `TodosScreen` |
@@ -143,6 +144,8 @@
 **pomodoro:** `PomodoroScreen.tsx`, `FocusSprout.tsx`, `GardenGrid.tsx`, `BackgroundWarning.tsx`, `PomodoroSettingsInline.tsx`, `pomodoro.data.ts`, `pomodoro.domain.ts`, `types.ts`
 
 **workout:** `WorkoutScreen.tsx`, `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx`, `workout.data.ts`, `workout.domain.ts`, `types.ts`
+
+**settings:** `SettingsScreen.tsx` (screen-only utility route — no `.data.ts` / `.domain.ts` in this folder)
 
 **shared:** `GitHubHeatmap.tsx`, `activityTypes.ts`
 
@@ -187,20 +190,22 @@
 |------|------|
 | `sectionColors.ts` | `SECTION_COLORS`, `SECTION_COLORS_LIGHT`, `SectionKey` |
 
-#### `tests/` (20 files)
+#### `tests/` (23 files)
 
 | File | Role |
 |------|------|
 | `setup.ts` | Vitest setup |
+| `appMeta.test.ts` | `core/db/appMeta` helpers |
 | `time.test.ts` | `lib/time` |
 | `validation.test.ts` | `lib/validation` |
-| `todos.domain.test.ts` | `todos.domain` |
-| `habits.domain.test.ts` | `habits.domain` |
-| `calories.domain.test.ts` | `calories.domain` |
-| `calories.data.test.ts` | Mocked calories data-layer contract tests |
-| `workout.domain.test.ts` | `workout.domain` |
-| `pomodoro.domain.test.ts` | `pomodoro.domain` |
 | `notifications.test.ts` | `lib/notifications` |
+| `*.domain.test.ts` | Domain coverage for todos, habits, calories, pomodoro, and workout |
+| `*.data.test.ts` | Data-layer contract coverage for todos, habits, calories, pomodoro, workout, and linked actions |
+| `linkedActions.engine.test.ts` | Linked Actions chain dedupe and execution behavior |
+| `linkedActions.types.test.ts` | Linked Actions typing and payload guards |
+| `linkedActionsEditor.model.test.ts` | Linked Actions editor state model coverage |
+| `linkedActionsTargetPicker.test.ts` | Target picker filtering and selection rules |
+| `inAppNotices.test.ts` | In-app notice queue/provider behavior |
 | `db.client.test.ts` | `core/db/client` error-handling smoke (invalid SQL; connection placeholder) |
 | `sync.engine.test.ts` | `SyncEngine.flush` in-flight enqueue + failed push / adapter batch mutation recovery |
 
@@ -1746,7 +1751,7 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (April 14, 2026):** **234 tests passed**; **22 test files passed** (Vitest v4)
+**Latest run (April 20, 2026):** **252 tests passed**; **23 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -1960,7 +1965,7 @@ Tests:
 3. COEP header is require-corp
 4. COOP header is same-origin
 5. service worker registers and controls the page
-6. SW cache name is superhabits-shell-v2
+6. SW cache name is superhabits-shell-v3
 7. stale v1 cache is not present
 8. localhost serves assets from network not SW cache
 9. second tab gets OPFS lock error when first is open
@@ -2049,7 +2054,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 234 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 252 passing.
 
 ---
 
@@ -2118,7 +2123,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (234 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (252 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2291,8 +2296,8 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **234** passing (Vitest) |
-| E2E | **59** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
+| Unit tests | **252** passing (Vitest) |
+| E2E | **61** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **11** |
 | Linked Actions | Foundation merged: schema tables + engine/effects + in-app notice banner + habit editor integration + habits source entrypoint |
 | Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
@@ -2401,6 +2406,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **234** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **252** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- Run `npx playwright test --list` when E2E spec count changes; keep **59** / **7 files** in sync
+- Run `npx playwright test --list` when E2E spec count changes; keep **61** / **7 files** in sync

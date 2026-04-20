@@ -18,12 +18,14 @@ Use with:
 
 - `app/_layout.tsx` - root providers and stack
 - `app/index.tsx` - root redirect to overview
+- `app/settings.tsx` - thin settings route wrapper
 - `app/(tabs)/_layout.tsx` - custom top tabs and swipe navigation
 - `app/(tabs)/*.tsx` - thin route wrappers
 
 ## Core Infrastructure
 
 - `core/providers/AppProviders.tsx` - DB bootstrap, service worker, guest profile, anonymous auth, sync flush lifecycle
+- `core/providers/ThemeProvider.tsx` - persisted theme mode and shared UI tokens
 - `core/db/client.ts` - SQLite bootstrap, singleton, migrations
 - `core/db/types.ts` - entity types
 - `core/db/schema.sql` - stale reference snapshot only
@@ -85,6 +87,9 @@ Use with:
 - `features/calories/CaloriesScreen.tsx`
 - `features/calories/calories.data.ts`
 - `features/calories/calories.domain.ts`
+
+### Settings
+- `features/settings/SettingsScreen.tsx`
 
 ### Cross-feature visuals
 - `features/shared/GitHubHeatmap.tsx`

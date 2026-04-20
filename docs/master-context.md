@@ -89,7 +89,7 @@ Companion docs in this folder:
 - Docs/rules describe Expo 55, React Native, Expo Router, NativeWind, SQLite, Supabase, Vitest, and Playwright.
 
 ### Inferred / uncertain
-- Some docs appear to have been written during or for a planned RN/TS upgrade: repo docs often say React Native `0.84` and TypeScript `6`, but `package.json` currently pins RN `0.83.4` and TS `5.9.2`.
+- Version-sensitive guidance should still be verified against `package.json` and current command output before making stack or tooling assumptions.
 
 ## Repo Structure and Ownership
 
@@ -102,7 +102,7 @@ Companion docs in this folder:
 | `features/shared/` | Cross-feature visualizations such as heatmaps/activity views |
 | `core/db/` | SQLite bootstrap, migrations, types, reference schema |
 | `core/sync/` | In-memory sync queue and Supabase push adapter |
-| `core/providers/` | App bootstrap for DB, sync, auth, query client, gestures |
+| `core/providers/` | App bootstrap for DB, sync, auth, query client, gestures, and theme |
 | `core/auth/` | Guest profile bootstrap |
 | `core/pwa/` | Service worker registration |
 | `core/ui/` | Shared UI primitives |
@@ -163,6 +163,7 @@ Companion docs in this folder:
 - Root redirect sends `/` to `/(tabs)/overview`.
 - `app/(tabs)/_layout.tsx` defines a custom top tab bar and swipe navigation between tabs.
 - Tab routes are thin wrappers such as `app/(tabs)/todos.tsx` -> `<TodosScreen />`.
+- `app/settings.tsx` is a thin non-tab route that renders `SettingsScreen`.
 - Current tabs: Overview, Todos, Habits, Pomodoro, Workout, Calories.
 
 ## UI / Design System Conventions
@@ -259,6 +260,7 @@ Companion docs in this folder:
 | Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history |
 | Workout | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history |
 | Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history |
+| Settings | Theme mode selection plus current shipped-scope/status summaries for linked actions and sync |
 
 ## Domain Concepts and Glossary
 
@@ -310,11 +312,11 @@ Companion docs in this folder:
 - `npm run e2e:headed`
 - `npm run e2e:debug`
 
-### Confirmed from code on April 14, 2026
+### Confirmed from code on April 20, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `234` tests.
+- `npm test`: passes with `252` tests.
 - `npm run build:web`: passes.
-- `npm run e2e`: passes with `59` tests.
+- `npm run e2e`: passes with `61` tests.
 
 ### Confirmed from code
 - No lint script or lint config was found.
@@ -336,14 +338,13 @@ Companion docs in this folder:
 
 ### Confirmed from code vs docs
 - `core/db/schema.sql` is stale: it still says schema version `4`, while runtime code is version `11`.
-- Multiple docs/rules say React Native `0.84` and TypeScript `6`, but `package.json` currently uses React Native `0.83.4` and TypeScript `5.9.2`.
 - Some docs still describe Linked Actions as "planned" even though schema + engine + first entrypoint are already merged on `main`.
 
 ### Confirmed from code
 - `App.tsx` and `index.ts` are legacy Expo starter files and are not the active app entry because `package.json` points to `expo-router/entry`.
 
 ### Inferred / uncertain
-- Some repo instructions were updated ahead of package/config changes, so version-sensitive guidance should be verified against code before editing.
+- Generated reports or secondary docs can lag the codebase, so version-sensitive guidance should be verified against code before editing.
 
 ## Current Priorities / Likely Next Areas of Work
 

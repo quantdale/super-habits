@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-   Expected: **180** tests passing, 0 failing
+   Expected: **252** tests passing, 0 failing
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -85,12 +85,12 @@ Evaluate:
 | Expression | Expected | Actual |
 |------------|----------|--------|
 | `navigator.serviceWorker.controller !== null` | `true` | ? |
-| `await (await caches.keys()).join(", ")` | includes `superhabits-shell-v2` | ? |
+| `await (await caches.keys()).join(", ")` | includes `superhabits-shell-v3` | ? |
 
 If `superhabits-shell-v1` appears in cache keys: stale SW cache
 still present — user should clear site data and reload.
 
-If `superhabits-shell-v2` missing: SW may not have activated yet —
+If `superhabits-shell-v3` missing: SW may not have activated yet —
 reload once and re-check.
 
 ### 2c — All 5 feature tabs
@@ -159,11 +159,11 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 180 passing | ? | PASS/FAIL |
+| Tests | 252 passing | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
-| Cache name | superhabits-shell-v2 | ? | PASS/FAIL |
+| Cache name | superhabits-shell-v3 | ? | PASS/FAIL |
 | DB init error | none | ? | PASS/FAIL |
 | Todos screen | renders | ? | PASS/FAIL |
 | Habits screen | renders | ? | PASS/FAIL |
@@ -252,7 +252,7 @@ Report final status using one of:
 
 ## Known non-blocking items (do not fail PR for these)
 
-- `toDateKey()` UTC issue — known, requires migration planning
+- `schema.sql` is a stale reference snapshot, not runtime authority
 - Sync flush gated on isRemoteEnabled() — intentional, remote off
 - tests/calories.data.test.ts — mocked data-layer coverage
 - No ESLint config — not yet set up, not in CI

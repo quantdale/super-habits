@@ -11,7 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **180** tests passing, 0 failing
+Expected: **252** tests passing, 0 failing
 
 Report:
 
@@ -49,6 +49,7 @@ infrastructure.spec.ts — COEP/COOP headers, crossOriginIsolated,
 SW cache name, no stale v1 cache,
 localhost network-first, OPFS lock,
 clean DB init
+boundary.spec.ts — cross-feature boundary, volume, and no-NaN/no-undefined checks
 
 Report:
 
@@ -62,8 +63,8 @@ Report:
 
 | Suite            | Tests | Passed | Failed | Skipped |
 | ---------------- | ----- | ------ | ------ | ------- |
-| Unit (Vitest)    | 180   | ?      | ?      | 0       |
-| E2E (Playwright) | ?     | ?      | ?      | ?       |
+| Unit (Vitest)    | 252   | ?      | ?      | 0       |
+| E2E (Playwright) | 61    | ?      | ?      | ?       |
 | **Total**        | ?     | ?      | ?      | ?       |
 
 **OVERALL: PASS or FAIL**

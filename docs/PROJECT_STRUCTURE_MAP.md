@@ -14,9 +14,9 @@ Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABI
 
 | Path | Role |
 |------|------|
-| **`app/`** | Expo Router only: root stack, index redirect, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
-| **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
-| **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. |
+| **`app/`** | Expo Router only: root stack, index redirect, `settings.tsx`, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
+| **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), theme state (`core/providers/ThemeProvider.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
+| **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. Current screen-only exceptions are `features/overview/` and `features/settings/`. |
 | **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB. |
 | **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette). |
 | **`tests/`** | Vitest: `lib/`, `*.domain.ts`, validation, sync engine tests, Linked Actions tests, and selected data/DB tests (`calories.data`, `db.client`). |
@@ -35,6 +35,8 @@ features/{name}/
   types.ts          ← re-exports / narrow types
 app/(tabs)/{name}.tsx → default export <{Name}Screen /> only
 ```
+
+Screen-only utility routes such as `app/settings.tsx` follow the same thin-wrapper rule and render a single screen component.
 
 - **Screen** orchestrates; **never** `getDatabase()` in screen.
 - **Data** owns writes, soft delete, `syncEngine.enqueue` where applicable.
