@@ -9,8 +9,18 @@ const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
 }));
 
+const { linkedActionsEngine } = vi.hoisted(() => ({
+  linkedActionsEngine: {
+    processSourceAction: vi.fn(),
+  },
+}));
+
 vi.mock("@/core/db/client", () => ({
   getDatabase,
+}));
+
+vi.mock("@/core/linked-actions/linkedActions.engine", () => ({
+  linkedActionsEngine,
 }));
 
 describe("features/workout/workout.data", () => {
@@ -44,6 +54,7 @@ describe("features/workout/workout.data", () => {
         expect.any(String),
       ],
     );
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
   it("writes workout session exercise rows for session flow completion", async () => {
@@ -70,6 +81,16 @@ describe("features/workout/workout.data", () => {
     });
 
     expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO workout_logs"),
+      [
+        expect.stringMatching(/^wrk_/),
+        "routine_2",
+        "Felt strong",
+        expect.any(String),
+        expect.any(String),
+      ],
+    );
+    expect(db.runAsync).toHaveBeenCalledWith(
       expect.stringContaining("INSERT INTO workout_session_exercises"),
       [
         expect.stringMatching(/^wsex_/),
@@ -79,6 +100,7 @@ describe("features/workout/workout.data", () => {
         expect.any(String),
       ],
     );
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
   it("applies linked-action workout log writes without source re-dispatch", async () => {
@@ -105,5 +127,6 @@ describe("features/workout/workout.data", () => {
       status: "applied",
       producedEntityId: "wrk_123",
     });
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 });

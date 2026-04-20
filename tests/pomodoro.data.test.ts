@@ -8,8 +8,18 @@ const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
 }));
 
+const { linkedActionsEngine } = vi.hoisted(() => ({
+  linkedActionsEngine: {
+    processSourceAction: vi.fn(),
+  },
+}));
+
 vi.mock("@/core/db/client", () => ({
   getDatabase,
+}));
+
+vi.mock("@/core/linked-actions/linkedActions.engine", () => ({
+  linkedActionsEngine,
 }));
 
 describe("features/pomodoro/pomodoro.data", () => {
@@ -42,6 +52,7 @@ describe("features/pomodoro/pomodoro.data", () => {
         expect.any(String),
       ],
     );
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
   it("writes pomodoro break sessions with the provided session type", async () => {
@@ -62,6 +73,7 @@ describe("features/pomodoro/pomodoro.data", () => {
       expect.stringContaining("INSERT INTO pomodoro_sessions"),
       expect.arrayContaining(["short_break"]),
     );
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
   it("applies linked-action pomodoro writes without source re-dispatch", async () => {
@@ -81,5 +93,6 @@ describe("features/pomodoro/pomodoro.data", () => {
       status: "applied",
       producedEntityId: "pom_123",
     });
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 });
