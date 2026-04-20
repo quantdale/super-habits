@@ -85,6 +85,83 @@ export type LinkedActionEffectType = ValueOfConstArrays<
   typeof LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY
 >;
 
+export const LINKED_ACTION_SUPPORTED_TRIGGER_TYPES = [
+  "todo.completed",
+  "habit.completed_for_day",
+] as const satisfies readonly LinkedActionTriggerType[];
+
+export const LINKED_ACTION_SUPPORTED_TARGET_FEATURES = [
+  "todos",
+  "habits",
+  "workout",
+] as const satisfies readonly LinkedActionFeature[];
+
+export const LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE = {
+  todos: ["todo"],
+  habits: ["habit"],
+  workout: ["workout_routine"],
+} as const satisfies Partial<
+  Record<LinkedActionFeature, readonly LinkedActionTargetEntityType[]>
+>;
+
+export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY = {
+  todo: ["todo.complete"],
+  habit: ["habit.increment", "habit.ensure_daily_target"],
+  workout_routine: ["workout.log"],
+} as const satisfies Partial<
+  Record<LinkedActionTargetEntityType, readonly LinkedActionEffectType[]>
+>;
+
+export const LINKED_ACTION_SUPPORTED_RULE_PATHS = [
+  {
+    sourceFeature: "todos",
+    sourceEntityType: "todo",
+    triggerType: "todo.completed",
+    targetFeature: "todos",
+    targetEntityType: "todo",
+    effectType: "todo.complete",
+  },
+  {
+    sourceFeature: "habits",
+    sourceEntityType: "habit",
+    triggerType: "habit.completed_for_day",
+    targetFeature: "todos",
+    targetEntityType: "todo",
+    effectType: "todo.complete",
+  },
+  {
+    sourceFeature: "habits",
+    sourceEntityType: "habit",
+    triggerType: "habit.completed_for_day",
+    targetFeature: "habits",
+    targetEntityType: "habit",
+    effectType: "habit.increment",
+  },
+  {
+    sourceFeature: "habits",
+    sourceEntityType: "habit",
+    triggerType: "habit.completed_for_day",
+    targetFeature: "habits",
+    targetEntityType: "habit",
+    effectType: "habit.ensure_daily_target",
+  },
+  {
+    sourceFeature: "habits",
+    sourceEntityType: "habit",
+    triggerType: "habit.completed_for_day",
+    targetFeature: "workout",
+    targetEntityType: "workout_routine",
+    effectType: "workout.log",
+  },
+] as const satisfies ReadonlyArray<{
+  sourceFeature: LinkedActionFeature;
+  sourceEntityType: LinkedActionSourceEntityType;
+  triggerType: LinkedActionTriggerType;
+  targetFeature: LinkedActionFeature;
+  targetEntityType: LinkedActionTargetEntityType;
+  effectType: LinkedActionEffectType;
+}>;
+
 export const LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE =
   "This linked action uses an unsupported target and must be removed or replaced.";
 
@@ -481,6 +558,21 @@ export function isSupportedLinkedActionEffect(
   );
 }
 
+export function isSupportedLinkedActionRulePath(
+  source: LinkedActionRuleSource,
+  target: LinkedActionRuleTarget,
+): boolean {
+  return LINKED_ACTION_SUPPORTED_RULE_PATHS.some(
+    (path) =>
+      path.sourceFeature === source.feature &&
+      path.sourceEntityType === source.entityType &&
+      path.triggerType === source.triggerType &&
+      path.targetFeature === target.feature &&
+      path.targetEntityType === target.entityType &&
+      path.effectType === target.effect.type,
+  );
+}
+
 export function isSupportedLinkedActionRule(
   rule: LinkedActionRuleDefinition,
 ): rule is LinkedActionSupportedRuleDefinition {
@@ -643,6 +735,8 @@ export function assertValidLinkedActionRuleShape(
     throw new Error(
       `Direction policy ${directionPolicy} is not supported for trigger ${source.triggerType} and effect ${target.effect.type}.`,
     );
+  if (!isSupportedLinkedActionRulePath(source, target)) {
+    throw new Error(LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE);
   }
 }
 

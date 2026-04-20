@@ -67,6 +67,16 @@ describe("linkedActionsEditor.model", () => {
   it("keeps workout and pomodoro triggers hidden from current authoring options", () => {
     expect(getLinkedActionTriggerOptions("workout")).toEqual([]);
     expect(getLinkedActionTriggerOptions("pomodoro")).toEqual([]);
+  it("returns only todo.completed as the trigger option for todos", () => {
+    const options = getLinkedActionTriggerOptions("todos");
+
+    expect(options.map((option) => option.value)).toEqual(["todo.completed"]);
+  });
+
+  it("returns only todo.complete as the effect option for todo targets", () => {
+    const options = getLinkedActionEffectOptions("todos");
+
+    expect(options.map((option) => option.value)).toEqual(["todo.complete"]);
   });
 
   it("creates an empty editor row from a source option", () => {

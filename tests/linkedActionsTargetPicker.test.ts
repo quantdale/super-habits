@@ -4,6 +4,9 @@ import {
   getLinkedActionTargetPickerProviders,
 } from "@/core/linked-actions/linkedActionsTargetProviders";
 import {
+  TODO_LINKED_ACTIONS_EDITOR_CONFIG,
+} from "@/core/linked-actions/linkedActionsEditor.config";
+import {
   createLinkedActionTargetCreateNewSelection,
   createLinkedActionTargetExistingSelection,
 } from "@/core/linked-actions/linkedActionsTargetPicker.types";
@@ -124,5 +127,11 @@ describe("linked actions target picker providers", () => {
       },
     });
     expect(getLinkedActionTargetPickerProviders()).toHaveLength(5);
+  });
+
+  it("limits the Todo editor flow to existing todo targets without create-new handoff", () => {
+    expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures).toEqual(["todos"]);
+    expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes).toEqual(["todo.completed"]);
+    expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget).toBe(false);
   });
 });

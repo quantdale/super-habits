@@ -146,6 +146,40 @@ describe("core/linked-actions/linkedActions.types", () => {
     });
   });
 
+  it("marks unsupported source-to-target paths as unsupported even when the trigger and effect exist individually", () => {
+    expect(
+      normalizeLinkedActionRuleRow({
+        id: "link_combo",
+        status: "active",
+        direction_policy: "one_way",
+        bidirectional_group_id: null,
+        source_feature: "todos",
+        source_entity_type: "todo",
+        source_entity_id: "todo_1",
+        trigger_type: "todo.completed",
+        target_feature: "habits",
+        target_entity_type: "habit",
+        target_entity_id: "habit_1",
+        effect_type: "habit.increment",
+        effect_payload: JSON.stringify({
+          amount: 1,
+          dateStrategy: "source_date",
+        }),
+        created_at: "2026-04-13T00:00:00.000Z",
+        updated_at: "2026-04-13T00:00:00.000Z",
+        deleted_at: null,
+      }),
+    ).toMatchObject({
+      id: "link_combo",
+      isUnsupported: true,
+      rawTargetFeature: "habits",
+      rawTargetEntityType: "habit",
+      rawEffectType: "habit.increment",
+      unsupportedReason:
+        "This linked action uses an unsupported target and must be removed or replaced.",
+    });
+  });
+
   it("keeps unknown target features parseable for persisted rows", () => {
     expect(
       normalizeLinkedActionRuleRow({
