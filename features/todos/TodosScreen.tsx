@@ -3,29 +3,24 @@ import { Platform, Pressable, Text, View, useWindowDimensions } from "react-nati
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
+import { Screen } from "@/core/ui/Screen";
+import { Modal } from "@/core/ui/Modal";
+import { Card } from "@/core/ui/Card";
 import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
 import {
-  createLinkedActionEditorRowFromRule,
+  buildLinkedActionEditorRowsFromRules,
+} from "@/core/linked-actions/linkedActionsEditor.adapter";
+import {
+  TODO_LINKED_ACTIONS_EDITOR_CONFIG,
+} from "@/core/linked-actions/linkedActionsEditor.config";
+import {
   createSaveLinkedActionRuleInputFromEditorRow,
 } from "@/core/linked-actions/linkedActionsEditor.model";
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
 } from "@/core/linked-actions/linkedActionsEditor.types";
-import {
-  createLinkedActionTargetExistingSelection,
-  type LinkedActionTargetPickerCandidate,
-} from "@/core/linked-actions/linkedActionsTargetPicker.types";
-import { getLinkedActionTargetPickerProvider } from "@/core/linked-actions/linkedActionsTargetProviders";
-import type {
-  LinkedActionFeature,
-  LinkedActionRuleDefinition,
-  SaveLinkedActionRuleForSourceInput,
-} from "@/core/linked-actions/linkedActions.types";
-import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
-import { Screen } from "@/core/ui/Screen";
-import { Modal } from "@/core/ui/Modal";
-import { Card } from "@/core/ui/Card";
+import type { SaveLinkedActionRuleForSourceInput } from "@/core/linked-actions/linkedActions.types";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { ScreenSection } from "@/core/ui/ScreenSection";
@@ -37,6 +32,7 @@ import { toDateKey } from "@/lib/time";
 import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { validateTodo } from "@/lib/validation";
 import { ValidationError } from "@/core/ui/ValidationError";
+import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import type { Todo, TodoPriority, TodoViewMode } from "./types";
 import { TodoItem } from "./TodoItem";
 import { findMissingRecurrenceIds, getTodayDateKey } from "./todos.domain";
@@ -44,8 +40,8 @@ import {
   addTodo,
   createRecurringInstance,
   getRecurringTodosByIds,
-  listAllActiveTodosForRecurrence,
   listTodoLinkedActionRules,
+  listAllActiveTodosForRecurrence,
   listTodos,
   removeTodo,
   saveTodoLinkedActionRules,
@@ -57,6 +53,7 @@ import {
 const COLOR = SECTION_COLORS.todos;
 const COLOR_TEXT = "#1D4ED8";
 const MUTED_ICON = "#94a3b8";
+const TODO_LINKED_ACTION_SOURCE_KEY = "todo-linked-actions-source";
 const VIEW_MODE_OPTIONS: ReadonlyArray<{
   mode: TodoViewMode;
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -65,33 +62,6 @@ const VIEW_MODE_OPTIONS: ReadonlyArray<{
   { mode: "list", icon: "format-list-bulleted" },
   { mode: "grid", icon: "grid-view" },
 ];
-
-const TODO_LINKED_ACTION_SOURCE_KEY = "todo-linked-actions-source";
-const TODO_LINKED_ACTION_ALLOWED_TARGETS: LinkedActionFeature[] = ["todos"];
-const TODO_LINKED_ACTION_ALLOWED_TRIGGERS = ["todo.completed"] as const;
-
-async function buildLinkedActionEditorRows(
-  rules: LinkedActionRuleDefinition[],
-): Promise<LinkedActionEditorRowDraft[]> {
-  const provider = getLinkedActionTargetPickerProvider("todos");
-  const candidates = provider.existing.supported
-    ? await provider.existing.loadCandidates()
-    : [];
-
-  return rules.map((rule) => {
-    const candidate =
-      !rule.isUnsupported && rule.target.entityId
-        ? candidates.find((item) => item.id === rule.target.entityId) ?? null
-        : null;
-
-    return createLinkedActionEditorRowFromRule({
-      rule,
-      targetSelection: candidate
-        ? createLinkedActionTargetExistingSelection(provider, candidate)
-        : null,
-    });
-  });
-}
 
 export function TodosScreen() {
   const { showNotice } = useInAppNotices();
@@ -121,6 +91,12 @@ export function TodosScreen() {
     () => pendingTasks.filter((todo) => todo.recurrence === "daily").length,
     [pendingTasks],
   );
+  const editingTodo = useMemo(
+    () => (editingId ? items.find((item) => item.id === editingId) ?? null : null),
+    [editingId, items],
+  );
+  const isRecurringLinkedActionSource =
+    editingTodo?.recurrence === "daily" || (!editingId && isRecurring);
   const overdueTasksCount = useMemo(() => {
     const today = toDateKey();
     return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
@@ -200,7 +176,7 @@ export function TodosScreen() {
     setLinkedActionsError(null);
 
     let linkedActionRules: SaveLinkedActionRuleForSourceInput[] = [];
-    if (editingId) {
+    if (!isRecurringLinkedActionSource) {
       try {
         linkedActionRules = linkedActionRows.map(createSaveLinkedActionRuleInputFromEditorRow);
       } catch (error) {
@@ -220,15 +196,20 @@ export function TodosScreen() {
         dueDate: dueDate ?? null,
         priority,
       });
-      await saveTodoLinkedActionRules(editingId, linkedActionRules);
+      if (!isRecurringLinkedActionSource) {
+        await saveTodoLinkedActionRules(editingId, linkedActionRules);
+      }
     } else {
-      await addTodo({
+      const todoId = await addTodo({
         title: title.trim(),
         notes: notes.trim() || undefined,
         dueDate: dueDate ?? null,
         priority,
         recurrence: isRecurring ? "daily" : null,
       });
+      if (!isRecurringLinkedActionSource) {
+        await saveTodoLinkedActionRules(todoId, linkedActionRules);
+      }
     }
     setModalVisible(false);
     resetForm();
@@ -244,12 +225,17 @@ export function TodosScreen() {
     setTodoError(null);
     setLinkedActionsError(null);
     setLinkedActionRows([]);
-    setLinkedActionsLoading(true);
+    setLinkedActionsLoading(todo.recurrence !== "daily");
     setModalVisible(true);
+
+    if (todo.recurrence === "daily") {
+      setLinkedActionsLoading(false);
+      return;
+    }
 
     try {
       const rules = await listTodoLinkedActionRules(todo.id);
-      setLinkedActionRows(await buildLinkedActionEditorRows(rules));
+      setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
     } catch (error) {
       setLinkedActionsError(
         error instanceof Error ? error.message : "Could not load linked actions for this task.",
@@ -259,10 +245,10 @@ export function TodosScreen() {
     }
   };
 
-  const handleToggle = useCallback(
+  const handleToggleTodo = useCallback(
     async (todo: Todo) => {
       const result = await toggleTodo(todo);
-      for (const notice of result.notices) {
+      for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
       await refresh();
@@ -270,7 +256,7 @@ export function TodosScreen() {
     [refresh, showNotice],
   );
 
-  const linkedActionSource: LinkedActionEditorSourceOption = {
+  const todoLinkedActionSource: LinkedActionEditorSourceOption = {
     key: TODO_LINKED_ACTION_SOURCE_KEY,
     feature: "todos",
     entityType: "todo",
@@ -442,7 +428,7 @@ export function TodosScreen() {
                                 todo={item}
                                 onLongPress={() => {}}
                                 isActive={false}
-                                onToggle={() => handleToggle(item)}
+                                onToggle={() => handleToggleTodo(item)}
                                 onDelete={() => removeTodo(item.id).then(refresh)}
                                 onEdit={() => {
                                   void startEdit(item);
@@ -462,7 +448,7 @@ export function TodosScreen() {
                       todo={item}
                       onLongPress={drag}
                       isActive={isActive}
-                      onToggle={() => handleToggle(item)}
+                      onToggle={() => handleToggleTodo(item)}
                       onDelete={() => removeTodo(item.id).then(refresh)}
                       onEdit={() => {
                         void startEdit(item);
@@ -476,8 +462,8 @@ export function TodosScreen() {
             </ScreenSection>
           ) : null}
         </View>
+
       <Modal visible={modalVisible} onClose={closeModal} scroll>
-        <>
         <Card
           variant="header"
           accentColor={SECTION_COLORS.todos}
@@ -584,38 +570,40 @@ export function TodosScreen() {
           )}
           <ValidationError message={todoError} />
         </Card>
+
         <Card
           variant="header"
           accentColor={SECTION_COLORS.todos}
           headerTitle="Linked Actions"
           headerSubtitle="Optional explicit rules that run when this task is completed."
         >
-          {editingId ? (
-            linkedActionsLoading ? (
-              <Text className="text-sm text-slate-600">Loading linked actions...</Text>
-            ) : (
-              <LinkedActionsEditorSection
-                sourceOptions={[linkedActionSource]}
-                selectedSourceKey={TODO_LINKED_ACTION_SOURCE_KEY}
-                rows={linkedActionRows}
-                onRowsChange={(rows) => {
-                  setLinkedActionsError(null);
-                  setLinkedActionRows(rows);
-                }}
-                allowSourceSelection={false}
-                allowedTargetFeatures={TODO_LINKED_ACTION_ALLOWED_TARGETS}
-                allowedTriggerTypes={[...TODO_LINKED_ACTION_ALLOWED_TRIGGERS]}
-                allowCreateNewTarget={false}
-                introTitle="Task completion rules"
-                introDescription="Choose another existing task to complete when this one is marked done."
-              />
-            )
-          ) : (
-            <Text className="text-sm text-slate-600">
-              Create the task first, then edit it to attach linked actions.
+          {isRecurringLinkedActionSource ? (
+            <Text className="text-sm" style={{ color: COLOR_TEXT }}>
+              Recurring tasks cannot be Linked Action sources yet.
             </Text>
+          ) : linkedActionsLoading ? (
+            <Text className="text-sm" style={{ color: COLOR_TEXT }}>
+              Loading linked actions...
+            </Text>
+          ) : (
+            <LinkedActionsEditorSection
+              sourceOptions={[todoLinkedActionSource]}
+              selectedSourceKey={TODO_LINKED_ACTION_SOURCE_KEY}
+              rows={linkedActionRows}
+              onRowsChange={(rows) => {
+                setLinkedActionsError(null);
+                setLinkedActionRows(rows);
+              }}
+              allowSourceSelection={false}
+              allowedTargetFeatures={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures}
+              allowedTriggerTypes={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes}
+              allowCreateNewTarget={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget}
+              introTitle="Task completion rules"
+              introDescription="Choose a target task and the effect that should run when this task is completed."
+            />
           )}
           <ValidationError message={linkedActionsError} />
+
           <View className="mt-3 flex-row gap-2">
             <View className="flex-1">
               <Button label="Cancel" variant="ghost" onPress={closeModal} />
@@ -625,7 +613,6 @@ export function TodosScreen() {
             </View>
           </View>
         </Card>
-        </>
       </Modal>
     </Screen>
 

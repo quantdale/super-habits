@@ -3,23 +3,20 @@ import { Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
 import {
-  createLinkedActionEditorRowFromRule,
+  buildLinkedActionEditorRowsFromRules,
+} from "@/core/linked-actions/linkedActionsEditor.adapter";
+import {
+  HABIT_LINKED_ACTIONS_EDITOR_CONFIG,
+} from "@/core/linked-actions/linkedActionsEditor.config";
+import {
   createSaveLinkedActionRuleInputFromEditorRow,
 } from "@/core/linked-actions/linkedActionsEditor.model";
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
 } from "@/core/linked-actions/linkedActionsEditor.types";
-import {
-  createLinkedActionTargetExistingSelection,
-  type LinkedActionTargetPickerCandidate,
-} from "@/core/linked-actions/linkedActionsTargetPicker.types";
-import {
-  getLinkedActionTargetPickerProvider,
-} from "@/core/linked-actions/linkedActionsTargetProviders";
 import type {
   LinkedActionFeature,
-  LinkedActionRuleDefinition,
 } from "@/core/linked-actions/linkedActions.types";
 import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
@@ -79,12 +76,6 @@ const TIME_GROUPS = [
 
 const COLOR = SECTION_COLORS.habits;
 const HABIT_LINKED_ACTION_SOURCE_KEY = "habit-linked-actions-source";
-const HABIT_LINKED_ACTION_ALLOWED_TARGETS: LinkedActionFeature[] = [
-  "todos",
-  "habits",
-  "workout",
-];
-const HABIT_LINKED_ACTION_ALLOWED_TRIGGERS = ["habit.completed_for_day"] as const;
 
 function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
   if (a.length !== b.length) return false;
@@ -92,42 +83,6 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
     if (a[i].dateKey !== b[i].dateKey || a[i].value !== b[i].value) return false;
   }
   return true;
-}
-
-async function buildLinkedActionEditorRows(
-  rules: LinkedActionRuleDefinition[],
-): Promise<LinkedActionEditorRowDraft[]> {
-  const candidatesByFeature = new Map<
-    LinkedActionFeature,
-    Promise<LinkedActionTargetPickerCandidate[]>
-  >();
-
-  return Promise.all(
-    rules.map(async (rule) => {
-      let targetSelection = null;
-
-      if (!rule.isUnsupported && rule.target.entityId) {
-        const provider = getLinkedActionTargetPickerProvider(rule.target.feature);
-        if (provider.existing.supported) {
-          let candidatesPromise = candidatesByFeature.get(rule.target.feature);
-          if (!candidatesPromise) {
-            candidatesPromise = provider.existing.loadCandidates();
-            candidatesByFeature.set(rule.target.feature, candidatesPromise);
-          }
-          const candidates = await candidatesPromise;
-          const candidate = candidates.find((item) => item.id === rule.target.entityId) ?? null;
-          targetSelection = candidate
-            ? createLinkedActionTargetExistingSelection(provider, candidate)
-            : null;
-        }
-      }
-
-      return createLinkedActionEditorRowFromRule({
-        rule,
-        targetSelection,
-      });
-    }),
-  );
 }
 
 export function HabitsScreen() {
@@ -224,7 +179,7 @@ export function HabitsScreen() {
 
     try {
       const rules = await listHabitLinkedActionRules(habit.id);
-      setLinkedActionRows(await buildLinkedActionEditorRows(rules));
+      setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
     } catch (error) {
       setLinkedActionsError(
         error instanceof Error ? error.message : "Could not load linked actions for this habit.",
@@ -673,9 +628,9 @@ export function HabitsScreen() {
                 setLinkedActionRows(rows);
               }}
               allowSourceSelection={false}
-              allowedTargetFeatures={HABIT_LINKED_ACTION_ALLOWED_TARGETS}
-              allowedTriggerTypes={[...HABIT_LINKED_ACTION_ALLOWED_TRIGGERS]}
-              allowCreateNewTarget={false}
+              allowedTargetFeatures={HABIT_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures}
+              allowedTriggerTypes={HABIT_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes}
+              allowCreateNewTarget={HABIT_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget}
               introTitle="Habit completion rules"
               introDescription="Choose a target item in Todos, Habits, or Workout and the effect that should run when this habit reaches its daily target."
             />

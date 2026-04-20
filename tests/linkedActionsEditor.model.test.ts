@@ -59,16 +59,16 @@ describe("linkedActionsEditor.model", () => {
     expect(options.map((option) => option.value)).toEqual(["habit.completed_for_day"]);
   });
 
-  it("returns the expected trigger options for todos", () => {
+  it("returns only todo.completed as the trigger option for todos", () => {
     const options = getLinkedActionTriggerOptions("todos");
 
     expect(options.map((option) => option.value)).toEqual(["todo.completed"]);
   });
 
-  it("returns the expected effect options for todos", () => {
-    expect(getLinkedActionEffectOptions("todos").map((option) => option.value)).toEqual([
-      "todo.complete",
-    ]);
+  it("returns only todo.complete as the effect option for todo targets", () => {
+    const options = getLinkedActionEffectOptions("todos");
+
+    expect(options.map((option) => option.value)).toEqual(["todo.complete"]);
   });
 
   it("creates an empty editor row from a source option", () => {
