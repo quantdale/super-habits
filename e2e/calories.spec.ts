@@ -41,11 +41,11 @@ test.describe("Calories", () => {
   test("entry persists after reload", async ({ page }) => {
     await fillCaloriesMacros(page, "Oats", "10", "40", "5", "5");
     await clickCaloriesAddEntry(page);
-    await expect(page.getByText(/Oats.*235 kcal/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Oats - 235 kcal", { exact: true })).toBeVisible({ timeout: 15_000 });
 
     await page.reload();
     await page.waitForLoadState("load");
     await goToTab(page, "calories");
-    await expect(page.getByText(/Oats.*235 kcal/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Oats - 235 kcal", { exact: true })).toBeVisible({ timeout: 15_000 });
   });
 });
