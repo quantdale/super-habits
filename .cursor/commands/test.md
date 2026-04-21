@@ -11,7 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **252** tests passing, 0 failing
+Expected: **299** tests passing, 0 failing
 
 Report:
 
@@ -45,6 +45,8 @@ workout.spec.ts — add routine, complete, delete,
 empty state, validation, persistence
 calories.spec.ts — add entry, meal type, daily total,
 empty state, validation, persistence
+settings.spec.ts — backup restore eligibility and restore guards
+command.spec.ts — command shell parse, confirm, and warning flow
 infrastructure.spec.ts — COEP/COOP headers, crossOriginIsolated,
 SW cache name, no stale v1 cache,
 localhost network-first, OPFS lock,
@@ -63,8 +65,8 @@ Report:
 
 | Suite            | Tests | Passed | Failed | Skipped |
 | ---------------- | ----- | ------ | ------ | ------- |
-| Unit (Vitest)    | 252   | ?      | ?      | 0       |
-| E2E (Playwright) | 61    | ?      | ?      | ?       |
+| Unit (Vitest)    | 299   | ?      | ?      | 0       |
+| E2E (Playwright) | 67    | ?      | ?      | ?       |
 | **Total**        | ?     | ?      | ?      | ?       |
 
 **OVERALL: PASS or FAIL**

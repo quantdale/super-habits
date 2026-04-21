@@ -314,9 +314,9 @@ Companion docs in this folder:
 
 ### Confirmed from code on April 20, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `252` tests.
+- `npm test`: passes with `299` tests.
 - `npm run build:web`: passes.
-- `npm run e2e`: passes with `61` tests.
+- `npm run e2e`: passes with `67` tests.
 
 ### Confirmed from code
 - No lint script or lint config was found.
