@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-   Expected: **252** tests passing, 0 failing
+   Expected: **299** tests passing, 0 failing
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -159,7 +159,7 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 252 passing | ? | PASS/FAIL |
+| Tests | 299 passing | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |

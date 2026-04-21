@@ -3,11 +3,13 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
 import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { Screen } from "@/core/ui/Screen";
 import { ScreenSection } from "@/core/ui/ScreenSection";
+import { COMMAND_EXPERIMENT_ENABLED } from "@/features/command/types";
 import { getCalorieGoal, hasAnyCalorieEntries, listCalorieEntries } from "@/features/calories/calories.data";
 import { caloriesTotal } from "@/features/calories/calories.domain";
 import {
@@ -97,6 +99,7 @@ const GRID_BOTTOM_ROW_CARD_CLASS = "min-h-[214px]";
 const MUTED_ICON = "#94a3b8";
 const SETTINGS_HREF = "/settings" as Href;
 const CALORIES_HREF = "/(tabs)/calories" as Href;
+const COMMAND_HREF = "/command" as Href;
 const OVERVIEW_CARD_ORDER: OverviewCardKey[] = ["pomodoro", "habits", "calories", "todos", "workout"];
 const POMODORO_HREF = "/(tabs)/pomodoro" as Href;
 
@@ -505,6 +508,28 @@ export function OverviewScreen() {
           }
         />
       </ScreenSection>
+
+      {COMMAND_EXPERIMENT_ENABLED ? (
+        <ScreenSection>
+          <Card accentColor="#475569" className="mb-0">
+            <View className="flex-row items-center justify-between gap-4">
+              <View className="min-w-0 flex-1">
+                <Text className="text-base font-semibold text-slate-900">Quick command</Text>
+                <Text className="mt-1 text-sm text-slate-500">
+                  Experimental command shell for single todo or habit creation.
+                </Text>
+              </View>
+              <View className="w-[148px]">
+                <Button
+                  label="Add with command"
+                  onPress={() => router.push(COMMAND_HREF)}
+                  color="#475569"
+                />
+              </View>
+            </View>
+          </Card>
+        </ScreenSection>
+      ) : null}
 
       {isLoading ? (
         <ScreenSection className="min-h-[220px] items-center justify-center py-14">

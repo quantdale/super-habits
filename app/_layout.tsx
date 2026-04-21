@@ -28,6 +28,7 @@ function ThemedRoot() {
       <StatusBar style={tokens.statusBarStyle} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="command" />
       </Stack>
       <InAppNoticeBanner />
     </>

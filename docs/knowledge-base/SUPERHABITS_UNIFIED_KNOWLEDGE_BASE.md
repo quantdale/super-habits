@@ -61,7 +61,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality (April 20, 2026):** `npm run typecheck` passes; `npm test` passes with **252** tests; `npm run build:web` passes; `npm run e2e` passes with **61** tests. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (April 21, 2026):** `npm run typecheck` passes; `npm test` passes with **299** tests; `npm run build:web` passes; `npm run e2e` passes with **67** tests. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -90,8 +90,8 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`) |
 | Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
-| Unit tests | **252** passing (Vitest) |
-| E2E tests | **61** Playwright tests in **7** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Unit tests | **299** passing (Vitest) |
+| E2E tests | **67** Playwright tests in **9** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
@@ -1751,7 +1751,7 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (April 20, 2026):** **252 tests passed**; **23 test files passed** (Vitest v4)
+**Latest run (April 21, 2026):** **299 tests passed**; **29 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -2054,7 +2054,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 252 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 299 passing.
 
 ---
 
@@ -2123,7 +2123,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (252 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (299 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2296,8 +2296,8 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **252** passing (Vitest) |
-| E2E | **61** Playwright tests in **7** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
+| Unit tests | **299** passing (Vitest) |
+| E2E | **67** Playwright tests in **9** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **11** |
 | Linked Actions | Foundation merged: schema tables + engine/effects + in-app notice banner + habit editor integration + habits source entrypoint |
 | Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
@@ -2406,6 +2406,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **252** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **299** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- Run `npx playwright test --list` when E2E spec count changes; keep **61** / **7 files** in sync
+- Run `npx playwright test --list` when E2E spec count changes; keep **67** / **9 files** in sync
