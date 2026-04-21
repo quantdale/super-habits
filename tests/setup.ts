@@ -21,6 +21,9 @@ vi.mock("expo-sqlite", () => ({
     runAsync: vi.fn().mockResolvedValue(undefined),
     getAllAsync: vi.fn().mockResolvedValue([]),
     getFirstAsync: vi.fn().mockResolvedValue(null),
+    withTransactionAsync: vi.fn(async (task: () => Promise<void>) => {
+      await task();
+    }),
     closeAsync: vi.fn().mockResolvedValue(undefined),
   }),
 }));

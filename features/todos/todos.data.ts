@@ -406,3 +406,41 @@ export async function completeTodoFromLinkedAction(
     targetLabel: todo.title,
   };
 }
+
+export async function applyRemoteTodos(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: Todo[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO todos (
+         id,
+         title,
+         notes,
+         completed,
+         due_date,
+         priority,
+         sort_order,
+         recurrence,
+         recurrence_id,
+         created_at,
+         updated_at,
+         deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.title,
+        row.notes,
+        row.completed,
+        row.due_date,
+        row.priority,
+        row.sort_order,
+        row.recurrence,
+        row.recurrence_id,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+      ],
+    );
+  }
+}

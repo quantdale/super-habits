@@ -356,3 +356,41 @@ export async function addCalorieEntryFromLinkedAction(input: {
     producedEntityId: input.id,
   };
 }
+
+export async function applyRemoteCalorieEntries(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: CalorieEntry[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO calorie_entries (
+         id,
+         food_name,
+         calories,
+         protein,
+         carbs,
+         fats,
+         fiber,
+         meal_type,
+         consumed_on,
+         created_at,
+         updated_at,
+         deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.food_name,
+        row.calories,
+        row.protein,
+        row.carbs,
+        row.fats,
+        row.fiber,
+        row.meal_type,
+        row.consumed_on,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+      ],
+    );
+  }
+}
