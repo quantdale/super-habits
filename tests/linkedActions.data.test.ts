@@ -63,6 +63,41 @@ describe("core/linked-actions/linkedActions.data", () => {
     expect(args[12]).toBe(JSON.stringify({}));
   });
 
+  it("creates todo.completed -> habit.increment with the fixed +1 source-date payload", async () => {
+    const db = {
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await createLinkedActionRule({
+      source: {
+        feature: "todos",
+        entityType: "todo",
+        entityId: "todo_1",
+        triggerType: "todo.completed",
+      },
+      target: {
+        feature: "habits",
+        entityType: "habit",
+        entityId: "habit_1",
+        effect: {
+          kind: "progress",
+          type: "habit.increment",
+          amount: 1,
+          dateStrategy: "source_date",
+        },
+      },
+    });
+
+    const [, args] = db.runAsync.mock.calls[0];
+    expect(args[4]).toBe("todos");
+    expect(args[7]).toBe("todo.completed");
+    expect(args[8]).toBe("habits");
+    expect(args[10]).toBe("habit_1");
+    expect(args[11]).toBe("habit.increment");
+    expect(args[12]).toBe(JSON.stringify({ amount: 1, dateStrategy: "source_date" }));
+  });
+
   it("normalizes stored rows when listing or fetching rules without crashing on legacy targets", async () => {
     const row: LinkedActionRuleRow = {
       id: "link_1",

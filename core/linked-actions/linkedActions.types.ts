@@ -81,6 +81,14 @@ export const LINKED_ACTION_SUPPORTED_RULE_PATHS = [
     effectType: "todo.complete",
   },
   {
+    sourceFeature: "todos",
+    sourceEntityType: "todo",
+    triggerType: "todo.completed",
+    targetFeature: "habits",
+    targetEntityType: "habit",
+    effectType: "habit.increment",
+  },
+  {
     sourceFeature: "habits",
     sourceEntityType: "habit",
     triggerType: "habit.completed_for_day",
@@ -559,6 +567,25 @@ export function isSupportedLinkedActionRulePath(
       path.targetFeature === target.feature &&
       path.targetEntityType === target.entityType &&
       path.effectType === target.effect.type,
+  );
+}
+
+export function getSupportedLinkedActionEffectTypesForPath(input: {
+  sourceFeature: LinkedActionFeature;
+  sourceEntityType: LinkedActionSourceEntityType;
+  triggerType?: LinkedActionTriggerType | null;
+  targetFeature: LinkedActionFeature;
+  targetEntityType: LinkedActionTargetEntityType;
+}): LinkedActionEffectType[] {
+  return uniqueValues(
+    LINKED_ACTION_SUPPORTED_RULE_PATHS.filter(
+      (path) =>
+        path.sourceFeature === input.sourceFeature &&
+        path.sourceEntityType === input.sourceEntityType &&
+        (input.triggerType ? path.triggerType === input.triggerType : true) &&
+        path.targetFeature === input.targetFeature &&
+        path.targetEntityType === input.targetEntityType,
+    ).map((path) => path.effectType),
   );
 }
 

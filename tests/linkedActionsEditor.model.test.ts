@@ -1,19 +1,43 @@
 import { describe, expect, it } from "vitest";
 import {
+  HABIT_LINKED_ACTIONS_EDITOR_CONFIG,
+  TODO_LINKED_ACTIONS_EDITOR_CONFIG,
+} from "@/core/linked-actions/linkedActionsEditor.config";
+import {
   applyLinkedActionTargetFeature,
   countLinkedActionEditorRowErrors,
   createEmptyLinkedActionEditorRow,
   createLinkedActionEditorRowFromRule,
   createSaveLinkedActionRuleInputFromEditorRow,
   getLinkedActionEffectOptions,
+  getLinkedActionEffectOptionsForSource,
   getLinkedActionTriggerOptions,
   validateLinkedActionEditorRow,
 } from "@/core/linked-actions/linkedActionsEditor.model";
+import {
+  isLinkedActionEffectEngineSupported,
+  isLinkedActionEffectAuthoringSupported,
+  isLinkedActionTargetFeatureEngineSupported,
+  isLinkedActionTargetFeatureAuthoringSupported,
+  isLinkedActionTriggerEngineSupported,
+  isLinkedActionTriggerAuthoringSupported,
+} from "@/core/linked-actions/linkedActions.policy";
 import { createLinkedActionTargetExistingSelection } from "@/core/linked-actions/linkedActionsTargetPicker.types";
+import {
+  getSupportedLinkedActionEffectTypesForPath,
+} from "@/core/linked-actions/linkedActions.types";
 import type {
+  LinkedActionEffectType,
+  LinkedActionFeature,
   LinkedActionRuleDefinition,
   LinkedActionSupportedRuleDefinition,
+  LinkedActionSourceEntityType,
+  LinkedActionTriggerType,
 } from "@/core/linked-actions/linkedActions.types";
+
+function sortedUnique<T extends string>(values: readonly T[]): T[] {
+  return [...new Set(values)].sort();
+}
 
 function buildSupportedRule(
   overrides: Partial<LinkedActionSupportedRuleDefinition>,
@@ -74,6 +98,144 @@ describe("linkedActionsEditor.model", () => {
     const options = getLinkedActionEffectOptions("todos");
 
     expect(options.map((option) => option.value)).toEqual(["todo.complete"]);
+  });
+
+  it("keeps policy, supported-path truth, and editor filtering aligned for todo -> habit", () => {
+    expect(isLinkedActionTriggerAuthoringSupported("todo.completed")).toBe(true);
+    expect(isLinkedActionTargetFeatureAuthoringSupported("habits")).toBe(true);
+    expect(isLinkedActionEffectAuthoringSupported("habit.increment")).toBe(true);
+
+    const options = getLinkedActionEffectOptionsForSource({
+      sourceFeature: "todos",
+      sourceEntityType: "todo",
+      triggerType: "todo.completed",
+      targetFeature: "habits",
+    });
+
+    expect(options.map((option) => option.value)).toEqual(["habit.increment"]);
+  });
+
+  it("keeps habits -> habits effects unchanged while todo -> habits stays narrow", () => {
+    const habitSourceOptions = getLinkedActionEffectOptionsForSource({
+      sourceFeature: "habits",
+      sourceEntityType: "habit",
+      triggerType: "habit.completed_for_day",
+      targetFeature: "habits",
+    });
+    const todoSourceOptions = getLinkedActionEffectOptionsForSource({
+      sourceFeature: "todos",
+      sourceEntityType: "todo",
+      triggerType: "todo.completed",
+      targetFeature: "habits",
+    });
+
+    expect(habitSourceOptions.map((option) => option.value)).toEqual([
+      "habit.increment",
+      "habit.ensure_daily_target",
+    ]);
+    expect(todoSourceOptions.map((option) => option.value)).toEqual(["habit.increment"]);
+  });
+
+  it("locks shipped source authoring contract across policy, path truth, and editor options", () => {
+    const sourceFlowMatrix: Array<{
+      sourceFeature: LinkedActionFeature;
+      sourceEntityType: LinkedActionSourceEntityType;
+      shippedTriggers: LinkedActionTriggerType[];
+      editorConfig: {
+        allowedTriggerTypes: LinkedActionTriggerType[];
+        allowedTargetFeatures: LinkedActionFeature[];
+      };
+      targets: Array<{
+        targetFeature: LinkedActionFeature;
+        expectedEffects: LinkedActionEffectType[];
+      }>;
+    }> = [
+      {
+        sourceFeature: "todos",
+        sourceEntityType: "todo",
+        shippedTriggers: ["todo.completed"],
+        editorConfig: TODO_LINKED_ACTIONS_EDITOR_CONFIG,
+        targets: [
+          {
+            targetFeature: "todos",
+            expectedEffects: ["todo.complete"],
+          },
+          {
+            targetFeature: "habits",
+            expectedEffects: ["habit.increment"],
+          },
+        ],
+      },
+      {
+        sourceFeature: "habits",
+        sourceEntityType: "habit",
+        shippedTriggers: ["habit.completed_for_day"],
+        editorConfig: HABIT_LINKED_ACTIONS_EDITOR_CONFIG,
+        targets: [
+          {
+            targetFeature: "todos",
+            expectedEffects: ["todo.complete"],
+          },
+          {
+            targetFeature: "habits",
+            expectedEffects: ["habit.increment", "habit.ensure_daily_target"],
+          },
+          {
+            targetFeature: "workout",
+            expectedEffects: ["workout.log"],
+          },
+        ],
+      },
+    ];
+
+    for (const flow of sourceFlowMatrix) {
+      for (const triggerType of flow.shippedTriggers) {
+        expect(isLinkedActionTriggerAuthoringSupported(triggerType)).toBe(true);
+        expect(isLinkedActionTriggerEngineSupported(triggerType)).toBe(true);
+      }
+
+      const editorTriggerOptions = getLinkedActionTriggerOptions(flow.sourceFeature).map(
+        (option) => option.value,
+      );
+      expect(sortedUnique(editorTriggerOptions)).toEqual(sortedUnique(flow.shippedTriggers));
+      expect(sortedUnique(flow.editorConfig.allowedTriggerTypes)).toEqual(
+        sortedUnique(flow.shippedTriggers),
+      );
+
+      const expectedTargetFeatures = flow.targets.map((target) => target.targetFeature);
+      expect(sortedUnique(flow.editorConfig.allowedTargetFeatures)).toEqual(
+        sortedUnique(expectedTargetFeatures),
+      );
+
+      for (const target of flow.targets) {
+        expect(isLinkedActionTargetFeatureAuthoringSupported(target.targetFeature)).toBe(true);
+        expect(isLinkedActionTargetFeatureEngineSupported(target.targetFeature)).toBe(true);
+
+        const triggerType = flow.shippedTriggers[0] ?? null;
+        const supportedEffectTypes = getSupportedLinkedActionEffectTypesForPath({
+          sourceFeature: flow.sourceFeature,
+          sourceEntityType: flow.sourceEntityType,
+          triggerType,
+          targetFeature: target.targetFeature,
+          targetEntityType: target.targetFeature === "workout" ? "workout_routine" : target.targetFeature === "habits" ? "habit" : "todo",
+        });
+        const editorEffectTypes = getLinkedActionEffectOptionsForSource({
+          sourceFeature: flow.sourceFeature,
+          sourceEntityType: flow.sourceEntityType,
+          triggerType,
+          targetFeature: target.targetFeature,
+        }).map((option) => option.value);
+
+        expect(sortedUnique(supportedEffectTypes)).toEqual(sortedUnique(target.expectedEffects));
+        expect(sortedUnique(editorEffectTypes)).toEqual(sortedUnique(target.expectedEffects));
+        expect(sortedUnique(editorEffectTypes)).toEqual(sortedUnique(supportedEffectTypes));
+
+        for (const effectType of target.expectedEffects) {
+          expect(isLinkedActionEffectAuthoringSupported(effectType)).toBe(true);
+          expect(isLinkedActionEffectEngineSupported(effectType)).toBe(true);
+        }
+      }
+    }
   });
 
   it("creates an empty editor row from a source option", () => {

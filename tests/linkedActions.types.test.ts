@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLinkedActionRuleRow,
+  getSupportedLinkedActionEffectTypesForPath,
   isSupportedLinkedActionTriggerType,
   normalizeLinkedActionRuleRow,
   parseLinkedActionEffectPayload,
@@ -146,7 +147,7 @@ describe("core/linked-actions/linkedActions.types", () => {
     });
   });
 
-  it("marks unsupported source-to-target paths as unsupported even when the trigger and effect exist individually", () => {
+  it("supports the todo.completed -> habit.increment path", () => {
     expect(
       normalizeLinkedActionRuleRow({
         id: "link_combo",
@@ -171,10 +172,55 @@ describe("core/linked-actions/linkedActions.types", () => {
       }),
     ).toMatchObject({
       id: "link_combo",
+      isUnsupported: false,
+      source: {
+        feature: "todos",
+        entityType: "todo",
+        triggerType: "todo.completed",
+      },
+      target: {
+        feature: "habits",
+        entityType: "habit",
+        entityId: "habit_1",
+        effect: {
+          kind: "progress",
+          type: "habit.increment",
+          amount: 1,
+          dateStrategy: "source_date",
+        },
+      },
+    });
+  });
+
+  it("keeps todo.completed -> habit.ensure_daily_target unsupported", () => {
+    expect(
+      normalizeLinkedActionRuleRow({
+        id: "link_combo_ensure",
+        status: "active",
+        direction_policy: "one_way",
+        bidirectional_group_id: null,
+        source_feature: "todos",
+        source_entity_type: "todo",
+        source_entity_id: "todo_1",
+        trigger_type: "todo.completed",
+        target_feature: "habits",
+        target_entity_type: "habit",
+        target_entity_id: "habit_1",
+        effect_type: "habit.ensure_daily_target",
+        effect_payload: JSON.stringify({
+          minimumCount: "target_per_day",
+          dateStrategy: "source_date",
+        }),
+        created_at: "2026-04-13T00:00:00.000Z",
+        updated_at: "2026-04-13T00:00:00.000Z",
+        deleted_at: null,
+      }),
+    ).toMatchObject({
+      id: "link_combo_ensure",
       isUnsupported: true,
       rawTargetFeature: "habits",
       rawTargetEntityType: "habit",
-      rawEffectType: "habit.increment",
+      rawEffectType: "habit.ensure_daily_target",
       unsupportedReason:
         "This linked action uses an unsupported target and must be removed or replaced.",
     });
@@ -214,5 +260,17 @@ describe("core/linked-actions/linkedActions.types", () => {
     expect(isSupportedLinkedActionTriggerType("habit.completed_for_day")).toBe(true);
     expect(isSupportedLinkedActionTriggerType("workout.completed")).toBe(false);
     expect(isSupportedLinkedActionTriggerType("pomodoro.focus_completed")).toBe(false);
+  });
+
+  it("derives supported effects from path truth for todo -> habits", () => {
+    expect(
+      getSupportedLinkedActionEffectTypesForPath({
+        sourceFeature: "todos",
+        sourceEntityType: "todo",
+        triggerType: "todo.completed",
+        targetFeature: "habits",
+        targetEntityType: "habit",
+      }),
+    ).toEqual(["habit.increment"]);
   });
 });

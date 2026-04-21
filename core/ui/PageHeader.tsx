@@ -13,18 +13,20 @@ export function PageHeader({ title, subtitle, actions, className }: PageHeaderPr
   const { tokens } = useAppTheme();
 
   return (
-    <View className={["flex-row items-start justify-between gap-4", className].filter(Boolean).join(" ")}>
+    <View
+      className={["flex-row items-start justify-between gap-4", className].filter(Boolean).join(" ")}
+    >
       <View className="min-w-0 flex-1">
-        <Text className="text-2xl font-bold" style={{ color: tokens.text }}>
+        <Text className="text-2xl font-bold leading-tight" style={{ color: tokens.text }}>
           {title}
         </Text>
         {subtitle ? (
-          <Text className="mt-1 text-sm leading-5" style={{ color: tokens.textMuted }}>
+          <Text className="mt-1.5 text-sm leading-6" style={{ color: tokens.textMuted }}>
             {subtitle}
           </Text>
         ) : null}
       </View>
-      {actions ? <View className="shrink-0 flex-row items-center gap-1">{actions}</View> : null}
+      {actions ? <View className="shrink-0 flex-row items-center gap-2 pt-0.5">{actions}</View> : null}
     </View>
   );
 }

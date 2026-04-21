@@ -6,14 +6,14 @@ import { clearDatabase } from "./helpers/db";
 async function openAddHabitModal(page: Page) {
   await expect(page.getByText("ANYTIME").first()).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel("Habit name");
-  // Click the Pressable wrapper (parent of the + text) — RN Web often rejects clicks on the raw text node.
+  // Click the first group's Add tile instead of class-based wrappers.
   for (let attempt = 0; attempt < 3; attempt++) {
-    const firstPlusPressable = page
+    const firstAddTile = page
       .getByLabel("Habit groups")
-      .getByText("+", { exact: true })
+      .getByText("Add", { exact: true })
       .first()
-      .locator("..");
-    await firstPlusPressable.click({ force: true });
+      .locator("xpath=preceding-sibling::*[1]");
+    await firstAddTile.click({ force: true });
     try {
       await nameField.waitFor({ state: "visible", timeout: 8_000 });
       return;
@@ -84,7 +84,8 @@ test.describe("Habits", () => {
     await page.getByLabel("Habit name").fill("Delete this habit");
     await page.getByText("Create habit", { exact: true }).locator("..").click({ force: true });
     await expect(page.getByText("Delete this habit").first()).toBeVisible();
-    await page.locator(".flex-row.justify-between.items-start .rounded-lg.p-2").first().click();
+    await page.getByLabel("Enter habit edit mode").click({ force: true });
+    await expect(page.getByLabel("Exit habit edit mode")).toBeVisible();
     await page.getByText("Delete", { exact: true }).first().click();
     await page.getByText("Delete habit", { exact: true }).last().click({ force: true });
     await expect(page.getByText("Delete this habit").first()).not.toBeVisible();

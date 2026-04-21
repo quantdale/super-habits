@@ -9,7 +9,7 @@ import {
   createEmptyLinkedActionEditorRow,
   getLinkedActionEffectDescription,
   getLinkedActionEffectLabel,
-  getLinkedActionEffectOptions,
+  getLinkedActionEffectOptionsForSource,
   getLinkedActionFeatureLabel,
   getLinkedActionTriggerLabel,
   getLinkedActionTriggerOptions,
@@ -155,7 +155,12 @@ function RuleRow({
   );
   const selectedTargetFeature = row.targetFeature;
   const effectOptions = selectedTargetFeature
-    ? getLinkedActionEffectOptions(selectedTargetFeature)
+    ? getLinkedActionEffectOptionsForSource({
+        sourceFeature: row.sourceFeature,
+        sourceEntityType: row.sourceEntityType,
+        triggerType: row.triggerType,
+        targetFeature: selectedTargetFeature,
+      })
     : [];
   const selectedEffectDescription = row.effectType
     ? getLinkedActionEffectDescription(row.effectType)

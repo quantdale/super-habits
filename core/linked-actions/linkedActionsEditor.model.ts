@@ -4,6 +4,7 @@ import {
   LINKED_ACTION_SOURCE_ENTITY_TYPES_BY_FEATURE,
   LINKED_ACTION_TARGET_ENTITY_TYPES_BY_FEATURE,
   LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY,
+  getSupportedLinkedActionEffectTypesForPath,
   isSupportedLinkedActionEffect,
   isSupportedLinkedActionTargetFeature,
   isSupportedLinkedActionTriggerType,
@@ -142,6 +143,35 @@ export function getLinkedActionEffectOptions(
   const entityType = getLinkedActionTargetEntityTypeForFeature(feature);
   return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[entityType]
     .filter((effectType) => isSupportedLinkedActionEffect(entityType, effectType))
+    .map((effectType) => ({
+      value: effectType,
+      label: getLinkedActionEffectLabel(effectType),
+      description: getLinkedActionEffectDescription(effectType),
+    }));
+}
+
+export function getLinkedActionEffectOptionsForSource(input: {
+  sourceFeature: LinkedActionFeature;
+  sourceEntityType: LinkedActionSourceEntityType;
+  triggerType: LinkedActionTriggerType | null;
+  targetFeature: LinkedActionFeature;
+}): Array<LinkedActionOption<LinkedActionEffectType>> {
+  if (!isSupportedLinkedActionTargetFeature(input.targetFeature)) {
+    return [];
+  }
+
+  const targetEntityType = getLinkedActionTargetEntityTypeForFeature(input.targetFeature);
+  const supportedEffectTypes = getSupportedLinkedActionEffectTypesForPath({
+    sourceFeature: input.sourceFeature,
+    sourceEntityType: input.sourceEntityType,
+    triggerType: input.triggerType,
+    targetFeature: input.targetFeature,
+    targetEntityType,
+  });
+
+  return LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY[targetEntityType]
+    .filter((effectType) => isSupportedLinkedActionEffect(targetEntityType, effectType))
+    .filter((effectType) => supportedEffectTypes.includes(effectType))
     .map((effectType) => ({
       value: effectType,
       label: getLinkedActionEffectLabel(effectType),
