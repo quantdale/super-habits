@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
 import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { Card } from "@/core/ui/Card";
@@ -143,6 +143,7 @@ function OverviewMetricCard({
 
 export function OverviewScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [isLoading, setIsLoading] = useState(true);
   const [pendingTodosCount, setPendingTodosCount] = useState(0);
@@ -249,6 +250,7 @@ export function OverviewScreen() {
   );
 
   const isListView = viewMode === "list";
+  const useSingleColumnGrid = width < 960;
 
   const renderCard = useCallback(
     (cardKey: OverviewCardKey, className?: string) => {
@@ -478,7 +480,7 @@ export function OverviewScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Open settings"
-                className="rounded-lg p-2"
+                className="rounded-xl p-2.5"
                 onPress={() => router.push(SETTINGS_HREF)}
               >
                 <MaterialIcons name="settings" size={24} color={MUTED_ICON} />
@@ -489,7 +491,7 @@ export function OverviewScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: viewMode === mode }}
                   accessibilityLabel={`${mode} overview layout`}
-                  className={`rounded-lg p-2 ${viewMode === mode ? "bg-focus-light" : ""}`}
+                  className={`rounded-xl p-2.5 ${viewMode === mode ? "bg-focus-light" : ""}`}
                   onPress={() => setViewMode(mode)}
                 >
                   <MaterialIcons
@@ -505,31 +507,39 @@ export function OverviewScreen() {
       </ScreenSection>
 
       {isLoading ? (
-        <ScreenSection className="min-h-[200px] items-center justify-center py-12">
+        <ScreenSection className="min-h-[220px] items-center justify-center py-14">
           <ActivityIndicator size="large" color={SECTION_TEXT_COLORS.focus} />
         </ScreenSection>
       ) : (
         <ScreenSection>
           {viewMode === "grid" ? (
-            <View className="gap-3">
-              <View className="flex-row gap-3">
-                {GRID_ROWS[0].map((cardKey) => (
-                  <View key={cardKey} className="flex-1">
-                    {renderCard(cardKey, GRID_TOP_ROW_CARD_CLASS)}
+            <View className="gap-4">
+              {useSingleColumnGrid ? (
+                <View className="gap-4">
+                  {OVERVIEW_CARD_ORDER.map((cardKey) => renderCard(cardKey))}
+                </View>
+              ) : (
+                <>
+                  <View className="flex-row gap-4">
+                    {GRID_ROWS[0].map((cardKey) => (
+                      <View key={cardKey} className="flex-1">
+                        {renderCard(cardKey, GRID_TOP_ROW_CARD_CLASS)}
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
 
-              <View className="flex-row gap-3">
-                {GRID_ROWS[1].map((cardKey) => (
-                  <View key={cardKey} className="flex-1">
-                    {renderCard(cardKey, GRID_BOTTOM_ROW_CARD_CLASS)}
+                  <View className="flex-row gap-4">
+                    {GRID_ROWS[1].map((cardKey) => (
+                      <View key={cardKey} className="flex-1">
+                        {renderCard(cardKey, GRID_BOTTOM_ROW_CARD_CLASS)}
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
+                </>
+              )}
             </View>
           ) : (
-            <View className="flex-col gap-3">
+            <View className="flex-col gap-4">
               {OVERVIEW_CARD_ORDER.map((cardKey) => renderCard(cardKey))}
             </View>
           )}
@@ -537,7 +547,7 @@ export function OverviewScreen() {
       )}
 
       {!isLoading && !hasAnyTrackedData ? (
-        <ScreenSection className="mb-0">
+        <ScreenSection className="mb-0 mt-1">
           <EmptyStateCard
             accentColor={SECTION_COLORS.focus}
             className="mb-0"
@@ -547,8 +557,6 @@ export function OverviewScreen() {
           />
         </ScreenSection>
       ) : null}
-
-      <View className="h-2" />
     </Screen>
   );
 }

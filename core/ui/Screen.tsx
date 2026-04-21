@@ -53,15 +53,15 @@ const styles = StyleSheet.create({
   scrollContentPadded: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 32,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   fill: {
     flex: 1,
   },
   padded: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 32,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
 });

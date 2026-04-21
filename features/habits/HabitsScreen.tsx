@@ -304,7 +304,7 @@ export function HabitsScreen() {
           actions={
             <Pressable
               onPress={() => setEditMode((e) => !e)}
-              className={`rounded-lg p-2 ${editMode ? "bg-habits-light" : ""}`}
+              className={`rounded-xl p-2.5 ${editMode ? "bg-habits-light" : ""}`}
               accessibilityRole="button"
               accessibilityLabel={editMode ? "Exit habit edit mode" : "Enter habit edit mode"}
               accessibilityState={{ selected: editMode }}
@@ -341,10 +341,10 @@ export function HabitsScreen() {
               </View>
             </View>
 
-            <View className="mt-4 flex-row gap-3">
+            <View className="mt-4 flex-row flex-wrap gap-3">
               <StatBlock
                 accentColor={SECTION_COLORS.habits}
-                className="flex-1"
+                className="min-w-[148px] flex-1"
                 icon={<Text style={{ fontSize: 20 }}>⚡</Text>}
                 value={overallStreak}
                 label="Best streak"
@@ -352,7 +352,7 @@ export function HabitsScreen() {
               />
               <StatBlock
                 accentColor={SECTION_COLORS.habits}
-                className="flex-1"
+                className="min-w-[148px] flex-1"
                 icon={<Text style={{ fontSize: 20 }}>📊</Text>}
                 value={`${consistencyPct}%`}
                 label="Consistency"
@@ -363,7 +363,7 @@ export function HabitsScreen() {
         </Card>
       </ScreenSection>
 
-      <ScreenSection className="gap-3 pb-4" accessibilityLabel="Habit groups">
+      <ScreenSection className="gap-4 pb-2" accessibilityLabel="Habit groups">
         {habits.length === 0 ? (
           <EmptyStateCard
             accentColor={SECTION_COLORS.habits}
@@ -520,7 +520,7 @@ export function HabitsScreen() {
         })}
       </ScreenSection>
 
-      <ScreenSection className="mt-2 pb-8">
+      <ScreenSection className="mb-0 pt-1">
         <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
       </ScreenSection>
 

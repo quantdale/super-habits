@@ -294,7 +294,7 @@ export function TodosScreen() {
                     <Pressable
                       key={mode}
                       onPress={() => setViewMode(mode)}
-                      className={`rounded-lg p-2 ${viewMode === mode ? "bg-todos-light" : ""}`}
+                      className={`rounded-xl p-2.5 ${viewMode === mode ? "bg-todos-light" : ""}`}
                       accessibilityState={{ selected: viewMode === mode }}
                       accessibilityLabel={`${mode} view`}
                     >
@@ -358,7 +358,7 @@ export function TodosScreen() {
 
           {!totallyEmpty ? (
             <ScreenSection className="min-h-0 mb-0 flex-1">
-              <View className="mb-3 flex-row items-center justify-between gap-3 px-1">
+              <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
                 <View>
                   <Text className="text-sm font-semibold text-slate-900">Pending</Text>
                   <Text className="mt-0.5 text-xs text-slate-500">
@@ -368,7 +368,7 @@ export function TodosScreen() {
                 {hasCompleted ? (
                   <Pressable
                     onPress={() => setShowCompleted((v) => !v)}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-2"
+                    className="rounded-full border border-slate-200 bg-white px-3 py-2.5"
                   >
                     <Text className="text-xs font-semibold text-slate-600">
                       {showCompleted ? "Hide" : "Show"} completed ({completedTasks.length})
@@ -408,12 +408,12 @@ export function TodosScreen() {
                 }
                 ListFooterComponent={
                   hasCompleted ? (
-                    <View className="pt-2">
+                    <View className="pt-3">
                       {showCompleted
                         ? [
                             <View
                               key="completed-header"
-                              className="mb-3 flex-row items-center justify-between gap-3 px-1"
+                              className="mb-4 flex-row items-center justify-between gap-3 px-1"
                             >
                               <View>
                                 <Text className="text-sm font-semibold text-slate-900">Completed</Text>
