@@ -26,6 +26,7 @@ Companion docs in this folder:
 - Main runtime entry is `expo-router/entry` from root `package.json`.
 - App shell is an Expo Router app with a root stack and a custom top-tab layout.
 - Product modules in active use: Overview, Todos, Habits, Pomodoro/Focus, Workout, Calories.
+- Additional active utility routes: `/command` for the experimental quick-command shell and `/settings` for theme plus backup restore status.
 
 ### Confirmed from docs
 - SuperHabits is positioned as an offline-first productivity app for web, iOS, and Android.
@@ -51,8 +52,8 @@ Companion docs in this folder:
 
 ### Confirmed from code
 - Local-first SQLite app is implemented and bootstrapped at startup.
-- Optional Supabase client, anonymous auth bootstrap, and push-only sync adapter exist.
-- Linked Actions foundation is merged: schema tables, engine + effect registry, in-app notice banner, habit editor integration, and the first habits source entrypoint.
+- Optional Supabase client, anonymous auth bootstrap, push backup, and restore v1 preview/import exist.
+- Linked Actions are live beyond the foundation stage: schema tables, engine + effect registry, in-app notice banner, habit editor integration, and shipped todo/habit source entrypoints are on `main`.
 - Playwright E2E infrastructure is configured for static web export served from `dist/`.
 
 ### Confirmed from docs
@@ -101,7 +102,7 @@ Companion docs in this folder:
 | `features/` | Feature modules: data/domain/screen/components |
 | `features/shared/` | Cross-feature visualizations such as heatmaps/activity views |
 | `core/db/` | SQLite bootstrap, migrations, types, reference schema |
-| `core/sync/` | In-memory sync queue and Supabase push adapter |
+| `core/sync/` | In-memory sync queue, Supabase push adapter, and restore v1 coordinator |
 | `core/providers/` | App bootstrap for DB, sync, auth, query client, gestures, and theme |
 | `core/auth/` | Guest profile bootstrap |
 | `core/pwa/` | Service worker registration |
@@ -120,12 +121,13 @@ Companion docs in this folder:
 ### Confirmed from code
 - UI -> feature `*.data.ts` for persistence, never directly to SQLite from screens.
 - Feature `*.domain.ts` files hold pure calculations and formatting rules.
-- `AppProviders` bootstraps `initializeDatabase()`, service worker registration, guest profile creation, and optional anonymous Supabase session.
+- `AppProviders` bootstraps `initializeDatabase()`, service worker registration, guest profile creation, optional anonymous Supabase session, and startup restore-preview checks.
 - `getDatabase()` in `core/db/client.ts` is the single SQLite entrypoint and uses a singleton promise.
 - On web, SQLite runs through Expo web export with OPFS-compatible isolation headers; native enables WAL.
 - Mutating writes in synced entities enqueue records into `syncEngine`.
 - `syncEngine.flush()` passes queued records to `SupabaseSyncAdapter`, which reads current local rows and upserts them to Supabase by table name.
 - Flush triggers are time-based and lifecycle-based: 30 second interval, web visibility hidden, and NetInfo reconnect.
+- Restore v1 is handled separately from `syncEngine`: `restore.coordinator.ts` builds preview/eligibility state and imports only a narrow entity subset onto empty devices.
 
 ### Confirmed from docs
 - `schema.sql` is reference-only, not runtime authority.
@@ -141,7 +143,9 @@ Companion docs in this folder:
 - `core/linked-actions/linkedActions.engine.ts` persists source events/executions and enforces dedupe via rule/source and chain fingerprint checks.
 - `core/linked-actions/linkedActions.effects.ts` maps effect types to feature-owned data-layer wrappers.
 - `features/habits/habits.data.ts` dispatches `habit.completed_for_day` to the linked actions engine on threshold crossing.
+- `features/todos/todos.data.ts` dispatches `todo.completed` for non-recurring todos.
 - `features/habits/HabitsScreen.tsx` exposes the current Linked Actions editor flow for habit-completion rules, and applied rules surface through the global in-app notice banner.
+- Supported shipped paths are narrower than the full type-level universe: todo completed -> todo complete / habit increment, and habit completed-for-day -> todo complete / habit increment / habit ensure target / workout log.
 
 ### Confirmed from docs
 - `docs/linked-actions-readiness.md` is a planning/proposal document and should be read as design context, not runtime truth.
@@ -163,6 +167,7 @@ Companion docs in this folder:
 - Root redirect sends `/` to `/(tabs)/overview`.
 - `app/(tabs)/_layout.tsx` defines a custom top tab bar and swipe navigation between tabs.
 - Tab routes are thin wrappers such as `app/(tabs)/todos.tsx` -> `<TodosScreen />`.
+- `app/command.tsx` is a thin non-tab route that renders `CommandScreen`.
 - `app/settings.tsx` is a thin non-tab route that renders `SettingsScreen`.
 - Current tabs: Overview, Todos, Habits, Pomodoro, Workout, Calories.
 
@@ -218,10 +223,11 @@ Companion docs in this folder:
 - The only active remote boundary is Supabase, used from `lib/supabase.ts` and `core/sync/supabase.adapter.ts`.
 - Features do not call Supabase directly; they write locally and optionally enqueue sync records.
 - `SupabaseSyncAdapter.pull()` is a stub returning `[]`.
+- Restore v1 reads Supabase directly from `core/sync/restore.coordinator.ts` for preview/import flow, not through `syncEngine.pull()`.
 - `core/db/migrations/001_initial_supabase.sql` only contains a reserved `profiles` table baseline, not a full cloud schema.
 
 ### Inferred / uncertain
-- Remote sync is currently a one-way backup mechanism, not full multi-device synchronization.
+- Remote sync is currently a backup-first mechanism, not full multi-device synchronization. The shipped restore path is intentionally limited and conservative.
 
 ## Auth Model
 
@@ -247,6 +253,9 @@ Companion docs in this folder:
   - `saved_meals`
 - Workout nested edits bump the parent `workout_routines.updated_at` and enqueue the parent routine instead of syncing nested rows directly.
 - If remote mode is disabled, flush listeners are skipped and the in-memory queue can grow until a later flush path runs.
+- Restore v1 eligibility requires an empty device for synced tables.
+- Restore v1 imports `todos`, `habits`, and `calorie_entries`.
+- Habit completion history, saved meals, and workout restore are intentionally out of scope for restore v1.
 
 ## Feature Inventory
 
@@ -260,7 +269,8 @@ Companion docs in this folder:
 | Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history |
 | Workout | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history |
 | Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history |
-| Settings | Theme mode selection plus current shipped-scope/status summaries for linked actions and sync |
+| Settings | Theme mode selection plus backup restore preview/actions and shipped-scope summaries |
+| Command | Experimental quick-command shell for a single create-todo or create-habit action with parse -> review -> confirm flow |
 
 ## Domain Concepts and Glossary
 
@@ -312,11 +322,11 @@ Companion docs in this folder:
 - `npm run e2e:headed`
 - `npm run e2e:debug`
 
-### Confirmed from code on April 20, 2026
+### Confirmed from code on April 21, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `299` tests.
+- `npm test`: passes with `312` tests.
 - `npm run build:web`: passes.
-- `npm run e2e`: passes with `67` tests.
+- `npx playwright test --list`: reports `69` tests in `9` files.
 
 ### Confirmed from code
 - No lint script or lint config was found.
@@ -338,7 +348,8 @@ Companion docs in this folder:
 
 ### Confirmed from code vs docs
 - `core/db/schema.sql` is stale: it still says schema version `4`, while runtime code is version `11`.
-- Some docs still describe Linked Actions as "planned" even though schema + engine + first entrypoint are already merged on `main`.
+- Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
+- Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 
 ### Confirmed from code
 - `App.tsx` and `index.ts` are legacy Expo starter files and are not the active app entry because `package.json` points to `expo-router/entry`.
@@ -349,7 +360,7 @@ Companion docs in this folder:
 ## Current Priorities / Likely Next Areas of Work
 
 ### Confirmed from code and docs
-- Implement real pull/restore/conflict handling for Supabase sync.
+- Extend restore/sync beyond the current conservative v1 scope and define conflict handling.
 - Decide whether to activate or remove dormant React Query and Zustand usage.
 - Clarify or improve background/off-app behavior for long-running Pomodoro sessions.
 - Continue cleaning documentation drift around schema, E2E flow, and stack versions.

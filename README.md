@@ -1,8 +1,8 @@
 # SuperHabits
 
-SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, five core modules, and a lightweight settings screen for appearance and current platform status. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
+SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, six active route surfaces, and a lightweight settings screen for appearance, backup restore status, and shipped-scope notes. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
-Data is stored locally in SQLite first, then optionally pushed to Supabase as cloud backup via the app's delta-sync pipeline.
+Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is conservative: regular app usage pushes synced entities to Supabase, and restore v1 can import a limited subset back onto an empty device.
 
 ## Project Overview
 
@@ -10,14 +10,15 @@ Data is stored locally in SQLite first, then optionally pushed to Supabase as cl
 - Web support with static export + service worker + OPFS-backed SQLite runtime
 - Native support through Expo for Android and iOS
 - Feature modules with strict data/domain/UI layering
-- Optional remote sync with anonymous Supabase authentication
+- Optional anonymous Supabase backup/restore integration
+- Experimental quick-command route for single todo or habit creation
 
 ## Tech Stack
 
 - Expo SDK 55 + React Native 0.83.4 + Expo Router
 - TypeScript 5.9 + NativeWind 4
 - SQLite via `expo-sqlite` (WAL on native); web runtime uses SQLite WASM + OPFS
-- Supabase (`@supabase/supabase-js`) for one-way sync backup and anonymous auth
+- Supabase (`@supabase/supabase-js`) for anonymous auth, push backup, and restore v1 preview/import
 - Vercel for static PWA hosting (`dist/` output + SPA rewrites + COOP/COEP headers)
 - Vitest for unit tests; Playwright for E2E
 
@@ -35,7 +36,17 @@ Data is stored locally in SQLite first, then optionally pushed to Supabase as cl
 2. Reads current rows from local SQLite by id
 3. Upserts those rows to matching Supabase tables (`onConflict: "id"`)
 
-Current sync mode is one-way push backup. `pull()` is intentionally a stub (`[]`) today.
+Current adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pull()` is still a stub (`[]`) today, but the app also ships a separate restore coordinator for empty-device restore v1.
+
+### Restore V1
+
+`core/sync/restore.coordinator.ts` provides the current restore path used by startup and Settings:
+
+- Restore is only allowed when the device is empty for synced tables.
+- Restore imports `todos`, `habits`, and `calorie_entries`.
+- Habit completion history stays local-only.
+- Saved meals stay local-only.
+- `workout_routines` backup status is shown, but workout restore is intentionally excluded in this phase because nested routine structure is not fully synced.
 
 ### Flush and Auth Lifecycle
 
@@ -72,6 +83,21 @@ Optional platform commands:
 - `npm run android`
 - `npm run ios`
 - `npm run web`
+
+## Routes and Surfaces
+
+Current route surfaces:
+
+- `/(tabs)/overview`
+- `/(tabs)/todos`
+- `/(tabs)/habits`
+- `/(tabs)/pomodoro`
+- `/(tabs)/workout`
+- `/(tabs)/calories`
+- `/command` for the experimental quick-command shell
+- `/settings`
+
+The Overview screen is the entry point for the experimental command shell. It shows an "Add with command" card when `COMMAND_EXPERIMENT_ENABLED` is true.
 
 ## Deployment
 
@@ -113,13 +139,13 @@ Set these for cloud sync/auth:
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
-If unset, the app runs local-only and Supabase push operations no-op safely.
+If unset, the app runs local-only and remote backup/restore operations stay unavailable without crashing the app.
 
 ## Quality Gates
 
 - Type checking: `npm run typecheck`
 - Unit tests: `npm test`
-- E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes)
+- E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes; Playwright serves static `dist/` through `node scripts/serve-e2e.js`)
 
 ## Additional Documentation
 

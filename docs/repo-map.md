@@ -18,6 +18,7 @@ Use with:
 
 - `app/_layout.tsx` - root providers and stack
 - `app/index.tsx` - root redirect to overview
+- `app/command.tsx` - thin quick-command route wrapper
 - `app/settings.tsx` - thin settings route wrapper
 - `app/(tabs)/_layout.tsx` - custom top tabs and swipe navigation
 - `app/(tabs)/*.tsx` - thin route wrappers
@@ -30,7 +31,9 @@ Use with:
 - `core/db/types.ts` - entity types
 - `core/db/schema.sql` - stale reference snapshot only
 - `core/sync/sync.engine.ts` - queue and flush behavior
-- `core/sync/supabase.adapter.ts` - push-only Supabase upsert adapter
+- `core/sync/supabase.adapter.ts` - Supabase push backup adapter
+- `core/sync/restore.coordinator.ts` - restore v1 preview, eligibility, and empty-device import
+- `core/sync/restore.types.ts` - restore v1 scope and result types
 - `core/auth/guestProfile.ts` - local guest metadata
 - `core/pwa/registerServiceWorker.ts` - web service worker registration
 
@@ -90,6 +93,12 @@ Use with:
 
 ### Settings
 - `features/settings/SettingsScreen.tsx`
+
+### Command
+- `features/command/CommandScreen.tsx`
+- `features/command/command.domain.ts`
+- `features/command/command.executor.ts`
+- `features/command/mockCommandParser.ts`
 
 ### Cross-feature visuals
 - `features/shared/GitHubHeatmap.tsx`

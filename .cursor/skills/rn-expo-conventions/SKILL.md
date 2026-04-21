@@ -11,7 +11,8 @@ Apply this when writing any UI, navigation, or platform-specific code.
 - File-based routing: app/ directory mirrors URL structure
 - Tab routes: app/(tabs)/{name}.tsx
 - Root layout: app/_layout.tsx — wraps everything in AppProviders
-- Tabs layout: app/(tabs)/_layout.tsx — defines 5 tab items
+- Tabs layout: app/(tabs)/_layout.tsx — defines 6 tab items including Overview
+- Non-tab utility routes: app/command.tsx and app/settings.tsx
 - Navigation: use expo-router's <Link> or router.push(), never React Navigation directly
 - Tab names and hrefs defined in (tabs)/_layout.tsx
 
@@ -81,7 +82,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - Run: npm test
 - Only pure function tests (no DB, no component rendering yet)
 - Every new domain function needs a test
-- Current count: 299 tests passing — update whenever tests are added or removed
+- Current count: 312 tests passing — update whenever tests are added or removed
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)

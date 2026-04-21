@@ -18,7 +18,7 @@ Phase 1 — Intake (answer before planning):
 - Does it touch any existing feature's data?
 
 Phase 2 — Plan (list every file to create or modify):
-- New migration: core/db/client.ts runMigrations (current stored version: 9, next: 10)
+- New migration: core/db/client.ts runMigrations (current stored version: 11, next: 12)
 - New type: core/db/types.ts
 - New data file: features/{name}/{name}.data.ts
 - New domain file: features/{name}/{name}.domain.ts

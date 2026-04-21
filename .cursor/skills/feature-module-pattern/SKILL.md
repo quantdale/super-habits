@@ -20,6 +20,7 @@ Route file (thin wrapper):
 ## Exceptions (current repo)
 - **`features/overview/`** — `OverviewScreen.tsx` only (dashboard tab). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
 - **`features/settings/`** — `SettingsScreen.tsx` only. It is a utility route rendered by `app/settings.tsx`, not a tab module.
+- **`features/command/`** — experimental utility route rendered by `app/command.tsx`; current files are `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, and `types.ts` rather than the standard `{feature}.data.ts` pattern.
 - **`features/shared/`** — cross-feature UI (`GitHubHeatmap`, `ActivityPreviewStrip`). Not a tab-routed module.
 - **Nested screens** — e.g. `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx` alongside `WorkoutScreen.tsx` under `features/workout/` for multi-step flows.
 

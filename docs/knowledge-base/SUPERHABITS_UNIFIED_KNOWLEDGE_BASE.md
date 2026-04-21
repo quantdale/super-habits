@@ -51,17 +51,19 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five MVP modules: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, **calories** (macro-derived kcal), plus a non-tab **settings** route for theme mode and current shipped-scope status.
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five core tabs: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal). Non-tab routes include **settings** for theme and backup restore status, plus **command** for the experimental quick-command shell.
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **11**. Next migration: `if (version < 12)`.
 
-**Sync:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (one-way **push backup**; `pull` is a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and pushes no-op without throwing.
+**Sync / backup:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
-**Linked Actions (foundation):** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, and the first source entrypoint is wired from habits completion (`habit.completed_for_day`).
+**Restore v1:** startup and Settings use `core/sync/restore.coordinator.ts` to preview backup status and allow a conservative restore only on an **empty device** for synced tables. Restore imports **todos**, **habits**, and **calorie_entries**. Habit completion history, saved meals, and workout restore remain out of scope in this phase.
+
+**Linked Actions:** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, shipped source entrypoints exist for `habit.completed_for_day` and non-recurring `todo.completed`, and the current habit editor flow exposes supported rule paths instead of a placeholder preview.
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality (April 21, 2026):** `npm run typecheck` passes; `npm test` passes with **299** tests; `npm run build:web` passes; `npm run e2e` passes with **67** tests. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (April 21, 2026):** `npm run typecheck` passes; `npm test` passes with **312** tests; `npm run build:web` passes; `npx playwright test --list` reports **69** tests in **9** files. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -86,21 +88,21 @@
 | Attribute | Value |
 |-----------|-------|
 | Name | `superhabits` (npm package, private) |
-| Purpose | Offline-first Expo + React Native client; Overview tab + five feature modules |
+| Purpose | Offline-first Expo + React Native client; Overview + five core tabs, plus utility command/settings routes |
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`) |
 | Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
-| Unit tests | **299** passing (Vitest) |
-| E2E tests | **67** Playwright tests in **9** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Unit tests | **312** passing (Vitest) |
+| E2E tests | **69** Playwright tests in **9** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
 | Path | Role |
 |------|------|
-| `app/` | Expo Router routes: root layout, index redirect, `settings.tsx`, `(tabs)` layout + thin tab route files |
+| `app/` | Expo Router routes: root layout, index redirect, `command.tsx`, `settings.tsx`, `(tabs)` layout + thin tab route files |
 | `assets/` | Icons, splash, favicon (referenced from `app.json`) |
 | `constants/` | Shared design tokens (section colors) |
-| `core/` | DB singleton, types, sync engine, guest profile, `AppProviders`, PWA registration, shared `ui/` |
+| `core/` | DB singleton, types, sync engine, restore coordinator, guest profile, `AppProviders`, PWA registration, shared `ui/` |
 | `features/` | Feature modules: `{name}.data.ts`, `{name}Screen.tsx`, optional `{name}.domain.ts`, `types.ts` re-exports |
 | `lib/` | Pure utilities: `id`, `time`, `validation`, `notifications`, **`supabase`** (client + anonymous session + `remoteMode`), `horizontalScrollViewportStyle` |
 | `public/` | Web static assets; `sw.js` service worker |
@@ -116,11 +118,12 @@
 
 ### Complete file inventory
 
-#### `app/` (10 files)
+#### `app/` (11 files)
 
 | File | Role |
 |------|------|
 | `_layout.tsx` | Root stack; `AppProviders`, `StatusBar`, hides header |
+| `command.tsx` | Renders `CommandScreen` |
 | `index.tsx` | Redirect to `/(tabs)/overview` |
 | `settings.tsx` | Renders `SettingsScreen` |
 | `(tabs)/_layout.tsx` | Top tab bar, `TabList` / `TabTrigger` / `TabSlot` |
@@ -147,6 +150,8 @@
 
 **settings:** `SettingsScreen.tsx` (screen-only utility route — no `.data.ts` / `.domain.ts` in this folder)
 
+**command:** `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, `types.ts` (experimental utility route for single create-todo / create-habit flow)
+
 **shared:** `GitHubHeatmap.tsx`, `activityTypes.ts`
 
 #### `core/` (21 logical paths)
@@ -159,6 +164,8 @@
 | `db/migrations/001_initial_supabase.sql` | Reference / future Supabase |
 | `sync/sync.engine.ts` | `SyncRecord`, `SyncAdapter`, `NoopSyncAdapter`, `SyncEngine`, **`syncEngine`** singleton (`SupabaseSyncAdapter`) |
 | `sync/supabase.adapter.ts` | `SupabaseSyncAdapter` — push upserts for synced entities |
+| `sync/restore.coordinator.ts` | Restore v1 preview, eligibility, dismissal, and empty-device import flow |
+| `sync/restore.types.ts` | Restore entity scope, preview, and result types |
 | `auth/guestProfile.ts` | `ensureGuestProfile` → `app_meta.guest_profile` |
 | `providers/AppProviders.tsx` | DB init, SW, guest profile, **`ensureAnonymousSession`**, React Query, NetInfo/interval/visibility sync flush when remote enabled |
 | `pwa/registerServiceWorker.ts` | Workbox `/sw.js` on web |
@@ -190,7 +197,7 @@
 |------|------|
 | `sectionColors.ts` | `SECTION_COLORS`, `SECTION_COLORS_LIGHT`, `SectionKey` |
 
-#### `tests/` (23 files)
+#### `tests/` (29 files)
 
 | File | Role |
 |------|------|
@@ -199,17 +206,22 @@
 | `time.test.ts` | `lib/time` |
 | `validation.test.ts` | `lib/validation` |
 | `notifications.test.ts` | `lib/notifications` |
-| `*.domain.test.ts` | Domain coverage for todos, habits, calories, pomodoro, and workout |
+| `*.domain.test.ts` | Domain coverage for todos, habits, calories, pomodoro, workout, and command parsing |
 | `*.data.test.ts` | Data-layer contract coverage for todos, habits, calories, pomodoro, workout, and linked actions |
+| `command.executor.test.ts` | Quick-command executor coverage |
 | `linkedActions.engine.test.ts` | Linked Actions chain dedupe and execution behavior |
 | `linkedActions.types.test.ts` | Linked Actions typing and payload guards |
 | `linkedActionsEditor.model.test.ts` | Linked Actions editor state model coverage |
 | `linkedActionsTargetPicker.test.ts` | Target picker filtering and selection rules |
 | `inAppNotices.test.ts` | In-app notice queue/provider behavior |
+| `restore.coordinator.test.ts` | Restore v1 eligibility, preview, and import guard coverage |
+| `restore.helpers.test.ts` | Restore helper coverage |
+| `restorePromptFlow.test.ts` | Startup restore prompt outcome rules |
+| `settings.restorePreview.test.ts` | Settings restore-preview auth-ready gating |
 | `db.client.test.ts` | `core/db/client` error-handling smoke (invalid SQL; connection placeholder) |
 | `sync.engine.test.ts` | `SyncEngine.flush` in-flight enqueue + failed push / adapter batch mutation recovery |
 
-#### `e2e/` (14 files)
+#### `e2e/` (12 files)
 
 | File | Role |
 |------|------|
@@ -220,12 +232,14 @@
 | `workout.spec.ts` | Workout flows |
 | `infrastructure.spec.ts` | COEP/COOP, SW, OPFS, DB |
 | `boundary.spec.ts` | Stress / boundary cases |
+| `command.spec.ts` | Quick-command parse, edit, and confirm flows |
 | `global.setup.ts` | `crossOriginIsolated` gate |
 | `global.teardown.ts` | No-op placeholder |
 | `helpers/navigation.ts` | `goToTab`, `hardReload`, `waitForDb` |
 | `helpers/db.ts` | `clearDatabase` (OPFS) |
 | `helpers/forms.ts` | `fillRoutineName`, `fillCaloriesMacros` |
 | `helpers/gestures.ts` | Swipe helpers for RN Web |
+| `settings.spec.ts` | Backup restore surface and empty-device guard behavior |
 | `README.md` | E2E notes |
 
 ### Layering rules (strict)
@@ -1751,7 +1765,7 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (April 21, 2026):** **299 tests passed**; **29 test files passed** (Vitest v4)
+**Latest run (April 21, 2026):** **312 tests passed**; **29 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -2054,7 +2068,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 299 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 312 passing.
 
 ---
 
@@ -2123,7 +2137,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (299 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (312 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2296,11 +2310,11 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **299** passing (Vitest) |
-| E2E | **67** Playwright tests in **9** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
+| Unit tests | **312** passing (Vitest) |
+| E2E | **69** Playwright tests in **9** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **11** |
-| Linked Actions | Foundation merged: schema tables + engine/effects + in-app notice banner + habit editor integration + habits source entrypoint |
-| Cloud sync | **One-way push backup:** `SupabaseSyncAdapter` upsert + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; **pull** not implemented |
+| Linked Actions | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix |
+| Cloud sync / restore | Push backup via `SupabaseSyncAdapter` + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; adapter **pull** not implemented; restore v1 separately supports empty-device import for todos, habits, and calorie entries only |
 | Validation | Hard rejection in feature screens via `lib/validation.ts` |
 | Design system | Per-section colors, card accent strips, GitHub heatmaps, PillChips |
 
@@ -2406,6 +2420,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **299** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **312** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- Run `npx playwright test --list` when E2E spec count changes; keep **67** / **9 files** in sync
+- Run `npx playwright test --list` when E2E spec count changes; keep **69** / **9 files** in sync

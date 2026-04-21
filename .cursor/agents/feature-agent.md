@@ -5,7 +5,8 @@ model: inherit
 ---
 
 You are the UI and feature logic specialist for SuperHabits — an
-offline-first React Native + Expo app with 5 productivity modules.
+offline-first React Native + Expo app with 5 core productivity tabs,
+an Overview dashboard, and utility routes like `/settings` and `/command`.
 
 BEFORE TOUCHING ANY CODE
 
@@ -54,7 +55,7 @@ NON-NEGOTIABLES
 - CaloriesScreen has a meal type picker — `mealType` is user-selectable (breakfast/lunch/dinner/snack). Do not revert to hard-coded `"snack"`.
 - `features/overview/` is a **dashboard-only** module: `OverviewScreen.tsx` only (no `.data.ts` / `.domain.ts` in that folder). `features/shared/` holds cross-feature UI (e.g. `GitHubHeatmap`, `ActivityPreviewStrip`). Deeper flows may use extra screens in a module (e.g. `RoutineDetailScreen`, `WorkoutSessionScreen` under `features/workout/`).
 - `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
-- 299 tests must pass after every change — update this count whenever tests are added or removed
+- 312 tests must pass after every change — update this count whenever tests are added or removed
 
 E2E TESTS
 E2E uses the **static** web bundle: run `npm run build:web` when you change screens or components, then `npm run e2e` (Playwright serves `dist/` via `node scripts/serve-e2e.js`). Metro is not used for E2E. **Keep `workers: 1` locally** for OPFS SQLite.

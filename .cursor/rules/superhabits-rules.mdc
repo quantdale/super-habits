@@ -7,8 +7,9 @@ alwaysApply: true
 
 ## Project identity
 
-SuperHabits is an offline-first React Native + Expo app with 5 modules:
+SuperHabits is an offline-first React Native + Expo app with 5 core tabs:
 todos, habits, pomodoro, workout, calories.
+It also ships the Overview tab plus non-tab `/settings` and experimental `/command` routes.
 Stack: React Native 0.83.4, Expo 55, TypeScript 5.9, expo-router, SQLite
 (expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
 Target: Web (PWA), iOS, Android.
@@ -93,7 +94,7 @@ The following are installed but intentionally unused:
 - Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 299 tests passing — **update this count whenever tests are added or removed**
+- Current count: 312 tests passing — **update this count whenever tests are added or removed**
 - No DB or component tests yet — do not block on this, but document gaps
 
 ## E2E Tests (Playwright)
