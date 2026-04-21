@@ -116,6 +116,69 @@ describe("core/linked-actions/linkedActions.engine", () => {
     expect(result.notices[0]?.payload.message).toContain("Linked Actions updated");
   });
 
+  it("applies todo.completed -> habit.increment using the same execution and dedupe flow", async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
+      buildRule({
+        id: "link_todo_habit_increment",
+        source: {
+          feature: "todos",
+          entityType: "todo",
+          entityId: "todo_1",
+          triggerType: "todo.completed",
+        },
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_2",
+          effect: {
+            kind: "progress",
+            type: "habit.increment",
+            amount: 1,
+            dateStrategy: "source_date",
+          },
+        },
+        rawTargetFeature: "habits",
+        rawTargetEntityType: "habit",
+        rawEffectType: "habit.increment",
+      }),
+    ]);
+
+    const executor = vi.fn().mockResolvedValue({
+      status: "applied",
+      targetLabel: "Hydrate",
+    });
+    const engine = new LinkedActionsEngine({
+      effectRegistry: { "habit.increment": executor },
+    });
+
+    const result = await engine.processSourceAction({
+      feature: "todos",
+      entityType: "todo",
+      entityId: "todo_1",
+      triggerType: "todo.completed",
+      label: "Morning todo",
+      sourceDateKey: "2026-04-14",
+    });
+
+    expect(executor).toHaveBeenCalledTimes(1);
+    expect(dataMocks.createLinkedActionExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ruleId: "link_todo_habit_increment",
+        effectType: "habit.increment",
+        targetFeature: "habits",
+        targetEntityType: "habit",
+        targetEntityId: "habit_2",
+      }),
+    );
+    expect(result.effects[0]).toMatchObject({
+      status: "applied",
+      effectType: "habit.increment",
+      targetFeature: "habits",
+      targetEntityType: "habit",
+      targetEntityId: "habit_2",
+    });
+  });
+
   it("returns duplicate results when the same source event already executed a rule", async () => {
     dataMocks.listMatchingLinkedActionRules.mockResolvedValue([buildRule()]);
     const priorExecution: LinkedActionExecutionRecord = {

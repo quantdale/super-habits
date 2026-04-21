@@ -219,6 +219,57 @@ describe("features/todos/todos.data", () => {
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).not.toHaveBeenCalled();
   });
 
+  it("allows saving todo.completed -> habit.increment rules for non-recurring todos", async () => {
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValue({
+        id: "todo_1",
+        recurrence: null,
+        deleted_at: null,
+      }),
+      runAsync: vi.fn(),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await saveTodoLinkedActionRules("todo_1", [
+      {
+        triggerType: "todo.completed",
+        target: {
+          feature: "habits",
+          entityType: "habit",
+          entityId: "habit_1",
+          effect: {
+            kind: "progress",
+            type: "habit.increment",
+            amount: 1,
+            dateStrategy: "source_date",
+          },
+        },
+      },
+    ]);
+
+    expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith({
+      feature: "todos",
+      entityType: "todo",
+      entityId: "todo_1",
+      rules: [
+        {
+          triggerType: "todo.completed",
+          target: {
+            feature: "habits",
+            entityType: "habit",
+            entityId: "habit_1",
+            effect: {
+              kind: "progress",
+              type: "habit.increment",
+              amount: 1,
+              dateStrategy: "source_date",
+            },
+          },
+        },
+      ],
+    });
+  });
+
   it("cleans source and target linked rules when removing a todo", async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({

@@ -6,9 +6,15 @@ import {
   createLinkedActionEditorRowFromRule,
   createSaveLinkedActionRuleInputFromEditorRow,
   getLinkedActionEffectOptions,
+  getLinkedActionEffectOptionsForSource,
   getLinkedActionTriggerOptions,
   validateLinkedActionEditorRow,
 } from "@/core/linked-actions/linkedActionsEditor.model";
+import {
+  isLinkedActionEffectAuthoringSupported,
+  isLinkedActionTargetFeatureAuthoringSupported,
+  isLinkedActionTriggerAuthoringSupported,
+} from "@/core/linked-actions/linkedActions.policy";
 import { createLinkedActionTargetExistingSelection } from "@/core/linked-actions/linkedActionsTargetPicker.types";
 import type {
   LinkedActionRuleDefinition,
@@ -74,6 +80,42 @@ describe("linkedActionsEditor.model", () => {
     const options = getLinkedActionEffectOptions("todos");
 
     expect(options.map((option) => option.value)).toEqual(["todo.complete"]);
+  });
+
+  it("keeps policy, supported-path truth, and editor filtering aligned for todo -> habit", () => {
+    expect(isLinkedActionTriggerAuthoringSupported("todo.completed")).toBe(true);
+    expect(isLinkedActionTargetFeatureAuthoringSupported("habits")).toBe(true);
+    expect(isLinkedActionEffectAuthoringSupported("habit.increment")).toBe(true);
+
+    const options = getLinkedActionEffectOptionsForSource({
+      sourceFeature: "todos",
+      sourceEntityType: "todo",
+      triggerType: "todo.completed",
+      targetFeature: "habits",
+    });
+
+    expect(options.map((option) => option.value)).toEqual(["habit.increment"]);
+  });
+
+  it("keeps habits -> habits effects unchanged while todo -> habits stays narrow", () => {
+    const habitSourceOptions = getLinkedActionEffectOptionsForSource({
+      sourceFeature: "habits",
+      sourceEntityType: "habit",
+      triggerType: "habit.completed_for_day",
+      targetFeature: "habits",
+    });
+    const todoSourceOptions = getLinkedActionEffectOptionsForSource({
+      sourceFeature: "todos",
+      sourceEntityType: "todo",
+      triggerType: "todo.completed",
+      targetFeature: "habits",
+    });
+
+    expect(habitSourceOptions.map((option) => option.value)).toEqual([
+      "habit.increment",
+      "habit.ensure_daily_target",
+    ]);
+    expect(todoSourceOptions.map((option) => option.value)).toEqual(["habit.increment"]);
   });
 
   it("creates an empty editor row from a source option", () => {

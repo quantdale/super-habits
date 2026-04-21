@@ -599,7 +599,7 @@ export function TodosScreen() {
               allowedTriggerTypes={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes}
               allowCreateNewTarget={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget}
               introTitle="Task completion rules"
-              introDescription="Choose a target task and the effect that should run when this task is completed."
+              introDescription="Choose a target task or habit and the effect that should run when this task is completed."
             />
           )}
           <ValidationError message={linkedActionsError} />
