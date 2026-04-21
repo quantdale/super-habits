@@ -384,3 +384,37 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
     targetLabel: habit.name,
   };
 }
+
+export async function applyRemoteHabits(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: Habit[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO habits (
+         id,
+         name,
+         target_per_day,
+         reminder_time,
+         category,
+         icon,
+         color,
+         created_at,
+         updated_at,
+         deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.name,
+        row.target_per_day,
+        row.reminder_time,
+        row.category,
+        row.icon,
+        row.color,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+      ],
+    );
+  }
+}

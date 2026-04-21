@@ -1,6 +1,6 @@
 import type * as SQLite from "expo-sqlite";
 
-export type AppMetaOwner = "system" | "auth" | "calories" | "pomodoro";
+export type AppMetaOwner = "system" | "auth" | "calories" | "pomodoro" | "sync";
 
 type AppMetaStorage = "text" | "json";
 
@@ -27,6 +27,12 @@ export const appMetaKeys = {
   dateKeyFormat: defineTextKey("date_key_format", "system"),
   dateKeyCutover: defineTextKey("date_key_cutover", "system"),
   guestProfile: defineJsonKey("guest_profile", "auth"),
+  restorePromptDismissedSignature: defineTextKey(
+    "restore_prompt_dismissed_signature",
+    "sync",
+  ),
+  lastRestoreSignature: defineTextKey("last_restore_signature", "sync"),
+  lastRestoreAt: defineTextKey("last_restore_at", "sync"),
   calorieGoal: defineJsonKey("calorie_goal", "calories"),
   pomodoroSettings: defineJsonKey("pomodoro_settings", "pomodoro"),
 } as const;
