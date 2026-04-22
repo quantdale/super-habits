@@ -20,7 +20,8 @@ const POLITE_PREFIX_PATTERN = /^(?:please|kindly)\s+/i;
 const QUESTION_PREFIX_PATTERN = /^(?:can|could|would)\s+you\s+/i;
 const TODO_KEYWORD_PATTERN = /\b(?:todo|task)\b/i;
 const HABIT_KEYWORD_PATTERN = /\bhabit\b/i;
-const TODO_HINT_PREFIX_PATTERN = /^(?:remind\s+me\s+to|add\s+(?:(?:a|an)\s+)?task\s+to)\s+/i;
+const TODO_HINT_PREFIX_PATTERN =
+  /^(?:remind\s+me\s+to|add\s+(?:(?:a|an)\s+)?task\s+to)(?:\s+|$)/i;
 const I_NEED_TO_PREFIX_PATTERN = /^i\s+need\s+to\s+/i;
 const VAGUE_I_NEED_TO_PATTERN = /^(?:be|get|become)\b/i;
 const I_NEED_TO_TASK_VERB_PATTERN =
@@ -204,9 +205,9 @@ function parseTodoDraft(input: ParseCommandInput): ParseCommandResult {
     POLITE_PREFIX_PATTERN,
     QUESTION_PREFIX_PATTERN,
     I_NEED_TO_PREFIX_PATTERN,
-    /^(?:remind\s+me\s+to)\s+/i,
-    /^(?:add|create|make)\s+(?:(?:a|an)\s+)?task\s+to\s+/i,
-    /^(?:please\s+)?(?:add|create|make)\s+(?:(?:a|an)\s+)?(?:todo|task)(?:\s+to)?\s+/i,
+    /^(?:remind\s+me\s+to)(?:\s+|$)/i,
+    /^(?:add|create|make)\s+(?:(?:a|an)\s+)?task\s+to(?:\s+|$)/i,
+    /^(?:please\s+)?(?:add|create|make)\s+(?:(?:a|an)\s+)?(?:todo|task)(?:\s+to)?(?:\s+|$)/i,
     /^(?:todo|task)\s*:?\s*/i,
   ]);
 
@@ -343,8 +344,8 @@ function parseHabitDraft(input: ParseCommandInput): ParseCommandResult {
   let workingText = stripLeadingScaffolding(input.rawText, [
     POLITE_PREFIX_PATTERN,
     QUESTION_PREFIX_PATTERN,
-    /^(?:please\s+)?(?:add|create|make)\s+(?:(?:a|an)\s+)?habit(?:\s+to)?\s+/i,
-    /^(?:create|add|make)\s+(?:(?:a|an)\s+)?habit\s+to\s+/i,
+    /^(?:please\s+)?(?:add|create|make)\s+(?:(?:a|an)\s+)?habit(?:\s+to)?(?:\s+|$)/i,
+    /^(?:create|add|make)\s+(?:(?:a|an)\s+)?habit\s+to(?:\s+|$)/i,
     /^habit\s*:?\s*/i,
   ]);
 

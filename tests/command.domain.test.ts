@@ -94,6 +94,58 @@ describe("features/command/command.domain (v1 rules hardened)", () => {
     expect(result.draft.fields.targetPerDay).toBe(1);
   });
 
+  it.each([
+    "Create a habit",
+    "Create a habit to",
+  ])("treats scaffold-only habit command %p as needs_input", (rawText) => {
+    const result = parseCommandDraft({
+      ...PARSE_INPUT_BASE,
+      rawText,
+    });
+
+    expect(result.outcome).toBe("draft");
+    if (result.outcome !== "draft") return;
+
+    expect(result.draft.kind).toBe("create_habit");
+    if (result.draft.kind !== "create_habit") return;
+    expect(result.draft.status).toBe("needs_input");
+    expect(result.draft.fields.name).toBeNull();
+    expect(result.draft.missingFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "name",
+        }),
+      ]),
+    );
+  });
+
+  it.each([
+    "Add a todo",
+    "Add a task",
+    "Create a task",
+    "Remind me to",
+  ])("treats scaffold-only todo command %p as needs_input", (rawText) => {
+    const result = parseCommandDraft({
+      ...PARSE_INPUT_BASE,
+      rawText,
+    });
+
+    expect(result.outcome).toBe("draft");
+    if (result.outcome !== "draft") return;
+
+    expect(result.draft.kind).toBe("create_todo");
+    if (result.draft.kind !== "create_todo") return;
+    expect(result.draft.status).toBe("needs_input");
+    expect(result.draft.fields.title).toBeNull();
+    expect(result.draft.missingFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "title",
+        }),
+      ]),
+    );
+  });
+
   it("keeps todo-with-time behavior as warning-only when date is supported", () => {
     const result = parseCommandDraft({
       ...PARSE_INPUT_BASE,
