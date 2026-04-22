@@ -38,6 +38,36 @@ export const supabase: SupabaseClient | null = supabaseConfigured
     })
   : null;
 
+export function isSupabaseConfigured() {
+  return supabaseConfigured;
+}
+
+export function getSupabaseFunctionUrl(functionName: string): string | null {
+  if (!supabaseConfigured) return null;
+  return `${supabaseUrl}/functions/v1/${functionName}`;
+}
+
+export function getSupabaseAnonKey(): string | null {
+  return supabaseConfigured ? supabaseAnonKey : null;
+}
+
+export async function getSupabaseAccessToken(): Promise<string | null> {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw error;
+  }
+
+  return session?.access_token ?? null;
+}
+
 /**
  * Ensures a Supabase auth session exists, creating an anonymous session when none is present.
  * No-ops when Supabase env is not configured (missing URL or anon key).

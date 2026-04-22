@@ -324,7 +324,7 @@ Companion docs in this folder:
 
 ### Confirmed from code on April 21, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `312` tests.
+- `npm test`: passes with `322` tests.
 - `npm run build:web`: passes.
 - `npx playwright test --list`: reports `69` tests in `9` files.
 

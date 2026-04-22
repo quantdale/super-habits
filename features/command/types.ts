@@ -1,6 +1,7 @@
 export const COMMAND_EXPERIMENT_ENABLED = true;
 
 export type DraftStatus = "ready" | "needs_input" | "unsupported";
+export type DraftParserKind = "mock_rules" | "model_proxy" | "model_proxy_fallback";
 
 export type DraftWarning = {
   code:
@@ -20,8 +21,8 @@ export type DraftMissingField = {
 export type DraftBase = {
   kind: "create_todo" | "create_habit";
   rawText: string;
-  parserKind: "mock_rules";
-  parserVersion: "v1";
+  parserKind: DraftParserKind;
+  parserVersion: string;
   confidence: number | null;
   status: DraftStatus;
   warnings: DraftWarning[];
@@ -57,11 +58,14 @@ export type ParseCommandInput = {
   now: Date;
   locale: string;
   timeZone: string;
+  todayDateKey: string;
+  tomorrowDateKey: string;
 };
 
 export type ParseCommandResult =
   | { outcome: "draft"; draft: DraftAiAction }
-  | { outcome: "unsupported"; rawText: string; reason: string };
+  | { outcome: "unsupported"; rawText: string; reason: string }
+  | { outcome: "unavailable"; rawText: string; message: string };
 
 export interface AiCommandParser {
   parse(input: ParseCommandInput): Promise<ParseCommandResult>;

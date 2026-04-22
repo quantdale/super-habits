@@ -13,7 +13,7 @@ import { ValidationError } from "@/core/ui/ValidationError";
 import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { toDateKey } from "@/lib/time";
 import { executeDraftAction } from "./command.executor";
-import { mockCommandParser } from "./mockCommandParser";
+import { commandParser } from "./commandParser";
 import type {
   CommandExecutionResult,
   DraftAiAction,
@@ -339,6 +339,7 @@ export function CommandScreen() {
   const [editableDraft, setEditableDraft] = useState<DraftAiAction | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [successResult, setSuccessResult] = useState<
     Extract<CommandExecutionResult, { outcome: "success" }> | null
   >(null);
@@ -370,22 +371,31 @@ export function CommandScreen() {
     setEditableDraft(null);
     setExecutionError(null);
     setIsExecuting(false);
+    setIsParsing(false);
     setSuccessResult(null);
   };
 
   const handleParseCommand = async () => {
     setExecutionError(null);
     setSuccessResult(null);
+    setIsParsing(true);
 
     const parserContext = getParserContext();
-    const nextResult = await mockCommandParser.parse({
-      rawText,
-      now: new Date(),
-      locale: parserContext.locale,
-      timeZone: parserContext.timeZone,
-    });
-    setParseResult(nextResult);
-    setEditableDraft(nextResult.outcome === "draft" ? cloneDraft(nextResult.draft) : null);
+    const now = new Date();
+    try {
+      const nextResult = await commandParser.parse({
+        rawText,
+        now,
+        locale: parserContext.locale,
+        timeZone: parserContext.timeZone,
+        todayDateKey: toDateKey(now),
+        tomorrowDateKey: getTomorrowDateKey(now),
+      });
+      setParseResult(nextResult);
+      setEditableDraft(nextResult.outcome === "draft" ? cloneDraft(nextResult.draft) : null);
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   const handleConfirm = async () => {
@@ -472,6 +482,7 @@ export function CommandScreen() {
                 setParseResult(null);
                 setEditableDraft(null);
                 setExecutionError(null);
+                setIsParsing(false);
                 setSuccessResult(null);
               }}
               placeholder="Add a todo to call mom tomorrow"
@@ -489,10 +500,10 @@ export function CommandScreen() {
             </View>
 
             <Button
-              label="Parse command"
+              label={isParsing ? "Parsing..." : "Parse command"}
               onPress={handleParseCommand}
               color={COMMAND_ACCENT}
-              disabled={!hasCommandText}
+              disabled={!hasCommandText || isParsing}
             />
           </View>
         </Card>
@@ -508,6 +519,28 @@ export function CommandScreen() {
             className="mb-0"
           >
             <Text className="text-sm text-slate-600">{parseResult.reason}</Text>
+          </Card>
+        </ScreenSection>
+      ) : null}
+
+      {parseResult?.outcome === "unavailable" ? (
+        <ScreenSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={COMMAND_ACCENT}
+            headerTitle="Parse unavailable"
+            headerSubtitle="Nothing has been saved yet."
+            className="mb-0"
+          >
+            <View className="gap-3">
+              <Text className="text-sm text-slate-600">{parseResult.message}</Text>
+              <Button
+                label="Try again"
+                onPress={handleParseCommand}
+                color={COMMAND_ACCENT}
+                disabled={!hasCommandText || isParsing}
+              />
+            </View>
           </Card>
         </ScreenSection>
       ) : null}

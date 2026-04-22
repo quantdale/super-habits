@@ -406,6 +406,62 @@ export function isDraftReady(draft: DraftAiAction): boolean {
   return draft.status === "ready";
 }
 
+/**
+ * Keep preflight intentionally narrow so remote parsing remains the primary
+ * parse path whenever a command is not obviously out of scope.
+ */
+export function preflightCommandDraft(
+  input: ParseCommandInput,
+): Extract<ParseCommandResult, { outcome: "unsupported" }> | null {
+  const rawText = normalizeWhitespace(input.rawText);
+  if (!rawText) {
+    return {
+      outcome: "unsupported",
+      rawText: input.rawText,
+      reason: "Enter a command first.",
+    };
+  }
+
+  const rootCheckText = stripLeadingScaffolding(rawText, [
+    POLITE_PREFIX_PATTERN,
+    QUESTION_PREFIX_PATTERN,
+  ]);
+  if (UNSUPPORTED_ROOT_VERB_PATTERN.test(rootCheckText)) {
+    return {
+      outcome: "unsupported",
+      rawText,
+      reason: "This version only supports creating new todos or habits.",
+    };
+  }
+
+  if (MULTI_ACTION_PATTERN.test(rawText)) {
+    return {
+      outcome: "unsupported",
+      rawText,
+      reason: "Use one create command at a time in this version.",
+    };
+  }
+
+  const lowerText = rawText.toLowerCase();
+  if (UNSUPPORTED_TODO_RECURRENCE_PATTERN.test(lowerText)) {
+    return {
+      outcome: "unsupported",
+      rawText,
+      reason: "Recurring commands are not supported in this version.",
+    };
+  }
+
+  if (WEEKDAY_SCHEDULE_PATTERN.test(lowerText)) {
+    return {
+      outcome: "unsupported",
+      rawText,
+      reason: "Weekday schedules are out of scope for this version.",
+    };
+  }
+
+  return null;
+}
+
 export function parseCommandDraft(input: ParseCommandInput): ParseCommandResult {
   const rawText = normalizeWhitespace(input.rawText);
   if (!rawText) {

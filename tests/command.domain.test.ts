@@ -1,13 +1,66 @@
 import { describe, expect, it } from "vitest";
-import { parseCommandDraft } from "@/features/command/command.domain";
+import {
+  parseCommandDraft,
+  preflightCommandDraft,
+} from "@/features/command/command.domain";
 
 const PARSE_INPUT_BASE = {
   now: new Date(2026, 3, 21, 9, 0, 0),
   locale: "en-US",
   timeZone: "Asia/Manila",
+  todayDateKey: "2026-04-21",
+  tomorrowDateKey: "2026-04-22",
 };
 
 describe("features/command/command.domain (v1 rules hardened)", () => {
+  it("preflight blocks destructive verbs before any deeper parse path runs", () => {
+    const result = preflightCommandDraft({
+      ...PARSE_INPUT_BASE,
+      rawText: "Delete my todo",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        outcome: "unsupported",
+      }),
+    );
+  });
+
+  it("preflight blocks obvious multi-action commands", () => {
+    const result = preflightCommandDraft({
+      ...PARSE_INPUT_BASE,
+      rawText: "Add a todo to call mom and pay bills tomorrow",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        outcome: "unsupported",
+      }),
+    );
+  });
+
+  it("preflight blocks recurring phrasing without becoming a full parser", () => {
+    const result = preflightCommandDraft({
+      ...PARSE_INPUT_BASE,
+      rawText: "Create a habit to stretch every day",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        outcome: "unsupported",
+      }),
+    );
+  });
+
+  it("preflight leaves ordinary supported commands alone", () => {
+    const result = preflightCommandDraft({
+      ...PARSE_INPUT_BASE,
+      rawText: "Add a todo to call mom tomorrow",
+    });
+
+    expect(result).toBeNull();
+  });
+
   it("keeps a known-good todo command parsing as ready", () => {
     const result = parseCommandDraft({
       ...PARSE_INPUT_BASE,
