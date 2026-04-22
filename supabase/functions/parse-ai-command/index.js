@@ -14,6 +14,9 @@ const SUPPORTED_WARNING_CODES = new Set([
   "defaulted_field",
   "partial_parse",
 ]);
+const SUPPORTED_TODO_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/g;
+const TODAY_PATTERN = /\btoday\b/gi;
+const TOMORROW_PATTERN = /\btomorrow\b/gi;
 
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
@@ -82,7 +85,83 @@ function normalizeConfidence(value) {
   return value;
 }
 
-function normalizeTodoDraft(payload, parserVersion, rawText) {
+function deriveTodoDueDateDirective(rawText) {
+  const todayMatches = rawText.match(TODAY_PATTERN) ?? [];
+  const tomorrowMatches = rawText.match(TOMORROW_PATTERN) ?? [];
+  const explicitMatches = rawText.match(SUPPORTED_TODO_DATE_PATTERN) ?? [];
+  const signalCount =
+    (todayMatches.length > 0 ? 1 : 0) +
+    (tomorrowMatches.length > 0 ? 1 : 0) +
+    explicitMatches.length;
+
+  if (signalCount > 1) {
+    return {
+      kind: "invalid",
+      reason: "Use at most one due date: today, tomorrow, or a single YYYY-MM-DD date.",
+    };
+  }
+
+  if (todayMatches.length > 0) {
+    return { kind: "today" };
+  }
+
+  if (tomorrowMatches.length > 0) {
+    return { kind: "tomorrow" };
+  }
+
+  if (explicitMatches.length === 1) {
+    const dateKey = explicitMatches[0];
+    if (!isValidDateKey(dateKey)) {
+      return {
+        kind: "invalid",
+        reason: "Use a real YYYY-MM-DD date when you include an explicit due date.",
+      };
+    }
+
+    return {
+      kind: "explicit",
+      dateKey,
+    };
+  }
+
+  return { kind: "none" };
+}
+
+function resolveAuthoritativeTodoDueDate(input, modelDueDate) {
+  const directive = deriveTodoDueDateDirective(input.rawText);
+
+  if (directive.kind === "invalid") {
+    return {
+      outcome: "unsupported",
+      rawText: input.rawText,
+      reason: directive.reason,
+    };
+  }
+
+  if (directive.kind === "today") {
+    return { dueDate: input.todayDateKey };
+  }
+
+  if (directive.kind === "tomorrow") {
+    return { dueDate: input.tomorrowDateKey };
+  }
+
+  if (directive.kind === "explicit") {
+    return { dueDate: directive.dateKey };
+  }
+
+  if (modelDueDate !== null) {
+    return {
+      outcome: "unsupported",
+      rawText: input.rawText,
+      reason: "Todo due dates are limited to today, tomorrow, or an explicit YYYY-MM-DD date.",
+    };
+  }
+
+  return { dueDate: null };
+}
+
+function normalizeTodoDraft(payload, parserVersion, input) {
   const fields = isRecord(payload.fields) ? payload.fields : null;
   if (!fields) {
     throw new Error("Todo draft fields must be an object.");
@@ -90,17 +169,18 @@ function normalizeTodoDraft(payload, parserVersion, rawText) {
 
   const title = fields.title == null ? null : toNonEmptyString(fields.title);
   const notes = fields.notes == null ? null : toNonEmptyString(fields.notes);
-  const dueDate = fields.dueDate == null ? null : toNonEmptyString(fields.dueDate);
+  const requestedDueDate = fields.dueDate == null ? null : toNonEmptyString(fields.dueDate);
   const priority = fields.priority;
+  const dueDateResult = resolveAuthoritativeTodoDueDate(input, requestedDueDate);
 
   if (payload.status !== "ready" && payload.status !== "needs_input") {
     throw new Error("Todo draft status must be ready or needs_input.");
   }
-  if (dueDate !== null && !isValidDateKey(dueDate)) {
-    throw new Error("Todo dueDate must be a valid YYYY-MM-DD date.");
-  }
   if (priority !== "urgent" && priority !== "normal" && priority !== "low") {
     throw new Error("Todo priority must be urgent, normal, or low.");
+  }
+  if ("outcome" in dueDateResult) {
+    return dueDateResult;
   }
 
   return {
@@ -114,7 +194,7 @@ function normalizeTodoDraft(payload, parserVersion, rawText) {
     fields: {
       title,
       notes,
-      dueDate,
+      dueDate: dueDateResult.dueDate,
       priority,
       recurrence: null,
       name: null,
@@ -123,7 +203,7 @@ function normalizeTodoDraft(payload, parserVersion, rawText) {
       icon: null,
       color: null,
     },
-    rawText,
+    rawText: input.rawText,
   };
 }
 
@@ -183,7 +263,7 @@ function normalizeHabitDraft(payload, parserVersion, rawText) {
   };
 }
 
-function normalizeModelResponse(payload, parserVersion, rawText) {
+function normalizeModelResponse(payload, parserVersion, input) {
   if (!isRecord(payload)) {
     throw new Error("Model output must be an object.");
   }
@@ -195,7 +275,7 @@ function normalizeModelResponse(payload, parserVersion, rawText) {
     }
     return {
       outcome: "unsupported",
-      rawText,
+      rawText: input.rawText,
       reason,
     };
   }
@@ -205,11 +285,11 @@ function normalizeModelResponse(payload, parserVersion, rawText) {
   }
 
   if (payload.kind === "create_todo") {
-    return normalizeTodoDraft(payload, parserVersion, rawText);
+    return normalizeTodoDraft(payload, parserVersion, input);
   }
 
   if (payload.kind === "create_habit") {
-    return normalizeHabitDraft(payload, parserVersion, rawText);
+    return normalizeHabitDraft(payload, parserVersion, input.rawText);
   }
 
   throw new Error("Model output kind is invalid.");

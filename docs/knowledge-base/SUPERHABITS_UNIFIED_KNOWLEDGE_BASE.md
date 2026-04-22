@@ -61,9 +61,11 @@
 
 **Linked Actions:** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, shipped source entrypoints exist for `habit.completed_for_day` and non-recurring `todo.completed`, and the current habit editor flow exposes supported rule paths instead of a placeholder preview.
 
+**Command shell:** `/command` is an experimental quick-command surface, not a full assistant. Current command scope is limited to `create_todo` and `create_habit`, always with parse -> review -> confirm before write. Parser mode defaults to **`mock`**; optional model-backed parsing uses **`remote_with_fallback`**, and the local parser remains the fallback guardrail. Todo due dates stay limited to **today**, **tomorrow**, or explicit **`YYYY-MM-DD`**.
+
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality (April 21, 2026):** `npm run typecheck` passes; `npm test` passes with **322** tests; `npm run build:web` passes; `npx playwright test --list` reports **69** tests in **9** files. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (April 21, 2026):** `npm run typecheck` passes; `npm test` passes with **326** tests; `npm run build:web` passes; `npx playwright test --list` reports **69** tests in **9** files. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -92,7 +94,7 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`) |
 | Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
-| Unit tests | **322** passing (Vitest) |
+| Unit tests | **326** passing (Vitest) |
 | E2E tests | **69** Playwright tests in **9** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
@@ -150,7 +152,7 @@
 
 **settings:** `SettingsScreen.tsx` (screen-only utility route — no `.data.ts` / `.domain.ts` in this folder)
 
-**command:** `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, `types.ts` (experimental utility route for single create-todo / create-habit flow)
+**command:** `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `commandConfig.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, `types.ts` (experimental utility route for single create-todo / create-habit flow; default parser mode `mock`, optional `remote_with_fallback`, local parser kept as fallback/guardrail)
 
 **shared:** `GitHubHeatmap.tsx`, `activityTypes.ts`
 
@@ -1765,7 +1767,7 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (April 21, 2026):** **322 tests passed**; **31 test files passed** (Vitest v4)
+**Latest run (April 21, 2026):** **326 tests passed**; **31 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -2068,7 +2070,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 322 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 326 passing.
 
 ---
 
@@ -2137,7 +2139,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (322 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (326 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2310,7 +2312,8 @@ Tag phase completions: `git tag phaseN-complete`
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
 | Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Unit tests | **322** passing (Vitest) |
+| Command shell | Experimental `/command` route for single `create_todo` / `create_habit` drafts only; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; not a chat assistant |
+| Unit tests | **326** passing (Vitest) |
 | E2E | **69** Playwright tests in **9** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **11** |
 | Linked Actions | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix |
@@ -2420,6 +2423,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **322** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **326** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
 - Run `npx playwright test --list` when E2E spec count changes; keep **69** / **9 files** in sync
