@@ -11,7 +11,7 @@ Data is stored locally in SQLite first, then optionally backed up to Supabase. T
 - Native support through Expo for Android and iOS
 - Feature modules with strict data/domain/UI layering
 - Optional anonymous Supabase backup/restore integration
-- Experimental quick-command route for single todo or habit creation
+- Experimental quick-command route for single todo or habit draft creation
 
 ## Tech Stack
 
@@ -98,6 +98,24 @@ Current route surfaces:
 - `/settings`
 
 The Overview screen is the entry point for the experimental command shell. It shows an "Add with command" card when `COMMAND_EXPERIMENT_ENABLED` is true.
+
+## Command Shell
+
+`/command` is an experimental quick-command shell, not a general assistant surface.
+
+- Supported draft kinds are limited to `create_todo` and `create_habit`.
+- The flow is parse -> review -> confirm before write.
+- Default parser mode is `mock`.
+- Optional model-backed parsing uses `remote_with_fallback`.
+- The local parser remains the fallback and guardrail path when remote parsing is disabled or unavailable.
+- Todo due dates stay limited to `today`, `tomorrow`, or explicit `YYYY-MM-DD`.
+
+Relevant env vars for the optional real parser path:
+
+- `EXPO_PUBLIC_AI_COMMAND_PARSE_MODE` with `remote_with_fallback` to enable remote parsing
+- `EXPO_PUBLIC_AI_COMMAND_BACKEND_HOST`
+- `EXPO_PUBLIC_AI_COMMAND_SUPABASE_FUNCTION_NAME`
+- `EXPO_PUBLIC_AI_COMMAND_PROXY_URL`
 
 ## Deployment
 

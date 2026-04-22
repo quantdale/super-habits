@@ -27,6 +27,8 @@ Companion docs in this folder:
 - App shell is an Expo Router app with a root stack and a custom top-tab layout.
 - Product modules in active use: Overview, Todos, Habits, Pomodoro/Focus, Workout, Calories.
 - Additional active utility routes: `/command` for the experimental quick-command shell and `/settings` for theme plus backup restore status.
+- The command shell is limited to single-action drafting for `create_todo` and `create_habit`, with parse -> review -> confirm flow rather than assistant chat.
+- Command parser mode defaults to `mock`; optional model-backed parsing uses `remote_with_fallback`, with the local parser retained as fallback and guardrail.
 
 ### Confirmed from docs
 - SuperHabits is positioned as an offline-first productivity app for web, iOS, and Android.
@@ -270,7 +272,7 @@ Companion docs in this folder:
 | Workout | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history |
 | Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history |
 | Settings | Theme mode selection plus backup restore preview/actions and shipped-scope summaries |
-| Command | Experimental quick-command shell for a single create-todo or create-habit action with parse -> review -> confirm flow |
+| Command | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; default parser mode is `mock`, optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail |
 
 ## Domain Concepts and Glossary
 
@@ -324,7 +326,7 @@ Companion docs in this folder:
 
 ### Confirmed from code on April 21, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `322` tests.
+- `npm test`: passes with `326` tests.
 - `npm run build:web`: passes.
 - `npx playwright test --list`: reports `69` tests in `9` files.
 

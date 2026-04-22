@@ -27,6 +27,9 @@ const SUPPORTED_WARNING_CODES: DraftWarning["code"][] = [
   "partial_parse",
 ];
 const SUPPORTED_WARNING_CODE_SET = new Set<string>(SUPPORTED_WARNING_CODES);
+const SUPPORTED_TODO_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/g;
+const TODAY_PATTERN = /\btoday\b/gi;
+const TOMORROW_PATTERN = /\btomorrow\b/gi;
 
 type RemoteParseResponse =
   | Record<string, unknown>
@@ -114,9 +117,87 @@ function normalizeOptionalString(value: unknown, fieldName: string): string | nu
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function deriveTodoDueDateDirective(rawText: string):
+  | { kind: "none" }
+  | { kind: "today" }
+  | { kind: "tomorrow" }
+  | { kind: "explicit"; dateKey: string }
+  | { kind: "invalid"; reason: string } {
+  const todayMatches = rawText.match(TODAY_PATTERN) ?? [];
+  const tomorrowMatches = rawText.match(TOMORROW_PATTERN) ?? [];
+  const explicitMatches = rawText.match(SUPPORTED_TODO_DATE_PATTERN) ?? [];
+  const signalCount =
+    (todayMatches.length > 0 ? 1 : 0) +
+    (tomorrowMatches.length > 0 ? 1 : 0) +
+    explicitMatches.length;
+
+  if (signalCount > 1) {
+    return {
+      kind: "invalid",
+      reason: "Use at most one due date: today, tomorrow, or a single YYYY-MM-DD date.",
+    };
+  }
+
+  if (todayMatches.length > 0) {
+    return { kind: "today" };
+  }
+
+  if (tomorrowMatches.length > 0) {
+    return { kind: "tomorrow" };
+  }
+
+  if (explicitMatches.length === 1) {
+    const dateKey = explicitMatches[0];
+    if (!isValidDateKey(dateKey)) {
+      return {
+        kind: "invalid",
+        reason: "Use a real YYYY-MM-DD date when you include an explicit due date.",
+      };
+    }
+
+    return {
+      kind: "explicit",
+      dateKey,
+    };
+  }
+
+  return { kind: "none" };
+}
+
+function resolveAuthoritativeTodoDueDate(
+  input: ParseCommandInput,
+  modelDueDate: string | null,
+): string | null {
+  const directive = deriveTodoDueDateDirective(input.rawText);
+
+  if (directive.kind === "invalid") {
+    throw new Error(directive.reason);
+  }
+
+  if (directive.kind === "today") {
+    return input.todayDateKey;
+  }
+
+  if (directive.kind === "tomorrow") {
+    return input.tomorrowDateKey;
+  }
+
+  if (directive.kind === "explicit") {
+    return directive.dateKey;
+  }
+
+  if (modelDueDate !== null) {
+    throw new Error(
+      "Model todo dueDate is only allowed when the command uses today, tomorrow, or YYYY-MM-DD.",
+    );
+  }
+
+  return null;
+}
+
 function normalizeRemoteTodoDraft(
   payload: Record<string, unknown>,
-  rawText: string,
+  input: ParseCommandInput,
 ): DraftCreateTodo {
   const fields = isRecord(payload.fields) ? payload.fields : null;
   if (!fields) {
@@ -125,15 +206,12 @@ function normalizeRemoteTodoDraft(
 
   const title = fields.title == null ? null : toNonEmptyString(fields.title);
   const notes = normalizeOptionalString(fields.notes, "todo notes");
-  const dueDate = fields.dueDate == null ? null : toNonEmptyString(fields.dueDate);
+  const requestedDueDate = fields.dueDate == null ? null : toNonEmptyString(fields.dueDate);
   const priority = fields.priority;
   const status = payload.status;
 
   if (status !== "ready" && status !== "needs_input") {
     throw new Error("Model todo status must be ready or needs_input.");
-  }
-  if (dueDate && !isValidDateKey(dueDate)) {
-    throw new Error("Model todo dueDate must be a valid YYYY-MM-DD date.");
   }
   if (priority !== "urgent" && priority !== "normal" && priority !== "low") {
     throw new Error("Model todo priority is invalid.");
@@ -141,7 +219,7 @@ function normalizeRemoteTodoDraft(
 
   return {
     kind: "create_todo",
-    rawText,
+    rawText: input.rawText,
     parserKind: "model_proxy",
     parserVersion: normalizeParserVersion(payload.parserVersion),
     confidence: normalizeConfidence(payload.confidence),
@@ -151,7 +229,7 @@ function normalizeRemoteTodoDraft(
     fields: {
       title,
       notes,
-      dueDate,
+      dueDate: resolveAuthoritativeTodoDueDate(input, requestedDueDate),
       priority,
       recurrence: null,
     },
@@ -239,7 +317,7 @@ export function normalizeRemoteParseResponse(
   }
 
   if (payload.kind === "create_todo") {
-    const draft = normalizeRemoteTodoDraft(payload, input.rawText);
+    const draft = normalizeRemoteTodoDraft(payload, input);
     const validationMessage = validateTodo(
       draft.fields.title ?? "",
       draft.fields.notes ?? "",
