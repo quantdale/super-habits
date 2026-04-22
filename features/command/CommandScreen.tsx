@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, type Href, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { Link, type Href, useFocusEffect, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 import { PageHeader } from "@/core/ui/PageHeader";
@@ -14,8 +14,11 @@ import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { toDateKey } from "@/lib/time";
 import { executeDraftAction } from "./command.executor";
 import { commandParser } from "./commandParser";
+import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from "./commandConfig";
+import { getAiCommandInternalRolloutPreference } from "./commandInternalRollout";
 import type {
   CommandExecutionResult,
+  CommandParseObservation,
   DraftAiAction,
   DraftCreateHabit,
   DraftCreateTodo,
@@ -78,6 +81,41 @@ function PreviewMissingField({ message }: { message: string }) {
     <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
       <Text className="text-sm text-slate-600">{message}</Text>
     </View>
+  );
+}
+
+function InternalMetadataCard({ observation }: { observation: CommandParseObservation }) {
+  return (
+    <Card
+      variant="header"
+      accentColor={COMMAND_ACCENT}
+      headerTitle="Internal parser metadata"
+      headerSubtitle="Visible only when internal rollout mode is enabled on this device."
+      className="mb-0"
+    >
+      <View className="gap-3">
+        <PreviewInfoRow label="Effective path" value={observation.effectivePath} />
+        <PreviewInfoRow label="Outcome" value={observation.outcome} />
+        <PreviewInfoRow label="Draft status" value={observation.draftStatus ?? "n/a"} />
+        <PreviewInfoRow
+          label="Latency"
+          value={`${observation.latencyMs} ms (${observation.latencyBucket})`}
+        />
+        <PreviewInfoRow label="Reason code" value={observation.reasonCode ?? "none"} />
+        <PreviewInfoRow
+          label="Warning codes"
+          value={observation.warningCodes.length > 0 ? observation.warningCodes.join(", ") : "none"}
+        />
+        <PreviewInfoRow
+          label="Missing fields"
+          value={
+            observation.missingFieldNames.length > 0
+              ? observation.missingFieldNames.join(", ")
+              : "none"
+          }
+        />
+      </View>
+    </Card>
   );
 }
 
@@ -334,15 +372,45 @@ function DraftPreview({
 
 export function CommandScreen() {
   const { tokens } = useAppTheme();
+  const parseConfig = useMemo(() => getAiCommandParseConfig(), []);
+  const internalRolloutAvailable = useMemo(
+    () => isAiCommandInternalRolloutAvailable(parseConfig),
+    [parseConfig],
+  );
   const [rawText, setRawText] = useState("");
   const [parseResult, setParseResult] = useState<ParseCommandResult | null>(null);
   const [editableDraft, setEditableDraft] = useState<DraftAiAction | null>(null);
+  const [parseObservation, setParseObservation] = useState<CommandParseObservation | null>(null);
+  const [internalRolloutEnabledOnDevice, setInternalRolloutEnabledOnDevice] = useState(false);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [successResult, setSuccessResult] = useState<
     Extract<CommandExecutionResult, { outcome: "success" }> | null
   >(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      if (!internalRolloutAvailable) {
+        setInternalRolloutEnabledOnDevice(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      void getAiCommandInternalRolloutPreference().then((enabled) => {
+        if (!cancelled) {
+          setInternalRolloutEnabledOnDevice(enabled);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [internalRolloutAvailable]),
+  );
 
   const parsedDraft = useMemo(
     () => (parseResult?.outcome === "draft" ? parseResult.draft : null),
@@ -369,6 +437,7 @@ export function CommandScreen() {
     setRawText("");
     setParseResult(null);
     setEditableDraft(null);
+    setParseObservation(null);
     setExecutionError(null);
     setIsExecuting(false);
     setIsParsing(false);
@@ -383,7 +452,7 @@ export function CommandScreen() {
     const parserContext = getParserContext();
     const now = new Date();
     try {
-      const nextResult = await commandParser.parse({
+      const execution = await commandParser.parseWithObservation({
         rawText,
         now,
         locale: parserContext.locale,
@@ -391,8 +460,15 @@ export function CommandScreen() {
         todayDateKey: toDateKey(now),
         tomorrowDateKey: getTomorrowDateKey(now),
       });
-      setParseResult(nextResult);
-      setEditableDraft(nextResult.outcome === "draft" ? cloneDraft(nextResult.draft) : null);
+      setParseResult(execution.result);
+      setParseObservation(execution.observation);
+      setEditableDraft(
+        execution.result.outcome === "draft" ? cloneDraft(execution.result.draft) : null,
+      );
+
+      if (internalRolloutAvailable && internalRolloutEnabledOnDevice) {
+        console.debug("[command][internal-rollout]", execution.observation);
+      }
     } finally {
       setIsParsing(false);
     }
@@ -449,7 +525,7 @@ export function CommandScreen() {
       <ScreenSection>
         <PageHeader
           title="Quick command"
-          subtitle="Parse a single create-todo or create-habit command, review it, then confirm."
+          subtitle="Experimental draft entry for a single todo or habit. Review the draft, then confirm before anything is saved."
           actions={
             <Link href={OVERVIEW_HREF} asChild>
               <Pressable
@@ -470,7 +546,7 @@ export function CommandScreen() {
           variant="header"
           accentColor={COMMAND_ACCENT}
           headerTitle="Command input"
-          headerSubtitle="Nothing has been saved yet."
+          headerSubtitle="Experimental draft parsing only. Nothing is saved until you confirm."
           className="mb-0"
         >
           <View className="gap-3">
@@ -481,6 +557,7 @@ export function CommandScreen() {
                 setRawText(nextText);
                 setParseResult(null);
                 setEditableDraft(null);
+                setParseObservation(null);
                 setExecutionError(null);
                 setIsParsing(false);
                 setSuccessResult(null);
@@ -495,7 +572,7 @@ export function CommandScreen() {
                 Create a habit to drink water every morning
               </Text>
               <Text className="mt-1 text-sm text-slate-600">
-                Add a todo to call mom tomorrow at 7pm
+                Add a todo to call mom tomorrow
               </Text>
             </View>
 
@@ -651,6 +728,12 @@ export function CommandScreen() {
             onConfirm={handleConfirm}
             onReset={handleReset}
           />
+        </ScreenSection>
+      ) : null}
+
+      {internalRolloutAvailable && internalRolloutEnabledOnDevice && parseObservation ? (
+        <ScreenSection className="mb-0">
+          <InternalMetadataCard observation={parseObservation} />
         </ScreenSection>
       ) : null}
     </Screen>

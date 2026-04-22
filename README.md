@@ -106,16 +106,24 @@ The Overview screen is the entry point for the experimental command shell. It sh
 - Supported draft kinds are limited to `create_todo` and `create_habit`.
 - The flow is parse -> review -> confirm before write.
 - Default parser mode is `mock`.
-- Optional model-backed parsing uses `remote_with_fallback`.
+- Optional model-backed parsing uses `remote_with_fallback`, but only on internal-capable builds after a tester enables it locally.
 - The local parser remains the fallback and guardrail path when remote parsing is disabled or unavailable.
 - Todo due dates stay limited to `today`, `tomorrow`, or explicit `YYYY-MM-DD`.
+- Public `/command` copy stays intentionally experimental and draft-focused; it does not imply broad production AI availability.
 
 Relevant env vars for the optional real parser path:
 
 - `EXPO_PUBLIC_AI_COMMAND_PARSE_MODE` with `remote_with_fallback` to enable remote parsing
+- `EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT` to allow the internal rollout toggle on supported builds
 - `EXPO_PUBLIC_AI_COMMAND_BACKEND_HOST`
 - `EXPO_PUBLIC_AI_COMMAND_SUPABASE_FUNCTION_NAME`
 - `EXPO_PUBLIC_AI_COMMAND_PROXY_URL`
+
+Internal rollout note:
+
+- The model parser toggle is device-local and disposable.
+- Clearing app storage may reset it.
+- Testers can disable it locally at any time to return to mock mode immediately.
 
 ## Deployment
 

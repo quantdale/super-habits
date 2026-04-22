@@ -25,6 +25,15 @@ function jsonResponse(status, body) {
   });
 }
 
+function logParseEvent(meta) {
+  console.log(
+    JSON.stringify({
+      event: "parse_ai_command",
+      ...meta,
+    }),
+  );
+}
+
 function isRecord(value) {
   return typeof value === "object" && value !== null;
 }
@@ -277,6 +286,7 @@ function normalizeModelResponse(payload, parserVersion, input) {
       outcome: "unsupported",
       rawText: input.rawText,
       reason,
+      reasonCode: "unsupported",
     };
   }
 
@@ -511,21 +521,50 @@ Deno.serve(async (request) => {
   }
 
   let requestBody;
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
   try {
     requestBody = normalizeRequestBody(await request.json());
   } catch (error) {
-    return jsonResponse(400, {
+    const responseBody = {
       error: error instanceof Error ? error.message : "Invalid request body.",
+    };
+    logParseEvent({
+      requestId,
+      rawTextLength: null,
+      latencyMs: Date.now() - startedAt,
+      outcome: "invalid_request",
+      reasonCode: "invalid_request",
+      httpStatus: 400,
     });
+    return jsonResponse(400, responseBody);
   }
 
   try {
     const { model, parsed } = await invokeOpenAiParse(requestBody);
     const normalized = normalizeModelResponse(parsed, model, requestBody.rawText);
+    logParseEvent({
+      requestId,
+      rawTextLength: requestBody.rawText.length,
+      latencyMs: Date.now() - startedAt,
+      outcome: normalized.outcome,
+      reasonCode:
+        normalized.outcome === "unsupported" ? normalized.reasonCode ?? "unsupported" : null,
+      httpStatus: 200,
+    });
     return jsonResponse(200, normalized);
   } catch (error) {
-    return jsonResponse(502, {
+    const responseBody = {
       error: error instanceof Error ? error.message : "Unable to parse command.",
+    };
+    logParseEvent({
+      requestId,
+      rawTextLength: requestBody.rawText.length,
+      latencyMs: Date.now() - startedAt,
+      outcome: "unavailable",
+      reasonCode: "model_request_failed",
+      httpStatus: 502,
     });
+    return jsonResponse(502, responseBody);
   }
 });

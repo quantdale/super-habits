@@ -2,6 +2,18 @@ export const COMMAND_EXPERIMENT_ENABLED = true;
 
 export type DraftStatus = "ready" | "needs_input" | "unsupported";
 export type DraftParserKind = "mock_rules" | "model_proxy" | "model_proxy_fallback";
+export type ParsePath = "mock" | "remote" | "remote_with_fallback";
+export type ParseLatencyBucket = "fast" | "noticeable" | "frustrating";
+export type ParseUnsupportedReasonCode = "unsupported";
+export type ParseUnavailableReasonCode =
+  | "remote_not_configured"
+  | "auth_session_unavailable"
+  | "request_timed_out"
+  | "request_failed"
+  | "http_error"
+  | "malformed_json"
+  | "response_validation_failed";
+export type ParseReasonCode = ParseUnsupportedReasonCode | ParseUnavailableReasonCode;
 
 export type DraftWarning = {
   code:
@@ -64,12 +76,33 @@ export type ParseCommandInput = {
 
 export type ParseCommandResult =
   | { outcome: "draft"; draft: DraftAiAction }
-  | { outcome: "unsupported"; rawText: string; reason: string }
-  | { outcome: "unavailable"; rawText: string; message: string };
+  | { outcome: "unsupported"; rawText: string; reason: string; reasonCode?: ParseUnsupportedReasonCode }
+  | {
+      outcome: "unavailable";
+      rawText: string;
+      message: string;
+      reasonCode: ParseUnavailableReasonCode;
+    };
 
 export interface AiCommandParser {
   parse(input: ParseCommandInput): Promise<ParseCommandResult>;
 }
+
+export type CommandParseObservation = {
+  effectivePath: ParsePath;
+  outcome: ParseCommandResult["outcome"];
+  draftStatus: DraftStatus | null;
+  warningCodes: DraftWarning["code"][];
+  missingFieldNames: string[];
+  latencyMs: number;
+  latencyBucket: ParseLatencyBucket;
+  reasonCode: ParseReasonCode | null;
+};
+
+export type CommandParseExecution = {
+  result: ParseCommandResult;
+  observation: CommandParseObservation;
+};
 
 export type CommandExecutionResult =
   | {

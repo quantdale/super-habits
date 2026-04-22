@@ -82,7 +82,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - Run: npm test
 - Only pure function tests (no DB, no component rendering yet)
 - Every new domain function needs a test
-- Current count: 326 tests passing — update whenever tests are added or removed
+- Current count: 334 tests passing — update whenever tests are added or removed
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)

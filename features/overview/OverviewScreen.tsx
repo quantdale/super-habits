@@ -516,7 +516,7 @@ export function OverviewScreen() {
               <View className="min-w-0 flex-1">
                 <Text className="text-base font-semibold text-slate-900">Quick command</Text>
                 <Text className="mt-1 text-sm text-slate-500">
-                  Experimental command shell for single todo or habit creation.
+                  Experimental draft entry for single todo or habit creation.
                 </Text>
               </View>
               <View className="w-[148px]">

@@ -1,6 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import { clearDatabase } from "./helpers/db";
 
+const INTERNAL_ROLLOUT_BUILD_ENABLED =
+  process.env.EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT === "true" &&
+  process.env.EXPO_PUBLIC_AI_COMMAND_PARSE_MODE === "remote_with_fallback";
+const INTERNAL_REMOTE_BACKEND_CONFIGURED =
+  process.env.EXPO_PUBLIC_AI_COMMAND_BACKEND_HOST === "custom_url"
+    ? Boolean(process.env.EXPO_PUBLIC_AI_COMMAND_PROXY_URL)
+    : Boolean(
+        process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      );
+
 async function openCommandScreen(page: Page) {
   await page.goto("/(tabs)/overview", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Add with command", { exact: true })).toBeVisible({
@@ -17,6 +27,11 @@ async function parseCommand(page: Page, rawText: string) {
 
 async function fillById(page: Page, id: string, value: string) {
   await page.locator(`#${id}`).fill(value, { force: true });
+}
+
+async function openSettingsScreen(page: Page) {
+  await page.goto("/settings", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Settings", { exact: true })).toBeVisible();
 }
 
 test.describe("Command shell", () => {
@@ -107,5 +122,50 @@ test.describe("Command shell", () => {
     await expect(page.getByText("Todos", { exact: true })).toBeVisible();
     await expect(page.getByText("call dad", { exact: true }).last()).toBeVisible();
     await expect(page.getByText("call mom", { exact: true })).toHaveCount(0);
+  });
+
+  test("keeps internal parser metadata hidden until internal rollout is enabled on the device", async ({
+    page,
+  }) => {
+    await openCommandScreen(page);
+    await parseCommand(page, "Add a todo to call mom tomorrow");
+
+    await expect(page.getByText("Internal parser metadata", { exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe("Command shell internal rollout", () => {
+  test.skip(
+    !INTERNAL_ROLLOUT_BUILD_ENABLED || !INTERNAL_REMOTE_BACKEND_CONFIGURED,
+    "Internal rollout tests require an internal-capable build with a configured remote backend.",
+  );
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/(tabs)/overview", { waitUntil: "domcontentloaded" });
+    await clearDatabase(page);
+  });
+
+  test("shows internal metadata only when the device-local rollout toggle is enabled and rolls back to mock immediately when disabled", async ({
+    page,
+  }) => {
+    await openSettingsScreen(page);
+    await page.getByText("Enable model parser", { exact: true }).locator("..").click({ force: true });
+
+    await openCommandScreen(page);
+    await parseCommand(page, "Add a todo to call mom tomorrow");
+
+    await expect(page.getByText("Internal parser metadata", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/remote_with_fallback|remote/, { exact: false }),
+    ).toBeVisible();
+
+    await openSettingsScreen(page);
+    await page.getByText("Use mock parser only", { exact: true }).locator("..").click({ force: true });
+
+    await openCommandScreen(page);
+    await parseCommand(page, "Add a todo to call mom tomorrow");
+
+    await expect(page.getByText("Internal parser metadata", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("mock_rules v1", { exact: true })).toBeVisible();
   });
 });

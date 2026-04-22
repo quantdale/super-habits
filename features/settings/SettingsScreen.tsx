@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, type Href, useFocusEffect } from "expo-router";
 import { Pressable, Text, View } from "react-native";
@@ -18,6 +18,14 @@ import { PillChip } from "@/core/ui/PillChip";
 import { Screen } from "@/core/ui/Screen";
 import { ScreenSection } from "@/core/ui/ScreenSection";
 import { maybeLoadRestorePreviewForSettings } from "@/features/settings/settingsRestorePreview";
+import {
+  getAiCommandParseConfig,
+  isAiCommandInternalRolloutAvailable,
+} from "@/features/command/commandConfig";
+import {
+  getAiCommandInternalRolloutPreference,
+  setAiCommandInternalRolloutPreference,
+} from "@/features/command/commandInternalRollout";
 
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
 const SETTINGS_ACCENT = "#475569";
@@ -192,6 +200,11 @@ function describeBackupEntity(status: RemoteBackupEntityStatus) {
 export function SettingsScreen() {
   const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
   const { authBootstrapReady } = useAppBootstrapState();
+  const commandConfig = useMemo(() => getAiCommandParseConfig(), []);
+  const commandInternalRolloutAvailable = useMemo(
+    () => isAiCommandInternalRolloutAvailable(commandConfig),
+    [commandConfig],
+  );
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
   const settingsAccent = resolvedTheme === "dark" ? "#64748b" : SETTINGS_ACCENT;
   const settingsTextColor = resolvedTheme === "dark" ? "#cbd5e1" : "#334155";
@@ -199,6 +212,11 @@ export function SettingsScreen() {
   const [restoreLoading, setRestoreLoading] = useState(true);
   const [restoreRunning, setRestoreRunning] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [commandRolloutEnabledOnDevice, setCommandRolloutEnabledOnDevice] = useState(false);
+  const [commandRolloutLoading, setCommandRolloutLoading] = useState(
+    commandInternalRolloutAvailable,
+  );
+  const [commandRolloutError, setCommandRolloutError] = useState<string | null>(null);
 
   const loadRestorePreview = useCallback(async () => {
     setRestoreLoading(true);
@@ -214,6 +232,27 @@ export function SettingsScreen() {
     }
   }, []);
 
+  const loadCommandRolloutPreference = useCallback(async () => {
+    if (!commandInternalRolloutAvailable) {
+      setCommandRolloutEnabledOnDevice(false);
+      setCommandRolloutLoading(false);
+      setCommandRolloutError(null);
+      return;
+    }
+
+    setCommandRolloutLoading(true);
+    try {
+      const enabled = await getAiCommandInternalRolloutPreference();
+      setCommandRolloutEnabledOnDevice(enabled);
+      setCommandRolloutError(null);
+    } catch {
+      setCommandRolloutEnabledOnDevice(false);
+      setCommandRolloutError("Unable to load the internal parser toggle right now.");
+    } finally {
+      setCommandRolloutLoading(false);
+    }
+  }, [commandInternalRolloutAvailable]);
+
   useFocusEffect(
     useCallback(() => {
       void maybeLoadRestorePreviewForSettings({
@@ -224,7 +263,8 @@ export function SettingsScreen() {
           setRestoreError(null);
         },
       });
-    }, [authBootstrapReady, loadRestorePreview]),
+      void loadCommandRolloutPreference();
+    }, [authBootstrapReady, loadCommandRolloutPreference, loadRestorePreview]),
   );
 
   const handleRestore = async () => {
@@ -250,6 +290,20 @@ export function SettingsScreen() {
     !restorePreview ||
     restorePreview.eligibility.kind !== "empty_device";
   const restoreButtonLabel = restoreRunning ? "Restoring..." : "Restore backup";
+
+  const handleCommandRolloutToggle = async (enabled: boolean) => {
+    setCommandRolloutLoading(true);
+    setCommandRolloutError(null);
+
+    try {
+      await setAiCommandInternalRolloutPreference(enabled);
+      setCommandRolloutEnabledOnDevice(enabled);
+    } catch {
+      setCommandRolloutError("Unable to update the internal parser toggle right now.");
+    } finally {
+      setCommandRolloutLoading(false);
+    }
+  };
 
   return (
     <Screen scroll>
@@ -449,6 +503,78 @@ export function SettingsScreen() {
           </View>
         </Card>
       </ScreenSection>
+
+      {commandInternalRolloutAvailable ? (
+        <ScreenSection>
+          <Card
+            variant="header"
+            accentColor={settingsAccent}
+            headerTitle="Command parser rollout"
+            headerSubtitle="Internal-only toggle for the model-backed parser. Public builds stay on mock mode."
+            headerRight={<MaterialIcons name="science" size={22} color="#ffffff" />}
+            className="mb-0"
+          >
+            <View className="gap-3">
+              <SettingsInfoRow
+                label="Effective default"
+                description="This build still defaults to the local mock parser until you enable the internal model parser on this device."
+                statusLabel="Mock"
+              />
+
+              <SettingsInfoRow
+                label="Device-local toggle"
+                description={
+                  commandRolloutLoading
+                    ? "Loading the internal parser preference for this device..."
+                    : commandRolloutEnabledOnDevice
+                      ? "Model-backed parsing is enabled on this device. Turn it off here at any time to roll back to mock immediately."
+                      : "Model-backed parsing is disabled on this device. The command shell will stay on mock mode until you opt in here."
+                }
+                statusLabel={commandRolloutEnabledOnDevice ? "Enabled" : "Disabled"}
+              />
+
+              <View
+                className="rounded-2xl border px-4 py-3"
+                style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              >
+                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                  Internal tester notes
+                </Text>
+                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  This toggle is device-local and disposable.
+                </Text>
+                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  Clearing app storage may reset it.
+                </Text>
+                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  If the remote parser misbehaves, disable it here to return to mock mode immediately.
+                </Text>
+              </View>
+
+              {commandRolloutError ? (
+                <Text className="text-sm" style={{ color: "#b91c1c" }}>
+                  {commandRolloutError}
+                </Text>
+              ) : null}
+
+              <View className="gap-2">
+                <Button
+                  label={commandRolloutLoading ? "Saving..." : "Enable model parser"}
+                  onPress={() => handleCommandRolloutToggle(true)}
+                  disabled={commandRolloutLoading || commandRolloutEnabledOnDevice}
+                  color={settingsAccent}
+                />
+                <Button
+                  label={commandRolloutLoading ? "Saving..." : "Use mock parser only"}
+                  onPress={() => handleCommandRolloutToggle(false)}
+                  variant="ghost"
+                  disabled={commandRolloutLoading || !commandRolloutEnabledOnDevice}
+                />
+              </View>
+            </View>
+          </Card>
+        </ScreenSection>
+      ) : null}
 
       {SECTIONS.map((section) => (
         <ScreenSection

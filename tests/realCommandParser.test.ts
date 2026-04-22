@@ -211,6 +211,7 @@ describe("features/command/realCommandParser normalization", () => {
       outcome: "unsupported",
       rawText: "Add a todo to call mom tomorrow",
       reason: "Use one create command at a time in this version.",
+      reasonCode: "unsupported",
     });
   });
 

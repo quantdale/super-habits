@@ -14,6 +14,7 @@ import type {
   DraftWarning,
   ParseCommandInput,
   ParseCommandResult,
+  ParseUnavailableReasonCode,
 } from "./types";
 import { getAiCommandParseConfig, type AiCommandParseConfig } from "./commandConfig";
 
@@ -36,8 +37,22 @@ type RemoteParseResponse =
   | {
       outcome: "unsupported";
       reason: string;
+      reasonCode?: string;
       parserVersion?: string;
     };
+
+function buildUnavailableResult(
+  rawText: string,
+  message: string,
+  reasonCode: ParseUnavailableReasonCode,
+): Extract<ParseCommandResult, { outcome: "unavailable" }> {
+  return {
+    outcome: "unavailable",
+    rawText,
+    message,
+    reasonCode,
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -309,6 +324,7 @@ export function normalizeRemoteParseResponse(
       outcome: "unsupported",
       rawText: input.rawText,
       reason,
+      reasonCode: "unsupported",
     };
   }
 
@@ -396,11 +412,11 @@ export class RemoteModelAiCommandParser implements AiCommandParser {
     const config = getAiCommandParseConfig();
     const url = await resolveRequestUrl(config);
     if (!url) {
-      return {
-        outcome: "unavailable",
-        rawText: input.rawText,
-        message: "Remote command parsing is not configured.",
-      };
+      return buildUnavailableResult(
+        input.rawText,
+        "Remote command parsing is not configured.",
+        "remote_not_configured",
+      );
     }
 
     let accessToken: string | null = null;
@@ -408,11 +424,11 @@ export class RemoteModelAiCommandParser implements AiCommandParser {
       try {
         accessToken = await getSupabaseAccessToken();
       } catch {
-        return {
-          outcome: "unavailable",
-          rawText: input.rawText,
-          message: "Remote command parsing could not load the current auth session.",
-        };
+        return buildUnavailableResult(
+          input.rawText,
+          "Remote command parsing could not load the current auth session.",
+          "auth_session_unavailable",
+        );
       }
     }
 
@@ -435,43 +451,44 @@ export class RemoteModelAiCommandParser implements AiCommandParser {
         REMOTE_PARSE_TIMEOUT_MS,
       );
     } catch (error) {
-      return {
-        outcome: "unavailable",
-        rawText: input.rawText,
-        message:
-          error instanceof Error && error.name === "AbortError"
-            ? "Remote command parsing timed out."
-            : "Remote command parsing request failed.",
-      };
+      return buildUnavailableResult(
+        input.rawText,
+        error instanceof Error && error.name === "AbortError"
+          ? "Remote command parsing timed out."
+          : "Remote command parsing request failed.",
+        error instanceof Error && error.name === "AbortError"
+          ? "request_timed_out"
+          : "request_failed",
+      );
     }
 
     if (!response.ok) {
-      return {
-        outcome: "unavailable",
-        rawText: input.rawText,
-        message: `Remote command parsing failed with status ${response.status}.`,
-      };
+      return buildUnavailableResult(
+        input.rawText,
+        `Remote command parsing failed with status ${response.status}.`,
+        "http_error",
+      );
     }
 
     let payload: unknown;
     try {
       payload = await response.json();
     } catch {
-      return {
-        outcome: "unavailable",
-        rawText: input.rawText,
-        message: "Remote command parsing returned malformed JSON.",
-      };
+      return buildUnavailableResult(
+        input.rawText,
+        "Remote command parsing returned malformed JSON.",
+        "malformed_json",
+      );
     }
 
     try {
       return normalizeRemoteParseResponse(payload, input);
     } catch (error) {
-      return {
-        outcome: "unavailable",
-        rawText: input.rawText,
-        message: error instanceof Error ? error.message : "Remote command parsing failed.",
-      };
+      return buildUnavailableResult(
+        input.rawText,
+        error instanceof Error ? error.message : "Remote command parsing failed.",
+        "response_validation_failed",
+      );
     }
   }
 }
