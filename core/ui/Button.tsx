@@ -32,16 +32,27 @@ export function Button({ label, onPress, variant = "primary", disabled = false, 
         : undefined
       : variant === "danger"
         ? { backgroundColor: "#ef4444" }
-        : { backgroundColor: tokens.surfaceElevated, borderColor: tokens.border, borderWidth: 1 };
+        : { backgroundColor: tokens.surface, borderColor: tokens.border, borderWidth: 1 };
 
   return (
     <Pressable
       disabled={disabled}
-      className={`rounded-xl px-4 py-3 ${className} ${disabled ? "opacity-40" : ""}`}
-      style={style}
+      className={`rounded-2xl px-4 py-3 ${className} ${disabled ? "opacity-40" : ""}`}
+      style={[
+        style,
+        variant === "primary" || variant === "danger"
+          ? {
+              shadowColor: "#0f172a",
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: disabled ? 0 : 0.08,
+              shadowRadius: 12,
+              elevation: disabled ? 0 : 1,
+            }
+          : undefined,
+      ]}
       onPress={onPress}
     >
-      <Text className={`text-center font-semibold ${labelClassName}`} style={variant === "ghost" ? { color: tokens.text } : undefined}>
+      <Text className={`text-center text-sm font-semibold ${labelClassName}`} style={variant === "ghost" ? { color: tokens.text } : undefined}>
         {label}
       </Text>
     </Pressable>

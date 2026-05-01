@@ -22,6 +22,7 @@ import type {
 } from "@/core/linked-actions/linkedActionsEditor.types";
 import type { SaveLinkedActionRuleForSourceInput } from "@/core/linked-actions/linkedActions.types";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { IconButton } from "@/core/ui/IconButton";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { ScreenSection } from "@/core/ui/ScreenSection";
 import { TextField } from "@/core/ui/TextField";
@@ -291,19 +292,14 @@ export function TodosScreen() {
               actions={
                 <>
                   {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                    <Pressable
+                    <IconButton
                       key={mode}
+                      icon={icon}
                       onPress={() => setViewMode(mode)}
-                      className={`rounded-xl p-2.5 ${viewMode === mode ? "bg-todos-light" : ""}`}
-                      accessibilityState={{ selected: viewMode === mode }}
                       accessibilityLabel={`${mode} view`}
-                    >
-                      <MaterialIcons
-                        name={icon}
-                        size={24}
-                        color={viewMode === mode ? COLOR : MUTED_ICON}
-                      />
-                    </Pressable>
+                      selected={viewMode === mode}
+                      accentColor={COLOR_TEXT}
+                    />
                   ))}
                 </>
               }
@@ -328,8 +324,8 @@ export function TodosScreen() {
                   </View>
                 </View>
                 <View className="mt-4 flex-row flex-wrap gap-2">
-                  <View className="rounded-full bg-slate-100 px-3 py-1.5">
-                    <Text className="text-xs font-semibold text-slate-600">
+                  <View className="rounded-full bg-todos-light px-3 py-1.5">
+                    <Text className="text-xs font-semibold text-todos-dark">
                       {pendingTasks.length} open
                     </Text>
                   </View>
@@ -358,12 +354,12 @@ export function TodosScreen() {
 
           {!totallyEmpty ? (
             <ScreenSection className="min-h-0 mb-0 flex-1">
-              <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
-                <View>
-                  <Text className="text-sm font-semibold text-slate-900">Pending</Text>
-                  <Text className="mt-0.5 text-xs text-slate-500">
-                    Swipe to edit or delete. Drag to reorder.
-                  </Text>
+                <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
+                  <View>
+                    <Text className="text-base font-semibold text-slate-900">Pending</Text>
+                    <Text className="mt-0.5 text-xs text-slate-500">
+                      Swipe to edit or delete. Drag to reorder.
+                    </Text>
                 </View>
                 {hasCompleted ? (
                   <Pressable
@@ -416,7 +412,7 @@ export function TodosScreen() {
                               className="mb-4 flex-row items-center justify-between gap-3 px-1"
                             >
                               <View>
-                                <Text className="text-sm font-semibold text-slate-900">Completed</Text>
+                                <Text className="text-base font-semibold text-slate-900">Completed</Text>
                                 <Text className="mt-0.5 text-xs text-slate-500">
                                   Completed tasks stay here until you toggle them back.
                                 </Text>

@@ -15,21 +15,19 @@ export function PillChip({ label, active, color, onPress, icon }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      className={`mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[7px] ${
-        active ? "border" : "border"
-      }`}
+      className="mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[8px]"
       style={
         active
           ? {
               backgroundColor: color,
               borderColor: color,
             }
-          : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+          : { borderColor: tokens.border, backgroundColor: tokens.surface }
       }
     >
       {icon ? <Text className="text-[13px]">{icon}</Text> : null}
       <Text
-        className={`text-[13px] ${active ? "font-semibold text-white" : "font-normal"}`}
+        className={`text-[13px] ${active ? "font-semibold text-white" : "font-medium"}`}
         style={active ? undefined : { color: tokens.textMuted }}
       >
         {label}

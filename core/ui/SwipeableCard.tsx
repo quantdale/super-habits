@@ -41,7 +41,6 @@ export function SwipeableCard({ children, accentColor, style, compact, onEdit, o
   return (
     <Card
       variant="standard"
-      accentColor={accentColor}
       className="mb-0 overflow-hidden"
       innerClassName="p-0"
       style={style}

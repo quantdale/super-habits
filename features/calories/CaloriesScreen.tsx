@@ -172,39 +172,37 @@ export function CaloriesScreen() {
   );
   const dailyCaloriesSection = useMemo(
     () => (
-      <View className="mt-4">
-        <Card
-          variant="header"
-          accentColor={COLOR}
-          headerTitle="Daily calories"
-          headerSubtitle="Year trend with your current goal overlaid."
-          headerRight={<MaterialIcons name="bar-chart" size={22} color="#ffffff" />}
-        >
-          <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
-        </Card>
-      </View>
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Daily calories"
+        headerSubtitle="Year trend with your current goal overlaid."
+        headerRight={<MaterialIcons name="bar-chart" size={22} color="#ffffff" />}
+        className="mb-0"
+      >
+        <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
+      </Card>
     ),
     [dailyTrend, goal.calories],
   );
   const calorieHistorySection = useMemo(
     () => (
-      <View className="mt-4">
-        <Card
-          variant="header"
-          accentColor={COLOR}
-          headerTitle="Calories history"
-          headerSubtitle="Rolling 53-week activity."
-          headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
-        >
-          <View className="w-full min-w-0 items-center justify-center">
-            <GitHubHeatmap
-              days={calorieHeatmapDays}
-              color={COLOR}
-              weeks={53}
-            />
-          </View>
-        </Card>
-      </View>
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Calories history"
+        headerSubtitle="Rolling 53-week activity."
+        headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+        className="mb-0"
+      >
+        <View className="w-full min-w-0 items-center justify-center">
+          <GitHubHeatmap
+            days={calorieHeatmapDays}
+            color={COLOR}
+            weeks={53}
+          />
+        </View>
+      </Card>
     ),
     [calorieHeatmapDays],
   );
@@ -324,8 +322,8 @@ export function CaloriesScreen() {
       </ScreenSection>
 
       <ScreenSection>
-        <View className="flex-row gap-3">
-          <View className="flex-1">
+        <View className="flex-row flex-wrap gap-3">
+          <View className="min-w-[160px] flex-1">
             <FeatureStatCard
               accentColor={COLOR}
               textColor={TEXT_COLOR}
@@ -336,7 +334,7 @@ export function CaloriesScreen() {
               note={hasCalorieStripActivity ? "Daily intake history is active" : "No intake history yet"}
             />
           </View>
-          <View className="flex-1">
+          <View className="min-w-[160px] flex-1">
             <FeatureStatCard
               accentColor={COLOR}
               textColor={TEXT_COLOR}
@@ -651,24 +649,35 @@ export function CaloriesScreen() {
         </View>
       </Modal>
 
-      {entries.map((entry) => (
-        <CalorieEntrySwipeRow
-          key={entry.id}
-          entry={entry}
-          accentColor={COLOR}
-          onEdit={() => openEntryEditModal(entry)}
-          onDelete={async () => {
-            await deleteCalorieEntry(entry.id);
-            if (editingEntryId === entry.id) {
-              resetCalorieForm();
-            }
-            await refresh();
-          }}
-        />
-      ))}
+      {entries.length > 0 ? (
+        <ScreenSection>
+          <View className="mb-4 px-1">
+            <Text className="text-base font-semibold text-slate-900">Logged today</Text>
+            <Text className="mt-1 text-sm text-slate-500">
+              Swipe an entry to edit or remove it.
+            </Text>
+          </View>
 
-      {dailyCaloriesSection}
-      {calorieHistorySection}
+          {entries.map((entry) => (
+            <CalorieEntrySwipeRow
+              key={entry.id}
+              entry={entry}
+              accentColor={COLOR}
+              onEdit={() => openEntryEditModal(entry)}
+              onDelete={async () => {
+                await deleteCalorieEntry(entry.id);
+                if (editingEntryId === entry.id) {
+                  resetCalorieForm();
+                }
+                await refresh();
+              }}
+            />
+          ))}
+        </ScreenSection>
+      ) : null}
+
+      <ScreenSection>{dailyCaloriesSection}</ScreenSection>
+      <ScreenSection className="mb-0">{calorieHistorySection}</ScreenSection>
     </Screen>
   );
 }

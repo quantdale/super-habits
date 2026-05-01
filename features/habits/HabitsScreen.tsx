@@ -22,6 +22,7 @@ import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { Card } from "@/core/ui/Card";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { IconButton } from "@/core/ui/IconButton";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { ScreenSection } from "@/core/ui/ScreenSection";
 import { StatBlock } from "@/core/ui/StatBlock";
@@ -302,19 +303,13 @@ export function HabitsScreen() {
           title="Habits"
           subtitle="Track daily consistency."
           actions={
-            <Pressable
+            <IconButton
+              icon={editMode ? "close" : "edit"}
               onPress={() => setEditMode((e) => !e)}
-              className={`rounded-xl p-2.5 ${editMode ? "bg-habits-light" : ""}`}
-              accessibilityRole="button"
               accessibilityLabel={editMode ? "Exit habit edit mode" : "Enter habit edit mode"}
-              accessibilityState={{ selected: editMode }}
-            >
-              <MaterialIcons
-                name={editMode ? "close" : "edit"}
-                size={24}
-                color={editMode ? SECTION_TEXT_COLORS.habits : "#94a3b8"}
-              />
-            </Pressable>
+              selected={editMode}
+              accentColor={SECTION_TEXT_COLORS.habits}
+            />
           }
         />
       </ScreenSection>

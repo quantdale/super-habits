@@ -295,8 +295,8 @@ export function PomodoroScreen() {
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 
       <ScreenSection>
-        <View className="flex-row gap-3">
-          <View className="flex-1">
+        <View className="flex-row flex-wrap gap-3">
+          <View className="min-w-[160px] flex-1">
             <FeatureStatCard
               accentColor={COLOR}
               textColor={TEXT_COLOR}
@@ -307,7 +307,7 @@ export function PomodoroScreen() {
               note={sessions.length > 0 ? "Completed focus sessions" : "No sessions logged yet"}
             />
           </View>
-          <View className="flex-1">
+          <View className="min-w-[160px] flex-1">
             <FeatureStatCard
               accentColor={COLOR}
               textColor={TEXT_COLOR}

@@ -28,8 +28,17 @@ export function Modal({ visible, onClose, title, children, scroll = false }: Mod
         />
         <Pressable onPress={(e) => e.stopPropagation()} className="w-full max-w-md">
           <View
-            className="w-full max-w-md overflow-hidden rounded-2xl"
-            style={{ backgroundColor: tokens.background, borderColor: tokens.border, borderWidth: 1 }}
+            className="w-full max-w-md overflow-hidden rounded-3xl"
+            style={{
+              backgroundColor: tokens.surface,
+              borderColor: tokens.border,
+              borderWidth: 1,
+              shadowColor: "#0f172a",
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.14,
+              shadowRadius: 24,
+              elevation: 4,
+            }}
           >
             <View
               className={`flex-row items-center px-5 pb-4 pt-5 ${title ? "justify-between" : "justify-end"}`}

@@ -38,12 +38,12 @@ export function TextField({
 
   return (
     <View className="mb-3">
-      <Text className="mb-1 text-sm font-medium" style={{ color: tokens.textMuted }}>{label}</Text>
+      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>{label}</Text>
       <TextInput
         nativeID={nativeID}
         accessibilityLabel={accessibilityLabelProp ?? label}
-        className="rounded-xl border px-3 py-2"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surface, color: tokens.text }}
+        className="rounded-2xl border px-4 py-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated, color: tokens.text }}
         value={value}
         onChangeText={handleChangeText}
         placeholder={placeholder}

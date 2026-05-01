@@ -6,6 +6,7 @@ import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/con
 import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { IconButton } from "@/core/ui/IconButton";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { Screen } from "@/core/ui/Screen";
 import { ScreenSection } from "@/core/ui/ScreenSection";
@@ -480,29 +481,21 @@ export function OverviewScreen() {
           subtitle="A compact snapshot of focus, habits, calories, todos, and workouts."
           actions={
             <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open settings"
-                className="rounded-xl p-2.5"
+              <IconButton
+                icon="settings"
                 onPress={() => router.push(SETTINGS_HREF)}
-              >
-                <MaterialIcons name="settings" size={24} color={MUTED_ICON} />
-              </Pressable>
+                accessibilityLabel="Open settings"
+                accentColor={SECTION_TEXT_COLORS.focus}
+              />
               {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                <Pressable
+                <IconButton
                   key={mode}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: viewMode === mode }}
-                  accessibilityLabel={`${mode} overview layout`}
-                  className={`rounded-xl p-2.5 ${viewMode === mode ? "bg-focus-light" : ""}`}
+                  icon={icon}
                   onPress={() => setViewMode(mode)}
-                >
-                  <MaterialIcons
-                    name={icon}
-                    size={24}
-                    color={viewMode === mode ? SECTION_TEXT_COLORS.focus : MUTED_ICON}
-                  />
-                </Pressable>
+                  accessibilityLabel={`${mode} overview layout`}
+                  selected={viewMode === mode}
+                  accentColor={SECTION_TEXT_COLORS.focus}
+                />
               ))}
             </>
           }

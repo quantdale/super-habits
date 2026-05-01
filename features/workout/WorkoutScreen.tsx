@@ -194,12 +194,12 @@ export function WorkoutScreen() {
           />
         </ScreenSection>
 
-        <ScreenSection>
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={TEXT_COLOR}
+      <ScreenSection>
+        <View className="flex-row flex-wrap gap-3">
+          <View className="min-w-[160px] flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
                 icon="fitness-center"
                 title="Workout days"
                 value={workoutDaysCount}
@@ -207,10 +207,10 @@ export function WorkoutScreen() {
                 note={workoutStripHasActivity ? "Sessions logged this year" : "No sessions logged yet"}
               />
             </View>
-            <View className="flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={TEXT_COLOR}
+          <View className="min-w-[160px] flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={TEXT_COLOR}
                 icon="calendar-today"
                 title="Current streak"
                 value={workoutStreak}
@@ -265,31 +265,33 @@ export function WorkoutScreen() {
         </ScreenSection>
 
         {routines.length > 0 ? (
-          <View className="mb-3 mt-1">
-            <Text className="text-sm font-semibold text-slate-900">Your routines</Text>
-            <Text className="mt-1 text-sm text-slate-500">
-              Swipe to edit or delete. Open a routine to manage exercises and sets.
-            </Text>
-          </View>
-        ) : null}
+          <ScreenSection>
+            <View className="mb-4 mt-1">
+              <Text className="text-base font-semibold text-slate-900">Your routines</Text>
+              <Text className="mt-1 text-sm text-slate-500">
+                Swipe to edit or delete. Open a routine to manage exercises and sets.
+              </Text>
+            </View>
 
-        {routines.map((routine) => (
-          <RoutineSwipeRow
-            key={routine.id}
-            routine={routine}
-            accentColor={COLOR}
-            onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
-            onCompleteWorkout={() => {
-              void (async () => {
-                await completeRoutine(routine.id);
-                refresh();
-              })();
-            }}
-            onRequestDelete={async () => {
-              await handleDeleteRoutine(routine);
-            }}
-          />
-        ))}
+            {routines.map((routine) => (
+              <RoutineSwipeRow
+                key={routine.id}
+                routine={routine}
+                accentColor={COLOR}
+                onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
+                onCompleteWorkout={() => {
+                  void (async () => {
+                    await completeRoutine(routine.id);
+                    refresh();
+                  })();
+                }}
+                onRequestDelete={async () => {
+                  await handleDeleteRoutine(routine);
+                }}
+              />
+            ))}
+          </ScreenSection>
+        ) : null}
 
         <ScreenSection className="mb-0">
           <Card

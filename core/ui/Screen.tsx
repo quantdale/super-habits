@@ -24,7 +24,7 @@ export function Screen({ children, scroll = false, padded = true }: ScreenProps)
           nestedScrollEnabled
           scrollEnabled
         >
-          {children}
+          <View style={styles.contentShell}>{children}</View>
         </ScrollView>
       ) : (
         <View
@@ -33,7 +33,7 @@ export function Screen({ children, scroll = false, padded = true }: ScreenProps)
             { backgroundColor: tokens.background },
           ]}
         >
-          {children}
+          <View style={styles.contentShellFill}>{children}</View>
         </View>
       )}
     </SafeAreaView>
@@ -52,16 +52,27 @@ const styles = StyleSheet.create({
   },
   scrollContentPadded: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 36,
   },
   fill: {
     flex: 1,
   },
   padded: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 36,
+  },
+  contentShell: {
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
+  },
+  contentShellFill: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
   },
 });

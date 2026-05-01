@@ -8,7 +8,7 @@ type ScreenSectionProps = ViewProps & {
 
 export function ScreenSection({ children, className, ...props }: ScreenSectionProps) {
   return (
-    <View className={["mb-5", className].filter(Boolean).join(" ")} {...props}>
+    <View className={["mb-6", className].filter(Boolean).join(" ")} {...props}>
       {children}
     </View>
   );

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import type { SavedMeal } from "./types";
 
 type Props = {
@@ -8,6 +9,8 @@ type Props = {
 };
 
 export function SavedMealChips({ meals, onSelect }: Props) {
+  const { tokens } = useAppTheme();
+
   if (meals.length === 0) return null;
 
   return (
@@ -21,7 +24,8 @@ export function SavedMealChips({ meals, onSelect }: Props) {
             <Pressable
               key={meal.id}
               onPress={() => onSelect(meal)}
-              className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+              className="flex-row items-center gap-2 rounded-2xl border px-3 py-2.5"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
             >
               <Text className="text-sm font-medium text-slate-700">{meal.food_name}</Text>
               <Text className="text-xs text-slate-400">{meal.calories} kcal</Text>

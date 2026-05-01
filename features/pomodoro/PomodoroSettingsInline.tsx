@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TextInput } from "react-native";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { Button } from "@/core/ui/Button";
 import { Card } from "@/core/ui/Card";
 import { ValidationError } from "@/core/ui/ValidationError";
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
+  const { tokens } = useAppTheme();
   const [focus, setFocus] = useState(String(settings.focusMinutes));
   const [shortBrk, setShortBrk] = useState(String(settings.shortBreakMinutes));
   const [longBrk, setLongBrk] = useState(String(settings.longBreakMinutes));
@@ -41,8 +43,8 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
       className="mb-4"
       innerClassName="p-4"
     >
-      <Text className="text-base font-semibold text-slate-900">Timer durations</Text>
-      <Text className="mb-4 mt-1 text-sm text-slate-500">
+      <Text className="text-base font-semibold" style={{ color: tokens.text }}>Timer durations</Text>
+      <Text className="mb-4 mt-1 text-sm" style={{ color: tokens.textMuted }}>
         Changes apply immediately and reset the current timer state.
       </Text>
 
@@ -53,7 +55,7 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
         { label: "Sessions before long break", value: sessions, set: setSessions },
       ].map(({ label, value, set }) => (
         <View key={label} className="mb-2 flex-row items-center justify-between">
-          <Text className="flex-1 text-sm text-slate-600">{label}</Text>
+          <Text className="flex-1 pr-3 text-sm" style={{ color: tokens.textMuted }}>{label}</Text>
           <TextInput
             value={value}
             onChangeText={(t) => {
@@ -61,7 +63,8 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
               set(t);
             }}
             keyboardType="number-pad"
-            className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-sm text-slate-800"
+            className="w-16 rounded-2xl border px-3 py-2 text-center text-sm"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated, color: tokens.text }}
             selectTextOnFocus
           />
         </View>
