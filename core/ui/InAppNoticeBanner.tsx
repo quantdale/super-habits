@@ -47,7 +47,7 @@ export function InAppNoticeBanner() {
           style={{
             borderColor: NOTICE_ACCENT,
             backgroundColor: tokens.surface,
-            shadowColor: "#000000",
+            shadowColor: tokens.shadowColor,
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.12,
             shadowRadius: 16,
@@ -77,7 +77,9 @@ export function InAppNoticeBanner() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Dismiss notice"
-              hitSlop={8}
+              hitSlop={4}
+              className="h-10 w-10 items-center justify-center rounded-full"
+              style={{ backgroundColor: tokens.surfaceElevated }}
               onPress={(event) => {
                 event.stopPropagation();
                 dismissNotice(id);

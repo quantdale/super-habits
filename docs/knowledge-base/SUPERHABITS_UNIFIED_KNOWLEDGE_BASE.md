@@ -51,7 +51,7 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five core tabs: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal). Non-tab routes include **settings** for theme and backup restore status, plus **command** for the experimental quick-command shell.
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five core tabs: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal). Non-tab routes include **settings** as a six-bucket shell for appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls, plus the retained **`/command`** page route for the experimental quick-command shell.
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **11**. Next migration: `if (version < 12)`.
 
@@ -61,11 +61,13 @@
 
 **Linked Actions:** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, shipped source entrypoints exist for `habit.completed_for_day` and non-recurring `todo.completed`, and the current habit editor flow exposes supported rule paths instead of a placeholder preview.
 
-**Command shell:** `/command` is an experimental quick-command surface, not a full assistant. Current command scope is limited to `create_todo` and `create_habit`, always with parse -> review -> confirm before write. Parser mode defaults to **`mock`**; optional model-backed parsing uses **`remote_with_fallback`**, but remote parsing is now intended for internal rollout only via an internal-capable build flag plus a device-local tester toggle. The local parser remains the fallback guardrail. Todo due dates stay limited to **today**, **tomorrow**, or explicit **`YYYY-MM-DD`**.
+**Command shell:** the primary command-center entry is a global overlay launcher on Overview, Todos, Habits, Pomodoro, Workout, and Calories; `/command` is the retained direct/internal page route, not the main launcher surface. Current command scope is limited to `create_todo` and `create_habit`, always with parse -> review -> confirm before write. Parser mode defaults to **`mock`**; optional model-backed parsing uses **`remote_with_fallback`**, but remote parsing is now intended for internal rollout only via an internal-capable build flag plus a device-local tester toggle. The local parser remains the fallback guardrail. Todo due dates stay limited to **today**, **tomorrow**, or explicit **`YYYY-MM-DD`**.
+
+**Calories shell:** `CaloriesScreen` now supports **`Form`** and **`Diary`** modes and remembers the last selected mode in AsyncStorage (`superhabits.calories.viewMode`).
 
 **UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
 
-**Quality (April 21, 2026):** `npm run typecheck` passes; `npm test` passes with **334** tests; `npm run build:web` passes; `npx playwright test --list` reports **71** tests in **9** files. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (May 5, 2026):** `npm run typecheck` passes; `npm test` passes with **340** tests; `npm run build:web` passes; `npx playwright test --list` reports **87** tests in **13** spec files. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
@@ -94,8 +96,8 @@
 | Entry | `package.json` → `"main": "expo-router/entry"` |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`) |
 | Next migration | `12` (new `if (version < 12)` block in `runMigrations`) |
-| Unit tests | **326** passing (Vitest) |
-| E2E tests | **71** Playwright tests in **9** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Unit tests | **340** passing (Vitest) |
+| E2E tests | **87** Playwright tests in **13** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
@@ -108,7 +110,7 @@
 | `features/` | Feature modules: `{name}.data.ts`, `{name}Screen.tsx`, optional `{name}.domain.ts`, `types.ts` re-exports |
 | `lib/` | Pure utilities: `id`, `time`, `validation`, `notifications`, **`supabase`** (client + anonymous session + `remoteMode`), `horizontalScrollViewportStyle` |
 | `public/` | Web static assets; `sw.js` service worker |
-| `tests/` | Vitest unit tests (domain-focused; one skipped data stub) |
+| `tests/` | Vitest unit tests for domain, command parser/config, data contracts, restore flows, linked actions, sync, and selected provider/DB behavior |
 | `e2e/` | Playwright specs + helpers |
 | `patches/` | `patch-package` overrides for `node_modules` |
 | `.github/workflows/` | CI (`ci.yml`) |
@@ -144,15 +146,15 @@
 
 **overview:** `OverviewScreen.tsx` (dashboard only — no `.data.ts` / `.domain.ts` in this folder)
 
-**calories:** `CaloriesScreen.tsx`, `MacroDonutChart.tsx`, `DailyCalorieChart.tsx`, `CalorieGoalModal.tsx`, `SavedMealChips.tsx`, `SavedMealSearchModal.tsx`, `calories.data.ts`, `calories.domain.ts`, `types.ts`
+**calories:** `CaloriesScreen.tsx`, `MacroDonutChart.tsx`, `DailyCalorieChart.tsx`, `CalorieGoalModal.tsx`, `CaloriesEntryFields.tsx`, `SavedMealChips.tsx`, `SavedMealSearchModal.tsx`, `calories.data.ts`, `calories.domain.ts`, `types.ts`
 
 **pomodoro:** `PomodoroScreen.tsx`, `FocusSprout.tsx`, `GardenGrid.tsx`, `BackgroundWarning.tsx`, `PomodoroSettingsInline.tsx`, `pomodoro.data.ts`, `pomodoro.domain.ts`, `types.ts`
 
 **workout:** `WorkoutScreen.tsx`, `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx`, `workout.data.ts`, `workout.domain.ts`, `types.ts`
 
-**settings:** `SettingsScreen.tsx` (screen-only utility route — no `.data.ts` / `.domain.ts` in this folder)
+**settings:** `SettingsScreen.tsx`, `settingsRestorePreview.ts` (screen-only utility route with six IA buckets; no feature `.data.ts` / `.domain.ts`)
 
-**command:** `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, `types.ts` (experimental utility route for single create-todo / create-habit flow; default parser mode `mock`, optional `remote_with_fallback`, local parser kept as fallback/guardrail; internal remote rollout uses a device-local tester toggle)
+**command:** `CommandCenterProvider.tsx`, `commandCenterConfig.ts`, `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `commandParser.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, `types.ts` (experimental overlay-first shell for single create-todo / create-habit flow; default parser mode `mock`, optional `remote_with_fallback`, local parser kept as fallback/guardrail; internal remote rollout uses a device-local tester toggle)
 
 **shared:** `GitHubHeatmap.tsx`, `activityTypes.ts`
 
@@ -199,7 +201,7 @@
 |------|------|
 | `sectionColors.ts` | `SECTION_COLORS`, `SECTION_COLORS_LIGHT`, `SectionKey` |
 
-#### `tests/` (29 files)
+#### `tests/` (32 files)
 
 | File | Role |
 |------|------|
@@ -211,11 +213,14 @@
 | `*.domain.test.ts` | Domain coverage for todos, habits, calories, pomodoro, workout, and command parsing |
 | `*.data.test.ts` | Data-layer contract coverage for todos, habits, calories, pomodoro, workout, and linked actions |
 | `command.executor.test.ts` | Quick-command executor coverage |
+| `commandConfig.test.ts` | Command config / rollout capability coverage |
+| `commandParser.facade.test.ts` | Command parser facade path/fallback coverage |
 | `linkedActions.engine.test.ts` | Linked Actions chain dedupe and execution behavior |
 | `linkedActions.types.test.ts` | Linked Actions typing and payload guards |
 | `linkedActionsEditor.model.test.ts` | Linked Actions editor state model coverage |
 | `linkedActionsTargetPicker.test.ts` | Target picker filtering and selection rules |
 | `inAppNotices.test.ts` | In-app notice queue/provider behavior |
+| `realCommandParser.test.ts` | Remote command-parser normalization and guardrail coverage |
 | `restore.coordinator.test.ts` | Restore v1 eligibility, preview, and import guard coverage |
 | `restore.helpers.test.ts` | Restore helper coverage |
 | `restorePromptFlow.test.ts` | Startup restore prompt outcome rules |
@@ -223,7 +228,7 @@
 | `db.client.test.ts` | `core/db/client` error-handling smoke (invalid SQL; connection placeholder) |
 | `sync.engine.test.ts` | `SyncEngine.flush` in-flight enqueue + failed push / adapter batch mutation recovery |
 
-#### `e2e/` (12 files)
+#### `e2e/` (22 files total: 13 spec files + support files)
 
 | File | Role |
 |------|------|
@@ -232,16 +237,22 @@
 | `calories.spec.ts` | Calories flows |
 | `pomodoro.spec.ts` | Pomodoro flows |
 | `workout.spec.ts` | Workout flows |
+| `settings.spec.ts` | Settings backup/restore flows |
+| `command.spec.ts` | Command-center launcher, parse/edit/confirm flows |
+| `command.eval.mock.spec.ts` | Public/mock command evaluation coverage |
+| `command.eval.internal.spec.ts` | Internal real-parser evaluation coverage |
+| `command.observation.mock.spec.ts` | Public/mock command observation coverage |
+| `command.observation.internal.spec.ts` | Internal real-parser observation coverage |
 | `infrastructure.spec.ts` | COEP/COOP, SW, OPFS, DB |
 | `boundary.spec.ts` | Stress / boundary cases |
-| `command.spec.ts` | Quick-command parse, edit, and confirm flows |
 | `global.setup.ts` | `crossOriginIsolated` gate |
 | `global.teardown.ts` | No-op placeholder |
+| `helpers/commandEvaluation.ts` | Shared command evaluation helpers |
+| `helpers/commandObservation.ts` | Shared command observation helpers |
 | `helpers/navigation.ts` | `goToTab`, `hardReload`, `waitForDb` |
 | `helpers/db.ts` | `clearDatabase` (OPFS) |
 | `helpers/forms.ts` | `fillRoutineName`, `fillCaloriesMacros` |
 | `helpers/gestures.ts` | Swipe helpers for RN Web |
-| `settings.spec.ts` | Backup restore surface and empty-device guard behavior |
 | `README.md` | E2E notes |
 
 ### Layering rules (strict)
@@ -448,24 +459,22 @@ Shared foreground trigger used by feature screens:
 |-------|------|----------|
 | npm `main` | `package.json` → `"expo-router/entry"` | Expo Router bootstraps `app/` tree |
 | Root layout | `app/_layout.tsx` | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; `Stack` with `headerShown: false` |
-| Index | `app/index.tsx` | `<Redirect href="/(tabs)/todos" />` — `/` → todos tab |
+| Index | `app/index.tsx` | `<Redirect href="/(tabs)/overview" />` — `/` → Overview tab |
 | Tabs layout | `app/(tabs)/_layout.tsx` | Custom top tab bar |
 | Tab routes | `app/(tabs)/{overview,todos,habits,pomodoro,workout,calories}.tsx` | Each renders one `*Screen` from `features/` |
 
 ### `app/_layout.tsx`
 
-- Imports: `@/global.css`, `expo-router` `Stack`, `expo-status-bar` `StatusBar`, `@/core/providers/AppProviders`
-- Renders: `AppProviders` → `StatusBar` → `Stack` with one screen `(tabs)`, headers hidden
+- Imports: `@/global.css`, `expo-router` `Stack`, `expo-status-bar` `StatusBar`, `@/core/providers/AppProviders`, `@/features/command/CommandCenterProvider`, `GlobalCommandCenterHost`, and `@/core/ui/InAppNoticeBanner`
+- Renders: `AppProviders` → themed root → `CommandCenterProvider` → `StatusBar` → `Stack` with `(tabs)` plus retained `command` route, then `GlobalCommandCenterHost` and `InAppNoticeBanner`
 
 ### `app/(tabs)/_layout.tsx` — top tab bar
 
-#### Constants
+#### Layout model
 
-| Name | Value | Role |
-|------|-------|------|
-| `TAB_CONTENT_SURFACE` | `#f8f7ff` | Active tab + content background |
-| `TAB_RAIL_BG` | `#eeecf8` | Inactive tab + rail background |
-| `TAB_RAIL_BORDER` | `#d4d0ee` | Rail border color |
+- The tab rail colors now come from `useAppTheme()` tokens (`tokens.tabRail`, `tokens.tabRailBorder`, `tokens.background`) instead of hard-coded shell constants.
+- `overview` uses a muted slate accent that shifts with theme; the other five tabs use their section colors from `SECTION_COLORS` / `SECTION_TEXT_COLORS`.
+- `TopTabItem` keeps the row-style icon + label layout, active rounded top corners, and inset inactive tabs, but the actual surface colors are theme-driven.
 
 #### `NAV_ITEMS` (exact)
 
@@ -478,32 +487,26 @@ Shared foreground trigger used by feature screens:
 | `workout` | `"/(tabs)/workout"` | Workout | `fitness-center` | `SECTION_TEXT_COLORS.workout` |
 | `calories` | `"/(tabs)/calories"` | Calories | `restaurant-menu` | `SECTION_TEXT_COLORS.calories` |
 
-#### `TopTabItem` styles
+#### `TopTabItem` behavior
 
-**Active:** `backgroundColor TAB_CONTENT_SURFACE`, `borderBottomWidth 0`, `marginTop 0`, top radii `16`, `paddingVertical 10`, `paddingHorizontal 4`, `gap 5`, `flexDirection row`, icon `16px`, label `fontSize 12`, `fontWeight 600`, color = section color.
-
-**Inactive:** `backgroundColor TAB_RAIL_BG`, `borderBottomWidth 1`, `borderColor TAB_RAIL_BORDER`, `marginTop 3`, icon/label `#94a3b8`, `fontWeight 400`.
-
-**TabList:** `flexDirection row`, `width 100%`, `alignItems stretch`, rail bg/border, `paddingHorizontal 4`, `paddingTop 4`, `gap 2`, `zIndex 10`.
-
-**TabSlot:** `flex 1`, `backgroundColor TAB_CONTENT_SURFACE`.
-
-**Connected tab illusion:** Active tab shares same bg as content surface (`#f8f7ff`) while rail stays `#eeecf8`; active item loses bottom border and sits flush with content.
+- Active tabs use the screen background token, drop the bottom border, and sit flush with content.
+- Inactive tabs keep the rail background/border token colors and a slight top inset.
+- Icons are `16px`; labels are `12px`; active labels are semibold and inactive labels use the muted icon token.
+- `TabList` stays a full-width horizontal rail with `gap: 2`, `paddingHorizontal: 4`, and `paddingTop: 4`.
+- `TabSlot` fills the rest of the screen and uses the themed background token.
 
 #### Swipe navigation implementation
 
 The tabs layout also supports horizontal swipe navigation between tab routes:
 
 - Uses `GestureDetector` + `Gesture.Pan()` from `react-native-gesture-handler`.
-- Uses Reanimated shared values (`translateX`, `tabIndex`, `screenWidthSV`, `isDeadZone`) for gesture state.
+- Uses Reanimated shared values (`tabIndex`, `screenWidthSV`, `isDeadZone`) for gesture state.
 - `activeOffsetX([-30, 30])` avoids accidental horizontal gestures.
 - A 40px edge dead-zone on left/right reduces conflicts with OS back/swipe gestures.
-- At first/last tabs, out-of-range drag is damped (`translationX * 0.3`) for boundary feedback.
 - On pan end, navigation commits when either:
   - drag distance crosses one-third of screen width, or
   - velocity crosses `±500`.
 - Route switch happens through `runOnJS(navigateToIndex)` and `router.navigate(...)`.
-- Content translation springs back with `withSpring(0)` after gesture completion.
 
 #### Tab route files (thin wrappers)
 
@@ -514,11 +517,22 @@ Each file: import `*Screen` from `@/features/...`; default export returns `<XxxS
 | Path | Screen |
 |------|--------|
 | `/` | Redirect → `/(tabs)/overview` |
+| `/(tabs)/overview` | Overview |
 | `/(tabs)/todos` | Todos |
 | `/(tabs)/habits` | Habits |
 | `/(tabs)/pomodoro` | Pomodoro |
 | `/(tabs)/workout` | Workout |
 | `/(tabs)/calories` | Calories |
+| `/settings` | Settings |
+| `/command` | Retained command page route |
+
+### Command-center shell
+
+- `GlobalCommandCenterHost` resolves launch context from the active tab segment and shows a floating launcher when `COMMAND_EXPERIMENT_ENABLED` is true, the current route is one of the six tabs, and the launcher is not suppressed.
+- Overlay layout is **drawer** on wide web (`Platform.OS === "web"` and width `>= 960`) and **bottom-sheet** elsewhere.
+- The launcher is intentionally hidden on `/settings`.
+- `useCommandLauncherSuppressed(...)` currently hides the launcher during active pomodoro sessions and active workout sessions.
+- `/command` still renders `CommandScreen` directly for the Settings entry point, direct navigation, and internal testing, but the user-facing command flow is overlay-first now.
 
 ---
 
@@ -1564,7 +1578,12 @@ Exports: `kcalFromMacros`, `caloriesTotal`, `buildWeeklyTrend`, `buildMacroDonut
 
 #### Screen — `features/calories/CaloriesScreen.tsx`
 
-Macro fields → computed kcal; `validateCalorieEntry` + `validateCalorieComputedKcal`; meal `PillChip`s; swipe rows (edit + delete); daily bar chart + 52-week heatmap; goal modal + saved meal search modal.
+Two primary modes:
+
+- **Form** — inline macro-entry form, recent saved-meal chips, saved-meal search entry point, swipeable "Logged today" rows, and the shared daily summary card.
+- **Diary** — search-first quick add, manual-add modal, entries grouped by stored meal type with expand/collapse cards, and the same shared daily summary card.
+
+`viewMode` persists through AsyncStorage key `superhabits.calories.viewMode`, so reloads reopen the last selected `Form` or `Diary` shell. Both modes share macro-derived kcal calculation, `validateCalorieEntry` + `validateCalorieComputedKcal`, meal `PillChip`s, goal modal, daily trend chart, and 52-week heatmap.
 
 #### Subcomponents
 
@@ -1767,7 +1786,7 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (April 21, 2026):** **334 tests passed**; **32 test files passed** (Vitest v4)
+**Latest run (May 5, 2026):** **340 tests passed**; **32 test files passed** (Vitest v4)
 
 #### `tests/time.test.ts`
 
@@ -2070,7 +2089,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 334 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 340 passing.
 
 ---
 
@@ -2123,7 +2142,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Phases:** Intake (answer field/entity/table/sync/domain questions) → Plan (list every file) → Approval → Implement data then domain then UI → Report.
 
-**Current version in command:** 9 → next 10.
+**Current version in command:** 11 → next 12.
 
 ---
 
@@ -2139,7 +2158,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (334 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (340 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2310,11 +2329,12 @@ Tag phase completions: `git tag phaseN-complete`
 | Habits | Categories, icons/colors, increment/decrement, aggregate 52-week heatmap, consistency %, Avocation-style layout |
 | Focus | Pomodoro timer, 3 modes, classic sequence, custom durations, garden grid, yearly heatmap |
 | Workout | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete |
-| Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap |
+| Calories | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap, plus `Form` / `Diary` modes with remembered last view |
+| Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal |
 | PWA / web | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json` |
-| Command shell | Experimental `/command` route for single `create_todo` / `create_habit` drafts only; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; internal remote rollout is gated by build config plus a device-local toggle; not a chat assistant |
-| Unit tests | **326** passing (Vitest) |
-| E2E | **71** Playwright tests in **9** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
+| Command shell | Experimental command center for single `create_todo` / `create_habit` drafts only; primary entry is the global overlay launcher, while `/command` remains the retained direct route; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; internal remote rollout is gated by build config plus a device-local toggle; not a chat assistant |
+| Unit tests | **340** passing (Vitest) |
+| E2E | **87** Playwright tests in **13** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e` |
 | Schema version | **11** |
 | Linked Actions | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix |
 | Cloud sync / restore | Push backup via `SupabaseSyncAdapter` + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; adapter **pull** not implemented; restore v1 separately supports empty-device import for todos, habits, and calorie entries only |
@@ -2332,7 +2352,6 @@ Tag phase completions: `git tag phaseN-complete`
 | Zustand | Installed, unused | Global state deferred |
 | `date-fns` | Unused | Could replace ad-hoc date formatting |
 | Native `Alert` on web | No-op | E2E documents delete flows don't confirm on web |
-| DB unit tests | STUB file skipped | No mocked `getDatabase` suite |
 
 ### Design decisions (evidence-based)
 
@@ -2423,6 +2442,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **326** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **340** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- Run `npx playwright test --list` when E2E spec count changes; keep **71** / **9 files** in sync
+- Run `npx playwright test --list` when E2E spec count changes; keep **87** / **13 files** in sync

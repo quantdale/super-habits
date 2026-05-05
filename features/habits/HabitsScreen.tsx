@@ -22,6 +22,7 @@ import { Screen } from "@/core/ui/Screen";
 import { Modal } from "@/core/ui/Modal";
 import { Card } from "@/core/ui/Card";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
+import { IconButton } from "@/core/ui/IconButton";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { ScreenSection } from "@/core/ui/ScreenSection";
 import { StatBlock } from "@/core/ui/StatBlock";
@@ -30,6 +31,7 @@ import { NumberStepperField } from "@/core/ui/NumberStepperField";
 import { Button } from "@/core/ui/Button";
 import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
 import { PillChip } from "@/core/ui/PillChip";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
 import type { Habit, HabitCategory, HabitIcon } from "./types";
 import {
@@ -61,7 +63,7 @@ import {
   HABIT_COLORS,
   HABIT_ICONS,
 } from "@/features/habits/habitPresets";
-import { SECTION_COLORS, SECTION_COLORS_LIGHT, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
 import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
 import { validateHabit } from "@/lib/validation";
@@ -86,6 +88,7 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
 }
 
 export function HabitsScreen() {
+  const { tokens } = useAppTheme();
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -302,19 +305,13 @@ export function HabitsScreen() {
           title="Habits"
           subtitle="Track daily consistency."
           actions={
-            <Pressable
+            <IconButton
+              icon={editMode ? "close" : "edit"}
               onPress={() => setEditMode((e) => !e)}
-              className={`rounded-xl p-2.5 ${editMode ? "bg-habits-light" : ""}`}
-              accessibilityRole="button"
               accessibilityLabel={editMode ? "Exit habit edit mode" : "Enter habit edit mode"}
-              accessibilityState={{ selected: editMode }}
-            >
-              <MaterialIcons
-                name={editMode ? "close" : "edit"}
-                size={24}
-                color={editMode ? SECTION_TEXT_COLORS.habits : "#94a3b8"}
-              />
-            </Pressable>
+              selected={editMode}
+              accentColor={SECTION_TEXT_COLORS.habits}
+            />
           }
         />
       </ScreenSection>
@@ -334,8 +331,10 @@ export function HabitsScreen() {
                 />
               </View>
               <View className="min-w-0 flex-1">
-                <Text className="text-base font-semibold text-slate-900">Today&apos;s rhythm</Text>
-                <Text className="mt-0.5 text-sm text-slate-500">
+                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                  Today&apos;s rhythm
+                </Text>
+                <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
                   {habits.length} habits across your daily routine
                 </Text>
               </View>
@@ -394,8 +393,10 @@ export function HabitsScreen() {
                       <Text style={{ fontSize: 18 }}>{group.icon}</Text>
                     </View>
                     <View>
-                      <Text className="text-base font-semibold text-slate-900">{group.label}</Text>
-                      <Text className="mt-0.5 text-sm text-slate-500">
+                      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                        {group.label}
+                      </Text>
+                      <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
                         {groupHabits.length} {groupHabits.length === 1 ? "habit" : "habits"}
                       </Text>
                     </View>
@@ -426,7 +427,8 @@ export function HabitsScreen() {
                               />
                             </View>
                             <Text
-                              className="text-center text-xs font-medium text-slate-700"
+                              className="text-center text-xs font-medium"
+                              style={{ color: tokens.text }}
                               numberOfLines={2}
                             >
                               {habit.name}
@@ -436,17 +438,23 @@ export function HabitsScreen() {
                                 onPress={() => {
                                   void openEditModal(habit);
                                 }}
-                                className="rounded-full bg-habits px-3 py-1.5"
+                                className="rounded-full px-3 py-1.5"
+                                style={{ backgroundColor: COLOR }}
                               >
-                                <Text className="text-xs font-medium text-white">Edit</Text>
+                                <Text className="text-xs font-medium" style={{ color: tokens.textOnAccent }}>
+                                  Edit
+                                </Text>
                               </Pressable>
                               <Pressable
                                 onPress={() => {
                                   void handleDeleteHabit(habit);
                                 }}
-                                className="rounded-full bg-rose-500 px-3 py-1.5"
+                                className="rounded-full px-3 py-1.5"
+                                style={{ backgroundColor: tokens.dangerSolid }}
                               >
-                                <Text className="text-xs font-medium text-white">Delete</Text>
+                                <Text className="text-xs font-medium" style={{ color: tokens.textOnAccent }}>
+                                  Delete
+                                </Text>
                               </Pressable>
                             </View>
                           </Card>
@@ -472,7 +480,8 @@ export function HabitsScreen() {
                               onDecrement={() => handleDecrement(habit.id)}
                             />
                             <Text
-                              className="mt-2 w-[84px] text-center text-[11px] font-medium leading-4 text-slate-500"
+                              className="mt-2 w-[84px] text-center text-[11px] font-medium leading-4"
+                              style={{ color: tokens.textMuted }}
                               numberOfLines={2}
                             >
                               {habit.name}
@@ -493,7 +502,7 @@ export function HabitsScreen() {
                       className="h-[68px] w-[68px] shrink-0 grow-0 items-center justify-center rounded-2xl border-2 border-dashed"
                       style={{
                         borderColor: SECTION_COLORS.habits + "60",
-                        backgroundColor: SECTION_COLORS_LIGHT.habits,
+                        backgroundColor: `${SECTION_COLORS.habits}18`,
                       }}
                     >
                       <Text
@@ -551,7 +560,9 @@ export function HabitsScreen() {
             max={99}
             placeholder="1"
           />
-          <Text className="mb-1 text-sm font-medium text-slate-700">Category</Text>
+          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+            Category
+          </Text>
           <View className="mb-3 flex-row flex-wrap">
             {TIME_GROUPS.map((g) => (
               <PillChip
@@ -567,7 +578,9 @@ export function HabitsScreen() {
               />
             ))}
           </View>
-          <Text className="mb-1 text-sm font-medium text-slate-700">Icon</Text>
+          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+            Icon
+          </Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
             {HABIT_ICONS.map((iconName) => (
               <Pressable
@@ -576,20 +589,24 @@ export function HabitsScreen() {
                   setHabitError(null);
                   setIcon(iconName);
                 }}
-                className={`items-center justify-center rounded-lg p-2 ${
-                  icon === iconName ? "bg-habits" : "bg-slate-200"
-                }`}
-                style={{ width: 44, height: 44 }}
+                className="items-center justify-center rounded-lg p-2"
+                style={{
+                  width: 44,
+                  height: 44,
+                  backgroundColor: icon === iconName ? COLOR : tokens.surfaceElevated,
+                }}
               >
                 <MaterialIcons
                   name={iconName}
                   size={24}
-                  color={icon === iconName ? "white" : "#94a3b8"}
+                  color={icon === iconName ? tokens.textOnAccent : tokens.iconMuted}
                 />
               </Pressable>
             ))}
           </View>
-          <Text className="mb-1 text-sm font-medium text-slate-700">Color</Text>
+          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+            Color
+          </Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
             {HABIT_COLORS.map((c) => (
               <Pressable
@@ -598,10 +615,14 @@ export function HabitsScreen() {
                   setHabitError(null);
                   setColor(c);
                 }}
-                className={`rounded-full ${
-                  color === c ? "ring-2 ring-slate-400 ring-offset-2" : ""
-                }`}
-                style={{ width: 36, height: 36, backgroundColor: c }}
+                className="rounded-full"
+                style={{
+                  width: 36,
+                  height: 36,
+                  backgroundColor: c,
+                  borderWidth: color === c ? 2 : 0,
+                  borderColor: color === c ? tokens.textMuted : "transparent",
+                }}
               />
             ))}
           </View>

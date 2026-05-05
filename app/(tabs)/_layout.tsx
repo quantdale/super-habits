@@ -12,7 +12,7 @@ import { useAppTheme } from "@/core/providers/ThemeProvider";
 const OVERVIEW_HREF = "/(tabs)/overview" as Href;
 
 const NAV_ITEMS = [
-  { name: "overview", href: OVERVIEW_HREF, label: "Overview", icon: "dashboard", color: "#475569" },
+  { name: "overview", href: OVERVIEW_HREF, label: "Overview", icon: "dashboard", color: SECTION_TEXT_COLORS.focus },
   { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", icon: "check-circle-outline", color: SECTION_TEXT_COLORS.todos },
   { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", icon: "loop", color: SECTION_TEXT_COLORS.habits },
   { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", icon: "timer", color: SECTION_TEXT_COLORS.focus },
@@ -116,7 +116,7 @@ export default function TabsLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { width: screenWidth } = useWindowDimensions();
-  const overviewColor = resolvedTheme === "dark" ? tokens.textMuted : "#475569";
+  const overviewColor = resolvedTheme === "dark" ? tokens.text : tokens.textMuted;
 
   const currentIndex = useMemo(() => {
     const segs = segments as readonly string[];

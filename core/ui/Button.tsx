@@ -23,7 +23,7 @@ export function Button({ label, onPress, variant = "primary", disabled = false, 
         : "";
   const labelClassName =
     variant === "primary" || variant === "danger"
-      ? "text-white"
+      ? ""
       : "";
   const style =
     variant === "primary"
@@ -31,17 +31,37 @@ export function Button({ label, onPress, variant = "primary", disabled = false, 
         ? { backgroundColor: color }
         : undefined
       : variant === "danger"
-        ? { backgroundColor: "#ef4444" }
+        ? { backgroundColor: tokens.dangerSolid }
         : { backgroundColor: tokens.surfaceElevated, borderColor: tokens.border, borderWidth: 1 };
 
   return (
     <Pressable
       disabled={disabled}
-      className={`rounded-xl px-4 py-3 ${className} ${disabled ? "opacity-40" : ""}`}
-      style={style}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      className={`min-h-[48px] rounded-2xl px-4 py-3 ${className} ${disabled ? "opacity-40" : ""}`}
+      style={[
+        style,
+        variant === "primary" || variant === "danger"
+          ? {
+              shadowColor: tokens.shadowColor,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: disabled ? 0 : 0.08,
+              shadowRadius: 12,
+              elevation: disabled ? 0 : 1,
+            }
+          : undefined,
+      ]}
       onPress={onPress}
     >
-      <Text className={`text-center font-semibold ${labelClassName}`} style={variant === "ghost" ? { color: tokens.text } : undefined}>
+      <Text
+        className={`text-center text-sm font-semibold ${labelClassName}`}
+        style={
+          variant === "ghost"
+            ? { color: tokens.text }
+            : { color: tokens.textOnAccent }
+        }
+      >
         {label}
       </Text>
     </Pressable>

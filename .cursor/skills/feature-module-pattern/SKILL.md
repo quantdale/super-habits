@@ -20,7 +20,7 @@ Route file (thin wrapper):
 ## Exceptions (current repo)
 - **`features/overview/`** — `OverviewScreen.tsx` only (dashboard tab). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
 - **`features/settings/`** — `SettingsScreen.tsx` only. It is a utility route rendered by `app/settings.tsx`, not a tab module.
-- **`features/command/`** — experimental utility route rendered by `app/command.tsx`; current files are `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, and `types.ts` rather than the standard `{feature}.data.ts` pattern.
+- **`features/command/`** — experimental overlay-first shell rendered globally from `app/_layout.tsx`, with retained direct page access at `app/command.tsx`; current files include `CommandCenterProvider.tsx`, `CommandScreen.tsx`, `commandCenterConfig.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `commandParser.ts`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, and `types.ts` rather than the standard `{feature}.data.ts` pattern.
 - **`features/shared/`** — cross-feature UI (`GitHubHeatmap`, `ActivityPreviewStrip`). Not a tab-routed module.
 - **Nested screens** — e.g. `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx` alongside `WorkoutScreen.tsx` under `features/workout/` for multi-step flows.
 
@@ -103,7 +103,7 @@ workout:
 calories:
   data: entries, saved meals, goals, soft delete, …
   domain: caloriesTotal, kcalFromMacros, charts/heatmap builders, …
-  screen: CaloriesScreen — meal type picker (breakfast/lunch/dinner/snack); goal modal; saved meal search modal
+  screen: CaloriesScreen — `Form` / `Diary` mode toggle with remembered last view, meal type picker (breakfast/lunch/dinner/snack), goal modal, saved meal search modal
   e2e: `e2e/calories.spec.ts`
 
 overview:

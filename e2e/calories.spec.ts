@@ -7,6 +7,10 @@ test.describe("Calories", () => {
   test.beforeEach(async ({ page }) => {
     await goToTab(page, "calories");
     await clearDatabase(page);
+    await page.evaluate(() => {
+      window.localStorage.removeItem("superhabits.calories.viewMode");
+    });
+    await page.reload({ waitUntil: "load" });
     await goToTab(page, "calories");
   });
 
@@ -43,9 +47,20 @@ test.describe("Calories", () => {
     await clickCaloriesAddEntry(page);
     await expect(page.getByText("Oats - 235 kcal", { exact: true })).toBeVisible({ timeout: 15_000 });
 
+    await page.getByLabel("Diary view").click();
+    await expect(page.getByText("Quick add", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Daily log", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("Oats", { timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("235 kcal", { timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("Logged", { timeout: 15_000 });
+
     await page.reload();
     await page.waitForLoadState("load");
     await goToTab(page, "calories");
-    await expect(page.getByText("Oats - 235 kcal", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Quick add", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Daily log", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("Oats", { timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("235 kcal", { timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("Logged", { timeout: 15_000 });
   });
 });

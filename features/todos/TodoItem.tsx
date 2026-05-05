@@ -1,9 +1,9 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 import { RectButton } from "react-native-gesture-handler";
-import colors from "tailwindcss/colors";
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { SwipeableCard } from "@/core/ui/SwipeableCard";
-import { SECTION_COLORS } from "@/constants/sectionColors";
 import { DueDateBadge } from "./DueDateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import type { Todo, TodoViewMode } from "./types";
@@ -29,7 +29,9 @@ export function TodoItem({
   viewMode = "content",
   cardWidth,
 }: Props) {
+  const { tokens } = useAppTheme();
   const done = todo.completed === 1;
+  const recurringTint = `${SECTION_COLORS.todos}18`;
 
   if (viewMode === "grid") {
     return (
@@ -48,19 +50,20 @@ export function TodoItem({
             accessibilityLabel="Drag to reorder"
             className="pt-0.5"
           >
-            <MaterialIcons name="drag-indicator" size={18} color={colors.slate[400]} />
+            <MaterialIcons name="drag-indicator" size={18} color={tokens.iconMuted} />
           </Pressable>
           <RectButton onPress={onToggle} hitSlop={6} style={{ backgroundColor: "transparent" }}>
             <MaterialIcons
               name={done ? "check-box" : "check-box-outline-blank"}
               size={18}
-              color={done ? colors.slate[500] : colors.slate[900]}
+              color={done ? tokens.iconMuted : tokens.text}
             />
           </RectButton>
           <View className="min-w-0 flex-1 gap-1">
             <Text
               numberOfLines={2}
-              className={`text-xs leading-4 ${done ? "text-slate-400 line-through" : "text-slate-800"}`}
+              className={`text-xs leading-4 ${done ? "line-through" : ""}`}
+              style={{ color: done ? tokens.textMuted : tokens.text }}
             >
               {todo.title}
             </Text>
@@ -91,7 +94,7 @@ export function TodoItem({
             hitSlop={8}
             accessibilityLabel="Drag to reorder"
           >
-            <MaterialIcons name="drag-indicator" size={18} color={colors.slate[400]} />
+            <MaterialIcons name="drag-indicator" size={18} color={tokens.iconMuted} />
           </Pressable>
           <RectButton
             onPress={onToggle}
@@ -101,20 +104,25 @@ export function TodoItem({
             <MaterialIcons
               name={done ? "check-box" : "check-box-outline-blank"}
               size={20}
-              color={done ? colors.slate[500] : colors.slate[900]}
+              color={done ? tokens.iconMuted : tokens.text}
             />
           </RectButton>
           <Text
             numberOfLines={1}
-            style={{ flex: 1, fontSize: 14, color: done ? colors.slate[400] : colors.slate[900] }}
+            style={{ flex: 1, fontSize: 14, color: done ? tokens.textMuted : tokens.text }}
             className={done ? "line-through" : ""}
           >
             {todo.title}
           </Text>
           <View className="flex-row items-center gap-1">
             {todo.recurrence === "daily" ? (
-              <View className="rounded-full bg-todos-light px-2 py-1">
-                <Text className="text-[10px] font-semibold text-todos">↻</Text>
+              <View className="rounded-full px-2 py-1" style={{ backgroundColor: recurringTint }}>
+                <Text
+                  className="text-[10px] font-semibold"
+                  style={{ color: SECTION_TEXT_COLORS.todos }}
+                >
+                  ↻
+                </Text>
               </View>
             ) : null}
             {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} compact /> : null}
@@ -141,7 +149,7 @@ export function TodoItem({
           className="pt-0.5"
           accessibilityLabel="Drag to reorder"
         >
-          <MaterialIcons name="drag-indicator" size={22} color={colors.slate[400]} />
+          <MaterialIcons name="drag-indicator" size={22} color={tokens.iconMuted} />
         </Pressable>
         <RectButton
           onPress={onToggle}
@@ -151,23 +159,33 @@ export function TodoItem({
           <MaterialIcons
             name={done ? "check-box" : "check-box-outline-blank"}
             size={24}
-            color={done ? colors.slate[500] : colors.slate[900]}
+            color={done ? tokens.iconMuted : tokens.text}
           />
         </RectButton>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View className="flex-row flex-wrap items-center gap-2">
             <Text
-              className={`text-[15px] font-semibold ${done ? "text-slate-400 line-through" : "text-slate-900"}`}
+              className={`text-[15px] font-semibold ${done ? "line-through" : ""}`}
+              style={{ color: done ? tokens.textMuted : tokens.text }}
             >
               {todo.title}
             </Text>
             {todo.recurrence === "daily" ? (
-              <View className="self-start rounded-full bg-todos-light px-2.5 py-1">
-                <Text className="text-[11px] font-semibold text-todos">↻ daily</Text>
+              <View
+                className="self-start rounded-full px-2.5 py-1"
+                style={{ backgroundColor: recurringTint }}
+              >
+                <Text className="text-[11px] font-semibold" style={{ color: SECTION_TEXT_COLORS.todos }}>
+                  ↻ daily
+                </Text>
               </View>
             ) : null}
           </View>
-          {todo.notes ? <Text className="mt-1 text-sm text-slate-500">{todo.notes}</Text> : null}
+          {todo.notes ? (
+            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              {todo.notes}
+            </Text>
+          ) : null}
           <View className="mt-2 flex-row flex-wrap gap-2">
             {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} /> : null}
             {todo.due_date ? <DueDateBadge dueDate={todo.due_date} /> : null}

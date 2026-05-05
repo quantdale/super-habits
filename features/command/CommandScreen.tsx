@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link, type Href, useFocusEffect, useRouter } from "expo-router";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, type Href, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 import { PageHeader } from "@/core/ui/PageHeader";
@@ -16,6 +16,10 @@ import { executeDraftAction } from "./command.executor";
 import { commandParser } from "./commandParser";
 import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from "./commandConfig";
 import { getAiCommandInternalRolloutPreference } from "./commandInternalRollout";
+import {
+  type CommandCenterLaunchContext,
+  getCommandCenterContextCopy,
+} from "./commandCenterConfig";
 import type {
   CommandExecutionResult,
   CommandParseObservation,
@@ -43,6 +47,14 @@ const HABIT_CATEGORIES: Array<{ value: DraftCreateHabit["fields"]["category"]; l
   { value: "evening", label: "Evening" },
 ];
 
+type CommandScreenPresentation = "page" | "overlay";
+
+type CommandScreenProps = {
+  presentation?: CommandScreenPresentation;
+  launchContext?: CommandCenterLaunchContext | null;
+  onRequestClose?: () => void;
+};
+
 function getParserContext() {
   if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {
     return { locale: "en-US", timeZone: "UTC" };
@@ -56,31 +68,84 @@ function getParserContext() {
 }
 
 function PreviewSectionTitle({ children }: { children: string }) {
-  return <Text className="text-sm font-semibold text-slate-900">{children}</Text>;
+  const { tokens } = useAppTheme();
+  return <Text className="text-sm font-semibold" style={{ color: tokens.text }}>{children}</Text>;
 }
 
 function PreviewInfoRow({ label, value }: { label: string; value: string }) {
+  const { tokens } = useAppTheme();
   return (
-    <View className="flex-row items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-      <Text className="text-sm font-medium text-slate-500">{label}</Text>
-      <Text className="flex-1 text-right text-sm text-slate-900">{value}</Text>
+    <View
+      className="flex-row items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+    >
+      <Text className="text-sm font-medium" style={{ color: tokens.textMuted }}>{label}</Text>
+      <Text className="flex-1 text-right text-sm" style={{ color: tokens.text }}>{value}</Text>
     </View>
   );
 }
 
 function PreviewWarning({ message }: { message: string }) {
+  const { tokens } = useAppTheme();
   return (
-    <View className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-      <Text className="text-sm text-amber-800">{message}</Text>
+    <View
+      className="rounded-xl border px-3 py-2.5"
+      style={{ borderColor: tokens.warningBorder, backgroundColor: tokens.warningBackground }}
+    >
+      <Text className="text-sm" style={{ color: tokens.warningText }}>{message}</Text>
     </View>
   );
 }
 
 function PreviewMissingField({ message }: { message: string }) {
+  const { tokens } = useAppTheme();
   return (
-    <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-      <Text className="text-sm text-slate-600">{message}</Text>
+    <View
+      className="rounded-xl border px-3 py-2.5"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+    >
+      <Text className="text-sm" style={{ color: tokens.textMuted }}>{message}</Text>
     </View>
+  );
+}
+
+function CommandSection({
+  children,
+  presentation,
+  className,
+}: {
+  children: ReactNode;
+  presentation: CommandScreenPresentation;
+  className?: string;
+}) {
+  if (presentation === "page") {
+    return <ScreenSection className={className}>{children}</ScreenSection>;
+  }
+
+  return <View className={className}>{children}</View>;
+}
+
+function LaunchContextCard({ launchContext }: { launchContext: CommandCenterLaunchContext }) {
+  const { tokens } = useAppTheme();
+  const contextCopy = getCommandCenterContextCopy(launchContext);
+
+  if (!contextCopy) return null;
+
+  return (
+    <Card accentColor={contextCopy.accentColor} className="mb-0">
+      <Text
+        className="text-xs font-semibold uppercase tracking-[1px]"
+        style={{ color: tokens.textMuted }}
+      >
+        Current section
+      </Text>
+      <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
+        {contextCopy.sectionLabel}
+      </Text>
+      <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+        {contextCopy.helperCopy}
+      </Text>
+    </Card>
   );
 }
 
@@ -175,6 +240,7 @@ function DraftPreview({
   onEditHabitCategory,
   onConfirm,
   onReset,
+  onNavigateToDestination,
 }: {
   parsedDraft: DraftAiAction;
   editableDraft: DraftAiAction;
@@ -195,7 +261,9 @@ function DraftPreview({
   onEditHabitCategory: (value: DraftCreateHabit["fields"]["category"]) => void;
   onConfirm: () => void;
   onReset: () => void;
+  onNavigateToDestination?: (href: Href) => void;
 }) {
+  const { tokens } = useAppTheme();
   const router = useRouter();
   const destinationHref = editableDraft.kind === "create_todo" ? TODOS_HREF : HABITS_HREF;
   const destinationLabel = editableDraft.kind === "create_todo" ? "Go to Todos" : "Go to Habits";
@@ -328,7 +396,7 @@ function DraftPreview({
               />
             ))}
             {!canConfirm ? (
-              <Text className="text-sm text-slate-500">
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
                 Fill required fields before saving.
               </Text>
             ) : null}
@@ -338,13 +406,25 @@ function DraftPreview({
         <ValidationError message={executionError} />
 
         {successResult ? (
-          <View className="gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-            <Text className="text-sm font-semibold text-emerald-800">{successResult.message}</Text>
+          <View
+            className="gap-2 rounded-xl border px-3 py-3"
+            style={{ borderColor: tokens.successBorder, backgroundColor: tokens.successBackground }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.successText }}>
+              {successResult.message}
+            </Text>
             <View className="flex-row gap-2">
               <View className="flex-1">
                 <Button
                   label={destinationLabel}
-                  onPress={() => router.push(destinationHref)}
+                  onPress={() => {
+                    if (onNavigateToDestination) {
+                      onNavigateToDestination(destinationHref);
+                      return;
+                    }
+
+                    router.push(destinationHref);
+                  }}
                   color={COMMAND_ACCENT}
                 />
               </View>
@@ -361,7 +441,7 @@ function DraftPreview({
             disabled={busy}
           />
         ) : (
-          <Text className="text-sm text-slate-500">
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
             Fill required fields before saving.
           </Text>
         )}
@@ -370,13 +450,27 @@ function DraftPreview({
   );
 }
 
-export function CommandScreen() {
+export function CommandScreen({
+  presentation = "page",
+  launchContext = null,
+  onRequestClose,
+}: CommandScreenProps) {
+  const router = useRouter();
   const { tokens } = useAppTheme();
   const parseConfig = useMemo(() => getAiCommandParseConfig(), []);
   const internalRolloutAvailable = useMemo(
     () => isAiCommandInternalRolloutAvailable(parseConfig),
     [parseConfig],
   );
+  const contextCopy = getCommandCenterContextCopy(launchContext);
+  const commandPlaceholder =
+    contextCopy?.inputPlaceholder ?? "Add a todo to call mom tomorrow";
+  const supportedExamples = contextCopy
+    ? [contextCopy.inputPlaceholder, "Create a habit to drink water every morning"]
+    : [
+        "Add a todo to call mom tomorrow",
+        "Create a habit to drink water every morning",
+      ];
   const [rawText, setRawText] = useState("");
   const [parseResult, setParseResult] = useState<ParseCommandResult | null>(null);
   const [editableDraft, setEditableDraft] = useState<DraftAiAction | null>(null);
@@ -389,28 +483,26 @@ export function CommandScreen() {
     Extract<CommandExecutionResult, { outcome: "success" }> | null
   >(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-      if (!internalRolloutAvailable) {
-        setInternalRolloutEnabledOnDevice(false);
-        return () => {
-          cancelled = true;
-        };
-      }
-
-      void getAiCommandInternalRolloutPreference().then((enabled) => {
-        if (!cancelled) {
-          setInternalRolloutEnabledOnDevice(enabled);
-        }
-      });
-
+    if (!internalRolloutAvailable) {
+      setInternalRolloutEnabledOnDevice(false);
       return () => {
         cancelled = true;
       };
-    }, [internalRolloutAvailable]),
-  );
+    }
+
+    void getAiCommandInternalRolloutPreference().then((enabled) => {
+      if (!cancelled) {
+        setInternalRolloutEnabledOnDevice(enabled);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [internalRolloutAvailable]);
 
   const parsedDraft = useMemo(
     () => (parseResult?.outcome === "draft" ? parseResult.draft : null),
@@ -498,7 +590,7 @@ export function CommandScreen() {
       <Screen scroll>
         <ScreenSection>
           <PageHeader
-            title="Quick command"
+            title="Command center"
             subtitle="This experimental screen is currently disabled."
             actions={
               <Link href={OVERVIEW_HREF} asChild>
@@ -520,28 +612,15 @@ export function CommandScreen() {
     );
   }
 
-  return (
-    <Screen scroll>
-      <ScreenSection>
-        <PageHeader
-          title="Quick command"
-          subtitle="Experimental draft entry for a single todo or habit. Review the draft, then confirm before anything is saved."
-          actions={
-            <Link href={OVERVIEW_HREF} asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Back to overview"
-                className="rounded-xl border px-3.5 py-2.5"
-                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-              >
-                <MaterialIcons name="arrow-back" size={18} color={tokens.text} />
-              </Pressable>
-            </Link>
-          }
-        />
-      </ScreenSection>
+  const commandContent = (
+    <>
+      {presentation === "overlay" && launchContext ? (
+        <CommandSection presentation={presentation} className="mb-4">
+          <LaunchContextCard launchContext={launchContext} />
+        </CommandSection>
+      ) : null}
 
-      <ScreenSection>
+      <CommandSection presentation={presentation}>
         <Card
           variant="header"
           accentColor={COMMAND_ACCENT}
@@ -562,18 +641,20 @@ export function CommandScreen() {
                 setIsParsing(false);
                 setSuccessResult(null);
               }}
-              placeholder="Add a todo to call mom tomorrow"
+              placeholder={commandPlaceholder}
               nativeID="command-input"
             />
 
-            <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <Text className="text-sm font-semibold text-slate-900">Supported examples</Text>
-              <Text className="mt-1 text-sm text-slate-600">
-                Create a habit to drink water every morning
-              </Text>
-              <Text className="mt-1 text-sm text-slate-600">
-                Add a todo to call mom tomorrow
-              </Text>
+            <View
+              className="rounded-xl border px-3 py-3"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+            >
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>Supported examples</Text>
+              {supportedExamples.map((example) => (
+                <Text key={example} className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  {example}
+                </Text>
+              ))}
             </View>
 
             <Button
@@ -584,10 +665,10 @@ export function CommandScreen() {
             />
           </View>
         </Card>
-      </ScreenSection>
+      </CommandSection>
 
       {parseResult?.outcome === "unsupported" ? (
-        <ScreenSection className="mb-0">
+        <CommandSection presentation={presentation} className="mb-0">
           <Card
             variant="header"
             accentColor={COMMAND_ACCENT}
@@ -595,13 +676,13 @@ export function CommandScreen() {
             headerSubtitle="Nothing has been saved yet."
             className="mb-0"
           >
-            <Text className="text-sm text-slate-600">{parseResult.reason}</Text>
+            <Text className="text-sm" style={{ color: tokens.textMuted }}>{parseResult.reason}</Text>
           </Card>
-        </ScreenSection>
+        </CommandSection>
       ) : null}
 
       {parseResult?.outcome === "unavailable" ? (
-        <ScreenSection className="mb-0">
+        <CommandSection presentation={presentation} className="mb-0">
           <Card
             variant="header"
             accentColor={COMMAND_ACCENT}
@@ -610,7 +691,7 @@ export function CommandScreen() {
             className="mb-0"
           >
             <View className="gap-3">
-              <Text className="text-sm text-slate-600">{parseResult.message}</Text>
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>{parseResult.message}</Text>
               <Button
                 label="Try again"
                 onPress={handleParseCommand}
@@ -619,11 +700,11 @@ export function CommandScreen() {
               />
             </View>
           </Card>
-        </ScreenSection>
+        </CommandSection>
       ) : null}
 
       {parsedDraft && editableDraft ? (
-        <ScreenSection className="mb-0">
+        <CommandSection presentation={presentation} className="mb-0">
           <DraftPreview
             parsedDraft={parsedDraft}
             editableDraft={editableDraft}
@@ -654,7 +735,13 @@ export function CommandScreen() {
               const trimmed = value.trim();
               setEditableDraft((current) =>
                 current?.kind === "create_todo"
-                  ? { ...current, fields: { ...current.fields, dueDate: trimmed.length > 0 ? trimmed : null } }
+                  ? {
+                      ...current,
+                      fields: {
+                        ...current.fields,
+                        dueDate: trimmed.length > 0 ? trimmed : null,
+                      },
+                    }
                   : current,
               );
               setExecutionError(null);
@@ -727,15 +814,47 @@ export function CommandScreen() {
             }}
             onConfirm={handleConfirm}
             onReset={handleReset}
+            onNavigateToDestination={(href) => {
+              router.push(href);
+              onRequestClose?.();
+            }}
           />
-        </ScreenSection>
+        </CommandSection>
       ) : null}
 
       {internalRolloutAvailable && internalRolloutEnabledOnDevice && parseObservation ? (
-        <ScreenSection className="mb-0">
+        <CommandSection presentation={presentation} className="mb-0">
           <InternalMetadataCard observation={parseObservation} />
-        </ScreenSection>
+        </CommandSection>
       ) : null}
+    </>
+  );
+
+  if (presentation === "overlay") {
+    return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
+  }
+
+  return (
+    <Screen scroll>
+      <ScreenSection>
+        <PageHeader
+          title="Command center"
+          subtitle="Internal route for the global command center. Review the draft, then confirm before anything is saved."
+          actions={
+            <Link href={OVERVIEW_HREF} asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Back to overview"
+                className="rounded-xl border px-3.5 py-2.5"
+                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+              >
+                <MaterialIcons name="arrow-back" size={18} color={tokens.text} />
+              </Pressable>
+            </Link>
+          }
+        />
+      </ScreenSection>
+      {commandContent}
     </Screen>
   );
 }

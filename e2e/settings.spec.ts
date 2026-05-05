@@ -20,7 +20,8 @@ test.describe("Settings backup restore", () => {
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await dismissStartupRestorePromptIfPresent(page);
 
-    await expect(page.getByText("Backup restore")).toBeVisible();
+    await expect(page.getByText("Backup status and restore")).toBeVisible();
+    await page.getByText("Current restore disclosures").scrollIntoViewIfNeeded();
     await expect(
       page.getByText("Habits restore definitions only. Habit completion history stays local-only."),
     ).toBeVisible();
@@ -37,7 +38,7 @@ test.describe("Settings backup restore", () => {
 
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByText("Backup restore")).toBeVisible();
+    await expect(page.getByText("Backup status and restore")).toBeVisible();
     await expect(
       page.getByText(
         "Restore is only available on an empty device in this phase. Existing active synced local rows block import.",

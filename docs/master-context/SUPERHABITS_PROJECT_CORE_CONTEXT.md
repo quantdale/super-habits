@@ -15,24 +15,36 @@ Primary product modules:
 - Workout
 - Calories
 
+Additional shipped utility surfaces:
+
+- `/settings`
+- retained `/command` page route for direct/internal command access
+
 ## What this app is
 
 SuperHabits is a local-first personal productivity system. SQLite is the source of truth. Optional Supabase integration exists as one-way remote backup sync, not full two-way sync.
 
 The app is beyond prototype stage: it has working features, a structured architecture, local persistence, optional cloud backup, a Vitest suite, Playwright E2E infrastructure, and web/native deployment setup. But some sync capabilities and some docs/config are still incomplete or drifting.
 
+Current shell reality to preserve:
+
+- `/` redirects to `/(tabs)/overview`
+- the command center is overlay-first on the six tab surfaces; `/command` remains a retained direct/internal page route
+- calories supports `Form` and `Diary` modes and remembers the last selected view
+- settings is organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal
+
 ## Tech stack
 
-- Expo 55
-- React
-- React Native
-- Expo Router
-- TypeScript
-- NativeWind + Tailwind
+- Expo `^55.0.8`
+- React `19.2.0`
+- React Native `0.83.4`
+- Expo Router `^55.0.7`
+- TypeScript `~5.9.2`
+- NativeWind `^4.2.3` + Tailwind
 - expo-sqlite
 - Supabase JS client
-- Vitest
-- Playwright
+- Vitest `^4.1.1`
+- Playwright `^1.58.2`
 - Vercel static deployment for web
 
 Important note:
@@ -93,6 +105,8 @@ Some repo docs mention newer React Native / TypeScript versions than what packag
 Exceptions:
 
 - `features/overview/` is dashboard-only
+- `features/settings/` is screen-only and rendered by `app/settings.tsx`
+- `features/command/` is an overlay-first command shell with a retained direct page route at `app/command.tsx`
 - `features/shared/` is for shared cross-feature UI
 - some features have nested screens, especially workout flows
 
@@ -149,6 +163,7 @@ Read-only dashboard aggregating major module summaries:
 - macro entry
 - automatic kcal calculation
 - saved meals
+- `Form` / `Diary` shells with remembered last-view preference
 - goal setting
 - charts
 - yearly history
@@ -230,9 +245,12 @@ If remote mode is disabled, listeners are skipped and the in-memory queue can gr
 
 ## Navigation
 
-- root route redirects to tabs
+- root route redirects to `/(tabs)/overview`
+- `app/_layout.tsx` wraps the shell, mounts `CommandCenterProvider`, and renders the global command-center host
 - `app/(tabs)/_layout.tsx` defines the custom top tab bar
 - route files are thin wrappers that render screen components
+- the command launcher appears on the six tab surfaces, opens a drawer on wide web and a bottom sheet elsewhere, and is hidden on `/settings`
+- `/command` still renders `CommandScreen` directly for Settings access, direct navigation, and internal testing
 
 Current tabs:
 
@@ -311,6 +329,13 @@ Web/PWA constraints:
 - `npm run e2e:report`
 - `npm run e2e:headed`
 - `npm run e2e:debug`
+
+Current verified quality baseline:
+
+- `npm run typecheck` passes
+- `npm test` passes with 340 tests in 32 files
+- `npm run build:web` passes
+- `npx playwright test --list` reports 87 tests in 13 spec files
 
 ## Known drift / caution areas
 

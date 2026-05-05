@@ -5,6 +5,10 @@ import { StatusBar } from "expo-status-bar";
 import { AppProviders } from "@/core/providers/AppProviders";
 import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { InAppNoticeBanner } from "@/core/ui/InAppNoticeBanner";
+import {
+  CommandCenterProvider,
+  GlobalCommandCenterHost,
+} from "@/features/command/CommandCenterProvider";
 
 export default function RootLayout() {
   return (
@@ -18,7 +22,7 @@ function ThemedRoot() {
   const { tokens } = useAppTheme();
 
   return (
-    <>
+    <CommandCenterProvider>
       <Head>
         <title>SuperHabits</title>
         <meta name="description" content="Master your day with offline-first habit tracking." />
@@ -30,7 +34,8 @@ function ThemedRoot() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="command" />
       </Stack>
+      <GlobalCommandCenterHost />
       <InAppNoticeBanner />
-    </>
+    </CommandCenterProvider>
   );
 }

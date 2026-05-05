@@ -8,20 +8,27 @@
 
 Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v11** → next migration: `if (version < 12)` in `core/db/client.ts`. Linked Actions and restore v1 are both live on `main`: linked actions ship real rules/events/executions storage plus habit/todo source entrypoints, and restore v1 ships startup/settings preview + empty-device import for a limited entity set.
 
+Current shell truth:
+- `/` redirects to `/(tabs)/overview`; top-level tabs are `overview`, `todos`, `habits`, `pomodoro`, `workout`, and `calories`.
+- `app/_layout.tsx` mounts the global command-center host; eligible tabs get a floating launcher, while `/command` remains a retained internal/direct-link page route.
+- The command launcher is hidden on `/settings` and suppressed during active pomodoro/workout sessions.
+- Calories supports `form` and `diary` modes and remembers the last selected mode in AsyncStorage (`superhabits.calories.viewMode`).
+- Settings is now a six-bucket IA: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
+
 ---
 
 ## 1. Core directory roles
 
 | Path | Role |
 |------|------|
-| **`app/`** | Expo Router only: root stack, index redirect, `command.tsx`, `settings.tsx`, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
+| **`app/`** | Expo Router only: root stack, index redirect, retained `command.tsx` / `settings.tsx`, command-center host wiring in `app/_layout.tsx`, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
 | **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **restore v1 coordinator + types** (`core/sync/restore.*`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), theme state (`core/providers/ThemeProvider.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
-| **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. Current screen-only exceptions are `features/overview/` and `features/settings/`; `features/command/` is an experimental utility route with `CommandScreen.tsx`, parsing/domain helpers, and an executor instead of a normal feature data file. |
+| **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. Current screen-only exceptions are `features/overview/` and `features/settings/`; `features/command/` is an experimental overlay-first shell with `CommandCenterProvider.tsx`, `CommandScreen.tsx`, parser/config helpers, and an executor instead of a normal feature data file. |
 | **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB. |
 | **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette). |
-| **`tests/`** | Vitest: `lib/`, `*.domain.ts`, validation, sync engine tests, Linked Actions tests, and selected data/DB tests (`calories.data`, `db.client`). |
+| **`tests/`** | Vitest: `lib/`, `*.domain.ts`, command parser/config/executor, linked actions, restore/settings preview flows, sync engine tests, and selected data/DB tests (`todos.data`, `habits.data`, `calories.data`, `pomodoro.data`, `workout.data`, `db.client`). |
 
-**Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
+**Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`, `13` spec files + helpers); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
 
 ---
 
@@ -112,7 +119,9 @@ Format: `{prefix}_{ms}_{rand8}` — not crypto-strong; local IDs only.
 | Feature CRUD + enqueue | `features/*/*.data.ts` |
 | Pure rules, streaks, formatting | `features/*/*.domain.ts` |
 | Screens & wiring | `features/*/*Screen.tsx` |
-| Experimental command shell | `features/command/*`, route `app/command.tsx`, overview entry card |
+| Global command-center shell | `features/command/*`, `app/_layout.tsx`, retained route `app/command.tsx` |
+| Calories view-mode preference | `features/calories/CaloriesScreen.tsx`, AsyncStorage key `superhabits.calories.viewMode` |
+| Settings IA buckets | `features/settings/SettingsScreen.tsx` |
 | IDs / date keys | `lib/id.ts`, `lib/time.ts` (`toDateKey` for YYYY-MM-DD) |
 | Form messages | `lib/validation.ts` |
 | Section colors | `constants/sectionColors.ts` |
