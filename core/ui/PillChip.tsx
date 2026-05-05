@@ -15,20 +15,28 @@ export function PillChip({ label, active, color, onPress, icon }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      className="mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[8px]"
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      className="mb-2 mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[8px]"
       style={
         active
           ? {
               backgroundColor: color,
               borderColor: color,
+              minHeight: 40,
             }
-          : { borderColor: tokens.border, backgroundColor: tokens.surface }
+          : {
+              borderColor: tokens.border,
+              backgroundColor: tokens.surfaceElevated,
+              minHeight: 40,
+            }
       }
     >
       {icon ? <Text className="text-[13px]">{icon}</Text> : null}
       <Text
-        className={`text-[13px] ${active ? "font-semibold text-white" : "font-medium"}`}
-        style={active ? undefined : { color: tokens.textMuted }}
+        className={`text-[13px] ${active ? "font-semibold" : "font-medium"}`}
+        style={active ? { color: tokens.textOnAccent } : { color: tokens.textMuted }}
       >
         {label}
       </Text>

@@ -15,8 +15,11 @@ export function SavedMealChips({ meals, onSelect }: Props) {
 
   return (
     <View className="mb-3">
-      <Text className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px] text-slate-400">
-        Recent meals
+      <Text
+        className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px]"
+        style={{ color: tokens.textMuted }}
+      >
+        Recent foods
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
         <View className="flex-row gap-2">
@@ -27,8 +30,12 @@ export function SavedMealChips({ meals, onSelect }: Props) {
               className="flex-row items-center gap-2 rounded-2xl border px-3 py-2.5"
               style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
             >
-              <Text className="text-sm font-medium text-slate-700">{meal.food_name}</Text>
-              <Text className="text-xs text-slate-400">{meal.calories} kcal</Text>
+              <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+                {meal.food_name}
+              </Text>
+              <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                {meal.calories} kcal
+              </Text>
             </Pressable>
           ))}
         </View>

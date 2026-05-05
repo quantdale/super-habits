@@ -7,7 +7,9 @@ import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
 import { PageHeader } from "@/core/ui/PageHeader";
 import { PillChip } from "@/core/ui/PillChip";
 import { ScreenSection } from "@/core/ui/ScreenSection";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
+import { useCommandLauncherSuppressed } from "@/features/command/CommandCenterProvider";
 import {
   listPomodoroSessionsForDateRange,
   logPomodoroSession,
@@ -57,6 +59,7 @@ function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
 }
 
 export function PomodoroScreen() {
+  const { tokens } = useAppTheme();
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
   const [currentMode, setCurrentMode] = useState<PomodoroMode>("focus");
   const [completedFocus, setCompletedFocus] = useState(0);
@@ -84,6 +87,7 @@ export function PomodoroScreen() {
   settingsRef.current = settings;
   totalSecondsRef.current = totalSeconds;
   startedAtRef.current = startedAt;
+  useCommandLauncherSuppressed("pomodoro-active-session", isRunning || isPaused);
 
   useEffect(() => {
     getPomodoroSettings().then((s) => {
@@ -360,12 +364,16 @@ export function PomodoroScreen() {
             className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}
             onPress={() => !isRunning && setShowSettings((v) => !v)}
             disabled={isRunning}
+            accessibilityRole="button"
+            accessibilityLabel={isRunning ? "Timer running" : "Edit timer duration"}
           >
             <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
               {minutes}:{seconds}
             </Text>
             {!isRunning ? (
-              <Text className="mt-0.5 text-center text-xs text-slate-400">tap to edit</Text>
+              <Text className="mt-0.5 text-center text-xs" style={{ color: tokens.textMuted }}>
+                tap to edit
+              </Text>
             ) : null}
           </Pressable>
         </View>
@@ -374,9 +382,8 @@ export function PomodoroScreen() {
           {Array.from({ length: settings.sessionsBeforeLongBreak }).map((_, i) => (
             <View
               key={i}
-              className={`h-2 w-2 rounded-full ${
-                i < completedFocus % settings.sessionsBeforeLongBreak ? "bg-focus" : "bg-slate-200"
-              }`}
+              className={`h-2 w-2 rounded-full ${i < completedFocus % settings.sessionsBeforeLongBreak ? "bg-focus" : ""}`}
+              style={i < completedFocus % settings.sessionsBeforeLongBreak ? undefined : { backgroundColor: tokens.border }}
             />
           ))}
         </View>
@@ -414,7 +421,7 @@ export function PomodoroScreen() {
         </View>
 
         {!isRunning && !isPaused && remaining === getModeDuration(currentMode, settings) ? (
-          <Text className="mt-3 text-center text-xs text-slate-400">
+          <Text className="mt-3 text-center text-xs" style={{ color: tokens.textMuted }}>
             Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
           </Text>
         ) : null}

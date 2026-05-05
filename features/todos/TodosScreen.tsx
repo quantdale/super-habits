@@ -28,6 +28,7 @@ import { ScreenSection } from "@/core/ui/ScreenSection";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
 import { PillChip } from "@/core/ui/PillChip";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { SECTION_COLORS } from "@/constants/sectionColors";
 import { toDateKey } from "@/lib/time";
 import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
@@ -53,7 +54,6 @@ import {
 
 const COLOR = SECTION_COLORS.todos;
 const COLOR_TEXT = "#1D4ED8";
-const MUTED_ICON = "#94a3b8";
 const TODO_LINKED_ACTION_SOURCE_KEY = "todo-linked-actions-source";
 const VIEW_MODE_OPTIONS: ReadonlyArray<{
   mode: TodoViewMode;
@@ -65,6 +65,7 @@ const VIEW_MODE_OPTIONS: ReadonlyArray<{
 ];
 
 export function TodosScreen() {
+  const { tokens } = useAppTheme();
   const { showNotice } = useInAppNotices();
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -317,8 +318,10 @@ export function TodosScreen() {
                     <MaterialIcons name="checklist" size={22} color={COLOR_TEXT} />
                   </View>
                   <View className="min-w-0 flex-1">
-                    <Text className="text-base font-semibold text-slate-900">Today&apos;s queue</Text>
-                    <Text className="mt-0.5 text-sm text-slate-500">
+                    <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                      Today&apos;s queue
+                    </Text>
+                    <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
                       {pendingTasks.length} pending, {completedTasks.length} completed
                     </Text>
                   </View>
@@ -329,14 +332,20 @@ export function TodosScreen() {
                       {pendingTasks.length} open
                     </Text>
                   </View>
-                  <View className="rounded-full bg-slate-100 px-3 py-1.5">
-                    <Text className="text-xs font-semibold text-slate-600">
+                  <View
+                    className="rounded-full px-3 py-1.5"
+                    style={{ backgroundColor: tokens.surfaceElevated }}
+                  >
+                    <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
                       {recurringTasksCount} daily
                     </Text>
                   </View>
                   {overdueTasksCount > 0 ? (
-                    <View className="rounded-full bg-rose-50 px-3 py-1.5">
-                      <Text className="text-xs font-semibold text-rose-600">
+                    <View
+                      className="rounded-full px-3 py-1.5"
+                      style={{ backgroundColor: tokens.dangerBackground }}
+                    >
+                      <Text className="text-xs font-semibold" style={{ color: tokens.dangerText }}>
                         {overdueTasksCount} overdue
                       </Text>
                     </View>
@@ -354,19 +363,22 @@ export function TodosScreen() {
 
           {!totallyEmpty ? (
             <ScreenSection className="min-h-0 mb-0 flex-1">
-                <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
-                  <View>
-                    <Text className="text-base font-semibold text-slate-900">Pending</Text>
-                    <Text className="mt-0.5 text-xs text-slate-500">
+              <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
+                <View>
+                  <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                    Pending
+                  </Text>
+                  <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
                       Swipe to edit or delete. Drag to reorder.
-                    </Text>
+                  </Text>
                 </View>
                 {hasCompleted ? (
                   <Pressable
                     onPress={() => setShowCompleted((v) => !v)}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-2.5"
+                    className="rounded-full border px-3 py-2.5"
+                    style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
                   >
-                    <Text className="text-xs font-semibold text-slate-600">
+                    <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
                       {showCompleted ? "Hide" : "Show"} completed ({completedTasks.length})
                     </Text>
                   </Pressable>
@@ -412,8 +424,10 @@ export function TodosScreen() {
                               className="mb-4 flex-row items-center justify-between gap-3 px-1"
                             >
                               <View>
-                                <Text className="text-base font-semibold text-slate-900">Completed</Text>
-                                <Text className="mt-0.5 text-xs text-slate-500">
+                                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                                  Completed
+                                </Text>
+                                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
                                   Completed tasks stay here until you toggle them back.
                                 </Text>
                               </View>
@@ -507,14 +521,15 @@ export function TodosScreen() {
             >
               <View
                 className={`h-5 w-5 items-center justify-center rounded border-2 ${
-                  isRecurring ? "border-todos bg-todos" : "border-slate-300"
+                  isRecurring ? "border-todos bg-todos" : ""
                 }`}
+                style={!isRecurring ? { borderColor: tokens.border, backgroundColor: tokens.surface } : undefined}
               >
                 {isRecurring ? (
-                  <Text className="text-xs font-bold text-white">↻</Text>
+                  <Text className="text-xs font-bold" style={{ color: tokens.textOnAccent }}>↻</Text>
                 ) : null}
               </View>
-              <Text className="text-sm text-slate-600">Repeat daily</Text>
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>Repeat daily</Text>
             </Pressable>
           ) : null}
           {Platform.OS === "web" ? (
@@ -533,7 +548,7 @@ export function TodosScreen() {
                 onPress={() => setShowDatePicker(true)}
                 className="mb-3 flex-row items-center gap-2 py-2"
               >
-                <Text className="text-sm text-slate-600">
+                <Text className="text-sm" style={{ color: tokens.textMuted }}>
                   {dueDate ? `Due: ${dueDate}` : "Add due date (optional)"}
                 </Text>
                 {dueDate ? (
@@ -616,10 +631,10 @@ export function TodosScreen() {
       onPress={openNewTodoModal}
       accessibilityRole="button"
       accessibilityLabel="Add task"
-      className="absolute bottom-6 right-4 z-10 h-14 w-14 items-center justify-center rounded-full bg-todos shadow-lg"
-      style={{ elevation: 4 }}
+      className="absolute bottom-24 right-4 z-10 h-14 w-14 items-center justify-center rounded-full shadow-lg"
+      style={{ backgroundColor: COLOR, elevation: 4, shadowColor: tokens.shadowColor }}
     >
-      <MaterialIcons name="add" size={28} color="#ffffff" />
+      <MaterialIcons name="add" size={28} color={tokens.textOnAccent} />
     </Pressable>
     </View>
   );

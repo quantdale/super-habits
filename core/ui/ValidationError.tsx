@@ -12,6 +12,7 @@ export function ValidationError({ message }: Props) {
   if (!message) return null;
   return (
     <View
+      accessibilityRole="alert"
       style={{
         backgroundColor: tokens.dangerBackground,
         borderRadius: 8,

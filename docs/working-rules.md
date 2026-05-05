@@ -40,6 +40,16 @@ If this file conflicts with current code, trust the code and document the confli
 - `*Screen.tsx` and feature components orchestrate and render UI; they do not open the DB directly.
 - `lib/` stays free of feature imports and DB access.
 
+## Current Product-Shell Facts
+
+### Confirmed from code
+- `/` redirects to `/(tabs)/overview`.
+- The command center is overlay-first now: `app/_layout.tsx` mounts a global launcher/host on the six tab surfaces, while `/command` remains a retained internal/direct-link page route.
+- The command launcher is hidden on `/settings` and is suppressed during active pomodoro/workout sessions.
+- Calories supports `Form` and `Diary` modes and remembers the last selected mode.
+- Settings keeps six buckets in this order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
+- Backup wording must stay conservative: push backup + restore v1 preview/import, not full two-way sync.
+
 ## Data and Sync Invariants
 
 ### Confirmed from code and docs
@@ -96,11 +106,11 @@ If this file conflicts with current code, trust the code and document the confli
 - Web/PWA behavior depends on OPFS-compatible isolation headers.
 
 ### Confirmed from code
-- Validation baseline on April 21, 2026:
+- Validation baseline on May 5, 2026:
   - `npm run typecheck` passes.
-- `npm test` passes with `326` tests.
+- `npm test` passes with `340` tests.
   - `npm run build:web` passes.
-  - `npx playwright test --list` reports `69` tests in `9` files.
+  - `npx playwright test --list` reports `87` tests in `13` spec files.
 
 ## Web / PWA Constraints
 

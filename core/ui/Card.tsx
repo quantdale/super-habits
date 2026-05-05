@@ -69,7 +69,7 @@ export function Card({
       backgroundColor: tokens.surface,
       borderColor: tokens.border,
       borderWidth: 1,
-      shadowColor: "#0f172a",
+      shadowColor: tokens.shadowColor,
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.05,
       shadowRadius: 14,

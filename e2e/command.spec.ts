@@ -13,15 +13,36 @@ const INTERNAL_REMOTE_BACKEND_CONFIGURED =
 
 async function openCommandScreen(page: Page) {
   await page.goto("/(tabs)/overview", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("Add with command", { exact: true })).toBeVisible({
+  const launcher = page.getByRole("button", { name: "Open command center" });
+  await expect(launcher).toBeVisible({
     timeout: 15_000,
   });
-  await page.getByText("Add with command", { exact: true }).locator("..").click({ force: true });
-  await expect(page.getByLabel("Command")).toBeVisible();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const launcherCount = await launcher.count();
+    for (let index = 0; index < launcherCount; index += 1) {
+      const candidate = launcher.nth(index);
+      if (await candidate.isVisible().catch(() => false)) {
+        try {
+          await candidate.click({ force: true });
+          break;
+        } catch {
+          continue;
+        }
+      }
+    }
+    try {
+      await expect(page.locator("#command-input")).toBeVisible({ timeout: 5_000 });
+      return;
+    } catch {
+      await page.waitForTimeout(250);
+    }
+  }
+
+  await expect(page.locator("#command-input")).toBeVisible({ timeout: 15_000 });
 }
 
 async function parseCommand(page: Page, rawText: string) {
-  await page.getByLabel("Command").fill(rawText);
+  await page.locator("#command-input").fill(rawText);
   await page.getByText("Parse command", { exact: true }).locator("..").click({ force: true });
 }
 
@@ -38,6 +59,58 @@ test.describe("Command shell", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/(tabs)/overview", { waitUntil: "domcontentloaded" });
     await clearDatabase(page);
+  });
+
+  test("shows the global launcher on main tabs, hides it on settings, and closes the overlay cleanly", async ({
+    page,
+  }) => {
+    const launcher = page.getByRole("button", { name: "Open command center" });
+    const visibleTabs = [
+      "/(tabs)/overview",
+      "/(tabs)/todos",
+      "/(tabs)/habits",
+      "/(tabs)/pomodoro",
+      "/(tabs)/workout",
+      "/(tabs)/calories",
+    ] as const;
+
+    for (const href of visibleTabs) {
+      await page.goto(href, { waitUntil: "domcontentloaded" });
+      await expect(launcher).toBeVisible();
+    }
+
+    await page.goto("/settings", { waitUntil: "domcontentloaded" });
+    await expect(launcher).toHaveCount(0);
+
+    await openCommandScreen(page);
+    await expect(page.getByText("Command center", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close" }).click({ force: true });
+    await expect(page.locator("#command-input")).toBeHidden();
+    await expect(launcher).toBeVisible();
+  });
+
+  test("hides the launcher during an active pomodoro session and restores it after reset", async ({
+    page,
+  }) => {
+    const launcher = page.getByRole("button", { name: "Open command center" });
+    const startButton = page.getByText("Start focus", { exact: true });
+    const pauseButton = page.getByText("Pause", { exact: true });
+
+    await page.goto("/(tabs)/pomodoro", { waitUntil: "domcontentloaded" });
+    await expect(launcher).toBeVisible();
+
+    await startButton.click({ force: true });
+    try {
+      await expect(pauseButton).toBeEnabled({ timeout: 3_000 });
+    } catch {
+      await startButton.click({ force: true });
+      await expect(pauseButton).toBeEnabled({ timeout: 3_000 });
+    }
+    await expect(launcher).toHaveCount(0);
+
+    await page.getByText("Reset", { exact: true }).click({ force: true });
+    await expect(page.getByText("Start focus", { exact: true })).toBeVisible();
+    await expect(launcher).toBeVisible();
   });
 
   test("parses todo, allows inline edits, and saves edited values on confirm", async ({ page }) => {

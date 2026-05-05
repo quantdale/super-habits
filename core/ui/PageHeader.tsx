@@ -14,7 +14,7 @@ export function PageHeader({ title, subtitle, actions, className }: PageHeaderPr
 
   return (
     <View
-      className={["flex-row items-start justify-between gap-4", className].filter(Boolean).join(" ")}
+      className={["flex-row flex-wrap items-start justify-between gap-4", className].filter(Boolean).join(" ")}
     >
       <View className="min-w-0 flex-1">
         <Text className="text-2xl font-bold leading-tight" style={{ color: tokens.text }}>
@@ -26,7 +26,7 @@ export function PageHeader({ title, subtitle, actions, className }: PageHeaderPr
           </Text>
         ) : null}
       </View>
-      {actions ? <View className="shrink-0 flex-row items-center gap-2 pt-0.5">{actions}</View> : null}
+      {actions ? <View className="shrink-0 flex-row flex-wrap items-center justify-end gap-2 pt-0.5">{actions}</View> : null}
     </View>
   );
 }

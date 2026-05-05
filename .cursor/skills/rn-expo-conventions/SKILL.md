@@ -10,9 +10,10 @@ Apply this when writing any UI, navigation, or platform-specific code.
 ## Routing (expo-router v55)
 - File-based routing: app/ directory mirrors URL structure
 - Tab routes: app/(tabs)/{name}.tsx
-- Root layout: app/_layout.tsx — wraps everything in AppProviders
+- Root layout: app/_layout.tsx — wraps everything in AppProviders and mounts the global command-center host
 - Tabs layout: app/(tabs)/_layout.tsx — defines 6 tab items including Overview
 - Non-tab utility routes: app/command.tsx and app/settings.tsx
+- Primary command-center entry is the global overlay launcher on the six tab surfaces; `/command` remains the retained direct/internal page route
 - Navigation: use expo-router's <Link> or router.push(), never React Navigation directly
 - Tab names and hrefs defined in (tabs)/_layout.tsx
 
@@ -76,13 +77,13 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - All DB entity types in core/db/types.ts
 - No any types — use unknown and narrow, or add proper types
 
-## Testing (Vitest v3)
+## Testing (Vitest v4)
 - Config: vitest.config.ts (node environment, @/ alias)
 - Test files: tests/ directory
 - Run: npm test
-- Only pure function tests (no DB, no component rendering yet)
+- Current suite covers domain logic plus command parser/config, data-layer contracts, restore flows, linked actions, and selected provider/DB behavior
 - Every new domain function needs a test
-- Current count: 334 tests passing — update whenever tests are added or removed
+- Current count: 340 tests passing — update whenever tests are added or removed
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)

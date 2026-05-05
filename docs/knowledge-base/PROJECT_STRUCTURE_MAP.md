@@ -8,11 +8,11 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 | Path | Responsibility | Key files |
 |------|----------------|-----------|
-| `app/` | Expo Router entry, stacks, tab shell, thin tab routes | `app/_layout.tsx`, `app/index.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/*.tsx` |
-| `features/` | Feature modules with data/domain/screen layering | `features/{feature}/{feature}.data.ts`, `features/{feature}/{feature}.domain.ts`, `features/{feature}/{Feature}Screen.tsx` |
+| `app/` | Expo Router entry, stacks, tab shell, thin tab routes, command-center host wiring | `app/_layout.tsx`, `app/index.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/*.tsx`, `app/command.tsx`, `app/settings.tsx` |
+| `features/` | Feature modules with data/domain/screen layering plus the overlay-first command shell | `features/{feature}/{feature}.data.ts`, `features/{feature}/{feature}.domain.ts`, `features/{feature}/{Feature}Screen.tsx`, `features/command/*` |
 | `core/` | Shared infra: DB, sync, auth bootstrap, providers, UI primitives | `core/db/client.ts`, `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/providers/AppProviders.tsx`, `core/auth/guestProfile.ts`, `core/pwa/registerServiceWorker.ts`, `core/ui/*` |
 | `lib/` | Pure helpers and platform utilities | `lib/id.ts`, `lib/time.ts`, `lib/validation.ts`, `lib/supabase.ts`, `lib/useForegroundRefresh.ts`, `lib/notifications.ts` |
-| `tests/` | Unit coverage for domain, sync engine, and selected data/db logic | `tests/*.test.ts` (including `sync.engine`, `db.client`, `calories.data`) |
+| `tests/` | Unit coverage for domain, command parsing/config, restore, linked actions, and selected data/db logic | `tests/*.test.ts` (including `sync.engine`, `db.client`, `calories.data`, `commandParser.facade`) |
 
 ---
 
@@ -28,9 +28,25 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 ## Routing and navigation
 
-- Root provider wrapper: `app/_layout.tsx`
+- Root provider wrapper + global command-center host: `app/_layout.tsx`
 - Top tab UI + swipe navigation: `app/(tabs)/_layout.tsx`
 - Thin route wrappers: `app/(tabs)/overview.tsx`, `todos.tsx`, `habits.tsx`, `pomodoro.tsx`, `workout.tsx`, `calories.tsx`
+- Utility routes: `app/settings.tsx`, retained `app/command.tsx`
+- `/` redirects to `/(tabs)/overview`
+- Command launcher shows on the six tab surfaces, opens as a drawer on wide web and a bottom sheet elsewhere, and stays hidden on `/settings`
+
+## Current product-shell facts
+
+- Calories supports `Form` and `Diary` modes and remembers the last selected view through AsyncStorage.
+- Settings currently uses six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
+- Supabase remains backup-oriented: push sync plus restore v1 preview/import, not full two-way sync.
+
+## Quality baseline
+
+- `npm test`: 340 tests in 32 files
+- `npx playwright test --list`: 87 tests in 13 spec files
+- Runtime schema version: 11
+- Next migration slot: `if (version < 12)`
 
 ---
 

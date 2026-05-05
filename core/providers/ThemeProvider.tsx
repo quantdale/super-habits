@@ -24,9 +24,19 @@ type ThemeTokens = {
   text: string;
   textMuted: string;
   iconMuted: string;
+  textOnAccent: string;
+  shadowColor: string;
+  overlayScrim: string;
   dangerBackground: string;
   dangerBorder: string;
   dangerText: string;
+  dangerSolid: string;
+  warningBackground: string;
+  warningBorder: string;
+  warningText: string;
+  successBackground: string;
+  successBorder: string;
+  successText: string;
   statusBarStyle: "light" | "dark";
   webThemeColor: string;
 };
@@ -43,9 +53,19 @@ const LIGHT_TOKENS: ThemeTokens = {
   text: "#0f172a",
   textMuted: "#64748b",
   iconMuted: "#94a3b8",
+  textOnAccent: "#ffffff",
+  shadowColor: "#0f172a",
+  overlayScrim: "rgba(15, 23, 42, 0.5)",
   dangerBackground: "#fef2f2",
   dangerBorder: "#fecaca",
-  dangerText: "#dc2626",
+  dangerText: "#b91c1c",
+  dangerSolid: "#dc2626",
+  warningBackground: "#fffbeb",
+  warningBorder: "#fcd34d",
+  warningText: "#92400e",
+  successBackground: "#ecfdf5",
+  successBorder: "#bbf7d0",
+  successText: "#166534",
   statusBarStyle: "dark",
   webThemeColor: "#8B5CF6",
 };
@@ -60,9 +80,19 @@ const DARK_TOKENS: ThemeTokens = {
   text: "#e2e8f0",
   textMuted: "#a6b0c2",
   iconMuted: "#94a3b8",
+  textOnAccent: "#f8fafc",
+  shadowColor: "#020617",
+  overlayScrim: "rgba(2, 6, 23, 0.76)",
   dangerBackground: "#3f1d24",
   dangerBorder: "#7f1d1d",
-  dangerText: "#fca5a5",
+  dangerText: "#fecaca",
+  dangerSolid: "#b91c1c",
+  warningBackground: "#3a2a10",
+  warningBorder: "#8a5a13",
+  warningText: "#fde68a",
+  successBackground: "#163223",
+  successBorder: "#166534",
+  successText: "#bbf7d0",
   statusBarStyle: "light",
   webThemeColor: "#0f1221",
 };

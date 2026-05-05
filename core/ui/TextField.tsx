@@ -42,8 +42,13 @@ export function TextField({
       <TextInput
         nativeID={nativeID}
         accessibilityLabel={accessibilityLabelProp ?? label}
-        className="rounded-2xl border px-4 py-3"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated, color: tokens.text }}
+        className="rounded-2xl border px-4 py-3 text-base"
+        style={{
+          minHeight: 48,
+          borderColor: tokens.border,
+          backgroundColor: tokens.surfaceElevated,
+          color: tokens.text,
+        }}
         value={value}
         onChangeText={handleChangeText}
         placeholder={placeholder}

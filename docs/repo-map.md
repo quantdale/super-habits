@@ -16,9 +16,9 @@ Use with:
 
 ## App Shell and Routing
 
-- `app/_layout.tsx` - root providers and stack
+- `app/_layout.tsx` - root providers, retained `/command` stack route, global command-center host, in-app notices
 - `app/index.tsx` - root redirect to overview
-- `app/command.tsx` - thin quick-command route wrapper
+- `app/command.tsx` - thin retained direct/internal command route wrapper
 - `app/settings.tsx` - thin settings route wrapper
 - `app/(tabs)/_layout.tsx` - custom top tabs and swipe navigation
 - `app/(tabs)/*.tsx` - thin route wrappers
@@ -88,6 +88,7 @@ Use with:
 
 ### Calories
 - `features/calories/CaloriesScreen.tsx`
+- `features/calories/CaloriesEntryFields.tsx`
 - `features/calories/calories.data.ts`
 - `features/calories/calories.domain.ts`
 
@@ -95,10 +96,16 @@ Use with:
 - `features/settings/SettingsScreen.tsx`
 
 ### Command
+- `features/command/CommandCenterProvider.tsx`
 - `features/command/CommandScreen.tsx`
+- `features/command/commandCenterConfig.ts`
+- `features/command/commandConfig.ts`
 - `features/command/command.domain.ts`
 - `features/command/command.executor.ts`
+- `features/command/commandInternalRollout.ts`
+- `features/command/commandParser.ts`
 - `features/command/mockCommandParser.ts`
+- `features/command/realCommandParser.ts`
 
 ### Cross-feature visuals
 - `features/shared/GitHubHeatmap.tsx`

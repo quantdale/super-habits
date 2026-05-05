@@ -4,8 +4,10 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { RectButton } from "react-native-gesture-handler";
 import { Screen } from "@/core/ui/Screen";
 import { Card } from "@/core/ui/Card";
+import { useCommandLauncherSuppressed } from "@/features/command/CommandCenterProvider";
 import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
 import { PageHeader } from "@/core/ui/PageHeader";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { ScreenSection } from "@/core/ui/ScreenSection";
 import { TextField } from "@/core/ui/TextField";
 import { Button } from "@/core/ui/Button";
@@ -58,6 +60,7 @@ function RoutineSwipeRow({
   onRequestDelete: () => void | Promise<void>;
   accentColor: string;
 }) {
+  const { tokens } = useAppTheme();
   return (
     <SwipeableCard
       accentColor={accentColor}
@@ -66,9 +69,13 @@ function RoutineSwipeRow({
       onDelete={onRequestDelete}
     >
       <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
-        <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
+        <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+          {routine.name}
+        </Text>
         {routine.description ? (
-          <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
+          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            {routine.description}
+          </Text>
         ) : null}
       </RectButton>
       <View className="mt-4">
@@ -79,6 +86,7 @@ function RoutineSwipeRow({
 }
 
 export function WorkoutScreen() {
+  const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -88,6 +96,7 @@ export function WorkoutScreen() {
   const [currentView, setCurrentView] = useState<ViewState>({ type: "list" });
   const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  useCommandLauncherSuppressed("workout-session-active", currentView.type === "session");
 
   const refresh = useCallback(async () => {
     const r = await listRoutines();
@@ -238,7 +247,7 @@ export function WorkoutScreen() {
             accentColor={COLOR}
             headerTitle="Add new routine"
             headerSubtitle="Keep names short and descriptions specific so routines stay scannable."
-            headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
+            headerRight={<MaterialIcons name="add" size={22} color={tokens.textOnAccent} />}
             className="mb-0"
           >
             <TextField
@@ -267,8 +276,10 @@ export function WorkoutScreen() {
         {routines.length > 0 ? (
           <ScreenSection>
             <View className="mb-4 mt-1">
-              <Text className="text-base font-semibold text-slate-900">Your routines</Text>
-              <Text className="mt-1 text-sm text-slate-500">
+              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                Your routines
+              </Text>
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
                 Swipe to edit or delete. Open a routine to manage exercises and sets.
               </Text>
             </View>
@@ -299,7 +310,7 @@ export function WorkoutScreen() {
             accentColor={COLOR}
             headerTitle="Workout history"
             headerSubtitle="Session intensity over the last 52 weeks."
-            headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+            headerRight={<MaterialIcons name="insights" size={22} color={tokens.textOnAccent} />}
             className="mb-0"
           >
             <View className="w-full min-w-0 items-center justify-center">

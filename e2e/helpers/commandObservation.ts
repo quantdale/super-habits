@@ -13,11 +13,32 @@ export async function clickLabeledAction(page: Page, label: string) {
 
 export async function openCommandScreen(page: Page) {
   await page.goto("/(tabs)/overview", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("Add with command", { exact: true })).toBeVisible({
+  const launcher = page.getByRole("button", { name: "Open command center" });
+  await expect(launcher).toBeVisible({
     timeout: 15_000,
   });
-  await page.getByText("Add with command", { exact: true }).locator("..").click({ force: true });
-  await expect(page.getByLabel("Command")).toBeVisible();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const launcherCount = await launcher.count();
+    for (let index = 0; index < launcherCount; index += 1) {
+      const candidate = launcher.nth(index);
+      if (await candidate.isVisible().catch(() => false)) {
+        try {
+          await candidate.click({ force: true });
+          break;
+        } catch {
+          continue;
+        }
+      }
+    }
+    try {
+      await expect(page.locator("#command-input")).toBeVisible({ timeout: 5_000 });
+      return;
+    } catch {
+      await page.waitForTimeout(250);
+    }
+  }
+
+  await expect(page.locator("#command-input")).toBeVisible({ timeout: 15_000 });
 }
 
 export async function openSettingsScreen(page: Page) {

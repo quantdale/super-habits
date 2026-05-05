@@ -49,7 +49,7 @@ export function SwipeableCard({ children, accentColor, style, compact, onEdit, o
         ref={swipeableRef}
         renderRightActions={() => (
           <SwipeRightActions
-            editColor={accentColor ?? "#64748b"}
+            editColor={accentColor ?? tokens.textMuted}
             onEdit={handleEdit}
             onDelete={handleDelete}
             compact={compact}

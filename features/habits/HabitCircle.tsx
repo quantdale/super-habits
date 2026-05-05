@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useAppTheme } from "@/core/providers/ThemeProvider";
 import type { Habit } from "./types";
 import { calculateHabitProgress } from "@/features/habits/habits.domain";
 import { ProgressRing } from "@/features/habits/ProgressRing";
@@ -19,7 +20,6 @@ type HabitCircleProps = {
 };
 
 const DEFAULT_SIZE = 56;
-const DEFAULT_BG_COLOR = "#f1f5f9";
 
 export function HabitCircle({
   habit,
@@ -31,9 +31,10 @@ export function HabitCircle({
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
+  const { tokens } = useAppTheme();
   const progress = calculateHabitProgress(todayCount, habit.target_per_day);
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
-  const habitColor = habit.color ?? "#64748b";
+  const habitColor = habit.color ?? tokens.textMuted;
   const iconTint = `${habitColor}18`;
 
   const strokeWidth = Math.max(3, Math.round(size / 14));
@@ -62,7 +63,7 @@ export function HabitCircle({
             size={ringSize}
             strokeWidth={strokeWidth}
             progress={progress}
-            backgroundColor="#e2e8f0"
+            backgroundColor={tokens.border}
             progressColor={habitColor}
           />
         </View>
@@ -74,7 +75,7 @@ export function HabitCircle({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: iconTint || DEFAULT_BG_COLOR,
+            backgroundColor: iconTint,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -89,7 +90,8 @@ export function HabitCircle({
       )}
       {showName ? (
         <Text
-          className="mt-2 text-center text-xs font-medium leading-4 text-slate-700"
+          className="mt-2 text-center text-xs font-medium leading-4"
+          style={{ color: tokens.text }}
           numberOfLines={2}
         >
           {habit.name}

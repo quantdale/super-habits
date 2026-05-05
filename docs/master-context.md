@@ -27,8 +27,11 @@ Companion docs in this folder:
 - App shell is an Expo Router app with a root stack and a custom top-tab layout.
 - Product modules in active use: Overview, Todos, Habits, Pomodoro/Focus, Workout, Calories.
 - Additional active utility routes: `/command` for the experimental quick-command shell and `/settings` for theme plus backup restore status.
+- The primary command-center UX is no longer page-first: `app/_layout.tsx` mounts a global launcher/overlay host across the tab routes, while `/command` remains a retained internal/direct-link page route.
 - The command shell is limited to single-action drafting for `create_todo` and `create_habit`, with parse -> review -> confirm flow rather than assistant chat.
 - Command parser mode defaults to `mock`; optional model-backed parsing uses `remote_with_fallback`, but internal rollout now requires both an internal-capable build flag and a device-local tester opt-in before remote parsing is attempted.
+- Calories supports `Form` and `Diary` modes, and the last selected mode is remembered in AsyncStorage.
+- Settings is now organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal.
 
 ### Confirmed from docs
 - SuperHabits is positioned as an offline-first productivity app for web, iOS, and Android.
@@ -80,12 +83,12 @@ Companion docs in this folder:
 - React `19.2.0`
 - React Native `0.83.4`
 - TypeScript `~5.9.2`
-- Expo Router
-- NativeWind 4 + Tailwind config
+- Expo Router `^55.0.7`
+- NativeWind `^4.2.3` + Tailwind config
 - `expo-sqlite`
 - Supabase JS client
-- React Query 5 provider installed
-- Playwright and Vitest for testing
+- React Query `^5.95.2` provider installed
+- Playwright `^1.58.2` and Vitest `^4.1.1` for testing
 - Vercel static deployment config for web
 
 ### Confirmed from docs
@@ -167,9 +170,12 @@ Companion docs in this folder:
 
 ### Confirmed from code
 - Root redirect sends `/` to `/(tabs)/overview`.
+- `app/_layout.tsx` wraps the shell in `CommandCenterProvider`, renders a stack with `(tabs)` plus the retained `command` route, and mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`.
 - `app/(tabs)/_layout.tsx` defines a custom top tab bar and swipe navigation between tabs.
 - Tab routes are thin wrappers such as `app/(tabs)/todos.tsx` -> `<TodosScreen />`.
-- `app/command.tsx` is a thin non-tab route that renders `CommandScreen`.
+- The command launcher appears on Overview, Todos, Habits, Pomodoro, Workout, and Calories when the experiment flag is enabled; it opens a drawer on wide web and a bottom sheet elsewhere.
+- The command launcher is hidden on `/settings` and is suppressed during active pomodoro/workout sessions.
+- `app/command.tsx` is a thin non-tab route that renders `CommandScreen`; it is retained for direct access, internal testing, and the Settings entry point.
 - `app/settings.tsx` is a thin non-tab route that renders `SettingsScreen`.
 - Current tabs: Overview, Todos, Habits, Pomodoro, Workout, Calories.
 
@@ -270,9 +276,9 @@ Companion docs in this folder:
 | Habits | Create/edit/delete, time-of-day grouping, icon/color presets, increment/decrement counts, streaks, yearly consistency view |
 | Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history |
 | Workout | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history |
-| Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history |
-| Settings | Theme mode selection plus backup restore preview/actions and shipped-scope summaries |
-| Command | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; default parser mode is `mock`, optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
+| Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference |
+| Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls |
+| Command | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the primary entry is a global overlay launcher on the six tab surfaces, while `/command` remains the retained page route. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
 
 ## Domain Concepts and Glossary
 
@@ -324,11 +330,11 @@ Companion docs in this folder:
 - `npm run e2e:headed`
 - `npm run e2e:debug`
 
-### Confirmed from code on April 21, 2026
+### Confirmed from code on May 5, 2026
 - `npm run typecheck`: passes.
-- `npm test`: passes with `334` tests.
+- `npm test`: passes with `340` tests.
 - `npm run build:web`: passes.
-- `npx playwright test --list`: reports `71` tests in `9` files.
+- `npx playwright test --list`: reports `87` tests in `13` spec files.
 
 ### Confirmed from code
 - No lint script or lint config was found.

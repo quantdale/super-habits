@@ -100,6 +100,14 @@ Known intentional exceptions exist for some non-synced or special tables such as
 - keep route files thin
 - screen files orchestrate only; do not bury persistence logic in UI
 
+Current shell facts that should not be regressed accidentally:
+
+- the command center is overlay-first on Overview, Todos, Habits, Pomodoro, Workout, and Calories; `/command` remains the retained page route
+- the command flow is still command-first and limited to `create_todo` / `create_habit`, not general assistant chat
+- calories supports `Form` and `Diary` modes and remembers the last selected view
+- settings keeps six buckets in order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal
+- backup wording stays conservative: push backup plus restore v1 preview/import, not full two-way sync
+
 ## Migration rules
 
 When schema changes are required:
@@ -126,11 +134,14 @@ After meaningful changes:
 
 - run `npm run typecheck`
 - run `npm test`
+- keep the current Vitest baseline honest: 340 tests passing unless the suite changes
 
 If web UI or behavior changed:
 
 - rebuild static web when needed
 - run E2E path as appropriate
+
+Current Playwright inventory baseline is 87 tests across 13 spec files.
 
 When business logic changes:
 

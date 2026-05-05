@@ -16,6 +16,12 @@ Target: Web (PWA), iOS, Android.
 Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
 Current stored schema version: **11** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 12) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
+Current product-shell facts to preserve:
+- The command center is overlay-first on the six tab surfaces; `/command` remains the retained direct/internal page route.
+- Calories supports `Form` and `Diary` modes and remembers the last selected view.
+- Settings is organized into six sections: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
+- Remote backup wording must stay conservative: push backup plus restore v1 preview/import, not full two-way sync.
+
 ## Non-negotiable invariants — violating these causes silent data corruption
 
 1. SOFT DELETE ONLY
@@ -94,8 +100,8 @@ The following are installed but intentionally unused:
 - Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 334 tests passing — **update this count whenever tests are added or removed**
-- No DB or component tests yet — do not block on this, but document gaps
+- Current count: 340 tests passing — **update this count whenever tests are added or removed**
+- Data/DB, restore, linked-actions, and provider-model tests already exist. Component rendering tests are still limited — document that gap honestly instead of describing the suite as domain-only.
 
 ## E2E Tests (Playwright)
 
@@ -108,6 +114,11 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - `e2e/pomodoro.spec.ts` — Pomodoro feature
 - `e2e/workout.spec.ts` — Workout feature
 - `e2e/calories.spec.ts` — Calories feature
+- `e2e/settings.spec.ts` — Settings backup/restore surface
+- `e2e/command.spec.ts` — Command-center launcher and confirm-before-write flow
+- `e2e/command.eval.mock.spec.ts` / `e2e/command.eval.internal.spec.ts` — command draft quality/evaluation coverage
+- `e2e/command.observation.mock.spec.ts` / `e2e/command.observation.internal.spec.ts` — command observation/fallback coverage
+- `e2e/boundary.spec.ts` — cross-feature boundary and regression cases
 - `e2e/infrastructure.spec.ts` — Headers, SW, OPFS, DB init
 
 **Config:** `playwright.config.ts`

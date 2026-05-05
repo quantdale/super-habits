@@ -21,6 +21,9 @@ export function NumberStepperField({
   const { tokens } = useAppTheme();
   const num = Number(value);
   const validNum = Number.isFinite(num) ? num : min;
+  const handleChangeText = (nextValue: string) => {
+    onChange(nextValue.replace(/\D/g, ""));
+  };
 
   const handleMinus = () => {
     onChange(String(Math.max(min, validNum - 1)));
@@ -37,15 +40,17 @@ export function NumberStepperField({
         <Pressable
           onPress={handleMinus}
           className="items-center justify-center rounded-l-2xl border border-r-0"
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${label}`}
           style={{ minWidth: 48, height: 48, borderColor: tokens.border, backgroundColor: tokens.surface }}
         >
           <Text className="text-lg font-semibold" style={{ color: tokens.textMuted }}>−</Text>
         </Pressable>
         <TextInput
-          className="flex-1 border px-3 py-2 text-center"
+          className="flex-1 border px-3 py-2 text-center text-base"
           style={{ height: 48, borderColor: tokens.border, backgroundColor: tokens.surfaceElevated, color: tokens.text }}
           value={value}
-          onChangeText={onChange}
+          onChangeText={handleChangeText}
           placeholder={placeholder}
           placeholderTextColor={tokens.textMuted}
           keyboardType="numeric"
@@ -53,6 +58,8 @@ export function NumberStepperField({
         <Pressable
           onPress={handlePlus}
           className="items-center justify-center rounded-r-2xl border border-l-0"
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${label}`}
           style={{ minWidth: 48, height: 48, borderColor: tokens.border, backgroundColor: tokens.surface }}
         >
           <Text className="text-lg font-semibold" style={{ color: tokens.textMuted }}>+</Text>

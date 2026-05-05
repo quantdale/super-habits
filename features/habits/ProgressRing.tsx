@@ -5,16 +5,16 @@ type ProgressRingProps = {
   size: number;
   strokeWidth: number;
   progress: number; // 0 to 1
-  backgroundColor?: string;
-  progressColor?: string;
+  backgroundColor: string;
+  progressColor: string;
 };
 
 export function ProgressRing({
   size,
   strokeWidth,
   progress,
-  backgroundColor = "#e2e8f0",
-  progressColor = "#94a3b8",
+  backgroundColor,
+  progressColor,
 }: ProgressRingProps) {
   const radius = size / 2 - strokeWidth / 2;
   const circumference = 2 * Math.PI * radius;

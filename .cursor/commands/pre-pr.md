@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-Expected: **334** tests passing, 0 failing
+Expected: **340** tests passing, 0 failing
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -49,6 +49,7 @@ SCREENSHOT OUTPUT FOLDER: .cursor/playwright-output/
 Save ALL browser_take_screenshot calls to this folder.
 Use these exact filenames:
   pre-pr-initial-load.png
+  pre-pr-overview.png
   pre-pr-todos.png
   pre-pr-habits.png
   pre-pr-pomodoro.png
@@ -93,12 +94,13 @@ still present — user should clear site data and reload.
 If `superhabits-shell-v3` missing: SW may not have activated yet —
 reload once and re-check.
 
-### 2c — All 5 feature tabs
+### 2c — All 6 tab surfaces
 
 Navigate to each URL. Take a screenshot → save as the path in the table. Check for blank/error state.
 
 | URL | Expected | Screenshot | Status |
 |-----|----------|------------|--------|
+| `http://localhost:8081/(tabs)/overview` | Overview screen renders | `.cursor/playwright-output/pre-pr-overview.png` | ? |
 | `http://localhost:8081/(tabs)/todos` | Todos screen renders | `.cursor/playwright-output/pre-pr-todos.png` | ? |
 | `http://localhost:8081/(tabs)/habits` | Habits screen renders | `.cursor/playwright-output/pre-pr-habits.png` | ? |
 | `http://localhost:8081/(tabs)/pomodoro` | Pomodoro screen renders | `.cursor/playwright-output/pre-pr-pomodoro.png` | ? |
@@ -159,12 +161,13 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 334 passing | ? | PASS/FAIL |
+| Tests | 340 passing | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
 | Cache name | superhabits-shell-v3 | ? | PASS/FAIL |
 | DB init error | none | ? | PASS/FAIL |
+| Overview screen | renders | ? | PASS/FAIL |
 | Todos screen | renders | ? | PASS/FAIL |
 | Habits screen | renders | ? | PASS/FAIL |
 | Pomodoro screen | renders | ? | PASS/FAIL |
