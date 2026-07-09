@@ -234,7 +234,6 @@ npm test             # vitest run
 
 # Web build / deploy
 npm run build:web    # npx expo export -p web → dist/
-npm run deploy:web   # npx expo export --platform web
 
 # E2E (requires dist/ to be up to date)
 npm run e2e          # playwright test
