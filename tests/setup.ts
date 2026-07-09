@@ -4,6 +4,16 @@ vi.mock("react-native", () => ({
   Platform: { OS: "ios", select: (obj: Record<string, unknown>) => obj["ios"] ?? obj["default"] },
 }));
 
+vi.mock("expo-crypto", () => ({
+  getRandomValues: vi.fn((array: Uint8Array) => {
+    for (let i = 0; i < array.length; i++) {
+      // Deterministic but non-repeating enough for test IDs
+      array[i] = (i * 17 + 31) % 256;
+    }
+    return array;
+  }),
+}));
+
 vi.mock("expo-notifications", () => ({
   setNotificationHandler: vi.fn(),
   getPermissionsAsync: vi.fn().mockResolvedValue({ status: "denied" }),
