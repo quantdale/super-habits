@@ -10,20 +10,29 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * Idempotent; must run before any notification is scheduled. Previously this
+ * only happened on the permission-request path, so devices where permission
+ * was already granted (e.g. Android <13 with no runtime prompt) never got a
+ * channel and HIGH-importance delivery was not guaranteed.
+ */
+async function ensureAndroidNotificationChannel(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync("default", {
+    name: "default",
+    importance: Notifications.AndroidImportance.HIGH,
+  });
+}
+
 export async function ensureNotificationPermission(): Promise<boolean> {
+  await ensureAndroidNotificationChannel();
+
   const { status } = await Notifications.getPermissionsAsync();
   if (status === "granted") {
     return true;
   }
 
   const request = await Notifications.requestPermissionsAsync();
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-  }
-
   return request.status === "granted";
 }
 
