@@ -240,7 +240,7 @@ export async function addSet(input: {
   restSeconds: number;
 }): Promise<string> {
   const timingErr = validateSetTiming(input.activeSeconds, input.restSeconds);
-  if (timingErr) return "";
+  if (timingErr) throw new Error(timingErr);
   const db = await getDatabase();
   const id = createId("eset");
   const now = nowIso();
@@ -291,7 +291,7 @@ export async function updateSet(
   const nextActive = updates.activeSeconds ?? row.active_seconds;
   const nextRest = updates.restSeconds ?? row.rest_seconds;
   const timingErr = validateSetTiming(nextActive, nextRest);
-  if (timingErr) return;
+  if (timingErr) throw new Error(timingErr);
 
   const now = nowIso();
   if (updates.activeSeconds !== undefined) {

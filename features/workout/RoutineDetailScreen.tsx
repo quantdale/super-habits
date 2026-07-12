@@ -171,7 +171,14 @@ export function RoutineDetailModal({
                               return;
                             }
                             setWorkoutError(null);
-                            await updateSet(set.id, { activeSeconds: next });
+                            try {
+                              await updateSet(set.id, { activeSeconds: next });
+                            } catch (error) {
+                              setWorkoutError(
+                                error instanceof Error ? error.message : "Could not update the set.",
+                              );
+                              return;
+                            }
                             refresh();
                           }}
                           min={5}
@@ -189,7 +196,14 @@ export function RoutineDetailModal({
                               return;
                             }
                             setWorkoutError(null);
-                            await updateSet(set.id, { restSeconds: next });
+                            try {
+                              await updateSet(set.id, { restSeconds: next });
+                            } catch (error) {
+                              setWorkoutError(
+                                error instanceof Error ? error.message : "Could not update the set.",
+                              );
+                              return;
+                            }
                             refresh();
                           }}
                           min={0}
