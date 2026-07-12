@@ -45,6 +45,15 @@ jobs:
       - name: Test
         run: npm run test
 
+      # Advisory for now: 1 critical + 2 high advisories live in the production
+      # dependency chain (expo -> @expo/cli: shell-quote, tmp, ws) and fixing
+      # them requires a coordinated expo-* bump (`npx expo install --fix`) —
+      # `npm audit fix` alone produces a lockfile without expo-modules-core and
+      # breaks typecheck. Flip continue-on-error to false once that bump lands.
+      - name: Audit runtime dependencies (advisory)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
   e2e:
     runs-on: ubuntu-latest
     needs: quality
