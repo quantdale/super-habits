@@ -178,56 +178,37 @@ export async function upsertSavedMeal(input: {
   const db = await getDatabase();
   const now = nowIso();
 
-  const existing = await db.getFirstAsync<SavedMeal>(
-    `SELECT * FROM saved_meals
-     WHERE food_name = ? COLLATE NOCASE`,
-    [input.foodName],
+  // Atomic upsert keyed on the case-insensitive unique index
+  // (idx_saved_meals_food_name); the previous read-then-insert raced it and
+  // threw on concurrent duplicates. On conflict the original id, created_at,
+  // and food_name casing are kept, matching the old UPDATE branch.
+  await db.runAsync(
+    `INSERT INTO saved_meals
+       (id, food_name, calories, protein, carbs, fats, fiber,
+        meal_type, use_count, last_used_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+     ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET
+       calories     = excluded.calories,
+       protein      = excluded.protein,
+       carbs        = excluded.carbs,
+       fats         = excluded.fats,
+       fiber        = excluded.fiber,
+       meal_type    = excluded.meal_type,
+       use_count    = use_count + 1,
+       last_used_at = excluded.last_used_at`,
+    [
+      createId("smeal"),
+      input.foodName,
+      input.calories,
+      input.protein,
+      input.carbs,
+      input.fats,
+      input.fiber,
+      input.mealType,
+      now,
+      now,
+    ],
   );
-
-  if (existing) {
-    await db.runAsync(
-      `UPDATE saved_meals SET
-         calories     = ?,
-         protein      = ?,
-         carbs        = ?,
-         fats         = ?,
-         fiber        = ?,
-         meal_type    = ?,
-         use_count    = use_count + 1,
-         last_used_at = ?
-       WHERE id = ?`,
-      [
-        input.calories,
-        input.protein,
-        input.carbs,
-        input.fats,
-        input.fiber,
-        input.mealType,
-        now,
-        existing.id,
-      ],
-    );
-  } else {
-    const id = createId("smeal");
-    await db.runAsync(
-      `INSERT INTO saved_meals
-         (id, food_name, calories, protein, carbs, fats, fiber,
-          meal_type, use_count, last_used_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-      [
-        id,
-        input.foodName,
-        input.calories,
-        input.protein,
-        input.carbs,
-        input.fats,
-        input.fiber,
-        input.mealType,
-        now,
-        now,
-      ],
-    );
-  }
 }
 
 export async function listRecentSavedMeals(limit: number = 5): Promise<SavedMeal[]> {
