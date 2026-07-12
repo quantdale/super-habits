@@ -6,6 +6,7 @@ type MockDatabase = {
   getAllAsync: ReturnType<typeof vi.fn>;
   getFirstAsync: ReturnType<typeof vi.fn>;
   closeAsync: ReturnType<typeof vi.fn>;
+  withTransactionAsync: ReturnType<typeof vi.fn>;
 };
 
 type LoadClientOptions = {
@@ -21,6 +22,12 @@ function buildDb(version: string | null = "11"): MockDatabase {
     getAllAsync: vi.fn().mockResolvedValue([]),
     getFirstAsync: vi.fn().mockResolvedValue(version ? { value: version } : null),
     closeAsync: vi.fn().mockResolvedValue(undefined),
+    // Pass-through that awaits the callback so rejections propagate exactly
+    // like a rolled-back real transaction would (abort-on-failure paths in
+    // runMigrations must not be stubbed into a no-op).
+    withTransactionAsync: vi.fn(async (fn: () => Promise<void>) => {
+      await fn();
+    }),
   };
 }
 
@@ -196,5 +203,85 @@ describe("core/db/client", () => {
     expect(
       sqlCalls.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS linked_action_events")),
     ).toBe(false);
+  });
+
+  it("wraps each pending migration in a transaction and none when up to date", async () => {
+    const pending = await loadDbClient({ schemaVersion: "9" });
+    await pending.client.getDatabase();
+    // v10 and v11 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(2);
+
+    const upToDate = await loadDbClient({ schemaVersion: "11" });
+    await upToDate.client.getDatabase();
+    expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
+  });
+
+  it("aborts bootstrap and does not bump the schema version when a migration statement fails", async () => {
+    vi.resetModules();
+    const db = buildDb("8");
+    db.runAsync.mockImplementation(async (sql: string) => {
+      if (String(sql).includes("ADD COLUMN recurrence")) {
+        throw new Error("disk I/O error");
+      }
+      return undefined;
+    });
+    const openDatabaseAsync = vi.fn().mockResolvedValue(db);
+
+    vi.doMock("react-native", () => ({
+      Platform: {
+        OS: "ios",
+        select: (obj: Record<string, unknown>) => obj.ios ?? obj.default,
+      },
+    }));
+    vi.doMock("expo-sqlite", () => ({ openDatabaseAsync }));
+
+    const client = await import("@/core/db/client");
+    await expect(client.getDatabase()).rejects.toThrow("disk I/O error");
+
+    const versionBump = db.runAsync.mock.calls.find(
+      ([sql, args]) =>
+        String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
+        Array.isArray(args) &&
+        args[0] === "db_schema_version" &&
+        args[1] === "9",
+    );
+    expect(versionBump).toBeUndefined();
+  });
+
+  it("skips ALTER when the column already exists instead of swallowing errors", async () => {
+    vi.resetModules();
+    const db = buildDb("8");
+    db.getAllAsync.mockImplementation(async (sql: string) => {
+      if (String(sql).includes("PRAGMA table_info(todos)")) {
+        return [{ name: "recurrence" }, { name: "recurrence_id" }];
+      }
+      return [];
+    });
+    const openDatabaseAsync = vi.fn().mockResolvedValue(db);
+
+    vi.doMock("react-native", () => ({
+      Platform: {
+        OS: "ios",
+        select: (obj: Record<string, unknown>) => obj.ios ?? obj.default,
+      },
+    }));
+    vi.doMock("expo-sqlite", () => ({ openDatabaseAsync }));
+
+    const client = await import("@/core/db/client");
+    await client.getDatabase();
+
+    const alterCalls = db.runAsync.mock.calls.filter(([sql]) =>
+      String(sql).includes("ALTER TABLE todos ADD COLUMN recurrence"),
+    );
+    expect(alterCalls).toHaveLength(0);
+
+    const versionBump = db.runAsync.mock.calls.find(
+      ([sql, args]) =>
+        String(sql).includes("INSERT OR REPLACE INTO app_meta") &&
+        Array.isArray(args) &&
+        args[0] === "db_schema_version" &&
+        args[1] === "9",
+    );
+    expect(versionBump).toBeDefined();
   });
 });
