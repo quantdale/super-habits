@@ -11,7 +11,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Modal, Platform, Text, View } from "react-native";
 import { initializeDatabase } from "@/core/db/client";
 import { registerServiceWorker } from "@/core/pwa/registerServiceWorker";
-import { ensureGuestProfile } from "@/core/auth/guestProfile";
 import { syncEngine } from "@/core/sync/sync.engine";
 import {
   dismissCurrentRestorePrompt,
@@ -69,7 +68,6 @@ export function AppProviders({ children }: PropsWithChildren) {
         return;
       }
 
-      await ensureGuestProfile().catch(() => undefined);
       await ensureAnonymousSession().catch((e) => {
         console.error("[auth] ensureAnonymousSession failed", e);
       });
