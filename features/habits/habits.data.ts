@@ -72,28 +72,37 @@ export async function incrementHabit(
        AND deleted_at IS NULL`,
     [habitId],
   );
-  const existing = await db.getFirstAsync<{ id: string; count: number }>(
+
+  // Guard before writing: a missing/soft-deleted habit must not accrete
+  // orphan completion rows.
+  if (!habit) {
+    return {
+      count: 0,
+      linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
+    };
+  }
+
+  // Atomic upsert instead of read-modify-write: two rapid taps previously
+  // either raced the UNIQUE(habit_id, date_key) constraint (crash) or lost
+  // an increment.
+  await db.runAsync(
+    `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?)
+     ON CONFLICT(habit_id, date_key) DO UPDATE SET
+       count = count + 1,
+       updated_at = excluded.updated_at`,
+    [createId("hcmp"), habitId, dateKey, now, now],
+  );
+
+  const row = await db.getFirstAsync<{ id: string; count: number }>(
     "SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
     [habitId, dateKey],
   );
-  const previousCount = existing?.count ?? 0;
-  const nextCount = previousCount + 1;
-  const completionId = existing?.id ?? createId("hcmp");
+  const nextCount = row?.count ?? 1;
+  const previousCount = nextCount - 1;
+  const completionId = row?.id ?? null;
 
-  if (existing) {
-    await db.runAsync("UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?", [
-      nextCount,
-      now,
-      existing.id,
-    ]);
-  } else {
-    await db.runAsync(
-      "INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
-      [completionId, habitId, dateKey, now, now],
-    );
-  }
-
-  if (!habit || previousCount >= habit.target_per_day || nextCount < habit.target_per_day) {
+  if (previousCount >= habit.target_per_day || nextCount < habit.target_per_day) {
     return {
       count: nextCount,
       linkedActions: EMPTY_LINKED_ACTIONS_RESULT,

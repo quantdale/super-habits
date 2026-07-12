@@ -11,13 +11,13 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Modal, Platform, Text, View } from "react-native";
 import { initializeDatabase } from "@/core/db/client";
 import { registerServiceWorker } from "@/core/pwa/registerServiceWorker";
-import { ensureGuestProfile } from "@/core/auth/guestProfile";
 import { syncEngine } from "@/core/sync/sync.engine";
 import {
   dismissCurrentRestorePrompt,
   getRestorePreview,
   restoreFromRemoteBackup,
 } from "@/core/sync/restore.coordinator";
+import { getDbBootstrapErrorMessage } from "@/core/providers/bootstrapErrorMessage";
 import { resolveRestorePromptOutcome } from "@/core/providers/restorePromptFlow";
 import type { RestorePreview } from "@/core/sync/restore.types";
 import { InAppNoticeProvider } from "@/core/providers/InAppNoticeProvider";
@@ -59,15 +59,15 @@ export function AppProviders({ children }: PropsWithChildren) {
         console.error("[db] initializeDatabase failed", e);
         if (!cancelled) {
           setDbError(
-            Platform.OS === "web"
-              ? "This browser does not support the required features to run SuperHabits. Try Chrome or Edge with site data cleared."
-              : "Database failed to initialize. Please restart the app.",
+            getDbBootstrapErrorMessage({
+              platformOs: Platform.OS,
+              hasSharedArrayBuffer: typeof SharedArrayBuffer !== "undefined",
+            }),
           );
         }
         return;
       }
 
-      await ensureGuestProfile().catch(() => undefined);
       await ensureAnonymousSession().catch((e) => {
         console.error("[auth] ensureAnonymousSession failed", e);
       });

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, Platform, Text, View } from "react-native";
 import { useAppTheme } from "@/core/providers/ThemeProvider";
 import { Button } from "./Button";
@@ -13,13 +13,10 @@ type ConfirmationOptions = {
   color?: string;
 };
 
-type PendingConfirmation = ConfirmationOptions & {
-  resolve: (confirmed: boolean) => void;
-};
-
 export function useConfirmationDialog() {
   const { tokens } = useAppTheme();
-  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<ConfirmationOptions | null>(null);
+  const pendingResolveRef = useRef<((confirmed: boolean) => void) | null>(null);
 
   const confirm = useCallback((options: ConfirmationOptions) => {
     if (Platform.OS !== "web") {
@@ -40,18 +37,18 @@ export function useConfirmationDialog() {
     }
 
     return new Promise<boolean>((resolve) => {
-      setPendingConfirmation({
-        ...options,
-        resolve,
-      });
+      pendingResolveRef.current = resolve;
+      setPendingConfirmation(options);
     });
   }, []);
 
+  // Resolve via the ref, outside the state updater: updaters must be pure
+  // (StrictMode double-invokes them, which double-resolved the promise).
   const resolvePendingConfirmation = useCallback((confirmed: boolean) => {
-    setPendingConfirmation((current) => {
-      current?.resolve(confirmed);
-      return null;
-    });
+    const resolve = pendingResolveRef.current;
+    pendingResolveRef.current = null;
+    setPendingConfirmation(null);
+    resolve?.(confirmed);
   }, []);
 
   const confirmationDialog = (

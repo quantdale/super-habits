@@ -39,9 +39,10 @@ describe("features/habits/habits.data", () => {
           name: "Hydrate",
           target_per_day: 2,
         })
+        // Post-upsert re-read: the increment just landed count 2.
         .mockResolvedValueOnce({
           id: "hcmp_1",
-          count: 1,
+          count: 2,
         }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -49,10 +50,19 @@ describe("features/habits/habits.data", () => {
 
     const result = await incrementHabit("habit_1", "2026-04-14");
 
-    expect(db.runAsync).toHaveBeenCalledWith(
-      "UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?",
-      [2, expect.any(String), "hcmp_1"],
-    );
+    // COR-001: single atomic upsert instead of read-modify-write.
+    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    const [upsertSql, upsertArgs] = db.runAsync.mock.calls[0];
+    expect(upsertSql).toContain("INSERT INTO habit_completions");
+    expect(upsertSql).toContain("ON CONFLICT(habit_id, date_key) DO UPDATE SET");
+    expect(upsertSql).toContain("count = count + 1");
+    expect(upsertArgs).toEqual([
+      expect.any(String),
+      "habit_1",
+      "2026-04-14",
+      expect.any(String),
+      expect.any(String),
+    ]);
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith({
       occurredAt: expect.any(String),
       feature: "habits",
@@ -86,7 +96,7 @@ describe("features/habits/habits.data", () => {
         })
         .mockResolvedValueOnce({
           id: "hcmp_1",
-          count: 1,
+          count: 2,
         }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -115,7 +125,7 @@ describe("features/habits/habits.data", () => {
         })
         .mockResolvedValueOnce({
           id: "hcmp_1",
-          count: 2,
+          count: 3,
         }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -123,12 +133,57 @@ describe("features/habits/habits.data", () => {
 
     const result = await incrementHabit("habit_1", "2026-04-14");
 
-    expect(db.runAsync).toHaveBeenCalledWith(
-      "UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?",
-      [3, expect.any(String), "hcmp_1"],
-    );
+    expect(db.runAsync).toHaveBeenCalledTimes(1);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result.count).toBe(3);
+  });
+
+  it("does not write completion rows when the habit is missing or soft-deleted", async () => {
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValueOnce(null),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    const result = await incrementHabit("habit_gone", "2026-04-14");
+
+    // COR-001: the old flow wrote an orphan completion row before checking
+    // the habit existed.
+    expect(db.runAsync).not.toHaveBeenCalled();
+    expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      count: 0,
+      linkedActions: {
+        matchedRuleCount: 0,
+        notices: [],
+      },
+    });
+  });
+
+  it("uses the same atomic upsert on repeated increments (double-tap safety)", async () => {
+    const db = {
+      getFirstAsync: vi
+        .fn()
+        .mockResolvedValueOnce({ name: "Hydrate", target_per_day: 5 })
+        .mockResolvedValueOnce({ id: "hcmp_1", count: 1 })
+        .mockResolvedValueOnce({ name: "Hydrate", target_per_day: 5 })
+        .mockResolvedValueOnce({ id: "hcmp_1", count: 2 }),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    const first = await incrementHabit("habit_1", "2026-04-14");
+    const second = await incrementHabit("habit_1", "2026-04-14");
+
+    // Both calls issue the single ON CONFLICT statement — there is no
+    // SELECT-then-INSERT branch left to interleave. (Mock-level proof of the
+    // statement shape; the SQL itself was validated against real SQLite.)
+    expect(db.runAsync).toHaveBeenCalledTimes(2);
+    for (const [sql] of db.runAsync.mock.calls) {
+      expect(sql).toContain("ON CONFLICT(habit_id, date_key) DO UPDATE SET");
+    }
+    expect(first.count).toBe(1);
+    expect(second.count).toBe(2);
   });
 
   it("skips linked-action increments when the habit target is missing or soft-deleted", async () => {

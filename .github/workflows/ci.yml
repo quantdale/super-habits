@@ -42,12 +42,30 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
+      # Non-UTC zone so the local-date-key logic in lib/time.ts is not only
+      # ever exercised where local == UTC. Full TZ/DST matrix is TST-001.
       - name: Test
         run: npm run test
+        env:
+          TZ: Asia/Manila
+
+      # Advisory for now: 1 critical + 2 high advisories live in the production
+      # dependency chain (expo -> @expo/cli: shell-quote, tmp, ws) and fixing
+      # them requires a coordinated expo-* bump (`npx expo install --fix`) —
+      # `npm audit fix` alone produces a lockfile without expo-modules-core and
+      # breaks typecheck. Flip continue-on-error to false once that bump lands.
+      - name: Audit runtime dependencies (advisory)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
 
   e2e:
     runs-on: ubuntu-latest
     needs: quality
+    # PRs already cover feature branches; direct pushes only run e2e on main.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +86,19 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # Browser binaries are ~130MB per download; cache them per Playwright
+      # version. `install --with-deps` still runs for OS packages, but skips
+      # the browser download on a cache hit.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

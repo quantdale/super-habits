@@ -701,4 +701,50 @@ describe("core/sync/restore.coordinator", () => {
     expect(loaded.db.getMeta()).not.toHaveProperty("last_restore_at");
     expect(loaded.db.getMeta()).not.toHaveProperty("last_restore_signature");
   });
+
+  it("aborts inside the transaction when local rows appear after the eligibility preview", async () => {
+    const localCounts = {
+      todos: 0,
+      habits: 0,
+      calorie_entries: 0,
+      workout_routines: 0,
+    };
+    const loaded = await loadCoordinator({
+      localCounts,
+      remoteRowsByEntity: {
+        todos: [
+          {
+            id: "todo_1",
+            updated_at: "2026-04-20T12:00:00.000Z",
+            created_at: "2026-04-19T12:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    // The eligibility preview reads one COUNT per synced entity (4). Flip the
+    // counts right after those reads so the in-transaction re-check (the next
+    // 4 COUNT queries) sees a todo that "appeared" mid-restore (COR-005).
+    const original = loaded.db.getFirstAsync.getMockImplementation()!;
+    let countQueries = 0;
+    loaded.db.getFirstAsync.mockImplementation(async (sql: string, params?: unknown[]) => {
+      const result = await original(sql, params);
+      if (/^SELECT COUNT\(\*\) AS total/i.test(sql)) {
+        countQueries += 1;
+        if (countQueries === 4) {
+          localCounts.todos = 1;
+        }
+      }
+      return result;
+    });
+
+    const result = await loaded.restoreFromRemoteBackup();
+
+    expect(result.status).toBe("blocked");
+    expect(loaded.applyRemoteTodos).not.toHaveBeenCalled();
+    expect(loaded.applyRemoteHabits).not.toHaveBeenCalled();
+    expect(loaded.applyRemoteCalorieEntries).not.toHaveBeenCalled();
+    expect(loaded.db.getMeta()).not.toHaveProperty("last_restore_at");
+    expect(loaded.db.getMeta()).not.toHaveProperty("last_restore_signature");
+  });
 });

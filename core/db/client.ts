@@ -79,80 +79,94 @@ const bootstrapStatements = [
   );`,
 ];
 
+/**
+ * True when `column` already exists on `table`. Fresh installs create some
+ * columns via bootstrap DDL that older databases add via migration, so ALTERs
+ * are gated on this instead of swallowing every error with a broad catch
+ * (which also hid disk-full/locked/corruption failures and then recorded the
+ * migration as applied).
+ */
+async function hasColumn(
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  column: string,
+): Promise<boolean> {
+  const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  return columns.some((c) => c.name === column);
+}
+
+async function addColumnIfMissing(
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  column: string,
+  definition: string,
+): Promise<void> {
+  if (await hasColumn(db, table, column)) return;
+  await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+/**
+ * Runs one migration step and its schema-version bump atomically. A failed
+ * step rolls back and aborts bootstrap (surfaced by the dbError UX) instead
+ * of being recorded as applied.
+ */
+async function applyMigration(
+  db: SQLite.SQLiteDatabase,
+  targetVersion: number,
+  apply: () => Promise<void>,
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await apply();
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, String(targetVersion));
+  });
+}
+
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   const schemaVersion = await getAppMetaText(db, appMetaKeys.dbSchemaVersion);
   const version = schemaVersion ? parseInt(schemaVersion, 10) : 0;
   if (version < 2) {
-    try {
-      await db.execAsync("ALTER TABLE habits ADD COLUMN category TEXT NOT NULL DEFAULT 'anytime'");
-    } catch {
-      // Column may already exist from CREATE TABLE
-    }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "2");
+    await applyMigration(db, 2, async () => {
+      await addColumnIfMissing(db, "habits", "category", "TEXT NOT NULL DEFAULT 'anytime'");
+    });
   }
   if (version < 3) {
-    try {
-      await db.execAsync("ALTER TABLE habits ADD COLUMN icon TEXT NOT NULL DEFAULT 'check-circle'");
-    } catch {
-      // Column may already exist from CREATE TABLE
-    }
-    try {
-      await db.execAsync("ALTER TABLE habits ADD COLUMN color TEXT NOT NULL DEFAULT '#64748b'");
-    } catch {
-      // Column may already exist from CREATE TABLE
-    }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "3");
+    await applyMigration(db, 3, async () => {
+      await addColumnIfMissing(db, "habits", "icon", "TEXT NOT NULL DEFAULT 'check-circle'");
+      await addColumnIfMissing(db, "habits", "color", "TEXT NOT NULL DEFAULT '#64748b'");
+    });
   }
   if (version < 4) {
-    try {
-      await db.execAsync(
-        "ALTER TABLE calorie_entries ADD COLUMN fiber REAL NOT NULL DEFAULT 0",
-      );
-    } catch {
-      // Column may already exist from CREATE TABLE
-    }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "4");
+    await applyMigration(db, 4, async () => {
+      await addColumnIfMissing(db, "calorie_entries", "fiber", "REAL NOT NULL DEFAULT 0");
+    });
   }
   if (version < 5) {
     // Record the UTC→local date key cutover in app_meta.
     // Rows written before this migration used UTC date keys (toISOString().slice(0, 10)).
     // Rows written after use local calendar keys via toDateKey() in lib/time.ts.
     // No backfill — rationale is documented in the unified knowledge base.
-    const cutoverIso = new Date().toISOString();
-    await setAppMetaText(db, appMetaKeys.dateKeyFormat, "local");
-    await setAppMetaText(db, appMetaKeys.dateKeyCutover, cutoverIso);
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "5");
+    await applyMigration(db, 5, async () => {
+      const cutoverIso = new Date().toISOString();
+      await setAppMetaText(db, appMetaKeys.dateKeyFormat, "local");
+      await setAppMetaText(db, appMetaKeys.dateKeyCutover, cutoverIso);
+    });
   }
   if (version < 6) {
-    try {
-      await db.runAsync(`ALTER TABLE todos ADD COLUMN due_date TEXT`);
-    } catch {
-      // Column may already exist
-    }
-    try {
+    await applyMigration(db, 6, async () => {
+      await addColumnIfMissing(db, "todos", "due_date", "TEXT");
+      await addColumnIfMissing(db, "todos", "priority", "TEXT NOT NULL DEFAULT 'normal'");
+      await addColumnIfMissing(db, "todos", "sort_order", "INTEGER NOT NULL DEFAULT 0");
       await db.runAsync(
-        `ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'`,
+        `UPDATE todos SET sort_order = (
+           SELECT COUNT(*) FROM todos t2
+           WHERE t2.created_at <= todos.created_at
+             AND t2.deleted_at IS NULL
+         ) WHERE deleted_at IS NULL`,
       );
-    } catch {
-      // Column may already exist
-    }
-    try {
-      await db.runAsync(
-        `ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
-      );
-    } catch {
-      // Column may already exist
-    }
-    await db.runAsync(
-      `UPDATE todos SET sort_order = (
-         SELECT COUNT(*) FROM todos t2
-         WHERE t2.created_at <= todos.created_at
-           AND t2.deleted_at IS NULL
-       ) WHERE deleted_at IS NULL`,
-    );
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "6");
+    });
   }
   if (version < 7) {
+    await applyMigration(db, 7, async () => {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS routine_exercises (
         id          TEXT PRIMARY KEY NOT NULL,
@@ -187,10 +201,10 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
         created_at      TEXT NOT NULL
       );
     `);
-
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "7");
+    });
   }
   if (version < 8) {
+    await applyMigration(db, 8, async () => {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS saved_meals (
         id          TEXT PRIMARY KEY NOT NULL,
@@ -211,23 +225,16 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_meals_food_name
       ON saved_meals (food_name COLLATE NOCASE);
     `);
-
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "8");
+    });
   }
   if (version < 9) {
-    try {
-      await db.runAsync(`ALTER TABLE todos ADD COLUMN recurrence TEXT`);
-    } catch {
-      // Column may already exist
-    }
-    try {
-      await db.runAsync(`ALTER TABLE todos ADD COLUMN recurrence_id TEXT`);
-    } catch {
-      // Column may already exist
-    }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "9");
+    await applyMigration(db, 9, async () => {
+      await addColumnIfMissing(db, "todos", "recurrence", "TEXT");
+      await addColumnIfMissing(db, "todos", "recurrence_id", "TEXT");
+    });
   }
   if (version < 10) {
+    await applyMigration(db, 10, async () => {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS linked_action_rules (
         id                      TEXT PRIMARY KEY NOT NULL,
@@ -264,10 +271,10 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_linked_action_rules_bidirectional_group
       ON linked_action_rules (bidirectional_group_id);
     `);
-
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "10");
+    });
   }
   if (version < 11) {
+    await applyMigration(db, 11, async () => {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS linked_action_events (
         id                  TEXT PRIMARY KEY NOT NULL,
@@ -344,8 +351,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_linked_action_executions_chain
       ON linked_action_executions (chain_id, created_at DESC);
     `);
-
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "11");
+    });
   }
 }
 

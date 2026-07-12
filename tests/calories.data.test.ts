@@ -170,20 +170,8 @@ describe("calories.data", () => {
     });
   });
 
-  it("upsertSavedMeal updates an existing meal and increments use_count", async () => {
-    db.getFirstAsync.mockResolvedValueOnce({
-      id: "smeal_existing",
-      food_name: "Protein oats",
-      calories: 320,
-      protein: 20,
-      carbs: 40,
-      fats: 5,
-      fiber: 4,
-      meal_type: "breakfast",
-      use_count: 3,
-      last_used_at: "2026-04-05T10:00:00.000Z",
-      created_at: "2026-04-01T10:00:00.000Z",
-    });
+  it("upsertSavedMeal issues a single atomic case-insensitive upsert", async () => {
+    vi.mocked(createId).mockReturnValue("smeal_new");
 
     await upsertSavedMeal({
       foodName: "Protein oats",
@@ -195,20 +183,26 @@ describe("calories.data", () => {
       mealType: "breakfast",
     });
 
-    expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE saved_meals SET"),
-      [
-        360,
-        30,
-        40,
-        10,
-        5,
-        "breakfast",
-        "2026-04-06T10:00:00.000Z",
-        "smeal_existing",
-      ],
-    );
-    expect(createId).not.toHaveBeenCalled();
+    // COR-001: one INSERT ... ON CONFLICT statement instead of the old
+    // read-then-branch, which raced idx_saved_meals_food_name.
+    expect(db.getFirstAsync).not.toHaveBeenCalled();
+    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    const [sql, args] = db.runAsync.mock.calls[0];
+    expect(sql).toContain("INSERT INTO saved_meals");
+    expect(sql).toContain("ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET");
+    expect(sql).toContain("use_count    = use_count + 1");
+    expect(args).toEqual([
+      "smeal_new",
+      "Protein oats",
+      360,
+      30,
+      40,
+      10,
+      5,
+      "breakfast",
+      "2026-04-06T10:00:00.000Z",
+      "2026-04-06T10:00:00.000Z",
+    ]);
   });
 
   it("upsertSavedMeal returns early for blank names", async () => {

@@ -412,7 +412,16 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   const db = await getDatabase();
   const restoredAt = nowIso();
 
+  let localRowsAppeared = false;
   await db.withTransactionAsync(async () => {
+    // Re-verify emptiness inside the transaction: local rows written between
+    // the eligibility preview and this point must abort the import.
+    const counts = await getLocalSyncBackedCounts();
+    if (SYNC_BACKED_ENTITIES.some((entity) => counts[entity] > 0)) {
+      localRowsAppeared = true;
+      return;
+    }
+
     await applyRemoteTodos(db, todos);
     await applyRemoteHabits(db, habits);
     await applyRemoteCalorieEntries(db, calorieEntries);
@@ -420,6 +429,13 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     await setAppMetaText(db, appMetaKeys.lastRestoreSignature, freshnessSignature);
     await setAppMetaText(db, appMetaKeys.lastRestoreAt, restoredAt);
   });
+
+  if (localRowsAppeared) {
+    return {
+      status: "blocked",
+      preview: await getRestorePreview(),
+    };
+  }
 
   return {
     status: "restored",

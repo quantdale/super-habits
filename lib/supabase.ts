@@ -44,7 +44,9 @@ export function isSupabaseConfigured() {
 
 export function getSupabaseFunctionUrl(functionName: string): string | null {
   if (!supabaseConfigured) return null;
-  return `${supabaseUrl}/functions/v1/${functionName}`;
+  // URL resolution guards trailing-slash env values (plain concat produced
+  // `...co//functions/v1/...`).
+  return new URL(`functions/v1/${functionName}`, supabaseUrl).toString();
 }
 
 export function getSupabaseAnonKey(): string | null {
