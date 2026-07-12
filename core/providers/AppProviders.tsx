@@ -18,6 +18,7 @@ import {
   getRestorePreview,
   restoreFromRemoteBackup,
 } from "@/core/sync/restore.coordinator";
+import { getDbBootstrapErrorMessage } from "@/core/providers/bootstrapErrorMessage";
 import { resolveRestorePromptOutcome } from "@/core/providers/restorePromptFlow";
 import type { RestorePreview } from "@/core/sync/restore.types";
 import { InAppNoticeProvider } from "@/core/providers/InAppNoticeProvider";
@@ -59,9 +60,10 @@ export function AppProviders({ children }: PropsWithChildren) {
         console.error("[db] initializeDatabase failed", e);
         if (!cancelled) {
           setDbError(
-            Platform.OS === "web"
-              ? "This browser does not support the required features to run SuperHabits. Try Chrome or Edge with site data cleared."
-              : "Database failed to initialize. Please restart the app.",
+            getDbBootstrapErrorMessage({
+              platformOs: Platform.OS,
+              hasSharedArrayBuffer: typeof SharedArrayBuffer !== "undefined",
+            }),
           );
         }
         return;
