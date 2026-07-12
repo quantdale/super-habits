@@ -52,3 +52,13 @@ yarn-error.*
 
 .vercel
 .env*.local
+
+# Supabase CLI local state (contains project ref / pooler URL)
+supabase/.temp/
+
+# Editor debug traces
+.cursor/debug-*.log
+
+# Playwright output (keep the .gitkeep placeholder)
+.cursor/playwright-output/*
+!.cursor/playwright-output/.gitkeep
