@@ -1,6 +1,6 @@
-import React from "react";
-import { Pressable, Text } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import React from 'react';
+import { Pressable, Text } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type Props = {
   label: string;
@@ -35,7 +35,7 @@ export function PillChip({ label, active, color, onPress, icon }: Props) {
     >
       {icon ? <Text className="text-[13px]">{icon}</Text> : null}
       <Text
-        className={`text-[13px] ${active ? "font-semibold" : "font-medium"}`}
+        className={`text-[13px] ${active ? 'font-semibold' : 'font-medium'}`}
         style={active ? { color: tokens.textOnAccent } : { color: tokens.textMuted }}
       >
         {label}

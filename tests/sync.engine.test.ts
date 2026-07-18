@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import { SyncEngine, type SyncRecord } from "@/core/sync/sync.engine";
+import { describe, expect, it, vi } from 'vitest';
+import { SyncEngine, type SyncRecord } from '@/core/sync/sync.engine';
 
-describe("SyncEngine", () => {
-  it("preserves records enqueued while a flush is in flight", async () => {
+describe('SyncEngine', () => {
+  it('preserves records enqueued while a flush is in flight', async () => {
     const pushedBatches: SyncRecord[][] = [];
     let releasePush: (() => void) | undefined;
     const pushBlocked = new Promise<void>((resolve) => {
@@ -19,16 +19,16 @@ describe("SyncEngine", () => {
 
     const engine = new SyncEngine(adapter);
     const first: SyncRecord = {
-      entity: "todos",
-      id: "todo_1",
-      updatedAt: "2026-04-06T10:00:00.000Z",
-      operation: "create",
+      entity: 'todos',
+      id: 'todo_1',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'create',
     };
     const second: SyncRecord = {
-      entity: "todos",
-      id: "todo_2",
-      updatedAt: "2026-04-06T10:00:01.000Z",
-      operation: "update",
+      entity: 'todos',
+      id: 'todo_2',
+      updatedAt: '2026-04-06T10:00:01.000Z',
+      operation: 'update',
     };
 
     engine.enqueue(first);
@@ -43,18 +43,18 @@ describe("SyncEngine", () => {
     expect(pushedBatches).toEqual([[first], [second]]);
   });
 
-  it("restores original records when push fails after adapter mutates the batch array", async () => {
+  it('restores original records when push fails after adapter mutates the batch array', async () => {
     const first: SyncRecord = {
-      entity: "todos",
-      id: "todo_1",
-      updatedAt: "2026-04-06T10:00:00.000Z",
-      operation: "create",
+      entity: 'todos',
+      id: 'todo_1',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'create',
     };
     const during: SyncRecord = {
-      entity: "todos",
-      id: "todo_2",
-      updatedAt: "2026-04-06T10:00:01.000Z",
-      operation: "update",
+      entity: 'todos',
+      id: 'todo_2',
+      updatedAt: '2026-04-06T10:00:01.000Z',
+      operation: 'update',
     };
 
     const batchesAtPushStart: SyncRecord[][] = [];
@@ -68,7 +68,7 @@ describe("SyncEngine", () => {
         if (attempt === 1) {
           records.length = 0;
           engine.enqueue(during);
-          throw new Error("push failed");
+          throw new Error('push failed');
         }
       }),
       pull: vi.fn(async () => []),
@@ -77,7 +77,7 @@ describe("SyncEngine", () => {
     engine = new SyncEngine(adapter);
 
     engine.enqueue(first);
-    await expect(engine.flush()).rejects.toThrow("push failed");
+    await expect(engine.flush()).rejects.toThrow('push failed');
     await engine.flush();
 
     expect(adapter.push).toHaveBeenCalledTimes(2);
@@ -85,12 +85,12 @@ describe("SyncEngine", () => {
     expect(batchesAtPushStart[1]).toEqual([first, during]);
   });
 
-  it("retries failed records on the next flush", async () => {
+  it('retries failed records on the next flush', async () => {
     const recordForRetry: SyncRecord = {
-      entity: "todos",
-      id: "todo_retry",
-      updatedAt: "2026-04-06T10:00:00.000Z",
-      operation: "update",
+      entity: 'todos',
+      id: 'todo_retry',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'update',
     };
 
     const pushedBatches: SyncRecord[][] = [];
@@ -100,7 +100,7 @@ describe("SyncEngine", () => {
         attempt += 1;
         pushedBatches.push([...records]);
         if (attempt === 1) {
-          throw new Error("transient failure");
+          throw new Error('transient failure');
         }
       }),
       pull: vi.fn(async () => []),
@@ -109,7 +109,7 @@ describe("SyncEngine", () => {
     const engine = new SyncEngine(adapter);
     engine.enqueue(recordForRetry);
 
-    await expect(engine.flush()).rejects.toThrow("transient failure");
+    await expect(engine.flush()).rejects.toThrow('transient failure');
     await engine.flush();
 
     expect(adapter.push).toHaveBeenCalledTimes(2);

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ['**']
   pull_request:
 
 # Cancel any in-progress run for the same branch/PR when a new commit is pushed.

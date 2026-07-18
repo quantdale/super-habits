@@ -1,11 +1,11 @@
-import { Platform } from "react-native";
-import * as SQLite from "expo-sqlite";
-import { appMetaKeys, getAppMetaText, setAppMetaText } from "@/core/db/appMeta";
+import { Platform } from 'react-native';
+import * as SQLite from 'expo-sqlite';
+import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const bootstrapStatements = [
-  ...(Platform.OS === "web" ? [] : ["PRAGMA journal_mode = WAL;"]),
+  ...(Platform.OS === 'web' ? [] : ['PRAGMA journal_mode = WAL;']),
   `CREATE TABLE IF NOT EXISTS todos (
     id TEXT PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
@@ -88,7 +88,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     } catch {
       // Column may already exist from CREATE TABLE
     }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "2");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '2');
   }
   if (version < 3) {
     try {
@@ -101,17 +101,15 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     } catch {
       // Column may already exist from CREATE TABLE
     }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "3");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '3');
   }
   if (version < 4) {
     try {
-      await db.execAsync(
-        "ALTER TABLE calorie_entries ADD COLUMN fiber REAL NOT NULL DEFAULT 0",
-      );
+      await db.execAsync('ALTER TABLE calorie_entries ADD COLUMN fiber REAL NOT NULL DEFAULT 0');
     } catch {
       // Column may already exist from CREATE TABLE
     }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "4");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '4');
   }
   if (version < 5) {
     // Record the UTC→local date key cutover in app_meta.
@@ -119,9 +117,9 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     // Rows written after use local calendar keys via toDateKey() in lib/time.ts.
     // No backfill — rationale is documented in the unified knowledge base.
     const cutoverIso = new Date().toISOString();
-    await setAppMetaText(db, appMetaKeys.dateKeyFormat, "local");
+    await setAppMetaText(db, appMetaKeys.dateKeyFormat, 'local');
     await setAppMetaText(db, appMetaKeys.dateKeyCutover, cutoverIso);
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "5");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '5');
   }
   if (version < 6) {
     try {
@@ -130,16 +128,12 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       // Column may already exist
     }
     try {
-      await db.runAsync(
-        `ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'`,
-      );
+      await db.runAsync(`ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'`);
     } catch {
       // Column may already exist
     }
     try {
-      await db.runAsync(
-        `ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
-      );
+      await db.runAsync(`ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
     } catch {
       // Column may already exist
     }
@@ -150,7 +144,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
            AND t2.deleted_at IS NULL
        ) WHERE deleted_at IS NULL`,
     );
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "6");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '6');
   }
   if (version < 7) {
     await db.execAsync(`
@@ -188,7 +182,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "7");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '7');
   }
   if (version < 8) {
     await db.execAsync(`
@@ -212,7 +206,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       ON saved_meals (food_name COLLATE NOCASE);
     `);
 
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "8");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '8');
   }
   if (version < 9) {
     try {
@@ -225,7 +219,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     } catch {
       // Column may already exist
     }
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "9");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '9');
   }
   if (version < 10) {
     await db.execAsync(`
@@ -265,7 +259,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       ON linked_action_rules (bidirectional_group_id);
     `);
 
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "10");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '10');
   }
   if (version < 11) {
     await db.execAsync(`
@@ -345,12 +339,12 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       ON linked_action_executions (chain_id, created_at DESC);
     `);
 
-    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, "11");
+    await setAppMetaText(db, appMetaKeys.dbSchemaVersion, '11');
   }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
-  const database = await SQLite.openDatabaseAsync("superhabits.db");
+  const database = await SQLite.openDatabaseAsync('superhabits.db');
   for (const statement of bootstrapStatements) {
     await database.execAsync(statement);
   }

@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { View, Text, TextInput } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
-import type { PomodoroSettings } from "./pomodoro.domain";
-import { validatePomodoroSettings } from "@/lib/validation";
+import React, { useState } from 'react';
+import { View, Text, TextInput } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
+import type { PomodoroSettings } from './pomodoro.domain';
+import { validatePomodoroSettings } from '@/lib/validation';
 
 type Props = {
   settings: PomodoroSettings;
@@ -38,24 +38,24 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
   };
 
   return (
-    <Card
-      accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
-      className="mb-4"
-      innerClassName="p-4"
-    >
-      <Text className="text-base font-semibold" style={{ color: tokens.text }}>Timer durations</Text>
+    <Card accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]} className="mb-4" innerClassName="p-4">
+      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+        Timer durations
+      </Text>
       <Text className="mb-4 mt-1 text-sm" style={{ color: tokens.textMuted }}>
         Changes apply immediately and reset the current timer state.
       </Text>
 
       {[
-        { label: "Focus (min)", value: focus, set: setFocus },
-        { label: "Short break (min)", value: shortBrk, set: setShortBrk },
-        { label: "Long break (min)", value: longBrk, set: setLongBrk },
-        { label: "Sessions before long break", value: sessions, set: setSessions },
+        { label: 'Focus (min)', value: focus, set: setFocus },
+        { label: 'Short break (min)', value: shortBrk, set: setShortBrk },
+        { label: 'Long break (min)', value: longBrk, set: setLongBrk },
+        { label: 'Sessions before long break', value: sessions, set: setSessions },
       ].map(({ label, value, set }) => (
         <View key={label} className="mb-2 flex-row items-center justify-between">
-          <Text className="flex-1 pr-3 text-sm" style={{ color: tokens.textMuted }}>{label}</Text>
+          <Text className="flex-1 pr-3 text-sm" style={{ color: tokens.textMuted }}>
+            {label}
+          </Text>
           <TextInput
             value={value}
             onChangeText={(t) => {
@@ -64,7 +64,11 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
             }}
             keyboardType="number-pad"
             className="w-16 rounded-2xl border px-3 py-2 text-center text-sm"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated, color: tokens.text }}
+            style={{
+              borderColor: tokens.border,
+              backgroundColor: tokens.surfaceElevated,
+              color: tokens.text,
+            }}
             selectTextOnFocus
           />
         </View>

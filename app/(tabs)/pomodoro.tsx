@@ -1,4 +1,4 @@
-import { PomodoroScreen } from "@/features/pomodoro/PomodoroScreen";
+import { PomodoroScreen } from '@/features/pomodoro/PomodoroScreen';
 
 export default function PomodoroRoute() {
   return <PomodoroScreen />;

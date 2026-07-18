@@ -9,11 +9,13 @@ Scope: inspection only, no runtime changes
 SuperHabits is structurally ready for an AI-assisted layer in one narrow sense: the app already has well-separated data contracts, deterministic validation, and feature-level write paths that can be wrapped safely. It is not ready for AI to mutate data directly. The safe path is to place AI above a read-only context layer and below a strict app-owned action gateway that emits Linked Actions drafts, requires user confirmation, and then delegates execution back into existing feature data flows.
 
 The codebase already exposes enough structured context to support:
+
 - natural-language-to-draft mapping for todos, habits, calories, pomodoro, and workout
 - read-only daily and yearly summaries
 - simple daily, weekly, and monthly insights based on counts, streaks, goals, and activity trends
 
 The biggest gaps are not schema gaps alone. They are interface gaps:
+
 - no canonical AI-safe read model
 - no shared action schema across features
 - no confirmation/audit layer
@@ -45,6 +47,7 @@ Recommendation: add an AI orchestration layer later, but keep execution app-nati
 #### Todos
 
 From [`core/db/types.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/core/db/types.ts) and [`features/todos/todos.data.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/todos/todos.data.ts):
+
 - title
 - notes
 - completed flag
@@ -55,6 +58,7 @@ From [`core/db/types.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/core
 - soft-delete state
 
 Useful AI cases:
+
 - "Remind me to call mom tomorrow"
 - "Make this urgent"
 - "Show my top pending tasks"
@@ -63,11 +67,13 @@ Useful AI cases:
 #### Habits
 
 From [`features/habits/habits.data.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/habits/habits.data.ts):
+
 - habit definitions: name, target, category, icon, color
 - completion counts by `date_key`
 - ranged completion history
 
 From [`features/habits/habits.domain.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/habits/habits.domain.ts):
+
 - day-level completion state
 - current streak
 - longest streak
@@ -75,6 +81,7 @@ From [`features/habits/habits.domain.ts`](/C:/Users/palac/.codex/worktrees/c2b8/
 - aggregated heatmap intensity
 
 Useful AI cases:
+
 - "Mark my reading habit done"
 - "How consistent have I been this week?"
 - "Which habit is most likely to break next?"
@@ -82,6 +89,7 @@ Useful AI cases:
 #### Calories
 
 From [`features/calories/calories.data.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/calories/calories.data.ts):
+
 - food name
 - calories
 - macros and fiber
@@ -92,12 +100,14 @@ From [`features/calories/calories.data.ts`](/C:/Users/palac/.codex/worktrees/c2b
 - daily summaries by date range
 
 From [`features/calories/calories.domain.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/calories/calories.domain.ts):
+
 - kcal from macros
 - goal progress
 - daily trend points
 - heatmap intensity relative to goal
 
 Useful AI cases:
+
 - "I ate overnight oats"
 - "Log my usual yogurt bowl"
 - "How far off my calorie goal am I this week?"
@@ -106,15 +116,18 @@ Useful AI cases:
 #### Pomodoro
 
 From [`features/pomodoro/pomodoro.data.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/pomodoro/pomodoro.data.ts):
+
 - settings
 - focus/break session logs with start/end/duration/type
 
 From [`features/pomodoro/pomodoro.domain.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/pomodoro/pomodoro.domain.ts):
+
 - mode sequencing
 - heatmap days
 - day streaks
 
 Useful AI cases:
+
 - "Start a 25-minute focus session"
 - "How many sessions did I do this week?"
 - "When am I most consistent with focus?"
@@ -122,12 +135,14 @@ Useful AI cases:
 #### Workout
 
 From [`features/workout/workout.data.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/workout/workout.data.ts):
+
 - routines
 - nested exercises and sets
 - workout logs
 - completed session exercise summaries
 
 From [`features/workout/workout.domain.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/workout/workout.domain.ts):
+
 - heatmap days
 - streaks
 - estimated session duration
@@ -135,6 +150,7 @@ From [`features/workout/workout.domain.ts`](/C:/Users/palac/.codex/worktrees/c2b
 - completed-set summaries
 
 Useful AI cases:
+
 - "Start push day"
 - "Log that I finished upper body"
 - "Which routines am I neglecting?"
@@ -142,6 +158,7 @@ Useful AI cases:
 #### Cross-feature rollups already present
 
 [`features/overview/OverviewScreen.tsx`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/features/overview/OverviewScreen.tsx) already assembles:
+
 - pending todo count
 - top pending todos
 - calories consumed vs goal
@@ -200,19 +217,19 @@ AI must never call `*.data.ts` directly and never produce SQL. It should output 
 ### Recommended layers
 
 1. `AIContextService`
-Reads feature-safe context from app-owned read models.
+   Reads feature-safe context from app-owned read models.
 
 2. `AIIntentInterpreter`
-Turns natural language into a typed proposal only.
+   Turns natural language into a typed proposal only.
 
 3. `AIActionResolver`
-Maps intent proposals to allowed Linked Action templates plus concrete args.
+   Maps intent proposals to allowed Linked Action templates plus concrete args.
 
 4. `AIConfirmationController`
-Builds preview UI, collects edits, and records approval or rejection.
+   Builds preview UI, collects edits, and records approval or rejection.
 
 5. `LinkedActionExecutor`
-Calls existing feature actions after confirmation.
+   Calls existing feature actions after confirmation.
 
 ### Recommended proposal shape
 
@@ -220,16 +237,16 @@ Calls existing feature actions after confirmation.
 type AIActionProposal = {
   sourceText: string;
   intent:
-    | "todo.create"
-    | "todo.update"
-    | "habit.create"
-    | "habit.increment"
-    | "calorie.log"
-    | "calorie.goal.update"
-    | "pomodoro.start"
-    | "workout.start"
-    | "workout.log"
-    | "insight.request";
+    | 'todo.create'
+    | 'todo.update'
+    | 'habit.create'
+    | 'habit.increment'
+    | 'calorie.log'
+    | 'calorie.goal.update'
+    | 'pomodoro.start'
+    | 'workout.start'
+    | 'workout.log'
+    | 'insight.request';
   confidence: number;
   missingFields: string[];
   readContext: string[];
@@ -251,7 +268,7 @@ type AIActionProposal = {
 ```ts
 type LinkedActionDraft = {
   actionType: string;
-  targetFeature: "todos" | "habits" | "calories" | "pomodoro" | "workout";
+  targetFeature: 'todos' | 'habits' | 'calories' | 'pomodoro' | 'workout';
   args: Record<string, unknown>;
   validationSchemaId: string;
   dedupeKey?: string;
@@ -272,6 +289,7 @@ type LinkedActionDraft = {
 ### Example: "I ate overnight oats"
 
 Safe flow:
+
 1. AI interprets this as `calorie.log`.
 2. App resolver looks for a matching `saved_meal`.
 3. If one strong match exists, produce a draft using that meal’s macros.
@@ -290,6 +308,7 @@ The app already uses explicit save buttons, modal edits, and destructive confirm
 ### Recommended UX pattern
 
 For every AI-proposed write, show:
+
 - a one-line summary
 - the exact fields to be written
 - the affected feature
@@ -314,19 +333,19 @@ For every AI-proposed write, show:
 ### Confirmation states
 
 1. `drafted`
-AI has a proposal but is missing required fields or user approval.
+   AI has a proposal but is missing required fields or user approval.
 
 2. `editable`
-User can adjust a few structured fields before execution.
+   User can adjust a few structured fields before execution.
 
 3. `confirmed`
-Draft is frozen and handed to Linked Actions.
+   Draft is frozen and handed to Linked Actions.
 
 4. `executed`
-Existing app write path succeeds.
+   Existing app write path succeeds.
 
 5. `failed`
-Validation or execution failed; show app-native error.
+   Validation or execution failed; show app-native error.
 
 ### UX constraints worth keeping
 
@@ -353,6 +372,7 @@ AI should not bypass Linked Actions. Linked Actions should be the only mutable c
 ### Why this fits the current codebase
 
 The feature data modules already encode the real business rules:
+
 - sync enqueue for synced entities
 - soft delete behavior
 - recurring todo logic
@@ -388,6 +408,7 @@ If AI bypasses Linked Actions and talks to those modules ad hoc, it will duplica
 ### Ready now
 
 Daily insights:
+
 - pending tasks
 - calories vs goal
 - focus streak
@@ -395,12 +416,14 @@ Daily insights:
 - habits completed today
 
 Weekly insights:
+
 - count of active days for calories, focus, and workout
 - habit consistency percentage
 - streak changes
 - top pending todos
 
 Monthly or yearly descriptive insights:
+
 - calorie trend over time
 - yearly focus session totals
 - yearly workout frequency
@@ -426,6 +449,7 @@ Monthly or yearly descriptive insights:
 ### Recommendation
 
 Build a small app-owned `InsightQueryService` later that exposes:
+
 - `getDailySnapshot(dateKey)`
 - `getWeeklySummary(startDateKey)`
 - `getMonthlySummary(monthKey)`
@@ -438,6 +462,7 @@ That avoids duplicating OverviewScreen logic in AI code.
 ### Sensitive data surface
 
 Potentially sensitive fields already in scope:
+
 - todo titles and notes
 - food names
 - calorie/macronutrient history
@@ -499,6 +524,7 @@ That means privacy policy cannot be bolted on later. It needs a first-class sett
 ### Phase 6: RAG later, not now
 
 If retrieval is needed later, layer it over derived AI documents, not raw tables:
+
 - daily summaries
 - routine summaries
 - saved-meal catalog

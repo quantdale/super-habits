@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
-import { Text, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import type { ReactNode } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
-export type CardVariant = "standard" | "header" | "stat";
+export type CardVariant = 'standard' | 'header' | 'stat';
 
 type CardProps = {
   children: ReactNode;
@@ -20,7 +20,7 @@ type CardProps = {
   innerClassName?: string;
 };
 
-const PAD = "p-4";
+const PAD = 'p-4';
 
 function withAlpha(color: string, opacity: number) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
@@ -37,7 +37,7 @@ export function Card({
   children,
   accentColor,
   className,
-  variant = "standard",
+  variant = 'standard',
   headerTitle,
   headerSubtitle,
   headerRight,
@@ -45,23 +45,23 @@ export function Card({
   innerClassName,
 }: CardProps) {
   const { tokens } = useAppTheme();
-  const extra = className?.trim() ?? "";
+  const extra = className?.trim() ?? '';
   const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
-  const marginClass = hasConsumerVerticalMargin ? "" : "mb-4";
+  const marginClass = hasConsumerVerticalMargin ? '' : 'mb-4';
   const accentTint = accentColor ? withAlpha(accentColor, 0.08) : undefined;
   const accentHeaderTint = accentColor ? withAlpha(accentColor, 0.06) : tokens.surfaceElevated;
 
   const rootBase = [
-    "relative",
-    "overflow-hidden",
-    "rounded-2xl",
+    'relative',
+    'overflow-hidden',
+    'rounded-2xl',
     marginClass,
-    "shadow-sm",
-    "shadow-black/5",
+    'shadow-sm',
+    'shadow-black/5',
     extra,
   ]
     .filter(Boolean)
-    .join(" ");
+    .join(' ');
 
   const rootStyle: StyleProp<ViewStyle> = [
     {
@@ -77,7 +77,7 @@ export function Card({
     style,
   ];
 
-  if (variant === "header") {
+  if (variant === 'header') {
     return (
       <View className={rootBase} style={rootStyle}>
         {accentColor ? (
@@ -85,7 +85,7 @@ export function Card({
             <View
               pointerEvents="none"
               style={{
-                position: "absolute",
+                position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
@@ -96,7 +96,7 @@ export function Card({
             <View
               pointerEvents="none"
               style={{
-                position: "absolute",
+                position: 'absolute',
                 top: 4,
                 left: 0,
                 right: 0,
@@ -116,7 +116,7 @@ export function Card({
               style={{ color: tokens.text }}
               numberOfLines={2}
             >
-              {headerTitle ?? ""}
+              {headerTitle ?? ''}
             </Text>
             {headerSubtitle ? (
               <Text
@@ -141,19 +141,21 @@ export function Card({
             </View>
           ) : null}
         </View>
-        <View className="px-4 pb-4 pt-2" style={{ backgroundColor: tokens.surface }}>{children}</View>
+        <View className="px-4 pb-4 pt-2" style={{ backgroundColor: tokens.surface }}>
+          {children}
+        </View>
       </View>
     );
   }
 
-  if (variant === "stat") {
+  if (variant === 'stat') {
     return (
       <View className={rootBase} style={rootStyle}>
         {accentColor ? (
           <View
             pointerEvents="none"
             style={{
-              position: "absolute",
+              position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
@@ -167,11 +169,11 @@ export function Card({
             <View
               pointerEvents="none"
               style={{
-                position: "absolute",
+                position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
-                height: "56%",
+                height: '56%',
                 backgroundColor: accentTint,
               }}
             />
@@ -196,7 +198,7 @@ export function Card({
           <View
             pointerEvents="none"
             style={{
-              position: "absolute",
+              position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
@@ -207,7 +209,7 @@ export function Card({
           <View
             pointerEvents="none"
             style={{
-              position: "absolute",
+              position: 'absolute',
               top: 4,
               left: 0,
               right: 0,

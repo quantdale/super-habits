@@ -1,40 +1,38 @@
-import type { AppNotice, LinkedActionsNoticePayload } from "@/core/notifications/inAppNotices.types";
-import {
-  supportsLinkedActionDirectionPolicy,
-} from "@/core/linked-actions/linkedActions.policy";
+import type {
+  AppNotice,
+  LinkedActionsNoticePayload,
+} from '@/core/notifications/inAppNotices.types';
+import { supportsLinkedActionDirectionPolicy } from '@/core/linked-actions/linkedActions.policy';
 
-export const LINKED_ACTION_RULE_STATUSES = ["active", "paused"] as const;
+export const LINKED_ACTION_RULE_STATUSES = ['active', 'paused'] as const;
 export type LinkedActionRuleStatus = (typeof LINKED_ACTION_RULE_STATUSES)[number];
 
-export const LINKED_ACTION_DIRECTION_POLICIES = [
-  "one_way",
-  "bidirectional_peer",
-] as const;
+export const LINKED_ACTION_DIRECTION_POLICIES = ['one_way', 'bidirectional_peer'] as const;
 export type LinkedActionDirectionPolicy = (typeof LINKED_ACTION_DIRECTION_POLICIES)[number];
 
 export const LINKED_ACTION_FEATURES = [
-  "todos",
-  "habits",
-  "calories",
-  "workout",
-  "pomodoro",
+  'todos',
+  'habits',
+  'calories',
+  'workout',
+  'pomodoro',
 ] as const;
 export type LinkedActionFeature = (typeof LINKED_ACTION_FEATURES)[number];
 
 export const LINKED_ACTION_SOURCE_ENTITY_TYPES_BY_FEATURE = {
-  todos: ["todo"],
-  habits: ["habit"],
-  calories: ["calorie_log"],
-  workout: ["workout_routine"],
-  pomodoro: ["pomodoro_timer"],
+  todos: ['todo'],
+  habits: ['habit'],
+  calories: ['calorie_log'],
+  workout: ['workout_routine'],
+  pomodoro: ['pomodoro_timer'],
 } as const;
 
 export const LINKED_ACTION_TARGET_ENTITY_TYPES_BY_FEATURE = {
-  todos: ["todo"],
-  habits: ["habit"],
-  calories: ["calorie_log"],
-  workout: ["workout_routine"],
-  pomodoro: ["pomodoro_session"],
+  todos: ['todo'],
+  habits: ['habit'],
+  calories: ['calorie_log'],
+  workout: ['workout_routine'],
+  pomodoro: ['pomodoro_session'],
 } as const;
 
 type ValueOfConstArrays<T extends Record<string, readonly string[]>> = T[keyof T][number];
@@ -48,11 +46,11 @@ export type LinkedActionTargetEntityType = ValueOfConstArrays<
 >;
 
 export const LINKED_ACTION_TRIGGER_TYPES_BY_SOURCE_ENTITY = {
-  todo: ["todo.completed"],
-  habit: ["habit.progress_incremented", "habit.completed_for_day"],
-  calorie_log: ["calorie.entry_logged"],
-  workout_routine: ["workout.completed"],
-  pomodoro_timer: ["pomodoro.focus_completed"],
+  todo: ['todo.completed'],
+  habit: ['habit.progress_incremented', 'habit.completed_for_day'],
+  calorie_log: ['calorie.entry_logged'],
+  workout_routine: ['workout.completed'],
+  pomodoro_timer: ['pomodoro.focus_completed'],
 } as const;
 
 export type LinkedActionTriggerType = ValueOfConstArrays<
@@ -60,11 +58,11 @@ export type LinkedActionTriggerType = ValueOfConstArrays<
 >;
 
 export const LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY = {
-  todo: ["todo.complete"],
-  habit: ["habit.increment", "habit.ensure_daily_target"],
-  calorie_log: ["calorie.log"],
-  workout_routine: ["workout.log"],
-  pomodoro_session: ["pomodoro.log"],
+  todo: ['todo.complete'],
+  habit: ['habit.increment', 'habit.ensure_daily_target'],
+  calorie_log: ['calorie.log'],
+  workout_routine: ['workout.log'],
+  pomodoro_session: ['pomodoro.log'],
 } as const;
 
 export type LinkedActionEffectType = ValueOfConstArrays<
@@ -73,61 +71,61 @@ export type LinkedActionEffectType = ValueOfConstArrays<
 
 export const LINKED_ACTION_SUPPORTED_RULE_PATHS = [
   {
-    sourceFeature: "todos",
-    sourceEntityType: "todo",
-    triggerType: "todo.completed",
-    targetFeature: "todos",
-    targetEntityType: "todo",
-    effectType: "todo.complete",
+    sourceFeature: 'todos',
+    sourceEntityType: 'todo',
+    triggerType: 'todo.completed',
+    targetFeature: 'todos',
+    targetEntityType: 'todo',
+    effectType: 'todo.complete',
   },
   {
-    sourceFeature: "todos",
-    sourceEntityType: "todo",
-    triggerType: "todo.completed",
-    targetFeature: "habits",
-    targetEntityType: "habit",
-    effectType: "habit.increment",
+    sourceFeature: 'todos',
+    sourceEntityType: 'todo',
+    triggerType: 'todo.completed',
+    targetFeature: 'habits',
+    targetEntityType: 'habit',
+    effectType: 'habit.increment',
   },
   {
-    sourceFeature: "habits",
-    sourceEntityType: "habit",
-    triggerType: "habit.completed_for_day",
-    targetFeature: "todos",
-    targetEntityType: "todo",
-    effectType: "todo.complete",
+    sourceFeature: 'habits',
+    sourceEntityType: 'habit',
+    triggerType: 'habit.completed_for_day',
+    targetFeature: 'todos',
+    targetEntityType: 'todo',
+    effectType: 'todo.complete',
   },
   {
-    sourceFeature: "habits",
-    sourceEntityType: "habit",
-    triggerType: "habit.completed_for_day",
-    targetFeature: "habits",
-    targetEntityType: "habit",
-    effectType: "habit.increment",
+    sourceFeature: 'habits',
+    sourceEntityType: 'habit',
+    triggerType: 'habit.completed_for_day',
+    targetFeature: 'habits',
+    targetEntityType: 'habit',
+    effectType: 'habit.increment',
   },
   {
-    sourceFeature: "habits",
-    sourceEntityType: "habit",
-    triggerType: "habit.completed_for_day",
-    targetFeature: "habits",
-    targetEntityType: "habit",
-    effectType: "habit.ensure_daily_target",
+    sourceFeature: 'habits',
+    sourceEntityType: 'habit',
+    triggerType: 'habit.completed_for_day',
+    targetFeature: 'habits',
+    targetEntityType: 'habit',
+    effectType: 'habit.ensure_daily_target',
   },
   {
-    sourceFeature: "habits",
-    sourceEntityType: "habit",
-    triggerType: "habit.completed_for_day",
-    targetFeature: "workout",
-    targetEntityType: "workout_routine",
-    effectType: "workout.log",
+    sourceFeature: 'habits',
+    sourceEntityType: 'habit',
+    triggerType: 'habit.completed_for_day',
+    targetFeature: 'workout',
+    targetEntityType: 'workout_routine',
+    effectType: 'workout.log',
   },
-] as const satisfies ReadonlyArray<{
+] as const satisfies readonly {
   sourceFeature: LinkedActionFeature;
   sourceEntityType: LinkedActionSourceEntityType;
   triggerType: LinkedActionTriggerType;
   targetFeature: LinkedActionFeature;
   targetEntityType: LinkedActionTargetEntityType;
   effectType: LinkedActionEffectType;
-}>;
+}[];
 
 function uniqueValues<T extends string>(values: readonly T[]): T[] {
   return [...new Set(values)];
@@ -166,36 +164,36 @@ export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY =
   }, {});
 
 export const LINKED_ACTION_UNSUPPORTED_RULE_MESSAGE =
-  "This linked action uses an unsupported target and must be removed or replaced.";
+  'This linked action uses an unsupported target and must be removed or replaced.';
 
-export type LinkedActionDateStrategy = "today" | "source_date";
-export type LinkedActionMealType = "breakfast" | "lunch" | "dinner" | "snack";
-export type LinkedActionPomodoroSessionType = "focus" | "short_break" | "long_break";
+export type LinkedActionDateStrategy = 'today' | 'source_date';
+export type LinkedActionMealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type LinkedActionPomodoroSessionType = 'focus' | 'short_break' | 'long_break';
 
 export type LinkedActionBinaryEffectDefinition = {
-  kind: "binary";
-  type: "todo.complete";
+  kind: 'binary';
+  type: 'todo.complete';
 };
 
 export type LinkedActionHabitIncrementEffectDefinition = {
-  kind: "progress";
-  type: "habit.increment";
+  kind: 'progress';
+  type: 'habit.increment';
   amount: number;
   dateStrategy: LinkedActionDateStrategy;
 };
 
 export type LinkedActionHabitEnsureTargetEffectDefinition = {
-  kind: "progress";
-  type: "habit.ensure_daily_target";
-  minimumCount: number | "target_per_day";
+  kind: 'progress';
+  type: 'habit.ensure_daily_target';
+  minimumCount: number | 'target_per_day';
   dateStrategy: LinkedActionDateStrategy;
 };
 
 export type LinkedActionCalorieLogEffectDefinition = {
-  kind: "log";
-  type: "calorie.log";
+  kind: 'log';
+  type: 'calorie.log';
   dateStrategy: LinkedActionDateStrategy;
-  templateSource: "inline" | "saved_meal";
+  templateSource: 'inline' | 'saved_meal';
   savedMealId: string | null;
   foodName: string;
   calories: number;
@@ -207,14 +205,14 @@ export type LinkedActionCalorieLogEffectDefinition = {
 };
 
 export type LinkedActionWorkoutLogEffectDefinition = {
-  kind: "log";
-  type: "workout.log";
+  kind: 'log';
+  type: 'workout.log';
   notes: string | null;
 };
 
 export type LinkedActionPomodoroLogEffectDefinition = {
-  kind: "log";
-  type: "pomodoro.log";
+  kind: 'log';
+  type: 'pomodoro.log';
   sessionType: LinkedActionPomodoroSessionType;
   durationSeconds: number;
 };
@@ -242,7 +240,7 @@ export type LinkedActionRuleTarget = {
 };
 
 export type LinkedActionUnsupportedEffectDefinition = {
-  kind: "unsupported";
+  kind: 'unsupported';
   type: string;
   rawPayload: string;
 };
@@ -285,8 +283,7 @@ export type LinkedActionUnsupportedRuleDefinition = LinkedActionRuleDefinitionBa
 };
 
 export type LinkedActionRuleDefinition =
-  | LinkedActionSupportedRuleDefinition
-  | LinkedActionUnsupportedRuleDefinition;
+  LinkedActionSupportedRuleDefinition | LinkedActionUnsupportedRuleDefinition;
 
 export type CreateLinkedActionRuleInput = {
   status?: LinkedActionRuleStatus;
@@ -324,7 +321,7 @@ export type LinkedActionRuleRow = {
   deleted_at: string | null;
 };
 
-export type LinkedActionOriginKind = "user" | "linked_action" | "system";
+export type LinkedActionOriginKind = 'user' | 'linked_action' | 'system';
 
 export type LinkedActionOriginMetadata = {
   originKind: LinkedActionOriginKind;
@@ -348,7 +345,7 @@ export type LinkedActionDedupeMetadata = {
 
 export type LinkedActionNotificationRecord = {
   id: string;
-  status: "pending" | "shown" | "read" | "dismissed";
+  status: 'pending' | 'shown' | 'read' | 'dismissed';
   title: string;
   body: string;
   targetFeature: LinkedActionFeature;
@@ -360,7 +357,7 @@ export type LinkedActionNotificationRecord = {
 };
 
 function objectValues<T extends Record<string, readonly string[]>>(record: T) {
-  return Object.values(record) as Array<T[keyof T]>;
+  return Object.values(record) as T[keyof T][];
 }
 
 function isStringArrayMember<T extends readonly string[]>(
@@ -372,7 +369,7 @@ function isStringArrayMember<T extends readonly string[]>(
 
 function flattenConstArrays<T extends Record<string, readonly string[]>>(
   record: T,
-): Array<T[keyof T][number]> {
+): T[keyof T][number][] {
   return objectValues(record).flatMap((value) => [...value]);
 }
 
@@ -392,7 +389,7 @@ const ALL_LINKED_ACTION_SUPPORTED_EFFECT_TYPES = Object.values(
   LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY,
 ).flatMap((value) => (value ? [...value] : []));
 function expectObject(value: unknown, context: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`${context} must be a JSON object`);
   }
   return value as Record<string, unknown>;
@@ -403,7 +400,7 @@ function expectJsonObject(value: string, context: string): Record<string, unknow
 }
 
 function expectString(value: unknown, context: string): string {
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     throw new Error(`${context} must be a string`);
   }
   return value;
@@ -415,32 +412,32 @@ function expectNullableString(value: unknown, context: string): string | null {
 }
 
 function expectNumber(value: unknown, context: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`${context} must be a finite number`);
   }
   return value;
 }
 
 function expectDateStrategy(value: unknown): LinkedActionDateStrategy {
-  const dateStrategy = expectString(value, "dateStrategy");
-  if (!["today", "source_date"].includes(dateStrategy)) {
-    throw new Error("dateStrategy must be today or source_date");
+  const dateStrategy = expectString(value, 'dateStrategy');
+  if (!['today', 'source_date'].includes(dateStrategy)) {
+    throw new Error('dateStrategy must be today or source_date');
   }
   return dateStrategy as LinkedActionDateStrategy;
 }
 
 function expectMealType(value: unknown): LinkedActionMealType {
-  const mealType = expectString(value, "calorie.log mealType");
-  if (!["breakfast", "lunch", "dinner", "snack"].includes(mealType)) {
-    throw new Error("calorie.log mealType must be breakfast, lunch, dinner, or snack");
+  const mealType = expectString(value, 'calorie.log mealType');
+  if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(mealType)) {
+    throw new Error('calorie.log mealType must be breakfast, lunch, dinner, or snack');
   }
   return mealType as LinkedActionMealType;
 }
 
 function expectPomodoroSessionType(value: unknown): LinkedActionPomodoroSessionType {
-  const sessionType = expectString(value, "pomodoro.log sessionType");
-  if (!["focus", "short_break", "long_break"].includes(sessionType)) {
-    throw new Error("pomodoro.log sessionType must be focus, short_break, or long_break");
+  const sessionType = expectString(value, 'pomodoro.log sessionType');
+  if (!['focus', 'short_break', 'long_break'].includes(sessionType)) {
+    throw new Error('pomodoro.log sessionType must be focus, short_break, or long_break');
   }
   return sessionType as LinkedActionPomodoroSessionType;
 }
@@ -449,9 +446,7 @@ export function isLinkedActionRuleStatus(value: string): value is LinkedActionRu
   return isStringArrayMember(LINKED_ACTION_RULE_STATUSES, value);
 }
 
-export function isLinkedActionDirectionPolicy(
-  value: string,
-): value is LinkedActionDirectionPolicy {
+export function isLinkedActionDirectionPolicy(value: string): value is LinkedActionDirectionPolicy {
   return isStringArrayMember(LINKED_ACTION_DIRECTION_POLICIES, value);
 }
 
@@ -485,9 +480,7 @@ export function isSupportedLinkedActionTriggerType(
   return (LINKED_ACTION_SUPPORTED_TRIGGER_TYPES as readonly string[]).includes(value);
 }
 
-export function isSupportedLinkedActionTargetFeature(
-  value: string,
-): value is LinkedActionFeature {
+export function isSupportedLinkedActionTargetFeature(value: string): value is LinkedActionFeature {
   return (LINKED_ACTION_SUPPORTED_TARGET_FEATURES as readonly string[]).includes(value);
 }
 
@@ -527,14 +520,9 @@ export function isSupportedLinkedActionTargetEntity(
     return false;
   }
 
-  const supportedEntityTypes =
-    LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE[
-      feature as keyof typeof LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE
-    ];
+  const supportedEntityTypes = LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE[feature];
 
-  return (
-    supportedEntityTypes?.includes(entityType as never) ?? false
-  );
+  return supportedEntityTypes?.includes(entityType) ?? false;
 }
 
 export function isSupportedLinkedActionEffect(
@@ -545,14 +533,9 @@ export function isSupportedLinkedActionEffect(
     return false;
   }
 
-  const supportedEffectTypes =
-    LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY[
-      entityType as keyof typeof LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY
-    ];
+  const supportedEffectTypes = LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY[entityType];
 
-  return (
-    supportedEffectTypes?.includes(effectType as never) ?? false
-  );
+  return supportedEffectTypes?.includes(effectType) ?? false;
 }
 
 export function isSupportedLinkedActionRulePath(
@@ -602,85 +585,83 @@ export function parseLinkedActionEffectPayload(
   const parsed = expectJsonObject(rawPayload, `${effectType} payload`);
 
   switch (effectType) {
-    case "todo.complete":
-      return { kind: "binary", type: "todo.complete" };
-    case "habit.increment":
+    case 'todo.complete':
+      return { kind: 'binary', type: 'todo.complete' };
+    case 'habit.increment':
       return {
-        kind: "progress",
-        type: "habit.increment",
-        amount: expectNumber(parsed.amount, "habit.increment amount"),
+        kind: 'progress',
+        type: 'habit.increment',
+        amount: expectNumber(parsed.amount, 'habit.increment amount'),
         dateStrategy: expectDateStrategy(parsed.dateStrategy),
       };
-    case "habit.ensure_daily_target": {
+    case 'habit.ensure_daily_target': {
       const minimumCount = parsed.minimumCount;
       if (
-        minimumCount !== "target_per_day" &&
-        (typeof minimumCount !== "number" || !Number.isFinite(minimumCount))
+        minimumCount !== 'target_per_day' &&
+        (typeof minimumCount !== 'number' || !Number.isFinite(minimumCount))
       ) {
         throw new Error(
-          "habit.ensure_daily_target minimumCount must be a finite number or target_per_day",
+          'habit.ensure_daily_target minimumCount must be a finite number or target_per_day',
         );
       }
       return {
-        kind: "progress",
-        type: "habit.ensure_daily_target",
+        kind: 'progress',
+        type: 'habit.ensure_daily_target',
         minimumCount,
         dateStrategy: expectDateStrategy(parsed.dateStrategy),
       };
     }
-    case "calorie.log": {
-      const templateSource = expectString(parsed.templateSource, "calorie.log templateSource");
-      if (!["inline", "saved_meal"].includes(templateSource)) {
-        throw new Error("calorie.log templateSource must be inline or saved_meal");
+    case 'calorie.log': {
+      const templateSource = expectString(parsed.templateSource, 'calorie.log templateSource');
+      if (!['inline', 'saved_meal'].includes(templateSource)) {
+        throw new Error('calorie.log templateSource must be inline or saved_meal');
       }
       return {
-        kind: "log",
-        type: "calorie.log",
+        kind: 'log',
+        type: 'calorie.log',
         dateStrategy: expectDateStrategy(parsed.dateStrategy),
-        templateSource: templateSource as "inline" | "saved_meal",
-        savedMealId: expectNullableString(parsed.savedMealId, "calorie.log savedMealId"),
-        foodName: expectString(parsed.foodName, "calorie.log foodName"),
-        calories: expectNumber(parsed.calories, "calorie.log calories"),
-        protein: expectNumber(parsed.protein, "calorie.log protein"),
-        carbs: expectNumber(parsed.carbs, "calorie.log carbs"),
-        fats: expectNumber(parsed.fats, "calorie.log fats"),
-        fiber: expectNumber(parsed.fiber, "calorie.log fiber"),
+        templateSource: templateSource as 'inline' | 'saved_meal',
+        savedMealId: expectNullableString(parsed.savedMealId, 'calorie.log savedMealId'),
+        foodName: expectString(parsed.foodName, 'calorie.log foodName'),
+        calories: expectNumber(parsed.calories, 'calorie.log calories'),
+        protein: expectNumber(parsed.protein, 'calorie.log protein'),
+        carbs: expectNumber(parsed.carbs, 'calorie.log carbs'),
+        fats: expectNumber(parsed.fats, 'calorie.log fats'),
+        fiber: expectNumber(parsed.fiber, 'calorie.log fiber'),
         mealType: expectMealType(parsed.mealType),
       };
     }
-    case "workout.log":
+    case 'workout.log':
       return {
-        kind: "log",
-        type: "workout.log",
-        notes: expectNullableString(parsed.notes, "workout.log notes"),
+        kind: 'log',
+        type: 'workout.log',
+        notes: expectNullableString(parsed.notes, 'workout.log notes'),
       };
-    case "pomodoro.log":
+    case 'pomodoro.log':
       return {
-        kind: "log",
-        type: "pomodoro.log",
+        kind: 'log',
+        type: 'pomodoro.log',
         sessionType: expectPomodoroSessionType(parsed.sessionType),
-        durationSeconds: expectNumber(parsed.durationSeconds, "pomodoro.log durationSeconds"),
+        durationSeconds: expectNumber(parsed.durationSeconds, 'pomodoro.log durationSeconds'),
       };
   }
 }
 
-export function serializeLinkedActionEffectPayload(
-  effect: LinkedActionEffectDefinition,
-): string {
+export function serializeLinkedActionEffectPayload(effect: LinkedActionEffectDefinition): string {
   switch (effect.type) {
-    case "todo.complete":
+    case 'todo.complete':
       return JSON.stringify({});
-    case "habit.increment":
+    case 'habit.increment':
       return JSON.stringify({
         amount: effect.amount,
         dateStrategy: effect.dateStrategy,
       });
-    case "habit.ensure_daily_target":
+    case 'habit.ensure_daily_target':
       return JSON.stringify({
         minimumCount: effect.minimumCount,
         dateStrategy: effect.dateStrategy,
       });
-    case "calorie.log":
+    case 'calorie.log':
       return JSON.stringify({
         dateStrategy: effect.dateStrategy,
         templateSource: effect.templateSource,
@@ -693,9 +674,9 @@ export function serializeLinkedActionEffectPayload(
         fiber: effect.fiber,
         mealType: effect.mealType,
       });
-    case "workout.log":
+    case 'workout.log':
       return JSON.stringify({ notes: effect.notes });
-    case "pomodoro.log":
+    case 'pomodoro.log':
       return JSON.stringify({
         sessionType: effect.sessionType,
         durationSeconds: effect.durationSeconds,
@@ -706,7 +687,7 @@ export function serializeLinkedActionEffectPayload(
 export function assertValidLinkedActionRuleShape(
   source: LinkedActionRuleSource,
   target: LinkedActionRuleTarget,
-  directionPolicy: LinkedActionDirectionPolicy = "one_way",
+  directionPolicy: LinkedActionDirectionPolicy = 'one_way',
 ): void {
   if (!isAllowedLinkedActionSourceEntity(source.feature, source.entityType)) {
     throw new Error(
@@ -719,7 +700,7 @@ export function assertValidLinkedActionRuleShape(
     );
   }
   if (!isSupportedLinkedActionTriggerType(source.triggerType)) {
-    throw new Error(`Trigger ${source.triggerType} is not currently supported.`);
+    throw new Error(`Trigger ${String(source.triggerType)} is not currently supported.`);
   }
   if (!isAllowedLinkedActionTargetEntity(target.feature, target.entityType)) {
     throw new Error(
@@ -757,9 +738,7 @@ export function assertValidLinkedActionRuleShape(
   }
 }
 
-export function normalizeLinkedActionRuleRow(
-  row: LinkedActionRuleRow,
-): LinkedActionRuleDefinition {
+export function normalizeLinkedActionRuleRow(row: LinkedActionRuleRow): LinkedActionRuleDefinition {
   if (!isLinkedActionRuleStatus(row.status)) {
     throw new Error(`Unknown linked action rule status: ${row.status}`);
   }
@@ -805,7 +784,7 @@ export function normalizeLinkedActionRuleRow(
       entityType: row.target_entity_type,
       entityId: row.target_entity_id,
       effect: {
-        kind: "unsupported",
+        kind: 'unsupported',
         type: row.effect_type,
         rawPayload: row.effect_payload,
       },
@@ -824,9 +803,7 @@ export function normalizeLinkedActionRuleRow(
     return unsupportedRule(`Unknown linked action target feature: ${row.target_feature}`);
   }
   if (!isLinkedActionTargetEntityType(row.target_entity_type)) {
-    return unsupportedRule(
-      `Unknown linked action target entity type: ${row.target_entity_type}`,
-    );
+    return unsupportedRule(`Unknown linked action target entity type: ${row.target_entity_type}`);
   }
   if (!isAllowedLinkedActionTargetEntity(row.target_feature, row.target_entity_type)) {
     return unsupportedRule(
@@ -881,11 +858,9 @@ export function normalizeLinkedActionRuleRow(
   }
 }
 
-export function buildLinkedActionRuleRow(
-  rule: LinkedActionRuleDefinition,
-): LinkedActionRuleRow {
+export function buildLinkedActionRuleRow(rule: LinkedActionRuleDefinition): LinkedActionRuleRow {
   if (rule.isUnsupported) {
-    throw new Error("Unsupported linked action rules must be removed or replaced before saving.");
+    throw new Error('Unsupported linked action rules must be removed or replaced before saving.');
   }
 
   assertValidLinkedActionRuleShape(rule.source, rule.target, rule.directionPolicy);
@@ -911,48 +886,45 @@ export function buildLinkedActionRuleRow(
 }
 
 export function parseLinkedActionRuleRecord(value: unknown): LinkedActionRuleDefinition {
-  const raw = expectObject(value, "linked action rule");
-  const source = expectObject(raw.source, "linked action source");
-  const target = expectObject(raw.target, "linked action target");
-  const effect = expectObject(target.effect, "linked action effect");
-  const effectType = expectString(effect.type, "linked action effect type");
+  const raw = expectObject(value, 'linked action rule');
+  const source = expectObject(raw.source, 'linked action source');
+  const target = expectObject(raw.target, 'linked action target');
+  const effect = expectObject(target.effect, 'linked action effect');
+  const effectType = expectString(effect.type, 'linked action effect type');
 
   return normalizeLinkedActionRuleRow({
-    id: expectString(raw.id, "linked action id"),
-    status: expectString(raw.status, "linked action status"),
-    direction_policy: expectString(raw.directionPolicy, "linked action directionPolicy"),
+    id: expectString(raw.id, 'linked action id'),
+    status: expectString(raw.status, 'linked action status'),
+    direction_policy: expectString(raw.directionPolicy, 'linked action directionPolicy'),
     bidirectional_group_id: expectNullableString(
       raw.bidirectionalGroupId,
-      "linked action bidirectionalGroupId",
+      'linked action bidirectionalGroupId',
     ),
-    source_feature: expectString(source.feature, "linked action source feature"),
-    source_entity_type: expectString(source.entityType, "linked action source entityType"),
-    source_entity_id: expectNullableString(source.entityId, "linked action source entityId"),
-    trigger_type: expectString(source.triggerType, "linked action source triggerType"),
-    target_feature: expectString(target.feature, "linked action target feature"),
-    target_entity_type: expectString(target.entityType, "linked action target entityType"),
-    target_entity_id: expectNullableString(target.entityId, "linked action target entityId"),
+    source_feature: expectString(source.feature, 'linked action source feature'),
+    source_entity_type: expectString(source.entityType, 'linked action source entityType'),
+    source_entity_id: expectNullableString(source.entityId, 'linked action source entityId'),
+    trigger_type: expectString(source.triggerType, 'linked action source triggerType'),
+    target_feature: expectString(target.feature, 'linked action target feature'),
+    target_entity_type: expectString(target.entityType, 'linked action target entityType'),
+    target_entity_id: expectNullableString(target.entityId, 'linked action target entityId'),
     effect_type: effectType,
     effect_payload: JSON.stringify(effect),
-    created_at: expectString(raw.createdAt, "linked action createdAt"),
-    updated_at: expectString(raw.updatedAt, "linked action updatedAt"),
-    deleted_at: expectNullableString(raw.deletedAt, "linked action deletedAt"),
+    created_at: expectString(raw.createdAt, 'linked action createdAt'),
+    updated_at: expectString(raw.updatedAt, 'linked action updatedAt'),
+    deleted_at: expectNullableString(raw.deletedAt, 'linked action deletedAt'),
   });
 }
 
 export const LINKED_ACTION_EXECUTION_STATUSES = [
-  "planned",
-  "applied",
-  "skipped",
-  "duplicate",
-  "failed",
+  'planned',
+  'applied',
+  'skipped',
+  'duplicate',
+  'failed',
 ] as const;
-export type LinkedActionExecutionStatus =
-  (typeof LINKED_ACTION_EXECUTION_STATUSES)[number];
+export type LinkedActionExecutionStatus = (typeof LINKED_ACTION_EXECUTION_STATUSES)[number];
 
-export type LinkedActionEffectProducedEntityType =
-  | LinkedActionTargetEntityType
-  | "workout_log";
+export type LinkedActionEffectProducedEntityType = LinkedActionTargetEntityType | 'workout_log';
 
 export type LinkedActionSourceActionInput = {
   eventId?: string;
@@ -1019,7 +991,7 @@ export type LinkedActionEffectPlan = {
 };
 
 export type LinkedActionEffectAdapterResult = {
-  status: "applied" | "skipped";
+  status: 'applied' | 'skipped';
   reason?: string | null;
   targetLabel?: string | null;
   producedEntityType?: LinkedActionEffectProducedEntityType | null;
@@ -1085,7 +1057,7 @@ export type LinkedActionEffectResult = {
   noticePreview: LinkedActionsNoticePayload | null;
 };
 
-export type LinkedActionProcessMode = "plan" | "apply";
+export type LinkedActionProcessMode = 'plan' | 'apply';
 
 export type LinkedActionProcessResult = {
   mode: LinkedActionProcessMode;
@@ -1095,9 +1067,7 @@ export type LinkedActionProcessResult = {
   notices: AppNotice[];
 };
 
-export function isLinkedActionExecutionStatus(
-  value: string,
-): value is LinkedActionExecutionStatus {
+export function isLinkedActionExecutionStatus(value: string): value is LinkedActionExecutionStatus {
   return isStringArrayMember(LINKED_ACTION_EXECUTION_STATUSES, value);
 }
 
@@ -1127,27 +1097,23 @@ export function buildLinkedActionEventRow(
   };
 }
 
-export function normalizeLinkedActionEventRow(
-  row: LinkedActionEventRow,
-): LinkedActionEventRecord {
+export function normalizeLinkedActionEventRow(row: LinkedActionEventRow): LinkedActionEventRecord {
   if (!isLinkedActionFeature(row.source_feature)) {
     throw new Error(`Unknown linked action event source feature: ${row.source_feature}`);
   }
   if (!isLinkedActionSourceEntityType(row.source_entity_type)) {
-    throw new Error(
-      `Unknown linked action event source entity type: ${row.source_entity_type}`,
-    );
+    throw new Error(`Unknown linked action event source entity type: ${row.source_entity_type}`);
   }
   if (!isLinkedActionTriggerType(row.trigger_type)) {
     throw new Error(`Unknown linked action event trigger type: ${row.trigger_type}`);
   }
-  if (!["user", "linked_action", "system"].includes(row.origin_kind)) {
+  if (!['user', 'linked_action', 'system'].includes(row.origin_kind)) {
     throw new Error(`Unknown linked action event origin kind: ${row.origin_kind}`);
   }
 
-  const payload = JSON.parse(row.payload);
+  const payload: unknown = JSON.parse(row.payload);
   const parsedPayload =
-    typeof payload === "object" && payload !== null && !Array.isArray(payload)
+    typeof payload === 'object' && payload !== null && !Array.isArray(payload)
       ? (payload as Record<string, unknown>)
       : {};
 

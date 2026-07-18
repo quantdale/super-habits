@@ -1,10 +1,10 @@
-import { Pressable, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import type { Habit } from "./types";
-import { calculateHabitProgress } from "@/features/habits/habits.domain";
-import { ProgressRing } from "@/features/habits/ProgressRing";
-import { DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
+import { Pressable, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import type { Habit } from './types';
+import { calculateHabitProgress } from '@/features/habits/habits.domain';
+import { ProgressRing } from '@/features/habits/ProgressRing';
+import { DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
 
 type HabitCircleProps = {
   habit: Habit;
@@ -52,11 +52,11 @@ export function HabitCircle({
       >
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             width: ringSize,
             height: ringSize,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <ProgressRing
@@ -69,15 +69,15 @@ export function HabitCircle({
         </View>
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             left: (ringSize - size) / 2,
             top: (ringSize - size) / 2,
             width: size,
             height: size,
             borderRadius: size / 2,
             backgroundColor: iconTint,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <MaterialIcons name={iconName} size={iconSize} color={habitColor} />
@@ -85,7 +85,7 @@ export function HabitCircle({
       </Pressable>
       {showStreak && streak > 0 && (
         <Text className="mt-0.5 text-xs font-medium text-amber-500">
-          {streak > 2 ? "🔥" : "⚡"} {streak}
+          {streak > 2 ? '🔥' : '⚡'} {streak}
         </Text>
       )}
       {showName ? (

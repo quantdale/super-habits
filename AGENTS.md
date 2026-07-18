@@ -60,38 +60,38 @@ Key product facts:
 
 ## Key Configuration Files
 
-| File | Purpose |
-|------|---------|
-| `package.json` | Dependencies, scripts, version `1.0.0`, main `expo-router/entry` |
-| `app.json` | Expo config: scheme `superhabits`, Android package `com.dale16.superhabits`, web static export, COOP/COEP headers, plugins |
-| `eas.json` | EAS Build profiles (`development`, `preview` APK, `production`); CLI `>= 18.5.0` |
-| `vercel.json` | Static web PWA deploy: `npm run build:web` → `dist/`, SPA rewrite, COOP/COEP headers |
-| `tsconfig.json` | Expo TS base, strict, `@/*` → `./*`, Vitest globals |
-| `metro.config.js` | Metro + NativeWind, `.wasm` asset extension, dev COOP/COEP middleware |
-| `babel.config.js` | Presets: `babel-preset-expo`, `nativewind/babel`; plugin: `react-native-reanimated/plugin` (must be last) |
-| `tailwind.config.js` | NativeWind preset, content paths, per-tab colors (`todos`, `habits`, `focus`, `workout`, `calories`, `brand`, `surface`) |
-| `vitest.config.ts` | Node env, `tests/**/*.test.ts` + `core/**/__tests__/**/*.test.ts`, `@/` alias, `__DEV__ = true` |
-| `playwright.config.ts` | E2E against `http://localhost:8081`, Chromium, `workers: 1` locally, serial files, `scripts/serve-e2e.js` |
-| `scripts/serve-e2e.js` | Static server for E2E; serves `dist/` with `require-corp` COEP and SPA fallback |
-| `.env` / `.env.local` | Optional Supabase and command-parser environment variables (no committed secrets) |
+| File                   | Purpose                                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`         | Dependencies, scripts, version `1.0.0`, main `expo-router/entry`                                                           |
+| `app.json`             | Expo config: scheme `superhabits`, Android package `com.dale16.superhabits`, web static export, COOP/COEP headers, plugins |
+| `eas.json`             | EAS Build profiles (`development`, `preview` APK, `production`); CLI `>= 18.5.0`                                           |
+| `vercel.json`          | Static web PWA deploy: `npm run build:web` → `dist/`, SPA rewrite, COOP/COEP headers                                       |
+| `tsconfig.json`        | Expo TS base, strict, `@/*` → `./*`, Vitest globals                                                                        |
+| `metro.config.js`      | Metro + NativeWind, `.wasm` asset extension, dev COOP/COEP middleware                                                      |
+| `babel.config.js`      | Presets: `babel-preset-expo`, `nativewind/babel`; plugin: `react-native-reanimated/plugin` (must be last)                  |
+| `tailwind.config.js`   | NativeWind preset, content paths, per-tab colors (`todos`, `habits`, `focus`, `workout`, `calories`, `brand`, `surface`)   |
+| `vitest.config.ts`     | Node env, `tests/**/*.test.ts` + `core/**/__tests__/**/*.test.ts`, `@/` alias, `__DEV__ = true`                            |
+| `playwright.config.ts` | E2E against `http://localhost:8081`, Chromium, `workers: 1` locally, serial files, `scripts/serve-e2e.js`                  |
+| `scripts/serve-e2e.js` | Static server for E2E; serves `dist/` with `require-corp` COEP and SPA fallback                                            |
+| `.env` / `.env.local`  | Optional Supabase and command-parser environment variables (no committed secrets)                                          |
 
 ## Directory Structure
 
-| Path | Role |
-|------|------|
-| `app/` | Expo Router only. Thin route wrappers and layouts. No business logic. Root layout mounts the global command-center host. |
-| `features/` | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions: `overview/` and `settings/` are screen-only; `command/` is an overlay-first shell; `shared/` holds cross-feature UI. |
-| `core/` | Cross-cutting infrastructure: DB client/migrations, entity types, sync engine + restore, linked actions, providers, PWA service-worker registration, shared UI primitives (`core/ui/`). |
-| `lib/` | Pure helpers only. No DB access, no feature imports. Includes `id.ts`, `time.ts`, `validation.ts`, `supabase.ts`, `notifications.ts`, etc. |
-| `constants/` | Design tokens such as `sectionColors.ts`. |
-| `tests/` | Vitest unit tests for domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider tests. |
-| `e2e/` | Playwright E2E specs and helpers. Runs against the static web export in `dist/`. |
-| `public/` | Static PWA assets: `sw.js`, `manifest.json`, icons. |
-| `assets/` | App icons and splash images. |
-| `scripts/` | Build/test helpers such as `serve-e2e.js`. |
-| `supabase/` | Supabase Edge Functions (`supabase/functions/parse-ai-command/`). |
-| `patches/` | `patch-package` patches for Metro / React Native CLI plugins. |
-| `docs/` | Architecture maps, knowledge base, and agent workflows. |
+| Path         | Role                                                                                                                                                                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`       | Expo Router only. Thin route wrappers and layouts. No business logic. Root layout mounts the global command-center host.                                                                                                                                            |
+| `features/`  | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions: `overview/` and `settings/` are screen-only; `command/` is an overlay-first shell; `shared/` holds cross-feature UI. |
+| `core/`      | Cross-cutting infrastructure: DB client/migrations, entity types, sync engine + restore, linked actions, providers, PWA service-worker registration, shared UI primitives (`core/ui/`).                                                                             |
+| `lib/`       | Pure helpers only. No DB access, no feature imports. Includes `id.ts`, `time.ts`, `validation.ts`, `supabase.ts`, `notifications.ts`, etc.                                                                                                                          |
+| `constants/` | Design tokens such as `sectionColors.ts`.                                                                                                                                                                                                                           |
+| `tests/`     | Vitest unit tests for domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider tests.                                                                                               |
+| `e2e/`       | Playwright E2E specs and helpers. Runs against the static web export in `dist/`.                                                                                                                                                                                    |
+| `public/`    | Static PWA assets: `sw.js`, `manifest.json`, icons.                                                                                                                                                                                                                 |
+| `assets/`    | App icons and splash images.                                                                                                                                                                                                                                        |
+| `scripts/`   | Build/test helpers such as `serve-e2e.js`.                                                                                                                                                                                                                          |
+| `supabase/`  | Supabase Edge Functions (`supabase/functions/parse-ai-command/`).                                                                                                                                                                                                   |
+| `patches/`   | `patch-package` patches for Metro / React Native CLI plugins.                                                                                                                                                                                                       |
+| `docs/`      | Architecture maps, knowledge base, and agent workflows.                                                                                                                                                                                                             |
 
 ## Architecture & Runtime
 
@@ -201,20 +201,20 @@ Current exceptions:
 
 ## Entity ID Prefixes (`createId`)
 
-| Entity | Prefix |
-|--------|--------|
-| `todos` | `todo` |
-| `habits` | `habit` |
-| `habit_completions` | `hcmp` |
-| `calorie_entries` | `cal` |
-| `saved_meals` | `smeal` |
-| `workout_routines`, `workout_logs` | `wrk` |
-| `routine_exercises` | `ex` |
-| `routine_exercise_sets` | `eset` |
-| `workout_session_exercises` | `wsex` |
-| `pomodoro_sessions` | `pom` |
-| guest profile (`app_meta`) | `guest` |
-| recurring todo series | `rec` |
+| Entity                             | Prefix  |
+| ---------------------------------- | ------- |
+| `todos`                            | `todo`  |
+| `habits`                           | `habit` |
+| `habit_completions`                | `hcmp`  |
+| `calorie_entries`                  | `cal`   |
+| `saved_meals`                      | `smeal` |
+| `workout_routines`, `workout_logs` | `wrk`   |
+| `routine_exercises`                | `ex`    |
+| `routine_exercise_sets`            | `eset`  |
+| `workout_session_exercises`        | `wsex`  |
+| `pomodoro_sessions`                | `pom`   |
+| guest profile (`app_meta`)         | `guest` |
+| recurring todo series              | `rec`   |
 
 ## Build, Run, and Test Commands
 
@@ -230,6 +230,10 @@ npm run web          # headless web dev server
 
 # Quality gates
 npm run typecheck    # tsc --noEmit
+npm run lint         # eslint . --ext .ts,.tsx
+npm run lint:fix     # eslint . --ext .ts,.tsx --fix
+npm run format       # prettier --write .
+npm run format:check # prettier --check .
 npm test             # vitest run
 
 # Web build / deploy
@@ -245,7 +249,8 @@ npm run e2e:debug    # Playwright inspector
 Current verified baselines:
 
 - `npm run typecheck`: 0 errors
-- `npm test`: **340 tests passing** across **32 test files**
+- `npm run lint`: 0 errors (warnings allowed)
+- `npm test`: **343 tests passing** across **33 test files**
 - `npx playwright test --list`: **87 tests** across **13 spec files**
 
 ## Testing Strategy
@@ -350,9 +355,9 @@ Because Expo public env vars are bundled into the client, never put real secrets
 
 ## Task Routing
 
-| Area | Read |
-|------|------|
-| Data/DB/sync/migration issues | `.cursor/agents/data-agent.md` |
+| Area                               | Read                              |
+| ---------------------------------- | --------------------------------- |
+| Data/DB/sync/migration issues      | `.cursor/agents/data-agent.md`    |
 | UI/domain/routing/component issues | `.cursor/agents/feature-agent.md` |
 
 ## Suggested Session Bootstrap Prompt

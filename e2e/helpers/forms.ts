@@ -1,4 +1,4 @@
-import { type Page } from "@playwright/test";
+import { type Page } from '@playwright/test';
 
 function inputAfterLabel(page: Page, label: string) {
   return page
@@ -25,10 +25,10 @@ export async function fillCalorieMacrosOnly(
   fats: string,
   fiber: string,
 ) {
-  await fillById(page, "cal-entry-protein", protein);
-  await fillById(page, "cal-entry-carbs", carbs);
-  await fillById(page, "cal-entry-fat", fats);
-  await fillById(page, "cal-entry-fiber", fiber);
+  await fillById(page, 'cal-entry-protein', protein);
+  await fillById(page, 'cal-entry-carbs', carbs);
+  await fillById(page, 'cal-entry-fat', fats);
+  await fillById(page, 'cal-entry-fiber', fiber);
 }
 
 /**
@@ -37,7 +37,7 @@ export async function fillCalorieMacrosOnly(
  * The header title matches the same copy, so target the last exact text match.
  */
 export async function clickCaloriesAddEntry(page: Page) {
-  await page.getByText("Add entry", { exact: true }).last().click({
+  await page.getByText('Add entry', { exact: true }).last().click({
     force: true,
     timeout: 30_000,
   });
@@ -51,11 +51,11 @@ export async function fillCaloriesMacros(
   fats: string,
   fiber: string,
 ) {
-  await fillById(page, "cal-entry-protein", protein);
-  await fillById(page, "cal-entry-carbs", carbs);
-  await fillById(page, "cal-entry-fat", fats);
-  await fillById(page, "cal-entry-fiber", fiber);
-  await fillById(page, "cal-entry-food", food);
+  await fillById(page, 'cal-entry-protein', protein);
+  await fillById(page, 'cal-entry-carbs', carbs);
+  await fillById(page, 'cal-entry-fat', fats);
+  await fillById(page, 'cal-entry-fiber', fiber);
+  await fillById(page, 'cal-entry-food', food);
 }
 
 /**
@@ -63,8 +63,8 @@ export async function fillCaloriesMacros(
  * so hidden/offscreen tab inputs do not steal indices.
  */
 export async function fillRoutineName(page: Page, name: string) {
-  const input = inputAfterLabel(page, "Routine name");
+  const input = inputAfterLabel(page, 'Routine name');
   await input.click();
-  await input.fill("");
+  await input.fill('');
   await input.type(name, { delay: 15 });
 }

@@ -1,12 +1,12 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AI_COMMAND_INTERNAL_ROLLOUT_STORAGE_KEY =
-  "superhabits.command.internal-rollout.remote-enabled";
+  'superhabits.command.internal-rollout.remote-enabled';
 
 let cachedInternalRolloutPreference: boolean | null = null;
 
 function normalizeStoredPreference(value: string | null): boolean {
-  return value === "enabled";
+  return value === 'enabled';
 }
 
 export async function getAiCommandInternalRolloutPreference(): Promise<boolean> {
@@ -30,7 +30,7 @@ export async function setAiCommandInternalRolloutPreference(enabled: boolean): P
 
   try {
     if (enabled) {
-      await AsyncStorage.setItem(AI_COMMAND_INTERNAL_ROLLOUT_STORAGE_KEY, "enabled");
+      await AsyncStorage.setItem(AI_COMMAND_INTERNAL_ROLLOUT_STORAGE_KEY, 'enabled');
       return;
     }
 

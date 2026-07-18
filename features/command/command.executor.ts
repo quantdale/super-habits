@@ -1,31 +1,31 @@
-import { addHabit } from "@/features/habits/habits.data";
-import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
-import type { HabitIcon } from "@/features/habits/types";
-import { addTodo } from "@/features/todos/todos.data";
-import { validateHabit, validateTodo } from "@/lib/validation";
+import { addHabit } from '@/features/habits/habits.data';
+import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
+import type { HabitIcon } from '@/features/habits/types';
+import { addTodo } from '@/features/todos/todos.data';
+import { validateHabit, validateTodo } from '@/lib/validation';
 import type {
   CommandExecutionResult,
   DraftAiAction,
   DraftCreateHabit,
   DraftCreateTodo,
-} from "./types";
+} from './types';
 
 function resolveHabitDefaults(draft: DraftCreateHabit) {
   return {
-    name: draft.fields.name?.trim() ?? "",
+    name: draft.fields.name?.trim() ?? '',
     targetPerDay: draft.fields.targetPerDay,
-    category: draft.fields.category ?? "anytime",
+    category: draft.fields.category ?? 'anytime',
     icon: (draft.fields.icon as HabitIcon | null) ?? DEFAULT_HABIT_ICON,
     color: draft.fields.color ?? DEFAULT_HABIT_COLOR,
   };
 }
 
 function resolveTodoFields(draft: DraftCreateTodo) {
-  const trimmedDueDate = draft.fields.dueDate?.trim() ?? "";
+  const trimmedDueDate = draft.fields.dueDate?.trim() ?? '';
 
   return {
-    title: draft.fields.title?.trim() ?? "",
-    notes: draft.fields.notes?.trim() ?? "",
+    title: draft.fields.title?.trim() ?? '',
+    notes: draft.fields.notes?.trim() ?? '',
     dueDate: trimmedDueDate.length > 0 ? trimmedDueDate : null,
     priority: draft.fields.priority,
   };
@@ -37,7 +37,7 @@ async function executeCreateTodo(draft: DraftCreateTodo): Promise<CommandExecuti
 
   if (validationMessage) {
     return {
-      outcome: "validation_error",
+      outcome: 'validation_error',
       message: validationMessage,
     };
   }
@@ -52,15 +52,15 @@ async function executeCreateTodo(draft: DraftCreateTodo): Promise<CommandExecuti
     });
 
     return {
-      outcome: "success",
-      kind: "create_todo",
+      outcome: 'success',
+      kind: 'create_todo',
       entityId,
-      message: "Todo saved.",
+      message: 'Todo saved.',
     };
   } catch (error) {
     return {
-      outcome: "error",
-      message: error instanceof Error ? error.message : "Unable to save the todo.",
+      outcome: 'error',
+      message: error instanceof Error ? error.message : 'Unable to save the todo.',
     };
   }
 }
@@ -71,7 +71,7 @@ async function executeCreateHabit(draft: DraftCreateHabit): Promise<CommandExecu
 
   if (validationMessage) {
     return {
-      outcome: "validation_error",
+      outcome: 'validation_error',
       message: validationMessage,
     };
   }
@@ -86,23 +86,19 @@ async function executeCreateHabit(draft: DraftCreateHabit): Promise<CommandExecu
     );
 
     return {
-      outcome: "success",
-      kind: "create_habit",
+      outcome: 'success',
+      kind: 'create_habit',
       entityId,
-      message: "Habit saved.",
+      message: 'Habit saved.',
     };
   } catch (error) {
     return {
-      outcome: "error",
-      message: error instanceof Error ? error.message : "Unable to save the habit.",
+      outcome: 'error',
+      message: error instanceof Error ? error.message : 'Unable to save the habit.',
     };
   }
 }
 
-export async function executeDraftAction(
-  draft: DraftAiAction,
-): Promise<CommandExecutionResult> {
-  return draft.kind === "create_todo"
-    ? executeCreateTodo(draft)
-    : executeCreateHabit(draft);
+export async function executeDraftAction(draft: DraftAiAction): Promise<CommandExecutionResult> {
+  return draft.kind === 'create_todo' ? executeCreateTodo(draft) : executeCreateHabit(draft);
 }

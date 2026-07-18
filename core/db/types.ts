@@ -5,9 +5,9 @@ export type BaseEntity = {
   deleted_at: string | null;
 };
 
-export type TodoPriority = "urgent" | "normal" | "low";
+export type TodoPriority = 'urgent' | 'normal' | 'low';
 
-export type TodoRecurrence = "daily" | null;
+export type TodoRecurrence = 'daily' | null;
 
 export type Todo = BaseEntity & {
   title: string;
@@ -20,21 +20,21 @@ export type Todo = BaseEntity & {
   recurrence_id: string | null;
 };
 
-export type HabitCategory = "anytime" | "morning" | "afternoon" | "evening";
+export type HabitCategory = 'anytime' | 'morning' | 'afternoon' | 'evening';
 
 export type HabitIcon =
-  | "check-circle"
-  | "favorite"
-  | "local-drink"
-  | "menu-book"
-  | "fitness-center"
-  | "wb-sunny"
-  | "bedtime"
-  | "self-improvement"
-  | "water-drop"
-  | "coffee"
-  | "psychology"
-  | "spa";
+  | 'check-circle'
+  | 'favorite'
+  | 'local-drink'
+  | 'menu-book'
+  | 'fitness-center'
+  | 'wb-sunny'
+  | 'bedtime'
+  | 'self-improvement'
+  | 'water-drop'
+  | 'coffee'
+  | 'psychology'
+  | 'spa';
 
 export type Habit = BaseEntity & {
   name: string;
@@ -61,7 +61,7 @@ export type PomodoroSession = {
   ended_at: string;
   duration_seconds: number;
   /** Legacy rows may use "break"; new logs use focus / short_break / long_break as needed */
-  session_type: "focus" | "break" | "short_break" | "long_break";
+  session_type: 'focus' | 'break' | 'short_break' | 'long_break';
   created_at: string;
 };
 
@@ -106,7 +106,7 @@ export type CalorieEntry = BaseEntity & {
   carbs: number;
   fats: number;
   fiber: number;
-  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   consumed_on: string;
 };
 

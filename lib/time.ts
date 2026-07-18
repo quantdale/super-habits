@@ -4,13 +4,13 @@ export function nowIso(): string {
 
 export function toDateKey(date = new Date()): string {
   const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
 export function dateKeyToLocalDate(dateKey: string): Date {
-  const [year, month, day] = dateKey.split("-").map(Number);
+  const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day, 0, 0, 0, 0);
 }
 

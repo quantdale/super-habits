@@ -1,12 +1,12 @@
-import { Platform, Text, TextInput, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import { Platform, Text, TextInput, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type TextFieldProps = {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
-  keyboardType?: "default" | "numeric" | "number-pad";
+  keyboardType?: 'default' | 'numeric' | 'number-pad';
   /** When true, only digits 0–9 are kept; uses number-pad. */
   unsignedInteger?: boolean;
   /** Passed to TextInput (screen readers + stable E2E on web). Defaults to `label`. */
@@ -20,17 +20,17 @@ export function TextField({
   value,
   onChangeText,
   placeholder,
-  keyboardType = "default",
+  keyboardType = 'default',
   unsignedInteger = false,
   accessibilityLabel: accessibilityLabelProp,
   nativeID,
 }: TextFieldProps) {
   const { tokens } = useAppTheme();
-  const resolvedKeyboardType = unsignedInteger ? "number-pad" : keyboardType;
+  const resolvedKeyboardType = unsignedInteger ? 'number-pad' : keyboardType;
 
   const handleChangeText = (text: string) => {
     if (unsignedInteger) {
-      onChangeText(text.replace(/\D/g, ""));
+      onChangeText(text.replace(/\D/g, ''));
     } else {
       onChangeText(text);
     }
@@ -38,7 +38,9 @@ export function TextField({
 
   return (
     <View className="mb-3">
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>{label}</Text>
+      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+        {label}
+      </Text>
       <TextInput
         nativeID={nativeID}
         accessibilityLabel={accessibilityLabelProp ?? label}
@@ -54,7 +56,7 @@ export function TextField({
         placeholder={placeholder}
         placeholderTextColor={tokens.textMuted}
         keyboardType={resolvedKeyboardType}
-        {...(Platform.OS === "web" && nativeID ? { id: nativeID } : {})}
+        {...(Platform.OS === 'web' && nativeID ? { id: nativeID } : {})}
       />
     </View>
   );

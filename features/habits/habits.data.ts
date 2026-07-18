@@ -1,27 +1,28 @@
-import { getDatabase } from "@/core/db/client";
-import { Habit, HabitCategory, HabitCompletion, HabitIcon } from "@/core/db/types";
+import { getDatabase } from '@/core/db/client';
+import { Habit, HabitCategory, HabitCompletion, HabitIcon } from '@/core/db/types';
 import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
   LinkedActionRuleDefinition,
   SaveLinkedActionRuleForSourceInput,
-} from "@/core/linked-actions/linkedActions.types";
-import { createId } from "@/lib/id";
-import { nowIso, toDateKey } from "@/lib/time";
-import { syncEngine } from "@/core/sync/sync.engine";
-import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
+} from '@/core/linked-actions/linkedActions.types';
+import { createId } from '@/lib/id';
+import { nowIso, toDateKey } from '@/lib/time';
+import { syncEngine } from '@/core/sync/sync.engine';
+import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import {
   deleteLinkedActionRulesForTargetEntity,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
-} from "@/core/linked-actions/linkedActions.data";
-import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
+} from '@/core/linked-actions/linkedActions.data';
+import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
 
-const CATEGORY_ORDER = "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
+const CATEGORY_ORDER =
+  "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
 
 export type LinkedActionsDispatchResult = Pick<
   LinkedActionProcessResult,
-  "matchedRuleCount" | "notices"
+  'matchedRuleCount' | 'notices'
 >;
 
 const EMPTY_LINKED_ACTIONS_RESULT: LinkedActionsDispatchResult = {
@@ -39,18 +40,18 @@ export async function listHabits(): Promise<Habit[]> {
 export async function addHabit(
   name: string,
   targetPerDay: number,
-  category: HabitCategory = "anytime",
+  category: HabitCategory = 'anytime',
   icon: HabitIcon = DEFAULT_HABIT_ICON,
   color: string = DEFAULT_HABIT_COLOR,
 ): Promise<string> {
-  const id = createId("habit");
+  const id = createId('habit');
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    "INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)",
+    'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)',
     [id, name, targetPerDay, category, icon, color, now, now],
   );
-  syncEngine.enqueue({ entity: "habits", id, updatedAt: now, operation: "create" });
+  syncEngine.enqueue({ entity: 'habits', id, updatedAt: now, operation: 'create' });
   return id;
 }
 
@@ -73,22 +74,22 @@ export async function incrementHabit(
     [habitId],
   );
   const existing = await db.getFirstAsync<{ id: string; count: number }>(
-    "SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
+    'SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
     [habitId, dateKey],
   );
   const previousCount = existing?.count ?? 0;
   const nextCount = previousCount + 1;
-  const completionId = existing?.id ?? createId("hcmp");
+  const completionId = existing?.id ?? createId('hcmp');
 
   if (existing) {
-    await db.runAsync("UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?", [
+    await db.runAsync('UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?', [
       nextCount,
       now,
       existing.id,
     ]);
   } else {
     await db.runAsync(
-      "INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
+      'INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)',
       [completionId, habitId, dateKey, now, now],
     );
   }
@@ -102,15 +103,15 @@ export async function incrementHabit(
 
   const processResult = await linkedActionsEngine.processSourceAction({
     occurredAt: now,
-    feature: "habits",
-    entityType: "habit",
+    feature: 'habits',
+    entityType: 'habit',
     entityId: habitId,
-    triggerType: "habit.completed_for_day",
+    triggerType: 'habit.completed_for_day',
     label: habit.name,
     sourceDateKey: dateKey,
     sourceRecordId: completionId,
     origin: {
-      originKind: "user",
+      originKind: 'user',
       originRuleId: null,
       originEventId: null,
     },
@@ -135,17 +136,17 @@ export async function decrementHabit(habitId: string, dateKey = toDateKey()): Pr
   const db = await getDatabase();
   const now = nowIso();
   const existing = await db.getFirstAsync<{ id: string; count: number }>(
-    "SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
+    'SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
     [habitId, dateKey],
   );
   if (!existing || existing.count <= 0) return;
   if (existing.count === 1) {
     // Hard delete intentional: habit_completions is a toggle-off
     // operation (non-synced entity, allowed exception per db-and-sync-invariants)
-    await db.runAsync("DELETE FROM habit_completions WHERE id = ?", [existing.id]);
+    await db.runAsync('DELETE FROM habit_completions WHERE id = ?', [existing.id]);
     return;
   }
-  await db.runAsync("UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?", [
+  await db.runAsync('UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?', [
     existing.count - 1,
     now,
     existing.id,
@@ -155,7 +156,7 @@ export async function decrementHabit(habitId: string, dateKey = toDateKey()): Pr
 export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()): Promise<number> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?",
+    'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
     [habitId, dateKey],
   );
   return row?.count ?? 0;
@@ -216,7 +217,7 @@ export async function updateHabit(
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    "UPDATE habits SET name = ?, target_per_day = ?, category = ?, icon = ?, color = ?, updated_at = ? WHERE id = ?",
+    'UPDATE habits SET name = ?, target_per_day = ?, category = ?, icon = ?, color = ?, updated_at = ? WHERE id = ?',
     [
       updates.name,
       updates.targetPerDay,
@@ -227,15 +228,15 @@ export async function updateHabit(
       habitId,
     ],
   );
-  syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "update" });
+  syncEngine.enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'update' });
 }
 
 export async function listHabitLinkedActionRules(
   habitId: string,
 ): Promise<LinkedActionRuleDefinition[]> {
   return listLinkedActionRulesForSourceEntity({
-    feature: "habits",
-    entityType: "habit",
+    feature: 'habits',
+    entityType: 'habit',
     entityId: habitId,
   });
 }
@@ -245,8 +246,8 @@ export async function saveHabitLinkedActionRules(
   rules: SaveLinkedActionRuleForSourceInput[],
 ): Promise<void> {
   await replaceLinkedActionRulesForSourceEntity({
-    feature: "habits",
-    entityType: "habit",
+    feature: 'habits',
+    entityType: 'habit',
     entityId: habitId,
     rules,
   });
@@ -255,20 +256,26 @@ export async function saveHabitLinkedActionRules(
 export async function deleteHabit(habitId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync("UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, habitId]);
+  await db.runAsync('UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?', [
+    now,
+    now,
+    habitId,
+  ]);
   await saveHabitLinkedActionRules(habitId, []);
   await deleteLinkedActionRulesForTargetEntity({
-    feature: "habits",
-    entityType: "habit",
+    feature: 'habits',
+    entityType: 'habit',
     entityId: habitId,
     deletedAt: now,
   });
-  syncEngine.enqueue({ entity: "habits", id: habitId, updatedAt: now, operation: "delete" });
+  syncEngine.enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'delete' });
 }
 
 async function getLinkedActionHabitTarget(habitId: string) {
   const db = await getDatabase();
-  const habit = await db.getFirstAsync<Pick<Habit, "id" | "name" | "target_per_day" | "deleted_at">>(
+  const habit = await db.getFirstAsync<
+    Pick<Habit, 'id' | 'name' | 'target_per_day' | 'deleted_at'>
+  >(
     `SELECT id, name, target_per_day, deleted_at
      FROM habits
      WHERE id = ?`,
@@ -284,13 +291,13 @@ export async function incrementHabitFromLinkedAction(input: {
 }): Promise<LinkedActionEffectAdapterResult> {
   const { db, habit } = await getLinkedActionHabitTarget(input.habitId);
   if (!habit || habit.deleted_at !== null) {
-    return { status: "skipped", reason: "target_missing" };
+    return { status: 'skipped', reason: 'target_missing' };
   }
 
   if (input.amount <= 0) {
     return {
-      status: "skipped",
-      reason: "invalid_amount",
+      status: 'skipped',
+      reason: 'invalid_amount',
       targetLabel: habit.name,
     };
   }
@@ -315,34 +322,34 @@ export async function incrementHabitFromLinkedAction(input: {
     await db.runAsync(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [createId("hcmp"), input.habitId, input.dateKey, input.amount, now, now],
+      [createId('hcmp'), input.habitId, input.dateKey, input.amount, now, now],
     );
   }
 
   return {
-    status: "applied",
+    status: 'applied',
     targetLabel: habit.name,
   };
 }
 
 export async function ensureHabitDailyTargetFromLinkedAction(input: {
   habitId: string;
-  minimumCount: number | "target_per_day";
+  minimumCount: number | 'target_per_day';
   dateKey: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const { db, habit } = await getLinkedActionHabitTarget(input.habitId);
   if (!habit || habit.deleted_at !== null) {
-    return { status: "skipped", reason: "target_missing" };
+    return { status: 'skipped', reason: 'target_missing' };
   }
 
   const desiredCount = Math.max(
     0,
-    input.minimumCount === "target_per_day" ? habit.target_per_day : input.minimumCount,
+    input.minimumCount === 'target_per_day' ? habit.target_per_day : input.minimumCount,
   );
   if (desiredCount === 0) {
     return {
-      status: "skipped",
-      reason: "already_satisfied",
+      status: 'skipped',
+      reason: 'already_satisfied',
       targetLabel: habit.name,
     };
   }
@@ -358,8 +365,8 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
 
   if (existing && existing.count >= desiredCount) {
     return {
-      status: "skipped",
-      reason: "already_satisfied",
+      status: 'skipped',
+      reason: 'already_satisfied',
       targetLabel: habit.name,
     };
   }
@@ -375,12 +382,12 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
     await db.runAsync(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [createId("hcmp"), input.habitId, input.dateKey, desiredCount, now, now],
+      [createId('hcmp'), input.habitId, input.dateKey, desiredCount, now, now],
     );
   }
 
   return {
-    status: "applied",
+    status: 'applied',
     targetLabel: habit.name,
   };
 }

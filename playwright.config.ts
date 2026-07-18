@@ -1,7 +1,7 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: './e2e',
 
   // Tests within the same file run serially by default (fullyParallel: false).
   fullyParallel: false,
@@ -26,29 +26,29 @@ export default defineConfig({
   // HTML report — viewable in browser after run
   reporter: [
     [
-      "html",
+      'html',
       {
-        outputFolder: ".cursor/playwright-output/e2e-report",
-        open: "never",
+        outputFolder: '.cursor/playwright-output/e2e-report',
+        open: 'never',
       },
     ],
     // Also log to terminal during run so you can see progress
-    ["list"],
+    ['list'],
   ],
 
   use: {
-    baseURL: "http://localhost:8081",
+    baseURL: 'http://localhost:8081',
     headless: true,
 
     // Only capture screenshot on failure — avoids disk bloat
-    screenshot: "only-on-failure",
+    screenshot: 'only-on-failure',
 
     // Store failure screenshots in the gitignored output folder
     // Note: Playwright uses outputDir for test artifacts
-    video: "off",
+    video: 'off',
 
     // Capture trace on first retry — helps diagnose flaky tests in CI
-    trace: "on-first-retry",
+    trace: 'on-first-retry',
 
     // Use "domcontentloaded" instead of "networkidle" by default.
     // "networkidle" waits for ALL network activity to stop — can be slow on
@@ -60,21 +60,21 @@ export default defineConfig({
   },
 
   // Failure screenshots and traces go to the gitignored output folder
-  outputDir: ".cursor/playwright-output/e2e-failures",
+  outputDir: '.cursor/playwright-output/e2e-failures',
 
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
 
-  globalSetup: "./e2e/global.setup.ts",
-  globalTeardown: "./e2e/global.teardown.ts",
+  globalSetup: './e2e/global.setup.ts',
+  globalTeardown: './e2e/global.teardown.ts',
 
   webServer: {
-    command: "node scripts/serve-e2e.js",
-    url: "http://localhost:8081",
+    command: 'node scripts/serve-e2e.js',
+    url: 'http://localhost:8081',
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

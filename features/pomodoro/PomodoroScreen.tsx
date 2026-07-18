@@ -1,28 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View, Pressable } from "react-native";
-import { Screen } from "@/core/ui/Screen";
-import { Card } from "@/core/ui/Card";
-import { Button } from "@/core/ui/Button";
-import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { PillChip } from "@/core/ui/PillChip";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
-import { useCommandLauncherSuppressed } from "@/features/command/CommandCenterProvider";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Text, View, Pressable } from 'react-native';
+import { Screen } from '@/core/ui/Screen';
+import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
+import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { PillChip } from '@/core/ui/PillChip';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import {
+  POMODORO_SECTION_KEY,
+  SECTION_COLORS,
+  SECTION_TEXT_COLORS,
+} from '@/constants/sectionColors';
+import { useCommandLauncherSuppressed } from '@/features/command/CommandCenterProvider';
 import {
   listPomodoroSessionsForDateRange,
   logPomodoroSession,
   getPomodoroSettings,
   savePomodoroSettings,
-} from "@/features/pomodoro/pomodoro.data";
-import { toDateKey } from "@/lib/time";
-import { useForegroundRefresh } from "@/lib/useForegroundRefresh";
-import type { PomodoroSession } from "./types";
-import {
-  cancelScheduledNotification,
-  scheduleTimerEndNotification,
-} from "@/lib/notifications";
+} from '@/features/pomodoro/pomodoro.data';
+import { toDateKey } from '@/lib/time';
+import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
+import type { PomodoroSession } from './types';
+import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
 import {
   buildPomodoroHeatmapDays,
   calculateGrowthProgress,
@@ -35,33 +36,32 @@ import {
   getPlantStage,
   type PomodoroMode,
   type PomodoroSettings,
-} from "./pomodoro.domain";
-import type { HeatmapDay } from "@/features/shared/activityTypes";
-import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
-import { FocusSprout } from "./FocusSprout";
-import { GardenGrid } from "./GardenGrid";
-import { BackgroundWarning } from "./BackgroundWarning";
-import { PomodoroSettingsInline } from "./PomodoroSettingsInline";
-import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+} from './pomodoro.domain';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
+import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import { FocusSprout } from './FocusSprout';
+import { GardenGrid } from './GardenGrid';
+import { BackgroundWarning } from './BackgroundWarning';
+import { PomodoroSettingsInline } from './PomodoroSettingsInline';
 
 const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
 const TEXT_COLOR = SECTION_TEXT_COLORS[POMODORO_SECTION_KEY];
 
 function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   switch (mode) {
-    case "focus":
-      return { title: "Focus complete", body: "Great work. Time for a short break." };
-    case "short_break":
-      return { title: "Break complete", body: "Ready for another focus session." };
-    case "long_break":
-      return { title: "Long break complete", body: "Start a new focus round when you are ready." };
+    case 'focus':
+      return { title: 'Focus complete', body: 'Great work. Time for a short break.' };
+    case 'short_break':
+      return { title: 'Break complete', body: 'Ready for another focus session.' };
+    case 'long_break':
+      return { title: 'Long break complete', body: 'Start a new focus round when you are ready.' };
   }
 }
 
 export function PomodoroScreen() {
   const { tokens } = useAppTheme();
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
-  const [currentMode, setCurrentMode] = useState<PomodoroMode>("focus");
+  const [currentMode, setCurrentMode] = useState<PomodoroMode>('focus');
   const [completedFocus, setCompletedFocus] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [totalSeconds, setTotalSeconds] = useState(DEFAULT_SETTINGS.focusMinutes * 60);
@@ -76,7 +76,7 @@ export function PomodoroScreen() {
   const notificationIdRef = useRef<string | null>(null);
   const lastTickTime = useRef<number | null>(null);
 
-  const currentModeRef = useRef<PomodoroMode>("focus");
+  const currentModeRef = useRef<PomodoroMode>('focus');
   const completedFocusRef = useRef(0);
   const settingsRef = useRef<PomodoroSettings>(DEFAULT_SETTINGS);
   const totalSecondsRef = useRef(DEFAULT_SETTINGS.focusMinutes * 60);
@@ -87,26 +87,28 @@ export function PomodoroScreen() {
   settingsRef.current = settings;
   totalSecondsRef.current = totalSeconds;
   startedAtRef.current = startedAt;
-  useCommandLauncherSuppressed("pomodoro-active-session", isRunning || isPaused);
+  useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
 
   useEffect(() => {
-    getPomodoroSettings().then((s) => {
+    void (async () => {
+      const s = await getPomodoroSettings();
       setSettings(s);
-      const d = getModeDuration("focus", s);
+      const d = getModeDuration('focus', s);
       setTotalSeconds(d);
       setRemaining(d);
-    });
+    })();
   }, []);
 
   useEffect(() => {
-    const start364 = new Date();
-    start364.setDate(start364.getDate() - 363);
-    const startKey = toDateKey(start364);
-    const endKey = toDateKey(new Date());
-    listPomodoroSessionsForDateRange(startKey, endKey).then((s) => {
+    void (async () => {
+      const start364 = new Date();
+      start364.setDate(start364.getDate() - 363);
+      const startKey = toDateKey(start364);
+      const endKey = toDateKey(new Date());
+      const s = await listPomodoroSessionsForDateRange(startKey, endKey);
       setSessions(s);
       setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
-    });
+    })();
   }, [historyVersion]);
 
   const refreshHistoryOnForeground = useCallback(() => {
@@ -123,10 +125,10 @@ export function PomodoroScreen() {
       }
     };
 
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
       return () => {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
   }, [isRunning]);
@@ -162,15 +164,15 @@ export function PomodoroScreen() {
           const totalSec = totalSecondsRef.current;
           const started = startedAtRef.current;
 
-          if (mode === "focus" && started) {
+          if (mode === 'focus' && started) {
             const endedAt = new Date();
             void logPomodoroSession(
               started.toISOString(),
               endedAt.toISOString(),
               totalSec,
-              "focus",
+              'focus',
             ).catch((err) => {
-              console.error("[PomodoroScreen] logPomodoroSession failed", err);
+              console.error('[PomodoroScreen] logPomodoroSession failed', err);
             });
             setHistoryVersion((v) => v + 1);
             const nextCompleted = completedFocusRef.current + 1;
@@ -178,7 +180,7 @@ export function PomodoroScreen() {
             completedFocusRef.current = nextCompleted;
           }
 
-          if (mode === "long_break") {
+          if (mode === 'long_break') {
             setCompletedFocus(0);
             completedFocusRef.current = 0;
           }
@@ -206,14 +208,13 @@ export function PomodoroScreen() {
   const modeColors = getModeColor(currentMode);
   const growthProgress = calculateGrowthProgress(remaining, totalSeconds);
   const plantStage = getPlantStage(growthProgress);
-  const showSprout =
-    currentMode === "focus" && (isRunning || remaining < totalSeconds);
+  const showSprout = currentMode === 'focus' && (isRunning || remaining < totalSeconds);
 
-  const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
-  const seconds = String(remaining % 60).padStart(2, "0");
+  const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+  const seconds = String(remaining % 60).padStart(2, '0');
 
   const startLabel =
-    currentMode === "focus" ? "Start focus" : `Start ${getModeLabel(currentMode).toLowerCase()}`;
+    currentMode === 'focus' ? 'Start focus' : `Start ${getModeLabel(currentMode).toLowerCase()}`;
 
   const handleSaveSettings = async (newSettings: PomodoroSettings) => {
     await savePomodoroSettings(newSettings);
@@ -280,7 +281,7 @@ export function PomodoroScreen() {
 
   const upNextMode = getNextMode(
     currentMode,
-    currentMode === "focus" ? completedFocus + 1 : completedFocus,
+    currentMode === 'focus' ? completedFocus + 1 : completedFocus,
     settings,
   );
   const upNextMinutes = Math.round(getModeDuration(upNextMode, settings) / 60);
@@ -308,7 +309,7 @@ export function PomodoroScreen() {
               title="Focus sessions"
               value={sessions.length}
               subtitle="This year"
-              note={sessions.length > 0 ? "Completed focus sessions" : "No sessions logged yet"}
+              note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
             />
           </View>
           <View className="min-w-[160px] flex-1">
@@ -319,7 +320,9 @@ export function PomodoroScreen() {
               title="Current streak"
               value={pomodoroStreak}
               subtitle="Consecutive focus days"
-              note={pomodoroStreak > 0 ? "Keep the streak alive" : "Your next session starts the streak"}
+              note={
+                pomodoroStreak > 0 ? 'Keep the streak alive' : 'Your next session starts the streak'
+              }
             />
           </View>
         </View>
@@ -333,98 +336,107 @@ export function PomodoroScreen() {
           headerSubtitle="Classic focus and break sequence with live progress."
           className="mb-0"
         >
-        <View className="mb-4 flex-row flex-wrap justify-center">
-          {(["focus", "short_break", "long_break"] as PomodoroMode[]).map((mode) => (
-            <PillChip
-              key={mode}
-              label={getModeLabel(mode)}
-              active={currentMode === mode}
-              color={COLOR}
-              onPress={() => {
-                if (isRunning) return;
-                setIsPaused(false);
-                setCurrentMode(mode);
-                currentModeRef.current = mode;
-                const d = getModeDuration(mode, settings);
-                setTotalSeconds(d);
-                totalSecondsRef.current = d;
-                setRemaining(d);
-                setStartedAt(null);
-                startedAtRef.current = null;
-              }}
-            />
-          ))}
-        </View>
+          <View className="mb-4 flex-row flex-wrap justify-center">
+            {(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => (
+              <PillChip
+                key={mode}
+                label={getModeLabel(mode)}
+                active={currentMode === mode}
+                color={COLOR}
+                onPress={() => {
+                  if (isRunning) return;
+                  setIsPaused(false);
+                  setCurrentMode(mode);
+                  currentModeRef.current = mode;
+                  const d = getModeDuration(mode, settings);
+                  setTotalSeconds(d);
+                  totalSecondsRef.current = d;
+                  setRemaining(d);
+                  setStartedAt(null);
+                  startedAtRef.current = null;
+                }}
+              />
+            ))}
+          </View>
 
-        <View className="w-full items-center justify-center py-2">
-          {showSprout ? (
-            <FocusSprout progress={growthProgress} stage={plantStage} size={160} accentColor={COLOR} />
-          ) : null}
-          <Pressable
-            className={showSprout ? "mt-2 w-full items-center" : "w-full items-center"}
-            onPress={() => !isRunning && setShowSettings((v) => !v)}
-            disabled={isRunning}
-            accessibilityRole="button"
-            accessibilityLabel={isRunning ? "Timer running" : "Edit timer duration"}
-          >
-            <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
-              {minutes}:{seconds}
-            </Text>
-            {!isRunning ? (
-              <Text className="mt-0.5 text-center text-xs" style={{ color: tokens.textMuted }}>
-                tap to edit
-              </Text>
+          <View className="w-full items-center justify-center py-2">
+            {showSprout ? (
+              <FocusSprout
+                progress={growthProgress}
+                stage={plantStage}
+                size={160}
+                accentColor={COLOR}
+              />
             ) : null}
-          </Pressable>
-        </View>
+            <Pressable
+              className={showSprout ? 'mt-2 w-full items-center' : 'w-full items-center'}
+              onPress={() => !isRunning && setShowSettings((v) => !v)}
+              disabled={isRunning}
+              accessibilityRole="button"
+              accessibilityLabel={isRunning ? 'Timer running' : 'Edit timer duration'}
+            >
+              <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
+                {minutes}:{seconds}
+              </Text>
+              {!isRunning ? (
+                <Text className="mt-0.5 text-center text-xs" style={{ color: tokens.textMuted }}>
+                  tap to edit
+                </Text>
+              ) : null}
+            </Pressable>
+          </View>
 
-        <View className="my-3 flex-row justify-center gap-1.5">
-          {Array.from({ length: settings.sessionsBeforeLongBreak }).map((_, i) => (
-            <View
-              key={i}
-              className={`h-2 w-2 rounded-full ${i < completedFocus % settings.sessionsBeforeLongBreak ? "bg-focus" : ""}`}
-              style={i < completedFocus % settings.sessionsBeforeLongBreak ? undefined : { backgroundColor: tokens.border }}
-            />
-          ))}
-        </View>
+          <View className="my-3 flex-row justify-center gap-1.5">
+            {Array.from({ length: settings.sessionsBeforeLongBreak }).map((_, i) => (
+              <View
+                key={i}
+                className={`h-2 w-2 rounded-full ${i < completedFocus % settings.sessionsBeforeLongBreak ? 'bg-focus' : ''}`}
+                style={
+                  i < completedFocus % settings.sessionsBeforeLongBreak
+                    ? undefined
+                    : { backgroundColor: tokens.border }
+                }
+              />
+            ))}
+          </View>
 
-        <View className="mt-4 gap-3">
-          {!isRunning && !isPaused && remaining === totalSeconds ? (
-            <Button label={startLabel} onPress={start} color={COLOR} />
-          ) : null}
+          <View className="mt-4 gap-3">
+            {!isRunning && !isPaused && remaining === totalSeconds ? (
+              <Button label={startLabel} onPress={start} color={COLOR} />
+            ) : null}
 
-          {isRunning ? (
-            <View className="flex-row gap-3">
-              <View className="flex-1">
-                <Button label="Pause" variant="ghost" onPress={pause} />
+            {isRunning ? (
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Button label="Pause" variant="ghost" onPress={pause} />
+                </View>
+                <View className="flex-1">
+                  <Button label="Reset" variant="ghost" onPress={reset} />
+                </View>
               </View>
-              <View className="flex-1">
-                <Button label="Reset" variant="ghost" onPress={reset} />
-              </View>
-            </View>
-          ) : null}
+            ) : null}
 
-          {isPaused && !isRunning ? (
-            <View className="flex-row gap-3">
-              <View className="flex-1">
-                <Button label="Resume" onPress={resume} color={COLOR} />
+            {isPaused && !isRunning ? (
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Button label="Resume" onPress={resume} color={COLOR} />
+                </View>
+                <View className="flex-1">
+                  <Button label="Reset" variant="ghost" onPress={reset} />
+                </View>
               </View>
-              <View className="flex-1">
-                <Button label="Reset" variant="ghost" onPress={reset} />
-              </View>
-            </View>
-          ) : null}
+            ) : null}
 
-          {remaining === 0 && !isRunning && !isPaused ? (
-            <Button label={startLabel} onPress={start} color={COLOR} />
-          ) : null}
-        </View>
+            {remaining === 0 && !isRunning && !isPaused ? (
+              <Button label={startLabel} onPress={start} color={COLOR} />
+            ) : null}
+          </View>
 
-        {!isRunning && !isPaused && remaining === getModeDuration(currentMode, settings) ? (
-          <Text className="mt-3 text-center text-xs" style={{ color: tokens.textMuted }}>
-            Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
-          </Text>
-        ) : null}
+          {!isRunning && !isPaused && remaining === getModeDuration(currentMode, settings) ? (
+            <Text className="mt-3 text-center text-xs" style={{ color: tokens.textMuted }}>
+              Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
+            </Text>
+          ) : null}
         </Card>
       </ScreenSection>
 

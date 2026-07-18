@@ -10,34 +10,35 @@ Only one tab of localhost:8081 should be open (OPFS lock).
 
 ## Running tests
 
-  npm run e2e              — run all tests headless
-  npm run e2e:report       — open the last HTML report
-  npm run e2e:headed       — run with visible browser (debug)
-  npm run e2e:debug        — run with Playwright inspector
+npm run e2e — run all tests headless
+npm run e2e:report — open the last HTML report
+npm run e2e:headed — run with visible browser (debug)
+npm run e2e:debug — run with Playwright inspector
 
 ## Output
 
-  .cursor/playwright-output/e2e-report/   — HTML report
-  .cursor/playwright-output/e2e-failures/ — failure screenshots
+.cursor/playwright-output/e2e-report/ — HTML report
+.cursor/playwright-output/e2e-failures/ — failure screenshots
 
 ## Test files
 
-  helpers/forms.ts       — Shared helpers: `fillCaloriesMacros`, `fillRoutineName` (RN Web controlled `TextInput` needs click + `type` with delay, not `fill` alone)
-  helpers/commandEvaluation.ts / helpers/commandObservation.ts — Shared command-center evaluation helpers
+helpers/forms.ts — Shared helpers: `fillCaloriesMacros`, `fillRoutineName` (RN Web controlled `TextInput` needs click + `type` with delay, not `fill` alone)
+helpers/commandEvaluation.ts / helpers/commandObservation.ts — Shared command-center evaluation helpers
 
-  todos.spec.ts          — Todos feature (add, complete, delete, empty state, validation, persistence)
-  habits.spec.ts         — Habits feature (add, increment, edit/delete tap — Alert is no-op on web so full delete cannot be E2E’d without app changes)
-  pomodoro.spec.ts       — Pomodoro (start timer, session log, empty history)
-  workout.spec.ts        — Workout (add routine, complete, delete, empty state, validation, persistence)
-  calories.spec.ts       — Calories (add entry, meal type, Form/Diary persistence, daily total, empty state, validation)
-  settings.spec.ts       — Settings backup/restore eligibility and disclosures
-  command.spec.ts        — Command-center launcher, overlay, parse/edit/confirm flow
-  command.eval.mock.spec.ts / command.eval.internal.spec.ts — Command draft quality/evaluation suites
-  command.observation.mock.spec.ts / command.observation.internal.spec.ts — Command observation/fallback suites
-  boundary.spec.ts       — Cross-feature boundary and regression cases
-  infrastructure.spec.ts — Cross-cutting: COEP/COOP headers, SW cache, OPFS lock, crossOriginIsolated
+todos.spec.ts — Todos feature (add, complete, delete, empty state, validation, persistence)
+habits.spec.ts — Habits feature (add, increment, edit/delete tap — Alert is no-op on web so full delete cannot be E2E’d without app changes)
+pomodoro.spec.ts — Pomodoro (start timer, session log, empty history)
+workout.spec.ts — Workout (add routine, complete, delete, empty state, validation, persistence)
+calories.spec.ts — Calories (add entry, meal type, Form/Diary persistence, daily total, empty state, validation)
+settings.spec.ts — Settings backup/restore eligibility and disclosures
+command.spec.ts — Command-center launcher, overlay, parse/edit/confirm flow
+command.eval.mock.spec.ts / command.eval.internal.spec.ts — Command draft quality/evaluation suites
+command.observation.mock.spec.ts / command.observation.internal.spec.ts — Command observation/fallback suites
+boundary.spec.ts — Cross-feature boundary and regression cases
+infrastructure.spec.ts — Cross-cutting: COEP/COOP headers, SW cache, OPFS lock, crossOriginIsolated
 
 ## Audit and Failure Handling
+
 - E2E failures are logged; see test output for artifacts.
 - Known flaky tests or infrastructure issues are documented in the knowledge base.
 - Skipped tests are marked with reasons in the codebase and knowledge base.

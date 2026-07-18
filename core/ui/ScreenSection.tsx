@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { View, type ViewProps } from "react-native";
+import type { ReactNode } from 'react';
+import { View, type ViewProps } from 'react-native';
 
 type ScreenSectionProps = ViewProps & {
   children: ReactNode;
@@ -8,7 +8,7 @@ type ScreenSectionProps = ViewProps & {
 
 export function ScreenSection({ children, className, ...props }: ScreenSectionProps) {
   return (
-    <View className={["mb-6", className].filter(Boolean).join(" ")} {...props}>
+    <View className={['mb-6', className].filter(Boolean).join(' ')} {...props}>
       {children}
     </View>
   );

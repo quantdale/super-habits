@@ -1,6 +1,6 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { Pressable } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 function withAlpha(color: string, opacity: number) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
@@ -45,11 +45,7 @@ export function IconButton({
         backgroundColor: selected ? withAlpha(resolvedAccent, 0.12) : tokens.surface,
       }}
     >
-      <MaterialIcons
-        name={icon}
-        size={size}
-        color={selected ? resolvedAccent : tokens.iconMuted}
-      />
+      <MaterialIcons name={icon} size={size} color={selected ? resolvedAccent : tokens.iconMuted} />
     </Pressable>
   );
 }

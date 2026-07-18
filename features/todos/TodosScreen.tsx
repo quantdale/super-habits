@@ -1,43 +1,40 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import DraggableFlatList, { type RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
-import { Screen } from "@/core/ui/Screen";
-import { Modal } from "@/core/ui/Modal";
-import { Card } from "@/core/ui/Card";
-import { LinkedActionsEditorSection } from "@/core/linked-actions/LinkedActionsEditorSection";
-import {
-  buildLinkedActionEditorRowsFromRules,
-} from "@/core/linked-actions/linkedActionsEditor.adapter";
-import {
-  TODO_LINKED_ACTIONS_EDITOR_CONFIG,
-} from "@/core/linked-actions/linkedActionsEditor.config";
-import {
-  createSaveLinkedActionRuleInputFromEditorRow,
-} from "@/core/linked-actions/linkedActionsEditor.model";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import DraggableFlatList, {
+  type RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
+import { Screen } from '@/core/ui/Screen';
+import { Modal } from '@/core/ui/Modal';
+import { Card } from '@/core/ui/Card';
+import { LinkedActionsEditorSection } from '@/core/linked-actions/LinkedActionsEditorSection';
+import { buildLinkedActionEditorRowsFromRules } from '@/core/linked-actions/linkedActionsEditor.adapter';
+import { TODO_LINKED_ACTIONS_EDITOR_CONFIG } from '@/core/linked-actions/linkedActionsEditor.config';
+import { createSaveLinkedActionRuleInputFromEditorRow } from '@/core/linked-actions/linkedActionsEditor.model';
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
-} from "@/core/linked-actions/linkedActionsEditor.types";
-import type { SaveLinkedActionRuleForSourceInput } from "@/core/linked-actions/linkedActions.types";
-import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
-import { IconButton } from "@/core/ui/IconButton";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { TextField } from "@/core/ui/TextField";
-import { Button } from "@/core/ui/Button";
-import { PillChip } from "@/core/ui/PillChip";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { SECTION_COLORS } from "@/constants/sectionColors";
-import { toDateKey } from "@/lib/time";
-import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
-import { validateTodo } from "@/lib/validation";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
-import type { Todo, TodoPriority, TodoViewMode } from "./types";
-import { TodoItem } from "./TodoItem";
-import { findMissingRecurrenceIds, getTodayDateKey } from "./todos.domain";
+} from '@/core/linked-actions/linkedActionsEditor.types';
+import type { SaveLinkedActionRuleForSourceInput } from '@/core/linked-actions/linkedActions.types';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { IconButton } from '@/core/ui/IconButton';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { TextField } from '@/core/ui/TextField';
+import { Button } from '@/core/ui/Button';
+import { PillChip } from '@/core/ui/PillChip';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { SECTION_COLORS } from '@/constants/sectionColors';
+import { toDateKey } from '@/lib/time';
+import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { validateTodo } from '@/lib/validation';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
+import type { Todo, TodoPriority, TodoViewMode } from './types';
+import { TodoItem } from './TodoItem';
+import { findMissingRecurrenceIds, getTodayDateKey } from './todos.domain';
 import {
   addTodo,
   createRecurringInstance,
@@ -50,27 +47,27 @@ import {
   toggleTodo,
   updateTodo,
   updateTodoOrder,
-} from "@/features/todos/todos.data";
+} from '@/features/todos/todos.data';
 
 const COLOR = SECTION_COLORS.todos;
-const COLOR_TEXT = "#1D4ED8";
-const TODO_LINKED_ACTION_SOURCE_KEY = "todo-linked-actions-source";
-const VIEW_MODE_OPTIONS: ReadonlyArray<{
+const COLOR_TEXT = '#1D4ED8';
+const TODO_LINKED_ACTION_SOURCE_KEY = 'todo-linked-actions-source';
+const VIEW_MODE_OPTIONS: readonly {
   mode: TodoViewMode;
   icon: keyof typeof MaterialIcons.glyphMap;
-}> = [
-  { mode: "content", icon: "view-agenda" },
-  { mode: "list", icon: "format-list-bulleted" },
-  { mode: "grid", icon: "grid-view" },
+}[] = [
+  { mode: 'content', icon: 'view-agenda' },
+  { mode: 'list', icon: 'format-list-bulleted' },
+  { mode: 'grid', icon: 'grid-view' },
 ];
 
 export function TodosScreen() {
   const { tokens } = useAppTheme();
   const { showNotice } = useInAppNotices();
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState<string | null>(null);
-  const [priority, setPriority] = useState<TodoPriority>("normal");
+  const [priority, setPriority] = useState<TodoPriority>('normal');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [items, setItems] = useState<Todo[]>([]);
@@ -81,7 +78,7 @@ export function TodosScreen() {
   const [linkedActionRows, setLinkedActionRows] = useState<LinkedActionEditorRowDraft[]>([]);
   const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<TodoViewMode>("content");
+  const [viewMode, setViewMode] = useState<TodoViewMode>('content');
   const { width: screenWidth } = useWindowDimensions();
   const gridColumns = screenWidth >= 1200 ? 4 : screenWidth >= 768 ? 3 : 2;
   const gridCardWidth = (screenWidth - 32 - 4 * (gridColumns * 2)) / gridColumns;
@@ -90,22 +87,22 @@ export function TodosScreen() {
   const completedTasks = useMemo(() => items.filter((t) => t.completed === 1), [items]);
   const hasCompleted = useMemo(() => completedTasks.length > 0, [completedTasks]);
   const recurringTasksCount = useMemo(
-    () => pendingTasks.filter((todo) => todo.recurrence === "daily").length,
+    () => pendingTasks.filter((todo) => todo.recurrence === 'daily').length,
     [pendingTasks],
   );
   const editingTodo = useMemo(
-    () => (editingId ? items.find((item) => item.id === editingId) ?? null : null),
+    () => (editingId ? (items.find((item) => item.id === editingId) ?? null) : null),
     [editingId, items],
   );
   const isRecurringLinkedActionSource =
-    editingTodo?.recurrence === "daily" || (!editingId && isRecurring);
+    editingTodo?.recurrence === 'daily' || (!editingId && isRecurring);
   const overdueTasksCount = useMemo(() => {
     const today = toDateKey();
     return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
   }, [pendingTasks]);
 
   const refresh = useCallback(() => {
-    listTodos().then(setItems);
+    void listTodos().then(setItems);
   }, []);
 
   const loadTodosOnFocus = useCallback(async () => {
@@ -138,17 +135,17 @@ export function TodosScreen() {
     const t = items.find((x) => x.id === editingId);
     if (t) {
       setTitle(t.title);
-      setNotes(t.notes ?? "");
+      setNotes(t.notes ?? '');
       setDueDate(t.due_date);
       setPriority(t.priority);
     }
   }, [editingId, items]);
 
   const resetForm = () => {
-    setTitle("");
-    setNotes("");
+    setTitle('');
+    setNotes('');
     setDueDate(null);
-    setPriority("normal");
+    setPriority('normal');
     setIsRecurring(false);
     setEditingId(null);
     setShowDatePicker(false);
@@ -185,7 +182,7 @@ export function TodosScreen() {
         setLinkedActionsError(
           error instanceof Error
             ? error.message
-            : "Finish or remove incomplete linked actions before saving this task.",
+            : 'Finish or remove incomplete linked actions before saving this task.',
         );
         return;
       }
@@ -207,7 +204,7 @@ export function TodosScreen() {
         notes: notes.trim() || undefined,
         dueDate: dueDate ?? null,
         priority,
-        recurrence: isRecurring ? "daily" : null,
+        recurrence: isRecurring ? 'daily' : null,
       });
       if (!isRecurringLinkedActionSource) {
         await saveTodoLinkedActionRules(todoId, linkedActionRules);
@@ -215,22 +212,22 @@ export function TodosScreen() {
     }
     setModalVisible(false);
     resetForm();
-    refresh();
+    void refresh();
   };
 
   const startEdit = async (todo: Todo) => {
     setEditingId(todo.id);
     setTitle(todo.title);
-    setNotes(todo.notes ?? "");
+    setNotes(todo.notes ?? '');
     setDueDate(todo.due_date);
     setPriority(todo.priority);
     setTodoError(null);
     setLinkedActionsError(null);
     setLinkedActionRows([]);
-    setLinkedActionsLoading(todo.recurrence !== "daily");
+    setLinkedActionsLoading(todo.recurrence !== 'daily');
     setModalVisible(true);
 
-    if (todo.recurrence === "daily") {
+    if (todo.recurrence === 'daily') {
       setLinkedActionsLoading(false);
       return;
     }
@@ -240,7 +237,7 @@ export function TodosScreen() {
       setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
     } catch (error) {
       setLinkedActionsError(
-        error instanceof Error ? error.message : "Could not load linked actions for this task.",
+        error instanceof Error ? error.message : 'Could not load linked actions for this task.',
       );
     } finally {
       setLinkedActionsLoading(false);
@@ -253,18 +250,18 @@ export function TodosScreen() {
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
-      await refresh();
+      void refresh();
     },
     [refresh, showNotice],
   );
 
   const todoLinkedActionSource: LinkedActionEditorSourceOption = {
     key: TODO_LINKED_ACTION_SOURCE_KEY,
-    feature: "todos",
-    entityType: "todo",
-    entityId: editingId ?? "draft-todo",
-    label: title.trim() || "This task",
-    description: "Rules below run when this task is completed.",
+    feature: 'todos',
+    entityType: 'todo',
+    entityId: editingId ?? 'draft-todo',
+    label: title.trim() || 'This task',
+    description: 'Rules below run when this task is completed.',
   };
 
   const emptyPending =
@@ -289,7 +286,7 @@ export function TodosScreen() {
           <ScreenSection>
             <PageHeader
               title="Todos"
-              subtitle={todosEmptyCardSubtitle ? undefined : "Offline-first task manager."}
+              subtitle={todosEmptyCardSubtitle ? undefined : 'Offline-first task manager.'}
               actions={
                 <>
                   {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
@@ -355,11 +352,7 @@ export function TodosScreen() {
             </Card>
           </ScreenSection>
 
-          {totallyEmpty ? (
-            <ScreenSection>
-              {noPendingTasksCard}
-            </ScreenSection>
-          ) : null}
+          {totallyEmpty ? <ScreenSection>{noPendingTasksCard}</ScreenSection> : null}
 
           {!totallyEmpty ? (
             <ScreenSection className="min-h-0 mb-0 flex-1">
@@ -369,7 +362,7 @@ export function TodosScreen() {
                     Pending
                   </Text>
                   <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
-                      Swipe to edit or delete. Drag to reorder.
+                    Swipe to edit or delete. Drag to reorder.
                   </Text>
                 </View>
                 {hasCompleted ? (
@@ -379,7 +372,7 @@ export function TodosScreen() {
                     style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
                   >
                     <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
-                      {showCompleted ? "Hide" : "Show"} completed ({completedTasks.length})
+                      {showCompleted ? 'Hide' : 'Show'} completed ({completedTasks.length})
                     </Text>
                   </Pressable>
                 ) : null}
@@ -391,7 +384,7 @@ export function TodosScreen() {
                 containerStyle={{ flex: 1 }}
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
                 activationDistance={10}
-                numColumns={viewMode === "grid" ? gridColumns : 1}
+                numColumns={viewMode === 'grid' ? gridColumns : 1}
                 onDragBegin={() => {}}
                 onDragEnd={async ({ data }) => {
                   setItems((prev) =>
@@ -401,7 +394,7 @@ export function TodosScreen() {
                     }),
                   );
                   await updateTodoOrder(data.map((d) => d.id));
-                  refresh();
+                  void refresh();
                 }}
                 ListEmptyComponent={
                   hasCompleted ? (
@@ -424,10 +417,16 @@ export function TodosScreen() {
                               className="mb-4 flex-row items-center justify-between gap-3 px-1"
                             >
                               <View>
-                                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                                <Text
+                                  className="text-base font-semibold"
+                                  style={{ color: tokens.text }}
+                                >
                                   Completed
                                 </Text>
-                                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                                <Text
+                                  className="mt-0.5 text-xs"
+                                  style={{ color: tokens.textMuted }}
+                                >
                                   Completed tasks stay here until you toggle them back.
                                 </Text>
                               </View>
@@ -444,7 +443,7 @@ export function TodosScreen() {
                                   void startEdit(item);
                                 }}
                                 viewMode={viewMode}
-                                cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
+                                cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
                               />
                             )),
                           ]
@@ -464,7 +463,7 @@ export function TodosScreen() {
                         void startEdit(item);
                       }}
                       viewMode={viewMode}
-                      cardWidth={viewMode === "grid" ? gridCardWidth : undefined}
+                      cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
                     />
                   </ScaleDecorator>
                 )}
@@ -473,169 +472,181 @@ export function TodosScreen() {
           ) : null}
         </View>
 
-      <Modal visible={modalVisible} onClose={closeModal} scroll>
-        <Card
-          variant="header"
-          accentColor={SECTION_COLORS.todos}
-          headerTitle={editingId ? "Edit task" : "Add new task"}
-        >
-          <TextField
-            label="Title"
-            value={title}
-            onChangeText={(t) => {
-              setTodoError(null);
-              setTitle(t);
-            }}
-            placeholder="Add a task..."
-          />
-          <TextField
-            label="Notes"
-            value={notes}
-            onChangeText={(t) => {
-              setTodoError(null);
-              setNotes(t);
-            }}
-            placeholder="Optional notes"
-          />
-          <View className="mb-3 flex-row flex-wrap">
-            {(["urgent", "normal", "low"] as TodoPriority[]).map((p) => (
-              <PillChip
-                key={p}
-                label={p}
-                active={priority === p}
-                color={COLOR}
-                onPress={() => {
-                  setTodoError(null);
-                  setPriority(p);
-                }}
-              />
-            ))}
-          </View>
-          {!editingId ? (
-            <Pressable
-              onPress={() => {
-                setTodoError(null);
-                setIsRecurring((v) => !v);
-              }}
-              className="mb-3 flex-row items-center gap-2 py-2"
-            >
-              <View
-                className={`h-5 w-5 items-center justify-center rounded border-2 ${
-                  isRecurring ? "border-todos bg-todos" : ""
-                }`}
-                style={!isRecurring ? { borderColor: tokens.border, backgroundColor: tokens.surface } : undefined}
-              >
-                {isRecurring ? (
-                  <Text className="text-xs font-bold" style={{ color: tokens.textOnAccent }}>↻</Text>
-                ) : null}
-              </View>
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>Repeat daily</Text>
-            </Pressable>
-          ) : null}
-          {Platform.OS === "web" ? (
+        <Modal visible={modalVisible} onClose={closeModal} scroll>
+          <Card
+            variant="header"
+            accentColor={SECTION_COLORS.todos}
+            headerTitle={editingId ? 'Edit task' : 'Add new task'}
+          >
             <TextField
-              label="Due date (YYYY-MM-DD)"
-              value={dueDate ?? ""}
+              label="Title"
+              value={title}
               onChangeText={(t) => {
                 setTodoError(null);
-                setDueDate(t.trim() || null);
+                setTitle(t);
               }}
-              placeholder="Optional"
+              placeholder="Add a task..."
             />
-          ) : (
-            <>
-              <Pressable
-                onPress={() => setShowDatePicker(true)}
-                className="mb-3 flex-row items-center gap-2 py-2"
-              >
-                <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                  {dueDate ? `Due: ${dueDate}` : "Add due date (optional)"}
-                </Text>
-                {dueDate ? (
-                  <Pressable
-                    onPress={() => {
-                      setTodoError(null);
-                      setDueDate(null);
-                    }}
-                    hitSlop={8}
-                  >
-                    <Text className="text-xs text-rose-400">✕ clear</Text>
-                  </Pressable>
-                ) : null}
-              </Pressable>
-              {showDatePicker ? (
-                <DateTimePicker
-                  value={dueDate ? new Date(dueDate + "T12:00:00") : new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(false);
-                    if (event.type === "set" && selectedDate) {
-                      setTodoError(null);
-                      setDueDate(toDateKey(selectedDate));
-                    }
+            <TextField
+              label="Notes"
+              value={notes}
+              onChangeText={(t) => {
+                setTodoError(null);
+                setNotes(t);
+              }}
+              placeholder="Optional notes"
+            />
+            <View className="mb-3 flex-row flex-wrap">
+              {(['urgent', 'normal', 'low'] as TodoPriority[]).map((p) => (
+                <PillChip
+                  key={p}
+                  label={p}
+                  active={priority === p}
+                  color={COLOR}
+                  onPress={() => {
+                    setTodoError(null);
+                    setPriority(p);
                   }}
                 />
-              ) : null}
-            </>
-          )}
-          <ValidationError message={todoError} />
-        </Card>
-
-        <Card
-          variant="header"
-          accentColor={SECTION_COLORS.todos}
-          headerTitle="Linked Actions"
-          headerSubtitle="Optional explicit rules that run when this task is completed."
-        >
-          {isRecurringLinkedActionSource ? (
-            <Text className="text-sm" style={{ color: COLOR_TEXT }}>
-              Recurring tasks cannot be Linked Action sources yet.
-            </Text>
-          ) : linkedActionsLoading ? (
-            <Text className="text-sm" style={{ color: COLOR_TEXT }}>
-              Loading linked actions...
-            </Text>
-          ) : (
-            <LinkedActionsEditorSection
-              sourceOptions={[todoLinkedActionSource]}
-              selectedSourceKey={TODO_LINKED_ACTION_SOURCE_KEY}
-              rows={linkedActionRows}
-              onRowsChange={(rows) => {
-                setLinkedActionsError(null);
-                setLinkedActionRows(rows);
-              }}
-              allowSourceSelection={false}
-              allowedTargetFeatures={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures}
-              allowedTriggerTypes={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes}
-              allowCreateNewTarget={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget}
-              introTitle="Task completion rules"
-              introDescription="Choose a target task or habit and the effect that should run when this task is completed."
-            />
-          )}
-          <ValidationError message={linkedActionsError} />
-
-          <View className="mt-3 flex-row gap-2">
-            <View className="flex-1">
-              <Button label="Cancel" variant="ghost" onPress={closeModal} />
+              ))}
             </View>
-            <View className="flex-1">
-              <Button label={editingId ? "Save changes" : "Add task"} onPress={onSave} color={COLOR} />
-            </View>
-          </View>
-        </Card>
-      </Modal>
-    </Screen>
+            {!editingId ? (
+              <Pressable
+                onPress={() => {
+                  setTodoError(null);
+                  setIsRecurring((v) => !v);
+                }}
+                className="mb-3 flex-row items-center gap-2 py-2"
+              >
+                <View
+                  className={`h-5 w-5 items-center justify-center rounded border-2 ${
+                    isRecurring ? 'border-todos bg-todos' : ''
+                  }`}
+                  style={
+                    !isRecurring
+                      ? { borderColor: tokens.border, backgroundColor: tokens.surface }
+                      : undefined
+                  }
+                >
+                  {isRecurring ? (
+                    <Text className="text-xs font-bold" style={{ color: tokens.textOnAccent }}>
+                      ↻
+                    </Text>
+                  ) : null}
+                </View>
+                <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                  Repeat daily
+                </Text>
+              </Pressable>
+            ) : null}
+            {Platform.OS === 'web' ? (
+              <TextField
+                label="Due date (YYYY-MM-DD)"
+                value={dueDate ?? ''}
+                onChangeText={(t) => {
+                  setTodoError(null);
+                  setDueDate(t.trim() || null);
+                }}
+                placeholder="Optional"
+              />
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => setShowDatePicker(true)}
+                  className="mb-3 flex-row items-center gap-2 py-2"
+                >
+                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                    {dueDate ? `Due: ${dueDate}` : 'Add due date (optional)'}
+                  </Text>
+                  {dueDate ? (
+                    <Pressable
+                      onPress={() => {
+                        setTodoError(null);
+                        setDueDate(null);
+                      }}
+                      hitSlop={8}
+                    >
+                      <Text className="text-xs text-rose-400">✕ clear</Text>
+                    </Pressable>
+                  ) : null}
+                </Pressable>
+                {showDatePicker ? (
+                  <DateTimePicker
+                    value={dueDate ? new Date(dueDate + 'T12:00:00') : new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setTodoError(null);
+                        setDueDate(toDateKey(selectedDate));
+                      }
+                    }}
+                  />
+                ) : null}
+              </>
+            )}
+            <ValidationError message={todoError} />
+          </Card>
 
-    <Pressable
-      onPress={openNewTodoModal}
-      accessibilityRole="button"
-      accessibilityLabel="Add task"
-      className="absolute bottom-24 right-4 z-10 h-14 w-14 items-center justify-center rounded-full shadow-lg"
-      style={{ backgroundColor: COLOR, elevation: 4, shadowColor: tokens.shadowColor }}
-    >
-      <MaterialIcons name="add" size={28} color={tokens.textOnAccent} />
-    </Pressable>
+          <Card
+            variant="header"
+            accentColor={SECTION_COLORS.todos}
+            headerTitle="Linked Actions"
+            headerSubtitle="Optional explicit rules that run when this task is completed."
+          >
+            {isRecurringLinkedActionSource ? (
+              <Text className="text-sm" style={{ color: COLOR_TEXT }}>
+                Recurring tasks cannot be Linked Action sources yet.
+              </Text>
+            ) : linkedActionsLoading ? (
+              <Text className="text-sm" style={{ color: COLOR_TEXT }}>
+                Loading linked actions...
+              </Text>
+            ) : (
+              <LinkedActionsEditorSection
+                sourceOptions={[todoLinkedActionSource]}
+                selectedSourceKey={TODO_LINKED_ACTION_SOURCE_KEY}
+                rows={linkedActionRows}
+                onRowsChange={(rows) => {
+                  setLinkedActionsError(null);
+                  setLinkedActionRows(rows);
+                }}
+                allowSourceSelection={false}
+                allowedTargetFeatures={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures}
+                allowedTriggerTypes={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes}
+                allowCreateNewTarget={TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget}
+                introTitle="Task completion rules"
+                introDescription="Choose a target task or habit and the effect that should run when this task is completed."
+              />
+            )}
+            <ValidationError message={linkedActionsError} />
+
+            <View className="mt-3 flex-row gap-2">
+              <View className="flex-1">
+                <Button label="Cancel" variant="ghost" onPress={closeModal} />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label={editingId ? 'Save changes' : 'Add task'}
+                  onPress={onSave}
+                  color={COLOR}
+                />
+              </View>
+            </View>
+          </Card>
+        </Modal>
+      </Screen>
+
+      <Pressable
+        onPress={openNewTodoModal}
+        accessibilityRole="button"
+        accessibilityLabel="Add task"
+        className="absolute bottom-24 right-4 z-10 h-14 w-14 items-center justify-center rounded-full shadow-lg"
+        style={{ backgroundColor: COLOR, elevation: 4, shadowColor: tokens.shadowColor }}
+      >
+        <MaterialIcons name="add" size={28} color={tokens.textOnAccent} />
+      </Pressable>
     </View>
   );
 }

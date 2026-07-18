@@ -1,57 +1,47 @@
-import { useCallback, useMemo, useState } from "react";
-import { MaterialIcons } from "@expo/vector-icons";
-import { Link, type Href, useFocusEffect } from "expo-router";
-import { Pressable, Text, View } from "react-native";
-import { useAppBootstrapState } from "@/core/providers/AppProviders";
-import { type ThemeMode, useAppTheme } from "@/core/providers/ThemeProvider";
-import { getRestorePreview, restoreFromRemoteBackup } from "@/core/sync/restore.coordinator";
+import { useCallback, useMemo, useState } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Link, type Href, useFocusEffect } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
+import { useAppBootstrapState } from '@/core/providers/AppProviders';
+import { type ThemeMode, useAppTheme } from '@/core/providers/ThemeProvider';
+import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.coordinator';
 import type {
   RemoteBackupEntityStatus,
   RestorePreview,
   SyncBackedEntity,
-} from "@/core/sync/restore.types";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
-import { NumberStepperField } from "@/core/ui/NumberStepperField";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { PillChip } from "@/core/ui/PillChip";
-import { Screen } from "@/core/ui/Screen";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { ValidationError } from "@/core/ui/ValidationError";
-import {
-  POMODORO_SECTION_KEY,
-  SECTION_COLORS,
-} from "@/constants/sectionColors";
-import {
-  DEFAULT_GOAL,
-  getCalorieGoal,
-  setCalorieGoal,
-} from "@/features/calories/calories.data";
-import type { CalorieGoal } from "@/features/calories/types";
+} from '@/core/sync/restore.types';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
+import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { PillChip } from '@/core/ui/PillChip';
+import { Screen } from '@/core/ui/Screen';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
+import { DEFAULT_GOAL, getCalorieGoal, setCalorieGoal } from '@/features/calories/calories.data';
+import type { CalorieGoal } from '@/features/calories/types';
 import {
   getAiCommandParseConfig,
   isAiCommandInternalRolloutAvailable,
-} from "@/features/command/commandConfig";
+} from '@/features/command/commandConfig';
 import {
   getAiCommandInternalRolloutPreference,
   setAiCommandInternalRolloutPreference,
-} from "@/features/command/commandInternalRollout";
-import { COMMAND_EXPERIMENT_ENABLED } from "@/features/command/types";
-import { maybeLoadRestorePreviewForSettings } from "@/features/settings/settingsRestorePreview";
-import {
-  getPomodoroSettings,
-  savePomodoroSettings,
-} from "@/features/pomodoro/pomodoro.data";
-import { DEFAULT_SETTINGS, type PomodoroSettings } from "@/features/pomodoro/pomodoro.domain";
-import { validateCalorieGoal, validatePomodoroSettings } from "@/lib/validation";
+} from '@/features/command/commandInternalRollout';
+import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
+import { maybeLoadRestorePreviewForSettings } from '@/features/settings/settingsRestorePreview';
+import { getPomodoroSettings, savePomodoroSettings } from '@/features/pomodoro/pomodoro.data';
+import { DEFAULT_SETTINGS, type PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
+import { validateCalorieGoal, validatePomodoroSettings } from '@/lib/validation';
 
-const OVERVIEW_HREF = "/(tabs)/overview" as Href;
-const COMMAND_HREF = "/command" as Href;
-const SETTINGS_ACCENT = "#475569";
-const BACKUP_ACCENT = "#0f766e";
-const INTERNAL_ACCENT = "#7c2d12";
+const OVERVIEW_HREF = '/(tabs)/overview' as Href;
+const COMMAND_HREF = '/command' as Href;
+const SETTINGS_ACCENT = '#475569';
+const BACKUP_ACCENT = '#0f766e';
+const INTERNAL_ACCENT = '#7c2d12';
 
-type SettingsStatusTone = "neutral" | "accent" | "warning" | "danger";
+type SettingsStatusTone = 'neutral' | 'accent' | 'warning' | 'danger';
 
 type SettingsRowProps = {
   label: string;
@@ -85,45 +75,45 @@ type CalorieGoalFormState = {
   fats: string;
 };
 
-const THEME_OPTIONS: Array<{
+const THEME_OPTIONS: {
   mode: ThemeMode;
   label: string;
   description: string;
-}> = [
+}[] = [
   {
-    mode: "system",
-    label: "System",
-    description: "Follow your device setting automatically.",
+    mode: 'system',
+    label: 'System',
+    description: 'Follow your device setting automatically.',
   },
   {
-    mode: "light",
-    label: "Light",
-    description: "Always use the light theme.",
+    mode: 'light',
+    label: 'Light',
+    description: 'Always use the light theme.',
   },
   {
-    mode: "dark",
-    label: "Dark",
-    description: "Always use the dark theme.",
+    mode: 'dark',
+    label: 'Dark',
+    description: 'Always use the dark theme.',
   },
 ];
 
 const RESTORE_ENTITY_ORDER: SyncBackedEntity[] = [
-  "todos",
-  "habits",
-  "calorie_entries",
-  "workout_routines",
+  'todos',
+  'habits',
+  'calorie_entries',
+  'workout_routines',
 ];
 
 const RESTORE_ENTITY_LABELS: Record<SyncBackedEntity, string> = {
-  todos: "Todos backup",
-  habits: "Habits backup",
-  calorie_entries: "Calories backup",
-  workout_routines: "Workout backup",
+  todos: 'Todos backup',
+  habits: 'Habits backup',
+  calorie_entries: 'Calories backup',
+  workout_routines: 'Workout backup',
 };
 
 function SettingsStatusPill({
   label,
-  tone = "neutral",
+  tone = 'neutral',
   accentColor = SETTINGS_ACCENT,
 }: {
   label: string;
@@ -133,20 +123,20 @@ function SettingsStatusPill({
   const { tokens } = useAppTheme();
 
   const backgroundColor =
-    tone === "accent"
+    tone === 'accent'
       ? `${accentColor}18`
-      : tone === "warning"
+      : tone === 'warning'
         ? tokens.warningBackground
-        : tone === "danger"
+        : tone === 'danger'
           ? tokens.dangerBackground
           : tokens.surfaceElevated;
 
   const textColor =
-    tone === "accent"
+    tone === 'accent'
       ? accentColor
-      : tone === "warning"
+      : tone === 'warning'
         ? tokens.warningText
-        : tone === "danger"
+        : tone === 'danger'
           ? tokens.dangerText
           : tokens.iconMuted;
 
@@ -166,7 +156,7 @@ function SettingsRow({
   label,
   description,
   statusLabel,
-  statusTone = "neutral",
+  statusTone = 'neutral',
   accentColor = SETTINGS_ACCENT,
   first = false,
   last = false,
@@ -175,7 +165,7 @@ function SettingsRow({
 
   return (
     <View
-      className={[!first ? "pt-3" : "", !last ? "border-b pb-3" : ""].filter(Boolean).join(" ")}
+      className={[!first ? 'pt-3' : '', !last ? 'border-b pb-3' : ''].filter(Boolean).join(' ')}
       style={!last ? { borderColor: tokens.border } : undefined}
     >
       <View className="flex-row items-start gap-3">
@@ -188,11 +178,7 @@ function SettingsRow({
           </Text>
         </View>
         {statusLabel ? (
-          <SettingsStatusPill
-            label={statusLabel}
-            tone={statusTone}
-            accentColor={accentColor}
-          />
+          <SettingsStatusPill label={statusLabel} tone={statusTone} accentColor={accentColor} />
         ) : null}
       </View>
     </View>
@@ -234,12 +220,11 @@ function SettingsSectionHeading({
   );
 }
 
-function getAppearanceSummary(mode: ThemeMode, resolvedTheme: "light" | "dark") {
-  if (mode === "system") {
+function getAppearanceSummary(mode: ThemeMode, resolvedTheme: 'light' | 'dark') {
+  if (mode === 'system') {
     return {
       summary: `Following your device setting. ${resolvedTheme[0].toUpperCase() + resolvedTheme.slice(1)} mode is active right now.`,
-      detail:
-        "System mode updates automatically when your device appearance changes.",
+      detail: 'System mode updates automatically when your device appearance changes.',
     };
   }
 
@@ -250,34 +235,34 @@ function getAppearanceSummary(mode: ThemeMode, resolvedTheme: "light" | "dark") 
 }
 
 function formatBackupTime(value: string | null) {
-  if (!value) return "No restorable backup timestamp is available yet.";
+  if (!value) return 'No restorable backup timestamp is available yet.';
   return new Date(value).toLocaleString();
 }
 
 function describeBackupEntity(status: RemoteBackupEntityStatus) {
-  if (status.phaseOneStatus === "excluded_in_phase_one") {
+  if (status.phaseOneStatus === 'excluded_in_phase_one') {
     const countLabel =
       status.remoteRowCount === null
-        ? "Remote status unavailable."
+        ? 'Remote status unavailable.'
         : `${status.remoteRowCount} remote rows.`;
     return `${countLabel} ${status.reason}`;
   }
 
-  if (status.remoteState === "available") {
-    return `${status.remoteRowCount ?? 0} rows backed up.${status.latestUpdatedAt ? ` Latest change: ${formatBackupTime(status.latestUpdatedAt)}` : ""}`;
+  if (status.remoteState === 'available') {
+    return `${status.remoteRowCount ?? 0} rows backed up.${status.latestUpdatedAt ? ` Latest change: ${formatBackupTime(status.latestUpdatedAt)}` : ''}`;
   }
 
-  if (status.remoteState === "empty") {
-    return "No remote rows are backed up for this entity yet.";
+  if (status.remoteState === 'empty') {
+    return 'No remote rows are backed up for this entity yet.';
   }
 
-  if (status.remoteState === "unavailable") {
-    return "Remote backup is not configured in this build.";
+  if (status.remoteState === 'unavailable') {
+    return 'Remote backup is not configured in this build.';
   }
 
   return status.errorMessage
     ? `Backup status failed to load: ${status.errorMessage}`
-    : "Backup status failed to load.";
+    : 'Backup status failed to load.';
 }
 
 function buildPomodoroForm(settings: PomodoroSettings): PomodoroFormState {
@@ -346,8 +331,8 @@ export function SettingsScreen() {
       setRestorePreview(preview);
       setRestoreError(null);
     } catch (err) {
-      console.error("[SettingsScreen] getRestorePreview failed", err);
-      setRestoreError("Unable to load backup status right now.");
+      console.error('[SettingsScreen] getRestorePreview failed', err);
+      setRestoreError('Unable to load backup status right now.');
     } finally {
       setRestoreLoading(false);
     }
@@ -368,7 +353,7 @@ export function SettingsScreen() {
       setCommandRolloutError(null);
     } catch {
       setCommandRolloutEnabledOnDevice(false);
-      setCommandRolloutError("Unable to load the internal parser toggle right now.");
+      setCommandRolloutError('Unable to load the internal parser toggle right now.');
     } finally {
       setCommandRolloutLoading(false);
     }
@@ -382,8 +367,8 @@ export function SettingsScreen() {
       setPomodoroForm(buildPomodoroForm(nextSettings));
       setPomodoroError(null);
     } catch (err) {
-      console.error("[SettingsScreen] getPomodoroSettings failed", err);
-      setPomodoroError("Unable to load timer defaults right now.");
+      console.error('[SettingsScreen] getPomodoroSettings failed', err);
+      setPomodoroError('Unable to load timer defaults right now.');
     } finally {
       setPomodoroLoading(false);
     }
@@ -397,8 +382,8 @@ export function SettingsScreen() {
       setCalorieGoalForm(buildCalorieGoalForm(nextGoal));
       setCalorieGoalError(null);
     } catch (err) {
-      console.error("[SettingsScreen] getCalorieGoal failed", err);
-      setCalorieGoalError("Unable to load nutrition defaults right now.");
+      console.error('[SettingsScreen] getCalorieGoal failed', err);
+      setCalorieGoalError('Unable to load nutrition defaults right now.');
     } finally {
       setCalorieGoalLoading(false);
     }
@@ -431,13 +416,13 @@ export function SettingsScreen() {
     setRestoreError(null);
     try {
       const result = await restoreFromRemoteBackup();
-      if (result.status === "blocked") {
+      if (result.status === 'blocked') {
         setRestoreError(result.preview.eligibility.message);
       }
       await loadRestorePreview();
     } catch (err) {
-      console.error("[SettingsScreen] restoreFromRemoteBackup failed", err);
-      setRestoreError("Restore failed. Your current local data was left unchanged.");
+      console.error('[SettingsScreen] restoreFromRemoteBackup failed', err);
+      setRestoreError('Restore failed. Your current local data was left unchanged.');
     } finally {
       setRestoreRunning(false);
     }
@@ -451,7 +436,7 @@ export function SettingsScreen() {
       await setAiCommandInternalRolloutPreference(enabled);
       setCommandRolloutEnabledOnDevice(enabled);
     } catch {
-      setCommandRolloutError("Unable to update the internal parser toggle right now.");
+      setCommandRolloutError('Unable to update the internal parser toggle right now.');
     } finally {
       setCommandRolloutLoading(false);
     }
@@ -483,8 +468,8 @@ export function SettingsScreen() {
       setPomodoroForm(buildPomodoroForm(nextSettings));
       setPomodoroError(null);
     } catch (err) {
-      console.error("[SettingsScreen] savePomodoroSettings failed", err);
-      setPomodoroError("Unable to save timer defaults right now.");
+      console.error('[SettingsScreen] savePomodoroSettings failed', err);
+      setPomodoroError('Unable to save timer defaults right now.');
     } finally {
       setPomodoroSaving(false);
     }
@@ -516,8 +501,8 @@ export function SettingsScreen() {
       setCalorieGoalForm(buildCalorieGoalForm(nextGoal));
       setCalorieGoalError(null);
     } catch (err) {
-      console.error("[SettingsScreen] setCalorieGoal failed", err);
-      setCalorieGoalError("Unable to save nutrition defaults right now.");
+      console.error('[SettingsScreen] setCalorieGoal failed', err);
+      setCalorieGoalError('Unable to save nutrition defaults right now.');
     } finally {
       setCalorieGoalSaving(false);
     }
@@ -527,44 +512,44 @@ export function SettingsScreen() {
     restoreLoading ||
     restoreRunning ||
     !restorePreview ||
-    restorePreview.eligibility.kind !== "empty_device";
-  const restoreButtonLabel = restoreRunning ? "Restoring..." : "Restore backup";
+    restorePreview.eligibility.kind !== 'empty_device';
+  const restoreButtonLabel = restoreRunning ? 'Restoring...' : 'Restore backup';
 
   const latestBackupStatusLabel = restoreLoading
-    ? "Loading"
+    ? 'Loading'
     : restorePreview?.remoteAvailable
-      ? "Available"
-      : restorePreview?.eligibility.kind === "blocked" &&
-          restorePreview.eligibility.reason === "remote_disabled"
-        ? "Local only"
-        : "Not ready";
+      ? 'Available'
+      : restorePreview?.eligibility.kind === 'blocked' &&
+          restorePreview.eligibility.reason === 'remote_disabled'
+        ? 'Local only'
+        : 'Not ready';
 
   const latestBackupStatusTone: SettingsStatusTone =
-    latestBackupStatusLabel === "Available"
-      ? "accent"
-      : latestBackupStatusLabel === "Loading"
-        ? "neutral"
-        : latestBackupStatusLabel === "Local only"
-          ? "warning"
-          : "neutral";
+    latestBackupStatusLabel === 'Available'
+      ? 'accent'
+      : latestBackupStatusLabel === 'Loading'
+        ? 'neutral'
+        : latestBackupStatusLabel === 'Local only'
+          ? 'warning'
+          : 'neutral';
 
   const restoreEligibilityLabel = restoreLoading
-    ? "Loading"
-    : restorePreview?.eligibility.kind === "empty_device"
-      ? "Allowed"
-      : "Blocked";
+    ? 'Loading'
+    : restorePreview?.eligibility.kind === 'empty_device'
+      ? 'Allowed'
+      : 'Blocked';
 
   const effectiveParserLabel = commandRolloutLoading
-    ? "Loading"
+    ? 'Loading'
     : commandInternalRolloutAvailable && commandRolloutEnabledOnDevice
-      ? "Model"
-      : "Mock";
+      ? 'Model'
+      : 'Mock';
 
   const effectiveParserDescription = commandInternalRolloutAvailable
     ? commandRolloutEnabledOnDevice
-      ? "Model-backed parsing is enabled on this device. You can turn it off in Developer / Internal to fall back to the mock parser immediately."
-      : "The command shell still defaults to the local mock parser. Internal testers can opt in from Developer / Internal."
-    : "This build keeps the command shell on the local mock parser only.";
+      ? 'Model-backed parsing is enabled on this device. You can turn it off in Developer / Internal to fall back to the mock parser immediately.'
+      : 'The command shell still defaults to the local mock parser. Internal testers can opt in from Developer / Internal.'
+    : 'This build keeps the command shell on the local mock parser only.';
 
   return (
     <Screen scroll>
@@ -654,7 +639,7 @@ export function SettingsScreen() {
               label="Latest restorable backup"
               description={
                 restoreLoading
-                  ? "Checking remote backup status..."
+                  ? 'Checking remote backup status...'
                   : formatBackupTime(restorePreview?.latestRestorableBackupAt ?? null)
               }
               statusLabel={latestBackupStatusLabel}
@@ -665,16 +650,16 @@ export function SettingsScreen() {
               label="Restore rule"
               description={
                 restoreLoading
-                  ? "Checking whether this device is still eligible for phase-one restore."
-                  : restorePreview?.eligibility.message ?? "Backup status is not available yet."
+                  ? 'Checking whether this device is still eligible for phase-one restore.'
+                  : (restorePreview?.eligibility.message ?? 'Backup status is not available yet.')
               }
               statusLabel={restoreEligibilityLabel}
               statusTone={
-                restoreEligibilityLabel === "Allowed"
-                  ? "accent"
-                  : restoreEligibilityLabel === "Blocked"
-                    ? "warning"
-                    : "neutral"
+                restoreEligibilityLabel === 'Allowed'
+                  ? 'accent'
+                  : restoreEligibilityLabel === 'Blocked'
+                    ? 'warning'
+                    : 'neutral'
               }
               accentColor={BACKUP_ACCENT}
             />
@@ -699,7 +684,8 @@ export function SettingsScreen() {
               Phase-one coverage
             </Text>
             <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              The backup feed covers more than the current restore scope. The rows below show what is backed up and what this phase can actually restore.
+              The backup feed covers more than the current restore scope. The rows below show what
+              is backed up and what this phase can actually restore.
             </Text>
 
             <View className="mt-4">
@@ -711,30 +697,30 @@ export function SettingsScreen() {
                   label={RESTORE_ENTITY_LABELS[entity]}
                   description={
                     restoreLoading || !restorePreview
-                      ? "Checking backup coverage..."
+                      ? 'Checking backup coverage...'
                       : describeBackupEntity(restorePreview.entityStatuses[entity])
                   }
                   statusLabel={
                     restoreLoading || !restorePreview
-                      ? "Loading"
+                      ? 'Loading'
                       : restorePreview.entityStatuses[entity].phaseOneStatus ===
-                          "excluded_in_phase_one"
-                        ? "Excluded"
-                        : restorePreview.entityStatuses[entity].remoteState === "available"
-                          ? "Backed up"
-                          : restorePreview.entityStatuses[entity].remoteState === "empty"
-                            ? "Empty"
-                            : "Unavailable"
+                          'excluded_in_phase_one'
+                        ? 'Excluded'
+                        : restorePreview.entityStatuses[entity].remoteState === 'available'
+                          ? 'Backed up'
+                          : restorePreview.entityStatuses[entity].remoteState === 'empty'
+                            ? 'Empty'
+                            : 'Unavailable'
                   }
                   statusTone={
                     restoreLoading || !restorePreview
-                      ? "neutral"
+                      ? 'neutral'
                       : restorePreview.entityStatuses[entity].phaseOneStatus ===
-                          "excluded_in_phase_one"
-                        ? "warning"
-                        : restorePreview.entityStatuses[entity].remoteState === "available"
-                          ? "accent"
-                          : "neutral"
+                          'excluded_in_phase_one'
+                        ? 'warning'
+                        : restorePreview.entityStatuses[entity].remoteState === 'available'
+                          ? 'accent'
+                          : 'neutral'
                   }
                   accentColor={BACKUP_ACCENT}
                 />
@@ -808,7 +794,7 @@ export function SettingsScreen() {
             label="Effective parser"
             description={effectiveParserDescription}
             statusLabel={effectiveParserLabel}
-            statusTone={effectiveParserLabel === "Model" ? "accent" : "neutral"}
+            statusTone={effectiveParserLabel === 'Model' ? 'accent' : 'neutral'}
             accentColor={SETTINGS_ACCENT}
           />
           <SettingsRow
@@ -833,7 +819,10 @@ export function SettingsScreen() {
                   elevation: 1,
                 }}
               >
-                <Text className="text-center text-sm font-semibold" style={{ color: tokens.textOnAccent }}>
+                <Text
+                  className="text-center text-sm font-semibold"
+                  style={{ color: tokens.textOnAccent }}
+                >
                   Open command center
                 </Text>
               </Pressable>
@@ -856,11 +845,11 @@ export function SettingsScreen() {
             label="Saved timer sequence"
             description={
               pomodoroLoading
-                ? "Loading saved timer defaults..."
+                ? 'Loading saved timer defaults...'
                 : formatPomodoroSummary(pomodoroSettings)
             }
-            statusLabel={pomodoroLoading ? "Loading" : "Saved"}
-            statusTone={pomodoroLoading ? "neutral" : "accent"}
+            statusLabel={pomodoroLoading ? 'Loading' : 'Saved'}
+            statusTone={pomodoroLoading ? 'neutral' : 'accent'}
             accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
           />
           <SettingsRow
@@ -921,7 +910,7 @@ export function SettingsScreen() {
           <View className="mt-2 flex-row gap-2">
             <View className="flex-1">
               <Button
-                label={pomodoroSaving ? "Saving..." : "Save timer defaults"}
+                label={pomodoroSaving ? 'Saving...' : 'Save timer defaults'}
                 onPress={handleSavePomodoroDefaults}
                 disabled={pomodoroLoading || pomodoroSaving}
                 color={SECTION_COLORS[POMODORO_SECTION_KEY]}
@@ -956,11 +945,11 @@ export function SettingsScreen() {
             label="Saved goal"
             description={
               calorieGoalLoading
-                ? "Loading saved calorie and macro goals..."
+                ? 'Loading saved calorie and macro goals...'
                 : formatCalorieGoalSummary(calorieGoal)
             }
-            statusLabel={calorieGoalLoading ? "Loading" : "Saved"}
-            statusTone={calorieGoalLoading ? "neutral" : "accent"}
+            statusLabel={calorieGoalLoading ? 'Loading' : 'Saved'}
+            statusTone={calorieGoalLoading ? 'neutral' : 'accent'}
             accentColor={SECTION_COLORS.calories}
           />
           <SettingsRow
@@ -1018,7 +1007,7 @@ export function SettingsScreen() {
           <View className="mt-2 flex-row gap-2">
             <View className="flex-1">
               <Button
-                label={calorieGoalSaving ? "Saving..." : "Save nutrition defaults"}
+                label={calorieGoalSaving ? 'Saving...' : 'Save nutrition defaults'}
                 onPress={handleSaveCalorieGoal}
                 disabled={calorieGoalLoading || calorieGoalSaving}
                 color={SECTION_COLORS.calories}
@@ -1062,7 +1051,8 @@ export function SettingsScreen() {
               Internal only
             </Text>
             <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              These controls and notes are for rollout testing and product diagnostics, not everyday setup.
+              These controls and notes are for rollout testing and product diagnostics, not everyday
+              setup.
             </Text>
           </View>
 
@@ -1072,35 +1062,35 @@ export function SettingsScreen() {
               label="Internal parser rollout"
               description={
                 commandInternalRolloutAvailable
-                  ? "This build can test the model-backed parser with a device-local preference."
-                  : "This build does not expose the internal model parser rollout controls."
+                  ? 'This build can test the model-backed parser with a device-local preference.'
+                  : 'This build does not expose the internal model parser rollout controls.'
               }
-              statusLabel={commandInternalRolloutAvailable ? "Available" : "Unavailable"}
-              statusTone={commandInternalRolloutAvailable ? "accent" : "warning"}
+              statusLabel={commandInternalRolloutAvailable ? 'Available' : 'Unavailable'}
+              statusTone={commandInternalRolloutAvailable ? 'accent' : 'warning'}
               accentColor={INTERNAL_ACCENT}
             />
             <SettingsRow
               label="Device preference"
               description={
                 commandRolloutLoading
-                  ? "Loading the saved internal parser preference for this device..."
+                  ? 'Loading the saved internal parser preference for this device...'
                   : commandRolloutEnabledOnDevice
-                    ? "Model-backed parsing is enabled on this device. Turn it off here to return to the mock parser immediately."
-                    : "Model-backed parsing is disabled on this device. The command shell stays on the mock parser until you opt in here."
+                    ? 'Model-backed parsing is enabled on this device. Turn it off here to return to the mock parser immediately.'
+                    : 'Model-backed parsing is disabled on this device. The command shell stays on the mock parser until you opt in here.'
               }
               statusLabel={
                 commandRolloutLoading
-                  ? "Loading"
+                  ? 'Loading'
                   : commandRolloutEnabledOnDevice
-                    ? "Enabled"
-                    : "Disabled"
+                    ? 'Enabled'
+                    : 'Disabled'
               }
               statusTone={
                 commandRolloutLoading
-                  ? "neutral"
+                  ? 'neutral'
                   : commandRolloutEnabledOnDevice
-                    ? "accent"
-                    : "neutral"
+                    ? 'accent'
+                    : 'neutral'
               }
               accentColor={INTERNAL_ACCENT}
             />
@@ -1117,13 +1107,13 @@ export function SettingsScreen() {
           {commandInternalRolloutAvailable ? (
             <View className="mt-2 gap-2">
               <Button
-                label={commandRolloutLoading ? "Saving..." : "Enable model parser"}
+                label={commandRolloutLoading ? 'Saving...' : 'Enable model parser'}
                 onPress={() => handleCommandRolloutToggle(true)}
                 disabled={commandRolloutLoading || commandRolloutEnabledOnDevice}
                 color={INTERNAL_ACCENT}
               />
               <Button
-                label={commandRolloutLoading ? "Saving..." : "Use mock parser only"}
+                label={commandRolloutLoading ? 'Saving...' : 'Use mock parser only'}
                 onPress={() => handleCommandRolloutToggle(false)}
                 variant="ghost"
                 disabled={commandRolloutLoading || !commandRolloutEnabledOnDevice}

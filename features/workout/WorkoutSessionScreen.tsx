@@ -1,20 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { View, Text, Pressable, Alert } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Screen } from "@/core/ui/Screen";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
-import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
-import { ScreenSection } from "@/core/ui/ScreenSection";
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, Pressable, Alert } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Screen } from '@/core/ui/Screen';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { ScreenSection } from '@/core/ui/ScreenSection';
 import {
   buildTimerSequence,
   formatWorkoutTime,
   summarizeCompletedSets,
   type TimerPhase,
-} from "./workout.domain";
-import { logWorkoutSession } from "./workout.data";
-import type { RoutineWithExercises } from "./types";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+} from './workout.domain';
+import { logWorkoutSession } from './workout.data';
+import type { RoutineWithExercises } from './types';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 
 const WORKOUT_COLOR = SECTION_COLORS.workout;
 
@@ -99,11 +99,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   };
 
   const handleCancel = () => {
-    Alert.alert("End workout?", "Progress will not be saved.", [
-      { text: "Keep going", style: "cancel" },
+    Alert.alert('End workout?', 'Progress will not be saved.', [
+      { text: 'Keep going', style: 'cancel' },
       {
-        text: "End",
-        style: "destructive",
+        text: 'End',
+        style: 'destructive',
         onPress: () => {
           setIsRunning(false);
           onCancel();
@@ -153,17 +153,25 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
     );
   }
 
-  const isActive = currentPhase.phase === "active";
+  const isActive = currentPhase.phase === 'active';
   const denom = currentPhase.durationSeconds > 0 ? currentPhase.durationSeconds : 1;
   const progress = 1 - remaining / denom;
 
   return (
     <Screen>
       <View className="mb-4 flex-row items-center justify-between">
-        <Pressable onPress={handleCancel} accessibilityRole="button" accessibilityLabel="End workout">
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>End</Text>
+        <Pressable
+          onPress={handleCancel}
+          accessibilityRole="button"
+          accessibilityLabel="End workout"
+        >
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+            End
+          </Text>
         </Pressable>
-        <Text className="text-sm" style={{ color: tokens.textMuted }}>{routine.name}</Text>
+        <Text className="text-sm" style={{ color: tokens.textMuted }}>
+          {routine.name}
+        </Text>
         <Text className="text-xs" style={{ color: tokens.iconMuted }}>
           {currentIndex + 1}/{sequence.length}
         </Text>
@@ -171,11 +179,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
       <Card accentColor={WORKOUT_COLOR}>
         <View
-          className={`self-center rounded-full px-3 py-1 ${isActive ? "bg-workout" : ""}`}
+          className={`self-center rounded-full px-3 py-1 ${isActive ? 'bg-workout' : ''}`}
           style={isActive ? undefined : { backgroundColor: tokens.warningText }}
         >
           <Text className="text-xs font-medium" style={{ color: tokens.textOnAccent }}>
-            {isActive ? "ACTIVE" : "REST"}
+            {isActive ? 'ACTIVE' : 'REST'}
           </Text>
         </View>
 
@@ -190,9 +198,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
           {formatWorkoutTime(remaining)}
         </Text>
 
-        <View className="mb-8 h-2 overflow-hidden rounded-full" style={{ backgroundColor: tokens.border }}>
+        <View
+          className="mb-8 h-2 overflow-hidden rounded-full"
+          style={{ backgroundColor: tokens.border }}
+        >
           <View
-            className={`h-full rounded-full ${isActive ? "bg-workout" : ""}`}
+            className={`h-full rounded-full ${isActive ? 'bg-workout' : ''}`}
             style={[
               {
                 width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`,
@@ -212,8 +223,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
         {currentIndex + 1 < sequence.length ? (
           <Text className="mt-6 text-center text-xs" style={{ color: tokens.textMuted }}>
-            Next:{" "}
-            {sequence[currentIndex + 1].phase === "rest"
+            Next:{' '}
+            {sequence[currentIndex + 1].phase === 'rest'
               ? `Rest ${formatWorkoutTime(sequence[currentIndex + 1].durationSeconds)}`
               : `${sequence[currentIndex + 1].exerciseName} — Set ${sequence[currentIndex + 1].setNumber}`}
           </Text>

@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Modal } from "@/core/ui/Modal";
-import { Button } from "@/core/ui/Button";
-import { NumberStepperField } from "@/core/ui/NumberStepperField";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { validateCalorieGoal } from "@/lib/validation";
-import type { CalorieGoal } from "@/features/calories/types";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Modal } from '@/core/ui/Modal';
+import { Button } from '@/core/ui/Button';
+import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { validateCalorieGoal } from '@/lib/validation';
+import type { CalorieGoal } from '@/features/calories/types';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 
 type Props = {
   visible: boolean;

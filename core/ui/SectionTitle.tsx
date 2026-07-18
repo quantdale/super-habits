@@ -1,4 +1,4 @@
-import { PageHeader } from "@/core/ui/PageHeader";
+import { PageHeader } from '@/core/ui/PageHeader';
 
 type SectionTitleProps = {
   title: string;

@@ -1,19 +1,19 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MaterialIcons } from "@expo/vector-icons";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
-import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
-import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
-import { Modal } from "@/core/ui/Modal";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { Screen } from "@/core/ui/Screen";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { SwipeableCard } from "@/core/ui/SwipeableCard";
-import { TextField } from "@/core/ui/TextField";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialIcons } from '@expo/vector-icons';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
+import { Modal } from '@/core/ui/Modal';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { Screen } from '@/core/ui/Screen';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { SwipeableCard } from '@/core/ui/SwipeableCard';
+import { TextField } from '@/core/ui/TextField';
 import {
   DEFAULT_GOAL,
   addCalorieEntry,
@@ -25,7 +25,7 @@ import {
   searchSavedMeals,
   setCalorieGoal,
   updateCalorieEntry,
-} from "@/features/calories/calories.data";
+} from '@/features/calories/calories.data';
 import {
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
@@ -34,26 +34,31 @@ import {
   caloriesTotal,
   filterSavedMeals,
   kcalFromMacros,
-} from "@/features/calories/calories.domain";
-import type { CalorieGoal, DailySummary } from "@/features/calories/types";
-import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
-import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
-import { toDateKey } from "@/lib/time";
-import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
-import { validateCalorieComputedKcal, validateCalorieEntry } from "@/lib/validation";
-import { CalorieGoalModal } from "./CalorieGoalModal";
-import { CaloriesEntryFields } from "./CaloriesEntryFields";
-import { DailyCalorieChart } from "./DailyCalorieChart";
-import { MacroDonutChart } from "./MacroDonutChart";
-import { SavedMealChips } from "./SavedMealChips";
-import { SavedMealSearchModal } from "./SavedMealSearchModal";
-import type { CalorieEntry, MealType, SavedMeal } from "./types";
+} from '@/features/calories/calories.domain';
+import type {
+  CalorieGoal,
+  DailySummary,
+  CalorieEntry,
+  MealType,
+  SavedMeal,
+} from '@/features/calories/types';
+import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import { toDateKey } from '@/lib/time';
+import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
+import { CalorieGoalModal } from './CalorieGoalModal';
+import { CaloriesEntryFields } from './CaloriesEntryFields';
+import { DailyCalorieChart } from './DailyCalorieChart';
+import { MacroDonutChart } from './MacroDonutChart';
+import { SavedMealChips } from './SavedMealChips';
+import { SavedMealSearchModal } from './SavedMealSearchModal';
 
 const COLOR = SECTION_COLORS.calories;
 const TEXT_COLOR = SECTION_TEXT_COLORS.calories;
-const CALORIES_VIEW_MODE_STORAGE_KEY = "superhabits.calories.viewMode";
+const CALORIES_VIEW_MODE_STORAGE_KEY = 'superhabits.calories.viewMode';
 
-type CaloriesViewMode = "form" | "diary";
+type CaloriesViewMode = 'form' | 'diary';
 
 type MealSection = {
   mealType: MealType;
@@ -62,16 +67,16 @@ type MealSection = {
   totalCalories: number;
 };
 
-const MEAL_OPTIONS: ReadonlyArray<{ value: MealType; label: string }> = [
-  { value: "breakfast", label: "Breakfast" },
-  { value: "lunch", label: "Lunch" },
-  { value: "dinner", label: "Dinner" },
-  { value: "snack", label: "Snack" },
+const MEAL_OPTIONS: readonly { value: MealType; label: string }[] = [
+  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Dinner' },
+  { value: 'snack', label: 'Snack' },
 ];
 
-const VIEW_MODE_OPTIONS: ReadonlyArray<{ value: CaloriesViewMode; label: string }> = [
-  { value: "form", label: "Form" },
-  { value: "diary", label: "Diary" },
+const VIEW_MODE_OPTIONS: readonly { value: CaloriesViewMode; label: string }[] = [
+  { value: 'form', label: 'Form' },
+  { value: 'diary', label: 'Diary' },
 ];
 
 function withAlpha(color: string, opacity: number) {
@@ -86,22 +91,22 @@ function withAlpha(color: string, opacity: number) {
 }
 
 function formatDayContext(dateKey: string) {
-  return new Date(`${dateKey}T12:00:00`).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
   });
 }
 
 function formatEntryTimestamp(timestamp: string) {
-  return new Date(timestamp).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
+  return new Date(timestamp).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
 function formatMealCount(count: number) {
-  return count === 1 ? "1 item" : `${count} items`;
+  return count === 1 ? '1 item' : `${count} items`;
 }
 
 const CalorieEntrySwipeRow = memo(
@@ -117,12 +122,17 @@ const CalorieEntrySwipeRow = memo(
     const { tokens } = useAppTheme();
 
     return (
-      <SwipeableCard accentColor={COLOR} style={{ marginBottom: 12 }} onEdit={onEdit} onDelete={onDelete}>
+      <SwipeableCard
+        accentColor={COLOR}
+        style={{ marginBottom: 12 }}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      >
         <Text className="text-base font-semibold" style={{ color: tokens.text }}>
           {entry.food_name} - {entry.calories} kcal
         </Text>
         <Text className="mt-1 text-sm capitalize" style={{ color: tokens.textMuted }}>
-          {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{" "}
+          {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{' '}
           {entry.fiber}g
         </Text>
       </SwipeableCard>
@@ -194,7 +204,7 @@ function ViewModeSwitch({
             style={active ? { backgroundColor: COLOR } : undefined}
           >
             <Text
-              className={active ? "text-sm font-semibold" : "text-sm font-medium"}
+              className={active ? 'text-sm font-semibold' : 'text-sm font-medium'}
               style={active ? { color: tokens.textOnAccent } : { color: tokens.textMuted }}
             >
               {option.label}
@@ -227,7 +237,10 @@ function DiaryMealGroupCard({
         <View className="flex-row items-center justify-between gap-3">
           <View className="min-w-0 flex-1">
             <View className="flex-row flex-wrap items-center gap-2">
-              <View className="rounded-full px-3 py-1" style={{ backgroundColor: withAlpha(COLOR, 0.12) }}>
+              <View
+                className="rounded-full px-3 py-1"
+                style={{ backgroundColor: withAlpha(COLOR, 0.12) }}
+              >
                 <Text className="text-xs font-semibold" style={{ color: TEXT_COLOR }}>
                   {section.label}
                 </Text>
@@ -241,7 +254,7 @@ function DiaryMealGroupCard({
             </Text>
           </View>
           <MaterialIcons
-            name={collapsed ? "expand-more" : "expand-less"}
+            name={collapsed ? 'expand-more' : 'expand-less'}
             size={22}
             color={tokens.iconMuted}
           />
@@ -309,12 +322,12 @@ function DiaryMealGroupCard({
 
 export function CaloriesScreen() {
   const { tokens } = useAppTheme();
-  const [food, setFood] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fats, setFats] = useState("");
-  const [fiber, setFiber] = useState("");
-  const [mealType, setMealType] = useState<MealType>("breakfast");
+  const [food, setFood] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fats, setFats] = useState('');
+  const [fiber, setFiber] = useState('');
+  const [mealType, setMealType] = useState<MealType>('breakfast');
   const [calorieError, setCalorieError] = useState<string | null>(null);
   const [entries, setEntries] = useState<CalorieEntry[]>([]);
   const [goal, setGoal] = useState<CalorieGoal>(DEFAULT_GOAL);
@@ -327,8 +340,8 @@ export function CaloriesScreen() {
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
-  const [viewMode, setViewMode] = useState<CaloriesViewMode>("form");
-  const [diarySearch, setDiarySearch] = useState("");
+  const [viewMode, setViewMode] = useState<CaloriesViewMode>('form');
+  const [diarySearch, setDiarySearch] = useState('');
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
 
   const refresh = useCallback(async () => {
@@ -339,7 +352,7 @@ export function CaloriesScreen() {
     startYear.setDate(startYear.getDate() - 364);
     const [recent, all, rangeYear, savedGoal] = await Promise.all([
       listRecentSavedMeals(5),
-      searchSavedMeals(""),
+      searchSavedMeals(''),
       getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date())),
       getCalorieGoal(),
     ]);
@@ -361,7 +374,7 @@ export function CaloriesScreen() {
     AsyncStorage.getItem(CALORIES_VIEW_MODE_STORAGE_KEY)
       .then((storedValue) => {
         if (!active) return;
-        if (storedValue === "form" || storedValue === "diary") {
+        if (storedValue === 'form' || storedValue === 'diary') {
           setViewMode(storedValue);
         }
       })
@@ -408,7 +421,7 @@ export function CaloriesScreen() {
   const hasCalorieStripActivity = calorieActivityDays.some((day) => day.active);
   const consistencyText = hasCalorieStripActivity
     ? `${goalProgress.percent}% of daily goal today`
-    : "Log food to start tracking";
+    : 'Log food to start tracking';
   const computedKcal = useMemo(
     () =>
       kcalFromMacros(
@@ -467,20 +480,20 @@ export function CaloriesScreen() {
   );
 
   const resetCalorieForm = () => {
-    setFood("");
-    setProtein("");
-    setCarbs("");
-    setFats("");
-    setFiber("");
-    setMealType("breakfast");
+    setFood('');
+    setProtein('');
+    setCarbs('');
+    setFats('');
+    setFiber('');
+    setMealType('breakfast');
     setEditingEntryId(null);
     setCalorieError(null);
   };
 
   const setAndPersistViewMode = useCallback((nextMode: CaloriesViewMode) => {
     setViewMode(nextMode);
-    if (nextMode === "form") {
-      setDiarySearch("");
+    if (nextMode === 'form') {
+      setDiarySearch('');
     }
     void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
   }, []);
@@ -498,8 +511,8 @@ export function CaloriesScreen() {
 
   const handleSelectSavedMeal = (meal: SavedMeal) => {
     applySavedMealToDraft(meal);
-    setDiarySearch("");
-    if (viewMode === "diary") {
+    setDiarySearch('');
+    if (viewMode === 'diary') {
       setEntryModalVisible(true);
     }
   };
@@ -510,7 +523,7 @@ export function CaloriesScreen() {
     setCarbs(String(entry.carbs));
     setFats(String(entry.fats));
     setFiber(String(entry.fiber ?? 0));
-    setMealType(entry.meal_type as MealType);
+    setMealType(entry.meal_type);
     setEditingEntryId(entry.id);
     setCalorieError(null);
     setEntryModalVisible(true);
@@ -590,15 +603,15 @@ export function CaloriesScreen() {
 
         resetCalorieForm();
         setEntryModalVisible(false);
-        setDiarySearch("");
+        setDiarySearch('');
         await refresh();
       } catch (error) {
         const message =
           error instanceof Error
             ? error.message
-            : typeof error === "string"
+            : typeof error === 'string'
               ? error
-              : "Could not save entry.";
+              : 'Could not save entry.';
         setCalorieError(message);
       }
     })();
@@ -619,7 +632,7 @@ export function CaloriesScreen() {
       </View>
       <View className="flex-1">
         <Button
-          label={editingEntryId ? "Save changes" : "Add entry"}
+          label={editingEntryId ? 'Save changes' : 'Add entry'}
           onPress={handleSubmit}
           color={COLOR}
         />
@@ -632,7 +645,9 @@ export function CaloriesScreen() {
       variant="header"
       accentColor={COLOR}
       headerTitle="Today"
-      headerSubtitle={viewMode === "diary" ? activeDateLabel : "Live totals, goal progress, and macro split."}
+      headerSubtitle={
+        viewMode === 'diary' ? activeDateLabel : 'Live totals, goal progress, and macro split.'
+      }
       headerRight={<MaterialIcons name="pie-chart" size={22} color={tokens.textOnAccent} />}
       className="mb-0"
     >
@@ -656,7 +671,10 @@ export function CaloriesScreen() {
             </Text>
           </Pressable>
         </View>
-        <View className="h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: tokens.border }}>
+        <View
+          className="h-2 w-full overflow-hidden rounded-full"
+          style={{ backgroundColor: tokens.border }}
+        >
           <View
             className="h-full rounded-full"
             style={{
@@ -686,7 +704,7 @@ export function CaloriesScreen() {
         <ViewModeSwitch value={viewMode} onChange={setAndPersistViewMode} />
       </ScreenSection>
 
-      {viewMode === "form" ? (
+      {viewMode === 'form' ? (
         <>
           <ScreenSection>
             <View className="flex-row flex-wrap gap-3">
@@ -698,7 +716,11 @@ export function CaloriesScreen() {
                   title="Days logged"
                   value={calorieActivityDays.filter((day) => day.active).length}
                   subtitle="Rolling year"
-                  note={hasCalorieStripActivity ? "Daily intake history is active" : "No intake history yet"}
+                  note={
+                    hasCalorieStripActivity
+                      ? 'Daily intake history is active'
+                      : 'No intake history yet'
+                  }
                 />
               </View>
               <View className="min-w-[160px] flex-1">
@@ -709,7 +731,11 @@ export function CaloriesScreen() {
                   title="Goal progress"
                   value={`${goalProgress.percent}%`}
                   subtitle="Today"
-                  note={goalProgress.over ? "You are over goal" : `${goalProgress.remaining} kcal remaining`}
+                  note={
+                    goalProgress.over
+                      ? 'You are over goal'
+                      : `${goalProgress.remaining} kcal remaining`
+                  }
                 />
               </View>
             </View>
@@ -811,7 +837,9 @@ export function CaloriesScreen() {
               accentColor={COLOR}
               headerTitle="Quick add"
               headerSubtitle="Recent foods, saved meals, search-first add, and manual entry."
-              headerRight={<MaterialIcons name="playlist-add" size={22} color={tokens.textOnAccent} />}
+              headerRight={
+                <MaterialIcons name="playlist-add" size={22} color={tokens.textOnAccent} />
+              }
               className="mb-0"
             >
               <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
@@ -825,7 +853,10 @@ export function CaloriesScreen() {
               {diarySearch.trim() ? (
                 diarySearchMatches.length > 0 ? (
                   <View className="mb-3 gap-2">
-                    <Text className="text-xs font-semibold uppercase" style={{ color: tokens.textMuted }}>
+                    <Text
+                      className="text-xs font-semibold uppercase"
+                      style={{ color: tokens.textMuted }}
+                    >
                       Matches
                     </Text>
                     {diarySearchMatches.map((meal) => (
@@ -833,14 +864,17 @@ export function CaloriesScreen() {
                         key={meal.id}
                         onPress={() => handleSelectSavedMeal(meal)}
                         className="rounded-2xl border px-4 py-3"
-                        style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+                        style={{
+                          borderColor: tokens.border,
+                          backgroundColor: tokens.surfaceElevated,
+                        }}
                       >
                         <Text className="text-sm font-medium" style={{ color: tokens.text }}>
                           {meal.food_name}
                         </Text>
                         <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                          {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fats}g
-                          {meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ""}
+                          {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fats}
+                          g{meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ''}
                         </Text>
                       </Pressable>
                     ))}
@@ -851,7 +885,8 @@ export function CaloriesScreen() {
                     style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
                   >
                     <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                      No saved meal matches “{diarySearch.trim()}”. Use Manual add to log it as a new food.
+                      No saved meal matches “{diarySearch.trim()}”. Use Manual add to log it as a
+                      new food.
                     </Text>
                   </View>
                 )
@@ -932,7 +967,7 @@ export function CaloriesScreen() {
       />
 
       <Modal
-        title={editingEntryId ? "Edit entry" : "Manual add"}
+        title={editingEntryId ? 'Edit entry' : 'Manual add'}
         visible={entryModalVisible}
         onClose={() => {
           setEntryModalVisible(false);

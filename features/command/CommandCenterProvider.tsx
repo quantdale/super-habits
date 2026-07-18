@@ -1,5 +1,5 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { useSegments } from "expo-router";
+import { MaterialIcons } from '@expo/vector-icons';
+import { useSegments } from 'expo-router';
 import {
   createContext,
   type PropsWithChildren,
@@ -8,24 +8,24 @@ import {
   useEffect,
   useMemo,
   useState,
-} from "react";
-import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Modal } from "@/core/ui/Modal";
-import { COMMAND_EXPERIMENT_ENABLED } from "@/features/command/types";
+} from 'react';
+import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Modal } from '@/core/ui/Modal';
+import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
 import {
   type CommandCenterLaunchContext,
   getCommandCenterContextCopy,
-} from "./commandCenterConfig";
-import { CommandScreen } from "./CommandScreen";
+} from './commandCenterConfig';
+import { CommandScreen } from './CommandScreen';
 
 const ELIGIBLE_TAB_CONTEXTS: Record<string, CommandCenterLaunchContext> = {
-  overview: "overview",
-  todos: "todos",
-  habits: "habits",
-  pomodoro: "pomodoro",
-  workout: "workout",
-  calories: "calories",
+  overview: 'overview',
+  todos: 'todos',
+  habits: 'habits',
+  pomodoro: 'pomodoro',
+  workout: 'workout',
+  calories: 'calories',
 };
 
 type CommandCenterContextValue = {
@@ -42,7 +42,7 @@ const CommandCenterContext = createContext<CommandCenterContextValue | null>(nul
 function resolveContextFromSegments(
   segments: readonly string[],
 ): CommandCenterLaunchContext | null {
-  const tabsIndex = segments.indexOf("(tabs)");
+  const tabsIndex = segments.indexOf('(tabs)');
   if (tabsIndex === -1) return null;
 
   const tabSegment = segments[tabsIndex + 1];
@@ -88,20 +88,23 @@ export function CommandCenterProvider({ children }: PropsWithChildren) {
       closeCommandCenter,
       setLauncherSuppressed,
     }),
-    [closeCommandCenter, isOpen, launchContext, openCommandCenter, setLauncherSuppressed, suppressionMap],
+    [
+      closeCommandCenter,
+      isOpen,
+      launchContext,
+      openCommandCenter,
+      setLauncherSuppressed,
+      suppressionMap,
+    ],
   );
 
-  return (
-    <CommandCenterContext.Provider value={value}>
-      {children}
-    </CommandCenterContext.Provider>
-  );
+  return <CommandCenterContext.Provider value={value}>{children}</CommandCenterContext.Provider>;
 }
 
 function useCommandCenterContext() {
   const context = useContext(CommandCenterContext);
   if (!context) {
-    throw new Error("useCommandCenterContext must be used within CommandCenterProvider");
+    throw new Error('useCommandCenterContext must be used within CommandCenterProvider');
   }
   return context;
 }
@@ -127,7 +130,7 @@ function FloatingCommandLauncher({
   const { tokens } = useAppTheme();
   const { width } = useWindowDimensions();
   const contextCopy = getCommandCenterContextCopy(launchContext);
-  const showLabel = Platform.OS === "web" && width >= 960;
+  const showLabel = Platform.OS === 'web' && width >= 960;
 
   if (!contextCopy) return null;
 
@@ -135,7 +138,7 @@ function FloatingCommandLauncher({
     <View
       pointerEvents="box-none"
       style={{
-        position: "absolute",
+        position: 'absolute',
         right: 16,
         bottom: 24,
         zIndex: 80,
@@ -146,7 +149,7 @@ function FloatingCommandLauncher({
         accessibilityLabel="Open command center"
         onPress={onPress}
         className={`items-center justify-center rounded-2xl border ${
-          showLabel ? "flex-row gap-2 px-4 py-3" : "h-14 w-14"
+          showLabel ? 'flex-row gap-2 px-4 py-3' : 'h-14 w-14'
         }`}
         style={{
           borderColor: tokens.border,
@@ -172,20 +175,12 @@ function FloatingCommandLauncher({
 export function GlobalCommandCenterHost() {
   const { width } = useWindowDimensions();
   const segments = useSegments() as readonly string[];
-  const {
-    isOpen,
-    launchContext,
-    launcherSuppressed,
-    openCommandCenter,
-    closeCommandCenter,
-  } = useCommandCenterContext();
+  const { isOpen, launchContext, launcherSuppressed, openCommandCenter, closeCommandCenter } =
+    useCommandCenterContext();
 
   const currentContext = useMemo(() => resolveContextFromSegments(segments), [segments]);
   const launcherVisible =
-    COMMAND_EXPERIMENT_ENABLED &&
-    !isOpen &&
-    currentContext !== null &&
-    !launcherSuppressed;
+    COMMAND_EXPERIMENT_ENABLED && !isOpen && currentContext !== null && !launcherSuppressed;
 
   useEffect(() => {
     if (!currentContext && isOpen) {
@@ -211,7 +206,7 @@ export function GlobalCommandCenterHost() {
         onClose={closeCommandCenter}
         title="Command center"
         scroll
-        layout={Platform.OS === "web" && width >= 960 ? "drawer" : "bottom-sheet"}
+        layout={Platform.OS === 'web' && width >= 960 ? 'drawer' : 'bottom-sheet'}
       >
         {launchContext ? (
           <CommandScreen

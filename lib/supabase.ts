@@ -1,23 +1,23 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export type RemoteMode = "disabled" | "enabled";
+export type RemoteMode = 'disabled' | 'enabled';
 
-let remoteMode: RemoteMode = "enabled";
+let remoteMode: RemoteMode = 'enabled';
 
 export function setRemoteMode(mode: RemoteMode) {
   remoteMode = mode;
 }
 
 export function isRemoteEnabled() {
-  return remoteMode === "enabled";
+  return remoteMode === 'enabled';
 }
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-const isBrowser = typeof window !== "undefined";
+const isBrowser = typeof window !== 'undefined';
 
 /** AsyncStorage touches `window` internally; avoid it during Expo static web export / SSR. */
 const ssrSafeStorage = {
@@ -30,7 +30,7 @@ const ssrSafeStorage = {
 export const supabase: SupabaseClient | null = supabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        storage: (isBrowser ? AsyncStorage : ssrSafeStorage) as typeof AsyncStorage,
+        storage: isBrowser ? AsyncStorage : ssrSafeStorage,
         autoRefreshToken: isBrowser,
         persistSession: isBrowser,
         detectSessionInUrl: false,
@@ -93,11 +93,8 @@ export async function ensureAnonymousSession(): Promise<void> {
   const { error: signInError } = await supabase.auth.signInAnonymously();
 
   if (signInError) {
-    const msg = signInError.message ?? "";
-    if (
-      /anonymous|disabled/i.test(msg) ||
-      (signInError as { status?: number }).status === 422
-    ) {
+    const msg = signInError.message ?? '';
+    if (/anonymous|disabled/i.test(msg) || (signInError as { status?: number }).status === 422) {
       return;
     }
     throw signInError;

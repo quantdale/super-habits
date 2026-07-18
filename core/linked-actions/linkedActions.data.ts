@@ -1,6 +1,6 @@
-import { getDatabase } from "@/core/db/client";
-import { createId } from "@/lib/id";
-import { nowIso } from "@/lib/time";
+import { getDatabase } from '@/core/db/client';
+import { createId } from '@/lib/id';
+import { nowIso } from '@/lib/time';
 import {
   type CreateLinkedActionRuleInput,
   type LinkedActionEventRecord,
@@ -21,7 +21,7 @@ import {
   normalizeLinkedActionEventRow,
   normalizeLinkedActionExecutionRow,
   normalizeLinkedActionRuleRow,
-} from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActions.types';
 
 async function insertLinkedActionRuleRow(
   db: Awaited<ReturnType<typeof getDatabase>>,
@@ -120,7 +120,7 @@ export async function listLinkedActionRules(): Promise<LinkedActionRuleDefinitio
 }
 
 export async function listMatchingLinkedActionRules(
-  source: Pick<LinkedActionSourceAction, "feature" | "entityType" | "entityId" | "triggerType">,
+  source: Pick<LinkedActionSourceAction, 'feature' | 'entityType' | 'entityId' | 'triggerType'>,
 ): Promise<LinkedActionRuleDefinition[]> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<LinkedActionRuleRow>(
@@ -138,9 +138,7 @@ export async function listMatchingLinkedActionRules(
   return rows.map(normalizeLinkedActionRuleRow);
 }
 
-export async function getLinkedActionRule(
-  id: string,
-): Promise<LinkedActionRuleDefinition | null> {
+export async function getLinkedActionRule(id: string): Promise<LinkedActionRuleDefinition | null> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<LinkedActionRuleRow>(
     `SELECT *
@@ -198,9 +196,9 @@ export async function createLinkedActionRule(
 ): Promise<LinkedActionRuleDefinition> {
   const now = nowIso();
   const rule: LinkedActionRuleDefinition = {
-    id: createId("link"),
-    status: input.status ?? "active",
-    directionPolicy: input.directionPolicy ?? "one_way",
+    id: createId('link'),
+    status: input.status ?? 'active',
+    directionPolicy: input.directionPolicy ?? 'one_way',
     bidirectionalGroupId: input.bidirectionalGroupId ?? null,
     source: input.source,
     target: input.target,
@@ -250,13 +248,14 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
       entityId: input.entityId,
       triggerType: ruleInput.triggerType,
     };
-    const existingRule =
-      ruleInput.existingRuleId ? existingById.get(ruleInput.existingRuleId) : undefined;
+    const existingRule = ruleInput.existingRuleId
+      ? existingById.get(ruleInput.existingRuleId)
+      : undefined;
 
     if (existingRule) {
       if (existingRule.isUnsupported) {
         throw new Error(
-          "Unsupported linked action rules must be removed or replaced before saving.",
+          'Unsupported linked action rules must be removed or replaced before saving.',
         );
       }
 
@@ -264,8 +263,7 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
         id: existingRule.id,
         status: ruleInput.status ?? existingRule.status,
         directionPolicy: ruleInput.directionPolicy ?? existingRule.directionPolicy,
-        bidirectionalGroupId:
-          ruleInput.bidirectionalGroupId ?? existingRule.bidirectionalGroupId,
+        bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? existingRule.bidirectionalGroupId,
         source,
         target: ruleInput.target,
         isUnsupported: false,
@@ -283,9 +281,9 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
     }
 
     const createdRule: LinkedActionRuleDefinition = {
-      id: createId("link"),
-      status: ruleInput.status ?? "active",
-      directionPolicy: ruleInput.directionPolicy ?? "one_way",
+      id: createId('link'),
+      status: ruleInput.status ?? 'active',
+      directionPolicy: ruleInput.directionPolicy ?? 'one_way',
       bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? null,
       source,
       target: ruleInput.target,
@@ -318,7 +316,7 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
 
 export async function updateLinkedActionRuleStatus(
   id: string,
-  status: LinkedActionRuleDefinition["status"],
+  status: LinkedActionRuleDefinition['status'],
 ): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
@@ -483,13 +481,13 @@ export async function getAppliedHabitDayCalorieExecution(
 }
 
 export async function createLinkedActionExecution(
-  execution: Omit<LinkedActionExecutionRecord, "id" | "createdAt" | "updatedAt"> & {
+  execution: Omit<LinkedActionExecutionRecord, 'id' | 'createdAt' | 'updatedAt'> & {
     id?: string;
   },
 ): Promise<LinkedActionExecutionRecord> {
   const now = nowIso();
   const record: LinkedActionExecutionRecord = {
-    id: execution.id ?? createId("lexec"),
+    id: execution.id ?? createId('lexec'),
     ruleId: execution.ruleId,
     sourceEventId: execution.sourceEventId,
     chainId: execution.chainId,
@@ -561,43 +559,39 @@ export async function updateLinkedActionExecution(
   updates: Partial<
     Pick<
       LinkedActionExecutionRecord,
-      | "status"
-      | "producedEntityType"
-      | "producedEntityId"
-      | "noticePayload"
-      | "errorMessage"
+      'status' | 'producedEntityType' | 'producedEntityId' | 'noticePayload' | 'errorMessage'
     >
   >,
 ): Promise<void> {
   const db = await getDatabase();
-  const fields: string[] = ["updated_at = ?"];
-  const values: Array<string | null> = [nowIso()];
+  const fields: string[] = ['updated_at = ?'];
+  const values: (string | null)[] = [nowIso()];
 
   if (updates.status !== undefined) {
-    fields.push("status = ?");
+    fields.push('status = ?');
     values.push(updates.status);
   }
   if (updates.producedEntityType !== undefined) {
-    fields.push("produced_entity_type = ?");
+    fields.push('produced_entity_type = ?');
     values.push(updates.producedEntityType);
   }
   if (updates.producedEntityId !== undefined) {
-    fields.push("produced_entity_id = ?");
+    fields.push('produced_entity_id = ?');
     values.push(updates.producedEntityId);
   }
   if (updates.noticePayload !== undefined) {
-    fields.push("notice_payload = ?");
+    fields.push('notice_payload = ?');
     values.push(updates.noticePayload ? JSON.stringify(updates.noticePayload) : null);
   }
   if (updates.errorMessage !== undefined) {
-    fields.push("error_message = ?");
+    fields.push('error_message = ?');
     values.push(updates.errorMessage);
   }
 
   values.push(id);
   await db.runAsync(
     `UPDATE linked_action_executions
-     SET ${fields.join(", ")}
+     SET ${fields.join(', ')}
      WHERE id = ?`,
     values,
   );

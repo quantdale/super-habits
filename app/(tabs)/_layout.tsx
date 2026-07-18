@@ -1,33 +1,73 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import type { Href } from "expo-router";
-import { useRouter, useSegments } from "expo-router";
-import { Tabs, TabList, TabTrigger, TabSlot } from "expo-router/ui";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { runOnJS, useSharedValue } from "react-native-reanimated";
-import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import { useCallback, useEffect, useMemo } from 'react';
+import { Pressable, StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import type { Href } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
+import { Tabs, TabList, TabTrigger, TabSlot } from 'expo-router/ui';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
+import {
+  POMODORO_SECTION_KEY,
+  SECTION_COLORS,
+  SECTION_TEXT_COLORS,
+} from '@/constants/sectionColors';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
-const OVERVIEW_HREF = "/(tabs)/overview" as Href;
+const OVERVIEW_HREF = '/(tabs)/overview' as Href;
 
 const NAV_ITEMS = [
-  { name: "overview", href: OVERVIEW_HREF, label: "Overview", icon: "dashboard", color: SECTION_TEXT_COLORS.focus },
-  { name: "todos", href: "/(tabs)/todos" as const, label: "To Do", icon: "check-circle-outline", color: SECTION_TEXT_COLORS.todos },
-  { name: "habits", href: "/(tabs)/habits" as const, label: "Habits", icon: "loop", color: SECTION_TEXT_COLORS.habits },
-  { name: "pomodoro", href: "/(tabs)/pomodoro" as const, label: "Focus", icon: "timer", color: SECTION_TEXT_COLORS.focus },
-  { name: "workout", href: "/(tabs)/workout" as const, label: "Workout", icon: "fitness-center", color: SECTION_TEXT_COLORS.workout },
-  { name: "calories", href: "/(tabs)/calories" as const, label: "Calories", icon: "restaurant-menu", color: SECTION_TEXT_COLORS.calories },
+  {
+    name: 'overview',
+    href: OVERVIEW_HREF,
+    label: 'Overview',
+    icon: 'dashboard',
+    color: SECTION_TEXT_COLORS.focus,
+  },
+  {
+    name: 'todos',
+    href: '/(tabs)/todos' as const,
+    label: 'To Do',
+    icon: 'check-circle-outline',
+    color: SECTION_TEXT_COLORS.todos,
+  },
+  {
+    name: 'habits',
+    href: '/(tabs)/habits' as const,
+    label: 'Habits',
+    icon: 'loop',
+    color: SECTION_TEXT_COLORS.habits,
+  },
+  {
+    name: 'pomodoro',
+    href: '/(tabs)/pomodoro' as const,
+    label: 'Focus',
+    icon: 'timer',
+    color: SECTION_TEXT_COLORS.focus,
+  },
+  {
+    name: 'workout',
+    href: '/(tabs)/workout' as const,
+    label: 'Workout',
+    icon: 'fitness-center',
+    color: SECTION_TEXT_COLORS.workout,
+  },
+  {
+    name: 'calories',
+    href: '/(tabs)/calories' as const,
+    label: 'Calories',
+    icon: 'restaurant-menu',
+    color: SECTION_TEXT_COLORS.calories,
+  },
 ] as const;
 
 const NAV_TAB_COUNT = NAV_ITEMS.length;
 const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
 const NAV_TO_SECTION_KEY = {
-  todos: "todos",
-  habits: "habits",
+  todos: 'todos',
+  habits: 'habits',
   pomodoro: POMODORO_SECTION_KEY,
-  workout: "workout",
-  calories: "calories",
+  workout: 'workout',
+  calories: 'calories',
 } as const;
 
 type TopTabItemProps = {
@@ -64,9 +104,9 @@ function TopTabItem({
       style={[
         {
           flex: 1,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
           gap: 5,
           minWidth: 0,
           backgroundColor: isFocused ? surfaceColor : tabRailColor,
@@ -82,9 +122,9 @@ function TopTabItem({
         },
         StyleSheet.flatten(style),
         {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
           gap: 5,
           minWidth: 0,
         },
@@ -100,7 +140,7 @@ function TopTabItem({
         style={{
           fontSize: 12,
           color: isFocused ? color : inactiveColor,
-          fontWeight: isFocused ? "600" : "400",
+          fontWeight: isFocused ? '600' : '400',
           flexShrink: 1,
         }}
         numberOfLines={1}
@@ -116,11 +156,11 @@ export default function TabsLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { width: screenWidth } = useWindowDimensions();
-  const overviewColor = resolvedTheme === "dark" ? tokens.text : tokens.textMuted;
+  const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
 
   const currentIndex = useMemo(() => {
     const segs = segments as readonly string[];
-    const tabsIdx = segs.indexOf("(tabs)");
+    const tabsIdx = segs.indexOf('(tabs)');
     const tabSegment = tabsIdx !== -1 ? segs[tabsIdx + 1] : undefined;
     const idx = tabSegment ? NAV_ITEMS.findIndex((item) => item.name === tabSegment) : -1;
     return idx >= 0 ? idx : 0;
@@ -138,22 +178,25 @@ export default function TabsLayout() {
     screenWidthSV.value = screenWidth;
   }, [screenWidth, screenWidthSV]);
 
-  const navigateToIndex = useCallback((index: number) => {
-    if (index < 0 || index >= NAV_TAB_COUNT) return;
-    router.navigate(NAV_ITEMS[index].href as Href);
-  }, [router]);
+  const navigateToIndex = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= NAV_TAB_COUNT) return;
+      router.navigate(NAV_ITEMS[index].href);
+    },
+    [router],
+  );
 
   const pan = useMemo(
     () =>
       Gesture.Pan()
         .activeOffsetX([-30, 30])
         .onStart((event) => {
-          "worklet";
+          'worklet';
           const w = screenWidthSV.value;
           isDeadZone.value = event.absoluteX < 40 || event.absoluteX > w - 40;
         })
         .onEnd((event) => {
-          "worklet";
+          'worklet';
           const w = screenWidthSV.value;
           const idx = tabIndex.value;
           const tx = event.translationX;
@@ -174,9 +217,9 @@ export default function TabsLayout() {
     <Tabs className="flex-1 flex-col">
       <TabList
         style={{
-          flexDirection: "row",
-          width: "100%",
-          alignItems: "stretch",
+          flexDirection: 'row',
+          width: '100%',
+          alignItems: 'stretch',
           backgroundColor: tokens.tabRail,
           borderBottomWidth: 1,
           borderBottomColor: tokens.tabRailBorder,
@@ -192,9 +235,9 @@ export default function TabsLayout() {
               label={item.label}
               icon={item.icon}
               color={
-                item.name === "overview"
+                item.name === 'overview'
                   ? overviewColor
-                  : resolvedTheme === "dark"
+                  : resolvedTheme === 'dark'
                     ? SECTION_COLORS[NAV_TO_SECTION_KEY[item.name]]
                     : item.color
               }

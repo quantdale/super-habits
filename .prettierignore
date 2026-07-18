@@ -1,0 +1,14 @@
+node_modules/
+dist/
+web-build/
+.expo/
+expo/
+supabase/functions/
+.vercel/
+.cursor/
+.playwright-mcp/
+test-results/
+playwright-report/
+package/
+coverage/
+package-lock.json

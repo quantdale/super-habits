@@ -3,6 +3,7 @@
 Purpose: fast navigation to the files most likely to matter during implementation. This is a lightweight map, not a second architecture document.
 
 Use with:
+
 - `docs/master-context.md` for architecture and drift
 - `docs/working-rules.md` for guardrails
 
@@ -61,25 +62,30 @@ Use with:
 ## Feature Modules
 
 ### Overview
+
 - `features/overview/OverviewScreen.tsx`
 
 ### Todos
+
 - `features/todos/TodosScreen.tsx`
 - `features/todos/todos.data.ts`
 - `features/todos/todos.domain.ts`
 
 ### Habits
+
 - `features/habits/HabitsScreen.tsx`
 - `features/habits/habits.data.ts`
 - `features/habits/habits.domain.ts`
 - `features/habits/habitPresets.ts`
 
 ### Pomodoro
+
 - `features/pomodoro/PomodoroScreen.tsx`
 - `features/pomodoro/pomodoro.data.ts`
 - `features/pomodoro/pomodoro.domain.ts`
 
 ### Workout
+
 - `features/workout/WorkoutScreen.tsx`
 - `features/workout/RoutineDetailScreen.tsx`
 - `features/workout/WorkoutSessionScreen.tsx`
@@ -87,15 +93,18 @@ Use with:
 - `features/workout/workout.domain.ts`
 
 ### Calories
+
 - `features/calories/CaloriesScreen.tsx`
 - `features/calories/CaloriesEntryFields.tsx`
 - `features/calories/calories.data.ts`
 - `features/calories/calories.domain.ts`
 
 ### Settings
+
 - `features/settings/SettingsScreen.tsx`
 
 ### Command
+
 - `features/command/CommandCenterProvider.tsx`
 - `features/command/CommandScreen.tsx`
 - `features/command/commandCenterConfig.ts`
@@ -108,6 +117,7 @@ Use with:
 - `features/command/realCommandParser.ts`
 
 ### Cross-feature visuals
+
 - `features/shared/GitHubHeatmap.tsx`
 
 ## Testing and Delivery

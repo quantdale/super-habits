@@ -14,18 +14,21 @@ If this file conflicts with current code, trust the code and document the confli
 ## Task Execution Workflow
 
 ### Confirmed workflow for the recovered clean repo
+
 - Start each new task from updated `main`.
 - Create one branch per task.
 - Use one worktree per active task whenever tasks may proceed in parallel.
 - Keep the task scope isolated to that branch and worktree until it is ready to merge.
 
 ### Wave rules
+
 - Group work into waves.
 - A wave may contain multiple tasks only if they are parallel-safe.
 - Do not start the next wave until the current wave is complete.
 - Re-plan before the next wave if completed work changes assumptions or file ownership.
 
 ### Parallel-safe vs overlapping
+
 - Parallel-safe tasks do not touch the same files and do not depend on each other's output.
 - Overlapping tasks share files, shared contracts, or sequencing dependencies and must not run in the same wave.
 - If there is any doubt about overlap, treat the tasks as sequential.
@@ -33,6 +36,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Layering Rules
 
 ### Confirmed from code and docs
+
 - `app/` is Expo Router only.
 - `app/(tabs)/*.tsx` should stay thin route wrappers that only render screens.
 - `features/{feature}/{feature}.data.ts` owns SQLite reads/writes, soft delete behavior, ID/date helpers, and sync enqueue.
@@ -43,6 +47,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Current Product-Shell Facts
 
 ### Confirmed from code
+
 - `/` redirects to `/(tabs)/overview`.
 - The command center is overlay-first now: `app/_layout.tsx` mounts a global launcher/host on the six tab surfaces, while `/command` remains a retained internal/direct-link page route.
 - The command launcher is hidden on `/settings` and is suppressed during active pomodoro/workout sessions.
@@ -53,6 +58,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Data and Sync Invariants
 
 ### Confirmed from code and docs
+
 - SQLite is the source of truth.
 - `getDatabase()` in `core/db/client.ts` must remain the only DB entrypoint.
 - Linked Actions tables are live in schema migrations: `linked_action_rules`, `linked_action_events`, and `linked_action_executions`.
@@ -72,6 +78,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## IDs, Dates, and Migrations
 
 ### Confirmed from code and docs
+
 - Create IDs only with `createId(prefix)` from `lib/id.ts`.
 - Create day keys only with `toDateKey()` from `lib/time.ts`.
 - `toDateKey()` currently uses local calendar dates, not UTC.
@@ -83,6 +90,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Feature Workflow
 
 ### Confirmed from docs
+
 - Before changing feature logic, read the feature’s `*.data.ts` and `*.domain.ts`.
 - If changing UI or domain behavior, treat the data layer as the contract.
 - If changing persistence, schema, or sync behavior, read:
@@ -96,6 +104,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Testing Workflow
 
 ### Confirmed from code and docs
+
 - Standard checks:
   - `npm run typecheck`
   - `npm test`
@@ -106,6 +115,7 @@ If this file conflicts with current code, trust the code and document the confli
 - Web/PWA behavior depends on OPFS-compatible isolation headers.
 
 ### Confirmed from code
+
 - Validation baseline on May 5, 2026:
   - `npm run typecheck` passes.
 - `npm test` passes with `340` tests.
@@ -115,6 +125,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Web / PWA Constraints
 
 ### Confirmed from code and docs
+
 - Web export is static.
 - OPFS-backed SQLite on web depends on:
   - `Cross-Origin-Embedder-Policy: require-corp`
@@ -125,6 +136,7 @@ If this file conflicts with current code, trust the code and document the confli
 ## Documentation Hygiene
 
 ### Confirmed from code and docs
+
 - Do not copy large sections between docs.
 - Keep authoritative values centralized:
   - schema version and migration guidance in `docs/master-context.md`
@@ -134,5 +146,6 @@ If this file conflicts with current code, trust the code and document the confli
 - Keep workflow guidance centralized in `docs/codex-workflow.md`; other docs should summarize it, not fork it.
 
 ### Known drift to keep in mind
+
 - `core/db/schema.sql` is reference-only and intentionally lags runtime migrations.
 - Secondary or historical docs may lag route surfaces, restore scope, or linked-actions support and should be cross-checked against current code before edits.

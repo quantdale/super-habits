@@ -1,5 +1,5 @@
-import * as Crypto from "expo-crypto";
-import { Platform } from "react-native";
+import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 
 /**
  * Canonical ID prefixes (entity → prefix). Use only these at call sites.
@@ -22,15 +22,15 @@ import { Platform } from "react-native";
  * | recurring todo ser. | rec    |
  */
 
-const RANDOM_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+const RANDOM_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
 
 function getRandomChars(length: number): string {
   const bytes =
-    Platform.OS === "web"
+    Platform.OS === 'web'
       ? crypto.getRandomValues(new Uint8Array(length))
       : Crypto.getRandomValues(new Uint8Array(length));
 
-  let result = "";
+  let result = '';
   for (let i = 0; i < length; i++) {
     result += RANDOM_ALPHABET[bytes[i] % RANDOM_ALPHABET.length];
   }

@@ -1,6 +1,6 @@
-import { PropsWithChildren } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import { PropsWithChildren } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
@@ -65,14 +65,14 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   contentShell: {
-    width: "100%",
+    width: '100%',
     maxWidth: 1180,
-    alignSelf: "center",
+    alignSelf: 'center',
   },
   contentShellFill: {
     flex: 1,
-    width: "100%",
+    width: '100%',
     maxWidth: 1180,
-    alignSelf: "center",
+    alignSelf: 'center',
   },
 });

@@ -1,30 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { Card } from "@/core/ui/Card";
-import { Button } from "@/core/ui/Button";
-import { Modal } from "@/core/ui/Modal";
-import { PillChip } from "@/core/ui/PillChip";
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
+import { Modal } from '@/core/ui/Modal';
+import { PillChip } from '@/core/ui/PillChip';
 import {
   getLinkedActionTargetPickerProvider,
   getLinkedActionTargetPickerProviders,
-} from "@/core/linked-actions/linkedActionsTargetProviders";
+} from '@/core/linked-actions/linkedActionsTargetProviders';
 import {
   createLinkedActionTargetCreateNewSelection,
   createLinkedActionTargetExistingSelection,
   type LinkedActionTargetPickerCandidate,
   type LinkedActionTargetPickerSelection,
-} from "@/core/linked-actions/linkedActionsTargetPicker.types";
-import type { LinkedActionFeature } from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActionsTargetPicker.types';
+import type { LinkedActionFeature } from '@/core/linked-actions/linkedActions.types';
 import {
   POMODORO_SECTION_KEY,
   SECTION_COLORS,
   SECTION_COLORS_LIGHT,
   SECTION_TEXT_COLORS,
-} from "@/constants/sectionColors";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+} from '@/constants/sectionColors';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type CandidateState = {
-  status: "idle" | "loading" | "ready" | "error";
+  status: 'idle' | 'loading' | 'ready' | 'error';
   items: LinkedActionTargetPickerCandidate[];
   error: string | null;
 };
@@ -41,19 +41,17 @@ type Props = {
 const MODULES = getLinkedActionTargetPickerProviders();
 
 function getFeatureAccentColor(feature: LinkedActionFeature) {
-  return feature === "pomodoro"
-    ? SECTION_COLORS[POMODORO_SECTION_KEY]
-    : SECTION_COLORS[feature];
+  return feature === 'pomodoro' ? SECTION_COLORS[POMODORO_SECTION_KEY] : SECTION_COLORS[feature];
 }
 
 function getFeatureLightColor(feature: LinkedActionFeature) {
-  return feature === "pomodoro"
+  return feature === 'pomodoro'
     ? SECTION_COLORS_LIGHT[POMODORO_SECTION_KEY]
     : SECTION_COLORS_LIGHT[feature];
 }
 
 function getFeatureTextColor(feature: LinkedActionFeature) {
-  return feature === "pomodoro"
+  return feature === 'pomodoro'
     ? SECTION_TEXT_COLORS[POMODORO_SECTION_KEY]
     : SECTION_TEXT_COLORS[feature];
 }
@@ -62,7 +60,7 @@ export function LinkedActionTargetPickerModal({
   visible,
   onClose,
   onSelect,
-  initialFeature = "todos",
+  initialFeature = 'todos',
   allowedFeatures,
   allowCreateNew = true,
 }: Props) {
@@ -77,7 +75,7 @@ export function LinkedActionTargetPickerModal({
   const [selectedFeature, setSelectedFeature] = useState<LinkedActionFeature>(defaultFeature);
   const [selectedExistingId, setSelectedExistingId] = useState<string | null>(null);
   const [candidateState, setCandidateState] = useState<CandidateState>({
-    status: "idle",
+    status: 'idle',
     items: [],
     error: null,
   });
@@ -99,7 +97,7 @@ export function LinkedActionTargetPickerModal({
 
     if (!provider.existing.supported) {
       setCandidateState({
-        status: "ready",
+        status: 'ready',
         items: [],
         error: null,
       });
@@ -108,7 +106,7 @@ export function LinkedActionTargetPickerModal({
 
     let cancelled = false;
     setCandidateState({
-      status: "loading",
+      status: 'loading',
       items: [],
       error: null,
     });
@@ -118,7 +116,7 @@ export function LinkedActionTargetPickerModal({
       .then((items) => {
         if (cancelled) return;
         setCandidateState({
-          status: "ready",
+          status: 'ready',
           items,
           error: null,
         });
@@ -126,9 +124,9 @@ export function LinkedActionTargetPickerModal({
       .catch((error: unknown) => {
         if (cancelled) return;
         const message =
-          error instanceof Error ? error.message : "Could not load target candidates.";
+          error instanceof Error ? error.message : 'Could not load target candidates.';
         setCandidateState({
-          status: "error",
+          status: 'error',
           items: [],
           error: message,
         });
@@ -146,10 +144,7 @@ export function LinkedActionTargetPickerModal({
   const accentColor = getFeatureAccentColor(selectedFeature);
   const lightColor = getFeatureLightColor(selectedFeature);
   const textColor = getFeatureTextColor(selectedFeature);
-  const createNewHandoff = useMemo(
-    () => provider.createNew.buildHandoff(),
-    [provider],
-  );
+  const createNewHandoff = useMemo(() => provider.createNew.buildHandoff(), [provider]);
   const selectedCandidate = candidateState.items.find(
     (candidate) => candidate.id === selectedExistingId,
   );
@@ -198,16 +193,19 @@ export function LinkedActionTargetPickerModal({
       >
         {provider.existing.supported ? (
           <>
-            {candidateState.status === "loading" ? (
+            {candidateState.status === 'loading' ? (
               <Text className="text-sm" style={{ color: tokens.textMuted }}>
                 Loading existing {provider.targetLabel} options...
               </Text>
             ) : null}
 
-            {candidateState.status === "error" ? (
+            {candidateState.status === 'error' ? (
               <View
                 className="rounded-2xl border px-4 py-3"
-                style={{ borderColor: tokens.dangerBorder, backgroundColor: tokens.dangerBackground }}
+                style={{
+                  borderColor: tokens.dangerBorder,
+                  backgroundColor: tokens.dangerBackground,
+                }}
               >
                 <Text className="text-sm font-semibold" style={{ color: tokens.dangerText }}>
                   Could not load candidates
@@ -218,7 +216,7 @@ export function LinkedActionTargetPickerModal({
               </View>
             ) : null}
 
-            {candidateState.status === "ready" && candidateState.items.length === 0 ? (
+            {candidateState.status === 'ready' && candidateState.items.length === 0 ? (
               <View
                 className="rounded-2xl border px-4 py-3"
                 style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}

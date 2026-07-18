@@ -1,4 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  completeTodoFromLinkedAction,
+  removeTodo,
+  saveTodoLinkedActionRules,
+  toggleTodo,
+} from '@/features/todos/todos.data';
 
 const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
@@ -22,62 +29,55 @@ const { syncEngine } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/core/db/client", () => ({
+vi.mock('@/core/db/client', () => ({
   getDatabase,
 }));
 
-vi.mock("@/core/linked-actions/linkedActions.engine", () => ({
+vi.mock('@/core/linked-actions/linkedActions.engine', () => ({
   linkedActionsEngine,
 }));
 
-vi.mock("@/core/linked-actions/linkedActions.data", () => linkedActionDataMocks);
+vi.mock('@/core/linked-actions/linkedActions.data', () => linkedActionDataMocks);
 
-vi.mock("@/core/sync/sync.engine", () => ({
+vi.mock('@/core/sync/sync.engine', () => ({
   syncEngine,
 }));
 
-vi.mock("@/lib/time", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/time")>("@/lib/time");
+vi.mock('@/lib/time', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/time')>('@/lib/time');
   return {
     ...actual,
-    nowIso: vi.fn(() => "2026-04-16T10:00:00.000Z"),
-    toDateKey: vi.fn(() => "2026-04-16"),
+    nowIso: vi.fn(() => '2026-04-16T10:00:00.000Z'),
+    toDateKey: vi.fn(() => '2026-04-16'),
   };
 });
 
-import {
-  completeTodoFromLinkedAction,
-  removeTodo,
-  saveTodoLinkedActionRules,
-  toggleTodo,
-} from "@/features/todos/todos.data";
-
-describe("features/todos/todos.data", () => {
+describe('features/todos/todos.data', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity.mockResolvedValue(undefined);
     linkedActionDataMocks.deleteLinkedActionRulesForTargetEntity.mockResolvedValue(undefined);
     linkedActionsEngine.processSourceAction.mockResolvedValue({
-      mode: "apply",
+      mode: 'apply',
       sourceEvent: {
-        eventId: "levt_1",
-        feature: "todos",
-        entityType: "todo",
-        entityId: "todo_1",
-        triggerType: "todo.completed",
-        sourceRecordId: "todo_1",
-        sourceDateKey: "2026-04-16",
-        occurredAt: "2026-04-16T10:00:00.000Z",
-        label: "Source todo",
+        eventId: 'levt_1',
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
+        triggerType: 'todo.completed',
+        sourceRecordId: 'todo_1',
+        sourceDateKey: '2026-04-16',
+        occurredAt: '2026-04-16T10:00:00.000Z',
+        label: 'Source todo',
         payload: {},
         origin: {
-          originKind: "user",
+          originKind: 'user',
           originRuleId: null,
           originEventId: null,
         },
         chain: {
-          chainId: "lchain_1",
-          rootEventId: "levt_1",
+          chainId: 'lchain_1',
+          rootEventId: 'levt_1',
           parentEventId: null,
           depth: 0,
         },
@@ -88,64 +88,64 @@ describe("features/todos/todos.data", () => {
     });
   });
 
-  it("dispatches linked actions only on non-recurring 0->1 completion", async () => {
+  it('dispatches linked actions only on non-recurring 0->1 completion', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_1",
-        title: "Source todo",
+        id: 'todo_1',
+        title: 'Source todo',
         notes: null,
         completed: 0,
         due_date: null,
-        priority: "normal",
+        priority: 'normal',
         sort_order: 1,
         recurrence: null,
         recurrence_id: null,
-        created_at: "2026-04-16T09:00:00.000Z",
-        updated_at: "2026-04-16T09:00:00.000Z",
+        created_at: '2026-04-16T09:00:00.000Z',
+        updated_at: '2026-04-16T09:00:00.000Z',
         deleted_at: null,
       }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
 
-    const result = await toggleTodo({ id: "todo_1" } as never);
+    const result = await toggleTodo({ id: 'todo_1' } as never);
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      "UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?",
-      [1, "2026-04-16T10:00:00.000Z", "todo_1"],
+      'UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?',
+      [1, '2026-04-16T10:00:00.000Z', 'todo_1'],
     );
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        feature: "todos",
-        entityType: "todo",
-        entityId: "todo_1",
-        triggerType: "todo.completed",
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
+        triggerType: 'todo.completed',
       }),
     );
     expect(result.completed).toBe(1);
   });
 
-  it("does not dispatch on reopen (1->0)", async () => {
+  it('does not dispatch on reopen (1->0)', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_1",
-        title: "Source todo",
+        id: 'todo_1',
+        title: 'Source todo',
         notes: null,
         completed: 1,
         due_date: null,
-        priority: "normal",
+        priority: 'normal',
         sort_order: 1,
         recurrence: null,
         recurrence_id: null,
-        created_at: "2026-04-16T09:00:00.000Z",
-        updated_at: "2026-04-16T09:00:00.000Z",
+        created_at: '2026-04-16T09:00:00.000Z',
+        updated_at: '2026-04-16T09:00:00.000Z',
         deleted_at: null,
       }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
 
-    const result = await toggleTodo({ id: "todo_1" } as never);
+    const result = await toggleTodo({ id: 'todo_1' } as never);
 
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -157,22 +157,22 @@ describe("features/todos/todos.data", () => {
     });
   });
 
-  it("does not dispatch for recurring todos and still creates follow-up instance", async () => {
+  it('does not dispatch for recurring todos and still creates follow-up instance', async () => {
     const db = {
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
-          id: "todo_1",
-          title: "Recurring todo",
+          id: 'todo_1',
+          title: 'Recurring todo',
           notes: null,
           completed: 0,
-          due_date: "2026-04-16",
-          priority: "normal",
+          due_date: '2026-04-16',
+          priority: 'normal',
           sort_order: 1,
-          recurrence: "daily",
-          recurrence_id: "rec_1",
-          created_at: "2026-04-16T09:00:00.000Z",
-          updated_at: "2026-04-16T09:00:00.000Z",
+          recurrence: 'daily',
+          recurrence_id: 'rec_1',
+          created_at: '2026-04-16T09:00:00.000Z',
+          updated_at: '2026-04-16T09:00:00.000Z',
           deleted_at: null,
         })
         .mockResolvedValueOnce(null)
@@ -181,20 +181,20 @@ describe("features/todos/todos.data", () => {
     };
     getDatabase.mockResolvedValue(db);
 
-    await toggleTodo({ id: "todo_1" } as never);
+    await toggleTodo({ id: 'todo_1' } as never);
 
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO todos"),
-      expect.arrayContaining(["rec_1"]),
+      expect.stringContaining('INSERT INTO todos'),
+      expect.arrayContaining(['rec_1']),
     );
   });
 
-  it("rejects saving non-empty source rules for recurring todos based on persisted row", async () => {
+  it('rejects saving non-empty source rules for recurring todos based on persisted row', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_1",
-        recurrence: "daily",
+        id: 'todo_1',
+        recurrence: 'daily',
         deleted_at: null,
       }),
       runAsync: vi.fn(),
@@ -202,28 +202,28 @@ describe("features/todos/todos.data", () => {
     getDatabase.mockResolvedValue(db);
 
     await expect(
-      saveTodoLinkedActionRules("todo_1", [
+      saveTodoLinkedActionRules('todo_1', [
         {
-          triggerType: "todo.completed",
+          triggerType: 'todo.completed',
           target: {
-            feature: "todos",
-            entityType: "todo",
-            entityId: "todo_target",
+            feature: 'todos',
+            entityType: 'todo',
+            entityId: 'todo_target',
             effect: {
-              kind: "binary",
-              type: "todo.complete",
+              kind: 'binary',
+              type: 'todo.complete',
             },
           },
         },
       ]),
-    ).rejects.toThrow("Recurring todos cannot be linked-action sources yet.");
+    ).rejects.toThrow('Recurring todos cannot be linked-action sources yet.');
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).not.toHaveBeenCalled();
   });
 
-  it("allows saving todo.completed -> habit.increment rules for non-recurring todos", async () => {
+  it('allows saving todo.completed -> habit.increment rules for non-recurring todos', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_1",
+        id: 'todo_1',
         recurrence: null,
         deleted_at: null,
       }),
@@ -231,39 +231,39 @@ describe("features/todos/todos.data", () => {
     };
     getDatabase.mockResolvedValue(db);
 
-    await saveTodoLinkedActionRules("todo_1", [
+    await saveTodoLinkedActionRules('todo_1', [
       {
-        triggerType: "todo.completed",
+        triggerType: 'todo.completed',
         target: {
-          feature: "habits",
-          entityType: "habit",
-          entityId: "habit_1",
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: 'habit_1',
           effect: {
-            kind: "progress",
-            type: "habit.increment",
+            kind: 'progress',
+            type: 'habit.increment',
             amount: 1,
-            dateStrategy: "source_date",
+            dateStrategy: 'source_date',
           },
         },
       },
     ]);
 
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith({
-      feature: "todos",
-      entityType: "todo",
-      entityId: "todo_1",
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
       rules: [
         {
-          triggerType: "todo.completed",
+          triggerType: 'todo.completed',
           target: {
-            feature: "habits",
-            entityType: "habit",
-            entityId: "habit_1",
+            feature: 'habits',
+            entityType: 'habit',
+            entityId: 'habit_1',
             effect: {
-              kind: "progress",
-              type: "habit.increment",
+              kind: 'progress',
+              type: 'habit.increment',
               amount: 1,
-              dateStrategy: "source_date",
+              dateStrategy: 'source_date',
             },
           },
         },
@@ -271,10 +271,10 @@ describe("features/todos/todos.data", () => {
     });
   });
 
-  it("cleans source and target linked rules when removing a todo", async () => {
+  it('cleans source and target linked rules when removing a todo', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_1",
+        id: 'todo_1',
         recurrence: null,
         deleted_at: null,
       }),
@@ -282,62 +282,62 @@ describe("features/todos/todos.data", () => {
     };
     getDatabase.mockResolvedValue(db);
 
-    await removeTodo("todo_1");
+    await removeTodo('todo_1');
 
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith({
-      feature: "todos",
-      entityType: "todo",
-      entityId: "todo_1",
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
       rules: [],
     });
     expect(linkedActionDataMocks.deleteLinkedActionRulesForTargetEntity).toHaveBeenCalledWith({
-      feature: "todos",
-      entityType: "todo",
-      entityId: "todo_1",
-      deletedAt: "2026-04-16T10:00:00.000Z",
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
+      deletedAt: '2026-04-16T10:00:00.000Z',
     });
   });
 
-  it("returns safe no-op notice metadata when engine reports self-target skip", async () => {
+  it('returns safe no-op notice metadata when engine reports self-target skip', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_1",
-        title: "Self target todo",
+        id: 'todo_1',
+        title: 'Self target todo',
         notes: null,
         completed: 0,
         due_date: null,
-        priority: "normal",
+        priority: 'normal',
         sort_order: 1,
         recurrence: null,
         recurrence_id: null,
-        created_at: "2026-04-16T09:00:00.000Z",
-        updated_at: "2026-04-16T09:00:00.000Z",
+        created_at: '2026-04-16T09:00:00.000Z',
+        updated_at: '2026-04-16T09:00:00.000Z',
         deleted_at: null,
       }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
     linkedActionsEngine.processSourceAction.mockResolvedValue({
-      mode: "apply",
+      mode: 'apply',
       sourceEvent: {
-        eventId: "levt_2",
-        feature: "todos",
-        entityType: "todo",
-        entityId: "todo_1",
-        triggerType: "todo.completed",
-        sourceRecordId: "todo_1",
-        sourceDateKey: "2026-04-16",
-        occurredAt: "2026-04-16T10:00:00.000Z",
-        label: "Self target todo",
+        eventId: 'levt_2',
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
+        triggerType: 'todo.completed',
+        sourceRecordId: 'todo_1',
+        sourceDateKey: '2026-04-16',
+        occurredAt: '2026-04-16T10:00:00.000Z',
+        label: 'Self target todo',
         payload: {},
         origin: {
-          originKind: "user",
+          originKind: 'user',
           originRuleId: null,
           originEventId: null,
         },
         chain: {
-          chainId: "lchain_2",
-          rootEventId: "levt_2",
+          chainId: 'lchain_2',
+          rootEventId: 'levt_2',
           parentEventId: null,
           depth: 0,
         },
@@ -346,16 +346,16 @@ describe("features/todos/todos.data", () => {
       effects: [
         {
           executionId: null,
-          ruleId: "link_self",
-          status: "skipped",
-          effectType: "todo.complete",
-          effectFingerprint: "fp",
-          targetFeature: "todos",
-          targetEntityType: "todo",
-          targetEntityId: "todo_1",
+          ruleId: 'link_self',
+          status: 'skipped',
+          effectType: 'todo.complete',
+          effectFingerprint: 'fp',
+          targetFeature: 'todos',
+          targetEntityType: 'todo',
+          targetEntityId: 'todo_1',
           producedEntityType: null,
           producedEntityId: null,
-          reason: "self_target_noop",
+          reason: 'self_target_noop',
           errorMessage: null,
           notice: null,
           noticePreview: null,
@@ -364,7 +364,7 @@ describe("features/todos/todos.data", () => {
       notices: [],
     });
 
-    const result = await toggleTodo({ id: "todo_1" } as never);
+    const result = await toggleTodo({ id: 'todo_1' } as never);
 
     expect(result.linkedActions).toEqual({
       matchedRuleCount: 1,
@@ -372,28 +372,25 @@ describe("features/todos/todos.data", () => {
     });
   });
 
-  it("skips completeTodoFromLinkedAction when the target todo is missing or soft-deleted", async () => {
+  it('skips completeTodoFromLinkedAction when the target todo is missing or soft-deleted', async () => {
     const db = {
-      getFirstAsync: vi
-        .fn()
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          id: "todo_deleted",
-          title: "Deleted target",
-          completed: 0,
-          deleted_at: "2026-04-16T09:00:00.000Z",
-        }),
+      getFirstAsync: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'todo_deleted',
+        title: 'Deleted target',
+        completed: 0,
+        deleted_at: '2026-04-16T09:00:00.000Z',
+      }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
 
-    await expect(completeTodoFromLinkedAction("todo_missing")).resolves.toEqual({
-      status: "skipped",
-      reason: "target_missing",
+    await expect(completeTodoFromLinkedAction('todo_missing')).resolves.toEqual({
+      status: 'skipped',
+      reason: 'target_missing',
     });
-    await expect(completeTodoFromLinkedAction("todo_deleted")).resolves.toEqual({
-      status: "skipped",
-      reason: "target_missing",
+    await expect(completeTodoFromLinkedAction('todo_deleted')).resolves.toEqual({
+      status: 'skipped',
+      reason: 'target_missing',
     });
 
     expect(db.runAsync).not.toHaveBeenCalled();
@@ -401,11 +398,11 @@ describe("features/todos/todos.data", () => {
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
-  it("marks the target todo complete without emitting a new todo.completed source event", async () => {
+  it('marks the target todo complete without emitting a new todo.completed source event', async () => {
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue({
-        id: "todo_2",
-        title: "Target todo",
+        id: 'todo_2',
+        title: 'Target todo',
         completed: 0,
         deleted_at: null,
       }),
@@ -413,20 +410,20 @@ describe("features/todos/todos.data", () => {
     };
     getDatabase.mockResolvedValue(db);
 
-    await expect(completeTodoFromLinkedAction("todo_2")).resolves.toEqual({
-      status: "applied",
-      targetLabel: "Target todo",
+    await expect(completeTodoFromLinkedAction('todo_2')).resolves.toEqual({
+      status: 'applied',
+      targetLabel: 'Target todo',
     });
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("SET completed = 1, updated_at = ?"),
-      [expect.any(String), "todo_2"],
+      expect.stringContaining('SET completed = 1, updated_at = ?'),
+      [expect.any(String), 'todo_2'],
     );
     expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: "todos",
-      id: "todo_2",
+      entity: 'todos',
+      id: 'todo_2',
       updatedAt: expect.any(String),
-      operation: "update",
+      operation: 'update',
     });
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });

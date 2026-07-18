@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
-import { Text, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { PillChip } from "@/core/ui/PillChip";
-import { TextField } from "@/core/ui/TextField";
-import { ValidationError } from "@/core/ui/ValidationError";
-import type { MealType } from "./types";
+import type { ReactNode } from 'react';
+import { Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { PillChip } from '@/core/ui/PillChip';
+import { TextField } from '@/core/ui/TextField';
+import { ValidationError } from '@/core/ui/ValidationError';
+import type { MealType } from './types';
 
 type MealOption = {
   value: MealType;
@@ -59,7 +59,7 @@ export function CaloriesEntryFields({
       <TextField
         label="Food"
         nativeID={`${fieldIdPrefix}-food`}
-        accessibilityLabel={`Calories ${fieldIdPrefix === "cal-edit" ? "edit" : "entry"} food`}
+        accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} food`}
         value={food}
         onChangeText={onFoodChange}
         placeholder="Greek yogurt"
@@ -69,7 +69,7 @@ export function CaloriesEntryFields({
           <TextField
             label="Protein (g)"
             nativeID={`${fieldIdPrefix}-protein`}
-            accessibilityLabel={`Calories ${fieldIdPrefix === "cal-edit" ? "edit" : "entry"} protein`}
+            accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} protein`}
             value={protein}
             onChangeText={onProteinChange}
             unsignedInteger
@@ -79,7 +79,7 @@ export function CaloriesEntryFields({
           <TextField
             label="Carbs (g)"
             nativeID={`${fieldIdPrefix}-carbs`}
-            accessibilityLabel={`Calories ${fieldIdPrefix === "cal-edit" ? "edit" : "entry"} carbs`}
+            accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} carbs`}
             value={carbs}
             onChangeText={onCarbsChange}
             unsignedInteger
@@ -89,7 +89,7 @@ export function CaloriesEntryFields({
           <TextField
             label="Fats (g)"
             nativeID={`${fieldIdPrefix}-fat`}
-            accessibilityLabel={`Calories ${fieldIdPrefix === "cal-edit" ? "edit" : "entry"} fat`}
+            accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} fat`}
             value={fats}
             onChangeText={onFatsChange}
             unsignedInteger
@@ -99,7 +99,7 @@ export function CaloriesEntryFields({
           <TextField
             label="Fiber (g)"
             nativeID={`${fieldIdPrefix}-fiber`}
-            accessibilityLabel={`Calories ${fieldIdPrefix === "cal-edit" ? "edit" : "entry"} fiber`}
+            accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} fiber`}
             value={fiber}
             onChangeText={onFiberChange}
             unsignedInteger
@@ -120,7 +120,7 @@ export function CaloriesEntryFields({
               backgroundColor: tokens.surfaceElevated,
             }}
           >
-            {computedKcal > 0 ? computedKcal : "—"}
+            {computedKcal > 0 ? computedKcal : '—'}
           </Text>
         </View>
         <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>

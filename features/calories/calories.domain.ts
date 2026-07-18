@@ -1,7 +1,7 @@
-import type { DailySummary, SavedMeal } from "./types";
-import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
-import { SECTION_COLORS } from "@/constants/sectionColors";
-import { buildDateRange, buildDateRangeOldestFirst } from "@/lib/time";
+import type { DailySummary, SavedMeal } from './types';
+import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import { SECTION_COLORS } from '@/constants/sectionColors';
+import { buildDateRange, buildDateRangeOldestFirst } from '@/lib/time';
 
 /**
  * (protein × 4) + ((carbs − fiber) × 4) + (fiber × 2) + (fat × 9)
@@ -14,12 +14,7 @@ export function kcalFromMacros(
   fiberG: number,
 ): number {
   const digestibleCarbG = Math.max(0, carbsG - fiberG);
-  return Math.max(
-    0,
-    Math.round(
-      proteinG * 4 + digestibleCarbG * 4 + fiberG * 2 + fatsG * 9,
-    ),
-  );
+  return Math.max(0, Math.round(proteinG * 4 + digestibleCarbG * 4 + fiberG * 2 + fatsG * 9));
 }
 
 export function caloriesTotal(entries: { calories: number }[]): number {
@@ -41,10 +36,7 @@ export type DailyTrendPoint = {
  * Default 365 — one year of daily points for scrolling charts.
  * Labels are short month + day (e.g. "Mar 15") for x-axis readability.
  */
-export function buildDailyTrend(
-  summaries: DailySummary[],
-  days: number = 365,
-): DailyTrendPoint[] {
+export function buildDailyTrend(summaries: DailySummary[], days: number = 365): DailyTrendPoint[] {
   const map = new Map<string, number>();
   for (const s of summaries) {
     map.set(s.dateKey, s.totalCalories);
@@ -52,7 +44,7 @@ export function buildDailyTrend(
 
   return buildDateRangeOldestFirst(days).map((dateKey) => {
     const d = new Date(`${dateKey}T12:00:00`);
-    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return {
       dateKey,
       value: map.get(dateKey) ?? 0,
@@ -92,10 +84,10 @@ export function buildMacroDonutData(
   if (totalKcal === 0) return [];
 
   const raw = [
-    { kcal: proteinKcal, color: SECTION_COLORS.todos, label: "Protein" as const, grams: protein },
-    { kcal: carbsKcal, color: SECTION_COLORS.calories, label: "Carbs" as const, grams: carbs },
-    { kcal: fatsKcal, color: SECTION_COLORS.workout, label: "Fats" as const, grams: fats },
-    { kcal: fiberKcal, color: SECTION_COLORS.habits, label: "Fiber" as const, grams: fiber },
+    { kcal: proteinKcal, color: SECTION_COLORS.todos, label: 'Protein' as const, grams: protein },
+    { kcal: carbsKcal, color: SECTION_COLORS.calories, label: 'Carbs' as const, grams: carbs },
+    { kcal: fatsKcal, color: SECTION_COLORS.workout, label: 'Fats' as const, grams: fats },
+    { kcal: fiberKcal, color: SECTION_COLORS.habits, label: 'Fiber' as const, grams: fiber },
   ];
 
   const nonZero = raw.filter((s) => s.kcal > 0);
@@ -157,8 +149,7 @@ export function buildCalorieActivityDays(
     return {
       dateKey,
       active: cal > 0,
-      value:
-        goalCalories > 0 ? Math.min(1, cal / goalCalories) : cal > 0 ? 1 : 0,
+      value: goalCalories > 0 ? Math.min(1, cal / goalCalories) : cal > 0 ? 1 : 0,
     };
   });
 }

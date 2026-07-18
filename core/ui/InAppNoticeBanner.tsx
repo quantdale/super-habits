@@ -1,13 +1,13 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { Pressable, SafeAreaView, Text, View } from "react-native";
-import { useInAppNotices } from "@/core/providers/InAppNoticeProvider";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { Pressable, SafeAreaView, Text, View } from 'react-native';
+import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
-const NOTICE_ACCENT = "#2563eb";
+const NOTICE_ACCENT = '#2563eb';
 
 function formatContextLabel(label?: string, fallbackFeature?: string) {
-  return label?.trim() || fallbackFeature || "item";
+  return label?.trim() || fallbackFeature || 'item';
 }
 
 export function InAppNoticeBanner() {
@@ -36,7 +36,7 @@ export function InAppNoticeBanner() {
   return (
     <SafeAreaView
       pointerEvents="box-none"
-      style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 100 }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 }}
     >
       <View pointerEvents="box-none" className="px-3 pt-3">
         <Pressable

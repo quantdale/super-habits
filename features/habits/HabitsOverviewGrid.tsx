@@ -1,11 +1,11 @@
-import React from "react";
-import { MaterialIcons } from "@expo/vector-icons";
-import { View, Text } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Card } from "@/core/ui/Card";
-import type { HeatmapDay } from "@/features/shared/activityTypes";
-import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import React from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Card } from '@/core/ui/Card';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
+import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
 
 type Props = {
   consistencyPercent: number;
@@ -14,11 +14,11 @@ type Props = {
 
 function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
   const { tokens } = useAppTheme();
-  const heatmapLegend: Array<{ label: string; color: string }> = [
-    { label: "None", color: tokens.border },
-    { label: "Some", color: `${SECTION_COLORS.habits}55` },
-    { label: "Most", color: `${SECTION_COLORS.habits}99` },
-    { label: "All", color: SECTION_COLORS.habits },
+  const heatmapLegend: { label: string; color: string }[] = [
+    { label: 'None', color: tokens.border },
+    { label: 'Some', color: `${SECTION_COLORS.habits}55` },
+    { label: 'Most', color: `${SECTION_COLORS.habits}99` },
+    { label: 'All', color: SECTION_COLORS.habits },
   ];
 
   return (
@@ -35,11 +35,7 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
               className="h-11 w-11 items-center justify-center rounded-xl"
               style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
             >
-              <MaterialIcons
-                name="track-changes"
-                size={22}
-                color={SECTION_TEXT_COLORS.habits}
-              />
+              <MaterialIcons name="track-changes" size={22} color={SECTION_TEXT_COLORS.habits} />
             </View>
             <View className="min-w-0 flex-1">
               <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -53,7 +49,7 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
               <Text
                 style={{
                   fontSize: 28,
-                  fontWeight: "700",
+                  fontWeight: '700',
                   color: SECTION_TEXT_COLORS.habits,
                 }}
               >

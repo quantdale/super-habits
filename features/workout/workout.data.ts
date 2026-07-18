@@ -1,18 +1,11 @@
-import { getDatabase } from "@/core/db/client";
-import {
-  RoutineExercise,
-  RoutineExerciseSet,
-  WorkoutLog,
-  WorkoutRoutine,
-} from "@/core/db/types";
-import type {
-  LinkedActionEffectAdapterResult,
-} from "@/core/linked-actions/linkedActions.types";
-import { deleteLinkedActionRulesForTargetEntity } from "@/core/linked-actions/linkedActions.data";
-import { createId } from "@/lib/id";
-import { getUtcIsoRangeForLocalDateKeys, nowIso } from "@/lib/time";
-import { syncEngine } from "@/core/sync/sync.engine";
-import { validateSetTiming } from "@/lib/validation";
+import { getDatabase } from '@/core/db/client';
+import { RoutineExercise, RoutineExerciseSet, WorkoutLog, WorkoutRoutine } from '@/core/db/types';
+import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
+import { deleteLinkedActionRulesForTargetEntity } from '@/core/linked-actions/linkedActions.data';
+import { createId } from '@/lib/id';
+import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
+import { syncEngine } from '@/core/sync/sync.engine';
+import { validateSetTiming } from '@/lib/validation';
 
 /** Nested routine_exercises / routine_exercise_sets rows are not separate sync entities; bump parent + enqueue so remotes can refetch the full routine. */
 async function markWorkoutRoutineUpdated(
@@ -25,10 +18,10 @@ async function markWorkoutRoutineUpdated(
     [now, routineId],
   );
   syncEngine.enqueue({
-    entity: "workout_routines",
+    entity: 'workout_routines',
     id: routineId,
     updatedAt: now,
-    operation: "update",
+    operation: 'update',
   });
 }
 
@@ -41,11 +34,11 @@ async function insertWorkoutLogRecord(input: {
   createdAtIso: string;
   requireActiveRoutine: boolean;
 }): Promise<{
-  status: "applied" | "skipped";
+  status: 'applied' | 'skipped';
   reason: string | null;
   routineName: string | null;
 }> {
-  const routine = await input.db.getFirstAsync<Pick<WorkoutRoutine, "id" | "name" | "deleted_at">>(
+  const routine = await input.db.getFirstAsync<Pick<WorkoutRoutine, 'id' | 'name' | 'deleted_at'>>(
     `SELECT id, name, deleted_at
      FROM workout_routines
      WHERE id = ?`,
@@ -54,13 +47,13 @@ async function insertWorkoutLogRecord(input: {
 
   if (input.requireActiveRoutine && (!routine || routine.deleted_at !== null)) {
     return {
-      status: "skipped",
-      reason: "target_missing",
+      status: 'skipped',
+      reason: 'target_missing',
       routineName: null,
     };
   }
 
-  const existing = await input.db.getFirstAsync<Pick<WorkoutLog, "id">>(
+  const existing = await input.db.getFirstAsync<Pick<WorkoutLog, 'id'>>(
     `SELECT id
      FROM workout_logs
      WHERE id = ?`,
@@ -76,7 +69,7 @@ async function insertWorkoutLogRecord(input: {
   }
 
   return {
-    status: "applied",
+    status: 'applied',
     reason: null,
     routineName: routine?.name ?? null,
   };
@@ -85,24 +78,24 @@ async function insertWorkoutLogRecord(input: {
 export async function listRoutines(): Promise<WorkoutRoutine[]> {
   const db = await getDatabase();
   return db.getAllAsync<WorkoutRoutine>(
-    "SELECT * FROM workout_routines WHERE deleted_at IS NULL ORDER BY created_at DESC",
+    'SELECT * FROM workout_routines WHERE deleted_at IS NULL ORDER BY created_at DESC',
   );
 }
 
 export async function addRoutine(name: string, description: string): Promise<void> {
-  const id = createId("wrk");
+  const id = createId('wrk');
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    "INSERT INTO workout_routines (id, name, description, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL)",
+    'INSERT INTO workout_routines (id, name, description, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL)',
     [id, name, description || null, now, now],
   );
-  syncEngine.enqueue({ entity: "workout_routines", id, updatedAt: now, operation: "create" });
+  syncEngine.enqueue({ entity: 'workout_routines', id, updatedAt: now, operation: 'create' });
 }
 
 export async function completeRoutine(routineId: string, notes?: string): Promise<void> {
   const db = await getDatabase();
-  const logId = createId("wrk");
+  const logId = createId('wrk');
   const now = nowIso();
 
   const record = await insertWorkoutLogRecord({
@@ -115,7 +108,7 @@ export async function completeRoutine(routineId: string, notes?: string): Promis
     requireActiveRoutine: false,
   });
 
-  if (record.status !== "applied") {
+  if (record.status !== 'applied') {
     return;
   }
 }
@@ -123,7 +116,7 @@ export async function completeRoutine(routineId: string, notes?: string): Promis
 export async function listWorkoutLogs(limit: number = 30): Promise<WorkoutLog[]> {
   const db = await getDatabase();
   return db.getAllAsync<WorkoutLog>(
-    "SELECT * FROM workout_logs ORDER BY completed_at DESC LIMIT ?",
+    'SELECT * FROM workout_logs ORDER BY completed_at DESC LIMIT ?',
     [limit],
   );
 }
@@ -149,18 +142,23 @@ export async function listWorkoutLogsForRange(
 export async function deleteRoutine(routineId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync("UPDATE workout_routines SET deleted_at = ?, updated_at = ? WHERE id = ?", [
+  await db.runAsync('UPDATE workout_routines SET deleted_at = ?, updated_at = ? WHERE id = ?', [
     now,
     now,
     routineId,
   ]);
   await deleteLinkedActionRulesForTargetEntity({
-    feature: "workout",
-    entityType: "workout_routine",
+    feature: 'workout',
+    entityType: 'workout_routine',
     entityId: routineId,
     deletedAt: now,
   });
-  syncEngine.enqueue({ entity: "workout_routines", id: routineId, updatedAt: now, operation: "delete" });
+  syncEngine.enqueue({
+    entity: 'workout_routines',
+    id: routineId,
+    updatedAt: now,
+    operation: 'delete',
+  });
 }
 
 // --- Exercises ---
@@ -171,7 +169,7 @@ export async function addExercise(input: {
   sortOrder?: number;
 }): Promise<string> {
   const db = await getDatabase();
-  const id = createId("ex");
+  const id = createId('ex');
   const now = nowIso();
   await db.runAsync(
     `INSERT INTO routine_exercises
@@ -240,24 +238,16 @@ export async function addSet(input: {
   restSeconds: number;
 }): Promise<string> {
   const timingErr = validateSetTiming(input.activeSeconds, input.restSeconds);
-  if (timingErr) return "";
+  if (timingErr) return '';
   const db = await getDatabase();
-  const id = createId("eset");
+  const id = createId('eset');
   const now = nowIso();
   await db.runAsync(
     `INSERT INTO routine_exercise_sets
        (id, exercise_id, set_number, active_seconds, rest_seconds,
         created_at, updated_at, deleted_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-    [
-      id,
-      input.exerciseId,
-      input.setNumber,
-      input.activeSeconds,
-      input.restSeconds,
-      now,
-      now,
-    ],
+    [id, input.exerciseId, input.setNumber, input.activeSeconds, input.restSeconds, now, now],
   );
   const exRow = await db.getFirstAsync<{ routine_id: string }>(
     `SELECT routine_id FROM routine_exercises WHERE id = ? AND deleted_at IS NULL`,
@@ -354,7 +344,7 @@ export async function addDefaultSet(exerciseId: string): Promise<void> {
 }
 
 export type RoutineWithExercises = WorkoutRoutine & {
-  exercises: Array<RoutineExercise & { sets: RoutineExerciseSet[] }>;
+  exercises: (RoutineExercise & { sets: RoutineExerciseSet[] })[];
 };
 
 export async function getRoutineWithExercises(
@@ -394,10 +384,10 @@ export async function getRoutineWithExercises(
 export async function logWorkoutSession(input: {
   routineId: string;
   notes?: string;
-  exercises: Array<{ exerciseName: string; setsCompleted: number }>;
+  exercises: { exerciseName: string; setsCompleted: number }[];
 }): Promise<void> {
   const db = await getDatabase();
-  const logId = createId("wrk");
+  const logId = createId('wrk');
   const now = nowIso();
 
   const record = await insertWorkoutLogRecord({
@@ -410,12 +400,12 @@ export async function logWorkoutSession(input: {
     requireActiveRoutine: false,
   });
 
-  if (record.status !== "applied") {
+  if (record.status !== 'applied') {
     return;
   }
 
   for (const ex of input.exercises) {
-    const exId = createId("wsex");
+    const exId = createId('wsex');
     await db.runAsync(
       `INSERT INTO workout_session_exercises
          (id, log_id, exercise_name, sets_completed, created_at)
@@ -442,14 +432,14 @@ export async function logWorkoutFromLinkedAction(input: {
     requireActiveRoutine: true,
   });
 
-  if (record.status !== "applied") {
-    return { status: "skipped", reason: record.reason ?? "target_missing" };
+  if (record.status !== 'applied') {
+    return { status: 'skipped', reason: record.reason ?? 'target_missing' };
   }
 
   return {
-    status: "applied",
+    status: 'applied',
     targetLabel: record.routineName ?? undefined,
-    producedEntityType: "workout_log",
+    producedEntityType: 'workout_log',
     producedEntityId: input.id,
   };
 }

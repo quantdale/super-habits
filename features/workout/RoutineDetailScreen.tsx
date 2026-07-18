@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, Alert, TextInput } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Modal } from "@/core/ui/Modal";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, Pressable, TextInput } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Modal } from '@/core/ui/Modal';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
 import {
   listExercises,
   addExercise,
@@ -13,25 +13,25 @@ import {
   addDefaultSet,
   updateSet,
   deleteSet,
-} from "./workout.data";
-import { formatWorkoutTime } from "./workout.domain";
-import type { RoutineExercise, RoutineExerciseSet } from "./types";
-import { SECTION_COLORS } from "@/constants/sectionColors";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { validateExerciseName, validateSetTiming } from "@/lib/validation";
-import { NumberStepperField } from "@/core/ui/NumberStepperField";
-import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
+} from './workout.data';
+import { formatWorkoutTime } from './workout.domain';
+import type { RoutineExercise, RoutineExerciseSet } from './types';
+import { SECTION_COLORS } from '@/constants/sectionColors';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { validateExerciseName, validateSetTiming } from '@/lib/validation';
+import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 
 const COLOR = SECTION_COLORS.workout;
 
 type ExerciseWithSets = RoutineExercise & { sets: RoutineExerciseSet[] };
 
 function summarizeExerciseSets(sets: RoutineExerciseSet[]): string {
-  if (sets.length === 0) return "No sets";
+  if (sets.length === 0) return 'No sets';
   const first = sets[0];
   const allSameActive = sets.every((s) => s.active_seconds === first.active_seconds);
   const allSameRest = sets.every((s) => s.rest_seconds === first.rest_seconds);
-  const head = `${sets.length} set${sets.length === 1 ? "" : "s"}`;
+  const head = `${sets.length} set${sets.length === 1 ? '' : 's'}`;
   if (allSameActive && allSameRest) {
     return `${head} · ${formatWorkoutTime(first.active_seconds)} / ${formatWorkoutTime(first.rest_seconds)}`;
   }
@@ -56,7 +56,7 @@ export function RoutineDetailModal({
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
-  const [newExerciseName, setNewExerciseName] = useState("");
+  const [newExerciseName, setNewExerciseName] = useState('');
   const [workoutError, setWorkoutError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -93,7 +93,7 @@ export function RoutineDetailModal({
       sortOrder: exercises.length + 1,
     });
     await addDefaultSet(exId);
-    setNewExerciseName("");
+    setNewExerciseName('');
     await refresh();
     setExpandedId(exId);
   };
@@ -101,10 +101,10 @@ export function RoutineDetailModal({
   const handleDeleteExercise = useCallback(
     async (id: string, name: string) => {
       const confirmed = await confirm({
-        title: "Remove exercise",
+        title: 'Remove exercise',
         message: `Remove "${name}" and all its sets?`,
-        confirmLabel: "Remove exercise",
-        confirmVariant: "danger",
+        confirmLabel: 'Remove exercise',
+        confirmVariant: 'danger',
       });
       if (!confirmed) return;
 
@@ -126,7 +126,9 @@ export function RoutineDetailModal({
           className="mb-4 rounded-2xl border px-4 py-3"
           style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
         >
-          <Text className="text-sm font-semibold" style={{ color: COLOR }}>Routine builder</Text>
+          <Text className="text-sm font-semibold" style={{ color: COLOR }}>
+            Routine builder
+          </Text>
           <Text className="mt-1 text-sm" style={{ color: COLOR }}>
             Add exercises, tune work and rest intervals, then start the routine when it is ready.
           </Text>
@@ -145,17 +147,27 @@ export function RoutineDetailModal({
                     accessibilityState={{ expanded: isOpen }}
                   >
                     <View className="min-w-0 flex-1">
-                      <Text className="text-base font-medium" style={{ color: tokens.text }}>{ex.name}</Text>
-                      <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>{summarizeExerciseSets(ex.sets)}</Text>
+                      <Text className="text-base font-medium" style={{ color: tokens.text }}>
+                        {ex.name}
+                      </Text>
+                      <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                        {summarizeExerciseSets(ex.sets)}
+                      </Text>
                     </View>
                     <MaterialIcons
-                      name={isOpen ? "expand-less" : "expand-more"}
+                      name={isOpen ? 'expand-less' : 'expand-more'}
                       size={24}
                       color={tokens.iconMuted}
                     />
                   </Pressable>
-                  <Pressable onPress={() => void handleDeleteExercise(ex.id, ex.name)} hitSlop={8} className="ml-2">
-                    <Text className="text-sm" style={{ color: tokens.dangerText }}>Remove</Text>
+                  <Pressable
+                    onPress={() => void handleDeleteExercise(ex.id, ex.name)}
+                    hitSlop={8}
+                    className="ml-2"
+                  >
+                    <Text className="text-sm" style={{ color: tokens.dangerText }}>
+                      Remove
+                    </Text>
                   </Pressable>
                 </View>
 
@@ -163,7 +175,10 @@ export function RoutineDetailModal({
                   <View className="mt-4 border-t pt-3" style={{ borderColor: tokens.border }}>
                     {ex.sets.map((set) => (
                       <View key={set.id} className="mb-4">
-                        <Text className="mb-2 text-xs font-medium" style={{ color: tokens.textMuted }}>
+                        <Text
+                          className="mb-2 text-xs font-medium"
+                          style={{ color: tokens.textMuted }}
+                        >
                           Set {set.set_number}
                         </Text>
                         <NumberStepperField
@@ -179,7 +194,7 @@ export function RoutineDetailModal({
                             }
                             setWorkoutError(null);
                             await updateSet(set.id, { activeSeconds: next });
-                            refresh();
+                            void refresh();
                           }}
                           min={5}
                           max={3600}
@@ -197,7 +212,7 @@ export function RoutineDetailModal({
                             }
                             setWorkoutError(null);
                             await updateSet(set.id, { restSeconds: next });
-                            refresh();
+                            void refresh();
                           }}
                           min={0}
                           max={1800}
@@ -206,12 +221,14 @@ export function RoutineDetailModal({
                           <Pressable
                             onPress={async () => {
                               await deleteSet(set.id);
-                              refresh();
+                              void refresh();
                             }}
                             className="self-end"
                             hitSlop={8}
                           >
-                            <Text className="text-sm" style={{ color: tokens.textMuted }}>Remove set</Text>
+                            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                              Remove set
+                            </Text>
                           </Pressable>
                         ) : null}
                       </View>
@@ -219,7 +236,7 @@ export function RoutineDetailModal({
                     <Pressable
                       onPress={async () => {
                         await addDefaultSet(ex.id);
-                        refresh();
+                        void refresh();
                       }}
                     >
                       <Text className="text-xs text-workout">+ Add set</Text>

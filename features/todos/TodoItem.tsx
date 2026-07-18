@@ -1,12 +1,12 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
-import { RectButton } from "react-native-gesture-handler";
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { SwipeableCard } from "@/core/ui/SwipeableCard";
-import { DueDateBadge } from "./DueDateBadge";
-import { PriorityBadge } from "./PriorityBadge";
-import type { Todo, TodoViewMode } from "./types";
+import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable, Text, View } from 'react-native';
+import { RectButton } from 'react-native-gesture-handler';
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { SwipeableCard } from '@/core/ui/SwipeableCard';
+import { DueDateBadge } from './DueDateBadge';
+import { PriorityBadge } from './PriorityBadge';
+import type { Todo, TodoViewMode } from './types';
 
 type Props = {
   todo: Todo;
@@ -26,14 +26,14 @@ export function TodoItem({
   onToggle,
   onDelete,
   onEdit,
-  viewMode = "content",
+  viewMode = 'content',
   cardWidth,
 }: Props) {
   const { tokens } = useAppTheme();
   const done = todo.completed === 1;
   const recurringTint = `${SECTION_COLORS.todos}18`;
 
-  if (viewMode === "grid") {
+  if (viewMode === 'grid') {
     return (
       <SwipeableCard
         accentColor={SECTION_COLORS.todos}
@@ -52,9 +52,9 @@ export function TodoItem({
           >
             <MaterialIcons name="drag-indicator" size={18} color={tokens.iconMuted} />
           </Pressable>
-          <RectButton onPress={onToggle} hitSlop={6} style={{ backgroundColor: "transparent" }}>
+          <RectButton onPress={onToggle} hitSlop={6} style={{ backgroundColor: 'transparent' }}>
             <MaterialIcons
-              name={done ? "check-box" : "check-box-outline-blank"}
+              name={done ? 'check-box' : 'check-box-outline-blank'}
               size={18}
               color={done ? tokens.iconMuted : tokens.text}
             />
@@ -62,14 +62,16 @@ export function TodoItem({
           <View className="min-w-0 flex-1 gap-1">
             <Text
               numberOfLines={2}
-              className={`text-xs leading-4 ${done ? "line-through" : ""}`}
+              className={`text-xs leading-4 ${done ? 'line-through' : ''}`}
               style={{ color: done ? tokens.textMuted : tokens.text }}
             >
               {todo.title}
             </Text>
-            {todo.priority !== "normal" || todo.due_date ? (
+            {todo.priority !== 'normal' || todo.due_date ? (
               <View className="flex-row flex-wrap gap-1">
-                {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} compact /> : null}
+                {todo.priority !== 'normal' ? (
+                  <PriorityBadge priority={todo.priority} compact />
+                ) : null}
                 {todo.due_date ? <DueDateBadge dueDate={todo.due_date} compact /> : null}
               </View>
             ) : null}
@@ -79,7 +81,7 @@ export function TodoItem({
     );
   }
 
-  if (viewMode === "list") {
+  if (viewMode === 'list') {
     return (
       <SwipeableCard
         accentColor={SECTION_COLORS.todos}
@@ -96,13 +98,9 @@ export function TodoItem({
           >
             <MaterialIcons name="drag-indicator" size={18} color={tokens.iconMuted} />
           </Pressable>
-          <RectButton
-            onPress={onToggle}
-            hitSlop={8}
-            style={{ backgroundColor: "transparent" }}
-          >
+          <RectButton onPress={onToggle} hitSlop={8} style={{ backgroundColor: 'transparent' }}>
             <MaterialIcons
-              name={done ? "check-box" : "check-box-outline-blank"}
+              name={done ? 'check-box' : 'check-box-outline-blank'}
               size={20}
               color={done ? tokens.iconMuted : tokens.text}
             />
@@ -110,12 +108,12 @@ export function TodoItem({
           <Text
             numberOfLines={1}
             style={{ flex: 1, fontSize: 14, color: done ? tokens.textMuted : tokens.text }}
-            className={done ? "line-through" : ""}
+            className={done ? 'line-through' : ''}
           >
             {todo.title}
           </Text>
           <View className="flex-row items-center gap-1">
-            {todo.recurrence === "daily" ? (
+            {todo.recurrence === 'daily' ? (
               <View className="rounded-full px-2 py-1" style={{ backgroundColor: recurringTint }}>
                 <Text
                   className="text-[10px] font-semibold"
@@ -125,7 +123,7 @@ export function TodoItem({
                 </Text>
               </View>
             ) : null}
-            {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} compact /> : null}
+            {todo.priority !== 'normal' ? <PriorityBadge priority={todo.priority} compact /> : null}
             {todo.due_date ? <DueDateBadge dueDate={todo.due_date} compact /> : null}
           </View>
         </View>
@@ -154,10 +152,10 @@ export function TodoItem({
         <RectButton
           onPress={onToggle}
           hitSlop={8}
-          style={{ paddingTop: 2, backgroundColor: "transparent" }}
+          style={{ paddingTop: 2, backgroundColor: 'transparent' }}
         >
           <MaterialIcons
-            name={done ? "check-box" : "check-box-outline-blank"}
+            name={done ? 'check-box' : 'check-box-outline-blank'}
             size={24}
             color={done ? tokens.iconMuted : tokens.text}
           />
@@ -165,17 +163,20 @@ export function TodoItem({
         <View style={{ flex: 1, minWidth: 0 }}>
           <View className="flex-row flex-wrap items-center gap-2">
             <Text
-              className={`text-[15px] font-semibold ${done ? "line-through" : ""}`}
+              className={`text-[15px] font-semibold ${done ? 'line-through' : ''}`}
               style={{ color: done ? tokens.textMuted : tokens.text }}
             >
               {todo.title}
             </Text>
-            {todo.recurrence === "daily" ? (
+            {todo.recurrence === 'daily' ? (
               <View
                 className="self-start rounded-full px-2.5 py-1"
                 style={{ backgroundColor: recurringTint }}
               >
-                <Text className="text-[11px] font-semibold" style={{ color: SECTION_TEXT_COLORS.todos }}>
+                <Text
+                  className="text-[11px] font-semibold"
+                  style={{ color: SECTION_TEXT_COLORS.todos }}
+                >
                   ↻ daily
                 </Text>
               </View>
@@ -187,7 +188,7 @@ export function TodoItem({
             </Text>
           ) : null}
           <View className="mt-2 flex-row flex-wrap gap-2">
-            {todo.priority !== "normal" ? <PriorityBadge priority={todo.priority} /> : null}
+            {todo.priority !== 'normal' ? <PriorityBadge priority={todo.priority} /> : null}
             {todo.due_date ? <DueDateBadge dueDate={todo.due_date} /> : null}
           </View>
         </View>
@@ -195,4 +196,3 @@ export function TodoItem({
     </SwipeableCard>
   );
 }
-

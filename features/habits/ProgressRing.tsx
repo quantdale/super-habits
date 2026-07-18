@@ -1,5 +1,5 @@
-import { View } from "react-native";
-import Svg, { Circle } from "react-native-svg";
+import { View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 type ProgressRingProps = {
   size: number;
@@ -22,7 +22,7 @@ export function ProgressRing({
 
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: "-90deg" }] }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
         {/* Background ring */}
         <Circle
           cx={size / 2}

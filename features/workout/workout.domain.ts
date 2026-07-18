@@ -1,11 +1,11 @@
-import type { WorkoutLog } from "./types";
-import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
+import type { WorkoutLog } from './types';
+import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import {
   buildDateRange,
   buildDateRangeOldestFirst,
   dateKeyToLocalDate,
   timestampToLocalDateKey,
-} from "@/lib/time";
+} from '@/lib/time';
 
 /**
  * Build ActivityDay array from workout logs.
@@ -62,7 +62,7 @@ export function buildWorkoutFrequency(
     const d = dateKeyToLocalDate(dateKey);
     return {
       dateKey,
-      label: d.toLocaleDateString("en", { weekday: "short" }),
+      label: d.toLocaleDateString('en', { weekday: 'short' }),
       value: map.get(dateKey) ?? 0,
     };
   });
@@ -75,7 +75,7 @@ export function buildWorkoutFrequency(
 export function formatWorkoutTime(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 /**
@@ -84,8 +84,8 @@ export function formatWorkoutTime(totalSeconds: number): string {
  */
 export function parseWorkoutTime(input: string): number {
   if (input == null) return 0;
-  if (input.includes(":")) {
-    const [m, s] = input.split(":").map(Number);
+  if (input.includes(':')) {
+    const [m, s] = input.split(':').map(Number);
     if (Number.isFinite(m) && Number.isFinite(s)) {
       return m * 60 + s;
     }
@@ -101,15 +101,12 @@ export function parseWorkoutTime(input: string): number {
  * across all exercises — gives an estimate before starting.
  */
 export function calculateSessionDuration(
-  exercises: Array<{
-    sets: Array<{ active_seconds: number; rest_seconds: number }>;
-  }>,
+  exercises: {
+    sets: { active_seconds: number; rest_seconds: number }[];
+  }[],
 ): number {
   return exercises.reduce((total, ex) => {
-    return (
-      total +
-      ex.sets.reduce((s, set) => s + set.active_seconds + set.rest_seconds, 0)
-    );
+    return total + ex.sets.reduce((s, set) => s + set.active_seconds + set.rest_seconds, 0);
   }, 0);
 }
 
@@ -122,19 +119,19 @@ export type TimerPhase = {
   exerciseIndex: number;
   setNumber: number;
   totalSets: number;
-  phase: "active" | "rest";
+  phase: 'active' | 'rest';
   durationSeconds: number;
 };
 
 export function buildTimerSequence(
-  exercises: Array<{
+  exercises: {
     name: string;
-    sets: Array<{
+    sets: {
       set_number: number;
       active_seconds: number;
       rest_seconds: number;
-    }>;
-  }>,
+    }[];
+  }[],
 ): TimerPhase[] {
   const sequence: TimerPhase[] = [];
 
@@ -145,19 +142,17 @@ export function buildTimerSequence(
         exerciseIndex: exIndex,
         setNumber: set.set_number,
         totalSets: exercise.sets.length,
-        phase: "active",
+        phase: 'active',
         durationSeconds: set.active_seconds,
       });
-      const isLastSet =
-        exIndex === exercises.length - 1 &&
-        set.set_number === exercise.sets.length;
+      const isLastSet = exIndex === exercises.length - 1 && set.set_number === exercise.sets.length;
       if (!isLastSet) {
         sequence.push({
           exerciseName: exercise.name,
           exerciseIndex: exIndex,
           setNumber: set.set_number,
           totalSets: exercise.sets.length,
-          phase: "rest",
+          phase: 'rest',
           durationSeconds: set.rest_seconds,
         });
       }
@@ -174,11 +169,11 @@ export function buildTimerSequence(
 export function summarizeCompletedSets(
   sequence: TimerPhase[],
   completedUpToIndex: number,
-): Array<{ exerciseName: string; setsCompleted: number }> {
+): { exerciseName: string; setsCompleted: number }[] {
   const map = new Map<string, number>();
   for (let i = 0; i <= completedUpToIndex; i++) {
     const phase = sequence[i];
-    if (!phase || phase.phase !== "active") continue;
+    if (!phase || phase.phase !== 'active') continue;
     map.set(phase.exerciseName, (map.get(phase.exerciseName) ?? 0) + 1);
   }
   return Array.from(map.entries()).map(([exerciseName, setsCompleted]) => ({

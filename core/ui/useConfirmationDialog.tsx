@@ -1,15 +1,15 @@
-import { useCallback, useState } from "react";
-import { Alert, Platform, Text, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Button } from "./Button";
-import { Modal } from "./Modal";
+import { useCallback, useState } from 'react';
+import { Alert, Platform, Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Button } from './Button';
+import { Modal } from './Modal';
 
 type ConfirmationOptions = {
   title: string;
   message: string;
   confirmLabel: string;
   cancelLabel?: string;
-  confirmVariant?: "primary" | "danger";
+  confirmVariant?: 'primary' | 'danger';
   color?: string;
 };
 
@@ -22,17 +22,17 @@ export function useConfirmationDialog() {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
 
   const confirm = useCallback((options: ConfirmationOptions) => {
-    if (Platform.OS !== "web") {
+    if (Platform.OS !== 'web') {
       return new Promise<boolean>((resolve) => {
         Alert.alert(options.title, options.message, [
           {
-            text: options.cancelLabel ?? "Cancel",
-            style: "cancel",
+            text: options.cancelLabel ?? 'Cancel',
+            style: 'cancel',
             onPress: () => resolve(false),
           },
           {
             text: options.confirmLabel,
-            style: options.confirmVariant === "danger" ? "destructive" : "default",
+            style: options.confirmVariant === 'danger' ? 'destructive' : 'default',
             onPress: () => resolve(true),
           },
         ]);
@@ -65,13 +65,13 @@ export function useConfirmationDialog() {
       </Text>
       <View className="mt-4 flex-row gap-2">
         <Button
-          label={pendingConfirmation?.cancelLabel ?? "Cancel"}
+          label={pendingConfirmation?.cancelLabel ?? 'Cancel'}
           variant="ghost"
           onPress={() => resolvePendingConfirmation(false)}
         />
         <Button
-          label={pendingConfirmation?.confirmLabel ?? "Confirm"}
-          variant={pendingConfirmation?.confirmVariant ?? "primary"}
+          label={pendingConfirmation?.confirmLabel ?? 'Confirm'}
+          variant={pendingConfirmation?.confirmVariant ?? 'primary'}
           color={pendingConfirmation?.color}
           onPress={() => resolvePendingConfirmation(true)}
         />

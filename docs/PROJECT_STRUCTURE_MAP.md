@@ -1,14 +1,15 @@
 # SuperHabits — Project Structure Map
 
 ## Error Handling and Validation Flows
+
 - Error handling strategies are documented in README and knowledge base.
 - Validation is hard-reject; errors are surfaced to users.
 - See audit findings for more details.
 
-
 Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v11** → next migration: `if (version < 12)` in `core/db/client.ts`. Linked Actions and restore v1 are both live on `main`: linked actions ship real rules/events/executions storage plus habit/todo source entrypoints, and restore v1 ships startup/settings preview + empty-device import for a limited entity set.
 
 Current shell truth:
+
 - `/` redirects to `/(tabs)/overview`; top-level tabs are `overview`, `todos`, `habits`, `pomodoro`, `workout`, and `calories`.
 - `app/_layout.tsx` mounts the global command-center host; eligible tabs get a floating launcher, while `/command` remains a retained internal/direct-link page route.
 - The command launcher is hidden on `/settings` and suppressed during active pomodoro/workout sessions.
@@ -19,14 +20,14 @@ Current shell truth:
 
 ## 1. Core directory roles
 
-| Path | Role |
-|------|------|
-| **`app/`** | Expo Router only: root stack, index redirect, retained `command.tsx` / `settings.tsx`, command-center host wiring in `app/_layout.tsx`, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic. |
-| **`core/`** | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **restore v1 coordinator + types** (`core/sync/restore.*`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), theme state (`core/providers/ThemeProvider.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
-| **`features/`** | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. Current screen-only exceptions are `features/overview/` and `features/settings/`; `features/command/` is an experimental overlay-first shell with `CommandCenterProvider.tsx`, `CommandScreen.tsx`, parser/config helpers, and an executor instead of a normal feature data file. |
-| **`lib/`** | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB. |
-| **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette). |
-| **`tests/`** | Vitest: `lib/`, `*.domain.ts`, command parser/config/executor, linked actions, restore/settings preview flows, sync engine tests, and selected data/DB tests (`todos.data`, `habits.data`, `calories.data`, `pomodoro.data`, `workout.data`, `db.client`). |
+| Path             | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`app/`**       | Expo Router only: root stack, index redirect, retained `command.tsx` / `settings.tsx`, command-center host wiring in `app/_layout.tsx`, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic.                                                                                                                                                                                                                                                                                        |
+| **`core/`**      | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **restore v1 coordinator + types** (`core/sync/restore.*`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), theme state (`core/providers/ThemeProvider.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
+| **`features/`**  | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. Current screen-only exceptions are `features/overview/` and `features/settings/`; `features/command/` is an experimental overlay-first shell with `CommandCenterProvider.tsx`, `CommandScreen.tsx`, parser/config helpers, and an executor instead of a normal feature data file.                                                |
+| **`lib/`**       | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB.                                                                                                                                                                                                                                                                                                             |
+| **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette).                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`tests/`**     | Vitest: `lib/`, `*.domain.ts`, command parser/config/executor, linked actions, restore/settings preview flows, sync engine tests, and selected data/DB tests (`todos.data`, `habits.data`, `calories.data`, `pomodoro.data`, `workout.data`, `db.client`).                                                                                                                                                                                                                                                                  |
 
 **Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`, `13` spec files + helpers); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
 
@@ -53,11 +54,11 @@ Screen-only utility routes such as `app/settings.tsx` and `app/command.tsx` foll
 
 ## 3. Database & sync authority (single sources of truth)
 
-| Concern | File | Notes |
-|---------|------|--------|
-| **Persistence** | `core/db/client.ts` | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()`, WAL native-only. `schema.sql` = reference, **not** runtime. |
-| **Row shapes** | `core/db/types.ts` | TypeScript entity types consumed by data layer. |
-| **Sync** | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/sync/restore.coordinator.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). Restore v1 preview/import lives beside the adapter and is intentionally narrower than full sync. |
+| Concern         | File                                                                                            | Notes                                                                                                                                                                                                                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Persistence** | `core/db/client.ts`                                                                             | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()`, WAL native-only. `schema.sql` = reference, **not** runtime.                                                                                                                                     |
+| **Row shapes**  | `core/db/types.ts`                                                                              | TypeScript entity types consumed by data layer.                                                                                                                                                                                                                                            |
+| **Sync**        | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/sync/restore.coordinator.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). Restore v1 preview/import lives beside the adapter and is intentionally narrower than full sync. |
 
 Remote flush (30s interval / visibility hidden / NetInfo reconnect) when `isRemoteEnabled()` (`lib/supabase.ts`, default **enabled**) — wired in `AppProviders` alongside **`ensureAnonymousSession()`**. `AppProviders` also checks restore preview on startup and may show the restore prompt when an empty device has a restorable remote backup.
 
@@ -88,44 +89,44 @@ Remote flush (30s interval / visibility hidden / NetInfo reconnect) when `isRemo
 
 Format: `{prefix}_{ms}_{rand8}` — not crypto-strong; local IDs only.
 
-| Prefix | Entity / use |
-|--------|----------------|
-| `todo` | `todos` |
-| `habit` | `habits` |
-| `hcmp` | `habit_completions` |
-| `cal` | `calorie_entries` |
-| `smeal` | `saved_meals` |
-| `wrk` | `workout_routines`, `workout_logs`, session log ids |
-| `ex` | `routine_exercises` |
-| `eset` | `routine_exercise_sets` |
-| `wsex` | `workout_session_exercises` |
-| `pom` | `pomodoro_sessions` |
-| `guest` | guest profile (`app_meta`) |
-| `rec` | `todos.recurrence_id` (daily series) |
+| Prefix  | Entity / use                                        |
+| ------- | --------------------------------------------------- |
+| `todo`  | `todos`                                             |
+| `habit` | `habits`                                            |
+| `hcmp`  | `habit_completions`                                 |
+| `cal`   | `calorie_entries`                                   |
+| `smeal` | `saved_meals`                                       |
+| `wrk`   | `workout_routines`, `workout_logs`, session log ids |
+| `ex`    | `routine_exercises`                                 |
+| `eset`  | `routine_exercise_sets`                             |
+| `wsex`  | `workout_session_exercises`                         |
+| `pom`   | `pomodoro_sessions`                                 |
+| `guest` | guest profile (`app_meta`)                          |
+| `rec`   | `todos.recurrence_id` (daily series)                |
 
 ---
 
 ## 6. Quick “where does X live?”
 
-| Logic type | Location |
-|------------|----------|
-| Route / tab shell | `app/` |
-| SQL, migrations, `getDatabase` | `core/db/client.ts` only |
-| Entity TS types | `core/db/types.ts` |
-| Sync queue API | `core/sync/sync.engine.ts` |
-| Restore v1 preview/import | `core/sync/restore.coordinator.ts`, `core/sync/restore.types.ts` |
-| Linked Actions contracts/engine | `core/linked-actions/*` |
-| Reusable RN UI chrome | `core/ui/` |
-| Feature CRUD + enqueue | `features/*/*.data.ts` |
-| Pure rules, streaks, formatting | `features/*/*.domain.ts` |
-| Screens & wiring | `features/*/*Screen.tsx` |
-| Global command-center shell | `features/command/*`, `app/_layout.tsx`, retained route `app/command.tsx` |
-| Calories view-mode preference | `features/calories/CaloriesScreen.tsx`, AsyncStorage key `superhabits.calories.viewMode` |
-| Settings IA buckets | `features/settings/SettingsScreen.tsx` |
-| IDs / date keys | `lib/id.ts`, `lib/time.ts` (`toDateKey` for YYYY-MM-DD) |
-| Form messages | `lib/validation.ts` |
-| Section colors | `constants/sectionColors.ts` |
-| Unit tests | `tests/*.test.ts` |
+| Logic type                      | Location                                                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------------------- |
+| Route / tab shell               | `app/`                                                                                   |
+| SQL, migrations, `getDatabase`  | `core/db/client.ts` only                                                                 |
+| Entity TS types                 | `core/db/types.ts`                                                                       |
+| Sync queue API                  | `core/sync/sync.engine.ts`                                                               |
+| Restore v1 preview/import       | `core/sync/restore.coordinator.ts`, `core/sync/restore.types.ts`                         |
+| Linked Actions contracts/engine | `core/linked-actions/*`                                                                  |
+| Reusable RN UI chrome           | `core/ui/`                                                                               |
+| Feature CRUD + enqueue          | `features/*/*.data.ts`                                                                   |
+| Pure rules, streaks, formatting | `features/*/*.domain.ts`                                                                 |
+| Screens & wiring                | `features/*/*Screen.tsx`                                                                 |
+| Global command-center shell     | `features/command/*`, `app/_layout.tsx`, retained route `app/command.tsx`                |
+| Calories view-mode preference   | `features/calories/CaloriesScreen.tsx`, AsyncStorage key `superhabits.calories.viewMode` |
+| Settings IA buckets             | `features/settings/SettingsScreen.tsx`                                                   |
+| IDs / date keys                 | `lib/id.ts`, `lib/time.ts` (`toDateKey` for YYYY-MM-DD)                                  |
+| Form messages                   | `lib/validation.ts`                                                                      |
+| Section colors                  | `constants/sectionColors.ts`                                                             |
+| Unit tests                      | `tests/*.test.ts`                                                                        |
 
 ---
 

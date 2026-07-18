@@ -1,14 +1,14 @@
-import "@/global.css";
-import { Stack } from "expo-router";
-import Head from "expo-router/head";
-import { StatusBar } from "expo-status-bar";
-import { AppProviders } from "@/core/providers/AppProviders";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { InAppNoticeBanner } from "@/core/ui/InAppNoticeBanner";
+import '@/global.css';
+import { Stack } from 'expo-router';
+import Head from 'expo-router/head';
+import { StatusBar } from 'expo-status-bar';
+import { AppProviders } from '@/core/providers/AppProviders';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
 import {
   CommandCenterProvider,
   GlobalCommandCenterHost,
-} from "@/features/command/CommandCenterProvider";
+} from '@/features/command/CommandCenterProvider';
 
 export default function RootLayout() {
   return (

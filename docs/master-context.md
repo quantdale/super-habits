@@ -3,12 +3,14 @@
 Purpose: a compact, repo-grounded briefing file for future AI agents and human contributors. This is not a replacement for the larger knowledge base; it is the shortest useful path to correct implementation context.
 
 Primary references:
+
 - `docs/PROJECT_STRUCTURE_MAP.md`
 - `.cursorrules`
 - `.cursor/rules/superhabits-rules.mdc`
 - `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`
 
 Companion docs in this folder:
+
 - `docs/working-rules.md` for implementation guardrails
 - `docs/ai-task-template.md` for reusable task briefs
 - `docs/repo-map.md` for fast file navigation
@@ -22,6 +24,7 @@ Companion docs in this folder:
 ## Project Overview
 
 ### Confirmed from code
+
 - Single-package Expo/React Native repository, not a monorepo.
 - Main runtime entry is `expo-router/entry` from root `package.json`.
 - App shell is an Expo Router app with a root stack and a custom top-tab layout.
@@ -34,15 +37,18 @@ Companion docs in this folder:
 - Settings is now organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal.
 
 ### Confirmed from docs
+
 - SuperHabits is positioned as an offline-first productivity app for web, iOS, and Android.
 - Docs consistently describe local SQLite as the source of truth with optional Supabase backup/sync.
 
 ### Inferred / uncertain
+
 - The repo is in an "active MVP" or early hardening phase: it has working features, tests, PWA deployment, and native build config, but still has unfinished sync and some doc/config drift.
 
 ## Product Purpose
 
 ### Confirmed from code
+
 - Todos: task capture, priority, due dates, reorder, daily recurrence.
 - Habits: daily targets, categories, icons/colors, streaks, yearly consistency heatmap.
 - Pomodoro: configurable focus/break timer, session logging, yearly focus heatmap, notification scheduling.
@@ -51,26 +57,31 @@ Companion docs in this folder:
 - Overview: read-only cross-feature dashboard aggregating all major modules.
 
 ### Confirmed from docs
+
 - The app is intended to unify day management across tasks, habits, focus, exercise, and nutrition.
 
 ## Current App Status / Maturity
 
 ### Confirmed from code
+
 - Local-first SQLite app is implemented and bootstrapped at startup.
 - Optional Supabase client, anonymous auth bootstrap, push backup, and restore v1 preview/import exist.
 - Linked Actions are live beyond the foundation stage: schema tables, engine + effect registry, in-app notice banner, habit editor integration, and shipped todo/habit source entrypoints are on `main`.
 - Playwright E2E infrastructure is configured for static web export served from `dist/`.
 
 ### Confirmed from docs
+
 - `.cursor/rules/superhabits-rules.mdc` calls the project an active MVP.
 - CI runs quality checks first, then E2E.
 
 ### Inferred / uncertain
+
 - The app is beyond prototype stage, but cloud sync, restore, and some operational polish are incomplete.
 
 ## Current Repo Workflow State
 
 ### Confirmed from current documentation
+
 - The repo is being operated as a recovered clean baseline.
 - New work should branch from current `main`, not from stale task branches.
 - Active parallel work should use separate worktrees and separate branches per task.
@@ -79,6 +90,7 @@ Companion docs in this folder:
 ## Tech Stack
 
 ### Confirmed from code
+
 - Expo `^55.0.8`
 - React `19.2.0`
 - React Native `0.83.4`
@@ -92,38 +104,42 @@ Companion docs in this folder:
 - Vercel static deployment config for web
 
 ### Confirmed from docs
+
 - Docs/rules describe Expo 55, React Native, Expo Router, NativeWind, SQLite, Supabase, Vitest, and Playwright.
 
 ### Inferred / uncertain
+
 - Version-sensitive guidance should still be verified against `package.json` and current command output before making stack or tooling assumptions.
 
 ## Repo Structure and Ownership
 
 ### Confirmed from code
 
-| Path | Owns |
-|---|---|
-| `app/` | Expo Router layouts and thin route wrappers only |
-| `features/` | Feature modules: data/domain/screen/components |
-| `features/shared/` | Cross-feature visualizations such as heatmaps/activity views |
-| `core/db/` | SQLite bootstrap, migrations, types, reference schema |
-| `core/sync/` | In-memory sync queue, Supabase push adapter, and restore v1 coordinator |
-| `core/providers/` | App bootstrap for DB, sync, auth, query client, gestures, and theme |
-| `core/auth/` | Guest profile bootstrap |
-| `core/pwa/` | Service worker registration |
-| `core/ui/` | Shared UI primitives |
-| `lib/` | Pure/platform helpers: IDs, time, validation, notifications, Supabase config, focus refresh |
-| `constants/` | Section color tokens |
-| `tests/` | Vitest tests |
-| `e2e/` | Playwright tests |
-| `public/` | Manifest and service worker for PWA |
+| Path               | Owns                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| `app/`             | Expo Router layouts and thin route wrappers only                                            |
+| `features/`        | Feature modules: data/domain/screen/components                                              |
+| `features/shared/` | Cross-feature visualizations such as heatmaps/activity views                                |
+| `core/db/`         | SQLite bootstrap, migrations, types, reference schema                                       |
+| `core/sync/`       | In-memory sync queue, Supabase push adapter, and restore v1 coordinator                     |
+| `core/providers/`  | App bootstrap for DB, sync, auth, query client, gestures, and theme                         |
+| `core/auth/`       | Guest profile bootstrap                                                                     |
+| `core/pwa/`        | Service worker registration                                                                 |
+| `core/ui/`         | Shared UI primitives                                                                        |
+| `lib/`             | Pure/platform helpers: IDs, time, validation, notifications, Supabase config, focus refresh |
+| `constants/`       | Section color tokens                                                                        |
+| `tests/`           | Vitest tests                                                                                |
+| `e2e/`             | Playwright tests                                                                            |
+| `public/`          | Manifest and service worker for PWA                                                         |
 
 ### Confirmed from docs
+
 - This ownership model matches `AGENTS.md`, `docs/PROJECT_STRUCTURE_MAP.md`, and `.cursorrules`.
 
 ## Core Architecture and Data Flow
 
 ### Confirmed from code
+
 - UI -> feature `*.data.ts` for persistence, never directly to SQLite from screens.
 - Feature `*.domain.ts` files hold pure calculations and formatting rules.
 - `AppProviders` bootstraps `initializeDatabase()`, service worker registration, guest profile creation, optional anonymous Supabase session, and startup restore-preview checks.
@@ -135,12 +151,14 @@ Companion docs in this folder:
 - Restore v1 is handled separately from `syncEngine`: `restore.coordinator.ts` builds preview/eligibility state and imports only a narrow entity subset onto empty devices.
 
 ### Confirmed from docs
+
 - `schema.sql` is reference-only, not runtime authority.
 - Migrations are append-only and live in `core/db/client.ts`.
 
 ## Linked Actions Snapshot
 
 ### Confirmed from code
+
 - `core/db/client.ts` includes linked actions migrations through schema version `11`:
   - `linked_action_rules`
   - `linked_action_events`
@@ -153,22 +171,26 @@ Companion docs in this folder:
 - Supported shipped paths are narrower than the full type-level universe: todo completed -> todo complete / habit increment, and habit completed-for-day -> todo complete / habit increment / habit ensure target / workout log.
 
 ### Confirmed from docs
+
 - `docs/linked-actions-readiness.md` is a planning/proposal document and should be read as design context, not runtime truth.
 
 ## State Management Approach
 
 ### Confirmed from code
+
 - Screen-local `useState` is the dominant state model.
 - Data reloads usually happen through `useFocusForegroundRefresh()` or `useFocusEffect`.
 - React Query is only used as a top-level `QueryClientProvider`; no feature currently uses query hooks.
 - No Zustand stores are used in app code.
 
 ### Inferred / uncertain
+
 - The app intentionally favors explicit local orchestration over a shared state layer for now.
 
 ## Navigation / Routing Structure
 
 ### Confirmed from code
+
 - Root redirect sends `/` to `/(tabs)/overview`.
 - `app/_layout.tsx` wraps the shell in `CommandCenterProvider`, renders a stack with `(tabs)` plus the retained `command` route, and mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`.
 - `app/(tabs)/_layout.tsx` defines a custom top tab bar and swipe navigation between tabs.
@@ -182,6 +204,7 @@ Companion docs in this folder:
 ## UI / Design System Conventions
 
 ### Confirmed from code
+
 - Light theme app shell with `#f8f7ff` surface.
 - NativeWind `className` styling is common; inline styles are used for dynamic values and complex layout.
 - Shared primitives include `Screen`, `Card`, `Button`, `Modal`, `TextField`, `PillChip`, `SwipeableCard`, and validation UI.
@@ -194,11 +217,13 @@ Companion docs in this folder:
 - GitHub-style yearly heatmaps are reused across multiple features.
 
 ### Confirmed from docs
+
 - Per-section color identity and card-based UI are explicit design conventions.
 
 ## Database / Storage Model
 
 ### Confirmed from code
+
 - Local database file is `superhabits.db`.
 - Main tables:
   - `todos`
@@ -221,12 +246,14 @@ Companion docs in this folder:
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
+
 - Soft delete is required for main synced entities.
 - `habit_completions` at zero and `saved_meals` are intentional hard-delete exceptions.
 
 ## API Layer and Service Boundaries
 
 ### Confirmed from code
+
 - There is no general REST or RPC layer used by features.
 - The only active remote boundary is Supabase, used from `lib/supabase.ts` and `core/sync/supabase.adapter.ts`.
 - Features do not call Supabase directly; they write locally and optionally enqueue sync records.
@@ -235,11 +262,13 @@ Companion docs in this folder:
 - `core/db/migrations/001_initial_supabase.sql` only contains a reserved `profiles` table baseline, not a full cloud schema.
 
 ### Inferred / uncertain
+
 - Remote sync is currently a backup-first mechanism, not full multi-device synchronization. The shipped restore path is intentionally limited and conservative.
 
 ## Auth Model
 
 ### Confirmed from code
+
 - Local app bootstrap creates a guest profile stored in `app_meta`.
 - If Supabase is configured, app startup attempts anonymous sign-in.
 - If Supabase env vars are missing, the app stays local-only and remote operations no-op safely.
@@ -247,6 +276,7 @@ Companion docs in this folder:
 ## Offline-First / Sync Behavior
 
 ### Confirmed from code
+
 - SQLite is the source of truth.
 - Syncable entities currently are:
   - `todos`
@@ -269,20 +299,21 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-| Feature | Current behavior |
-|---|---|
-| Overview | Dashboard aggregates pending todos, calories vs goal, best habit streak, focus sessions/streak, workout days/streak |
-| Todos | Add/edit/delete, swipe actions, priority, due date, drag reorder, daily recurrence, completed toggle |
-| Habits | Create/edit/delete, time-of-day grouping, icon/color presets, increment/decrement counts, streaks, yearly consistency view |
-| Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history |
-| Workout | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history |
-| Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference |
-| Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls |
-| Command | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the primary entry is a global overlay launcher on the six tab surfaces, while `/command` remains the retained page route. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
+| Feature  | Current behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview | Dashboard aggregates pending todos, calories vs goal, best habit streak, focus sessions/streak, workout days/streak                                                                                                                                                                                                                                                                                                                                                                |
+| Todos    | Add/edit/delete, swipe actions, priority, due date, drag reorder, daily recurrence, completed toggle                                                                                                                                                                                                                                                                                                                                                                               |
+| Habits   | Create/edit/delete, time-of-day grouping, icon/color presets, increment/decrement counts, streaks, yearly consistency view                                                                                                                                                                                                                                                                                                                                                         |
+| Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history                                                                                                                                                                                                                                                                                                                                                                  |
+| Workout  | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history                                                                                                                                                                                                                                                                                                                                                                                   |
+| Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference                                                                                                                                                                                                                                                                                            |
+| Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls                                                                                                                                                                                                                                                                                                                         |
+| Command  | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the primary entry is a global overlay launcher on the six tab surfaces, while `/command` remains the retained page route. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
 
 ## Domain Concepts and Glossary
 
 ### Confirmed from code
+
 - `date_key`: local `YYYY-MM-DD` day identifier produced by `toDateKey()`.
 - `recurrence_id`: stable series ID linking daily recurring todo instances.
 - `HabitCompletion.count`: per-habit, per-day count used against `target_per_day`.
@@ -293,6 +324,7 @@ Companion docs in this folder:
 ## Business Rules / Must-Not-Break Behaviors
 
 ### Confirmed from code
+
 - `getDatabase()` must remain the only DB entrypoint.
 - Main synced entities use soft delete via `deleted_at`.
 - Synced writes enqueue immediately after mutation from data-layer code.
@@ -302,6 +334,7 @@ Companion docs in this folder:
 - Todos recurrence generation creates the next daily instance when a recurring todo is completed and tomorrow does not already exist.
 
 ### Confirmed from docs
+
 - Never edit old migrations; append new migration blocks only.
 - UI should not import DB directly.
 - Domain files should remain pure.
@@ -309,6 +342,7 @@ Companion docs in this folder:
 ## Environment / Config Requirements
 
 ### Confirmed from code
+
 - Recognized public env vars:
   - `EXPO_PUBLIC_SUPABASE_URL`
   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
@@ -318,6 +352,7 @@ Companion docs in this folder:
 ## Build / Test / Dev Commands
 
 ### Confirmed from code
+
 - `npm run start`
 - `npm run android`
 - `npm run ios`
@@ -331,17 +366,20 @@ Companion docs in this folder:
 - `npm run e2e:debug`
 
 ### Confirmed from code on May 5, 2026
+
 - `npm run typecheck`: passes.
 - `npm test`: passes with `340` tests.
 - `npm run build:web`: passes.
 - `npx playwright test --list`: reports `87` tests in `13` spec files.
 
 ### Confirmed from code
+
 - No lint script or lint config was found.
 
 ## Coding Conventions Detected
 
 ### Confirmed from code
+
 - `@/` path alias rooted at the repo.
 - File naming follows feature conventions:
   - `{feature}.data.ts`
@@ -355,25 +393,30 @@ Companion docs in this folder:
 ## Known Gaps, Ambiguities, and Outdated Docs
 
 ### Confirmed from code vs docs
+
 - `core/db/schema.sql` is stale: it still says schema version `4`, while runtime code is version `11`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 
 ### Confirmed from code
+
 - `App.tsx` and `index.ts` are legacy Expo starter files and are not the active app entry because `package.json` points to `expo-router/entry`.
 
 ### Inferred / uncertain
+
 - Generated reports or secondary docs can lag the codebase, so version-sensitive guidance should be verified against code before editing.
 
 ## Current Priorities / Likely Next Areas of Work
 
 ### Confirmed from code and docs
+
 - Extend restore/sync beyond the current conservative v1 scope and define conflict handling.
 - Decide whether to activate or remove dormant React Query and Zustand usage.
 - Clarify or improve background/off-app behavior for long-running Pomodoro sessions.
 - Continue cleaning documentation drift around schema, E2E flow, and stack versions.
 
 ### Inferred / uncertain
+
 - Accessibility/usability audit appears to be a likely missing workstream; the knowledge base explicitly calls out the lack of a documented audit.
 
 ## How to Brief an AI Agent for This Repo

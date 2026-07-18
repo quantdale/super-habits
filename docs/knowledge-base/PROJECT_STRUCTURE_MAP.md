@@ -6,13 +6,13 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 ## Core directories
 
-| Path | Responsibility | Key files |
-|------|----------------|-----------|
-| `app/` | Expo Router entry, stacks, tab shell, thin tab routes, command-center host wiring | `app/_layout.tsx`, `app/index.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/*.tsx`, `app/command.tsx`, `app/settings.tsx` |
-| `features/` | Feature modules with data/domain/screen layering plus the overlay-first command shell | `features/{feature}/{feature}.data.ts`, `features/{feature}/{feature}.domain.ts`, `features/{feature}/{Feature}Screen.tsx`, `features/command/*` |
-| `core/` | Shared infra: DB, sync, auth bootstrap, providers, UI primitives | `core/db/client.ts`, `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/providers/AppProviders.tsx`, `core/auth/guestProfile.ts`, `core/pwa/registerServiceWorker.ts`, `core/ui/*` |
-| `lib/` | Pure helpers and platform utilities | `lib/id.ts`, `lib/time.ts`, `lib/validation.ts`, `lib/supabase.ts`, `lib/useForegroundRefresh.ts`, `lib/notifications.ts` |
-| `tests/` | Unit coverage for domain, command parsing/config, restore, linked actions, and selected data/db logic | `tests/*.test.ts` (including `sync.engine`, `db.client`, `calories.data`, `commandParser.facade`) |
+| Path        | Responsibility                                                                                        | Key files                                                                                                                                                                                          |
+| ----------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`      | Expo Router entry, stacks, tab shell, thin tab routes, command-center host wiring                     | `app/_layout.tsx`, `app/index.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/*.tsx`, `app/command.tsx`, `app/settings.tsx`                                                                            |
+| `features/` | Feature modules with data/domain/screen layering plus the overlay-first command shell                 | `features/{feature}/{feature}.data.ts`, `features/{feature}/{feature}.domain.ts`, `features/{feature}/{Feature}Screen.tsx`, `features/command/*`                                                   |
+| `core/`     | Shared infra: DB, sync, auth bootstrap, providers, UI primitives                                      | `core/db/client.ts`, `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/providers/AppProviders.tsx`, `core/auth/guestProfile.ts`, `core/pwa/registerServiceWorker.ts`, `core/ui/*` |
+| `lib/`      | Pure helpers and platform utilities                                                                   | `lib/id.ts`, `lib/time.ts`, `lib/validation.ts`, `lib/supabase.ts`, `lib/useForegroundRefresh.ts`, `lib/notifications.ts`                                                                          |
+| `tests/`    | Unit coverage for domain, command parsing/config, restore, linked actions, and selected data/db logic | `tests/*.test.ts` (including `sync.engine`, `db.client`, `calories.data`, `commandParser.facade`)                                                                                                  |
 
 ---
 

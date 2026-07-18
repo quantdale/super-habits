@@ -1,12 +1,16 @@
-import React from "react";
-import { View, Text, Pressable } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
-import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
-import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
-import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
-import type { PomodoroSession } from "./types";
-import { formatSessionDuration } from "./pomodoro.domain";
+import React from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import Svg, { Circle, Ellipse, Line, Path } from 'react-native-svg';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import {
+  POMODORO_SECTION_KEY,
+  SECTION_COLORS,
+  SECTION_TEXT_COLORS,
+} from '@/constants/sectionColors';
+
+import type { PomodoroSession } from './types';
+import { formatSessionDuration } from './pomodoro.domain';
 
 type Props = {
   sessions: PomodoroSession[];
@@ -43,7 +47,10 @@ function MiniPlant({ color = SECTION_COLORS[POMODORO_SECTION_KEY] }: { color?: s
   );
 }
 
-export function GardenGrid({ sessions, accentColor = SECTION_COLORS[POMODORO_SECTION_KEY] }: Props) {
+export function GardenGrid({
+  sessions,
+  accentColor = SECTION_COLORS[POMODORO_SECTION_KEY],
+}: Props) {
   const { tokens } = useAppTheme();
   if (sessions.length === 0) {
     return (
@@ -61,7 +68,7 @@ export function GardenGrid({ sessions, accentColor = SECTION_COLORS[POMODORO_SEC
     <View>
       <Text className="mb-3 px-1 text-xs" style={{ color: tokens.textMuted }}>
         Your garden — {sessions.length} session
-        {sessions.length !== 1 ? "s" : ""}
+        {sessions.length !== 1 ? 's' : ''}
       </Text>
       <View className="flex-row flex-wrap gap-3 px-1">
         {sessions.map((session) => (

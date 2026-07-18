@@ -1,7 +1,7 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { Text, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Card } from "./Card";
+import { MaterialIcons } from '@expo/vector-icons';
+import { Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Card } from './Card';
 
 type FeatureStatCardProps = {
   accentColor: string;
@@ -27,7 +27,7 @@ export function FeatureStatCard({
   const { tokens } = useAppTheme();
 
   return (
-    <Card accentColor={accentColor} className={["mb-0", className].filter(Boolean).join(" ")}>
+    <Card accentColor={accentColor} className={['mb-0', className].filter(Boolean).join(' ')}>
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-3">
@@ -47,7 +47,10 @@ export function FeatureStatCard({
             </View>
           </View>
 
-          <Text className="mt-4 text-3xl font-bold tabular-nums tracking-tight" style={{ color: tokens.text }}>
+          <Text
+            className="mt-4 text-3xl font-bold tabular-nums tracking-tight"
+            style={{ color: tokens.text }}
+          >
             {value}
           </Text>
           {note ? (

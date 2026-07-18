@@ -1,4 +1,4 @@
-import { createId } from "@/lib/id";
+import { createId } from '@/lib/id';
 import {
   createLinkedActionEvent,
   createLinkedActionExecution,
@@ -8,15 +8,15 @@ import {
   getLinkedActionExecutionByRuleAndSourceEvent,
   listMatchingLinkedActionRules,
   updateLinkedActionExecution,
-} from "@/core/linked-actions/linkedActions.data";
+} from '@/core/linked-actions/linkedActions.data';
 import {
   linkedActionEffectRegistry,
   type LinkedActionEffectExecutor,
-} from "@/core/linked-actions/linkedActions.effects";
+} from '@/core/linked-actions/linkedActions.effects';
 import {
   buildLinkedActionsNoticePayload,
   createLinkedActionsNoticeFromPayload,
-} from "@/core/linked-actions/linkedActionsNotice";
+} from '@/core/linked-actions/linkedActionsNotice';
 import {
   isAllowedLinkedActionSourceEntity,
   isAllowedLinkedActionTrigger,
@@ -32,8 +32,8 @@ import {
   type LinkedActionSupportedRuleDefinition,
   type LinkedActionSourceAction,
   type LinkedActionSourceActionInput,
-} from "@/core/linked-actions/linkedActions.types";
-import type { AppNotice, LinkedActionsNoticePayload } from "@/core/notifications/inAppNotices.types";
+} from '@/core/linked-actions/linkedActions.types';
+import type { AppNotice } from '@/core/notifications/inAppNotices.types';
 
 type LinkedActionsEngineOptions = {
   effectRegistry?: Partial<Record<string, LinkedActionEffectExecutor>>;
@@ -42,22 +42,22 @@ type LinkedActionsEngineOptions = {
 
 function inferProducedEntityPlan(
   rule: LinkedActionSupportedRuleDefinition,
-): Pick<LinkedActionEffectPlan, "plannedProducedEntityType" | "plannedProducedEntityId"> {
+): Pick<LinkedActionEffectPlan, 'plannedProducedEntityType' | 'plannedProducedEntityId'> {
   switch (rule.target.effect.type) {
-    case "calorie.log":
+    case 'calorie.log':
       return {
-        plannedProducedEntityType: "calorie_log",
-        plannedProducedEntityId: createId("cal"),
+        plannedProducedEntityType: 'calorie_log',
+        plannedProducedEntityId: createId('cal'),
       };
-    case "workout.log":
+    case 'workout.log':
       return {
-        plannedProducedEntityType: "workout_log",
-        plannedProducedEntityId: createId("wrk"),
+        plannedProducedEntityType: 'workout_log',
+        plannedProducedEntityId: createId('wrk'),
       };
-    case "pomodoro.log":
+    case 'pomodoro.log':
       return {
-        plannedProducedEntityType: "pomodoro_session",
-        plannedProducedEntityId: createId("pom"),
+        plannedProducedEntityType: 'pomodoro_session',
+        plannedProducedEntityId: createId('pom'),
       };
     default:
       return {
@@ -72,17 +72,17 @@ function buildEffectFingerprint(rule: LinkedActionSupportedRuleDefinition) {
     rule.id,
     rule.target.feature,
     rule.target.entityType,
-    rule.target.entityId ?? "none",
+    rule.target.entityId ?? 'none',
     rule.target.effect.type,
     serializeLinkedActionEffectPayload(rule.target.effect),
-  ].join("|");
+  ].join('|');
 }
 
 function normalizeOrigin(
-  origin: LinkedActionSourceActionInput["origin"],
+  origin: LinkedActionSourceActionInput['origin'],
 ): LinkedActionOriginMetadata {
   return {
-    originKind: origin?.originKind ?? "user",
+    originKind: origin?.originKind ?? 'user',
     originRuleId: origin?.originRuleId ?? null,
     originEventId: origin?.originEventId ?? null,
   };
@@ -100,12 +100,12 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
     );
   }
 
-  const eventId = input.eventId ?? createId("levt");
+  const eventId = input.eventId ?? createId('levt');
   const origin = normalizeOrigin(input.origin);
-  const chainId = input.chain?.chainId ?? createId("lchain");
+  const chainId = input.chain?.chainId ?? createId('lchain');
   const rootEventId = input.chain?.rootEventId ?? eventId;
   const parentEventId = input.chain?.parentEventId ?? origin.originEventId ?? null;
-  const depth = input.chain?.depth ?? (origin.originKind === "linked_action" ? 1 : 0);
+  const depth = input.chain?.depth ?? (origin.originKind === 'linked_action' ? 1 : 0);
 
   return {
     eventId,
@@ -131,13 +131,13 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
 async function findPriorAppliedExecutionForFirstRealPath(
   plan: LinkedActionEffectPlan,
 ): Promise<LinkedActionExecutionRecord | null> {
-  if (plan.rule.target.effect.type !== "calorie.log") {
+  if (plan.rule.target.effect.type !== 'calorie.log') {
     return null;
   }
   if (
-    plan.sourceEvent.feature !== "habits" ||
-    plan.sourceEvent.entityType !== "habit" ||
-    plan.sourceEvent.triggerType !== "habit.completed_for_day" ||
+    plan.sourceEvent.feature !== 'habits' ||
+    plan.sourceEvent.entityType !== 'habit' ||
+    plan.sourceEvent.triggerType !== 'habit.completed_for_day' ||
     !plan.sourceEvent.entityId ||
     !plan.sourceEvent.sourceDateKey
   ) {
@@ -152,13 +152,13 @@ async function findPriorAppliedExecutionForFirstRealPath(
 }
 
 function isSelfTargetNoop(plan: LinkedActionEffectPlan): boolean {
-  if (plan.rule.target.effect.type !== "todo.complete") {
+  if (plan.rule.target.effect.type !== 'todo.complete') {
     return false;
   }
 
   return (
-    plan.sourceEvent.feature === "todos" &&
-    plan.sourceEvent.entityType === "todo" &&
+    plan.sourceEvent.feature === 'todos' &&
+    plan.sourceEvent.entityType === 'todo' &&
     Boolean(plan.sourceEvent.entityId) &&
     plan.sourceEvent.entityId === plan.rule.target.entityId
   );
@@ -182,7 +182,7 @@ function buildPlan(
 
   return {
     ...plan,
-    noticePreview: buildLinkedActionsNoticePayload(plan, "planned"),
+    noticePreview: buildLinkedActionsNoticePayload(plan, 'planned'),
   };
 }
 
@@ -191,13 +191,13 @@ function buildUnsupportedRuleEffectFingerprint(rule: LinkedActionRuleDefinition)
     rule.id,
     rule.rawTargetFeature,
     rule.rawTargetEntityType,
-    rule.target.entityId ?? "none",
+    rule.target.entityId ?? 'none',
     rule.rawEffectType,
-  ].join("|");
+  ].join('|');
 }
 
 function buildUnsupportedRuleResult(rule: LinkedActionRuleDefinition): LinkedActionEffectResult {
-  console.warn("Skipping unsupported linked action rule", {
+  console.warn('Skipping unsupported linked action rule', {
     ruleId: rule.id,
     targetFeature: rule.rawTargetFeature,
     targetEntityType: rule.rawTargetEntityType,
@@ -207,7 +207,7 @@ function buildUnsupportedRuleResult(rule: LinkedActionRuleDefinition): LinkedAct
   return {
     executionId: null,
     ruleId: rule.id,
-    status: "skipped",
+    status: 'skipped',
     effectType: rule.rawEffectType,
     effectFingerprint: buildUnsupportedRuleEffectFingerprint(rule),
     targetFeature: rule.rawTargetFeature,
@@ -215,7 +215,7 @@ function buildUnsupportedRuleResult(rule: LinkedActionRuleDefinition): LinkedAct
     targetEntityId: rule.target.entityId,
     producedEntityType: null,
     producedEntityId: null,
-    reason: "unsupported_rule",
+    reason: 'unsupported_rule',
     errorMessage: rule.unsupportedReason,
     notice: null,
     noticePreview: null,
@@ -234,7 +234,7 @@ function mapExecutionToDuplicateResult(
   return {
     executionId: execution.id,
     ruleId: plan.rule.id,
-    status: "duplicate",
+    status: 'duplicate',
     effectType: plan.rule.target.effect.type,
     effectFingerprint: plan.effectFingerprint,
     targetFeature: plan.rule.target.feature,
@@ -261,11 +261,11 @@ export class LinkedActionsEngine {
 
   async processSourceAction(
     input: LinkedActionSourceActionInput,
-    mode: LinkedActionProcessMode = "apply",
+    mode: LinkedActionProcessMode = 'apply',
   ): Promise<LinkedActionProcessResult> {
     const normalizedEvent = normalizeSourceAction(input);
     const sourceEvent =
-      mode === "apply"
+      mode === 'apply'
         ? ((await getLinkedActionEvent(normalizedEvent.eventId)) ??
           (await createLinkedActionEvent(normalizedEvent)))
         : normalizedEvent;
@@ -282,11 +282,11 @@ export class LinkedActionsEngine {
 
       const plan = buildPlan(sourceEvent, rule);
 
-      if (mode === "plan") {
+      if (mode === 'plan') {
         effects.push({
           executionId: null,
           ruleId: plan.rule.id,
-          status: "planned",
+          status: 'planned',
           effectType: plan.rule.target.effect.type,
           effectFingerprint: plan.effectFingerprint,
           targetFeature: plan.rule.target.feature,
@@ -308,11 +308,7 @@ export class LinkedActionsEngine {
       );
       if (priorExecution) {
         effects.push(
-          mapExecutionToDuplicateResult(
-            priorExecution,
-            plan,
-            "source_event_already_executed",
-          ),
+          mapExecutionToDuplicateResult(priorExecution, plan, 'source_event_already_executed'),
         );
         continue;
       }
@@ -323,20 +319,14 @@ export class LinkedActionsEngine {
         plan.effectFingerprint,
       );
       if (chainGuardHit) {
-        effects.push(
-          mapExecutionToDuplicateResult(chainGuardHit, plan, "chain_guard_duplicate"),
-        );
+        effects.push(mapExecutionToDuplicateResult(chainGuardHit, plan, 'chain_guard_duplicate'));
         continue;
       }
 
       const priorAppliedExecution = await findPriorAppliedExecutionForFirstRealPath(plan);
       if (priorAppliedExecution) {
         effects.push(
-          mapExecutionToDuplicateResult(
-            priorAppliedExecution,
-            plan,
-            "habit_day_already_logged",
-          ),
+          mapExecutionToDuplicateResult(priorAppliedExecution, plan, 'habit_day_already_logged'),
         );
         continue;
       }
@@ -345,7 +335,7 @@ export class LinkedActionsEngine {
         effects.push({
           executionId: null,
           ruleId: plan.rule.id,
-          status: "skipped",
+          status: 'skipped',
           effectType: plan.rule.target.effect.type,
           effectFingerprint: plan.effectFingerprint,
           targetFeature: plan.rule.target.feature,
@@ -353,7 +343,7 @@ export class LinkedActionsEngine {
           targetEntityId: plan.rule.target.entityId,
           producedEntityType: null,
           producedEntityId: null,
-          reason: "self_target_noop",
+          reason: 'self_target_noop',
           errorMessage: null,
           notice: null,
           noticePreview: null,
@@ -369,7 +359,7 @@ export class LinkedActionsEngine {
         originRuleId: sourceEvent.origin.originRuleId,
         effectType: plan.rule.target.effect.type,
         effectFingerprint: plan.effectFingerprint,
-        status: "planned",
+        status: 'planned',
         targetFeature: plan.rule.target.feature,
         targetEntityType: plan.rule.target.entityType,
         targetEntityId: plan.rule.target.entityId,
@@ -388,13 +378,11 @@ export class LinkedActionsEngine {
         }
 
         const outcome = await executor(plan);
-        const producedEntityType =
-          outcome.producedEntityType ?? plan.plannedProducedEntityType;
-        const producedEntityId =
-          outcome.producedEntityId ?? plan.plannedProducedEntityId;
+        const producedEntityType = outcome.producedEntityType ?? plan.plannedProducedEntityType;
+        const producedEntityId = outcome.producedEntityId ?? plan.plannedProducedEntityId;
         const noticePayload =
-          outcome.status === "applied"
-            ? buildLinkedActionsNoticePayload(plan, "applied", outcome.targetLabel)
+          outcome.status === 'applied'
+            ? buildLinkedActionsNoticePayload(plan, 'applied', outcome.targetLabel)
             : null;
 
         await updateLinkedActionExecution(execution.id, {
@@ -405,9 +393,7 @@ export class LinkedActionsEngine {
           errorMessage: null,
         });
 
-        const notice = noticePayload
-          ? createLinkedActionsNoticeFromPayload(noticePayload)
-          : null;
+        const notice = noticePayload ? createLinkedActionsNoticeFromPayload(noticePayload) : null;
         if (notice) {
           notices.push(notice);
           await Promise.resolve(this.options.onNotice?.(notice));
@@ -430,16 +416,16 @@ export class LinkedActionsEngine {
           noticePreview: noticePayload ?? plan.noticePreview,
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown execution failure";
+        const message = error instanceof Error ? error.message : 'Unknown execution failure';
         await updateLinkedActionExecution(execution.id, {
-          status: "failed",
+          status: 'failed',
           errorMessage: message,
         });
 
         effects.push({
           executionId: execution.id,
           ruleId: plan.rule.id,
-          status: "failed",
+          status: 'failed',
           effectType: plan.rule.target.effect.type,
           effectFingerprint: plan.effectFingerprint,
           targetFeature: plan.rule.target.feature,

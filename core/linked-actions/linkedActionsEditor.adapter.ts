@@ -1,20 +1,14 @@
-import {
-  createLinkedActionEditorRowFromRule,
-} from "@/core/linked-actions/linkedActionsEditor.model";
-import {
-  getLinkedActionTargetPickerProvider,
-} from "@/core/linked-actions/linkedActionsTargetProviders";
+import { createLinkedActionEditorRowFromRule } from '@/core/linked-actions/linkedActionsEditor.model';
+import { getLinkedActionTargetPickerProvider } from '@/core/linked-actions/linkedActionsTargetProviders';
 import {
   createLinkedActionTargetExistingSelection,
   type LinkedActionTargetPickerCandidate,
-} from "@/core/linked-actions/linkedActionsTargetPicker.types";
-import type {
-  LinkedActionEditorRowDraft,
-} from "@/core/linked-actions/linkedActionsEditor.types";
+} from '@/core/linked-actions/linkedActionsTargetPicker.types';
+import type { LinkedActionEditorRowDraft } from '@/core/linked-actions/linkedActionsEditor.types';
 import type {
   LinkedActionFeature,
   LinkedActionRuleDefinition,
-} from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActions.types';
 
 export async function buildLinkedActionEditorRowsFromRules(
   rules: LinkedActionRuleDefinition[],

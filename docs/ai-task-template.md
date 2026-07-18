@@ -13,12 +13,14 @@ Task type: [feature | fix | refactor | migration | audit | pre-PR]
 Scope: [files/folders/features]
 Goal: [what should change]
 Branch/worktree plan:
+
 - branch: [one branch for this task]
 - worktree: [dedicated worktree if running alongside other tasks]
-Wave:
+  Wave:
 - [Wave N only, or explain why this is parallel-safe with other work]
 
 Must preserve:
+
 - offline-first SQLite-first behavior
 - current layering rules
 - [task-specific invariants]
@@ -33,22 +35,27 @@ If docs conflict with code, call it out explicitly.
 Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 
 This is feature/UI work in:
+
 - `features/[feature]/`
 - `app/(tabs)/[route].tsx` [only if needed]
 
 Goal:
+
 - [user-facing feature change]
 
 Before editing:
+
 - read `features/[feature]/[feature].data.ts`
 - read `features/[feature]/[feature].domain.ts` if it exists
 
 Must preserve:
+
 - no direct DB access from screens/components
 - thin route wrappers
 - existing validation and sync behavior unless explicitly changing it
 
 Validation:
+
 - run `npm test`
 - if web UI changed, run `npm run build:web`
 - if web behavior changed, run `npm run e2e` after build
@@ -60,20 +67,25 @@ Validation:
 Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 
 Bug:
+
 - [describe the observed behavior]
 
 Expected:
+
 - [describe the correct behavior]
 
 Scope:
+
 - [suspected files or feature]
 
 Requirements:
+
 - confirm root cause from code before patching
 - keep the fix minimal
 - call out any doc drift or stale comments you find
 
 Validation:
+
 - [tests/commands relevant to the bug]
 ```
 
@@ -83,15 +95,18 @@ Validation:
 Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 
 This is data/DB/sync work in:
+
 - `core/db/client.ts`
 - `core/db/types.ts`
 - `core/sync/*`
 - `features/[feature]/[feature].data.ts`
 
 Goal:
+
 - [migration or persistence change]
 
 Must preserve:
+
 - `getDatabase()` as the only DB entrypoint
 - soft delete rules
 - `createId(prefix)` usage
@@ -100,11 +115,13 @@ Must preserve:
 - append-only migrations
 
 If schema changes:
+
 - use the next migration slot documented in `docs/master-context.md`
 - do not edit older migration blocks
 - call out any required follow-up to `schema.sql` as documentation drift, not runtime authority
 
 Validation:
+
 - `npm test`
 - `npm run typecheck` if it becomes valid in the repo
 ```
@@ -115,18 +132,22 @@ Validation:
 Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 
 Refactor goal:
+
 - [clarity / duplication / structure objective]
 
 Scope:
+
 - [paths]
 
 Constraints:
+
 - no behavior changes unless explicitly listed
 - preserve layering boundaries
 - preserve sync and persistence semantics
 - prefer small, reviewable edits over broad rewrites
 
 Validation:
+
 - [relevant tests]
 ```
 
@@ -136,9 +157,11 @@ Validation:
 Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 
 Audit scope:
+
 - [feature / subsystem / PR / files]
 
 Priorities:
+
 1. correctness and regressions
 2. invariant violations
 3. sync/data risks
@@ -146,6 +169,7 @@ Priorities:
 5. stale docs or misleading comments
 
 Output format:
+
 - findings first, ordered by severity
 - include file references
 - keep summaries brief
@@ -159,12 +183,14 @@ Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 Prepare this change for review.
 
 Do:
+
 - inspect the touched files
 - verify architecture and invariant compliance
 - run the relevant checks
 - list any remaining risks or gaps
 
 Checks:
+
 - `npm test`
 - `npm run build:web` if web UI changed
 - `npm run e2e` if web behavior changed and static build was updated

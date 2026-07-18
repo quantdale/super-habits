@@ -32,15 +32,15 @@ npm run build:web        # Expo web export (needed before e2e in CI)
 
 ### Directory roles
 
-| Path | Role |
-|------|------|
-| `app/` | Expo Router only — root stack, `(tabs)/_layout`, thin `*.tsx` per tab (each renders one `*Screen`). No business logic. |
-| `features/` | Product modules — one subdirectory per feature (see pattern below). |
-| `core/` | Cross-cutting infra: DB singleton + migrations (`core/db/client.ts`), entity types (`core/db/types.ts`), sync (`core/sync/sync.engine.ts`, `supabase.adapter.ts`), `AppProviders`, shared `core/ui/` primitives. |
-| `lib/` | Pure/platform helpers: `id`, `time`, `validation`, `supabase` (client + anonymous session + `remoteMode`), notifications. No DB, no feature imports. |
-| `constants/` | Design tokens — `sectionColors.ts` (per-tab palette). |
-| `tests/` | Vitest unit specs for `*.domain.ts` and `lib/` helpers. |
-| `e2e/` | Playwright specs + `helpers/` (`db.ts`, `navigation.ts`, `forms.ts`). |
+| Path         | Role                                                                                                                                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`       | Expo Router only — root stack, `(tabs)/_layout`, thin `*.tsx` per tab (each renders one `*Screen`). No business logic.                                                                                           |
+| `features/`  | Product modules — one subdirectory per feature (see pattern below).                                                                                                                                              |
+| `core/`      | Cross-cutting infra: DB singleton + migrations (`core/db/client.ts`), entity types (`core/db/types.ts`), sync (`core/sync/sync.engine.ts`, `supabase.adapter.ts`), `AppProviders`, shared `core/ui/` primitives. |
+| `lib/`       | Pure/platform helpers: `id`, `time`, `validation`, `supabase` (client + anonymous session + `remoteMode`), notifications. No DB, no feature imports.                                                             |
+| `constants/` | Design tokens — `sectionColors.ts` (per-tab palette).                                                                                                                                                            |
+| `tests/`     | Vitest unit specs for `*.domain.ts` and `lib/` helpers.                                                                                                                                                          |
+| `e2e/`       | Playwright specs + `helpers/` (`db.ts`, `navigation.ts`, `forms.ts`).                                                                                                                                            |
 
 ### Feature module pattern
 
@@ -83,25 +83,25 @@ After **every** mutating write on synced entities, call `syncEngine.enqueue` imm
 ### IDs and date keys
 
 ```ts
-import { createId } from "@/lib/id";   // createId("todo") → "todo_<ms>_<rand8>"
-import { toDateKey } from "@/lib/time"; // toDateKey() → "YYYY-MM-DD" (local calendar date)
+import { createId } from '@/lib/id'; // createId("todo") → "todo_<ms>_<rand8>"
+import { toDateKey } from '@/lib/time'; // toDateKey() → "YYYY-MM-DD" (local calendar date)
 ```
 
 **Entity prefix registry:**
 
-| Prefix | Entity |
-|--------|--------|
-| `todo` | todos |
-| `habit` | habits |
-| `hcmp` | habit_completions |
-| `cal` | calorie_entries |
-| `smeal` | saved_meals |
-| `wrk` | workout_routines / workout_logs |
-| `ex` | routine_exercises |
-| `eset` | routine_exercise_sets |
-| `wsex` | workout_session_exercises |
-| `pom` | pomodoro_sessions |
-| `rec` | todos.recurrence_id |
+| Prefix  | Entity                          |
+| ------- | ------------------------------- |
+| `todo`  | todos                           |
+| `habit` | habits                          |
+| `hcmp`  | habit_completions               |
+| `cal`   | calorie_entries                 |
+| `smeal` | saved_meals                     |
+| `wrk`   | workout_routines / workout_logs |
+| `ex`    | routine_exercises               |
+| `eset`  | routine_exercise_sets           |
+| `wsex`  | workout_session_exercises       |
+| `pom`   | pomodoro_sessions               |
+| `rec`   | todos.recurrence_id             |
 
 `toDateKey()` uses local calendar dates since migration 5. Preserve this behavior for new writes.
 
@@ -137,12 +137,12 @@ Use `getByText` for `Button`/`Pressable` labels (RN Web doesn't always expose `r
 
 ## MCP Servers (`.vscode/mcp.json`)
 
-| Server | Use in this project |
-|--------|---------------------|
+| Server         | Use in this project                                                                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | **playwright** | Browser automation — interact with the Expo web app on `localhost:8081`, inspect the DOM, fill forms, click elements during E2E debugging |
-| **github** | Issues, PRs, code search across the repo (requires Docker + GitHub PAT prompt) |
-| **fetch** | Fetch external URLs, docs, or APIs and return them as markdown/JSON |
-| **lighthouse** | Run PWA / performance / accessibility audits against `localhost:8081` |
+| **github**     | Issues, PRs, code search across the repo (requires Docker + GitHub PAT prompt)                                                            |
+| **fetch**      | Fetch external URLs, docs, or APIs and return them as markdown/JSON                                                                       |
+| **lighthouse** | Run PWA / performance / accessibility audits against `localhost:8081`                                                                     |
 
 E2E work: run `npm run build:web` before Playwright; `npm run e2e` serves `dist/` via `node scripts/serve-e2e.js`.
 
@@ -150,18 +150,18 @@ E2E work: run `npm run build:web` before Playwright; `npm run e2e` serves `dist/
 
 ## Where Does X Live?
 
-| Need | Location |
-|------|----------|
-| SQL, getDatabase, migrations | `core/db/client.ts` only |
-| Entity TypeScript types | `core/db/types.ts` |
-| Sync queue API | `core/sync/sync.engine.ts` |
-| Reusable RN components | `core/ui/` |
-| Feature CRUD + enqueue | `features/*/{name}.data.ts` |
+| Need                            | Location                      |
+| ------------------------------- | ----------------------------- |
+| SQL, getDatabase, migrations    | `core/db/client.ts` only      |
+| Entity TypeScript types         | `core/db/types.ts`            |
+| Sync queue API                  | `core/sync/sync.engine.ts`    |
+| Reusable RN components          | `core/ui/`                    |
+| Feature CRUD + enqueue          | `features/*/{name}.data.ts`   |
 | Pure rules, streaks, formatting | `features/*/{name}.domain.ts` |
-| Screens and wiring | `features/*/*Screen.tsx` |
-| ID generation | `lib/id.ts` |
-| Date keys (YYYY-MM-DD) | `lib/time.ts` (`toDateKey`) |
-| Form validation messages | `lib/validation.ts` |
-| Section color tokens | `constants/sectionColors.ts` |
-| Unit tests | `tests/*.test.ts` |
-| E2E specs | `e2e/*.spec.ts` |
+| Screens and wiring              | `features/*/*Screen.tsx`      |
+| ID generation                   | `lib/id.ts`                   |
+| Date keys (YYYY-MM-DD)          | `lib/time.ts` (`toDateKey`)   |
+| Form validation messages        | `lib/validation.ts`           |
+| Section color tokens            | `constants/sectionColors.ts`  |
+| Unit tests                      | `tests/*.test.ts`             |
+| E2E specs                       | `e2e/*.spec.ts`               |

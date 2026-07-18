@@ -5,12 +5,12 @@ import {
   useRef,
   type PropsWithChildren,
   type ReactNode,
-} from "react";
-import { Platform, ScrollView, View, type ViewStyle } from "react-native";
+} from 'react';
+import { Platform, ScrollView, View, type ViewStyle } from 'react-native';
 import {
   HORIZONTAL_SCROLL_CONTENT,
   HORIZONTAL_SCROLL_VIEWPORT_STYLE,
-} from "@/lib/horizontalScrollViewportStyle";
+} from '@/lib/horizontalScrollViewportStyle';
 
 export type HorizontalScrollAreaHandle = {
   scrollToEnd: (options?: { animated?: boolean }) => void;
@@ -32,12 +32,12 @@ type Props = PropsWithChildren<{
 
 /** Web-only: extra styles; overflow uses Tailwind so horizontal scroll works in nested layouts. */
 const WEB_OUTER_EXTRA = {
-  overscrollBehaviorX: "contain",
-  WebkitOverflowScrolling: "touch",
+  overscrollBehaviorX: 'contain',
+  WebkitOverflowScrolling: 'touch',
 } as ViewStyle;
 
 const WEB_INNER: ViewStyle = {
-  alignSelf: "flex-start",
+  alignSelf: 'flex-start',
   flexShrink: 0,
 };
 
@@ -47,13 +47,13 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
     ref,
   ) {
     const nativeRef = useRef<ScrollView>(null);
-    const webScrollId = `hscroll-${useId().replace(/:/g, "")}`;
+    const webScrollId = `hscroll-${useId().replace(/:/g, '')}`;
 
     useImperativeHandle(
       ref,
       () => ({
         scrollToEnd: ({ animated = false } = {}) => {
-          if (Platform.OS === "web" && typeof document !== "undefined") {
+          if (Platform.OS === 'web' && typeof document !== 'undefined') {
             const el = document.getElementById(webScrollId);
             if (el) {
               el.scrollLeft = el.scrollWidth - el.clientWidth;
@@ -70,7 +70,7 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
       stripMinHeight != null ? { minHeight: stripMinHeight } : undefined;
 
     const strip =
-      Platform.OS === "web" ? (
+      Platform.OS === 'web' ? (
         <View
           nativeID={webScrollId}
           className="w-full min-h-0 min-w-0 max-w-full shrink overflow-x-auto overflow-y-hidden"
@@ -92,7 +92,7 @@ export const HorizontalScrollArea = forwardRef<HorizontalScrollAreaHandle, Props
       );
 
     return (
-      <View className="w-full min-w-0 max-w-full" style={{ alignSelf: "stretch" }}>
+      <View className="w-full min-w-0 max-w-full" style={{ alignSelf: 'stretch' }}>
         {strip}
         {footer}
       </View>

@@ -1,6 +1,6 @@
-import React from "react";
-import { View, Text, Pressable } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import React from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type Props = {
   visible: boolean;
@@ -27,7 +27,9 @@ export function BackgroundWarning({ visible, onDismiss }: Props) {
           </Text>
         </View>
         <Pressable onPress={onDismiss} hitSlop={8}>
-          <Text className="ml-2 text-sm" style={{ color: tokens.iconMuted }}>✕</Text>
+          <Text className="ml-2 text-sm" style={{ color: tokens.iconMuted }}>
+            ✕
+          </Text>
         </Pressable>
       </View>
     </View>

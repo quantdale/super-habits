@@ -1,18 +1,18 @@
-import React, { useMemo } from "react";
-import { View, Text } from "react-native";
-import { PieChart } from "react-native-gifted-charts";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import React, { useMemo } from 'react';
+import { View, Text } from 'react-native';
+import { PieChart } from 'react-native-gifted-charts';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { SECTION_TEXT_COLORS } from '@/constants/sectionColors';
 
 const MACRO_CHIPS: {
   label: string;
-  key: "protein" | "carbs" | "fats" | "fiber";
+  key: 'protein' | 'carbs' | 'fats' | 'fiber';
   color: string;
 }[] = [
-  { label: "Protein", key: "protein", color: SECTION_TEXT_COLORS.todos },
-  { label: "Carbs", key: "carbs", color: SECTION_TEXT_COLORS.calories },
-  { label: "Fats", key: "fats", color: SECTION_TEXT_COLORS.workout },
-  { label: "Fiber", key: "fiber", color: SECTION_TEXT_COLORS.habits },
+  { label: 'Protein', key: 'protein', color: SECTION_TEXT_COLORS.todos },
+  { label: 'Carbs', key: 'carbs', color: SECTION_TEXT_COLORS.calories },
+  { label: 'Fats', key: 'fats', color: SECTION_TEXT_COLORS.workout },
+  { label: 'Fiber', key: 'fiber', color: SECTION_TEXT_COLORS.habits },
 ];
 
 type Props = {
@@ -92,7 +92,7 @@ export function MacroDonutChart({
       <View className="mt-3 flex-row justify-around px-2">
         {MACRO_CHIPS.map((m) => (
           <View key={m.label} className="items-center">
-            <Text style={{ fontSize: 15, fontWeight: "700", color: m.color }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: m.color }}>
               {Math.round(macroValues[m.key])}g
             </Text>
             <Text style={{ fontSize: 11, color: tokens.textMuted }}>{m.label}</Text>

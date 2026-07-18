@@ -1,10 +1,10 @@
-import { appMetaKeys, getAppMetaText, setAppMetaText } from "@/core/db/appMeta";
-import { getDatabase } from "@/core/db/client";
-import { applyRemoteCalorieEntries } from "@/features/calories/calories.data";
-import { applyRemoteHabits } from "@/features/habits/habits.data";
-import { applyRemoteTodos } from "@/features/todos/todos.data";
-import { isRemoteEnabled, supabase } from "@/lib/supabase";
-import { nowIso } from "@/lib/time";
+import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
+import { getDatabase } from '@/core/db/client';
+import { applyRemoteCalorieEntries } from '@/features/calories/calories.data';
+import { applyRemoteHabits } from '@/features/habits/habits.data';
+import { applyRemoteTodos } from '@/features/todos/todos.data';
+import { isRemoteEnabled, supabase } from '@/lib/supabase';
+import { nowIso } from '@/lib/time';
 import type {
   BackupFreshnessSignature,
   LocalSyncBackedCounts,
@@ -15,20 +15,17 @@ import type {
   RestorePreview,
   RestoreScopedEntity,
   SyncBackedEntity,
-} from "@/core/sync/restore.types";
-import {
-  RESTORE_SCOPED_ENTITIES,
-  SYNC_BACKED_ENTITIES,
-} from "@/core/sync/restore.types";
+} from '@/core/sync/restore.types';
+import { RESTORE_SCOPED_ENTITIES, SYNC_BACKED_ENTITIES } from '@/core/sync/restore.types';
 
-const RESTORE_SCOPE_VERSION = "phase_one_restore_v1";
+const RESTORE_SCOPE_VERSION = 'phase_one_restore_v1';
 const PAGE_SIZE = 1_000;
 const WORKOUT_RESTORE_EXCLUSION_REASON =
-  "Workout routines are excluded in this phase because nested routine structure is not synced yet.";
+  'Workout routines are excluded in this phase because nested routine structure is not synced yet.';
 
 type RemoteMeta = Pick<
   RemoteBackupEntityStatus,
-  "remoteState" | "remoteRowCount" | "latestUpdatedAt" | "errorMessage"
+  'remoteState' | 'remoteRowCount' | 'latestUpdatedAt' | 'errorMessage'
 >;
 
 type RemoteUpdatedRow = {
@@ -36,24 +33,19 @@ type RemoteUpdatedRow = {
 };
 
 function buildBlockedEligibility(
-  reason:
-    | "local_data_present"
-    | "remote_backup_unavailable"
-    | "remote_disabled",
+  reason: 'local_data_present' | 'remote_backup_unavailable' | 'remote_disabled',
   message: string,
   localCounts: LocalSyncBackedCounts,
 ): RestoreEligibility {
   return {
-    kind: "blocked",
+    kind: 'blocked',
     reason,
     message,
     localCounts,
   };
 }
 
-function getOrderedStatusEntries(
-  statuses: Record<SyncBackedEntity, RemoteBackupEntityStatus>,
-) {
+function getOrderedStatusEntries(statuses: Record<SyncBackedEntity, RemoteBackupEntityStatus>) {
   return SYNC_BACKED_ENTITIES.map((entity) => statuses[entity]);
 }
 
@@ -71,8 +63,7 @@ function computeFreshnessSignature(
   });
 
   const hasRemoteBackup = relevant.some(
-    (status) =>
-      status.remoteState === "available" && (status.remoteRowCount ?? 0) > 0,
+    (status) => status.remoteState === 'available' && (status.remoteRowCount ?? 0) > 0,
   );
   if (!hasRemoteBackup) return null;
 
@@ -82,9 +73,7 @@ function computeFreshnessSignature(
   });
 }
 
-function buildWarnings(
-  statuses: Record<SyncBackedEntity, RemoteBackupEntityStatus>,
-): string[] {
+function buildWarnings(statuses: Record<SyncBackedEntity, RemoteBackupEntityStatus>): string[] {
   const warnings: string[] = [];
   const workoutStatus = statuses.workout_routines;
 
@@ -93,13 +82,13 @@ function buildWarnings(
   }
 
   const remoteErrors = getOrderedStatusEntries(statuses).filter(
-    (status) => status.remoteState === "error" && status.errorMessage,
+    (status) => status.remoteState === 'error' && status.errorMessage,
   );
   if (remoteErrors.length > 0) {
     warnings.push(
       `Some remote backup status checks failed: ${remoteErrors
         .map((status) => `${status.entity}: ${status.errorMessage}`)
-        .join("; ")}`,
+        .join('; ')}`,
     );
   }
 
@@ -108,8 +97,8 @@ function buildWarnings(
 
 function buildDisclosures(): string[] {
   return [
-    "Habits restore definitions only. Habit completion history stays local-only.",
-    "Calories restore entries only. Saved meals stay local-only.",
+    'Habits restore definitions only. Habit completion history stays local-only.',
+    'Calories restore entries only. Saved meals stay local-only.',
     WORKOUT_RESTORE_EXCLUSION_REASON,
   ];
 }
@@ -131,7 +120,7 @@ async function getLocalSyncBackedCounts(): Promise<LocalSyncBackedCounts> {
 async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMeta> {
   if (!isRemoteEnabled() || !supabase) {
     return {
-      remoteState: "unavailable",
+      remoteState: 'unavailable',
       remoteRowCount: null,
       latestUpdatedAt: null,
       errorMessage: null,
@@ -140,11 +129,11 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
 
   const countResult = await supabase
     .from(entity)
-    .select("id", { count: "exact", head: true })
-    .is("deleted_at", null);
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null);
   if (countResult.error) {
     return {
-      remoteState: "error",
+      remoteState: 'error',
       remoteRowCount: null,
       latestUpdatedAt: null,
       errorMessage: countResult.error.message,
@@ -154,7 +143,7 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
   const count = countResult.count ?? 0;
   if (count === 0) {
     return {
-      remoteState: "empty",
+      remoteState: 'empty',
       remoteRowCount: 0,
       latestUpdatedAt: null,
       errorMessage: null,
@@ -163,14 +152,14 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
 
   const latestResult = await supabase
     .from(entity)
-    .select("updated_at")
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
+    .select('updated_at')
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
     .limit(1);
 
   if (latestResult.error) {
     return {
-      remoteState: "error",
+      remoteState: 'error',
       remoteRowCount: count,
       latestUpdatedAt: null,
       errorMessage: latestResult.error.message,
@@ -180,7 +169,7 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
   const latestRow = (latestResult.data?.[0] ?? null) as RemoteUpdatedRow | null;
 
   return {
-    remoteState: "available",
+    remoteState: 'available',
     remoteRowCount: count,
     latestUpdatedAt: latestRow?.updated_at ?? null,
     errorMessage: null,
@@ -193,12 +182,12 @@ async function getRemoteEntityStatuses(): Promise<
   const entries = await Promise.all(
     SYNC_BACKED_ENTITIES.map(async (entity) => {
       const remoteMeta = await fetchRemoteEntityMeta(entity);
-      const isWorkout = entity === "workout_routines";
+      const isWorkout = entity === 'workout_routines';
 
       const status: RemoteBackupEntityStatus = {
         entity,
         phaseOneRestorable: !isWorkout,
-        phaseOneStatus: isWorkout ? "excluded_in_phase_one" : "included",
+        phaseOneStatus: isWorkout ? 'excluded_in_phase_one' : 'included',
         remoteState: remoteMeta.remoteState,
         remoteRowCount: remoteMeta.remoteRowCount,
         latestUpdatedAt: remoteMeta.latestUpdatedAt,
@@ -225,22 +214,18 @@ function computeLatestRestorableBackupAt(
   return candidates.sort((a, b) => b.localeCompare(a))[0] ?? null;
 }
 
-function buildUnavailableEntityStatuses(): Record<
-  SyncBackedEntity,
-  RemoteBackupEntityStatus
-> {
+function buildUnavailableEntityStatuses(): Record<SyncBackedEntity, RemoteBackupEntityStatus> {
   return Object.fromEntries(
     SYNC_BACKED_ENTITIES.map((entity) => [
       entity,
       {
         entity,
-        phaseOneRestorable: entity !== "workout_routines",
-        phaseOneStatus:
-          entity === "workout_routines" ? "excluded_in_phase_one" : "included",
-        remoteState: "unavailable",
+        phaseOneRestorable: entity !== 'workout_routines',
+        phaseOneStatus: entity === 'workout_routines' ? 'excluded_in_phase_one' : 'included',
+        remoteState: 'unavailable',
         remoteRowCount: null,
         latestUpdatedAt: null,
-        reason: entity === "workout_routines" ? WORKOUT_RESTORE_EXCLUSION_REASON : null,
+        reason: entity === 'workout_routines' ? WORKOUT_RESTORE_EXCLUSION_REASON : null,
         errorMessage: null,
       } satisfies RemoteBackupEntityStatus,
     ]),
@@ -252,38 +237,35 @@ function buildEligibility(
   remoteAvailable: boolean,
   remoteEnabled: boolean,
 ): RestoreEligibility {
-  const hasAnyLocalSyncRows = SYNC_BACKED_ENTITIES.some(
-    (entity) => localCounts[entity] > 0,
-  );
+  const hasAnyLocalSyncRows = SYNC_BACKED_ENTITIES.some((entity) => localCounts[entity] > 0);
 
   if (!remoteEnabled) {
     return buildBlockedEligibility(
-      "remote_disabled",
-      "Remote backup is disabled in local-only mode.",
+      'remote_disabled',
+      'Remote backup is disabled in local-only mode.',
       localCounts,
     );
   }
 
   if (hasAnyLocalSyncRows) {
     return buildBlockedEligibility(
-      "local_data_present",
-      "Restore is only available on an empty device in this phase. Existing active synced local rows block import.",
+      'local_data_present',
+      'Restore is only available on an empty device in this phase. Existing active synced local rows block import.',
       localCounts,
     );
   }
 
   if (!remoteAvailable) {
     return buildBlockedEligibility(
-      "remote_backup_unavailable",
-      "No restorable remote backup is available for this account yet.",
+      'remote_backup_unavailable',
+      'No restorable remote backup is available for this account yet.',
       localCounts,
     );
   }
 
   return {
-    kind: "empty_device",
-    message:
-      "This device is empty for synced tables, so importing the remote backup is allowed.",
+    kind: 'empty_device',
+    message: 'This device is empty for synced tables, so importing the remote backup is allowed.',
     localCounts,
   };
 }
@@ -292,7 +274,7 @@ async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
   entity: TEntity,
 ): Promise<RemoteRestoreRowMap[TEntity][]> {
   if (!isRemoteEnabled()) {
-    throw new Error("[restore] Remote backup is disabled.");
+    throw new Error('[restore] Remote backup is disabled.');
   }
   if (!supabase) return [];
 
@@ -303,9 +285,9 @@ async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
     const to = from + PAGE_SIZE - 1;
     const result = await supabase
       .from(entity)
-      .select("*")
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
+      .select('*')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, to);
 
     if (result.error) {
@@ -330,16 +312,14 @@ export async function getRestorePreview(): Promise<RestorePreview> {
   const [db, localCounts, entityStatuses] = await Promise.all([
     getDatabase(),
     getLocalSyncBackedCounts(),
-    remoteEnabled
-      ? getRemoteEntityStatuses()
-      : Promise.resolve(buildUnavailableEntityStatuses()),
+    remoteEnabled ? getRemoteEntityStatuses() : Promise.resolve(buildUnavailableEntityStatuses()),
   ]);
 
   const remoteAvailable =
     remoteEnabled &&
     RESTORE_SCOPED_ENTITIES.some((entity) => {
       const status = entityStatuses[entity];
-      return status.remoteState === "available" && (status.remoteRowCount ?? 0) > 0;
+      return status.remoteState === 'available' && (status.remoteRowCount ?? 0) > 0;
     });
   const freshnessSignature = computeFreshnessSignature(entityStatuses);
   const dismissedSignature =
@@ -356,9 +336,7 @@ export async function getRestorePreview(): Promise<RestorePreview> {
     freshnessSignature,
     dismissedForCurrentBackup,
     startupPromptEligible:
-      remoteAvailable &&
-      eligibility.kind === "empty_device" &&
-      !dismissedForCurrentBackup,
+      remoteAvailable && eligibility.kind === 'empty_device' && !dismissedForCurrentBackup,
     eligibility,
     entityStatuses,
     warnings: buildWarnings(entityStatuses),
@@ -372,25 +350,21 @@ export async function dismissCurrentRestorePrompt(
   if (!freshnessSignature) return;
 
   const db = await getDatabase();
-  await setAppMetaText(
-    db,
-    appMetaKeys.restorePromptDismissedSignature,
-    freshnessSignature,
-  );
+  await setAppMetaText(db, appMetaKeys.restorePromptDismissedSignature, freshnessSignature);
 }
 
 export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult> {
   if (!isRemoteEnabled()) {
     return {
-      status: "blocked",
+      status: 'blocked',
       preview: await getRestorePreview(),
     };
   }
 
   const preview = await getRestorePreview();
-  if (preview.eligibility.kind !== "empty_device") {
+  if (preview.eligibility.kind !== 'empty_device') {
     return {
-      status: "blocked",
+      status: 'blocked',
       preview,
     };
   }
@@ -398,15 +372,15 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   const freshnessSignature = preview.freshnessSignature;
   if (!freshnessSignature) {
     return {
-      status: "blocked",
+      status: 'blocked',
       preview,
     };
   }
 
   const [todos, habits, calorieEntries] = await Promise.all([
-    fetchRemoteRows("todos"),
-    fetchRemoteRows("habits"),
-    fetchRemoteRows("calorie_entries"),
+    fetchRemoteRows('todos'),
+    fetchRemoteRows('habits'),
+    fetchRemoteRows('calorie_entries'),
   ]);
 
   const db = await getDatabase();
@@ -422,7 +396,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   });
 
   return {
-    status: "restored",
+    status: 'restored',
     restoredAt,
     freshnessSignature,
     importedCounts: {
