@@ -31,6 +31,7 @@ describe('android notification channel (COR-007)', () => {
       scheduleNotificationAsync: vi.fn(),
       cancelScheduledNotificationAsync: vi.fn(),
       AndroidImportance: { HIGH: 5 },
+      PermissionStatus: { GRANTED: 'granted' },
       SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval' },
     }));
 

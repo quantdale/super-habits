@@ -1,8 +1,8 @@
-import type * as SQLite from "expo-sqlite";
+import type * as SQLite from 'expo-sqlite';
 
-export type AppMetaOwner = "system" | "auth" | "calories" | "pomodoro" | "sync";
+export type AppMetaOwner = 'system' | 'auth' | 'calories' | 'pomodoro' | 'sync';
 
-type AppMetaStorage = "text" | "json";
+type AppMetaStorage = 'text' | 'json';
 
 type AppMetaKeyDefinition<TStorage extends AppMetaStorage> = {
   key: string;
@@ -10,31 +10,28 @@ type AppMetaKeyDefinition<TStorage extends AppMetaStorage> = {
   storage: TStorage;
 };
 
-type AppMetaTextKey = AppMetaKeyDefinition<"text">;
-type AppMetaJsonKey = AppMetaKeyDefinition<"json">;
+type AppMetaTextKey = AppMetaKeyDefinition<'text'>;
+type AppMetaJsonKey = AppMetaKeyDefinition<'json'>;
 
 function defineTextKey(key: string, owner: AppMetaOwner): AppMetaTextKey {
-  return { key, owner, storage: "text" };
+  return { key, owner, storage: 'text' };
 }
 
 function defineJsonKey(key: string, owner: AppMetaOwner): AppMetaJsonKey {
-  return { key, owner, storage: "json" };
+  return { key, owner, storage: 'json' };
 }
 
 // Central registry for all known app_meta keys in active runtime use.
 export const appMetaKeys = {
-  dbSchemaVersion: defineTextKey("db_schema_version", "system"),
-  dateKeyFormat: defineTextKey("date_key_format", "system"),
-  dateKeyCutover: defineTextKey("date_key_cutover", "system"),
-  guestProfile: defineJsonKey("guest_profile", "auth"),
-  restorePromptDismissedSignature: defineTextKey(
-    "restore_prompt_dismissed_signature",
-    "sync",
-  ),
-  lastRestoreSignature: defineTextKey("last_restore_signature", "sync"),
-  lastRestoreAt: defineTextKey("last_restore_at", "sync"),
-  calorieGoal: defineJsonKey("calorie_goal", "calories"),
-  pomodoroSettings: defineJsonKey("pomodoro_settings", "pomodoro"),
+  dbSchemaVersion: defineTextKey('db_schema_version', 'system'),
+  dateKeyFormat: defineTextKey('date_key_format', 'system'),
+  dateKeyCutover: defineTextKey('date_key_cutover', 'system'),
+  guestProfile: defineJsonKey('guest_profile', 'auth'),
+  restorePromptDismissedSignature: defineTextKey('restore_prompt_dismissed_signature', 'sync'),
+  lastRestoreSignature: defineTextKey('last_restore_signature', 'sync'),
+  lastRestoreAt: defineTextKey('last_restore_at', 'sync'),
+  calorieGoal: defineJsonKey('calorie_goal', 'calories'),
+  pomodoroSettings: defineJsonKey('pomodoro_settings', 'pomodoro'),
 } as const;
 
 export async function getAppMetaText(
@@ -42,7 +39,7 @@ export async function getAppMetaText(
   metaKey: AppMetaTextKey | AppMetaJsonKey,
 ): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM app_meta WHERE key = ?",
+    'SELECT value FROM app_meta WHERE key = ?',
     [metaKey.key],
   );
   return row?.value ?? null;
@@ -53,7 +50,7 @@ export async function setAppMetaText(
   metaKey: AppMetaTextKey | AppMetaJsonKey,
   value: string,
 ): Promise<void> {
-  await db.runAsync("INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)", [
+  await db.runAsync('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [
     metaKey.key,
     value,
   ]);

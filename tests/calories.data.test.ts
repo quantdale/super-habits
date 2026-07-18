@@ -1,28 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock("@/core/db/client", () => ({
-  getDatabase: vi.fn(),
-}));
-
-vi.mock("@/core/sync/sync.engine", () => ({
-  syncEngine: {
-    enqueue: vi.fn(),
-  },
-}));
-
-vi.mock("@/lib/id", () => ({
-  createId: vi.fn(),
-}));
-
-vi.mock("@/lib/time", () => ({
-  nowIso: vi.fn(),
-  toDateKey: vi.fn(),
-}));
-
-import { getDatabase } from "@/core/db/client";
-import { syncEngine } from "@/core/sync/sync.engine";
-import { createId } from "@/lib/id";
-import { nowIso, toDateKey } from "@/lib/time";
+import { getDatabase } from '@/core/db/client';
+import { syncEngine } from '@/core/sync/sync.engine';
+import { createId } from '@/lib/id';
+import { nowIso, toDateKey } from '@/lib/time';
 import {
   addCalorieEntry,
   deleteCalorieEntry,
@@ -30,7 +11,26 @@ import {
   setCalorieGoal,
   updateCalorieEntry,
   upsertSavedMeal,
-} from "@/features/calories/calories.data";
+} from '@/features/calories/calories.data';
+
+vi.mock('@/core/db/client', () => ({
+  getDatabase: vi.fn(),
+}));
+
+vi.mock('@/core/sync/sync.engine', () => ({
+  syncEngine: {
+    enqueue: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/id', () => ({
+  createId: vi.fn(),
+}));
+
+vi.mock('@/lib/time', () => ({
+  nowIso: vi.fn(),
+  toDateKey: vi.fn(),
+}));
 
 const db = {
   runAsync: vi.fn(),
@@ -38,149 +38,137 @@ const db = {
   getAllAsync: vi.fn(),
 };
 
-describe("calories.data", () => {
+describe('calories.data', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getDatabase).mockResolvedValue(db as never);
-    vi.mocked(nowIso).mockReturnValue("2026-04-06T10:00:00.000Z");
-    vi.mocked(toDateKey).mockReturnValue("2026-04-06");
+    vi.mocked(nowIso).mockReturnValue('2026-04-06T10:00:00.000Z');
+    vi.mocked(toDateKey).mockReturnValue('2026-04-06');
   });
 
-  it("addCalorieEntry inserts the entry, saves the meal, and enqueues create", async () => {
-    vi.mocked(createId)
-      .mockReturnValueOnce("cal_1")
-      .mockReturnValueOnce("smeal_1");
+  it('addCalorieEntry inserts the entry, saves the meal, and enqueues create', async () => {
+    vi.mocked(createId).mockReturnValueOnce('cal_1').mockReturnValueOnce('smeal_1');
     db.getFirstAsync.mockResolvedValueOnce(null);
 
     await addCalorieEntry({
-      foodName: "Chicken breast",
+      foodName: 'Chicken breast',
       calories: 220,
       protein: 40,
       carbs: 0,
       fats: 5,
       fiber: 0,
-      mealType: "lunch",
+      mealType: 'lunch',
     });
 
     expect(db.runAsync).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining("INSERT INTO calorie_entries"),
+      expect.stringContaining('INSERT INTO calorie_entries'),
       [
-        "cal_1",
-        "Chicken breast",
+        'cal_1',
+        'Chicken breast',
         220,
         40,
         0,
         5,
         0,
-        "lunch",
-        "2026-04-06",
-        "2026-04-06T10:00:00.000Z",
-        "2026-04-06T10:00:00.000Z",
+        'lunch',
+        '2026-04-06',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
       ],
     );
     expect(db.runAsync).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("INSERT INTO saved_meals"),
+      expect.stringContaining('INSERT INTO saved_meals'),
       [
-        "smeal_1",
-        "Chicken breast",
+        'smeal_1',
+        'Chicken breast',
         220,
         40,
         0,
         5,
         0,
-        "lunch",
-        "2026-04-06T10:00:00.000Z",
-        "2026-04-06T10:00:00.000Z",
+        'lunch',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
       ],
     );
     expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: "calorie_entries",
-      id: "cal_1",
-      updatedAt: "2026-04-06T10:00:00.000Z",
-      operation: "create",
+      entity: 'calorie_entries',
+      id: 'cal_1',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'create',
     });
   });
 
-  it("updateCalorieEntry recalculates calories, updates saved meals, and enqueues update", async () => {
-    vi.mocked(createId).mockReturnValueOnce("smeal_2");
+  it('updateCalorieEntry recalculates calories, updates saved meals, and enqueues update', async () => {
+    vi.mocked(createId).mockReturnValueOnce('smeal_2');
     db.getFirstAsync.mockResolvedValueOnce(null);
 
-    await updateCalorieEntry("cal_1", {
-      foodName: "Protein oats",
+    await updateCalorieEntry('cal_1', {
+      foodName: 'Protein oats',
       protein: 30,
       carbs: 40,
       fats: 10,
       fiber: 5,
-      mealType: "breakfast",
+      mealType: 'breakfast',
     });
 
     expect(db.runAsync).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining("UPDATE calorie_entries SET"),
-      [
-        "Protein oats",
-        360,
-        30,
-        40,
-        10,
-        5,
-        "breakfast",
-        "2026-04-06T10:00:00.000Z",
-        "cal_1",
-      ],
+      expect.stringContaining('UPDATE calorie_entries SET'),
+      ['Protein oats', 360, 30, 40, 10, 5, 'breakfast', '2026-04-06T10:00:00.000Z', 'cal_1'],
     );
     expect(db.runAsync).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("INSERT INTO saved_meals"),
+      expect.stringContaining('INSERT INTO saved_meals'),
       [
-        "smeal_2",
-        "Protein oats",
+        'smeal_2',
+        'Protein oats',
         360,
         30,
         40,
         10,
         5,
-        "breakfast",
-        "2026-04-06T10:00:00.000Z",
-        "2026-04-06T10:00:00.000Z",
+        'breakfast',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
       ],
     );
     expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: "calorie_entries",
-      id: "cal_1",
-      updatedAt: "2026-04-06T10:00:00.000Z",
-      operation: "update",
+      entity: 'calorie_entries',
+      id: 'cal_1',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'update',
     });
   });
 
-  it("deleteCalorieEntry soft-deletes the row and enqueues delete", async () => {
-    await deleteCalorieEntry("cal_9");
+  it('deleteCalorieEntry soft-deletes the row and enqueues delete', async () => {
+    await deleteCalorieEntry('cal_9');
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      "UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?",
-      ["2026-04-06T10:00:00.000Z", "2026-04-06T10:00:00.000Z", "cal_9"],
+      'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?',
+      ['2026-04-06T10:00:00.000Z', '2026-04-06T10:00:00.000Z', 'cal_9'],
     );
     expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: "calorie_entries",
-      id: "cal_9",
-      updatedAt: "2026-04-06T10:00:00.000Z",
-      operation: "delete",
+      entity: 'calorie_entries',
+      id: 'cal_9',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'delete',
     });
   });
 
-  it("upsertSavedMeal issues a single atomic case-insensitive upsert", async () => {
-    vi.mocked(createId).mockReturnValue("smeal_new");
+  it('upsertSavedMeal issues a single atomic case-insensitive upsert', async () => {
+    vi.mocked(createId).mockReturnValue('smeal_new');
 
     await upsertSavedMeal({
-      foodName: "Protein oats",
+      foodName: 'Protein oats',
       calories: 360,
       protein: 30,
       carbs: 40,
       fats: 10,
       fiber: 5,
-      mealType: "breakfast",
+      mealType: 'breakfast',
     });
 
     // COR-001: one INSERT ... ON CONFLICT statement instead of the old
@@ -188,32 +176,32 @@ describe("calories.data", () => {
     expect(db.getFirstAsync).not.toHaveBeenCalled();
     expect(db.runAsync).toHaveBeenCalledTimes(1);
     const [sql, args] = db.runAsync.mock.calls[0];
-    expect(sql).toContain("INSERT INTO saved_meals");
-    expect(sql).toContain("ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET");
-    expect(sql).toContain("use_count    = use_count + 1");
+    expect(sql).toContain('INSERT INTO saved_meals');
+    expect(sql).toContain('ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET');
+    expect(sql).toContain('use_count    = use_count + 1');
     expect(args).toEqual([
-      "smeal_new",
-      "Protein oats",
+      'smeal_new',
+      'Protein oats',
       360,
       30,
       40,
       10,
       5,
-      "breakfast",
-      "2026-04-06T10:00:00.000Z",
-      "2026-04-06T10:00:00.000Z",
+      'breakfast',
+      '2026-04-06T10:00:00.000Z',
+      '2026-04-06T10:00:00.000Z',
     ]);
   });
 
-  it("upsertSavedMeal returns early for blank names", async () => {
+  it('upsertSavedMeal returns early for blank names', async () => {
     await upsertSavedMeal({
-      foodName: "   ",
+      foodName: '   ',
       calories: 100,
       protein: 0,
       carbs: 0,
       fats: 0,
       fiber: 0,
-      mealType: "snack",
+      mealType: 'snack',
     });
 
     expect(getDatabase).not.toHaveBeenCalled();
@@ -221,9 +209,9 @@ describe("calories.data", () => {
     expect(db.runAsync).not.toHaveBeenCalled();
   });
 
-  it("getCalorieGoal falls back to the default goal when the row is missing or invalid", async () => {
+  it('getCalorieGoal falls back to the default goal when the row is missing or invalid', async () => {
     db.getFirstAsync.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      value: "{not valid json}",
+      value: '{not valid json}',
     });
 
     await expect(getCalorieGoal()).resolves.toEqual({
@@ -240,7 +228,7 @@ describe("calories.data", () => {
     });
   });
 
-  it("setCalorieGoal stores the goal through app_meta JSON serialization", async () => {
+  it('setCalorieGoal stores the goal through app_meta JSON serialization', async () => {
     await setCalorieGoal({
       calories: 2300,
       protein: 180,
@@ -249,9 +237,9 @@ describe("calories.data", () => {
     });
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
+      'INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)',
       [
-        "calorie_goal",
+        'calorie_goal',
         JSON.stringify({
           calories: 2300,
           protein: 180,

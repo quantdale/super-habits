@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import { Text, View } from "react-native";
-import { Card } from "@/core/ui/Card";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import type { ReactNode } from 'react';
+import { Text, View } from 'react-native';
+import { Card } from '@/core/ui/Card';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type EmptyStateCardProps = {
   accentColor: string;

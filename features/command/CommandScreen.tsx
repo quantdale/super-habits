@@ -1,21 +1,25 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link, type Href, useFocusEffect, useRouter } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { Screen } from "@/core/ui/Screen";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { Card } from "@/core/ui/Card";
-import { Button } from "@/core/ui/Button";
-import { PillChip } from "@/core/ui/PillChip";
-import { TextField } from "@/core/ui/TextField";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { toDateKey } from "@/lib/time";
-import { executeDraftAction } from "./command.executor";
-import { commandParser } from "./commandParser";
-import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from "./commandConfig";
-import { getAiCommandInternalRolloutPreference } from "./commandInternalRollout";
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { Link, type Href, useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable, Text, View } from 'react-native';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { Screen } from '@/core/ui/Screen';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
+import { PillChip } from '@/core/ui/PillChip';
+import { TextField } from '@/core/ui/TextField';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { toDateKey } from '@/lib/time';
+import { executeDraftAction } from './command.executor';
+import { commandParser } from './commandParser';
+import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from './commandConfig';
+import { getAiCommandInternalRolloutPreference } from './commandInternalRollout';
+import {
+  type CommandCenterLaunchContext,
+  getCommandCenterContextCopy,
+} from './commandCenterConfig';
 import type {
   CommandExecutionResult,
   CommandParseObservation,
@@ -24,63 +28,136 @@ import type {
   DraftCreateTodo,
   DraftMissingField,
   ParseCommandResult,
-} from "./types";
-import { COMMAND_EXPERIMENT_ENABLED } from "./types";
+} from './types';
+import { COMMAND_EXPERIMENT_ENABLED } from './types';
 
-const OVERVIEW_HREF = "/(tabs)/overview" as Href;
-const TODOS_HREF = "/(tabs)/todos" as Href;
-const HABITS_HREF = "/(tabs)/habits" as Href;
-const COMMAND_ACCENT = "#475569";
-const TODO_PRIORITIES: Array<{ value: DraftCreateTodo["fields"]["priority"]; label: string }> = [
-  { value: "urgent", label: "Urgent" },
-  { value: "normal", label: "Normal" },
-  { value: "low", label: "Low" },
+const OVERVIEW_HREF = '/(tabs)/overview' as Href;
+const TODOS_HREF = '/(tabs)/todos' as Href;
+const HABITS_HREF = '/(tabs)/habits' as Href;
+const COMMAND_ACCENT = '#475569';
+const TODO_PRIORITIES: { value: DraftCreateTodo['fields']['priority']; label: string }[] = [
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'low', label: 'Low' },
 ];
-const HABIT_CATEGORIES: Array<{ value: DraftCreateHabit["fields"]["category"]; label: string }> = [
-  { value: "anytime", label: "Anytime" },
-  { value: "morning", label: "Morning" },
-  { value: "afternoon", label: "Afternoon" },
-  { value: "evening", label: "Evening" },
+const HABIT_CATEGORIES: { value: DraftCreateHabit['fields']['category']; label: string }[] = [
+  { value: 'anytime', label: 'Anytime' },
+  { value: 'morning', label: 'Morning' },
+  { value: 'afternoon', label: 'Afternoon' },
+  { value: 'evening', label: 'Evening' },
 ];
+
+type CommandScreenPresentation = 'page' | 'overlay';
+
+type CommandScreenProps = {
+  presentation?: CommandScreenPresentation;
+  launchContext?: CommandCenterLaunchContext | null;
+  onRequestClose?: () => void;
+};
 
 function getParserContext() {
-  if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {
-    return { locale: "en-US", timeZone: "UTC" };
+  if (typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') {
+    return { locale: 'en-US', timeZone: 'UTC' };
   }
 
   const options = Intl.DateTimeFormat().resolvedOptions();
   return {
-    locale: options.locale ?? "en-US",
-    timeZone: options.timeZone ?? "UTC",
+    locale: options.locale ?? 'en-US',
+    timeZone: options.timeZone ?? 'UTC',
   };
 }
 
 function PreviewSectionTitle({ children }: { children: string }) {
-  return <Text className="text-sm font-semibold text-slate-900">{children}</Text>;
+  const { tokens } = useAppTheme();
+  return (
+    <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+      {children}
+    </Text>
+  );
 }
 
 function PreviewInfoRow({ label, value }: { label: string; value: string }) {
+  const { tokens } = useAppTheme();
   return (
-    <View className="flex-row items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-      <Text className="text-sm font-medium text-slate-500">{label}</Text>
-      <Text className="flex-1 text-right text-sm text-slate-900">{value}</Text>
+    <View
+      className="flex-row items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+    >
+      <Text className="text-sm font-medium" style={{ color: tokens.textMuted }}>
+        {label}
+      </Text>
+      <Text className="flex-1 text-right text-sm" style={{ color: tokens.text }}>
+        {value}
+      </Text>
     </View>
   );
 }
 
 function PreviewWarning({ message }: { message: string }) {
+  const { tokens } = useAppTheme();
   return (
-    <View className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-      <Text className="text-sm text-amber-800">{message}</Text>
+    <View
+      className="rounded-xl border px-3 py-2.5"
+      style={{ borderColor: tokens.warningBorder, backgroundColor: tokens.warningBackground }}
+    >
+      <Text className="text-sm" style={{ color: tokens.warningText }}>
+        {message}
+      </Text>
     </View>
   );
 }
 
 function PreviewMissingField({ message }: { message: string }) {
+  const { tokens } = useAppTheme();
   return (
-    <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-      <Text className="text-sm text-slate-600">{message}</Text>
+    <View
+      className="rounded-xl border px-3 py-2.5"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+    >
+      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+        {message}
+      </Text>
     </View>
+  );
+}
+
+function CommandSection({
+  children,
+  presentation,
+  className,
+}: {
+  children: ReactNode;
+  presentation: CommandScreenPresentation;
+  className?: string;
+}) {
+  if (presentation === 'page') {
+    return <ScreenSection className={className}>{children}</ScreenSection>;
+  }
+
+  return <View className={className}>{children}</View>;
+}
+
+function LaunchContextCard({ launchContext }: { launchContext: CommandCenterLaunchContext }) {
+  const { tokens } = useAppTheme();
+  const contextCopy = getCommandCenterContextCopy(launchContext);
+
+  if (!contextCopy) return null;
+
+  return (
+    <Card accentColor={contextCopy.accentColor} className="mb-0">
+      <Text
+        className="text-xs font-semibold uppercase tracking-[1px]"
+        style={{ color: tokens.textMuted }}
+      >
+        Current section
+      </Text>
+      <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
+        {contextCopy.sectionLabel}
+      </Text>
+      <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+        {contextCopy.helperCopy}
+      </Text>
+    </Card>
   );
 }
 
@@ -96,22 +173,22 @@ function InternalMetadataCard({ observation }: { observation: CommandParseObserv
       <View className="gap-3">
         <PreviewInfoRow label="Effective path" value={observation.effectivePath} />
         <PreviewInfoRow label="Outcome" value={observation.outcome} />
-        <PreviewInfoRow label="Draft status" value={observation.draftStatus ?? "n/a"} />
+        <PreviewInfoRow label="Draft status" value={observation.draftStatus ?? 'n/a'} />
         <PreviewInfoRow
           label="Latency"
           value={`${observation.latencyMs} ms (${observation.latencyBucket})`}
         />
-        <PreviewInfoRow label="Reason code" value={observation.reasonCode ?? "none"} />
+        <PreviewInfoRow label="Reason code" value={observation.reasonCode ?? 'none'} />
         <PreviewInfoRow
           label="Warning codes"
-          value={observation.warningCodes.length > 0 ? observation.warningCodes.join(", ") : "none"}
+          value={observation.warningCodes.length > 0 ? observation.warningCodes.join(', ') : 'none'}
         />
         <PreviewInfoRow
           label="Missing fields"
           value={
             observation.missingFieldNames.length > 0
-              ? observation.missingFieldNames.join(", ")
-              : "none"
+              ? observation.missingFieldNames.join(', ')
+              : 'none'
           }
         />
       </View>
@@ -126,29 +203,29 @@ function getTomorrowDateKey(base = new Date()): string {
 }
 
 function cloneDraft(draft: DraftAiAction): DraftAiAction {
-  return draft.kind === "create_todo"
+  return draft.kind === 'create_todo'
     ? { ...draft, fields: { ...draft.fields } }
     : { ...draft, fields: { ...draft.fields } };
 }
 
 function getInlineRequiredMissingFields(draft: DraftAiAction): DraftMissingField[] {
-  if (draft.kind === "create_todo") {
+  if (draft.kind === 'create_todo') {
     return draft.fields.title?.trim()
       ? []
-      : [{ field: "title", message: "Add the task title before saving." }];
+      : [{ field: 'title', message: 'Add the task title before saving.' }];
   }
 
   return draft.fields.name?.trim()
     ? []
-    : [{ field: "name", message: "Add the habit name before saving." }];
+    : [{ field: 'name', message: 'Add the habit name before saving.' }];
 }
 
 function isFieldStillMissing(draft: DraftAiAction, field: string): boolean {
-  if (draft.kind === "create_todo" && field === "title") {
+  if (draft.kind === 'create_todo' && field === 'title') {
     return !draft.fields.title?.trim();
   }
 
-  if (draft.kind === "create_habit" && field === "name") {
+  if (draft.kind === 'create_habit' && field === 'name') {
     return !draft.fields.name?.trim();
   }
 
@@ -175,6 +252,7 @@ function DraftPreview({
   onEditHabitCategory,
   onConfirm,
   onReset,
+  onNavigateToDestination,
 }: {
   parsedDraft: DraftAiAction;
   editableDraft: DraftAiAction;
@@ -182,23 +260,25 @@ function DraftPreview({
   canConfirm: boolean;
   busy: boolean;
   executionError: string | null;
-  successResult: Extract<CommandExecutionResult, { outcome: "success" }> | null;
+  successResult: Extract<CommandExecutionResult, { outcome: 'success' }> | null;
   onEditTodoTitle: (value: string) => void;
   onEditTodoNotes: (value: string) => void;
   onEditTodoDueDate: (value: string) => void;
   onSetTodoDueDateToday: () => void;
   onSetTodoDueDateTomorrow: () => void;
   onClearTodoDueDate: () => void;
-  onEditTodoPriority: (value: DraftCreateTodo["fields"]["priority"]) => void;
+  onEditTodoPriority: (value: DraftCreateTodo['fields']['priority']) => void;
   onEditHabitName: (value: string) => void;
   onEditHabitTargetPerDay: (value: string) => void;
-  onEditHabitCategory: (value: DraftCreateHabit["fields"]["category"]) => void;
+  onEditHabitCategory: (value: DraftCreateHabit['fields']['category']) => void;
   onConfirm: () => void;
   onReset: () => void;
+  onNavigateToDestination?: (href: Href) => void;
 }) {
+  const { tokens } = useAppTheme();
   const router = useRouter();
-  const destinationHref = editableDraft.kind === "create_todo" ? TODOS_HREF : HABITS_HREF;
-  const destinationLabel = editableDraft.kind === "create_todo" ? "Go to Todos" : "Go to Habits";
+  const destinationHref = editableDraft.kind === 'create_todo' ? TODOS_HREF : HABITS_HREF;
+  const destinationLabel = editableDraft.kind === 'create_todo' ? 'Go to Todos' : 'Go to Habits';
 
   return (
     <Card
@@ -211,35 +291,35 @@ function DraftPreview({
       <View className="gap-3">
         <PreviewInfoRow
           label="Intent"
-          value={editableDraft.kind === "create_todo" ? "Create todo" : "Create habit"}
+          value={editableDraft.kind === 'create_todo' ? 'Create todo' : 'Create habit'}
         />
         <PreviewInfoRow label="Parser status" value={parsedDraft.status} />
-        <PreviewInfoRow label="Ready to save" value={canConfirm ? "yes" : "no"} />
+        <PreviewInfoRow label="Ready to save" value={canConfirm ? 'yes' : 'no'} />
         <PreviewInfoRow
           label="Parser"
           value={`${parsedDraft.parserKind} ${parsedDraft.parserVersion}`}
         />
 
-        {editableDraft.kind === "create_todo" ? (
+        {editableDraft.kind === 'create_todo' ? (
           <>
             <PreviewSectionTitle>Todo fields</PreviewSectionTitle>
             <TextField
               label="Title"
-              value={editableDraft.fields.title ?? ""}
+              value={editableDraft.fields.title ?? ''}
               onChangeText={onEditTodoTitle}
               placeholder="Task title"
               nativeID="command-edit-todo-title"
             />
             <TextField
               label="Notes"
-              value={editableDraft.fields.notes ?? ""}
+              value={editableDraft.fields.notes ?? ''}
               onChangeText={onEditTodoNotes}
               placeholder="Optional notes"
               nativeID="command-edit-todo-notes"
             />
             <TextField
               label="Due date (YYYY-MM-DD)"
-              value={editableDraft.fields.dueDate ?? ""}
+              value={editableDraft.fields.dueDate ?? ''}
               onChangeText={onEditTodoDueDate}
               placeholder="YYYY-MM-DD"
               nativeID="command-edit-todo-due-date"
@@ -273,7 +353,7 @@ function DraftPreview({
             <PreviewSectionTitle>Habit fields</PreviewSectionTitle>
             <TextField
               label="Name"
-              value={editableDraft.fields.name ?? ""}
+              value={editableDraft.fields.name ?? ''}
               onChangeText={onEditHabitName}
               placeholder="Habit name"
               nativeID="command-edit-habit-name"
@@ -283,7 +363,7 @@ function DraftPreview({
               value={
                 Number.isFinite(editableDraft.fields.targetPerDay)
                   ? String(editableDraft.fields.targetPerDay)
-                  : ""
+                  : ''
               }
               onChangeText={onEditHabitTargetPerDay}
               placeholder="1"
@@ -304,7 +384,7 @@ function DraftPreview({
             </View>
             <PreviewInfoRow
               label="Defaults on save"
-              value={`${editableDraft.fields.icon ?? "default icon"}, ${editableDraft.fields.color ?? "default color"}`}
+              value={`${editableDraft.fields.icon ?? 'default icon'}, ${editableDraft.fields.color ?? 'default color'}`}
             />
           </>
         )}
@@ -313,7 +393,10 @@ function DraftPreview({
           <>
             <PreviewSectionTitle>Warnings</PreviewSectionTitle>
             {parsedDraft.warnings.map((warning) => (
-              <PreviewWarning key={`${warning.code}:${warning.message}`} message={warning.message} />
+              <PreviewWarning
+                key={`${warning.code}:${warning.message}`}
+                message={warning.message}
+              />
             ))}
           </>
         ) : null}
@@ -328,7 +411,7 @@ function DraftPreview({
               />
             ))}
             {!canConfirm ? (
-              <Text className="text-sm text-slate-500">
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
                 Fill required fields before saving.
               </Text>
             ) : null}
@@ -338,13 +421,25 @@ function DraftPreview({
         <ValidationError message={executionError} />
 
         {successResult ? (
-          <View className="gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-            <Text className="text-sm font-semibold text-emerald-800">{successResult.message}</Text>
+          <View
+            className="gap-2 rounded-xl border px-3 py-3"
+            style={{ borderColor: tokens.successBorder, backgroundColor: tokens.successBackground }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.successText }}>
+              {successResult.message}
+            </Text>
             <View className="flex-row gap-2">
               <View className="flex-1">
                 <Button
                   label={destinationLabel}
-                  onPress={() => router.push(destinationHref)}
+                  onPress={() => {
+                    if (onNavigateToDestination) {
+                      onNavigateToDestination(destinationHref);
+                      return;
+                    }
+
+                    router.push(destinationHref);
+                  }}
                   color={COMMAND_ACCENT}
                 />
               </View>
@@ -355,13 +450,13 @@ function DraftPreview({
           </View>
         ) : canConfirm ? (
           <Button
-            label={busy ? "Saving..." : "Confirm and save"}
+            label={busy ? 'Saving...' : 'Confirm and save'}
             onPress={onConfirm}
             color={COMMAND_ACCENT}
             disabled={busy}
           />
         ) : (
-          <Text className="text-sm text-slate-500">
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
             Fill required fields before saving.
           </Text>
         )}
@@ -370,14 +465,24 @@ function DraftPreview({
   );
 }
 
-export function CommandScreen() {
+export function CommandScreen({
+  presentation = 'page',
+  launchContext = null,
+  onRequestClose,
+}: CommandScreenProps) {
+  const router = useRouter();
   const { tokens } = useAppTheme();
   const parseConfig = useMemo(() => getAiCommandParseConfig(), []);
   const internalRolloutAvailable = useMemo(
     () => isAiCommandInternalRolloutAvailable(parseConfig),
     [parseConfig],
   );
-  const [rawText, setRawText] = useState("");
+  const contextCopy = getCommandCenterContextCopy(launchContext);
+  const commandPlaceholder = contextCopy?.inputPlaceholder ?? 'Add a todo to call mom tomorrow';
+  const supportedExamples = contextCopy
+    ? [contextCopy.inputPlaceholder, 'Create a habit to drink water every morning']
+    : ['Add a todo to call mom tomorrow', 'Create a habit to drink water every morning'];
+  const [rawText, setRawText] = useState('');
   const [parseResult, setParseResult] = useState<ParseCommandResult | null>(null);
   const [editableDraft, setEditableDraft] = useState<DraftAiAction | null>(null);
   const [parseObservation, setParseObservation] = useState<CommandParseObservation | null>(null);
@@ -385,35 +490,34 @@ export function CommandScreen() {
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-  const [successResult, setSuccessResult] = useState<
-    Extract<CommandExecutionResult, { outcome: "success" }> | null
-  >(null);
+  const [successResult, setSuccessResult] = useState<Extract<
+    CommandExecutionResult,
+    { outcome: 'success' }
+  > | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-      if (!internalRolloutAvailable) {
-        setInternalRolloutEnabledOnDevice(false);
-        return () => {
-          cancelled = true;
-        };
-      }
-
-      void getAiCommandInternalRolloutPreference().then((enabled) => {
-        if (!cancelled) {
-          setInternalRolloutEnabledOnDevice(enabled);
-        }
-      });
-
+    if (!internalRolloutAvailable) {
+      setInternalRolloutEnabledOnDevice(false);
       return () => {
         cancelled = true;
       };
-    }, [internalRolloutAvailable]),
-  );
+    }
+
+    void getAiCommandInternalRolloutPreference().then((enabled) => {
+      if (!cancelled) {
+        setInternalRolloutEnabledOnDevice(enabled);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [internalRolloutAvailable]);
 
   const parsedDraft = useMemo(
-    () => (parseResult?.outcome === "draft" ? parseResult.draft : null),
+    () => (parseResult?.outcome === 'draft' ? parseResult.draft : null),
     [parseResult],
   );
   const visibleMissingFields = useMemo(() => {
@@ -434,7 +538,7 @@ export function CommandScreen() {
   );
 
   const handleReset = () => {
-    setRawText("");
+    setRawText('');
     setParseResult(null);
     setEditableDraft(null);
     setParseObservation(null);
@@ -463,11 +567,11 @@ export function CommandScreen() {
       setParseResult(execution.result);
       setParseObservation(execution.observation);
       setEditableDraft(
-        execution.result.outcome === "draft" ? cloneDraft(execution.result.draft) : null,
+        execution.result.outcome === 'draft' ? cloneDraft(execution.result.draft) : null,
       );
 
       if (internalRolloutAvailable && internalRolloutEnabledOnDevice) {
-        console.debug("[command][internal-rollout]", execution.observation);
+        console.debug('[command][internal-rollout]', execution.observation);
       }
     } finally {
       setIsParsing(false);
@@ -481,7 +585,7 @@ export function CommandScreen() {
     setExecutionError(null);
 
     const result = await executeDraftAction(editableDraft);
-    if (result.outcome === "success") {
+    if (result.outcome === 'success') {
       setSuccessResult(result);
     } else {
       setSuccessResult(null);
@@ -498,7 +602,7 @@ export function CommandScreen() {
       <Screen scroll>
         <ScreenSection>
           <PageHeader
-            title="Quick command"
+            title="Command center"
             subtitle="This experimental screen is currently disabled."
             actions={
               <Link href={OVERVIEW_HREF} asChild>
@@ -520,28 +624,15 @@ export function CommandScreen() {
     );
   }
 
-  return (
-    <Screen scroll>
-      <ScreenSection>
-        <PageHeader
-          title="Quick command"
-          subtitle="Experimental draft entry for a single todo or habit. Review the draft, then confirm before anything is saved."
-          actions={
-            <Link href={OVERVIEW_HREF} asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Back to overview"
-                className="rounded-xl border px-3.5 py-2.5"
-                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-              >
-                <MaterialIcons name="arrow-back" size={18} color={tokens.text} />
-              </Pressable>
-            </Link>
-          }
-        />
-      </ScreenSection>
+  const commandContent = (
+    <>
+      {presentation === 'overlay' && launchContext ? (
+        <CommandSection presentation={presentation} className="mb-4">
+          <LaunchContextCard launchContext={launchContext} />
+        </CommandSection>
+      ) : null}
 
-      <ScreenSection>
+      <CommandSection presentation={presentation}>
         <Card
           variant="header"
           accentColor={COMMAND_ACCENT}
@@ -562,32 +653,36 @@ export function CommandScreen() {
                 setIsParsing(false);
                 setSuccessResult(null);
               }}
-              placeholder="Add a todo to call mom tomorrow"
+              placeholder={commandPlaceholder}
               nativeID="command-input"
             />
 
-            <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <Text className="text-sm font-semibold text-slate-900">Supported examples</Text>
-              <Text className="mt-1 text-sm text-slate-600">
-                Create a habit to drink water every morning
+            <View
+              className="rounded-xl border px-3 py-3"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+            >
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Supported examples
               </Text>
-              <Text className="mt-1 text-sm text-slate-600">
-                Add a todo to call mom tomorrow
-              </Text>
+              {supportedExamples.map((example) => (
+                <Text key={example} className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  {example}
+                </Text>
+              ))}
             </View>
 
             <Button
-              label={isParsing ? "Parsing..." : "Parse command"}
+              label={isParsing ? 'Parsing...' : 'Parse command'}
               onPress={handleParseCommand}
               color={COMMAND_ACCENT}
               disabled={!hasCommandText || isParsing}
             />
           </View>
         </Card>
-      </ScreenSection>
+      </CommandSection>
 
-      {parseResult?.outcome === "unsupported" ? (
-        <ScreenSection className="mb-0">
+      {parseResult?.outcome === 'unsupported' ? (
+        <CommandSection presentation={presentation} className="mb-0">
           <Card
             variant="header"
             accentColor={COMMAND_ACCENT}
@@ -595,13 +690,15 @@ export function CommandScreen() {
             headerSubtitle="Nothing has been saved yet."
             className="mb-0"
           >
-            <Text className="text-sm text-slate-600">{parseResult.reason}</Text>
+            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+              {parseResult.reason}
+            </Text>
           </Card>
-        </ScreenSection>
+        </CommandSection>
       ) : null}
 
-      {parseResult?.outcome === "unavailable" ? (
-        <ScreenSection className="mb-0">
+      {parseResult?.outcome === 'unavailable' ? (
+        <CommandSection presentation={presentation} className="mb-0">
           <Card
             variant="header"
             accentColor={COMMAND_ACCENT}
@@ -610,7 +707,9 @@ export function CommandScreen() {
             className="mb-0"
           >
             <View className="gap-3">
-              <Text className="text-sm text-slate-600">{parseResult.message}</Text>
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                {parseResult.message}
+              </Text>
               <Button
                 label="Try again"
                 onPress={handleParseCommand}
@@ -619,11 +718,11 @@ export function CommandScreen() {
               />
             </View>
           </Card>
-        </ScreenSection>
+        </CommandSection>
       ) : null}
 
       {parsedDraft && editableDraft ? (
-        <ScreenSection className="mb-0">
+        <CommandSection presentation={presentation} className="mb-0">
           <DraftPreview
             parsedDraft={parsedDraft}
             editableDraft={editableDraft}
@@ -634,7 +733,7 @@ export function CommandScreen() {
             successResult={successResult}
             onEditTodoTitle={(value) => {
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
+                current?.kind === 'create_todo'
                   ? { ...current, fields: { ...current.fields, title: value } }
                   : current,
               );
@@ -643,7 +742,7 @@ export function CommandScreen() {
             }}
             onEditTodoNotes={(value) => {
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
+                current?.kind === 'create_todo'
                   ? { ...current, fields: { ...current.fields, notes: value } }
                   : current,
               );
@@ -653,8 +752,14 @@ export function CommandScreen() {
             onEditTodoDueDate={(value) => {
               const trimmed = value.trim();
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
-                  ? { ...current, fields: { ...current.fields, dueDate: trimmed.length > 0 ? trimmed : null } }
+                current?.kind === 'create_todo'
+                  ? {
+                      ...current,
+                      fields: {
+                        ...current.fields,
+                        dueDate: trimmed.length > 0 ? trimmed : null,
+                      },
+                    }
                   : current,
               );
               setExecutionError(null);
@@ -662,7 +767,7 @@ export function CommandScreen() {
             }}
             onSetTodoDueDateToday={() => {
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
+                current?.kind === 'create_todo'
                   ? { ...current, fields: { ...current.fields, dueDate: toDateKey(new Date()) } }
                   : current,
               );
@@ -671,7 +776,7 @@ export function CommandScreen() {
             }}
             onSetTodoDueDateTomorrow={() => {
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
+                current?.kind === 'create_todo'
                   ? { ...current, fields: { ...current.fields, dueDate: getTomorrowDateKey() } }
                   : current,
               );
@@ -680,7 +785,7 @@ export function CommandScreen() {
             }}
             onClearTodoDueDate={() => {
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
+                current?.kind === 'create_todo'
                   ? { ...current, fields: { ...current.fields, dueDate: null } }
                   : current,
               );
@@ -689,7 +794,7 @@ export function CommandScreen() {
             }}
             onEditTodoPriority={(value) => {
               setEditableDraft((current) =>
-                current?.kind === "create_todo"
+                current?.kind === 'create_todo'
                   ? { ...current, fields: { ...current.fields, priority: value } }
                   : current,
               );
@@ -698,7 +803,7 @@ export function CommandScreen() {
             }}
             onEditHabitName={(value) => {
               setEditableDraft((current) =>
-                current?.kind === "create_habit"
+                current?.kind === 'create_habit'
                   ? { ...current, fields: { ...current.fields, name: value } }
                   : current,
               );
@@ -709,7 +814,7 @@ export function CommandScreen() {
               const nextValue = value.trim();
               const parsedValue = nextValue.length > 0 ? Number(nextValue) : Number.NaN;
               setEditableDraft((current) =>
-                current?.kind === "create_habit"
+                current?.kind === 'create_habit'
                   ? { ...current, fields: { ...current.fields, targetPerDay: parsedValue } }
                   : current,
               );
@@ -718,7 +823,7 @@ export function CommandScreen() {
             }}
             onEditHabitCategory={(value) => {
               setEditableDraft((current) =>
-                current?.kind === "create_habit"
+                current?.kind === 'create_habit'
                   ? { ...current, fields: { ...current.fields, category: value } }
                   : current,
               );
@@ -727,15 +832,47 @@ export function CommandScreen() {
             }}
             onConfirm={handleConfirm}
             onReset={handleReset}
+            onNavigateToDestination={(href) => {
+              router.push(href);
+              onRequestClose?.();
+            }}
           />
-        </ScreenSection>
+        </CommandSection>
       ) : null}
 
       {internalRolloutAvailable && internalRolloutEnabledOnDevice && parseObservation ? (
-        <ScreenSection className="mb-0">
+        <CommandSection presentation={presentation} className="mb-0">
           <InternalMetadataCard observation={parseObservation} />
-        </ScreenSection>
+        </CommandSection>
       ) : null}
+    </>
+  );
+
+  if (presentation === 'overlay') {
+    return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
+  }
+
+  return (
+    <Screen scroll>
+      <ScreenSection>
+        <PageHeader
+          title="Command center"
+          subtitle="Internal route for the global command center. Review the draft, then confirm before anything is saved."
+          actions={
+            <Link href={OVERVIEW_HREF} asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Back to overview"
+                className="rounded-xl border px-3.5 py-2.5"
+                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+              >
+                <MaterialIcons name="arrow-back" size={18} color={tokens.text} />
+              </Pressable>
+            </Link>
+          }
+        />
+      </ScreenSection>
+      {commandContent}
     </Screen>
   );
 }

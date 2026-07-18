@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SyncRecord } from "@/core/sync/sync.engine";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SyncRecord } from '@/core/sync/sync.engine';
 
 type AdapterSetupOptions = {
   supabase?: { from: ReturnType<typeof vi.fn> } | null;
@@ -15,14 +15,14 @@ async function setupAdapter(options: AdapterSetupOptions) {
   const upsert = vi.fn().mockResolvedValue({ error: null });
   const from = vi.fn().mockReturnValue({ upsert });
 
-  vi.doMock("@/core/db/client", () => ({
+  vi.doMock('@/core/db/client', () => ({
     getDatabase,
   }));
 
   const supabase = options.supabase === undefined ? { from } : options.supabase;
-  vi.doMock("@/lib/supabase", () => ({ supabase }));
+  vi.doMock('@/lib/supabase', () => ({ supabase }));
 
-  const { SupabaseSyncAdapter } = await import("@/core/sync/supabase.adapter");
+  const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
   return {
     adapter: new SupabaseSyncAdapter(),
     db,
@@ -36,17 +36,17 @@ function record(entity: string, id: string): SyncRecord {
   return {
     entity,
     id,
-    updatedAt: "2026-04-07T12:00:00.000Z",
-    operation: "update",
+    updatedAt: '2026-04-07T12:00:00.000Z',
+    operation: 'update',
   };
 }
 
-describe("SupabaseSyncAdapter", () => {
+describe('SupabaseSyncAdapter', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("returns early for an empty push batch", async () => {
+  it('returns early for an empty push batch', async () => {
     const { adapter, getDatabase } = await setupAdapter({});
 
     await adapter.push([]);
@@ -54,127 +54,129 @@ describe("SupabaseSyncAdapter", () => {
     expect(getDatabase).not.toHaveBeenCalled();
   });
 
-  it("returns early when supabase is unavailable", async () => {
+  it('returns early when supabase is unavailable', async () => {
     const { adapter, getDatabase } = await setupAdapter({
       supabase: null,
     });
 
-    await adapter.push([record("todos", "todo_1")]);
+    await adapter.push([record('todos', 'todo_1')]);
 
     expect(getDatabase).not.toHaveBeenCalled();
   });
 
-  it("throws for unknown entities so the sync engine retains the batch", async () => {
+  it('throws for unknown entities so the sync engine retains the batch', async () => {
     const { adapter, db, from } = await setupAdapter({});
 
-    await expect(adapter.push([record("unknown_table", "row_1")])).rejects.toThrow(
-      "[sync] Unknown entity in queue: unknown_table",
+    await expect(adapter.push([record('unknown_table', 'row_1')])).rejects.toThrow(
+      '[sync] Unknown entity in queue: unknown_table',
     );
 
     expect(db.getAllAsync).not.toHaveBeenCalled();
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("deduplicates IDs per entity when building the SQL query", async () => {
+  it('deduplicates IDs per entity when building the SQL query', async () => {
     const { adapter, db } = await setupAdapter({});
-    db.getAllAsync.mockResolvedValue([{ id: "todo_1" }, { id: "todo_2" }]);
+    db.getAllAsync.mockResolvedValue([{ id: 'todo_1' }, { id: 'todo_2' }]);
 
     await adapter.push([
-      record("todos", "todo_1"),
-      record("todos", "todo_1"),
-      record("todos", "todo_2"),
+      record('todos', 'todo_1'),
+      record('todos', 'todo_1'),
+      record('todos', 'todo_2'),
     ]);
 
     expect(db.getAllAsync).toHaveBeenCalledTimes(1);
     const [sql, ids] = db.getAllAsync.mock.calls[0];
-    expect(sql).toContain("SELECT * FROM todos WHERE id IN (?, ?)");
-    expect(ids).toEqual(["todo_1", "todo_2"]);
+    expect(sql).toContain('SELECT * FROM todos WHERE id IN (?, ?)');
+    expect(ids).toEqual(['todo_1', 'todo_2']);
   });
 
-  it("calls upsert with selected rows and onConflict id", async () => {
+  it('calls upsert with selected rows and onConflict id', async () => {
     const { adapter, db, from, upsert } = await setupAdapter({});
-    const rows = [{ id: "todo_1", title: "Ship tests" }];
+    const rows = [{ id: 'todo_1', title: 'Ship tests' }];
     db.getAllAsync.mockResolvedValue(rows);
 
-    await adapter.push([record("todos", "todo_1")]);
+    await adapter.push([record('todos', 'todo_1')]);
 
-    expect(from).toHaveBeenCalledWith("todos");
-    expect(upsert).toHaveBeenCalledWith(rows, { onConflict: "id" });
+    expect(from).toHaveBeenCalledWith('todos');
+    expect(upsert).toHaveBeenCalledWith(rows, { onConflict: 'id' });
   });
 
-  it("throws when the local SELECT returns no rows for a queued record", async () => {
+  it('throws when the local SELECT returns no rows for a queued record', async () => {
     const { adapter, db, from } = await setupAdapter({});
     db.getAllAsync.mockResolvedValue([]);
 
-    await expect(adapter.push([record("todos", "todo_1")])).rejects.toThrow(
-      "[sync] Missing local rows for todos: todo_1",
+    await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow(
+      '[sync] Missing local rows for todos: todo_1',
     );
 
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("throws when only part of a queued entity batch can be loaded locally", async () => {
+  it('throws when only part of a queued entity batch can be loaded locally', async () => {
     const { adapter, db, from } = await setupAdapter({});
-    db.getAllAsync.mockResolvedValue([{ id: "todo_1", title: "Only one row" }]);
+    db.getAllAsync.mockResolvedValue([{ id: 'todo_1', title: 'Only one row' }]);
 
     await expect(
-      adapter.push([record("todos", "todo_1"), record("todos", "todo_2")]),
-    ).rejects.toThrow("[sync] Missing local rows for todos: todo_2");
+      adapter.push([record('todos', 'todo_1'), record('todos', 'todo_2')]),
+    ).rejects.toThrow('[sync] Missing local rows for todos: todo_2');
 
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("throws Supabase upsert errors so the sync engine can retry the batch", async () => {
-    const upsertError = new Error("timeout");
-    const supabase = { from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: upsertError }) }) };
+  it('throws Supabase upsert errors so the sync engine can retry the batch', async () => {
+    const upsertError = new Error('timeout');
+    const supabase = {
+      from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: upsertError }) }),
+    };
     const { adapter, db } = await setupAdapter({ supabase });
-    db.getAllAsync.mockResolvedValue([{ id: "todo_1" }]);
+    db.getAllAsync.mockResolvedValue([{ id: 'todo_1' }]);
 
-    await expect(adapter.push([record("todos", "todo_1")])).rejects.toThrow(
-      "[sync] Supabase upsert failed for todos: timeout",
+    await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow(
+      '[sync] Supabase upsert failed for todos: timeout',
     );
   });
 
-  it("rethrows transport failures (like network timeout)", async () => {
-    const timeoutError = new Error("network timeout");
-    const supabase = { from: vi.fn().mockReturnValue({ upsert: vi.fn().mockRejectedValue(timeoutError) }) };
+  it('rethrows transport failures (like network timeout)', async () => {
+    const timeoutError = new Error('network timeout');
+    const supabase = {
+      from: vi.fn().mockReturnValue({ upsert: vi.fn().mockRejectedValue(timeoutError) }),
+    };
     const { adapter, db } = await setupAdapter({ supabase });
-    db.getAllAsync.mockResolvedValue([{ id: "habit_1" }]);
+    db.getAllAsync.mockResolvedValue([{ id: 'habit_1' }]);
 
-    await expect(adapter.push([record("habits", "habit_1")])).rejects.toThrow(
-      "network timeout",
-    );
+    await expect(adapter.push([record('habits', 'habit_1')])).rejects.toThrow('network timeout');
   });
 
-  it("rethrows database read failures", async () => {
-    const dbError = new Error("db read failed");
+  it('rethrows database read failures', async () => {
+    const dbError = new Error('db read failed');
     const { adapter, db, from } = await setupAdapter({});
     db.getAllAsync.mockRejectedValue(dbError);
 
-    await expect(adapter.push([record("todos", "todo_1")])).rejects.toThrow(
-      "db read failed",
-    );
+    await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow('db read failed');
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("processes each known entity in the same batch separately", async () => {
-    const supabase = { from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: null }) }) };
+  it('processes each known entity in the same batch separately', async () => {
+    const supabase = {
+      from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: null }) }),
+    };
     const { adapter, db } = await setupAdapter({ supabase });
     db.getAllAsync
-      .mockResolvedValueOnce([{ id: "todo_1" }])
-      .mockResolvedValueOnce([{ id: "cal_1" }]);
+      .mockResolvedValueOnce([{ id: 'todo_1' }])
+      .mockResolvedValueOnce([{ id: 'cal_1' }]);
 
-    await adapter.push([record("todos", "todo_1"), record("calorie_entries", "cal_1")]);
+    await adapter.push([record('todos', 'todo_1'), record('calorie_entries', 'cal_1')]);
 
     expect(db.getAllAsync).toHaveBeenCalledTimes(2);
-    expect(supabase.from).toHaveBeenNthCalledWith(1, "todos");
-    expect(supabase.from).toHaveBeenNthCalledWith(2, "calorie_entries");
+    expect(supabase.from).toHaveBeenNthCalledWith(1, 'todos');
+    expect(supabase.from).toHaveBeenNthCalledWith(2, 'calorie_entries');
   });
 
-  it("pull currently returns an empty array", async () => {
+  it('pull currently returns an empty array', async () => {
     const { adapter } = await setupAdapter({});
 
     await expect(adapter.pull(null)).resolves.toEqual([]);
-    await expect(adapter.pull("2026-04-07T00:00:00.000Z")).resolves.toEqual([]);
+    await expect(adapter.pull('2026-04-07T00:00:00.000Z')).resolves.toEqual([]);
   });
 });

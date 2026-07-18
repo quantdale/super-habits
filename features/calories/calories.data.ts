@@ -1,18 +1,14 @@
-import {
-  appMetaKeys,
-  getAppMetaJsonOrDefault,
-  setAppMetaJson,
-} from "@/core/db/appMeta";
-import { getDatabase } from "@/core/db/client";
-import { CalorieEntry, SavedMeal } from "@/core/db/types";
-import type { LinkedActionEffectAdapterResult } from "@/core/linked-actions/linkedActions.types";
-import { createId } from "@/lib/id";
-import { nowIso, toDateKey } from "@/lib/time";
-import { syncEngine } from "@/core/sync/sync.engine";
-import { kcalFromMacros } from "@/features/calories/calories.domain";
-import type { CalorieGoal, DailySummary } from "@/features/calories/types";
+import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
+import { getDatabase } from '@/core/db/client';
+import { CalorieEntry, SavedMeal } from '@/core/db/types';
+import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
+import { createId } from '@/lib/id';
+import { nowIso, toDateKey } from '@/lib/time';
+import { syncEngine } from '@/core/sync/sync.engine';
+import { kcalFromMacros } from '@/features/calories/calories.domain';
+import type { CalorieGoal, DailySummary } from '@/features/calories/types';
 
-export type { CalorieGoal, DailySummary } from "@/features/calories/types";
+export type { CalorieGoal, DailySummary } from '@/features/calories/types';
 
 export async function getCalorieSummaryByRange(
   startDateKey: string,
@@ -57,7 +53,7 @@ export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {
   const db = await getDatabase();
   return db.getAllAsync<CalorieEntry>(
-    "SELECT * FROM calorie_entries WHERE deleted_at IS NULL AND consumed_on = ? ORDER BY created_at DESC",
+    'SELECT * FROM calorie_entries WHERE deleted_at IS NULL AND consumed_on = ? ORDER BY created_at DESC',
     [dateKey],
   );
 }
@@ -80,15 +76,15 @@ export async function addCalorieEntry(input: {
   carbs?: number;
   fats?: number;
   fiber?: number;
-  mealType: "breakfast" | "lunch" | "dinner" | "snack";
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   consumedOn?: string;
 }): Promise<void> {
-  const id = createId("cal");
+  const id = createId('cal');
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
   const db = await getDatabase();
   await db.runAsync(
-    "INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+    'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
     [
       id,
       input.foodName,
@@ -103,7 +99,7 @@ export async function addCalorieEntry(input: {
       now,
     ],
   );
-  syncEngine.enqueue({ entity: "calorie_entries", id, updatedAt: now, operation: "create" });
+  syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'create' });
   await upsertSavedMeal({
     foodName: input.foodName,
     calories: input.calories,
@@ -123,7 +119,7 @@ export async function updateCalorieEntry(
     carbs: number;
     fats: number;
     fiber: number;
-    mealType: "breakfast" | "lunch" | "dinner" | "snack";
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   },
 ): Promise<void> {
   const db = await getDatabase();
@@ -152,7 +148,7 @@ export async function updateCalorieEntry(
       id,
     ],
   );
-  syncEngine.enqueue({ entity: "calorie_entries", id, updatedAt: now, operation: "update" });
+  syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'update' });
   await upsertSavedMeal({
     foodName: updates.foodName,
     calories,
@@ -197,7 +193,7 @@ export async function upsertSavedMeal(input: {
        use_count    = use_count + 1,
        last_used_at = excluded.last_used_at`,
     [
-      createId("smeal"),
+      createId('smeal'),
       input.foodName,
       input.calories,
       input.protein,
@@ -223,7 +219,7 @@ export async function listRecentSavedMeals(limit: number = 5): Promise<SavedMeal
 
 /** Escape `\`, `%`, `_` for SQLite `LIKE ... ESCAPE '\\'`. */
 function escapeSqliteLikePattern(fragment: string): string {
-  return fragment.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+  return fragment.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 export async function searchSavedMeals(query: string): Promise<SavedMeal[]> {
@@ -252,8 +248,12 @@ export async function deleteSavedMeal(id: string): Promise<void> {
 export async function deleteCalorieEntry(id: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync("UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, id]);
-  syncEngine.enqueue({ entity: "calorie_entries", id, updatedAt: now, operation: "delete" });
+  await db.runAsync('UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?', [
+    now,
+    now,
+    id,
+  ]);
+  syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'delete' });
 }
 
 export async function addCalorieEntryFromLinkedAction(input: {
@@ -264,11 +264,11 @@ export async function addCalorieEntryFromLinkedAction(input: {
   carbs: number;
   fats: number;
   fiber: number;
-  mealType: "breakfast" | "lunch" | "dinner" | "snack";
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   consumedOn: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  const existing = await db.getFirstAsync<Pick<CalorieEntry, "id" | "food_name">>(
+  const existing = await db.getFirstAsync<Pick<CalorieEntry, 'id' | 'food_name'>>(
     `SELECT id, food_name
      FROM calorie_entries
      WHERE id = ?`,
@@ -277,9 +277,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
 
   if (existing) {
     return {
-      status: "applied",
+      status: 'applied',
       targetLabel: existing.food_name,
-      producedEntityType: "calorie_log",
+      producedEntityType: 'calorie_log',
       producedEntityId: existing.id,
     };
   }
@@ -315,10 +315,10 @@ export async function addCalorieEntryFromLinkedAction(input: {
     ],
   );
   syncEngine.enqueue({
-    entity: "calorie_entries",
+    entity: 'calorie_entries',
     id: input.id,
     updatedAt: now,
-    operation: "create",
+    operation: 'create',
   });
   await upsertSavedMeal({
     foodName: input.foodName,
@@ -331,9 +331,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
   });
 
   return {
-    status: "applied",
+    status: 'applied',
     targetLabel: input.foodName,
-    producedEntityType: "calorie_log",
+    producedEntityType: 'calorie_log',
     producedEntityId: input.id,
   };
 }

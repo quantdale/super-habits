@@ -1,23 +1,23 @@
-import type { Href } from "expo-router";
+import type { Href } from 'expo-router';
 import type {
   LinkedActionFeature,
   LinkedActionTargetEntityType,
-} from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActions.types';
 import type {
   LinkedActionTargetCreateNewHandoff,
   LinkedActionTargetPickerCandidate,
   LinkedActionTargetPickerProvider,
-} from "@/core/linked-actions/linkedActionsTargetPicker.types";
-import { listHabits } from "@/features/habits/habits.data";
-import { listTodos } from "@/features/todos/todos.data";
-import { listRoutines } from "@/features/workout/workout.data";
+} from '@/core/linked-actions/linkedActionsTargetPicker.types';
+import { listHabits } from '@/features/habits/habits.data';
+import { listTodos } from '@/features/todos/todos.data';
+import { listRoutines } from '@/features/workout/workout.data';
 
 const TARGET_FEATURE_HREFS: Record<LinkedActionFeature, Href> = {
-  todos: "/(tabs)/todos",
-  habits: "/(tabs)/habits",
-  calories: "/(tabs)/calories",
-  workout: "/(tabs)/workout",
-  pomodoro: "/(tabs)/pomodoro",
+  todos: '/(tabs)/todos',
+  habits: '/(tabs)/habits',
+  calories: '/(tabs)/calories',
+  workout: '/(tabs)/workout',
+  pomodoro: '/(tabs)/pomodoro',
 };
 
 function capitalizeLabel(value: string) {
@@ -32,7 +32,7 @@ function createModuleHandoff(input: {
   ctaLabel: string;
 }): LinkedActionTargetCreateNewHandoff {
   return {
-    kind: "module_handoff",
+    kind: 'module_handoff',
     feature: input.feature,
     entityType: input.entityType,
     title: input.title,
@@ -45,25 +45,25 @@ function createModuleHandoff(input: {
 function formatTodoCandidateSubtitle(input: {
   notes: string | null;
   dueDate: string | null;
-  priority: "urgent" | "normal" | "low";
-  recurrence: "daily" | null;
+  priority: 'urgent' | 'normal' | 'low';
+  recurrence: 'daily' | null;
 }) {
   if (input.notes?.trim()) {
     return input.notes.trim();
   }
 
   const details: string[] = [];
-  if (input.priority !== "normal") {
+  if (input.priority !== 'normal') {
     details.push(capitalizeLabel(input.priority));
   }
   if (input.dueDate) {
     details.push(`Due ${input.dueDate}`);
   }
-  if (input.recurrence === "daily") {
-    details.push("Repeats daily");
+  if (input.recurrence === 'daily') {
+    details.push('Repeats daily');
   }
 
-  return details.join(" · ") || undefined;
+  return details.join(' · ') || undefined;
 }
 
 async function loadTodoCandidates(): Promise<LinkedActionTargetPickerCandidate[]> {
@@ -96,145 +96,145 @@ async function loadWorkoutRoutineCandidates(): Promise<LinkedActionTargetPickerC
   return routines.map((routine) => ({
     id: routine.id,
     title: routine.name,
-    subtitle: routine.description ?? "No description yet",
+    subtitle: routine.description ?? 'No description yet',
   }));
 }
 
 const LINKED_ACTION_TARGET_PICKER_PROVIDERS: LinkedActionTargetPickerProvider[] = [
   {
-    feature: "todos",
-    entityType: "todo",
-    moduleLabel: "Todos",
-    targetLabel: "task",
+    feature: 'todos',
+    entityType: 'todo',
+    moduleLabel: 'Todos',
+    targetLabel: 'task',
     existing: {
       supported: true,
-      title: "Choose an existing task",
-      emptyTitle: "No pending tasks yet",
-      emptyDescription: "Create a task first, then come back to select it as the linked target.",
+      title: 'Choose an existing task',
+      emptyTitle: 'No pending tasks yet',
+      emptyDescription: 'Create a task first, then come back to select it as the linked target.',
       loadCandidates: loadTodoCandidates,
     },
     createNew: {
-      title: "Create a new task",
+      title: 'Create a new task',
       description:
-        "The current linked-actions flow uses an explicit handoff: open Todos, add the task there, then return and pick it.",
+        'The current linked-actions flow uses an explicit handoff: open Todos, add the task there, then return and pick it.',
       buildHandoff: () =>
         createModuleHandoff({
-          feature: "todos",
-          entityType: "todo",
-          title: "Create a new task",
+          feature: 'todos',
+          entityType: 'todo',
+          title: 'Create a new task',
           description:
-            "Open Todos, create the task you want to target, then return here and select it from the existing task list.",
-          ctaLabel: "Open Todos",
+            'Open Todos, create the task you want to target, then return here and select it from the existing task list.',
+          ctaLabel: 'Open Todos',
         }),
     },
   },
   {
-    feature: "habits",
-    entityType: "habit",
-    moduleLabel: "Habits",
-    targetLabel: "habit",
+    feature: 'habits',
+    entityType: 'habit',
+    moduleLabel: 'Habits',
+    targetLabel: 'habit',
     existing: {
       supported: true,
-      title: "Choose an existing habit",
-      emptyTitle: "No habits yet",
-      emptyDescription: "Create a habit first, then select it as the linked target.",
+      title: 'Choose an existing habit',
+      emptyTitle: 'No habits yet',
+      emptyDescription: 'Create a habit first, then select it as the linked target.',
       loadCandidates: loadHabitCandidates,
     },
     createNew: {
-      title: "Create a new habit",
+      title: 'Create a new habit',
       description:
-        "The current linked-actions flow hands off to the Habits module instead of opening the creation modal inside the editor.",
+        'The current linked-actions flow hands off to the Habits module instead of opening the creation modal inside the editor.',
       buildHandoff: () =>
         createModuleHandoff({
-          feature: "habits",
-          entityType: "habit",
-          title: "Create a new habit",
+          feature: 'habits',
+          entityType: 'habit',
+          title: 'Create a new habit',
           description:
-            "Open Habits, create the habit you want to target, then return here and choose it from the existing habit list.",
-          ctaLabel: "Open Habits",
+            'Open Habits, create the habit you want to target, then return here and choose it from the existing habit list.',
+          ctaLabel: 'Open Habits',
         }),
     },
   },
   {
-    feature: "workout",
-    entityType: "workout_routine",
-    moduleLabel: "Workout",
-    targetLabel: "routine",
+    feature: 'workout',
+    entityType: 'workout_routine',
+    moduleLabel: 'Workout',
+    targetLabel: 'routine',
     existing: {
       supported: true,
-      title: "Choose an existing workout routine",
-      emptyTitle: "No routines yet",
-      emptyDescription: "Create a workout routine first, then come back and select it here.",
+      title: 'Choose an existing workout routine',
+      emptyTitle: 'No routines yet',
+      emptyDescription: 'Create a workout routine first, then come back and select it here.',
       loadCandidates: loadWorkoutRoutineCandidates,
     },
     createNew: {
-      title: "Create a new workout routine",
+      title: 'Create a new workout routine',
       description:
-        "The current linked-actions flow keeps the workout routine editor in the Workout module and hands off to it explicitly.",
+        'The current linked-actions flow keeps the workout routine editor in the Workout module and hands off to it explicitly.',
       buildHandoff: () =>
         createModuleHandoff({
-          feature: "workout",
-          entityType: "workout_routine",
-          title: "Create a new workout routine",
+          feature: 'workout',
+          entityType: 'workout_routine',
+          title: 'Create a new workout routine',
           description:
-            "Open Workout, add the routine there, then return here and choose it from the existing routine list.",
-          ctaLabel: "Open Workout",
+            'Open Workout, add the routine there, then return here and choose it from the existing routine list.',
+          ctaLabel: 'Open Workout',
         }),
     },
   },
   {
-    feature: "calories",
-    entityType: "calorie_log",
-    moduleLabel: "Calories",
-    targetLabel: "calorie log",
+    feature: 'calories',
+    entityType: 'calorie_log',
+    moduleLabel: 'Calories',
+    targetLabel: 'calorie log',
     existing: {
       supported: false,
-      title: "Choose an existing calorie log",
-      emptyTitle: "This target creates a new log entry",
+      title: 'Choose an existing calorie log',
+      emptyTitle: 'This target creates a new log entry',
       emptyDescription:
-        "Calorie targets do not point at a long-lived existing item in the current flow. The linked action creates a fresh calorie entry.",
-      loadCandidates: async () => [],
+        'Calorie targets do not point at a long-lived existing item in the current flow. The linked action creates a fresh calorie entry.',
+      loadCandidates: () => Promise.resolve([]),
     },
     createNew: {
-      title: "Start a calorie-entry handoff",
+      title: 'Start a calorie-entry handoff',
       description:
-        "Calorie entry creation stays inside the Calories screen and is exposed here as an explicit handoff.",
+        'Calorie entry creation stays inside the Calories screen and is exposed here as an explicit handoff.',
       buildHandoff: () =>
         createModuleHandoff({
-          feature: "calories",
-          entityType: "calorie_log",
-          title: "Start a calorie-entry handoff",
+          feature: 'calories',
+          entityType: 'calorie_log',
+          title: 'Start a calorie-entry handoff',
           description:
-            "Open Calories to create the entry details. Full inline creation is intentionally outside the current linked-actions flow.",
-          ctaLabel: "Open Calories",
+            'Open Calories to create the entry details. Full inline creation is intentionally outside the current linked-actions flow.',
+          ctaLabel: 'Open Calories',
         }),
     },
   },
   {
-    feature: "pomodoro",
-    entityType: "pomodoro_session",
-    moduleLabel: "Pomodoro",
-    targetLabel: "session",
+    feature: 'pomodoro',
+    entityType: 'pomodoro_session',
+    moduleLabel: 'Pomodoro',
+    targetLabel: 'session',
     existing: {
       supported: false,
-      title: "Choose an existing session",
-      emptyTitle: "This target creates a new session log",
+      title: 'Choose an existing session',
+      emptyTitle: 'This target creates a new session log',
       emptyDescription:
-        "Pomodoro targets create a new session record, so there is no reusable existing target item in the current flow.",
-      loadCandidates: async () => [],
+        'Pomodoro targets create a new session record, so there is no reusable existing target item in the current flow.',
+      loadCandidates: () => Promise.resolve([]),
     },
     createNew: {
-      title: "Start a pomodoro handoff",
+      title: 'Start a pomodoro handoff',
       description:
-        "Session creation stays in the Pomodoro module and the handoff is explicit here.",
+        'Session creation stays in the Pomodoro module and the handoff is explicit here.',
       buildHandoff: () =>
         createModuleHandoff({
-          feature: "pomodoro",
-          entityType: "pomodoro_session",
-          title: "Start a pomodoro handoff",
+          feature: 'pomodoro',
+          entityType: 'pomodoro_session',
+          title: 'Start a pomodoro handoff',
           description:
-            "Open Pomodoro to define or run the session context. Full inline creation is intentionally outside the current linked-actions flow.",
-          ctaLabel: "Open Pomodoro",
+            'Open Pomodoro to define or run the session context. Full inline creation is intentionally outside the current linked-actions flow.',
+          ctaLabel: 'Open Pomodoro',
         }),
     },
   },

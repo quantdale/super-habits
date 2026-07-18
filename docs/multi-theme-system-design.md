@@ -23,13 +23,13 @@ The proposal covers:
 
 ### 2.1 What exists
 
-| Layer | File | Role today |
-|---|---|---|
-| Token provider | `core/providers/ThemeProvider.tsx` | `ThemeTokens` (13 tokens), `LIGHT_TOKENS`/`DARK_TOKENS`, mode persistence (`superhabits.theme.mode`), OS-appearance listener, web `data-theme` attribute + `<meta name="theme-color">` |
-| Section identity | `constants/sectionColors.ts` | Per-feature accents (Todos blue, Habits green, Focus purple, Workout orange, Calories amber) with light-tint and 700-level text variants |
-| Utility classes | `tailwind.config.js` | Static section colors, `brand` purple scale, `surface` — **not** theme-aware |
-| Web baseline | `global.css` | Hardcoded body backgrounds for light and `html[data-theme="dark"]` |
-| Consumers | `core/ui/*`, `features/*`, `app/(tabs)/_layout.tsx` | Inline `style={{ color: tokens.text }}` pattern; Tailwind classes for structure |
+| Layer            | File                                                | Role today                                                                                                                                                                             |
+| ---------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token provider   | `core/providers/ThemeProvider.tsx`                  | `ThemeTokens` (13 tokens), `LIGHT_TOKENS`/`DARK_TOKENS`, mode persistence (`superhabits.theme.mode`), OS-appearance listener, web `data-theme` attribute + `<meta name="theme-color">` |
+| Section identity | `constants/sectionColors.ts`                        | Per-feature accents (Todos blue, Habits green, Focus purple, Workout orange, Calories amber) with light-tint and 700-level text variants                                               |
+| Utility classes  | `tailwind.config.js`                                | Static section colors, `brand` purple scale, `surface` — **not** theme-aware                                                                                                           |
+| Web baseline     | `global.css`                                        | Hardcoded body backgrounds for light and `html[data-theme="dark"]`                                                                                                                     |
+| Consumers        | `core/ui/*`, `features/*`, `app/(tabs)/_layout.tsx` | Inline `style={{ color: tokens.text }}` pattern; Tailwind classes for structure                                                                                                        |
 
 ### 2.2 What works well (and should be preserved)
 
@@ -59,7 +59,7 @@ The proposal covers:
 1. **One source of truth.** All theme-dependent color decisions live in theme definition files. Components never branch on theme identity or appearance.
 2. **Open/closed registry.** Adding theme #15 touches `core/theme/themes/` and one registry line — zero component, screen, or CSS edits.
 3. **WCAG AA floor, AAA where free.** Every text-bearing pair ≥ 4.5:1 (including button hover/active states); non-text UI indicators ≥ 3:1 (WCAG 1.4.11). Enforced by a CI script, not by review vigilance.
-4. **Preserve product identity.** Section accents, layout, radii, elevation, and typography are theme-invariant. Themes recolor the *chrome*, not the *brand*.
+4. **Preserve product identity.** Section accents, layout, radii, elevation, and typography are theme-invariant. Themes recolor the _chrome_, not the _brand_.
 5. **No UX regression.** The System/Light/Dark mode chips keep working exactly as today; theme selection layers on top.
 
 ---
@@ -70,53 +70,53 @@ The proposal covers:
 
 ```ts
 // core/theme/tokens.ts
-export type ThemeAppearance = "light" | "dark";
+export type ThemeAppearance = 'light' | 'dark';
 
 export type ThemeTokens = {
   // ── Brand & interaction ─────────────────────────────────────────────
-  primary: string;         // NEW: the theme's identity color (icons, rings, links-as-chrome)
-  secondary: string;       // NEW: quiet companion fill (selected chips, secondary pills)
-  accent: string;          // NEW: text-grade highlight (links, emphasis, notice accents), AA on surface
-  button: string;          // NEW: primary button fill
-  buttonText: string;      // NEW: label on button/buttonHover/buttonActive (AA on all three)
-  buttonHover: string;     // NEW: pointer-hover fill (web) / focus fill
-  buttonActive: string;    // NEW: pressed fill (Pressable pressed state, web :active)
+  primary: string; // NEW: the theme's identity color (icons, rings, links-as-chrome)
+  secondary: string; // NEW: quiet companion fill (selected chips, secondary pills)
+  accent: string; // NEW: text-grade highlight (links, emphasis, notice accents), AA on surface
+  button: string; // NEW: primary button fill
+  buttonText: string; // NEW: label on button/buttonHover/buttonActive (AA on all three)
+  buttonHover: string; // NEW: pointer-hover fill (web) / focus fill
+  buttonActive: string; // NEW: pressed fill (Pressable pressed state, web :active)
 
   // ── Surfaces ────────────────────────────────────────────────────────
-  background: string;      // kept: screen background
-  surface: string;         // kept: cards, sheets, inputs
+  background: string; // kept: screen background
+  surface: string; // kept: cards, sheets, inputs
   surfaceElevated: string; // kept: inset rows, nested panels
-  surfaceHover: string;    // NEW: hoverable rows/list items (derived, see below)
-  surfaceActive: string;   // NEW: pressed rows/list items (derived)
-  overlay: string;         // NEW: modal scrim (rgba; heavier on dark themes)
+  surfaceHover: string; // NEW: hoverable rows/list items (derived, see below)
+  surfaceActive: string; // NEW: pressed rows/list items (derived)
+  overlay: string; // NEW: modal scrim (rgba; heavier on dark themes)
 
   // ── Structure ───────────────────────────────────────────────────────
-  border: string;          // kept
-  tabRail: string;         // kept
-  tabRailBorder: string;   // kept
+  border: string; // kept
+  tabRail: string; // kept
+  tabRailBorder: string; // kept
 
   // ── Content ─────────────────────────────────────────────────────────
-  text: string;            // kept
-  textMuted: string;       // kept
-  iconMuted: string;       // kept
+  text: string; // kept
+  textMuted: string; // kept
+  iconMuted: string; // kept
 
   // ── Semantic status ─────────────────────────────────────────────────
   dangerBackground: string; // kept
-  dangerBorder: string;     // kept
-  dangerText: string;       // kept
-  successText: string;      // NEW: replaces scattered #22c55e / #16a34a
-  warningText: string;      // NEW: replaces scattered #92400e / amber literals
+  dangerBorder: string; // kept
+  dangerText: string; // kept
+  successText: string; // NEW: replaces scattered #22c55e / #16a34a
+  warningText: string; // NEW: replaces scattered #92400e / amber literals
 
   // ── Platform ────────────────────────────────────────────────────────
-  statusBarStyle: "light" | "dark"; // kept
-  webThemeColor: string;            // kept: PWA <meta name="theme-color">
+  statusBarStyle: 'light' | 'dark'; // kept
+  webThemeColor: string; // kept: PWA <meta name="theme-color">
 };
 
 export type ThemeDefinition = {
-  id: string;                 // stable kebab-case key, persisted
-  name: string;               // display name
+  id: string; // stable kebab-case key, persisted
+  name: string; // display name
   appearance: ThemeAppearance;
-  description: string;        // one-liner shown in the picker
+  description: string; // one-liner shown in the picker
   tokens: ThemeTokens;
   /** Optional remap when the default section accents clash or fail contrast. */
   sectionOverrides?: Partial<Record<SectionKey, { fill: string; text: string }>>;
@@ -188,17 +188,17 @@ Adding a future theme = one new file in `themes/` + one import/registration line
 
 ### 5.2 Provider model — "day slot / night slot"
 
-The existing `ThemeMode = "system" | "light" | "dark"` keeps its exact meaning: *which appearance is active*. Theme selection adds two slots:
+The existing `ThemeMode = "system" | "light" | "dark"` keeps its exact meaning: _which appearance is active_. Theme selection adds two slots:
 
 ```ts
 type ThemeContextValue = {
-  mode: ThemeMode;                    // unchanged
-  resolvedTheme: ResolvedTheme;       // unchanged ("light" | "dark" appearance)
-  themeId: ThemeId;                   // NEW: the active theme's id
-  theme: ThemeDefinition;             // NEW: full definition (for the picker)
-  tokens: ThemeTokens;                // unchanged shape, widened
+  mode: ThemeMode; // unchanged
+  resolvedTheme: ResolvedTheme; // unchanged ("light" | "dark" appearance)
+  themeId: ThemeId; // NEW: the active theme's id
+  theme: ThemeDefinition; // NEW: full definition (for the picker)
+  tokens: ThemeTokens; // unchanged shape, widened
   setMode: (mode: ThemeMode) => void; // unchanged
-  setTheme: (id: ThemeId) => void;    // NEW
+  setTheme: (id: ThemeId) => void; // NEW
 };
 ```
 
@@ -215,7 +215,8 @@ This model gives "hybrid" usage for free: Solarized by day, Nord Arctic by night
 `global.css` currently hardcodes two body backgrounds. With 14 themes this becomes:
 
 ```css
-body, #root {
+body,
+#root {
   background-color: var(--sh-background, #f8f7ff);
 }
 ```
@@ -223,8 +224,8 @@ body, #root {
 The provider's existing `document` effect grows by one loop:
 
 ```ts
-document.documentElement.setAttribute("data-theme", theme.appearance); // kept for e2e + CSS hooks
-document.documentElement.setAttribute("data-theme-id", theme.id);
+document.documentElement.setAttribute('data-theme', theme.appearance); // kept for e2e + CSS hooks
+document.documentElement.setAttribute('data-theme-id', theme.id);
 for (const [key, value] of Object.entries(tokens)) {
   document.documentElement.style.setProperty(`--sh-${kebabCase(key)}`, String(value));
 }
@@ -244,7 +245,7 @@ This also future-proofs web-only styling (scrollbar colors, selection color, PWA
 
 ```ts
 export function createTheme(input: ThemeInput): ThemeDefinition {
-  const tokens = withDerivedTokens(input);      // fills §4 derivation rules
+  const tokens = withDerivedTokens(input); // fills §4 derivation rules
   if (__DEV__) assertContrast(input.id, tokens); // same math as the CI script
   return { ...input, tokens };
 }
@@ -260,130 +261,130 @@ export function createTheme(input: ThemeInput): ThemeDefinition {
 
 Every palette below was validated with `scripts/validate-theme-contrast.mjs` (WCAG 2.1 relative-luminance math). Per theme, 10 checks:
 
-| Pair | Threshold |
-|---|---|
-| `text` on `background` / `surface` / `surfaceElevated` | ≥ 4.5:1 (AA) |
-| `textMuted` on `surface` / `surfaceElevated` | ≥ 4.5:1 (AA) |
-| `buttonText` on `button` / `buttonHover` / `buttonActive` | ≥ 4.5:1 (AA) |
-| `accent` (as text) on `surface` | ≥ 4.5:1 (AA) |
-| `primary` on `surface` (non-text UI) | ≥ 3.0:1 (WCAG 1.4.11) |
+| Pair                                                      | Threshold             |
+| --------------------------------------------------------- | --------------------- |
+| `text` on `background` / `surface` / `surfaceElevated`    | ≥ 4.5:1 (AA)          |
+| `textMuted` on `surface` / `surfaceElevated`              | ≥ 4.5:1 (AA)          |
+| `buttonText` on `button` / `buttonHover` / `buttonActive` | ≥ 4.5:1 (AA)          |
+| `accent` (as text) on `surface`                           | ≥ 4.5:1 (AA)          |
+| `primary` on `surface` (non-text UI)                      | ≥ 3.0:1 (WCAG 1.4.11) |
 
 **Result: 140/140 checks pass.** Body text achieves AAA (≥ 7:1) in all 14 themes. Notable design choice: dark themes with very saturated primaries (Forest, Emerald, Nord, Cyberpunk) use **dark labels on bright button fills** rather than white-on-mid-tone — this is what lets their pressed/hover states stay AA instead of dipping below 4.5:1 the way white-on-`#3B82F6` (3.68:1) does.
 
-Summary — each theme's *weakest* text-bearing pair (AA requires ≥ 4.5; everything else in the theme scores higher, with body text at AAA in all 14):
+Summary — each theme's _weakest_ text-bearing pair (AA requires ≥ 4.5; everything else in the theme scores higher, with body text at AAA in all 14):
 
-| Theme | Appearance | Weakest text pair | Ratio |
-|---|---|---|---|
-| Light | light | textMuted / surfaceElevated | 5.01 |
-| Dark | dark | buttonText / button | 5.70 |
-| Midnight Blue | dark | buttonText / button | 5.17 |
-| Forest Green | dark | buttonText / buttonActive | 6.23 |
-| Ocean Teal | light | textMuted / surfaceElevated | 5.02 |
-| Royal Purple | dark | buttonText / button | 5.70 |
-| Crimson Red | dark | buttonText / button | 4.83 |
-| Sunset Orange | light | buttonText / button | 5.18 |
-| Rose Pink | light | textMuted / surfaceElevated | 4.57 |
-| Cyberpunk Neon | dark | buttonText / buttonActive | 4.98 |
-| Nord Arctic | dark | accent / surface | 4.94 |
-| Solarized | light | textMuted / surfaceElevated | 4.94 |
-| Emerald Dark | dark | buttonText / buttonActive | 5.30 |
-| Coffee Brown | light | textMuted / surfaceElevated | 4.87 |
+| Theme          | Appearance | Weakest text pair           | Ratio |
+| -------------- | ---------- | --------------------------- | ----- |
+| Light          | light      | textMuted / surfaceElevated | 5.01  |
+| Dark           | dark       | buttonText / button         | 5.70  |
+| Midnight Blue  | dark       | buttonText / button         | 5.17  |
+| Forest Green   | dark       | buttonText / buttonActive   | 6.23  |
+| Ocean Teal     | light      | textMuted / surfaceElevated | 5.02  |
+| Royal Purple   | dark       | buttonText / button         | 5.70  |
+| Crimson Red    | dark       | buttonText / button         | 4.83  |
+| Sunset Orange  | light      | buttonText / button         | 5.18  |
+| Rose Pink      | light      | textMuted / surfaceElevated | 4.57  |
+| Cyberpunk Neon | dark       | buttonText / buttonActive   | 4.98  |
+| Nord Arctic    | dark       | accent / surface            | 4.94  |
+| Solarized      | light      | textMuted / surfaceElevated | 4.94  |
+| Emerald Dark   | dark       | buttonText / buttonActive   | 5.30  |
+| Coffee Brown   | light      | textMuted / surfaceElevated | 4.87  |
 
-*(Full per-pair output: run the script.)*
+_(Full per-pair output: run the script.)_
 
 Hover/active semantics everywhere: **surface** hover/active are derived (§4); **button** hover/active are explicit and listed per theme; on native, `buttonActive`/`surfaceActive` map to `Pressable`'s pressed state, hover applies on web and pointer-equipped tablets.
 
 ---
 
-### 6.1 Light *(existing — refined)*
+### 6.1 Light _(existing — refined)_
 
 Kept as the default. Two refinements: `textMuted` `#64748b → #5d6c83` (fixes the 4.47:1 AA miss on elevated surfaces) and the default button fill documented as `#7C3AED` (brand-600) instead of `bg-brand-500` `#8B5CF6`, whose white label sits at 4.23:1 — marginally under AA today.
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#7C3AED` | | Text / Muted | `#0f172a` / `#5d6c83` |
-| Secondary | `#ede9fe` | | Accent | `#6D28D9` |
-| Background | `#f8f7ff` | | Button / label | `#7C3AED` / `#ffffff` |
-| Surface / Elevated | `#ffffff` / `#f8f7ff` | | Button hover / active | `#6D28D9` / `#5B21B6` |
-| Border | `#e2e8f0` | | Tab rail / border | `#eeecf8` / `#d4d0ee` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#7C3AED`             |     | Text / Muted          | `#0f172a` / `#5d6c83` |
+| Secondary          | `#ede9fe`             |     | Accent                | `#6D28D9`             |
+| Background         | `#f8f7ff`             |     | Button / label        | `#7C3AED` / `#ffffff` |
+| Surface / Elevated | `#ffffff` / `#f8f7ff` |     | Button hover / active | `#6D28D9` / `#5B21B6` |
+| Border             | `#e2e8f0`             |     | Tab rail / border     | `#eeecf8` / `#d4d0ee` |
 
 **Feel:** the current airy lavender-white workspace. **Best for:** general use, default. **Class:** Light.
 
-### 6.2 Dark *(existing — extended)*
+### 6.2 Dark _(existing — extended)_
 
 Kept verbatim; gains the new roles.
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#A78BFA` | | Text / Muted | `#e2e8f0` / `#a6b0c2` |
-| Secondary | `#2b2350` | | Accent | `#C4B5FD` |
-| Background | `#0f1221` | | Button / label | `#7C3AED` / `#ffffff` |
-| Surface / Elevated | `#171a2a` / `#111427` | | Button hover / active | `#6D28D9` / `#5B21B6` |
-| Border | `#334155` | | Tab rail / border | `#1a1f34` / `#2e3552` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#A78BFA`             |     | Text / Muted          | `#e2e8f0` / `#a6b0c2` |
+| Secondary          | `#2b2350`             |     | Accent                | `#C4B5FD`             |
+| Background         | `#0f1221`             |     | Button / label        | `#7C3AED` / `#ffffff` |
+| Surface / Elevated | `#171a2a` / `#111427` |     | Button hover / active | `#6D28D9` / `#5B21B6` |
+| Border             | `#334155`             |     | Tab rail / border     | `#1a1f34` / `#2e3552` |
 
 **Feel:** the current cool indigo night mode. **Best for:** general use, low light. **Class:** Dark.
 
 ### 6.3 Midnight Blue
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#3B82F6` | | Text / Muted | `#e8f0fb` / `#9fb3d1` |
-| Secondary | `#1e3a5f` | | Accent | `#7DD3FC` |
-| Background | `#0a1526` | | Button / label | `#2563EB` / `#ffffff` |
-| Surface / Elevated | `#112036` / `#0d1a2d` | | Button hover / active | `#1D4ED8` / `#1E40AF` |
-| Border | `#23395a` | | Tab rail / border | `#0d1b2f` / `#1e3350` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#3B82F6`             |     | Text / Muted          | `#e8f0fb` / `#9fb3d1` |
+| Secondary          | `#1e3a5f`             |     | Accent                | `#7DD3FC`             |
+| Background         | `#0a1526`             |     | Button / label        | `#2563EB` / `#ffffff` |
+| Surface / Elevated | `#112036` / `#0d1a2d` |     | Button hover / active | `#1D4ED8` / `#1E40AF` |
+| Border             | `#23395a`             |     | Tab rail / border     | `#0d1b2f` / `#1e3350` |
 
 **Feel:** a deep navy cockpit — calm, cold, and serious, like an IDE at 1 a.m. Blue-tinted grays keep hierarchy readable without warmth. Sky-blue accents read as instrumentation rather than decoration.
 **Best for:** productivity and coding; the most conservative dark upgrade for office use. **Class:** Dark.
 
 ### 6.4 Forest Green
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#4ADE80` | | Text / Muted | `#e4eee6` / `#9db4a4` |
-| Secondary | `#1d3528` | | Accent | `#A3E635` |
-| Background | `#0c1712` | | Button / label | `#34D399` / `#052e1f` |
-| Surface / Elevated | `#13211a` / `#101d16` | | Button hover / active | `#5FE3AC` / `#2BBE88` |
-| Border | `#24382c` | | Tab rail / border | `#101c15` / `#20342a` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#4ADE80`             |     | Text / Muted          | `#e4eee6` / `#9db4a4` |
+| Secondary          | `#1d3528`             |     | Accent                | `#A3E635`             |
+| Background         | `#0c1712`             |     | Button / label        | `#34D399` / `#052e1f` |
+| Surface / Elevated | `#13211a` / `#101d16` |     | Button hover / active | `#5FE3AC` / `#2BBE88` |
+| Border             | `#24382c`             |     | Tab rail / border     | `#101c15` / `#20342a` |
 
 **Feel:** a pine forest after dusk — moss-dark surfaces with bright leaf-green interactions. Because Habits already owns green, this theme feels "native" to the app's core loop; lime accents give completed streaks extra pop.
 **Best for:** habit-focused daily use and evening journaling; users who find blue-dark themes sterile. **Class:** Dark.
 
 ### 6.5 Ocean Teal
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#0D9488` | | Text / Muted | `#0f3d3b` / `#42706b` |
-| Secondary | `#ccfbf1` | | Accent | `#0E7490` |
-| Background | `#f2fafa` | | Button / label | `#0F766E` / `#ffffff` |
-| Surface / Elevated | `#ffffff` / `#eaf5f5` | | Button hover / active | `#115E59` / `#134E4A` |
-| Border | `#cbe5e2` | | Tab rail / border | `#e4f2f1` / `#c4dedb` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#0D9488`             |     | Text / Muted          | `#0f3d3b` / `#42706b` |
+| Secondary          | `#ccfbf1`             |     | Accent                | `#0E7490`             |
+| Background         | `#f2fafa`             |     | Button / label        | `#0F766E` / `#ffffff` |
+| Surface / Elevated | `#ffffff` / `#eaf5f5` |     | Button hover / active | `#115E59` / `#134E4A` |
+| Border             | `#cbe5e2`             |     | Tab rail / border     | `#e4f2f1` / `#c4dedb` |
 
 **Feel:** a bright coastal morning — white cards floating on sea-glass. Teal is the classic "calm competence" hue; the deep-cyan accent keeps links distinct from the primary.
 **Best for:** general use and design work in daylight; a fresh alternative to the lavender default. **Class:** Light.
 
 ### 6.6 Royal Purple
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#A78BFA` | | Text / Muted | `#efeafb` / `#b4a8d6` |
-| Secondary | `#33265c` | | Accent | `#FBBF24` |
-| Background | `#160f2b` | | Button / label | `#7C3AED` / `#ffffff` |
-| Surface / Elevated | `#211a3e` / `#1b1435` | | Button hover / active | `#6D28D9` / `#5B21B6` |
-| Border | `#382b63` | | Tab rail / border | `#191133` / `#302355` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#A78BFA`             |     | Text / Muted          | `#efeafb` / `#b4a8d6` |
+| Secondary          | `#33265c`             |     | Accent                | `#FBBF24`             |
+| Background         | `#160f2b`             |     | Button / label        | `#7C3AED` / `#ffffff` |
+| Surface / Elevated | `#211a3e` / `#1b1435` |     | Button hover / active | `#6D28D9` / `#5B21B6` |
+| Border             | `#382b63`             |     | Tab rail / border     | `#191133` / `#302355` |
 
 **Feel:** velvet and gold — a saturated violet night with warm amber accents that read as gilt edges. It's the app's own brand purple turned up to "evening gown."
 **Best for:** general use for users who love the brand color; gaming/leisure sessions. **Class:** Dark.
 
 ### 6.7 Crimson Red
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#F87171` | | Text / Muted | `#fbedee` / `#d3a6ac` |
-| Secondary | `#3d1d24` | | Accent | `#FBBF24` |
-| Background | `#190c10` | | Button / label | `#DC2626` / `#ffffff` |
-| Surface / Elevated | `#241318` / `#1f1014` | | Button hover / active | `#B91C1C` / `#991B1B` |
-| Border | `#47242b` | | Tab rail / border | `#1d0e12` / `#3a1d24` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#F87171`             |     | Text / Muted          | `#fbedee` / `#d3a6ac` |
+| Secondary          | `#3d1d24`             |     | Accent                | `#FBBF24`             |
+| Background         | `#190c10`             |     | Button / label        | `#DC2626` / `#ffffff` |
+| Surface / Elevated | `#241318` / `#1f1014` |     | Button hover / active | `#B91C1C` / `#991B1B` |
+| Border             | `#47242b`             |     | Tab rail / border     | `#1d0e12` / `#3a1d24` |
 
 **Feel:** a dark theater — near-black cherry surfaces with crimson drive and gold trim. High-energy without glare.
 **Best for:** gaming and workout-heavy users (it flatters the Workout orange); short intense sessions rather than all-day reading. **Class:** Dark.
@@ -391,39 +392,39 @@ Kept verbatim; gains the new roles.
 
 ### 6.8 Sunset Orange
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#EA580C` | | Text / Muted | `#3b1d0f` / `#7c4a21` |
-| Secondary | `#fed7aa` | | Accent | `#7E22CE` |
-| Background | `#fff9f2` | | Button / label | `#C2410C` / `#ffffff` |
-| Surface / Elevated | `#ffffff` / `#fff3e6` | | Button hover / active | `#9A3412` / `#7C2D12` |
-| Border | `#f3dfc9` | | Tab rail / border | `#fdf0e2` / `#eed7bc` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#EA580C`             |     | Text / Muted          | `#3b1d0f` / `#7c4a21` |
+| Secondary          | `#fed7aa`             |     | Accent                | `#7E22CE`             |
+| Background         | `#fff9f2`             |     | Button / label        | `#C2410C` / `#ffffff` |
+| Surface / Elevated | `#ffffff` / `#fff3e6` |     | Button hover / active | `#9A3412` / `#7C2D12` |
+| Border             | `#f3dfc9`             |     | Tab rail / border     | `#fdf0e2` / `#eed7bc` |
 
 **Feel:** golden hour — cream pages, ember-orange actions, and a dusk-violet accent that completes the sunset gradient. Warm without being yellow-tinted enough to distort content colors.
 **Best for:** general use; motivational/energetic daily planning; pairs naturally with the Calories and Workout sections. **Class:** Light.
 
 ### 6.9 Rose Pink
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#DB2777` | | Text / Muted | `#3f1226` / `#8b5f70` |
-| Secondary | `#fce7f3` | | Accent | `#9D174D` |
-| Background | `#fdf5f8` | | Button / label | `#BE185D` / `#ffffff` |
-| Surface / Elevated | `#ffffff` / `#fbeaf1` | | Button hover / active | `#9D174D` / `#831843` |
-| Border | `#f3d7e2` | | Tab rail / border | `#faeaf1` / `#eed0dd` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#DB2777`             |     | Text / Muted          | `#3f1226` / `#8b5f70` |
+| Secondary          | `#fce7f3`             |     | Accent                | `#9D174D`             |
+| Background         | `#fdf5f8`             |     | Button / label        | `#BE185D` / `#ffffff` |
+| Surface / Elevated | `#ffffff` / `#fbeaf1` |     | Button hover / active | `#9D174D` / `#831843` |
+| Border             | `#f3d7e2`             |     | Tab rail / border     | `#faeaf1` / `#eed0dd` |
 
 **Feel:** soft blush stationery — quiet pink washes with confident magenta actions. Deliberately desaturated backgrounds keep it elegant rather than saccharine.
 **Best for:** general use and journaling; users who want gentle, personal-feeling tools. **Class:** Light.
 
 ### 6.10 Cyberpunk Neon
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#FF2ED1` | | Text / Muted | `#eaf2ff` / `#8b93b8` |
-| Secondary | `#1d1145` | | Accent | `#00E5FF` |
-| Background | `#07080f` | | Button / label | `#FF2ED1` / `#14020f` |
-| Surface / Elevated | `#0e1020` / `#0a0c18` | | Button hover / active | `#FF5CDC` / `#E51EB8` |
-| Border | `#262b4a` | | Tab rail / border | `#0a0c16` / `#202440` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#FF2ED1`             |     | Text / Muted          | `#eaf2ff` / `#8b93b8` |
+| Secondary          | `#1d1145`             |     | Accent                | `#00E5FF`             |
+| Background         | `#07080f`             |     | Button / label        | `#FF2ED1` / `#14020f` |
+| Surface / Elevated | `#0e1020` / `#0a0c18` |     | Button hover / active | `#FF5CDC` / `#E51EB8` |
+| Border             | `#262b4a`             |     | Tab rail / border     | `#0a0c16` / `#202440` |
 
 **Feel:** neon signage on wet asphalt — near-black indigo with magenta and cyan reserved for interactive elements only. The discipline is the design: large fields stay dark, neon stays scarce, so it reads "arcade" without eye strain.
 **Best for:** gaming and late-night focus sprints; OLED devices (true-black adjacency saves battery). **Class:** Dark.
@@ -431,52 +432,52 @@ Kept verbatim; gains the new roles.
 
 ### 6.11 Nord Arctic
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#88C0D0` | | Text / Muted | `#eceff4` / `#c2c9d6` |
-| Secondary | `#434c5e` | | Accent | `#A3BE8C` |
-| Background | `#2e3440` | | Button / label | `#88C0D0` / `#20262e` |
-| Surface / Elevated | `#3b4252` / `#343b49` | | Button hover / active | `#9BCDDC` / `#79B2C4` |
-| Border | `#4c566a` | | Tab rail / border | `#333947` / `#454f63` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#88C0D0`             |     | Text / Muted          | `#eceff4` / `#c2c9d6` |
+| Secondary          | `#434c5e`             |     | Accent                | `#A3BE8C`             |
+| Background         | `#2e3440`             |     | Button / label        | `#88C0D0` / `#20262e` |
+| Surface / Elevated | `#3b4252` / `#343b49` |     | Button hover / active | `#9BCDDC` / `#79B2C4` |
+| Border             | `#4c566a`             |     | Tab rail / border     | `#333947` / `#454f63` |
 
-**Feel:** the beloved developer palette — polar-night grays that are *soft* rather than black, frost-blue interactions, aurora-green accents. Noticeably lower overall contrast tension than the other dark themes; the calmest long-session option.
+**Feel:** the beloved developer palette — polar-night grays that are _soft_ rather than black, frost-blue interactions, aurora-green accents. Noticeably lower overall contrast tension than the other dark themes; the calmest long-session option.
 **Best for:** coding and all-day productivity; users coming from Nord editors/terminals will feel at home instantly. **Class:** Dark.
 
 ### 6.12 Solarized
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#268BD2` | | Text / Muted | `#073642` / `#51666d` |
-| Secondary | `#eee8d5` | | Accent | `#5a60ba` |
-| Background | `#fdf6e3` | | Button / label | `#1a6e9e` / `#ffffff` |
-| Surface / Elevated | `#fffcf2` / `#eee8d5` | | Button hover / active | `#15597f` / `#104963` |
-| Border | `#ddd1ae` | | Tab rail / border | `#f6eed7` / `#dccfa8` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#268BD2`             |     | Text / Muted          | `#073642` / `#51666d` |
+| Secondary          | `#eee8d5`             |     | Accent                | `#5a60ba`             |
+| Background         | `#fdf6e3`             |     | Button / label        | `#1a6e9e` / `#ffffff` |
+| Surface / Elevated | `#fffcf2` / `#eee8d5` |     | Button hover / active | `#15597f` / `#104963` |
+| Border             | `#ddd1ae`             |     | Tab rail / border     | `#f6eed7` / `#dccfa8` |
 
 **Feel:** aged paper under warm lamplight — Ethan Schoonover's famously low-glare base tones with the canonical solar blue. Two faithfulness compromises for accessibility: button fills darken `#268BD2` to `#1a6e9e` (white labels on canonical blue are 3.7:1), and the violet accent deepens `#6c71c4` to `#5a60ba` (4.27 → 5.36:1).
 **Best for:** coding and reading-heavy productivity in bright environments. **Class:** Hybrid — this spec is the light half; its natural night partner is Nord Arctic (or a future Solarized Dark theme file), and the day/night slot model (§5.2) makes that pairing one tap.
 
 ### 6.13 Emerald Dark
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#10B981` | | Text / Muted | `#e7f0ec` / `#96aba1` |
-| Secondary | `#173029` | | Accent | `#6EE7B7` |
-| Background | `#0a0f0d` | | Button / label | `#10B981` / `#04241a` |
-| Surface / Elevated | `#111917` / `#0d1412` | | Button hover / active | `#34D399` / `#0DA678` |
-| Border | `#1f2e29` | | Tab rail / border | `#0d1310` / `#1c2a24` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#10B981`             |     | Text / Muted          | `#e7f0ec` / `#96aba1` |
+| Secondary          | `#173029`             |     | Accent                | `#6EE7B7`             |
+| Background         | `#0a0f0d`             |     | Button / label        | `#10B981` / `#04241a` |
+| Surface / Elevated | `#111917` / `#0d1412` |     | Button hover / active | `#34D399` / `#0DA678` |
+| Border             | `#1f2e29`             |     | Tab rail / border     | `#0d1310` / `#1c2a24` |
 
-**Feel:** jewel-case minimalism — a neutral near-black canvas (distinctly *not* green-washed, unlike Forest Green) where vivid emerald is the only voice. Terminal-heritage green-on-black, refined.
+**Feel:** jewel-case minimalism — a neutral near-black canvas (distinctly _not_ green-washed, unlike Forest Green) where vivid emerald is the only voice. Terminal-heritage green-on-black, refined.
 **Best for:** coding and focused deep work; OLED-friendly. **Class:** Dark.
 
 ### 6.14 Coffee Brown
 
-| Role | Value | | Role | Value |
-|---|---|---|---|---|
-| Primary | `#8B5E3C` | | Text / Muted | `#33261c` / `#75634f` |
-| Secondary | `#e9dbcc` | | Accent | `#0F766E` |
-| Background | `#faf6f0` | | Button / label | `#6F4E37` / `#ffffff` |
-| Surface / Elevated | `#ffffff` / `#f3ebe1` | | Button hover / active | `#5A3F2C` / `#46311F` |
-| Border | `#e7dacb` | | Tab rail / border | `#f4ede3` / `#e2d3c0` |
+| Role               | Value                 |     | Role                  | Value                 |
+| ------------------ | --------------------- | --- | --------------------- | --------------------- |
+| Primary            | `#8B5E3C`             |     | Text / Muted          | `#33261c` / `#75634f` |
+| Secondary          | `#e9dbcc`             |     | Accent                | `#0F766E`             |
+| Background         | `#faf6f0`             |     | Button / label        | `#6F4E37` / `#ffffff` |
+| Surface / Elevated | `#ffffff` / `#f3ebe1` |     | Button hover / active | `#5A3F2C` / `#46311F` |
+| Border             | `#e7dacb`             |     | Tab rail / border     | `#f4ede3` / `#e2d3c0` |
 
 **Feel:** a café notebook — latte cream, espresso text, and a glazed-ceramic teal accent that keeps it from going monochrome-sepia. The warmest, most analog-feeling theme in the set.
 **Best for:** journaling, reading, general use; people who plan their day over coffee. **Class:** Light.
@@ -496,24 +497,24 @@ The five section colors are product identity and stay theme-independent **by def
 
 Which surfaces inherit theme tokens, and which token drives each. Items marked ⚠ are the gaps the refactor closes (§11).
 
-| Area | Component(s) | Tokens |
-|---|---|---|
-| Screen background | `Screen`, `TabSlot` | `background` |
-| Top tab rail | `app/(tabs)/_layout.tsx` | `tabRail`, `tabRailBorder`, active tab face `background`, inactive icon `iconMuted`; ⚠ Overview tab color `#475569`/ternary → `textMuted` |
-| Cards | `Card` (all 3 variants), `FeatureStatCard`, `EmptyStateCard`, `StatBlock` | `surface`, `surfaceElevated`, `border`, `text`, `textMuted`; ⚠ drop `border-slate-200` class |
-| Page headers | `PageHeader`, `SectionTitle` | `text`, `textMuted` |
-| Buttons | `Button` | ⚠ primary → `button`/`buttonText` + `buttonHover`/`buttonActive` (replaces `bg-brand-500`); danger → `dangerText`-family fills (replaces `#ef4444`); ghost → `surfaceElevated`/`border`/`text` (already tokenized) |
-| Chips & filters | `PillChip` | inactive `surfaceElevated`/`border`/`textMuted` (done); active keeps section color by design; non-section chips (Settings mode chips) → `button`/`buttonText` |
-| Inputs | `TextField`, `NumberStepperField` | `surface`, `border`, `text`, `textMuted` placeholder; focus ring → `primary` (new affordance, web) |
-| Modals & dialogs | `Modal`, `useConfirmationDialog`, `LinkedActionTargetPickerModal`, `CalorieGoalModal`, `SavedMealSearchModal` | `background`, `border`, `text`; ⚠ scrim `rgba(0,0,0,0.5)` → `overlay` |
-| Menus / pickers | target pickers, saved-meal search results | `surface`, `surfaceHover` (new hover), `surfaceActive` (pressed), `border` |
-| Notifications | `InAppNoticeBanner` | `surface`, `text`, `textMuted`, `iconMuted`; ⚠ `NOTICE_ACCENT #2563eb` → `accent` (+ `${accent}16` icon well) |
-| Tables / lists | `TodoItem`, workout tables, `SwipeableCard`, `SwipeRightActions` | `surface`, `border`, `text`, `textMuted`; swipe action fills stay semantic (danger = `dangerText` family, complete = `successText` family) ⚠ |
-| Status/error text | `ValidationError`, inline `#b91c1c`/`#92400e` literals | ⚠ → `dangerText`, `warningText`, `successText` |
-| Charts | `DailyCalorieChart`, `MacroDonutChart`, `ProgressRing`, `HabitCircle` | axis/labels → `textMuted`; grid/track → `border`; series stay section-colored ⚠ |
-| Heatmap | `GitHubHeatmap` | ⚠ empty cell `#e2e8f0` → `border`; labels `#94a3b8` → `iconMuted`; legend chip `#f1f5f9` → `surfaceElevated`; intensity ramp stays section green |
-| Neutral screens | Settings, Command, Overview accents (`#475569`) | ⚠ → `textMuted` (as the "neutral accent"), removing the dark-mode ternaries |
-| Status bar / PWA | `StatusBar`, `<meta theme-color>`, `global.css` | `statusBarStyle`, `webThemeColor`, `--sh-background` (§5.3) |
+| Area              | Component(s)                                                                                                  | Tokens                                                                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Screen background | `Screen`, `TabSlot`                                                                                           | `background`                                                                                                                                                                                                       |
+| Top tab rail      | `app/(tabs)/_layout.tsx`                                                                                      | `tabRail`, `tabRailBorder`, active tab face `background`, inactive icon `iconMuted`; ⚠ Overview tab color `#475569`/ternary → `textMuted`                                                                          |
+| Cards             | `Card` (all 3 variants), `FeatureStatCard`, `EmptyStateCard`, `StatBlock`                                     | `surface`, `surfaceElevated`, `border`, `text`, `textMuted`; ⚠ drop `border-slate-200` class                                                                                                                       |
+| Page headers      | `PageHeader`, `SectionTitle`                                                                                  | `text`, `textMuted`                                                                                                                                                                                                |
+| Buttons           | `Button`                                                                                                      | ⚠ primary → `button`/`buttonText` + `buttonHover`/`buttonActive` (replaces `bg-brand-500`); danger → `dangerText`-family fills (replaces `#ef4444`); ghost → `surfaceElevated`/`border`/`text` (already tokenized) |
+| Chips & filters   | `PillChip`                                                                                                    | inactive `surfaceElevated`/`border`/`textMuted` (done); active keeps section color by design; non-section chips (Settings mode chips) → `button`/`buttonText`                                                      |
+| Inputs            | `TextField`, `NumberStepperField`                                                                             | `surface`, `border`, `text`, `textMuted` placeholder; focus ring → `primary` (new affordance, web)                                                                                                                 |
+| Modals & dialogs  | `Modal`, `useConfirmationDialog`, `LinkedActionTargetPickerModal`, `CalorieGoalModal`, `SavedMealSearchModal` | `background`, `border`, `text`; ⚠ scrim `rgba(0,0,0,0.5)` → `overlay`                                                                                                                                              |
+| Menus / pickers   | target pickers, saved-meal search results                                                                     | `surface`, `surfaceHover` (new hover), `surfaceActive` (pressed), `border`                                                                                                                                         |
+| Notifications     | `InAppNoticeBanner`                                                                                           | `surface`, `text`, `textMuted`, `iconMuted`; ⚠ `NOTICE_ACCENT #2563eb` → `accent` (+ `${accent}16` icon well)                                                                                                      |
+| Tables / lists    | `TodoItem`, workout tables, `SwipeableCard`, `SwipeRightActions`                                              | `surface`, `border`, `text`, `textMuted`; swipe action fills stay semantic (danger = `dangerText` family, complete = `successText` family) ⚠                                                                       |
+| Status/error text | `ValidationError`, inline `#b91c1c`/`#92400e` literals                                                        | ⚠ → `dangerText`, `warningText`, `successText`                                                                                                                                                                     |
+| Charts            | `DailyCalorieChart`, `MacroDonutChart`, `ProgressRing`, `HabitCircle`                                         | axis/labels → `textMuted`; grid/track → `border`; series stay section-colored ⚠                                                                                                                                    |
+| Heatmap           | `GitHubHeatmap`                                                                                               | ⚠ empty cell `#e2e8f0` → `border`; labels `#94a3b8` → `iconMuted`; legend chip `#f1f5f9` → `surfaceElevated`; intensity ramp stays section green                                                                   |
+| Neutral screens   | Settings, Command, Overview accents (`#475569`)                                                               | ⚠ → `textMuted` (as the "neutral accent"), removing the dark-mode ternaries                                                                                                                                        |
+| Status bar / PWA  | `StatusBar`, `<meta theme-color>`, `global.css`                                                               | `statusBarStyle`, `webThemeColor`, `--sh-background` (§5.3)                                                                                                                                                        |
 
 Deliberately **not** themed: section identity colors (fills/series), the habit "garden" illustration greens (`FocusSprout`, `GardenGrid` — botanical, not chrome), and semantic red/green meaning (recolorable per theme, but never repurposed).
 
@@ -546,10 +547,10 @@ The Settings ▸ Appearance card grows from three mode chips into a two-level pi
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **`ThemePreviewCard`** (new `core/ui` primitive): a ~72×56 swatch rendered *from the theme's own tokens* — background field, floating `surface` chip, `primary` dot, two `text`/`textMuted` strokes — plus name and a `Light`/`Dark` badge. Selected card shows a `primary`-colored ring + check. Cards are `accessibilityRole="radio"` within a labeled radio group, and the name text is real text (screen-reader friendly), never baked into an image.
+- **`ThemePreviewCard`** (new `core/ui` primitive): a ~72×56 swatch rendered _from the theme's own tokens_ — background field, floating `surface` chip, `primary` dot, two `text`/`textMuted` strokes — plus name and a `Light`/`Dark` badge. Selected card shows a `primary`-colored ring + check. Cards are `accessibilityRole="radio"` within a labeled radio group, and the name text is real text (screen-reader friendly), never baked into an image.
 - **Interaction:** tapping a card calls `setTheme(id)` — instant, whole-app live preview (the provider re-renders; no confirmation step, no restart). The mode chips keep their exact current behavior. When mode is `light`, the night row stays visible but dimmed with the caption "shown when Dark mode is active" (and vice versa), teaching the slot model passively.
 - **Ordering:** Light/Dark defaults first, then by catalog order. With 12+ themes per row, horizontal scroll (`HorizontalScrollArea` already exists) beats a grid on phones.
-- The existing "Current selection" info row and `FeatureStatCard` ("Theme mode") extend to show the active theme name, e.g. *"Nord Arctic · Dark · following system."*
+- The existing "Current selection" info row and `FeatureStatCard` ("Theme mode") extend to show the active theme name, e.g. _"Nord Arctic · Dark · following system."_
 
 ---
 
@@ -557,10 +558,10 @@ The Settings ▸ Appearance card grows from three mode chips into a two-level pi
 
 **Storage** (AsyncStorage, alongside the existing key):
 
-| Key | Value | Notes |
-|---|---|---|
-| `superhabits.theme.mode` | `"system" \| "light" \| "dark"` | **unchanged** — v1 key keeps working as-is |
-| `superhabits.theme.slots.v2` | `{"lightThemeId":"solarized","darkThemeId":"nord-arctic"}` | new; JSON; written on every `setTheme` |
+| Key                          | Value                                                      | Notes                                      |
+| ---------------------------- | ---------------------------------------------------------- | ------------------------------------------ |
+| `superhabits.theme.mode`     | `"system" \| "light" \| "dark"`                            | **unchanged** — v1 key keeps working as-is |
+| `superhabits.theme.slots.v2` | `{"lightThemeId":"solarized","darkThemeId":"nord-arctic"}` | new; JSON; written on every `setTheme`     |
 
 **Why not one combined JSON blob:** reusing the v1 mode key means zero migration for the mode itself, old builds remain forward-compatible (they simply ignore the slots key), and a corrupted slots value degrades to the current behavior — exactly the failure mode the app has today.
 
@@ -578,7 +579,7 @@ Phased so every phase ships green (`typecheck`, `vitest`, `build:web`, Playwrigh
 Create `core/theme/` (types, factory, registry) and move `LIGHT_TOKENS`/`DARK_TOKENS` into `themes/light.ts` / `themes/dark.ts`, widened with the new roles at their current effective values (button = brand purple, accent = brand text purple, notice accent stays blue via `accent` only after Phase 1). Rewire `ThemeProvider` to the registry + slot resolution + CSS custom properties. `useAppTheme()` keeps its shape (superset), so **zero consumer edits compile-break**. Add `validate-theme-contrast` to CI.
 
 **Phase 1 — Primitive sweep (`core/ui`).**
-`Button` (token fills + pressed/hover states via `Pressable` state callback), `Card` (drop slate class), `Modal` (`overlay`), `PillChip` (non-section usage), `InAppNoticeBanner` (`accent`), `TextField`/`NumberStepperField` (focus ring), `SwipeRightActions`, `EmptyStateCard`, `StatBlock`, `ValidationError` (`dangerText`). After this phase, *any* registered theme renders correctly in all shared chrome.
+`Button` (token fills + pressed/hover states via `Pressable` state callback), `Card` (drop slate class), `Modal` (`overlay`), `PillChip` (non-section usage), `InAppNoticeBanner` (`accent`), `TextField`/`NumberStepperField` (focus ring), `SwipeRightActions`, `EmptyStateCard`, `StatBlock`, `ValidationError` (`dangerText`). After this phase, _any_ registered theme renders correctly in all shared chrome.
 
 **Phase 2 — Screen sweep (`features/`, `app/`).**
 Remove `resolvedTheme` ternaries and neutral-accent literals in Settings/Command/Overview (→ `textMuted`), tab layout Overview color, restore-warning/error literals (→ `warningText`/`dangerText`), success literals (→ `successText`). Introduce `getSectionAccents(appearance)` and migrate `SECTION_COLORS_LIGHT` chip/tint usages.
@@ -605,12 +606,12 @@ Estimated diff surface: ~25 files, of which ~14 are new theme/infra files; phase
 
 ## 13. Risks & Open Questions
 
-| Risk | Mitigation |
-|---|---|
-| Section accents look off on an exotic theme | `sectionOverrides` escape hatch (§7); only 2 of 12 proposed themes need it |
-| Red-primary theme vs. destructive-action affordance | Crimson overrides danger set + danger actions keep icon/copy signals (§6.7) |
-| NativeWind class caching fights dynamic colors | Avoided by policy: dynamic color never goes through Tailwind classes (§5.4) |
-| Theme count creep degrades the picker | Horizontal-scroll rows scale to ~20; beyond that, group by appearance into a modal gallery (registry already carries the metadata) |
+| Risk                                                                          | Mitigation                                                                                                                               |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Section accents look off on an exotic theme                                   | `sectionOverrides` escape hatch (§7); only 2 of 12 proposed themes need it                                                               |
+| Red-primary theme vs. destructive-action affordance                           | Crimson overrides danger set + danger actions keep icon/copy signals (§6.7)                                                              |
+| NativeWind class caching fights dynamic colors                                | Avoided by policy: dynamic color never goes through Tailwind classes (§5.4)                                                              |
+| Theme count creep degrades the picker                                         | Horizontal-scroll rows scale to ~20; beyond that, group by appearance into a modal gallery (registry already carries the metadata)       |
 | Contrast math ≠ perception (e.g., pure-saturated accents can shimmer on dark) | Catalog already tones neon usage (§6.10); preview strip in the picker lets users judge before committing — and switching back is one tap |
 
 Open questions for the team:

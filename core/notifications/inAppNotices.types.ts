@@ -1,4 +1,4 @@
-import type { Href } from "expo-router";
+import type { Href } from 'expo-router';
 
 export type InAppNoticeContext = {
   feature: string;
@@ -9,12 +9,12 @@ export type InAppNoticeContext = {
 
 export type InAppNoticeDestination =
   | {
-      kind: "href";
+      kind: 'href';
       href: Href;
       label?: string;
     }
   | {
-      kind: "linked-actions-target";
+      kind: 'linked-actions-target';
       href: Href;
       feature: string;
       entityType: string;
@@ -23,7 +23,7 @@ export type InAppNoticeDestination =
     };
 
 export type LinkedActionsNoticePayload = {
-  kind: "linked-actions";
+  kind: 'linked-actions';
   message: string;
   reason: string;
   source: InAppNoticeContext;

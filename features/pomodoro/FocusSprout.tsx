@@ -1,8 +1,8 @@
-import React from "react";
-import { View } from "react-native";
-import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
-import { POMODORO_SECTION_KEY, SECTION_COLORS } from "@/constants/sectionColors";
-import type { PlantStage } from "./pomodoro.domain";
+import React from 'react';
+import { View } from 'react-native';
+import Svg, { Circle, Ellipse, Line, Path } from 'react-native-svg';
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
+import type { PlantStage } from './pomodoro.domain';
 
 type Props = {
   progress: number; // 0–1
@@ -50,17 +50,17 @@ function FocusSproutInner({
 
   // Leaf scale — appears at seedling, grows to full at grown
   const leafScale =
-    stage === "seed" || stage === "sprout"
+    stage === 'seed' || stage === 'sprout'
       ? 0
-      : stage === "seedling"
+      : stage === 'seedling'
         ? 0.6
-        : stage === "growing"
+        : stage === 'growing'
           ? 0.85
           : 1.0;
 
-  const soilColor = "#92764f";
+  const soilColor = '#92764f';
   const stemColor = accentColor;
-  const leafColor = "#22c55e"; // green-500
+  const leafColor = '#22c55e'; // green-500
   const crownColor = accentColor;
 
   return (
@@ -70,7 +70,7 @@ function FocusSproutInner({
         <Ellipse cx={80} cy={132} rx={36} ry={10} fill={soilColor} opacity={0.6} />
 
         {/* Stem — grows upward */}
-        {stage !== "seed" && (
+        {stage !== 'seed' && (
           <Line
             x1={stemX}
             y1={128}
@@ -83,7 +83,7 @@ function FocusSproutInner({
         )}
 
         {/* Seed bump (stage: seed only) */}
-        {stage === "seed" && (
+        {stage === 'seed' && (
           <Ellipse cx={80} cy={128} rx={8} ry={6} fill={stemColor} opacity={0.8} />
         )}
 
@@ -114,7 +114,7 @@ function FocusSproutInner({
         )}
 
         {/* Crown — appears only at grown stage */}
-        {stage === "grown" && (
+        {stage === 'grown' && (
           <>
             <Circle cx={stemX} cy={stemTop - 10} r={18} fill={leafColor} opacity={0.85} />
             <Circle cx={stemX - 14} cy={stemTop - 4} r={12} fill={leafColor} opacity={0.75} />

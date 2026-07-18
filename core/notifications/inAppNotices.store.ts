@@ -1,4 +1,4 @@
-import type { AppNotice } from "./inAppNotices.types";
+import type { AppNotice } from './inAppNotices.types';
 
 export type InAppNoticeState = {
   notices: AppNotice[];

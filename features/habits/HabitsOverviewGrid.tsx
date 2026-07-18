@@ -1,24 +1,26 @@
-import React from "react";
-import { MaterialIcons } from "@expo/vector-icons";
-import { View, Text } from "react-native";
-import { Card } from "@/core/ui/Card";
-import type { HeatmapDay } from "@/features/shared/activityTypes";
-import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+import React from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Card } from '@/core/ui/Card';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
+import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
 
 type Props = {
   consistencyPercent: number;
   heatmapDays: HeatmapDay[];
 };
 
-const HEATMAP_LEGEND: Array<{ label: string; color: string }> = [
-  { label: "None", color: "#e2e8f0" },
-  { label: "Some", color: `${SECTION_COLORS.habits}55` },
-  { label: "Most", color: `${SECTION_COLORS.habits}99` },
-  { label: "All", color: SECTION_COLORS.habits },
-];
-
 function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
+  const { tokens } = useAppTheme();
+  const heatmapLegend: { label: string; color: string }[] = [
+    { label: 'None', color: tokens.border },
+    { label: 'Some', color: `${SECTION_COLORS.habits}55` },
+    { label: 'Most', color: `${SECTION_COLORS.habits}99` },
+    { label: 'All', color: SECTION_COLORS.habits },
+  ];
+
   return (
     <View className="w-full items-center">
       <Card
@@ -33,21 +35,21 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
               className="h-11 w-11 items-center justify-center rounded-xl"
               style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
             >
-              <MaterialIcons
-                name="track-changes"
-                size={22}
-                color={SECTION_TEXT_COLORS.habits}
-              />
+              <MaterialIcons name="track-changes" size={22} color={SECTION_TEXT_COLORS.habits} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text className="text-base font-semibold text-slate-900">Consistency</Text>
-              <Text className="mt-0.5 text-sm text-slate-500">All habits over the last 52 weeks</Text>
+              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                Consistency
+              </Text>
+              <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
+                All habits over the last 52 weeks
+              </Text>
             </View>
             <View className="items-end">
               <Text
                 style={{
                   fontSize: 28,
-                  fontWeight: "700",
+                  fontWeight: '700',
                   color: SECTION_TEXT_COLORS.habits,
                 }}
               >
@@ -64,7 +66,7 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
           />
 
           <View className="mt-3 w-full flex-row flex-wrap items-center gap-3">
-            {HEATMAP_LEGEND.map((l) => (
+            {heatmapLegend.map((l) => (
               <View key={l.label} className="flex-row items-center gap-1">
                 <View
                   style={{
@@ -74,7 +76,7 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
                     backgroundColor: l.color,
                   }}
                 />
-                <Text style={{ fontSize: 11, color: "#94a3b8" }}>{l.label}</Text>
+                <Text style={{ fontSize: 11, color: tokens.textMuted }}>{l.label}</Text>
               </View>
             ))}
           </View>

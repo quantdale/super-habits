@@ -1,6 +1,6 @@
-import type { HabitCompletion } from "./types";
-import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
-import { buildDateRange, buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
+import type { HabitCompletion } from './types';
+import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import { buildDateRange, buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
 
 function buildEmptyActivityDays(days: number): ActivityDay[] {
   return buildDateRange(days).map((dateKey) => ({
@@ -106,8 +106,8 @@ export function calculateLongestStreak(dayCompletions: DayCompletion[]): number 
  * Used in HabitCircle below the ring.
  */
 export function getStreakLabel(streak: number): string {
-  if (streak === 0) return "";
-  if (streak === 1) return "1 day";
+  if (streak === 0) return '';
+  if (streak === 1) return '1 day';
   return `${streak} days`;
 }
 
@@ -148,15 +148,14 @@ export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
     const dateKey = `${y}-${m}-${dd}`;
 
     headers.push({
       dateKey,
       dayLabel: String(d.getDate()),
-      monthLabel:
-        d.getDate() === 1 ? d.toLocaleDateString("en", { month: "short" }) : null,
+      monthLabel: d.getDate() === 1 ? d.toLocaleDateString('en', { month: 'short' }) : null,
       isToday: dateKey === todayKey,
     });
   }
@@ -167,13 +166,13 @@ export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
  * Build the full habits × days grid for the overview.
  */
 export function buildHabitGrid(
-  habits: Array<{
+  habits: {
     id: string;
     name: string;
     color: string;
     target_per_day: number;
-  }>,
-  completions: Array<{ habit_id: string; date_key: string; count: number }>,
+  }[],
+  completions: { habit_id: string; date_key: string; count: number }[],
   days: number = 364,
 ): HabitGridRow[] {
   const lookup = new Map<string, Map<string, number>>();

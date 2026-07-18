@@ -1,12 +1,12 @@
-import { preflightCommandDraft } from "./command.domain";
+import { preflightCommandDraft } from './command.domain';
 import {
   getAiCommandParseConfig,
   isAiCommandInternalRolloutAvailable,
   isAiCommandRemoteModeEnabled,
-} from "./commandConfig";
-import { getAiCommandInternalRolloutPreference } from "./commandInternalRollout";
-import { mockCommandParser } from "./mockCommandParser";
-import { realCommandParser } from "./realCommandParser";
+} from './commandConfig';
+import { getAiCommandInternalRolloutPreference } from './commandInternalRollout';
+import { mockCommandParser } from './mockCommandParser';
+import { realCommandParser } from './realCommandParser';
 import type {
   AiCommandParser,
   CommandParseExecution,
@@ -15,34 +15,34 @@ import type {
   ParseCommandResult,
   ParsePath,
   ParseReasonCode,
-} from "./types";
+} from './types';
 
 function annotateFallbackResult(result: ParseCommandResult): ParseCommandResult {
-  if (result.outcome !== "draft") {
+  if (result.outcome !== 'draft') {
     return result;
   }
 
   return {
-    outcome: "draft",
+    outcome: 'draft',
     draft: {
       ...result.draft,
-      parserKind: "model_proxy_fallback",
+      parserKind: 'model_proxy_fallback',
     },
   };
 }
 
-function getLatencyBucket(latencyMs: number): CommandParseObservation["latencyBucket"] {
-  if (latencyMs < 500) return "fast";
-  if (latencyMs < 1500) return "noticeable";
-  return "frustrating";
+function getLatencyBucket(latencyMs: number): CommandParseObservation['latencyBucket'] {
+  if (latencyMs < 500) return 'fast';
+  if (latencyMs < 1500) return 'noticeable';
+  return 'frustrating';
 }
 
 function getReasonCode(result: ParseCommandResult): ParseReasonCode | null {
-  if (result.outcome === "unsupported") {
-    return result.reasonCode ?? "unsupported";
+  if (result.outcome === 'unsupported') {
+    return result.reasonCode ?? 'unsupported';
   }
 
-  if (result.outcome === "unavailable") {
+  if (result.outcome === 'unavailable') {
     return result.reasonCode;
   }
 
@@ -57,10 +57,11 @@ function buildObservation(
   return {
     effectivePath,
     outcome: result.outcome,
-    draftStatus: result.outcome === "draft" ? result.draft.status : null,
-    warningCodes: result.outcome === "draft" ? result.draft.warnings.map((warning) => warning.code) : [],
+    draftStatus: result.outcome === 'draft' ? result.draft.status : null,
+    warningCodes:
+      result.outcome === 'draft' ? result.draft.warnings.map((warning) => warning.code) : [],
     missingFieldNames:
-      result.outcome === "draft"
+      result.outcome === 'draft'
         ? result.draft.missingFields.map((missingField) => missingField.field)
         : [],
     latencyMs,
@@ -85,7 +86,7 @@ export class CommandParserFacade implements AiCommandParser {
         ? await getAiCommandInternalRolloutPreference()
         : false;
       const effectivePath: ParsePath =
-        remoteCapabilityAvailable && localInternalPreference ? "remote" : "mock";
+        remoteCapabilityAvailable && localInternalPreference ? 'remote' : 'mock';
       const latencyMs = Date.now() - startedAt;
       return {
         result: preflight,
@@ -99,25 +100,23 @@ export class CommandParserFacade implements AiCommandParser {
       ? await getAiCommandInternalRolloutPreference()
       : false;
     const shouldAttemptRemote =
-      isAiCommandRemoteModeEnabled(config) &&
-      remoteCapabilityAvailable &&
-      localInternalPreference;
+      isAiCommandRemoteModeEnabled(config) && remoteCapabilityAvailable && localInternalPreference;
 
     if (!shouldAttemptRemote) {
       const result = await mockCommandParser.parse(input);
       const latencyMs = Date.now() - startedAt;
       return {
         result,
-        observation: buildObservation(result, "mock", latencyMs),
+        observation: buildObservation(result, 'mock', latencyMs),
       };
     }
 
     const remoteResult = await realCommandParser.parse(input);
-    if (remoteResult.outcome !== "unavailable") {
+    if (remoteResult.outcome !== 'unavailable') {
       const latencyMs = Date.now() - startedAt;
       return {
         result: remoteResult,
-        observation: buildObservation(remoteResult, "remote", latencyMs),
+        observation: buildObservation(remoteResult, 'remote', latencyMs),
       };
     }
 
@@ -126,13 +125,13 @@ export class CommandParserFacade implements AiCommandParser {
       const latencyMs = Date.now() - startedAt;
       return {
         result: fallbackResult,
-        observation: buildObservation(fallbackResult, "remote_with_fallback", latencyMs),
+        observation: buildObservation(fallbackResult, 'remote_with_fallback', latencyMs),
       };
     } catch {
       const latencyMs = Date.now() - startedAt;
       return {
         result: remoteResult,
-        observation: buildObservation(remoteResult, "remote", latencyMs),
+        observation: buildObservation(remoteResult, 'remote', latencyMs),
       };
     }
   }

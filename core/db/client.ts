@@ -1,11 +1,11 @@
-import { Platform } from "react-native";
-import * as SQLite from "expo-sqlite";
-import { appMetaKeys, getAppMetaText, setAppMetaText } from "@/core/db/appMeta";
+import { Platform } from 'react-native';
+import * as SQLite from 'expo-sqlite';
+import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const bootstrapStatements = [
-  ...(Platform.OS === "web" ? [] : ["PRAGMA journal_mode = WAL;"]),
+  ...(Platform.OS === 'web' ? [] : ['PRAGMA journal_mode = WAL;']),
   `CREATE TABLE IF NOT EXISTS todos (
     id TEXT PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
@@ -126,18 +126,18 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   const version = schemaVersion ? parseInt(schemaVersion, 10) : 0;
   if (version < 2) {
     await applyMigration(db, 2, async () => {
-      await addColumnIfMissing(db, "habits", "category", "TEXT NOT NULL DEFAULT 'anytime'");
+      await addColumnIfMissing(db, 'habits', 'category', "TEXT NOT NULL DEFAULT 'anytime'");
     });
   }
   if (version < 3) {
     await applyMigration(db, 3, async () => {
-      await addColumnIfMissing(db, "habits", "icon", "TEXT NOT NULL DEFAULT 'check-circle'");
-      await addColumnIfMissing(db, "habits", "color", "TEXT NOT NULL DEFAULT '#64748b'");
+      await addColumnIfMissing(db, 'habits', 'icon', "TEXT NOT NULL DEFAULT 'check-circle'");
+      await addColumnIfMissing(db, 'habits', 'color', "TEXT NOT NULL DEFAULT '#64748b'");
     });
   }
   if (version < 4) {
     await applyMigration(db, 4, async () => {
-      await addColumnIfMissing(db, "calorie_entries", "fiber", "REAL NOT NULL DEFAULT 0");
+      await addColumnIfMissing(db, 'calorie_entries', 'fiber', 'REAL NOT NULL DEFAULT 0');
     });
   }
   if (version < 5) {
@@ -147,15 +147,15 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     // No backfill — rationale is documented in the unified knowledge base.
     await applyMigration(db, 5, async () => {
       const cutoverIso = new Date().toISOString();
-      await setAppMetaText(db, appMetaKeys.dateKeyFormat, "local");
+      await setAppMetaText(db, appMetaKeys.dateKeyFormat, 'local');
       await setAppMetaText(db, appMetaKeys.dateKeyCutover, cutoverIso);
     });
   }
   if (version < 6) {
     await applyMigration(db, 6, async () => {
-      await addColumnIfMissing(db, "todos", "due_date", "TEXT");
-      await addColumnIfMissing(db, "todos", "priority", "TEXT NOT NULL DEFAULT 'normal'");
-      await addColumnIfMissing(db, "todos", "sort_order", "INTEGER NOT NULL DEFAULT 0");
+      await addColumnIfMissing(db, 'todos', 'due_date', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'priority', "TEXT NOT NULL DEFAULT 'normal'");
+      await addColumnIfMissing(db, 'todos', 'sort_order', 'INTEGER NOT NULL DEFAULT 0');
       await db.runAsync(
         `UPDATE todos SET sort_order = (
            SELECT COUNT(*) FROM todos t2
@@ -167,7 +167,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   if (version < 7) {
     await applyMigration(db, 7, async () => {
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS routine_exercises (
         id          TEXT PRIMARY KEY NOT NULL,
         routine_id  TEXT NOT NULL,
@@ -179,7 +179,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS routine_exercise_sets (
         id              TEXT PRIMARY KEY NOT NULL,
         exercise_id     TEXT NOT NULL,
@@ -192,7 +192,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS workout_session_exercises (
         id              TEXT PRIMARY KEY NOT NULL,
         log_id          TEXT NOT NULL,
@@ -205,7 +205,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   if (version < 8) {
     await applyMigration(db, 8, async () => {
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS saved_meals (
         id          TEXT PRIMARY KEY NOT NULL,
         food_name   TEXT NOT NULL,
@@ -221,7 +221,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_meals_food_name
       ON saved_meals (food_name COLLATE NOCASE);
     `);
@@ -229,13 +229,13 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   if (version < 9) {
     await applyMigration(db, 9, async () => {
-      await addColumnIfMissing(db, "todos", "recurrence", "TEXT");
-      await addColumnIfMissing(db, "todos", "recurrence_id", "TEXT");
+      await addColumnIfMissing(db, 'todos', 'recurrence', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'recurrence_id', 'TEXT');
     });
   }
   if (version < 10) {
     await applyMigration(db, 10, async () => {
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS linked_action_rules (
         id                      TEXT PRIMARY KEY NOT NULL,
         status                  TEXT NOT NULL,
@@ -256,7 +256,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_linked_action_rules_source_lookup
       ON linked_action_rules (
         status,
@@ -267,7 +267,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_linked_action_rules_bidirectional_group
       ON linked_action_rules (bidirectional_group_id);
     `);
@@ -275,7 +275,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   if (version < 11) {
     await applyMigration(db, 11, async () => {
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS linked_action_events (
         id                  TEXT PRIMARY KEY NOT NULL,
         chain_id            TEXT NOT NULL,
@@ -298,12 +298,12 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_linked_action_events_chain
       ON linked_action_events (chain_id, created_at DESC);
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_linked_action_events_source_lookup
       ON linked_action_events (
         source_feature,
@@ -314,7 +314,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE TABLE IF NOT EXISTS linked_action_executions (
         id                    TEXT PRIMARY KEY NOT NULL,
         rule_id               TEXT NOT NULL,
@@ -337,17 +337,17 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_linked_action_executions_source_rule
       ON linked_action_executions (rule_id, source_event_id);
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_linked_action_executions_chain_guard
       ON linked_action_executions (chain_id, rule_id, effect_fingerprint);
     `);
 
-    await db.execAsync(`
+      await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_linked_action_executions_chain
       ON linked_action_executions (chain_id, created_at DESC);
     `);
@@ -356,7 +356,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
-  const database = await SQLite.openDatabaseAsync("superhabits.db");
+  const database = await SQLite.openDatabaseAsync('superhabits.db');
   for (const statement of bootstrapStatements) {
     await database.execAsync(statement);
   }

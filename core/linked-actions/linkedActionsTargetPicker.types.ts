@@ -1,8 +1,8 @@
-import type { Href } from "expo-router";
+import type { Href } from 'expo-router';
 import type {
   LinkedActionFeature,
   LinkedActionTargetEntityType,
-} from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActions.types';
 
 export type LinkedActionTargetPickerCandidate = {
   id: string;
@@ -11,7 +11,7 @@ export type LinkedActionTargetPickerCandidate = {
 };
 
 export type LinkedActionTargetCreateNewHandoff = {
-  kind: "module_handoff";
+  kind: 'module_handoff';
   feature: LinkedActionFeature;
   entityType: LinkedActionTargetEntityType;
   title: string;
@@ -45,22 +45,22 @@ export type LinkedActionTargetPickerProvider = {
 
 export type LinkedActionTargetPickerSelection =
   | {
-      kind: "existing";
+      kind: 'existing';
       feature: LinkedActionFeature;
       entityType: LinkedActionTargetEntityType;
       candidate: LinkedActionTargetPickerCandidate;
     }
   | {
-      kind: "create_new";
+      kind: 'create_new';
       handoff: LinkedActionTargetCreateNewHandoff;
     };
 
 export function createLinkedActionTargetExistingSelection(
-  provider: Pick<LinkedActionTargetPickerProvider, "feature" | "entityType">,
+  provider: Pick<LinkedActionTargetPickerProvider, 'feature' | 'entityType'>,
   candidate: LinkedActionTargetPickerCandidate,
 ): LinkedActionTargetPickerSelection {
   return {
-    kind: "existing",
+    kind: 'existing',
     feature: provider.feature,
     entityType: provider.entityType,
     candidate,
@@ -71,7 +71,7 @@ export function createLinkedActionTargetCreateNewSelection(
   handoff: LinkedActionTargetCreateNewHandoff,
 ): LinkedActionTargetPickerSelection {
   return {
-    kind: "create_new",
+    kind: 'create_new',
     handoff,
   };
 }

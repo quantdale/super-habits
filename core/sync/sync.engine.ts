@@ -1,10 +1,10 @@
-import { SupabaseSyncAdapter } from "@/core/sync/supabase.adapter";
+import { SupabaseSyncAdapter } from '@/core/sync/supabase.adapter';
 
 export type SyncRecord = {
   entity: string;
   id: string;
   updatedAt: string;
-  operation: "create" | "update" | "delete";
+  operation: 'create' | 'update' | 'delete';
 };
 
 export interface SyncAdapter {
@@ -13,12 +13,12 @@ export interface SyncAdapter {
 }
 
 export class NoopSyncAdapter implements SyncAdapter {
-  async push(_records: SyncRecord[]) {
-    return;
+  push(_records: SyncRecord[]) {
+    return Promise.resolve();
   }
 
-  async pull(_since: string | null) {
-    return [];
+  pull(_since: string | null) {
+    return Promise.resolve<SyncRecord[]>([]);
   }
 }
 

@@ -1,4 +1,4 @@
-import { Page } from "@playwright/test";
+import { Page } from '@playwright/test';
 
 /**
  * Clear all SQLite data for a fresh test state.
@@ -9,16 +9,16 @@ export async function clearDatabase(page: Page) {
   await page.evaluate(async () => {
     const root = await navigator.storage.getDirectory();
     try {
-      await root.removeEntry("superhabits.db", { recursive: true });
+      await root.removeEntry('superhabits.db', { recursive: true });
     } catch {
       // File may not exist yet — that is fine
     }
     try {
-      await root.removeEntry("superhabits.db-wal", { recursive: true });
+      await root.removeEntry('superhabits.db-wal', { recursive: true });
     } catch {}
     try {
-      await root.removeEntry("superhabits.db-shm", { recursive: true });
+      await root.removeEntry('superhabits.db-shm', { recursive: true });
     } catch {}
   });
-  await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
 }

@@ -1,10 +1,10 @@
-import type { PomodoroSession } from "./types";
-import type { HeatmapDay } from "@/features/shared/activityTypes";
-import { buildDateRangeOldestFirst, timestampToLocalDateKey } from "@/lib/time";
+import type { PomodoroSession } from './types';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
+import { buildDateRangeOldestFirst, timestampToLocalDateKey } from '@/lib/time';
 
-export type PomodoroState = "idle" | "running" | "finished";
+export type PomodoroState = 'idle' | 'running' | 'finished';
 
-export type PomodoroMode = "focus" | "short_break" | "long_break";
+export type PomodoroMode = 'focus' | 'short_break' | 'long_break';
 
 export type PomodoroSettings = {
   focusMinutes: number;
@@ -28,11 +28,11 @@ export const FOCUS_SECONDS = DEFAULT_SETTINGS.focusMinutes * 60;
  */
 export function getModeDuration(mode: PomodoroMode, settings: PomodoroSettings): number {
   switch (mode) {
-    case "focus":
+    case 'focus':
       return settings.focusMinutes * 60;
-    case "short_break":
+    case 'short_break':
       return settings.shortBreakMinutes * 60;
-    case "long_break":
+    case 'long_break':
       return settings.longBreakMinutes * 60;
   }
 }
@@ -52,8 +52,8 @@ export function getNextMode(
   completedFocusSessions: number,
   settings: PomodoroSettings,
 ): PomodoroMode {
-  if (currentMode === "short_break" || currentMode === "long_break") {
-    return "focus";
+  if (currentMode === 'short_break' || currentMode === 'long_break') {
+    return 'focus';
   }
   // currentMode === "focus"
   // Guard: at least one session must be completed before
@@ -62,19 +62,19 @@ export function getNextMode(
     completedFocusSessions > 0 &&
     completedFocusSessions % settings.sessionsBeforeLongBreak === 0
   ) {
-    return "long_break";
+    return 'long_break';
   }
-  return "short_break";
+  return 'short_break';
 }
 
 export function getModeLabel(mode: PomodoroMode): string {
   switch (mode) {
-    case "focus":
-      return "Focus";
-    case "short_break":
-      return "Short Break";
-    case "long_break":
-      return "Long Break";
+    case 'focus':
+      return 'Focus';
+    case 'short_break':
+      return 'Short Break';
+    case 'long_break':
+      return 'Long Break';
   }
 }
 
@@ -84,12 +84,12 @@ export function getModeLabel(mode: PomodoroMode): string {
  */
 export function getModeColor(mode: PomodoroMode): { bg: string; text: string; bar: string } {
   switch (mode) {
-    case "focus":
-      return { bg: "bg-brand-500", text: "text-brand-500", bar: "bg-brand-500" };
-    case "short_break":
-      return { bg: "bg-emerald-500", text: "text-emerald-500", bar: "bg-emerald-500" };
-    case "long_break":
-      return { bg: "bg-violet-500", text: "text-violet-500", bar: "bg-violet-500" };
+    case 'focus':
+      return { bg: 'bg-brand-500', text: 'text-brand-500', bar: 'bg-brand-500' };
+    case 'short_break':
+      return { bg: 'bg-emerald-500', text: 'text-emerald-500', bar: 'bg-emerald-500' };
+    case 'long_break':
+      return { bg: 'bg-violet-500', text: 'text-violet-500', bar: 'bg-violet-500' };
   }
 }
 
@@ -98,7 +98,7 @@ export function getModeColor(mode: PomodoroMode): { bg: string; text: string; ba
  * Returns null for invalid input.
  */
 export function parseMinutesSeconds(input: string): { minutes: number; seconds: number } | null {
-  const parts = input.split(":");
+  const parts = input.split(':');
   if (parts.length !== 2) return null;
   const m = parseInt(parts[0], 10);
   const s = parseInt(parts[1], 10);
@@ -107,9 +107,9 @@ export function parseMinutesSeconds(input: string): { minutes: number; seconds: 
 }
 
 export function nextPomodoroState(remainingSeconds: number, isRunning: boolean): PomodoroState {
-  if (remainingSeconds <= 0) return "finished";
-  if (isRunning) return "running";
-  return "idle";
+  if (remainingSeconds <= 0) return 'finished';
+  if (isRunning) return 'running';
+  return 'idle';
 }
 
 /**
@@ -129,18 +129,18 @@ export function calculateGrowthProgress(
 }
 
 export type PlantStage =
-  | "seed" // 0–10% — small bump in soil
-  | "sprout" // 10–35% — first shoot appears
-  | "seedling" // 35–65% — small plant with leaves
-  | "growing" // 65–90% — taller plant
-  | "grown"; // 90–100% — full plant
+  | 'seed' // 0–10% — small bump in soil
+  | 'sprout' // 10–35% — first shoot appears
+  | 'seedling' // 35–65% — small plant with leaves
+  | 'growing' // 65–90% — taller plant
+  | 'grown'; // 90–100% — full plant
 
 export function getPlantStage(progress: number): PlantStage {
-  if (progress < 0.1) return "seed";
-  if (progress < 0.35) return "sprout";
-  if (progress < 0.65) return "seedling";
-  if (progress < 0.9) return "growing";
-  return "grown";
+  if (progress < 0.1) return 'seed';
+  if (progress < 0.35) return 'sprout';
+  if (progress < 0.65) return 'seedling';
+  if (progress < 0.9) return 'growing';
+  return 'grown';
 }
 
 /**
@@ -163,17 +163,17 @@ export function formatSessionTime(startedAt: string): string {
     date.getMonth() === today.getMonth() &&
     date.getDate() === today.getDate();
 
-  const time = date.toLocaleTimeString("en", {
-    hour: "2-digit",
-    minute: "2-digit",
+  const time = date.toLocaleTimeString('en', {
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   });
 
   if (isToday) return `Today ${time}`;
   return (
-    date.toLocaleDateString("en", {
-      month: "short",
-      day: "numeric",
+    date.toLocaleDateString('en', {
+      month: 'short',
+      day: 'numeric',
     }) + ` ${time}`
   );
 }

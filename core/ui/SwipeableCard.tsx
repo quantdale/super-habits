@@ -1,9 +1,9 @@
-import { useRef, type ReactNode } from "react";
-import { type StyleProp, View, type ViewStyle } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { Card } from "./Card";
-import { SwipeRightActions } from "./SwipeRightActions";
+import { useRef, type ReactNode } from 'react';
+import { type StyleProp, View, type ViewStyle } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Card } from './Card';
+import { SwipeRightActions } from './SwipeRightActions';
 
 type Props = {
   children: ReactNode;
@@ -39,18 +39,12 @@ export function SwipeableCard({ children, accentColor, style, compact, onEdit, o
   };
 
   return (
-    <Card
-      variant="standard"
-      accentColor={accentColor}
-      className="mb-0 overflow-hidden"
-      innerClassName="p-0"
-      style={style}
-    >
+    <Card variant="standard" className="mb-0 overflow-hidden" innerClassName="p-0" style={style}>
       <Swipeable
         ref={swipeableRef}
         renderRightActions={() => (
           <SwipeRightActions
-            editColor={accentColor ?? "#64748b"}
+            editColor={accentColor ?? tokens.textMuted}
             onEdit={handleEdit}
             onDelete={handleDelete}
             compact={compact}
@@ -61,8 +55,8 @@ export function SwipeableCard({ children, accentColor, style, compact, onEdit, o
       >
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "stretch",
+            flexDirection: 'row',
+            alignItems: 'stretch',
             backgroundColor: tokens.surface,
           }}
         >

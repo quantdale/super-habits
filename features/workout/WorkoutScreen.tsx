@@ -1,16 +1,18 @@
-import { useCallback, useState } from "react";
-import { Alert, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import { RectButton } from "react-native-gesture-handler";
-import { Screen } from "@/core/ui/Screen";
-import { Card } from "@/core/ui/Card";
-import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { TextField } from "@/core/ui/TextField";
-import { Button } from "@/core/ui/Button";
-import { FeatureStatCard } from "@/core/ui/FeatureStatCard";
-import type { WorkoutRoutine } from "./types";
+import { useCallback, useState } from 'react';
+import { Alert, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { RectButton } from 'react-native-gesture-handler';
+import { Screen } from '@/core/ui/Screen';
+import { Card } from '@/core/ui/Card';
+import { useCommandLauncherSuppressed } from '@/features/command/CommandCenterProvider';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { TextField } from '@/core/ui/TextField';
+import { Button } from '@/core/ui/Button';
+import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
+import type { WorkoutRoutine, RoutineWithExercises } from './types';
 import {
   addRoutine,
   completeRoutine,
@@ -18,30 +20,29 @@ import {
   getRoutineWithExercises,
   listRoutines,
   listWorkoutLogsForRange,
-} from "@/features/workout/workout.data";
+} from '@/features/workout/workout.data';
 import {
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
-} from "@/features/workout/workout.domain";
-import type { ActivityDay, HeatmapDay } from "@/features/shared/activityTypes";
-import { GitHubHeatmap } from "@/features/shared/GitHubHeatmap";
-import { toDateKey } from "@/lib/time";
-import { useFocusForegroundRefresh } from "@/lib/useForegroundRefresh";
-import { RoutineDetailModal } from "./RoutineDetailScreen";
-import { WorkoutSessionScreen } from "./WorkoutSessionScreen";
-import type { RoutineWithExercises } from "./types";
-import { SECTION_COLORS } from "@/constants/sectionColors";
-import { SwipeableCard } from "@/core/ui/SwipeableCard";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { useConfirmationDialog } from "@/core/ui/useConfirmationDialog";
-import { validateRoutineName } from "@/lib/validation";
-import { SECTION_TEXT_COLORS } from "@/constants/sectionColors";
+} from '@/features/workout/workout.domain';
+import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import { toDateKey } from '@/lib/time';
+import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { RoutineDetailModal } from './RoutineDetailScreen';
+import { WorkoutSessionScreen } from './WorkoutSessionScreen';
+
+import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SwipeableCard } from '@/core/ui/SwipeableCard';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { validateRoutineName } from '@/lib/validation';
 
 const COLOR = SECTION_COLORS.workout;
 const TEXT_COLOR = SECTION_TEXT_COLORS.workout;
 
-type ViewState = { type: "list" } | { type: "session"; routine: RoutineWithExercises };
+type ViewState = { type: 'list' } | { type: 'session'; routine: RoutineWithExercises };
 
 type RoutineModalState = { routineId: string; routineName: string };
 
@@ -58,6 +59,7 @@ function RoutineSwipeRow({
   onRequestDelete: () => void | Promise<void>;
   accentColor: string;
 }) {
+  const { tokens } = useAppTheme();
   return (
     <SwipeableCard
       accentColor={accentColor}
@@ -65,10 +67,14 @@ function RoutineSwipeRow({
       onEdit={onOpenDetail}
       onDelete={onRequestDelete}
     >
-      <RectButton onPress={onOpenDetail} style={{ backgroundColor: "transparent" }}>
-        <Text className="text-base font-semibold text-slate-900">{routine.name}</Text>
+      <RectButton onPress={onOpenDetail} style={{ backgroundColor: 'transparent' }}>
+        <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+          {routine.name}
+        </Text>
         {routine.description ? (
-          <Text className="mt-1 text-sm text-slate-600">{routine.description}</Text>
+          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            {routine.description}
+          </Text>
         ) : null}
       </RectButton>
       <View className="mt-4">
@@ -79,15 +85,17 @@ function RoutineSwipeRow({
 }
 
 export function WorkoutScreen() {
+  const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
   const [workoutHeatmapDays, setWorkoutHeatmapDays] = useState<HeatmapDay[]>([]);
-  const [currentView, setCurrentView] = useState<ViewState>({ type: "list" });
+  const [currentView, setCurrentView] = useState<ViewState>({ type: 'list' });
   const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
 
   const refresh = useCallback(async () => {
     const r = await listRoutines();
@@ -112,9 +120,9 @@ export function WorkoutScreen() {
     }
     setWorkoutError(null);
     await addRoutine(name.trim(), description.trim());
-    setName("");
-    setDescription("");
-    refresh();
+    setName('');
+    setDescription('');
+    void refresh();
   };
 
   const openRoutineModal = useCallback((routineId: string, routineName: string) => {
@@ -124,10 +132,10 @@ export function WorkoutScreen() {
   const handleDeleteRoutine = useCallback(
     async (routine: WorkoutRoutine) => {
       const confirmed = await confirm({
-        title: "Remove routine",
+        title: 'Remove routine',
         message: `Remove "${routine.name}"?`,
-        confirmLabel: "Delete routine",
-        confirmVariant: "danger",
+        confirmLabel: 'Delete routine',
+        confirmVariant: 'danger',
       });
       if (!confirmed) return;
 
@@ -144,16 +152,16 @@ export function WorkoutScreen() {
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
   const workoutDaysCount = workoutActivityDays.filter((d) => d.active).length;
 
-  if (currentView.type === "session") {
+  if (currentView.type === 'session') {
     return (
       <WorkoutSessionScreen
         routine={currentView.routine}
         onFinish={() => {
-          setCurrentView({ type: "list" });
-          refresh();
+          setCurrentView({ type: 'list' });
+          void refresh();
         }}
         onCancel={() => {
-          setCurrentView({ type: "list" });
+          setCurrentView({ type: 'list' });
           setRoutineModal({
             routineId: currentView.routine.id,
             routineName: currentView.routine.name,
@@ -167,18 +175,18 @@ export function WorkoutScreen() {
     <>
       <RoutineDetailModal
         visible={routineModal !== null}
-        routineId={routineModal?.routineId ?? ""}
-        routineName={routineModal?.routineName ?? ""}
+        routineId={routineModal?.routineId ?? ''}
+        routineName={routineModal?.routineName ?? ''}
         onClose={() => setRoutineModal(null)}
         onStartWorkout={async () => {
           if (!routineModal) return;
           const full = await getRoutineWithExercises(routineModal.routineId);
           if (!full || full.exercises.length === 0) {
-            Alert.alert("No exercises", "Add exercises to this routine before starting.");
+            Alert.alert('No exercises', 'Add exercises to this routine before starting.');
             return;
           }
           setRoutineModal(null);
-          setCurrentView({ type: "session", routine: full });
+          setCurrentView({ type: 'session', routine: full });
         }}
       />
       {confirmationDialog}
@@ -188,15 +196,15 @@ export function WorkoutScreen() {
             title="Workout"
             subtitle={
               workoutStripHasActivity
-                ? "Create simple routines, update exercises, and mark completions without leaving the tab."
-                : "Create simple routines and mark completions."
+                ? 'Create simple routines, update exercises, and mark completions without leaving the tab.'
+                : 'Create simple routines and mark completions.'
             }
           />
         </ScreenSection>
 
         <ScreenSection>
-          <View className="flex-row gap-3">
-            <View className="flex-1">
+          <View className="flex-row flex-wrap gap-3">
+            <View className="min-w-[160px] flex-1">
               <FeatureStatCard
                 accentColor={COLOR}
                 textColor={TEXT_COLOR}
@@ -204,10 +212,12 @@ export function WorkoutScreen() {
                 title="Workout days"
                 value={workoutDaysCount}
                 subtitle="Last 52 weeks"
-                note={workoutStripHasActivity ? "Sessions logged this year" : "No sessions logged yet"}
+                note={
+                  workoutStripHasActivity ? 'Sessions logged this year' : 'No sessions logged yet'
+                }
               />
             </View>
-            <View className="flex-1">
+            <View className="min-w-[160px] flex-1">
               <FeatureStatCard
                 accentColor={COLOR}
                 textColor={TEXT_COLOR}
@@ -215,7 +225,11 @@ export function WorkoutScreen() {
                 title="Current streak"
                 value={workoutStreak}
                 subtitle="Back-to-back workout days"
-                note={workoutStreak > 0 ? "Keep the run alive today" : "Your next session starts the streak"}
+                note={
+                  workoutStreak > 0
+                    ? 'Keep the run alive today'
+                    : 'Your next session starts the streak'
+                }
               />
             </View>
           </View>
@@ -238,7 +252,7 @@ export function WorkoutScreen() {
             accentColor={COLOR}
             headerTitle="Add new routine"
             headerSubtitle="Keep names short and descriptions specific so routines stay scannable."
-            headerRight={<MaterialIcons name="add" size={22} color="#ffffff" />}
+            headerRight={<MaterialIcons name="add" size={22} color={tokens.textOnAccent} />}
             className="mb-0"
           >
             <TextField
@@ -265,31 +279,35 @@ export function WorkoutScreen() {
         </ScreenSection>
 
         {routines.length > 0 ? (
-          <View className="mb-3 mt-1">
-            <Text className="text-sm font-semibold text-slate-900">Your routines</Text>
-            <Text className="mt-1 text-sm text-slate-500">
-              Swipe to edit or delete. Open a routine to manage exercises and sets.
-            </Text>
-          </View>
-        ) : null}
+          <ScreenSection>
+            <View className="mb-4 mt-1">
+              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                Your routines
+              </Text>
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                Swipe to edit or delete. Open a routine to manage exercises and sets.
+              </Text>
+            </View>
 
-        {routines.map((routine) => (
-          <RoutineSwipeRow
-            key={routine.id}
-            routine={routine}
-            accentColor={COLOR}
-            onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
-            onCompleteWorkout={() => {
-              void (async () => {
-                await completeRoutine(routine.id);
-                refresh();
-              })();
-            }}
-            onRequestDelete={async () => {
-              await handleDeleteRoutine(routine);
-            }}
-          />
-        ))}
+            {routines.map((routine) => (
+              <RoutineSwipeRow
+                key={routine.id}
+                routine={routine}
+                accentColor={COLOR}
+                onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
+                onCompleteWorkout={() => {
+                  void (async () => {
+                    await completeRoutine(routine.id);
+                    void refresh();
+                  })();
+                }}
+                onRequestDelete={async () => {
+                  await handleDeleteRoutine(routine);
+                }}
+              />
+            ))}
+          </ScreenSection>
+        ) : null}
 
         <ScreenSection className="mb-0">
           <Card
@@ -297,15 +315,11 @@ export function WorkoutScreen() {
             accentColor={COLOR}
             headerTitle="Workout history"
             headerSubtitle="Session intensity over the last 52 weeks."
-            headerRight={<MaterialIcons name="insights" size={22} color="#ffffff" />}
+            headerRight={<MaterialIcons name="insights" size={22} color={tokens.textOnAccent} />}
             className="mb-0"
           >
             <View className="w-full min-w-0 items-center justify-center">
-              <GitHubHeatmap
-                days={workoutHeatmapDays}
-                color={COLOR}
-                weeks={52}
-              />
+              <GitHubHeatmap days={workoutHeatmapDays} color={COLOR} weeks={52} />
             </View>
           </Card>
         </ScreenSection>

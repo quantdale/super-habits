@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createLinkedActionRule,
   deleteLinkedActionRulesForTargetEntity,
@@ -10,23 +10,23 @@ import {
   listLinkedActionRules,
   replaceLinkedActionRulesForSourceEntity,
   updateLinkedActionRuleStatus,
-} from "@/core/linked-actions/linkedActions.data";
-import type { LinkedActionRuleRow } from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActions.data';
+import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 
 const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
 }));
 
-vi.mock("@/core/db/client", () => ({
+vi.mock('@/core/db/client', () => ({
   getDatabase,
 }));
 
-describe("core/linked-actions/linkedActions.data", () => {
+describe('core/linked-actions/linkedActions.data', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("creates a linked action rule with serialized effect payload", async () => {
+  it('creates a linked action rule with serialized effect payload', async () => {
     const db = {
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -34,36 +34,36 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     const created = await createLinkedActionRule({
       source: {
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_1",
-        triggerType: "habit.completed_for_day",
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: 'habit_1',
+        triggerType: 'habit.completed_for_day',
       },
       target: {
-        feature: "todos",
-        entityType: "todo",
-        entityId: "todo_1",
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
         effect: {
-          kind: "binary",
-          type: "todo.complete",
+          kind: 'binary',
+          type: 'todo.complete',
         },
       },
-      directionPolicy: "bidirectional_peer",
-      bidirectionalGroupId: "group_1",
+      directionPolicy: 'bidirectional_peer',
+      bidirectionalGroupId: 'group_1',
     });
 
-    expect(created.status).toBe("active");
-    expect(created.directionPolicy).toBe("bidirectional_peer");
+    expect(created.status).toBe('active');
+    expect(created.directionPolicy).toBe('bidirectional_peer');
     expect(db.runAsync).toHaveBeenCalledTimes(1);
     const [, args] = db.runAsync.mock.calls[0];
     expect(args[0]).toMatch(/^link_/);
-    expect(args[1]).toBe("active");
-    expect(args[2]).toBe("bidirectional_peer");
-    expect(args[3]).toBe("group_1");
+    expect(args[1]).toBe('active');
+    expect(args[2]).toBe('bidirectional_peer');
+    expect(args[3]).toBe('group_1');
     expect(args[12]).toBe(JSON.stringify({}));
   });
 
-  it("creates todo.completed -> habit.increment with the fixed +1 source-date payload", async () => {
+  it('creates todo.completed -> habit.increment with the fixed +1 source-date payload', async () => {
     const db = {
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -71,53 +71,53 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     await createLinkedActionRule({
       source: {
-        feature: "todos",
-        entityType: "todo",
-        entityId: "todo_1",
-        triggerType: "todo.completed",
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
+        triggerType: 'todo.completed',
       },
       target: {
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_1",
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: 'habit_1',
         effect: {
-          kind: "progress",
-          type: "habit.increment",
+          kind: 'progress',
+          type: 'habit.increment',
           amount: 1,
-          dateStrategy: "source_date",
+          dateStrategy: 'source_date',
         },
       },
     });
 
     const [, args] = db.runAsync.mock.calls[0];
-    expect(args[4]).toBe("todos");
-    expect(args[7]).toBe("todo.completed");
-    expect(args[8]).toBe("habits");
-    expect(args[10]).toBe("habit_1");
-    expect(args[11]).toBe("habit.increment");
-    expect(args[12]).toBe(JSON.stringify({ amount: 1, dateStrategy: "source_date" }));
+    expect(args[4]).toBe('todos');
+    expect(args[7]).toBe('todo.completed');
+    expect(args[8]).toBe('habits');
+    expect(args[10]).toBe('habit_1');
+    expect(args[11]).toBe('habit.increment');
+    expect(args[12]).toBe(JSON.stringify({ amount: 1, dateStrategy: 'source_date' }));
   });
 
-  it("normalizes stored rows when listing or fetching rules without crashing on legacy targets", async () => {
+  it('normalizes stored rows when listing or fetching rules without crashing on legacy targets', async () => {
     const row: LinkedActionRuleRow = {
-      id: "link_1",
-      status: "active",
-      direction_policy: "one_way",
+      id: 'link_1',
+      status: 'active',
+      direction_policy: 'one_way',
       bidirectional_group_id: null,
-      source_feature: "workout",
-      source_entity_type: "workout_routine",
-      source_entity_id: "wrk_1",
-      trigger_type: "workout.completed",
-      target_feature: "pomodoro",
-      target_entity_type: "pomodoro_session",
+      source_feature: 'workout',
+      source_entity_type: 'workout_routine',
+      source_entity_id: 'wrk_1',
+      trigger_type: 'workout.completed',
+      target_feature: 'pomodoro',
+      target_entity_type: 'pomodoro_session',
       target_entity_id: null,
-      effect_type: "pomodoro.log",
+      effect_type: 'pomodoro.log',
       effect_payload: JSON.stringify({
-        sessionType: "focus",
+        sessionType: 'focus',
         durationSeconds: 900,
       }),
-      created_at: "2026-04-13T00:00:00.000Z",
-      updated_at: "2026-04-13T00:00:00.000Z",
+      created_at: '2026-04-13T00:00:00.000Z',
+      updated_at: '2026-04-13T00:00:00.000Z',
       deleted_at: null,
     };
 
@@ -129,114 +129,111 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     await expect(listLinkedActionRules()).resolves.toEqual([
       {
-        id: "link_1",
-        status: "active",
-        directionPolicy: "one_way",
+        id: 'link_1',
+        status: 'active',
+        directionPolicy: 'one_way',
         bidirectionalGroupId: null,
         source: {
-          feature: "workout",
-          entityType: "workout_routine",
-          entityId: "wrk_1",
-          triggerType: "workout.completed",
+          feature: 'workout',
+          entityType: 'workout_routine',
+          entityId: 'wrk_1',
+          triggerType: 'workout.completed',
         },
         target: {
-          feature: "pomodoro",
-          entityType: "pomodoro_session",
+          feature: 'pomodoro',
+          entityType: 'pomodoro_session',
           entityId: null,
           effect: {
-            kind: "unsupported",
-            type: "pomodoro.log",
+            kind: 'unsupported',
+            type: 'pomodoro.log',
             rawPayload: JSON.stringify({
-              sessionType: "focus",
+              sessionType: 'focus',
               durationSeconds: 900,
             }),
           },
         },
         isUnsupported: true,
         unsupportedReason:
-          "This linked action uses an unsupported target and must be removed or replaced.",
-        rawTargetFeature: "pomodoro",
-        rawTargetEntityType: "pomodoro_session",
-        rawEffectType: "pomodoro.log",
-        createdAt: "2026-04-13T00:00:00.000Z",
-        updatedAt: "2026-04-13T00:00:00.000Z",
+          'This linked action uses an unsupported target and must be removed or replaced.',
+        rawTargetFeature: 'pomodoro',
+        rawTargetEntityType: 'pomodoro_session',
+        rawEffectType: 'pomodoro.log',
+        createdAt: '2026-04-13T00:00:00.000Z',
+        updatedAt: '2026-04-13T00:00:00.000Z',
         deletedAt: null,
       },
     ]);
 
-    await expect(getLinkedActionRule("link_1")).resolves.toMatchObject({
-      id: "link_1",
+    await expect(getLinkedActionRule('link_1')).resolves.toMatchObject({
+      id: 'link_1',
       isUnsupported: true,
-      rawTargetFeature: "pomodoro",
+      rawTargetFeature: 'pomodoro',
     });
   });
 
-  it("updates status and soft deletes without changing other runtime behavior", async () => {
+  it('updates status and soft deletes without changing other runtime behavior', async () => {
     const db = {
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
 
-    await updateLinkedActionRuleStatus("link_1", "paused");
-    await deleteLinkedActionRule("link_1");
+    await updateLinkedActionRuleStatus('link_1', 'paused');
+    await deleteLinkedActionRule('link_1');
 
     expect(db.runAsync).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining("SET status = ?, updated_at = ?"),
-      ["paused", expect.any(String), "link_1"],
+      expect.stringContaining('SET status = ?, updated_at = ?'),
+      ['paused', expect.any(String), 'link_1'],
     );
     expect(db.runAsync).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("SET deleted_at = ?, updated_at = ?"),
-      [expect.any(String), expect.any(String), "link_1"],
+      expect.stringContaining('SET deleted_at = ?, updated_at = ?'),
+      [expect.any(String), expect.any(String), 'link_1'],
     );
   });
 
-  it("soft deletes rules when a linked target entity is removed", async () => {
+  it('soft deletes rules when a linked target entity is removed', async () => {
     const db = {
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
 
     await deleteLinkedActionRulesForTargetEntity({
-      feature: "habits",
-      entityType: "habit",
-      entityId: "habit_target",
-      deletedAt: "2026-04-15T00:00:00.000Z",
+      feature: 'habits',
+      entityType: 'habit',
+      entityId: 'habit_target',
+      deletedAt: '2026-04-15T00:00:00.000Z',
     });
 
-    expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("target_feature = ?"),
-      [
-        "2026-04-15T00:00:00.000Z",
-        "2026-04-15T00:00:00.000Z",
-        "habits",
-        "habit",
-        "habit_target",
-      ],
-    );
+    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('target_feature = ?'), [
+      '2026-04-15T00:00:00.000Z',
+      '2026-04-15T00:00:00.000Z',
+      'habits',
+      'habit',
+      'habit_target',
+    ]);
   });
 
-  it("filters active rules by exact source entity and trigger", async () => {
+  it('filters active rules by exact source entity and trigger', async () => {
     const row: LinkedActionRuleRow = {
-      id: "link_2",
-      status: "active",
-      direction_policy: "one_way",
+      id: 'link_2',
+      status: 'active',
+      direction_policy: 'one_way',
       bidirectional_group_id: null,
-      source_feature: "habits",
-      source_entity_type: "habit",
-      source_entity_id: "habit_1",
-      trigger_type: "habit.completed_for_day",
-      target_feature: "habits",
-      target_entity_type: "habit",
-      target_entity_id: "habit_2",
-      effect_type: "habit.increment",
+      source_feature: 'habits',
+      source_entity_type: 'habit',
+      source_entity_id: 'habit_1',
+      trigger_type: 'habit.completed_for_day',
+      target_feature: 'habits',
+      target_entity_type: 'habit',
+      target_entity_id: 'habit_2',
+      effect_type: 'habit.increment',
       effect_payload: JSON.stringify({
         amount: 1,
-        dateStrategy: "today",
+        dateStrategy: 'today',
       }),
-      created_at: "2026-04-13T00:00:00.000Z",
-      updated_at: "2026-04-13T00:00:00.000Z",
+      created_at: '2026-04-13T00:00:00.000Z',
+      updated_at: '2026-04-13T00:00:00.000Z',
       deleted_at: null,
     };
     const db = {
@@ -246,39 +243,41 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     await expect(
       listActiveLinkedActionRulesForSource({
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_1",
-        triggerType: "habit.completed_for_day",
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: 'habit_1',
+        triggerType: 'habit.completed_for_day',
       }),
     ).resolves.toHaveLength(1);
 
-    expect(db.getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining("status = 'active'"),
-      ["habits", "habit", "habit_1", "habit.completed_for_day"],
-    );
+    expect(db.getAllAsync).toHaveBeenCalledWith(expect.stringContaining("status = 'active'"), [
+      'habits',
+      'habit',
+      'habit_1',
+      'habit.completed_for_day',
+    ]);
   });
 
-  it("looks up prior applied calorie executions for the same habit and day", async () => {
+  it('looks up prior applied calorie executions for the same habit and day', async () => {
     const executionRow = {
-      id: "lexec_1",
-      rule_id: "link_calorie",
-      source_event_id: "levt_1",
-      chain_id: "lchain_1",
-      root_event_id: "levt_1",
+      id: 'lexec_1',
+      rule_id: 'link_calorie',
+      source_event_id: 'levt_1',
+      chain_id: 'lchain_1',
+      root_event_id: 'levt_1',
       origin_rule_id: null,
-      effect_type: "calorie.log",
-      effect_fingerprint: "fingerprint",
-      status: "applied",
-      target_feature: "calories",
-      target_entity_type: "calorie_log",
+      effect_type: 'calorie.log',
+      effect_fingerprint: 'fingerprint',
+      status: 'applied',
+      target_feature: 'calories',
+      target_entity_type: 'calorie_log',
       target_entity_id: null,
-      produced_entity_type: "calorie_log",
-      produced_entity_id: "cal_1",
+      produced_entity_type: 'calorie_log',
+      produced_entity_id: 'cal_1',
       notice_payload: null,
       error_message: null,
-      created_at: "2026-04-14T00:00:00.000Z",
-      updated_at: "2026-04-14T00:00:00.000Z",
+      created_at: '2026-04-14T00:00:00.000Z',
+      updated_at: '2026-04-14T00:00:00.000Z',
     };
     const db = {
       getFirstAsync: vi.fn().mockResolvedValue(executionRow),
@@ -286,38 +285,38 @@ describe("core/linked-actions/linkedActions.data", () => {
     getDatabase.mockResolvedValue(db);
 
     await expect(
-      getAppliedHabitDayCalorieExecution("link_calorie", "habit_1", "2026-04-14"),
+      getAppliedHabitDayCalorieExecution('link_calorie', 'habit_1', '2026-04-14'),
     ).resolves.toMatchObject({
-      id: "lexec_1",
-      effectType: "calorie.log",
-      producedEntityId: "cal_1",
+      id: 'lexec_1',
+      effectType: 'calorie.log',
+      producedEntityId: 'cal_1',
     });
 
     expect(db.getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining("ev.source_date_key = ?"),
-      ["link_calorie", "habit_1", "2026-04-14"],
+      expect.stringContaining('ev.source_date_key = ?'),
+      ['link_calorie', 'habit_1', '2026-04-14'],
     );
   });
 
-  it("lists all non-deleted rules for a source entity across triggers", async () => {
+  it('lists all non-deleted rules for a source entity across triggers', async () => {
     const db = {
       getAllAsync: vi.fn().mockResolvedValue([
         {
-          id: "link_3",
-          status: "paused",
-          direction_policy: "one_way",
+          id: 'link_3',
+          status: 'paused',
+          direction_policy: 'one_way',
           bidirectional_group_id: null,
-          source_feature: "habits",
-          source_entity_type: "habit",
-          source_entity_id: "habit_1",
-          trigger_type: "habit.completed_for_day",
-          target_feature: "todos",
-          target_entity_type: "todo",
-          target_entity_id: "todo_1",
-          effect_type: "todo.complete",
+          source_feature: 'habits',
+          source_entity_type: 'habit',
+          source_entity_id: 'habit_1',
+          trigger_type: 'habit.completed_for_day',
+          target_feature: 'todos',
+          target_entity_type: 'todo',
+          target_entity_id: 'todo_1',
+          effect_type: 'todo.complete',
           effect_payload: JSON.stringify({}),
-          created_at: "2026-04-13T00:00:00.000Z",
-          updated_at: "2026-04-13T00:00:00.000Z",
+          created_at: '2026-04-13T00:00:00.000Z',
+          updated_at: '2026-04-13T00:00:00.000Z',
           deleted_at: null,
         },
       ]),
@@ -326,41 +325,42 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     await expect(
       listLinkedActionRulesForSourceEntity({
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_1",
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: 'habit_1',
       }),
     ).resolves.toHaveLength(1);
 
-    expect(db.getAllAsync).toHaveBeenCalledWith(
-      expect.stringContaining("source_entity_id = ?"),
-      ["habits", "habit", "habit_1"],
-    );
+    expect(db.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('source_entity_id = ?'), [
+      'habits',
+      'habit',
+      'habit_1',
+    ]);
   });
 
-  it("replaces rules for a source entity by updating kept rules, creating new ones, and soft deleting removed ones", async () => {
+  it('replaces rules for a source entity by updating kept rules, creating new ones, and soft deleting removed ones', async () => {
     const existingRow: LinkedActionRuleRow = {
-      id: "link_existing",
-      status: "active",
-      direction_policy: "one_way",
+      id: 'link_existing',
+      status: 'active',
+      direction_policy: 'one_way',
       bidirectional_group_id: null,
-      source_feature: "habits",
-      source_entity_type: "habit",
-      source_entity_id: "habit_1",
-      trigger_type: "habit.completed_for_day",
-      target_feature: "todos",
-      target_entity_type: "todo",
-      target_entity_id: "todo_old",
-      effect_type: "todo.complete",
+      source_feature: 'habits',
+      source_entity_type: 'habit',
+      source_entity_id: 'habit_1',
+      trigger_type: 'habit.completed_for_day',
+      target_feature: 'todos',
+      target_entity_type: 'todo',
+      target_entity_id: 'todo_old',
+      effect_type: 'todo.complete',
       effect_payload: JSON.stringify({}),
-      created_at: "2026-04-13T00:00:00.000Z",
-      updated_at: "2026-04-13T00:00:00.000Z",
+      created_at: '2026-04-13T00:00:00.000Z',
+      updated_at: '2026-04-13T00:00:00.000Z',
       deleted_at: null,
     };
     const removedRow: LinkedActionRuleRow = {
       ...existingRow,
-      id: "link_removed",
-      target_entity_id: "todo_removed",
+      id: 'link_removed',
+      target_entity_id: 'todo_removed',
     };
     const db = {
       getAllAsync: vi.fn().mockResolvedValue([existingRow, removedRow]),
@@ -369,34 +369,34 @@ describe("core/linked-actions/linkedActions.data", () => {
     getDatabase.mockResolvedValue(db);
 
     await replaceLinkedActionRulesForSourceEntity({
-      feature: "habits",
-      entityType: "habit",
-      entityId: "habit_1",
+      feature: 'habits',
+      entityType: 'habit',
+      entityId: 'habit_1',
       rules: [
         {
-          existingRuleId: "link_existing",
-          triggerType: "habit.completed_for_day",
+          existingRuleId: 'link_existing',
+          triggerType: 'habit.completed_for_day',
           target: {
-            feature: "todos",
-            entityType: "todo",
-            entityId: "todo_updated",
+            feature: 'todos',
+            entityType: 'todo',
+            entityId: 'todo_updated',
             effect: {
-              kind: "binary",
-              type: "todo.complete",
+              kind: 'binary',
+              type: 'todo.complete',
             },
           },
         },
         {
-          triggerType: "habit.completed_for_day",
+          triggerType: 'habit.completed_for_day',
           target: {
-            feature: "habits",
-            entityType: "habit",
-            entityId: "habit_2",
+            feature: 'habits',
+            entityType: 'habit',
+            entityId: 'habit_2',
             effect: {
-              kind: "progress",
-              type: "habit.increment",
+              kind: 'progress',
+              type: 'habit.increment',
               amount: 1,
-              dateStrategy: "source_date",
+              dateStrategy: 'source_date',
             },
           },
         },
@@ -405,73 +405,73 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     expect(db.runAsync).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining("UPDATE linked_action_rules"),
+      expect.stringContaining('UPDATE linked_action_rules'),
       [
-        "active",
-        "one_way",
+        'active',
+        'one_way',
         null,
-        "habits",
-        "habit",
-        "habit_1",
-        "habit.completed_for_day",
-        "todos",
-        "todo",
-        "todo_updated",
-        "todo.complete",
+        'habits',
+        'habit',
+        'habit_1',
+        'habit.completed_for_day',
+        'todos',
+        'todo',
+        'todo_updated',
+        'todo.complete',
         JSON.stringify({}),
         expect.any(String),
         null,
-        "link_existing",
+        'link_existing',
       ],
     );
     expect(db.runAsync).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("INSERT INTO linked_action_rules"),
+      expect.stringContaining('INSERT INTO linked_action_rules'),
       expect.arrayContaining([
         expect.stringMatching(/^link_/),
-        "active",
-        "one_way",
+        'active',
+        'one_way',
         null,
-        "habits",
-        "habit",
-        "habit_1",
-        "habit.completed_for_day",
-        "habits",
-        "habit",
-        "habit_2",
-        "habit.increment",
-        JSON.stringify({ amount: 1, dateStrategy: "source_date" }),
+        'habits',
+        'habit',
+        'habit_1',
+        'habit.completed_for_day',
+        'habits',
+        'habit',
+        'habit_2',
+        'habit.increment',
+        JSON.stringify({ amount: 1, dateStrategy: 'source_date' }),
       ]),
     );
     expect(db.runAsync).toHaveBeenNthCalledWith(
       3,
-      expect.stringContaining("SET deleted_at = ?, updated_at = ?"),
-      [expect.any(String), expect.any(String), "link_removed"],
+      expect.stringContaining('SET deleted_at = ?, updated_at = ?'),
+      [expect.any(String), expect.any(String), 'link_removed'],
     );
   });
 
-  it("refuses to overwrite an unsupported existing rule", async () => {
+  it('refuses to overwrite an unsupported existing rule', async () => {
     const db = {
       getAllAsync: vi.fn().mockResolvedValue([
         {
-          id: "link_legacy",
-          status: "active",
-          direction_policy: "one_way",
+          id: 'link_legacy',
+          status: 'active',
+          direction_policy: 'one_way',
           bidirectional_group_id: null,
-          source_feature: "habits",
-          source_entity_type: "habit",
-          source_entity_id: "habit_1",
-          trigger_type: "habit.completed_for_day",
-          target_feature: "pomodoro",
-          target_entity_type: "pomodoro_session",
+          source_feature: 'habits',
+          source_entity_type: 'habit',
+          source_entity_id: 'habit_1',
+          trigger_type: 'habit.completed_for_day',
+          target_feature: 'pomodoro',
+          target_entity_type: 'pomodoro_session',
           target_entity_id: null,
-          effect_type: "pomodoro.log",
+          effect_type: 'pomodoro.log',
           effect_payload: JSON.stringify({
-            sessionType: "focus",
+            sessionType: 'focus',
             durationSeconds: 1500,
           }),
-          created_at: "2026-04-13T00:00:00.000Z",
-          updated_at: "2026-04-13T00:00:00.000Z",
+          created_at: '2026-04-13T00:00:00.000Z',
+          updated_at: '2026-04-13T00:00:00.000Z',
           deleted_at: null,
         },
       ]),
@@ -481,25 +481,25 @@ describe("core/linked-actions/linkedActions.data", () => {
 
     await expect(
       replaceLinkedActionRulesForSourceEntity({
-        feature: "habits",
-        entityType: "habit",
-        entityId: "habit_1",
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: 'habit_1',
         rules: [
           {
-            existingRuleId: "link_legacy",
-            triggerType: "habit.completed_for_day",
+            existingRuleId: 'link_legacy',
+            triggerType: 'habit.completed_for_day',
             target: {
-              feature: "todos",
-              entityType: "todo",
-              entityId: "todo_1",
+              feature: 'todos',
+              entityType: 'todo',
+              entityId: 'todo_1',
               effect: {
-                kind: "binary",
-                type: "todo.complete",
+                kind: 'binary',
+                type: 'todo.complete',
               },
             },
           },
         ],
       }),
-    ).rejects.toThrow("Unsupported linked action rules must be removed or replaced before saving.");
+    ).rejects.toThrow('Unsupported linked action rules must be removed or replaced before saving.');
   });
 });

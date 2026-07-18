@@ -1,20 +1,20 @@
-import path from "node:path";
-import { defineConfig } from "vitest/config";
+import path from 'node:path';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    environment: "node",
-    include: ["tests/**/*.test.ts", "core/**/__tests__/**/*.test.ts"],
-    exclude: ["e2e/**", "node_modules/**"],
+    environment: 'node',
+    include: ['tests/**/*.test.ts', 'core/**/__tests__/**/*.test.ts'],
+    exclude: ['e2e/**', 'node_modules/**'],
     globals: true,
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ['./tests/setup.ts'],
   },
   define: {
-    __DEV__: "true",
+    __DEV__: 'true',
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      '@': path.resolve(__dirname, '.'),
     },
   },
 });

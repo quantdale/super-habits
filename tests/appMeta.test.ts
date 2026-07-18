@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 import {
   appMetaKeys,
   getAppMetaJson,
@@ -6,7 +6,7 @@ import {
   getAppMetaText,
   setAppMetaJson,
   setAppMetaText,
-} from "@/core/db/appMeta";
+} from '@/core/db/appMeta';
 
 function buildDb() {
   return {
@@ -15,45 +15,44 @@ function buildDb() {
   };
 }
 
-describe("core/db/appMeta", () => {
-  it("reads text values using the shared key registry", async () => {
+describe('core/db/appMeta', () => {
+  it('reads text values using the shared key registry', async () => {
     const db = buildDb();
-    db.getFirstAsync.mockResolvedValueOnce({ value: "9" });
+    db.getFirstAsync.mockResolvedValueOnce({ value: '9' });
 
-    await expect(getAppMetaText(db as never, appMetaKeys.dbSchemaVersion)).resolves.toBe("9");
-    expect(db.getFirstAsync).toHaveBeenCalledWith(
-      "SELECT value FROM app_meta WHERE key = ?",
-      ["db_schema_version"],
-    );
+    await expect(getAppMetaText(db as never, appMetaKeys.dbSchemaVersion)).resolves.toBe('9');
+    expect(db.getFirstAsync).toHaveBeenCalledWith('SELECT value FROM app_meta WHERE key = ?', [
+      'db_schema_version',
+    ]);
   });
 
-  it("parses JSON values strictly for callers that need existing behavior", async () => {
+  it('parses JSON values strictly for callers that need existing behavior', async () => {
     const db = buildDb();
     db.getFirstAsync.mockResolvedValueOnce({
-      value: JSON.stringify({ id: "guest_1", createdAt: "2026-04-13T00:00:00.000Z" }),
+      value: JSON.stringify({ id: 'guest_1', createdAt: '2026-04-13T00:00:00.000Z' }),
     });
 
-    await expect(getAppMetaJson<{ id: string; createdAt: string }>(
-      db as never,
-      appMetaKeys.guestProfile,
-    )).resolves.toEqual({
-      id: "guest_1",
-      createdAt: "2026-04-13T00:00:00.000Z",
+    await expect(
+      getAppMetaJson<{ id: string; createdAt: string }>(db as never, appMetaKeys.guestProfile),
+    ).resolves.toEqual({
+      id: 'guest_1',
+      createdAt: '2026-04-13T00:00:00.000Z',
     });
   });
 
-  it("returns the provided default when JSON is missing or invalid", async () => {
+  it('returns the provided default when JSON is missing or invalid', async () => {
     const db = buildDb();
     db.getFirstAsync.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      value: "{broken json}",
+      value: '{broken json}',
     });
 
     await expect(
-      getAppMetaJsonOrDefault(
-        db as never,
-        appMetaKeys.calorieGoal,
-        { calories: 2000, protein: 150, carbs: 200, fats: 65 },
-      ),
+      getAppMetaJsonOrDefault(db as never, appMetaKeys.calorieGoal, {
+        calories: 2000,
+        protein: 150,
+        carbs: 200,
+        fats: 65,
+      }),
     ).resolves.toEqual({
       calories: 2000,
       protein: 150,
@@ -62,11 +61,12 @@ describe("core/db/appMeta", () => {
     });
 
     await expect(
-      getAppMetaJsonOrDefault(
-        db as never,
-        appMetaKeys.calorieGoal,
-        { calories: 2000, protein: 150, carbs: 200, fats: 65 },
-      ),
+      getAppMetaJsonOrDefault(db as never, appMetaKeys.calorieGoal, {
+        calories: 2000,
+        protein: 150,
+        carbs: 200,
+        fats: 65,
+      }),
     ).resolves.toEqual({
       calories: 2000,
       protein: 150,
@@ -75,10 +75,10 @@ describe("core/db/appMeta", () => {
     });
   });
 
-  it("writes text and JSON values through the shared upsert path", async () => {
+  it('writes text and JSON values through the shared upsert path', async () => {
     const db = buildDb();
 
-    await setAppMetaText(db as never, appMetaKeys.dbSchemaVersion, "9");
+    await setAppMetaText(db as never, appMetaKeys.dbSchemaVersion, '9');
     await setAppMetaJson(db as never, appMetaKeys.pomodoroSettings, {
       focusMinutes: 25,
       shortBreakMinutes: 5,
@@ -88,14 +88,14 @@ describe("core/db/appMeta", () => {
 
     expect(db.runAsync).toHaveBeenNthCalledWith(
       1,
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
-      ["db_schema_version", "9"],
+      'INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)',
+      ['db_schema_version', '9'],
     );
     expect(db.runAsync).toHaveBeenNthCalledWith(
       2,
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
+      'INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)',
       [
-        "pomodoro_settings",
+        'pomodoro_settings',
         JSON.stringify({
           focusMinutes: 25,
           shortBreakMinutes: 5,

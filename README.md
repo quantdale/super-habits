@@ -1,8 +1,8 @@
 # SuperHabits
 
-SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, six active route surfaces, and a lightweight settings screen for appearance, backup restore status, and shipped-scope notes. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
+SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, six tab surfaces, a six-bucket settings IA, and an experimental command center that now launches as a global overlay. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
-Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is conservative: regular app usage pushes synced entities to Supabase, and restore v1 can import a limited subset back onto an empty device.
+Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes synced entities to Supabase, and restore v1 can import a limited subset back onto an empty device. This is not full two-way sync.
 
 ## Project Overview
 
@@ -11,7 +11,9 @@ Data is stored locally in SQLite first, then optionally backed up to Supabase. T
 - Native support through Expo for Android and iOS
 - Feature modules with strict data/domain/UI layering
 - Optional anonymous Supabase backup/restore integration
-- Experimental quick-command route for single todo or habit draft creation
+- Global command-center overlay across the main tabs, with a retained `/command` page route for direct/internal access
+- Calories `Form` / `Diary` modes with remembered last-view preference
+- Settings grouped into Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal
 
 ## Tech Stack
 
@@ -88,21 +90,24 @@ Optional platform commands:
 
 Current route surfaces:
 
+- `/` redirects to `/(tabs)/overview`
 - `/(tabs)/overview`
 - `/(tabs)/todos`
 - `/(tabs)/habits`
 - `/(tabs)/pomodoro`
 - `/(tabs)/workout`
 - `/(tabs)/calories`
-- `/command` for the experimental quick-command shell
 - `/settings`
+- `/command` for the retained experimental command page route
 
-The Overview screen is the entry point for the experimental command shell. It shows an "Add with command" card when `COMMAND_EXPERIMENT_ENABLED` is true.
+The root layout mounts `GlobalCommandCenterHost`, so when `COMMAND_EXPERIMENT_ENABLED` is true the eligible tabs show a floating launcher that opens a drawer on wide web and a bottom sheet elsewhere. The launcher is hidden on `/settings` and suppressed during active pomodoro/workout sessions. `/command` remains the direct-link/internal page route and is still linked from Settings.
 
 ## Command Shell
 
 `/command` is an experimental quick-command shell, not a general assistant surface.
 
+- The primary user-facing entry is the global overlay launcher on Overview, Todos, Habits, Focus, Workout, and Calories.
+- `/command` is the retained page route for direct access, internal testing, and the Settings entry point.
 - Supported draft kinds are limited to `create_todo` and `create_habit`.
 - The flow is parse -> review -> confirm before write.
 - Default parser mode is `mock`.
@@ -172,6 +177,11 @@ If unset, the app runs local-only and remote backup/restore operations stay unav
 - Type checking: `npm run typecheck`
 - Unit tests: `npm test`
 - E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes; Playwright serves static `dist/` through `node scripts/serve-e2e.js`)
+
+Current local baseline on May 5, 2026:
+
+- `npm test`: `340` Vitest tests across `32` test files
+- `npx playwright test --list`: `87` Playwright tests across `13` spec files
 
 ## Additional Documentation
 

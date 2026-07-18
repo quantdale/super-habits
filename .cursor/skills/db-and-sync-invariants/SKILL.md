@@ -47,8 +47,8 @@ After every INSERT or UPDATE on main entities, call:
   where operation is `"create" | "update" | "delete"` — `SyncRecord` shape in `core/sync/sync.engine.ts` is `{ entity: string; id: string; updatedAt: string; operation: ... }` (not `payload`, `table`, or `timestamp`).
 
 Entities that DO sync: todos, habits, calorie_entries, workout_routines (enqueue entity names match syncEngine usage in *.data.ts)
-Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions
-(This is intentional — local-only data.)
+Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions, saved_meals, workout_session_exercises, routine_exercises, routine_exercise_sets
+(This is intentional — local-only data or nested workout structure handled by routine bumps.)
 
 The exported **`syncEngine`** uses **`SupabaseSyncAdapter`** (push upsert to Supabase when the client is configured). **`NoopSyncAdapter`** remains the `SyncEngine` constructor default for tests. **`enqueue()` always runs** — it fills the in-memory queue; never skip it on writes.
 

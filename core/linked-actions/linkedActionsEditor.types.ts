@@ -7,8 +7,8 @@ import type {
   LinkedActionSourceEntityType,
   LinkedActionTargetEntityType,
   LinkedActionTriggerType,
-} from "@/core/linked-actions/linkedActions.types";
-import type { LinkedActionTargetPickerSelection } from "@/core/linked-actions/linkedActionsTargetPicker.types";
+} from '@/core/linked-actions/linkedActions.types';
+import type { LinkedActionTargetPickerSelection } from '@/core/linked-actions/linkedActionsTargetPicker.types';
 
 export type LinkedActionEditorSourceOption = {
   key: string;
@@ -21,7 +21,7 @@ export type LinkedActionEditorSourceOption = {
 
 export type LinkedActionEditorRowDraft = {
   id: string;
-  mode: "existing" | "draft";
+  mode: 'existing' | 'draft';
   existingRuleId: string | null;
   status: LinkedActionRuleStatus;
   directionPolicy: LinkedActionDirectionPolicy;
@@ -34,24 +34,20 @@ export type LinkedActionEditorRowDraft = {
   targetSelection: LinkedActionTargetPickerSelection | null;
   effectType: LinkedActionEffectType | null;
   isUnsupported: boolean;
-  unsupportedTarget:
-    | {
-        feature: string;
-        entityType: string;
-        effectType: string;
-        message: string;
-      }
-    | null;
+  unsupportedTarget: {
+    feature: string;
+    entityType: string;
+    effectType: string;
+    message: string;
+  } | null;
   isOrphaned: boolean;
-  orphanedTarget:
-    | {
-        feature: string;
-        entityType: string;
-        entityId: string | null;
-        effectType: string;
-        message: string;
-      }
-    | null;
+  orphanedTarget: {
+    feature: string;
+    entityType: string;
+    entityId: string | null;
+    effectType: string;
+    message: string;
+  } | null;
 };
 
 export type LinkedActionEditorRowValidation = {

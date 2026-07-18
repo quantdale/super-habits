@@ -1,9 +1,10 @@
-import { Pressable, Text, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import type { Habit } from "./types";
-import { calculateHabitProgress } from "@/features/habits/habits.domain";
-import { ProgressRing } from "@/features/habits/ProgressRing";
-import { DEFAULT_HABIT_ICON } from "@/features/habits/habitPresets";
+import { Pressable, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import type { Habit } from './types';
+import { calculateHabitProgress } from '@/features/habits/habits.domain';
+import { ProgressRing } from '@/features/habits/ProgressRing';
+import { DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
 
 type HabitCircleProps = {
   habit: Habit;
@@ -19,7 +20,6 @@ type HabitCircleProps = {
 };
 
 const DEFAULT_SIZE = 56;
-const DEFAULT_BG_COLOR = "#f1f5f9";
 
 export function HabitCircle({
   habit,
@@ -31,9 +31,10 @@ export function HabitCircle({
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
+  const { tokens } = useAppTheme();
   const progress = calculateHabitProgress(todayCount, habit.target_per_day);
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
-  const habitColor = habit.color ?? "#64748b";
+  const habitColor = habit.color ?? tokens.textMuted;
   const iconTint = `${habitColor}18`;
 
   const strokeWidth = Math.max(3, Math.round(size / 14));
@@ -51,32 +52,32 @@ export function HabitCircle({
       >
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             width: ringSize,
             height: ringSize,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <ProgressRing
             size={ringSize}
             strokeWidth={strokeWidth}
             progress={progress}
-            backgroundColor="#e2e8f0"
+            backgroundColor={tokens.border}
             progressColor={habitColor}
           />
         </View>
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             left: (ringSize - size) / 2,
             top: (ringSize - size) / 2,
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: iconTint || DEFAULT_BG_COLOR,
-            alignItems: "center",
-            justifyContent: "center",
+            backgroundColor: iconTint,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <MaterialIcons name={iconName} size={iconSize} color={habitColor} />
@@ -84,12 +85,13 @@ export function HabitCircle({
       </Pressable>
       {showStreak && streak > 0 && (
         <Text className="mt-0.5 text-xs font-medium text-amber-500">
-          {streak > 2 ? "🔥" : "⚡"} {streak}
+          {streak > 2 ? '🔥' : '⚡'} {streak}
         </Text>
       )}
       {showName ? (
         <Text
-          className="mt-2 text-center text-xs font-medium leading-4 text-slate-700"
+          className="mt-2 text-center text-xs font-medium leading-4"
+          style={{ color: tokens.text }}
           numberOfLines={2}
         >
           {habit.name}

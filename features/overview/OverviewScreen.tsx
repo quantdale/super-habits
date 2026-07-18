@@ -1,45 +1,61 @@
-import { type ReactNode, useCallback, useState } from "react";
-import { MaterialIcons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { type Href, useFocusEffect, useRouter } from "expo-router";
-import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_TEXT_COLORS } from "@/constants/sectionColors";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
-import { EmptyStateCard } from "@/core/ui/EmptyStateCard";
-import { PageHeader } from "@/core/ui/PageHeader";
-import { Screen } from "@/core/ui/Screen";
-import { ScreenSection } from "@/core/ui/ScreenSection";
-import { COMMAND_EXPERIMENT_ENABLED } from "@/features/command/types";
-import { getCalorieGoal, hasAnyCalorieEntries, listCalorieEntries } from "@/features/calories/calories.data";
-import { caloriesTotal } from "@/features/calories/calories.domain";
+import { type ReactNode, useCallback, useState } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import {
+  POMODORO_SECTION_KEY,
+  SECTION_COLORS,
+  SECTION_TEXT_COLORS,
+} from '@/constants/sectionColors';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+
+import { Card } from '@/core/ui/Card';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { IconButton } from '@/core/ui/IconButton';
+import { PageHeader } from '@/core/ui/PageHeader';
+import { Screen } from '@/core/ui/Screen';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import {
+  getCalorieGoal,
+  hasAnyCalorieEntries,
+  listCalorieEntries,
+} from '@/features/calories/calories.data';
+import { caloriesTotal } from '@/features/calories/calories.domain';
 import {
   getAllHabitCompletionsForRange,
   getCompletionHistory,
   listHabits,
-} from "@/features/habits/habits.data";
+} from '@/features/habits/habits.data';
 import {
   buildDayCompletions,
   buildHabitGrid,
   calculateCurrentStreak,
   calculateOverallConsistency,
-} from "@/features/habits/habits.domain";
-import { listPomodoroSessions, listPomodoroSessionsForDateRange } from "@/features/pomodoro/pomodoro.data";
+} from '@/features/habits/habits.domain';
+import {
+  listPomodoroSessions,
+  listPomodoroSessionsForDateRange,
+} from '@/features/pomodoro/pomodoro.data';
 import {
   buildPomodoroHeatmapDays,
   computePomodoroStreakFromHeatmapDays,
-} from "@/features/pomodoro/pomodoro.domain";
-import { listTodos } from "@/features/todos/todos.data";
-import type { Todo } from "@/features/todos/types";
-import { listRoutines, listWorkoutLogs, listWorkoutLogsForRange } from "@/features/workout/workout.data";
+} from '@/features/pomodoro/pomodoro.domain';
+import { listTodos } from '@/features/todos/todos.data';
+import type { Todo } from '@/features/todos/types';
+import {
+  listRoutines,
+  listWorkoutLogs,
+  listWorkoutLogsForRange,
+} from '@/features/workout/workout.data';
 import {
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
-} from "@/features/workout/workout.domain";
-import { buildDateRangeOldestFirst, toDateKey } from "@/lib/time";
+} from '@/features/workout/workout.domain';
+import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
 
-type ViewMode = "grid" | "column" | "list";
-type OverviewCardKey = "pomodoro" | "habits" | "calories" | "todos" | "workout";
+type ViewMode = 'grid' | 'column' | 'list';
+type OverviewCardKey = 'pomodoro' | 'habits' | 'calories' | 'todos' | 'workout';
 type OverviewCardTone = {
   title: string;
   subtitle: string;
@@ -49,59 +65,63 @@ type OverviewCardTone = {
 };
 
 const VIEW_MODE_OPTIONS: { mode: ViewMode; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-  { mode: "grid", icon: "grid-view" },
-  { mode: "column", icon: "view-agenda" },
-  { mode: "list", icon: "view-list" },
+  { mode: 'grid', icon: 'grid-view' },
+  { mode: 'column', icon: 'view-agenda' },
+  { mode: 'list', icon: 'view-list' },
 ];
 const OVERVIEW_CARD_META: Record<OverviewCardKey, OverviewCardTone> = {
   pomodoro: {
-    title: "Focus",
-    subtitle: "This year",
-    icon: "timer",
+    title: 'Focus',
+    subtitle: 'This year',
+    icon: 'timer',
     accentColor: SECTION_COLORS[POMODORO_SECTION_KEY],
     textColor: SECTION_TEXT_COLORS[POMODORO_SECTION_KEY],
   },
   habits: {
-    title: "Habits",
-    subtitle: "Current streak",
-    icon: "track-changes",
+    title: 'Habits',
+    subtitle: 'Current streak',
+    icon: 'track-changes',
     accentColor: SECTION_COLORS.habits,
     textColor: SECTION_TEXT_COLORS.habits,
   },
   calories: {
-    title: "Calories",
-    subtitle: "Daily goal",
-    icon: "restaurant-menu",
+    title: 'Calories',
+    subtitle: 'Daily goal',
+    icon: 'restaurant-menu',
     accentColor: SECTION_COLORS.calories,
     textColor: SECTION_TEXT_COLORS.calories,
   },
   todos: {
-    title: "To-Do",
-    subtitle: "Top priorities",
-    icon: "checklist",
+    title: 'To-Do',
+    subtitle: 'Top priorities',
+    icon: 'checklist',
     accentColor: SECTION_COLORS.todos,
     textColor: SECTION_TEXT_COLORS.todos,
   },
   workout: {
-    title: "Workout",
-    subtitle: "Last 52 weeks",
-    icon: "fitness-center",
+    title: 'Workout',
+    subtitle: 'Last 52 weeks',
+    icon: 'fitness-center',
     accentColor: SECTION_COLORS.workout,
     textColor: SECTION_TEXT_COLORS.workout,
   },
 };
 const GRID_ROWS: OverviewCardKey[][] = [
-  ["pomodoro", "habits"],
-  ["calories", "todos", "workout"],
+  ['pomodoro', 'habits'],
+  ['calories', 'todos', 'workout'],
 ];
-const GRID_TOP_ROW_CARD_CLASS = "min-h-[248px]";
-const GRID_BOTTOM_ROW_CARD_CLASS = "min-h-[214px]";
-const MUTED_ICON = "#94a3b8";
-const SETTINGS_HREF = "/settings" as Href;
-const CALORIES_HREF = "/(tabs)/calories" as Href;
-const COMMAND_HREF = "/command" as Href;
-const OVERVIEW_CARD_ORDER: OverviewCardKey[] = ["pomodoro", "habits", "calories", "todos", "workout"];
-const POMODORO_HREF = "/(tabs)/pomodoro" as Href;
+const GRID_TOP_ROW_CARD_CLASS = 'min-h-[248px]';
+const GRID_BOTTOM_ROW_CARD_CLASS = 'min-h-[214px]';
+const SETTINGS_HREF = '/settings' as Href;
+const CALORIES_HREF = '/(tabs)/calories' as Href;
+const OVERVIEW_CARD_ORDER: OverviewCardKey[] = [
+  'pomodoro',
+  'habits',
+  'calories',
+  'todos',
+  'workout',
+];
+const POMODORO_HREF = '/(tabs)/pomodoro' as Href;
 
 function OverviewMetricCard({
   cardKey,
@@ -114,13 +134,14 @@ function OverviewMetricCard({
   className?: string;
   children: ReactNode;
 }) {
+  const { tokens } = useAppTheme();
   const meta = OVERVIEW_CARD_META[cardKey];
-  const isDetailedView = viewMode !== "list";
+  const isDetailedView = viewMode !== 'list';
 
   return (
     <Card
       accentColor={meta.accentColor}
-      className={["mb-0", className].filter(Boolean).join(" ")}
+      className={['mb-0', className].filter(Boolean).join(' ')}
       innerClassName="p-0"
     >
       <View className="flex-1 p-4">
@@ -132,11 +153,15 @@ function OverviewMetricCard({
             <MaterialIcons name={meta.icon} size={22} color={meta.textColor} />
           </View>
           <View className="min-w-0 flex-1">
-            <Text className="text-base font-semibold text-slate-900">{meta.title}</Text>
-            <Text className="mt-0.5 text-sm text-slate-500">{meta.subtitle}</Text>
+            <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+              {meta.title}
+            </Text>
+            <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
+              {meta.subtitle}
+            </Text>
           </View>
         </View>
-        <View className={["mt-4", isDetailedView ? "flex-1 justify-between" : ""].join(" ").trim()}>
+        <View className={['mt-4', isDetailedView ? 'flex-1 justify-between' : ''].join(' ').trim()}>
           {children}
         </View>
       </View>
@@ -146,8 +171,9 @@ function OverviewMetricCard({
 
 export function OverviewScreen() {
   const router = useRouter();
+  const { tokens } = useAppTheme();
   const { width } = useWindowDimensions();
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [isLoading, setIsLoading] = useState(true);
   const [pendingTodosCount, setPendingTodosCount] = useState(0);
   const [topPendingTodos, setTopPendingTodos] = useState<Todo[]>([]);
@@ -180,20 +206,19 @@ export function OverviewScreen() {
         workoutLogs,
         habits,
         allHabitCompletions,
-      ] =
-        await Promise.all([
-          listTodos(),
-          listCalorieEntries(today),
-          hasAnyCalorieEntries(),
-          getCalorieGoal(),
-          listPomodoroSessions(1),
-          listPomodoroSessionsForDateRange(startDate, today),
-          listRoutines(),
-          listWorkoutLogs(1),
-          listWorkoutLogsForRange(startDate, today),
-          listHabits(),
-          getAllHabitCompletionsForRange(startDate, today),
-        ]);
+      ] = await Promise.all([
+        listTodos(),
+        listCalorieEntries(today),
+        hasAnyCalorieEntries(),
+        getCalorieGoal(),
+        listPomodoroSessions(1),
+        listPomodoroSessionsForDateRange(startDate, today),
+        listRoutines(),
+        listWorkoutLogs(1),
+        listWorkoutLogsForRange(startDate, today),
+        listHabits(),
+        getAllHabitCompletionsForRange(startDate, today),
+      ]);
 
       const pending = todos.filter((t) => t.completed === 0);
       setPendingTodosCount(pending.length);
@@ -240,7 +265,7 @@ export function OverviewScreen() {
       );
       setBestHabitStreak(streakEntries.length === 0 ? 0 : Math.max(0, ...streakEntries));
     } catch (err) {
-      console.error("[OverviewScreen] loadDashboardData failed", err);
+      console.error('[OverviewScreen] loadDashboardData failed', err);
     } finally {
       setIsLoading(false);
     }
@@ -252,22 +277,27 @@ export function OverviewScreen() {
     }, [loadDashboardData]),
   );
 
-  const isListView = viewMode === "list";
+  const isListView = viewMode === 'list';
   const useSingleColumnGrid = width < 960;
 
   const renderCard = useCallback(
     (cardKey: OverviewCardKey, className?: string) => {
       switch (cardKey) {
-        case "pomodoro":
+        case 'pomodoro':
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
                 <View className="flex-row items-center justify-between gap-3">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+                    <Text
+                      className="text-2xl font-bold tabular-nums tracking-tight"
+                      style={{ color: tokens.text }}
+                    >
                       {pomodoroSessions} sessions
                     </Text>
-                    <Text className="mt-1 text-sm text-slate-500">{pomodoroStreak} day streak</Text>
+                    <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                      {pomodoroStreak} day streak
+                    </Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
@@ -287,11 +317,18 @@ export function OverviewScreen() {
               ) : (
                 <>
                   <View className="items-center">
-                    <Text className="text-center text-5xl font-bold tabular-nums tracking-tight text-slate-900">
+                    <Text
+                      className="text-center text-5xl font-bold tabular-nums tracking-tight"
+                      style={{ color: tokens.text }}
+                    >
                       {pomodoroSessions}
                     </Text>
-                    <Text className="mt-1 text-base font-semibold text-slate-700">sessions this year</Text>
-                    <Text className="mt-2 text-sm text-slate-500">{pomodoroStreak} day streak</Text>
+                    <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
+                      sessions this year
+                    </Text>
+                    <Text className="mt-2 text-sm" style={{ color: tokens.textMuted }}>
+                      {pomodoroStreak} day streak
+                    </Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
@@ -311,36 +348,48 @@ export function OverviewScreen() {
               )}
             </OverviewMetricCard>
           );
-        case "habits":
+        case 'habits':
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
                 <View className="flex-row items-center justify-between gap-3">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-lg font-semibold tabular-nums text-slate-900">
+                    <Text
+                      className="text-lg font-semibold tabular-nums"
+                      style={{ color: tokens.text }}
+                    >
                       {bestHabitStreak} day streak
                     </Text>
                   </View>
-                  <Text className="text-sm text-slate-500">{habitConsistency}% consistent</Text>
+                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                    {habitConsistency}% consistent
+                  </Text>
                 </View>
               ) : (
                 <View className="items-start">
-                  <Text className="text-3xl font-bold tabular-nums text-slate-900">
+                  <Text className="text-3xl font-bold tabular-nums" style={{ color: tokens.text }}>
                     {bestHabitStreak}
                   </Text>
-                  <Text className="mt-1 text-base font-semibold text-slate-700">days streak</Text>
-                  <Text className="mt-2 text-sm text-slate-500">{habitConsistency}% consistent</Text>
+                  <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
+                    days streak
+                  </Text>
+                  <Text className="mt-2 text-sm" style={{ color: tokens.textMuted }}>
+                    {habitConsistency}% consistent
+                  </Text>
                 </View>
               )}
             </OverviewMetricCard>
           );
-        case "calories":
+        case 'calories':
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
                 <View className="flex-row items-center justify-between gap-3">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-lg font-semibold tabular-nums text-slate-900">
+                    <Text
+                      className="text-lg font-semibold tabular-nums"
+                      style={{ color: tokens.text }}
+                    >
                       {caloriesConsumed} / {calorieGoal} kcal
                     </Text>
                   </View>
@@ -361,7 +410,10 @@ export function OverviewScreen() {
                 </View>
               ) : (
                 <>
-                  <Text className="text-lg font-semibold tabular-nums text-slate-900">
+                  <Text
+                    className="text-lg font-semibold tabular-nums"
+                    style={{ color: tokens.text }}
+                  >
                     {caloriesConsumed} / {calorieGoal} kcal
                   </Text>
                   <Pressable
@@ -382,21 +434,30 @@ export function OverviewScreen() {
               )}
             </OverviewMetricCard>
           );
-        case "todos":
+        case 'todos':
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
                 <View className="gap-2">
-                  <Text className="text-sm font-semibold text-slate-700">
-                    {pendingTodosCount} pending {pendingTodosCount === 1 ? "task" : "tasks"}
+                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                    {pendingTodosCount} pending {pendingTodosCount === 1 ? 'task' : 'tasks'}
                   </Text>
                   {topPendingTodos.length === 0 ? (
-                    <Text className="text-sm text-slate-500">No pending tasks</Text>
+                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      No pending tasks
+                    </Text>
                   ) : (
                     topPendingTodos.slice(0, 2).map((todo) => (
                       <View key={todo.id} className="flex-row items-center gap-3">
-                        <View className="h-4 w-4 rounded border-2 border-slate-300 bg-white" />
-                        <Text className="flex-1 text-sm text-slate-700" numberOfLines={2}>
+                        <View
+                          className="h-4 w-4 rounded border-2"
+                          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+                        />
+                        <Text
+                          className="flex-1 text-sm"
+                          style={{ color: tokens.text }}
+                          numberOfLines={2}
+                        >
                           {todo.title}
                         </Text>
                       </View>
@@ -405,16 +466,25 @@ export function OverviewScreen() {
                 </View>
               ) : (
                 <View className="gap-3">
-                  <Text className="text-sm font-semibold text-slate-700">
-                    {pendingTodosCount} pending {pendingTodosCount === 1 ? "task" : "tasks"}
+                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                    {pendingTodosCount} pending {pendingTodosCount === 1 ? 'task' : 'tasks'}
                   </Text>
                   {topPendingTodos.length === 0 ? (
-                    <Text className="text-base text-slate-500">No pending tasks</Text>
+                    <Text className="text-base" style={{ color: tokens.textMuted }}>
+                      No pending tasks
+                    </Text>
                   ) : (
                     topPendingTodos.map((todo) => (
                       <View key={todo.id} className="flex-row items-center gap-3">
-                        <View className="h-5 w-5 rounded border-2 border-slate-300 bg-white" />
-                        <Text className="flex-1 text-base text-slate-700" numberOfLines={2}>
+                        <View
+                          className="h-5 w-5 rounded border-2"
+                          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+                        />
+                        <Text
+                          className="flex-1 text-base"
+                          style={{ color: tokens.text }}
+                          numberOfLines={2}
+                        >
                           {todo.title}
                         </Text>
                       </View>
@@ -424,31 +494,46 @@ export function OverviewScreen() {
               )}
             </OverviewMetricCard>
           );
-        case "workout":
+        case 'workout':
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
                 <View className="flex-row items-center justify-between gap-3">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-lg font-semibold tabular-nums text-slate-900">
+                    <Text
+                      className="text-lg font-semibold tabular-nums"
+                      style={{ color: tokens.text }}
+                    >
                       {workoutDays} workout days
                     </Text>
                   </View>
-                  <Text className="text-sm text-slate-500">{workoutStreak} day streak</Text>
+                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                    {workoutStreak} day streak
+                  </Text>
                 </View>
               ) : (
                 <View className="w-full flex-row justify-between gap-4">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-2xl font-bold tabular-nums text-slate-900">
+                    <Text
+                      className="text-2xl font-bold tabular-nums"
+                      style={{ color: tokens.text }}
+                    >
                       {workoutDays}
                     </Text>
-                    <Text className="mt-0.5 text-xs text-slate-500">workout days</Text>
+                    <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                      workout days
+                    </Text>
                   </View>
                   <View className="min-w-0 flex-1 items-end">
-                    <Text className="text-2xl font-bold tabular-nums text-slate-900">
+                    <Text
+                      className="text-2xl font-bold tabular-nums"
+                      style={{ color: tokens.text }}
+                    >
                       {workoutStreak}
                     </Text>
-                    <Text className="mt-0.5 text-xs text-slate-500">day streak</Text>
+                    <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                      day streak
+                    </Text>
                   </View>
                 </View>
               )}
@@ -480,56 +565,26 @@ export function OverviewScreen() {
           subtitle="A compact snapshot of focus, habits, calories, todos, and workouts."
           actions={
             <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open settings"
-                className="rounded-xl p-2.5"
+              <IconButton
+                icon="settings"
                 onPress={() => router.push(SETTINGS_HREF)}
-              >
-                <MaterialIcons name="settings" size={24} color={MUTED_ICON} />
-              </Pressable>
+                accessibilityLabel="Open settings"
+                accentColor={SECTION_TEXT_COLORS.focus}
+              />
               {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                <Pressable
+                <IconButton
                   key={mode}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: viewMode === mode }}
-                  accessibilityLabel={`${mode} overview layout`}
-                  className={`rounded-xl p-2.5 ${viewMode === mode ? "bg-focus-light" : ""}`}
+                  icon={icon}
                   onPress={() => setViewMode(mode)}
-                >
-                  <MaterialIcons
-                    name={icon}
-                    size={24}
-                    color={viewMode === mode ? SECTION_TEXT_COLORS.focus : MUTED_ICON}
-                  />
-                </Pressable>
+                  accessibilityLabel={`${mode} overview layout`}
+                  selected={viewMode === mode}
+                  accentColor={SECTION_TEXT_COLORS.focus}
+                />
               ))}
             </>
           }
         />
       </ScreenSection>
-
-      {COMMAND_EXPERIMENT_ENABLED ? (
-        <ScreenSection>
-          <Card accentColor="#475569" className="mb-0">
-            <View className="flex-row items-center justify-between gap-4">
-              <View className="min-w-0 flex-1">
-                <Text className="text-base font-semibold text-slate-900">Quick command</Text>
-                <Text className="mt-1 text-sm text-slate-500">
-                  Experimental draft entry for single todo or habit creation.
-                </Text>
-              </View>
-              <View className="w-[148px]">
-                <Button
-                  label="Add with command"
-                  onPress={() => router.push(COMMAND_HREF)}
-                  color="#475569"
-                />
-              </View>
-            </View>
-          </Card>
-        </ScreenSection>
-      ) : null}
 
       {isLoading ? (
         <ScreenSection className="min-h-[220px] items-center justify-center py-14">
@@ -537,7 +592,7 @@ export function OverviewScreen() {
         </ScreenSection>
       ) : (
         <ScreenSection>
-          {viewMode === "grid" ? (
+          {viewMode === 'grid' ? (
             <View className="gap-4">
               {useSingleColumnGrid ? (
                 <View className="gap-4">

@@ -1,14 +1,9 @@
-import { getDatabase } from "@/core/db/client";
-import type { SyncAdapter, SyncRecord } from "@/core/sync/sync.engine";
-import { supabase } from "@/lib/supabase";
+import { getDatabase } from '@/core/db/client';
+import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
+import { supabase } from '@/lib/supabase';
 
 /** SQLite table names that are enqueued for sync — must match `syncEngine.enqueue` entity strings. */
-const SYNCABLE_ENTITIES = [
-  "todos",
-  "habits",
-  "calorie_entries",
-  "workout_routines",
-] as const;
+const SYNCABLE_ENTITIES = ['todos', 'habits', 'calorie_entries', 'workout_routines'] as const;
 
 type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];
 
@@ -47,23 +42,21 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       const ids = [...idSet];
       if (ids.length === 0) continue;
 
-      const placeholders = ids.map(() => "?").join(", ");
+      const placeholders = ids.map(() => '?').join(', ');
       const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
 
       const rows = await db.getAllAsync<Record<string, unknown>>(sql, ids);
       const selectedIds = new Set(
-        rows.flatMap((row) => (typeof row.id === "string" ? [row.id] : [])),
+        rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : [])),
       );
       const missingIds = ids.filter((id) => !selectedIds.has(id));
 
       if (missingIds.length > 0) {
-        throw new Error(
-          `[sync] Missing local rows for ${entity}: ${missingIds.join(", ")}`,
-        );
+        throw new Error(`[sync] Missing local rows for ${entity}: ${missingIds.join(', ')}`);
       }
 
       const { error } = await supabase.from(entity).upsert(rows, {
-        onConflict: "id",
+        onConflict: 'id',
       });
 
       if (error) {
@@ -72,7 +65,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     }
   }
 
-  async pull(_since: string | null): Promise<SyncRecord[]> {
-    return [];
+  pull(_since: string | null): Promise<SyncRecord[]> {
+    return Promise.resolve([]);
   }
 }

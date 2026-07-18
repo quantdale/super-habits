@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
-import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { LinkedActionTargetPickerModal } from "@/core/linked-actions/LinkedActionTargetPickerModal";
+import { useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { LinkedActionTargetPickerModal } from '@/core/linked-actions/LinkedActionTargetPickerModal';
 import {
   applyLinkedActionTargetFeature,
   countLinkedActionEditorRowErrors,
@@ -14,28 +14,26 @@ import {
   getLinkedActionTriggerLabel,
   getLinkedActionTriggerOptions,
   validateLinkedActionEditorRow,
-} from "@/core/linked-actions/linkedActionsEditor.model";
+} from '@/core/linked-actions/linkedActionsEditor.model';
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
-} from "@/core/linked-actions/linkedActionsEditor.types";
+} from '@/core/linked-actions/linkedActionsEditor.types';
 import type {
   LinkedActionFeature,
   LinkedActionTriggerType,
-} from "@/core/linked-actions/linkedActions.types";
-import {
-  LINKED_ACTION_SUPPORTED_TARGET_FEATURES,
-} from "@/core/linked-actions/linkedActions.types";
-import { Button } from "@/core/ui/Button";
-import { Card } from "@/core/ui/Card";
-import { PillChip } from "@/core/ui/PillChip";
-import { ValidationError } from "@/core/ui/ValidationError";
+} from '@/core/linked-actions/linkedActions.types';
+import { LINKED_ACTION_SUPPORTED_TARGET_FEATURES } from '@/core/linked-actions/linkedActions.types';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
+import { PillChip } from '@/core/ui/PillChip';
+import { ValidationError } from '@/core/ui/ValidationError';
 import {
   POMODORO_SECTION_KEY,
   SECTION_COLORS,
   SECTION_COLORS_LIGHT,
   SECTION_TEXT_COLORS,
-} from "@/constants/sectionColors";
+} from '@/constants/sectionColors';
 
 type Props = {
   sourceOptions: LinkedActionEditorSourceOption[];
@@ -57,19 +55,17 @@ type TargetPickerState = {
 } | null;
 
 function getFeatureAccentColor(feature: LinkedActionFeature) {
-  return feature === "pomodoro"
-    ? SECTION_COLORS[POMODORO_SECTION_KEY]
-    : SECTION_COLORS[feature];
+  return feature === 'pomodoro' ? SECTION_COLORS[POMODORO_SECTION_KEY] : SECTION_COLORS[feature];
 }
 
 function getFeatureLightColor(feature: LinkedActionFeature) {
-  return feature === "pomodoro"
+  return feature === 'pomodoro'
     ? SECTION_COLORS_LIGHT[POMODORO_SECTION_KEY]
     : SECTION_COLORS_LIGHT[feature];
 }
 
 function getFeatureTextColor(feature: LinkedActionFeature) {
-  return feature === "pomodoro"
+  return feature === 'pomodoro'
     ? SECTION_TEXT_COLORS[POMODORO_SECTION_KEY]
     : SECTION_TEXT_COLORS[feature];
 }
@@ -97,7 +93,7 @@ function RuleRow({
   if (row.isUnsupported) {
     const unsupportedTargetSummary = row.unsupportedTarget
       ? `${row.unsupportedTarget.feature} / ${row.unsupportedTarget.entityType} / ${row.unsupportedTarget.effectType}`
-      : "Stored target unavailable";
+      : 'Stored target unavailable';
 
     return (
       <Card
@@ -107,7 +103,10 @@ function RuleRow({
         headerSubtitle="Legacy rule kept for visibility only."
         headerRight={
           <Pressable onPress={() => onRemove(row.id)} hitSlop={8}>
-            <Text className="text-xs font-semibold uppercase tracking-[1px]" style={{ color: "#ffffff" }}>
+            <Text
+              className="text-xs font-semibold uppercase tracking-[1px]"
+              style={{ color: '#ffffff' }}
+            >
               Remove
             </Text>
           </Pressable>
@@ -138,7 +137,7 @@ function RuleRow({
               style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
             >
               <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                {row.triggerType ? getLinkedActionTriggerLabel(row.triggerType) : "Unknown trigger"}
+                {row.triggerType ? getLinkedActionTriggerLabel(row.triggerType) : 'Unknown trigger'}
               </Text>
               <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
                 This row is disabled. Remove it, then add a new supported rule if needed.
@@ -166,7 +165,7 @@ function RuleRow({
     ? getLinkedActionEffectDescription(row.effectType)
     : null;
   const rowValidation =
-    row.mode === "existing" && countLinkedActionEditorRowErrors(row) === 0
+    row.mode === 'existing' && countLinkedActionEditorRowErrors(row) === 0
       ? {}
       : {
           ...validateLinkedActionEditorRow(row),
@@ -175,23 +174,21 @@ function RuleRow({
             !row.isOrphaned &&
             !row.targetSelection &&
             validateLinkedActionEditorRow(row).targetSelection
-              ? "Choose an existing target item."
+              ? 'Choose an existing target item.'
               : validateLinkedActionEditorRow(row).targetSelection,
         };
-  const validationErrors = Object.values(
-    rowValidation,
-  ).filter((value): value is string => Boolean(value));
+  const validationErrors = Object.values(rowValidation).filter((value): value is string =>
+    Boolean(value),
+  );
 
-  let targetSelectionSummary:
-    | {
-        title: string;
-        description: string;
-        actionLabel: string | null;
-        actionPress: (() => void) | null;
-      }
-    | null = null;
+  let targetSelectionSummary: {
+    title: string;
+    description: string;
+    actionLabel: string | null;
+    actionPress: (() => void) | null;
+  } | null = null;
 
-  if (row.targetSelection?.kind === "existing") {
+  if (row.targetSelection?.kind === 'existing') {
     targetSelectionSummary = {
       title: row.targetSelection.candidate.title,
       description:
@@ -200,7 +197,7 @@ function RuleRow({
       actionLabel: null,
       actionPress: null,
     };
-  } else if (row.targetSelection?.kind === "create_new") {
+  } else if (row.targetSelection?.kind === 'create_new') {
     const { handoff } = row.targetSelection;
     targetSelectionSummary = {
       title: handoff.title,
@@ -213,24 +210,27 @@ function RuleRow({
     ? [
         row.orphanedTarget.feature,
         row.orphanedTarget.entityType,
-        row.orphanedTarget.entityId ?? "unknown-target",
+        row.orphanedTarget.entityId ?? 'unknown-target',
         row.orphanedTarget.effectType,
-      ].join(" / ")
-    : "Stored target unavailable";
+      ].join(' / ')
+    : 'Stored target unavailable';
 
   return (
     <Card
       variant="header"
       accentColor={getFeatureAccentColor(row.sourceFeature)}
-      headerTitle={row.mode === "existing" ? "Linked rule" : "New linked rule"}
+      headerTitle={row.mode === 'existing' ? 'Linked rule' : 'New linked rule'}
       headerSubtitle={
         row.triggerType
           ? `When ${getLinkedActionTriggerLabel(row.triggerType).toLowerCase()}, apply one explicit effect.`
-          : "Build one explicit rule at a time."
+          : 'Build one explicit rule at a time.'
       }
       headerRight={
         <Pressable onPress={() => onRemove(row.id)} hitSlop={8}>
-          <Text className="text-xs font-semibold uppercase tracking-[1px]" style={{ color: "#ffffff" }}>
+          <Text
+            className="text-xs font-semibold uppercase tracking-[1px]"
+            style={{ color: '#ffffff' }}
+          >
             Remove
           </Text>
         </Pressable>
@@ -299,9 +299,9 @@ function RuleRow({
             {row.isOrphaned
               ? row.orphanedTarget?.message
               : (targetSelectionSummary?.description ??
-                  (allowCreateNewTarget
-                    ? "Pick an existing target item or use the create-new handoff."
-                    : "Pick an existing target item from the target feature."))}
+                (allowCreateNewTarget
+                  ? 'Pick an existing target item or use the create-new handoff.'
+                  : 'Pick an existing target item from the target feature.'))}
           </Text>
           {targetSelectionSummary ? (
             <>
@@ -323,12 +323,14 @@ function RuleRow({
             <Button
               label={
                 row.isOrphaned
-                  ? "Choose replacement target"
+                  ? 'Choose replacement target'
                   : row.targetSelection
-                    ? "Change target item"
-                    : "Choose target item"
+                    ? 'Change target item'
+                    : 'Choose target item'
               }
-              onPress={() => onOpenTargetPicker(row.id, row.targetFeature ?? allowedTargetFeatures[0])}
+              onPress={() =>
+                onOpenTargetPicker(row.id, row.targetFeature ?? allowedTargetFeatures[0])
+              }
               disabled={!row.targetFeature}
               color={row.targetFeature ? getFeatureAccentColor(row.targetFeature) : undefined}
             />
@@ -364,7 +366,7 @@ function RuleRow({
                     className="text-sm font-semibold"
                     style={{ color: getFeatureTextColor(selectedTargetFeature) }}
                   >
-                    {row.effectType ? getLinkedActionEffectLabel(row.effectType) : "Effect"}
+                    {row.effectType ? getLinkedActionEffectLabel(row.effectType) : 'Effect'}
                   </Text>
                   <Text
                     className="mt-1 text-sm"
@@ -398,8 +400,8 @@ export function LinkedActionsEditorSection({
   allowedTargetFeatures = [...LINKED_ACTION_SUPPORTED_TARGET_FEATURES],
   allowedTriggerTypes,
   allowCreateNewTarget = true,
-  introTitle = "Linked Actions",
-  introDescription = "Build explicit rules by choosing a trigger, target item, and effect.",
+  introTitle = 'Linked Actions',
+  introDescription = 'Build explicit rules by choosing a trigger, target item, and effect.',
 }: Props) {
   const { tokens } = useAppTheme();
   const [targetPickerState, setTargetPickerState] = useState<TargetPickerState>(null);
@@ -428,7 +430,7 @@ export function LinkedActionsEditorSection({
   const handleTargetSelected = (
     rowId: string,
     feature: LinkedActionFeature,
-    targetSelection: NonNullable<LinkedActionEditorRowDraft["targetSelection"]>,
+    targetSelection: NonNullable<LinkedActionEditorRowDraft['targetSelection']>,
   ) => {
     onRowsChange(
       rows.map((row) =>
@@ -456,7 +458,7 @@ export function LinkedActionsEditorSection({
         onSelect={(targetSelection) => {
           if (!targetPickerState) return;
           const feature =
-            targetSelection.kind === "existing"
+            targetSelection.kind === 'existing'
               ? targetSelection.feature
               : targetSelection.handoff.feature;
           handleTargetSelected(targetPickerState.rowId, feature, targetSelection);
@@ -539,7 +541,7 @@ export function LinkedActionsEditorSection({
       ))}
 
       <Button
-        label={rows.length === 0 ? "Add linked action" : "Add another linked action"}
+        label={rows.length === 0 ? 'Add linked action' : 'Add another linked action'}
         onPress={handleAddRow}
         color={getFeatureAccentColor(selectedSource.feature)}
       />

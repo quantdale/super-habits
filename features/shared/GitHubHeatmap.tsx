@@ -1,12 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  InteractionManager,
-  View,
-  Text,
-  type ViewStyle,
-} from "react-native";
-import { HorizontalScrollArea } from "@/core/ui/HorizontalScrollArea";
-import type { HeatmapDay } from "./activityTypes";
+import React, { useEffect, useMemo, useState } from 'react';
+import { InteractionManager, View, Text, type ViewStyle } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { HorizontalScrollArea } from '@/core/ui/HorizontalScrollArea';
+import type { HeatmapDay } from './activityTypes';
 
 type Props = {
   days: HeatmapDay[];
@@ -23,34 +19,33 @@ const DAY_LABEL_TEXT_WIDTH = 24;
 const DAY_LABEL_FONT_SIZE = 10;
 const DEFAULT_WEEKS = 52;
 
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /** Month label row (incl. marginBottom) + 7×day grid — matches real heatmap strip height. */
-const HEATMAP_STRIP_MIN_HEIGHT =
-  4 + 14 + (7 * CELL + 6 * GAP);
+const HEATMAP_STRIP_MIN_HEIGHT = 4 + 14 + (7 * CELL + 6 * GAP);
 
 /** Stable references for HorizontalScrollArea — avoids new object identity each render. */
 const HEATMAP_SCROLL_CONTENT: ViewStyle = {
-  justifyContent: "center",
-  alignItems: "center",
-  minWidth: "100%",
+  justifyContent: 'center',
+  alignItems: 'center',
+  minWidth: '100%',
 };
 
 const HEATMAP_WEB_INNER: ViewStyle = {
-  alignSelf: "stretch",
-  width: "100%",
-  alignItems: "center",
+  alignSelf: 'stretch',
+  width: '100%',
+  alignItems: 'center',
 };
 
-function getColorForValue(value: number, color: string): string {
-  if (value === 0) return "#e2e8f0";
-  if (value === 1) return color + "55";
-  if (value === 2) return color + "99";
+function getColorForValue(value: number, color: string, emptyColor: string): string {
+  if (value === 0) return emptyColor;
+  if (value === 1) return color + '55';
+  if (value === 2) return color + '99';
   return color;
 }
 
 function parseLocalDate(dateKey: string): Date {
-  const [y, m, d] = dateKey.split("-").map(Number);
+  const [y, m, d] = dateKey.split('-').map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
@@ -63,7 +58,10 @@ function buildCalendarGrid(days: HeatmapDay[]): (HeatmapDay | null)[][] {
   const firstDate = parseLocalDate(days[0].dateKey);
   const firstDow = (firstDate.getDay() + 6) % 7;
 
-  const padded: (HeatmapDay | null)[] = [...Array(firstDow).fill(null), ...days];
+  const padded: (HeatmapDay | null)[] = [
+    ...new Array<HeatmapDay | null>(firstDow).fill(null),
+    ...days,
+  ];
 
   const weeks: (HeatmapDay | null)[][] = [];
   for (let i = 0; i < padded.length; i += 7) {
@@ -85,18 +83,19 @@ function monthLabelsForWeeks(weeksGrid: (HeatmapDay | null)[][]): string[] {
   let prevKey: string | null = null;
   return weeksGrid.map((week) => {
     const first = firstDayInWeek(week);
-    if (!first) return "";
+    if (!first) return '';
     const dt = parseLocalDate(first.dateKey);
     const key = `${dt.getFullYear()}-${dt.getMonth()}`;
     if (key !== prevKey) {
       prevKey = key;
-      return dt.toLocaleDateString("en", { month: "short" });
+      return dt.toLocaleDateString('en', { month: 'short' });
     }
-    return "";
+    return '';
   });
 }
 
 function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props) {
+  const { tokens } = useAppTheme();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -126,18 +125,17 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
   const weekColumns = useMemo(() => buildCalendarGrid(trimmedDays), [trimmedDays]);
   const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
 
-  const footer =
-    label ? (
-      <Text
-        style={{
-          fontSize: 11,
-          color: "#94a3b8",
-          marginTop: 6,
-        }}
-      >
-        {label}
-      </Text>
-    ) : null;
+  const footer = label ? (
+    <Text
+      style={{
+        fontSize: 11,
+        color: tokens.textMuted,
+        marginTop: 6,
+      }}
+    >
+      {label}
+    </Text>
+  ) : null;
 
   if (!isReady) {
     return (
@@ -149,10 +147,10 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
       >
         <View
           style={{
-            width: "100%",
+            width: '100%',
             minHeight: HEATMAP_STRIP_MIN_HEIGHT,
             borderRadius: 6,
-            backgroundColor: "#f1f5f9",
+            backgroundColor: tokens.surfaceElevated,
           }}
           accessibilityLabel="Loading activity heatmap"
         />
@@ -161,17 +159,17 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
   }
 
   const grid = (
-    <View style={{ flexDirection: "column", alignItems: "center", width: "100%" }}>
-      <View style={{ flexDirection: "row", gap: GAP, marginBottom: 4 }}>
+    <View style={{ flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+      <View style={{ flexDirection: 'row', gap: GAP, marginBottom: 4 }}>
         <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }} />
         {weekColumns.map((_, wi) => (
-          <View key={`m-${wi}`} style={{ width: CELL, alignItems: "center" }}>
-            <Text style={{ fontSize: 9, color: "#94a3b8" }}>{monthLabels[wi] ?? ""}</Text>
+          <View key={`m-${wi}`} style={{ width: CELL, alignItems: 'center' }}>
+            <Text style={{ fontSize: 9, color: tokens.textMuted }}>{monthLabels[wi] ?? ''}</Text>
           </View>
         ))}
       </View>
 
-      <View style={{ flexDirection: "row", gap: GAP }}>
+      <View style={{ flexDirection: 'row', gap: GAP }}>
         <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }}>
           {DAY_LABELS.map((d, i) => (
             <View
@@ -179,13 +177,13 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
               style={{
                 height: CELL,
                 marginBottom: GAP,
-                justifyContent: "center",
+                justifyContent: 'center',
               }}
             >
               <Text
                 style={{
                   fontSize: DAY_LABEL_FONT_SIZE,
-                  color: "#94a3b8",
+                  color: tokens.textMuted,
                   width: DAY_LABEL_TEXT_WIDTH,
                 }}
                 numberOfLines={1}
@@ -205,7 +203,9 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
                   width: CELL,
                   height: CELL,
                   borderRadius: 3,
-                  backgroundColor: day ? getColorForValue(day.value, color) : "transparent",
+                  backgroundColor: day
+                    ? getColorForValue(day.value, color, tokens.border)
+                    : 'transparent',
                 }}
               />
             ))}

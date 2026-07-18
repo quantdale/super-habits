@@ -5,15 +5,15 @@ import {
   useContext,
   useMemo,
   useState,
-} from "react";
+} from 'react';
 import {
   createInAppNoticeState,
   dismissInAppNotice,
   enqueueInAppNotice,
   getCurrentInAppNotice,
   type InAppNoticeState,
-} from "@/core/notifications/inAppNotices.store";
-import type { AppNotice } from "@/core/notifications/inAppNotices.types";
+} from '@/core/notifications/inAppNotices.store';
+import type { AppNotice } from '@/core/notifications/inAppNotices.types';
 
 type InAppNoticeContextValue = {
   currentNotice: AppNotice | null;
@@ -51,7 +51,7 @@ export function InAppNoticeProvider({ children }: PropsWithChildren) {
 export function useInAppNotices() {
   const context = useContext(InAppNoticeContext);
   if (!context) {
-    throw new Error("useInAppNotices must be used within InAppNoticeProvider");
+    throw new Error('useInAppNotices must be used within InAppNoticeProvider');
   }
   return context;
 }

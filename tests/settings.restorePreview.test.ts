@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import { maybeLoadRestorePreviewForSettings } from "@/features/settings/settingsRestorePreview";
+import { describe, expect, it, vi } from 'vitest';
+import { maybeLoadRestorePreviewForSettings } from '@/features/settings/settingsRestorePreview';
 
-describe("settings restore preview auth readiness gate", () => {
-  it("does not fetch restore preview before auth bootstrap is ready", async () => {
+describe('settings restore preview auth readiness gate', () => {
+  it('does not fetch restore preview before auth bootstrap is ready', async () => {
     const loadRestorePreview = vi.fn().mockResolvedValue(undefined);
     const onAuthBootstrapping = vi.fn();
 
@@ -16,7 +16,7 @@ describe("settings restore preview auth readiness gate", () => {
     expect(onAuthBootstrapping).toHaveBeenCalledTimes(1);
   });
 
-  it("fetches restore preview once auth bootstrap is ready", async () => {
+  it('fetches restore preview once auth bootstrap is ready', async () => {
     const loadRestorePreview = vi.fn().mockResolvedValue(undefined);
     const onAuthBootstrapping = vi.fn();
 
@@ -30,7 +30,7 @@ describe("settings restore preview auth readiness gate", () => {
     expect(onAuthBootstrapping).not.toHaveBeenCalled();
   });
 
-  it("can transition from auth bootstrapping to ready without terminal error action", async () => {
+  it('can transition from auth bootstrapping to ready without terminal error action', async () => {
     const loadRestorePreview = vi.fn().mockResolvedValue(undefined);
     const onAuthBootstrapping = vi.fn();
 

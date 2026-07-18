@@ -1,25 +1,25 @@
-import { getDatabase } from "@/core/db/client";
-import type { Todo, TodoPriority, TodoRecurrence } from "@/core/db/types";
+import { getDatabase } from '@/core/db/client';
+import type { Todo, TodoPriority, TodoRecurrence } from '@/core/db/types';
 import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
   LinkedActionRuleDefinition,
   SaveLinkedActionRuleForSourceInput,
-} from "@/core/linked-actions/linkedActions.types";
+} from '@/core/linked-actions/linkedActions.types';
 import {
   deleteLinkedActionRulesForTargetEntity,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
-} from "@/core/linked-actions/linkedActions.data";
-import { createId } from "@/lib/id";
-import { nowIso, toDateKey } from "@/lib/time";
-import { syncEngine } from "@/core/sync/sync.engine";
-import { linkedActionsEngine } from "@/core/linked-actions/linkedActions.engine";
-import { getTomorrowDateKey } from "./todos.domain";
+} from '@/core/linked-actions/linkedActions.data';
+import { createId } from '@/lib/id';
+import { nowIso, toDateKey } from '@/lib/time';
+import { syncEngine } from '@/core/sync/sync.engine';
+import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
+import { getTomorrowDateKey } from './todos.domain';
 
 export type TodoLinkedActionsDispatchResult = Pick<
   LinkedActionProcessResult,
-  "matchedRuleCount" | "notices"
+  'matchedRuleCount' | 'notices'
 >;
 
 export type ToggleTodoResult = {
@@ -49,17 +49,13 @@ export async function addTodo(input: {
   recurrence?: TodoRecurrence;
 }): Promise<string> {
   const db = await getDatabase();
-  const id = createId("todo");
+  const id = createId('todo');
   const now = nowIso();
 
-  const recurrenceId = input.recurrence === "daily" ? createId("rec") : null;
+  const recurrenceId = input.recurrence === 'daily' ? createId('rec') : null;
 
   const dueDate =
-    input.dueDate !== undefined
-      ? input.dueDate
-      : input.recurrence === "daily"
-        ? toDateKey()
-        : null;
+    input.dueDate !== undefined ? input.dueDate : input.recurrence === 'daily' ? toDateKey() : null;
 
   const maxRow = await db.getFirstAsync<{ maxOrder: number }>(
     `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
@@ -78,7 +74,7 @@ export async function addTodo(input: {
       input.title,
       input.notes ?? null,
       dueDate,
-      input.priority ?? "normal",
+      input.priority ?? 'normal',
       sortOrder,
       input.recurrence ?? null,
       recurrenceId,
@@ -87,10 +83,10 @@ export async function addTodo(input: {
     ],
   );
   syncEngine.enqueue({
-    entity: "todos",
+    entity: 'todos',
     id,
     updatedAt: now,
-    operation: "create",
+    operation: 'create',
   });
 
   return id;
@@ -104,7 +100,7 @@ export async function createRecurringInstance(input: {
   dueDate: string;
 }): Promise<void> {
   const db = await getDatabase();
-  const id = createId("todo");
+  const id = createId('todo');
   const now = nowIso();
 
   const maxRow = await db.getFirstAsync<{ maxOrder: number }>(
@@ -133,10 +129,10 @@ export async function createRecurringInstance(input: {
   );
 
   syncEngine.enqueue({
-    entity: "todos",
+    entity: 'todos',
     id,
     updatedAt: now,
-    operation: "create",
+    operation: 'create',
   });
 }
 
@@ -160,7 +156,7 @@ export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<T
 }
 
 export async function listAllActiveTodosForRecurrence(): Promise<
-  Pick<Todo, "recurrence_id" | "recurrence" | "due_date" | "deleted_at">[]
+  Pick<Todo, 'recurrence_id' | 'recurrence' | 'due_date' | 'deleted_at'>[]
 > {
   const db = await getDatabase();
   return db.getAllAsync(
@@ -180,10 +176,10 @@ export async function updateTodoOrder(orderedIds: string[]): Promise<void> {
       [i + 1, now, orderedIds[i]],
     );
     syncEngine.enqueue({
-      entity: "todos",
+      entity: 'todos',
       id: orderedIds[i],
       updatedAt: now,
-      operation: "update",
+      operation: 'update',
     });
   }
 }
@@ -200,33 +196,33 @@ export async function updateTodo(
   const db = await getDatabase();
   const now = nowIso();
 
-  const fields: string[] = ["updated_at = ?"];
+  const fields: string[] = ['updated_at = ?'];
   const values: (string | null)[] = [now];
 
   if (updates.title !== undefined) {
-    fields.push("title = ?");
+    fields.push('title = ?');
     values.push(updates.title);
   }
   if (updates.notes !== undefined) {
-    fields.push("notes = ?");
+    fields.push('notes = ?');
     values.push(updates.notes);
   }
   if (updates.dueDate !== undefined) {
-    fields.push("due_date = ?");
+    fields.push('due_date = ?');
     values.push(updates.dueDate);
   }
   if (updates.priority !== undefined) {
-    fields.push("priority = ?");
+    fields.push('priority = ?');
     values.push(updates.priority);
   }
 
   values.push(id);
-  await db.runAsync(`UPDATE todos SET ${fields.join(", ")} WHERE id = ?`, values);
+  await db.runAsync(`UPDATE todos SET ${fields.join(', ')} WHERE id = ?`, values);
   syncEngine.enqueue({
-    entity: "todos",
+    entity: 'todos',
     id,
     updatedAt: now,
-    operation: "update",
+    operation: 'update',
   });
 }
 
@@ -234,8 +230,8 @@ export async function listTodoLinkedActionRules(
   todoId: string,
 ): Promise<LinkedActionRuleDefinition[]> {
   return listLinkedActionRulesForSourceEntity({
-    feature: "todos",
-    entityType: "todo",
+    feature: 'todos',
+    entityType: 'todo',
     entityId: todoId,
   });
 }
@@ -245,7 +241,7 @@ export async function saveTodoLinkedActionRules(
   rules: SaveLinkedActionRuleForSourceInput[],
 ): Promise<void> {
   const db = await getDatabase();
-  const todo = await db.getFirstAsync<Pick<Todo, "id" | "recurrence" | "deleted_at">>(
+  const todo = await db.getFirstAsync<Pick<Todo, 'id' | 'recurrence' | 'deleted_at'>>(
     `SELECT id, recurrence, deleted_at
      FROM todos
      WHERE id = ?`,
@@ -253,16 +249,16 @@ export async function saveTodoLinkedActionRules(
   );
 
   if (!todo) {
-    throw new Error("Todo not found.");
+    throw new Error('Todo not found.');
   }
 
-  if (todo.recurrence === "daily" && rules.length > 0) {
-    throw new Error("Recurring todos cannot be linked-action sources yet.");
+  if (todo.recurrence === 'daily' && rules.length > 0) {
+    throw new Error('Recurring todos cannot be linked-action sources yet.');
   }
 
   await replaceLinkedActionRulesForSourceEntity({
-    feature: "todos",
-    entityType: "todo",
+    feature: 'todos',
+    entityType: 'todo',
     entityId: todoId,
     rules,
   });
@@ -289,10 +285,14 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
   const previous = current.completed;
   const next: 0 | 1 = previous === 1 ? 0 : 1;
 
-  await db.runAsync("UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?", [next, now, current.id]);
-  syncEngine.enqueue({ entity: "todos", id: current.id, updatedAt: now, operation: "update" });
+  await db.runAsync('UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?', [
+    next,
+    now,
+    current.id,
+  ]);
+  syncEngine.enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });
 
-  if (next === 1 && current.recurrence === "daily" && current.recurrence_id) {
+  if (next === 1 && current.recurrence === 'daily' && current.recurrence_id) {
     const tomorrow = getTomorrowDateKey();
     const existing = await db.getFirstAsync<{ id: string }>(
       `SELECT id FROM todos
@@ -312,7 +312,7 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
     }
   }
 
-  if (previous !== 0 || next !== 1 || current.recurrence === "daily") {
+  if (previous !== 0 || next !== 1 || current.recurrence === 'daily') {
     return {
       completed: next,
       linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
@@ -321,15 +321,15 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
 
   const processResult = await linkedActionsEngine.processSourceAction({
     occurredAt: now,
-    feature: "todos",
-    entityType: "todo",
+    feature: 'todos',
+    entityType: 'todo',
     entityId: current.id,
-    triggerType: "todo.completed",
+    triggerType: 'todo.completed',
     label: current.title,
     sourceDateKey: toDateKey(),
     sourceRecordId: current.id,
     origin: {
-      originKind: "user",
+      originKind: 'user',
       originRuleId: null,
       originEventId: null,
     },
@@ -352,22 +352,22 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
 export async function removeTodo(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await db.runAsync("UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ?", [now, now, id]);
+  await db.runAsync('UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
   await saveTodoLinkedActionRules(id, []);
   await deleteLinkedActionRulesForTargetEntity({
-    feature: "todos",
-    entityType: "todo",
+    feature: 'todos',
+    entityType: 'todo',
     entityId: id,
     deletedAt: now,
   });
-  syncEngine.enqueue({ entity: "todos", id, updatedAt: now, operation: "delete" });
+  syncEngine.enqueue({ entity: 'todos', id, updatedAt: now, operation: 'delete' });
 }
 
 export async function completeTodoFromLinkedAction(
   todoId: string,
 ): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  const todo = await db.getFirstAsync<Pick<Todo, "id" | "title" | "completed" | "deleted_at">>(
+  const todo = await db.getFirstAsync<Pick<Todo, 'id' | 'title' | 'completed' | 'deleted_at'>>(
     `SELECT id, title, completed, deleted_at
      FROM todos
      WHERE id = ?`,
@@ -375,13 +375,13 @@ export async function completeTodoFromLinkedAction(
   );
 
   if (!todo || todo.deleted_at !== null) {
-    return { status: "skipped", reason: "target_missing" };
+    return { status: 'skipped', reason: 'target_missing' };
   }
 
   if (todo.completed === 1) {
     return {
-      status: "skipped",
-      reason: "already_completed",
+      status: 'skipped',
+      reason: 'already_completed',
       targetLabel: todo.title,
     };
   }
@@ -395,14 +395,14 @@ export async function completeTodoFromLinkedAction(
     [now, todoId],
   );
   syncEngine.enqueue({
-    entity: "todos",
+    entity: 'todos',
     id: todoId,
     updatedAt: now,
-    operation: "update",
+    operation: 'update',
   });
 
   return {
-    status: "applied",
+    status: 'applied',
     targetLabel: todo.title,
   };
 }

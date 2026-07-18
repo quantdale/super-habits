@@ -1,11 +1,15 @@
-import "@/global.css";
-import { Stack, type ErrorBoundaryProps } from "expo-router";
-import Head from "expo-router/head";
-import { StatusBar } from "expo-status-bar";
-import { Pressable, Text, View } from "react-native";
-import { AppProviders } from "@/core/providers/AppProviders";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
-import { InAppNoticeBanner } from "@/core/ui/InAppNoticeBanner";
+import '@/global.css';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import Head from 'expo-router/head';
+import { StatusBar } from 'expo-status-bar';
+import { Pressable, Text, View } from 'react-native';
+import { AppProviders } from '@/core/providers/AppProviders';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
+import {
+  CommandCenterProvider,
+  GlobalCommandCenterHost,
+} from '@/features/command/CommandCenterProvider';
 
 /**
  * Route-level error boundary so a render-time exception shows recovery UI
@@ -17,17 +21,17 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     <View
       style={{
         flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#f8f7ff",
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f8f7ff',
         padding: 32,
       }}
     >
-      <Text style={{ fontSize: 18, fontWeight: "600", color: "#0f172a", textAlign: "center" }}>
+      <Text style={{ fontSize: 18, fontWeight: '600', color: '#0f172a', textAlign: 'center' }}>
         Something went wrong
       </Text>
       <Text
-        style={{ marginTop: 8, fontSize: 14, color: "#64748b", textAlign: "center" }}
+        style={{ marginTop: 8, fontSize: 14, color: '#64748b', textAlign: 'center' }}
         numberOfLines={4}
       >
         {error.message}
@@ -39,12 +43,12 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         style={{
           marginTop: 20,
           borderRadius: 12,
-          backgroundColor: "#0f172a",
+          backgroundColor: '#0f172a',
           paddingHorizontal: 24,
           paddingVertical: 12,
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#ffffff" }}>Try again</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: '#ffffff' }}>Try again</Text>
       </Pressable>
     </View>
   );
@@ -62,7 +66,7 @@ function ThemedRoot() {
   const { tokens } = useAppTheme();
 
   return (
-    <>
+    <CommandCenterProvider>
       <Head>
         <title>SuperHabits</title>
         <meta name="description" content="Master your day with offline-first habit tracking." />
@@ -74,7 +78,8 @@ function ThemedRoot() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="command" />
       </Stack>
+      <GlobalCommandCenterHost />
       <InAppNoticeBanner />
-    </>
+    </CommandCenterProvider>
   );
 }

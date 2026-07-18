@@ -1,6 +1,6 @@
-import React from "react";
-import { View, Text } from "react-native";
-import { useAppTheme } from "@/core/providers/ThemeProvider";
+import React from 'react';
+import { View, Text } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 type Props = {
   message: string | null;
@@ -12,6 +12,7 @@ export function ValidationError({ message }: Props) {
   if (!message) return null;
   return (
     <View
+      accessibilityRole="alert"
       style={{
         backgroundColor: tokens.dangerBackground,
         borderRadius: 8,
@@ -20,8 +21,8 @@ export function ValidationError({ message }: Props) {
         marginBottom: 8,
         borderWidth: 1,
         borderColor: tokens.dangerBorder,
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: 'row',
+        alignItems: 'center',
         gap: 6,
       }}
     >

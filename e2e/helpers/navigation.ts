@@ -1,11 +1,11 @@
-import { Page } from "@playwright/test";
+import { Page } from '@playwright/test';
 
 export const TABS = {
-  todos:    "/(tabs)/todos",
-  habits:   "/(tabs)/habits",
-  pomodoro: "/(tabs)/pomodoro",
-  workout:  "/(tabs)/workout",
-  calories: "/(tabs)/calories",
+  todos: '/(tabs)/todos',
+  habits: '/(tabs)/habits',
+  pomodoro: '/(tabs)/pomodoro',
+  workout: '/(tabs)/workout',
+  calories: '/(tabs)/calories',
 } as const;
 
 /**
@@ -17,27 +17,24 @@ export const TABS = {
  */
 /** FAB opens new todo — no visible "Make a Task" copy; use accessible name. */
 export async function openNewTodoModal(page: Page) {
-  await page.getByRole("button", { name: "Add task" }).first().click();
+  await page.getByRole('button', { name: 'Add task' }).first().click();
 }
 
 /**
  * Primary action in the new-todo modal. The FAB has no visible "Add task" text (icon + a11y label only),
  * so `getByText("Add task")` resolves to the modal button. Force avoids pointer interception on long lists.
  */
-export async function submitTodoModal(
-  page: Page,
-  options?: { waitForClose?: boolean },
-) {
+export async function submitTodoModal(page: Page, options?: { waitForClose?: boolean }) {
   const titleInput = page.getByPlaceholder(/Add a task/i);
   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
-  await page.getByText("Add task", { exact: true }).locator("..").click({ force: true });
+  await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
   if (options?.waitForClose) {
-    await titleInput.waitFor({ state: "hidden", timeout: 15_000 });
+    await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
   }
 }
 
 export async function goToTab(page: Page, tab: keyof typeof TABS) {
-  await page.goto(TABS[tab], { waitUntil: "domcontentloaded" });
+  await page.goto(TABS[tab], { waitUntil: 'domcontentloaded' });
   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
   // hydration sets DOM values that React immediately overrides with controlled state.
@@ -47,11 +44,9 @@ export async function goToTab(page: Page, tab: keyof typeof TABS) {
   await page
     .waitForFunction(
       () => {
-        const inputs = Array.from(document.querySelectorAll("input"));
+        const inputs = Array.from(document.querySelectorAll('input'));
         if (inputs.length === 0) return true; // no inputs on this tab
-        return inputs.some((el) =>
-          Object.keys(el).some((k) => k.startsWith("__reactFiber")),
-        );
+        return inputs.some((el) => Object.keys(el).some((k) => k.startsWith('__reactFiber')));
       },
       { timeout: 10_000 },
     )
@@ -65,7 +60,7 @@ export async function goToTab(page: Page, tab: keyof typeof TABS) {
  * Uses domcontentloaded for the same reason as goToTab.
  */
 export async function hardReload(page: Page) {
-  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.reload({ waitUntil: 'domcontentloaded' });
 }
 
 /**

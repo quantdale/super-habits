@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
-import { Modal } from "@/core/ui/Modal";
-import { Button } from "@/core/ui/Button";
-import { NumberStepperField } from "@/core/ui/NumberStepperField";
-import { ValidationError } from "@/core/ui/ValidationError";
-import { validateCalorieGoal } from "@/lib/validation";
-import type { CalorieGoal } from "@/features/calories/types";
-import { SECTION_COLORS } from "@/constants/sectionColors";
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { Modal } from '@/core/ui/Modal';
+import { Button } from '@/core/ui/Button';
+import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { validateCalorieGoal } from '@/lib/validation';
+import type { CalorieGoal } from '@/features/calories/types';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 
 type Props = {
   visible: boolean;
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Props) {
+  const { tokens } = useAppTheme();
   const [calories, setCalories] = useState(String(currentGoal.calories));
   const [protein, setProtein] = useState(String(currentGoal.protein));
   const [carbs, setCarbs] = useState(String(currentGoal.carbs));
@@ -49,7 +51,9 @@ export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Prop
 
   return (
     <Modal title="Daily goals" visible={visible} onClose={onClose} scroll>
-      <Text className="mb-6 text-sm text-slate-500">Set your daily calorie and macro targets.</Text>
+      <Text className="mb-6 text-sm" style={{ color: tokens.textMuted }}>
+        Set your daily calorie and macro targets.
+      </Text>
       <NumberStepperField
         label="Calories (kcal)"
         value={calories}

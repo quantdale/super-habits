@@ -1,30 +1,19 @@
-import type { CalorieEntry, Habit, Todo } from "@/core/db/types";
+import type { CalorieEntry, Habit, Todo } from '@/core/db/types';
 
-export const RESTORE_SCOPED_ENTITIES = [
-  "todos",
-  "habits",
-  "calorie_entries",
-] as const;
+export const RESTORE_SCOPED_ENTITIES = ['todos', 'habits', 'calorie_entries'] as const;
 
-export const SYNC_BACKED_ENTITIES = [
-  ...RESTORE_SCOPED_ENTITIES,
-  "workout_routines",
-] as const;
+export const SYNC_BACKED_ENTITIES = [...RESTORE_SCOPED_ENTITIES, 'workout_routines'] as const;
 
 export type RestoreScopedEntity = (typeof RESTORE_SCOPED_ENTITIES)[number];
 export type SyncBackedEntity = (typeof SYNC_BACKED_ENTITIES)[number];
 export type BackupFreshnessSignature = string;
 
-export type RemoteBackupEntityState =
-  | "available"
-  | "empty"
-  | "unavailable"
-  | "error";
+export type RemoteBackupEntityState = 'available' | 'empty' | 'unavailable' | 'error';
 
 export type RemoteBackupEntityStatus = {
   entity: SyncBackedEntity;
   phaseOneRestorable: boolean;
-  phaseOneStatus: "included" | "excluded_in_phase_one";
+  phaseOneStatus: 'included' | 'excluded_in_phase_one';
   remoteState: RemoteBackupEntityState;
   remoteRowCount: number | null;
   latestUpdatedAt: string | null;
@@ -36,16 +25,13 @@ export type LocalSyncBackedCounts = Record<SyncBackedEntity, number>;
 
 export type RestoreEligibility =
   | {
-      kind: "empty_device";
+      kind: 'empty_device';
       message: string;
       localCounts: LocalSyncBackedCounts;
     }
   | {
-      kind: "blocked";
-      reason:
-        | "local_data_present"
-        | "remote_backup_unavailable"
-        | "remote_disabled";
+      kind: 'blocked';
+      reason: 'local_data_present' | 'remote_backup_unavailable' | 'remote_disabled';
       message: string;
       localCounts: LocalSyncBackedCounts;
     };
@@ -64,11 +50,11 @@ export type RestorePreview = {
 
 export type RestoreExecutionResult =
   | {
-      status: "blocked";
+      status: 'blocked';
       preview: RestorePreview;
     }
   | {
-      status: "restored";
+      status: 'restored';
       restoredAt: string;
       freshnessSignature: BackupFreshnessSignature;
       importedCounts: Record<RestoreScopedEntity, number>;
