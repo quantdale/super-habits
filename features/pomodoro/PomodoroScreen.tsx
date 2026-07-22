@@ -53,7 +53,7 @@ function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   }
 }
 
-export function PomodoroScreen() {
+export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);

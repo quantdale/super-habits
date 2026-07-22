@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { Link, type Href, useRouter } from 'expo-router';
+
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { PageHeader } from '@/core/ui/PageHeader';
@@ -11,6 +11,7 @@ import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { type AppSection } from '@/core/providers/NavigationProvider';
 import { toDateKey } from '@/lib/time';
 import { executeDraftAction } from './command.executor';
 import { commandParser } from './commandParser';
@@ -31,9 +32,6 @@ import type {
 } from './types';
 import { COMMAND_EXPERIMENT_ENABLED } from './types';
 
-const OVERVIEW_HREF = '/(tabs)/overview' as Href;
-const TODOS_HREF = '/(tabs)/todos' as Href;
-const HABITS_HREF = '/(tabs)/habits' as Href;
 const TODO_PRIORITIES: { value: DraftCreateTodo['fields']['priority']; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
   { value: 'normal', label: 'Normal' },
@@ -46,12 +44,10 @@ const HABIT_CATEGORIES: { value: DraftCreateHabit['fields']['category']; label: 
   { value: 'evening', label: 'Evening' },
 ];
 
-type CommandScreenPresentation = 'page' | 'overlay';
-
 type CommandScreenProps = {
-  presentation?: CommandScreenPresentation;
   launchContext?: CommandCenterLaunchContext | null;
   onRequestClose?: () => void;
+  onNavigateToDestination?: (section: AppSection) => void;
 };
 
 function getParserContext() {
@@ -120,19 +116,7 @@ function PreviewMissingField({ message }: { message: string }) {
   );
 }
 
-function CommandSection({
-  children,
-  presentation,
-  className,
-}: {
-  children: ReactNode;
-  presentation: CommandScreenPresentation;
-  className?: string;
-}) {
-  if (presentation === 'page') {
-    return <ScreenSection className={className}>{children}</ScreenSection>;
-  }
-
+function CommandSection({ children, className }: { children: ReactNode; className?: string }) {
   return <View className={className}>{children}</View>;
 }
 
@@ -273,11 +257,11 @@ function DraftPreview({
   onEditHabitCategory: (value: DraftCreateHabit['fields']['category']) => void;
   onConfirm: () => void;
   onReset: () => void;
-  onNavigateToDestination?: (href: Href) => void;
+  onNavigateToDestination?: (section: AppSection) => void;
 }) {
   const { tokens } = useAppTheme();
-  const router = useRouter();
-  const destinationHref = editableDraft.kind === 'create_todo' ? TODOS_HREF : HABITS_HREF;
+  const destinationSection: AppSection =
+    editableDraft.kind === 'create_todo' ? 'todos' : 'habits';
   const destinationLabel = editableDraft.kind === 'create_todo' ? 'Go to Todos' : 'Go to Habits';
 
   return (
@@ -433,12 +417,7 @@ function DraftPreview({
                 <Button
                   label={destinationLabel}
                   onPress={() => {
-                    if (onNavigateToDestination) {
-                      onNavigateToDestination(destinationHref);
-                      return;
-                    }
-
-                    router.push(destinationHref);
+                    onNavigateToDestination?.(destinationSection);
                   }}
                   color={tokens.textMuted}
                 />
@@ -466,11 +445,10 @@ function DraftPreview({
 }
 
 export function CommandScreen({
-  presentation = 'page',
   launchContext = null,
   onRequestClose,
+  onNavigateToDestination,
 }: CommandScreenProps) {
-  const router = useRouter();
   const { tokens } = useAppTheme();
   const parseConfig = useMemo(() => getAiCommandParseConfig(), []);
   const internalRolloutAvailable = useMemo(
@@ -602,18 +580,17 @@ export function CommandScreen({
             title="Command center"
             subtitle="This experimental screen is currently disabled."
             actions={
-              <Link href={OVERVIEW_HREF} asChild>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to overview"
-                  className="rounded-xl border px-3.5 py-2.5"
-                  style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                >
-                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                    Back
-                  </Text>
-                </Pressable>
-              </Link>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close command center"
+                className="rounded-xl border px-3.5 py-2.5"
+                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+                onPress={onRequestClose}
+              >
+                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                  Back
+                </Text>
+              </Pressable>
             }
           />
         </ScreenSection>
@@ -623,13 +600,13 @@ export function CommandScreen({
 
   const commandContent = (
     <>
-      {presentation === 'overlay' && launchContext ? (
-        <CommandSection presentation={presentation} className="mb-4">
+      {launchContext ? (
+        <CommandSection className="mb-4">
           <LaunchContextCard launchContext={launchContext} />
         </CommandSection>
       ) : null}
 
-      <CommandSection presentation={presentation}>
+      <CommandSection>
         <Card
           variant="header"
           accentColor={tokens.textMuted}
@@ -679,7 +656,7 @@ export function CommandScreen({
       </CommandSection>
 
       {parseResult?.outcome === 'unsupported' ? (
-        <CommandSection presentation={presentation} className="mb-0">
+        <CommandSection className="mb-0">
           <Card
             variant="header"
             accentColor={tokens.textMuted}
@@ -695,7 +672,7 @@ export function CommandScreen({
       ) : null}
 
       {parseResult?.outcome === 'unavailable' ? (
-        <CommandSection presentation={presentation} className="mb-0">
+        <CommandSection className="mb-0">
           <Card
             variant="header"
             accentColor={tokens.textMuted}
@@ -719,7 +696,7 @@ export function CommandScreen({
       ) : null}
 
       {parsedDraft && editableDraft ? (
-        <CommandSection presentation={presentation} className="mb-0">
+        <CommandSection className="mb-0">
           <DraftPreview
             parsedDraft={parsedDraft}
             editableDraft={editableDraft}
@@ -829,8 +806,8 @@ export function CommandScreen({
             }}
             onConfirm={handleConfirm}
             onReset={handleReset}
-            onNavigateToDestination={(href) => {
-              router.push(href);
+            onNavigateToDestination={(section) => {
+              onNavigateToDestination?.(section);
               onRequestClose?.();
             }}
           />
@@ -838,38 +815,12 @@ export function CommandScreen({
       ) : null}
 
       {internalRolloutAvailable && internalRolloutEnabledOnDevice && parseObservation ? (
-        <CommandSection presentation={presentation} className="mb-0">
+        <CommandSection className="mb-0">
           <InternalMetadataCard observation={parseObservation} />
         </CommandSection>
       ) : null}
     </>
   );
 
-  if (presentation === 'overlay') {
-    return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
-  }
-
-  return (
-    <Screen scroll>
-      <ScreenSection>
-        <PageHeader
-          title="Command center"
-          subtitle="Internal route for the global command center. Review the draft, then confirm before anything is saved."
-          actions={
-            <Link href={OVERVIEW_HREF} asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Back to overview"
-                className="rounded-xl border px-3.5 py-2.5"
-                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-              >
-                <MaterialIcons name="arrow-back" size={18} color={tokens.text} />
-              </Pressable>
-            </Link>
-          }
-        />
-      </ScreenSection>
-      {commandContent}
-    </Screen>
-  );
+  return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
 }

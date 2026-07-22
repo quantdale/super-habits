@@ -29,7 +29,7 @@ import {
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { toDateKey } from '@/lib/time';
-import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
 import { WorkoutSessionScreen } from './WorkoutSessionScreen';
 
@@ -83,7 +83,7 @@ function RoutineSwipeRow({
   );
 }
 
-export function WorkoutScreen() {
+export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const colorText = sectionAccents.workout.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -110,7 +110,7 @@ export function WorkoutScreen() {
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
   }, []);
 
-  useFocusForegroundRefresh(refresh);
+  useActiveForegroundRefresh(isActive, refresh);
 
   const onCreate = async () => {
     const err = validateRoutineName(name);

@@ -12,7 +12,7 @@ export async function clickLabeledAction(page: Page, label: string) {
 }
 
 export async function openCommandScreen(page: Page) {
-  await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   const launcher = page.getByRole('button', { name: 'Open command center' });
   await expect(launcher).toBeVisible({
     timeout: 15_000,
@@ -42,8 +42,9 @@ export async function openCommandScreen(page: Page) {
 }
 
 export async function openSettingsScreen(page: Page) {
-  await page.goto('/settings', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText('Settings', { exact: true })).toBeVisible();
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Open settings' }).click();
+  await expect(page.getByText('Theme and display', { exact: true })).toBeVisible();
 }
 
 export async function parseCommand(page: Page, rawText: string) {

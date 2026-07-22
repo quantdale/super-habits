@@ -37,3 +37,25 @@ export function useFocusForegroundRefresh(onRefresh: () => void | Promise<void>)
   useFocusEffect(handleRefresh);
   useForegroundRefresh(handleRefresh);
 }
+
+/**
+ * Like `useFocusForegroundRefresh`, but triggers the refresh when `isActive`
+ * becomes true instead of when the route gains focus. Use this for screens
+ * rendered inside a single-route section switcher.
+ */
+export function useActiveForegroundRefresh(
+  isActive: boolean,
+  onRefresh: () => void | Promise<void>,
+) {
+  const handleRefresh = useCallback(() => {
+    void onRefresh();
+  }, [onRefresh]);
+
+  useEffect(() => {
+    if (isActive) {
+      handleRefresh();
+    }
+  }, [isActive, handleRefresh]);
+
+  useForegroundRefresh(handleRefresh);
+}

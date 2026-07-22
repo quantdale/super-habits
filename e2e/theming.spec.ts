@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { clearDatabase } from './helpers/db';
+import { openSettingsScreen } from './helpers/commandObservation';
 
 async function dismissStartupRestorePromptIfPresent(page: import('@playwright/test').Page) {
   const dismissButton = page.getByText('Not now', { exact: true });
@@ -27,7 +28,7 @@ test.describe('Theming', () => {
   });
 
   test('defaults to the Light theme in Light mode', async ({ page }) => {
-    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await openSettingsScreen(page);
     await dismissStartupRestorePromptIfPresent(page);
 
     await page.getByRole('button', { name: 'Light', exact: true }).click();
@@ -41,7 +42,7 @@ test.describe('Theming', () => {
   test('selecting a night theme applies it immediately and persists across reload', async ({
     page,
   }) => {
-    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await openSettingsScreen(page);
     await dismissStartupRestorePromptIfPresent(page);
 
     // Fix mode to Dark first: in `system` mode, filling the night slot alone
@@ -60,7 +61,7 @@ test.describe('Theming', () => {
   });
 
   test('mode chips show the correct slot theme without losing the other slot', async ({ page }) => {
-    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await openSettingsScreen(page);
     await dismissStartupRestorePromptIfPresent(page);
 
     await page.getByRole('button', { name: 'Dark', exact: true }).click();

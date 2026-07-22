@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Link, type Href, useFocusEffect } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useAppBootstrapState } from '@/core/providers/AppProviders';
 import { type ThemeMode, useAppTheme } from '@/core/providers/ThemeProvider';
@@ -33,13 +32,12 @@ import {
   setAiCommandInternalRolloutPreference,
 } from '@/features/command/commandInternalRollout';
 import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
+import { useCommandCenter } from '@/features/command/CommandCenterProvider';
 import { maybeLoadRestorePreviewForSettings } from '@/features/settings/settingsRestorePreview';
 import { getPomodoroSettings, savePomodoroSettings } from '@/features/pomodoro/pomodoro.data';
 import { DEFAULT_SETTINGS, type PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
 import { validateCalorieGoal, validatePomodoroSettings } from '@/lib/validation';
 
-const OVERVIEW_HREF = '/(tabs)/overview' as Href;
-const COMMAND_HREF = '/command' as Href;
 const BACKUP_ACCENT = '#0f766e';
 const INTERNAL_ACCENT = '#7c2d12';
 
@@ -339,9 +337,15 @@ function formatCalorieGoalSummary(goal: CalorieGoal) {
   return `${goal.calories} kcal, ${goal.protein}g protein, ${goal.carbs}g carbs, ${goal.fats}g fats.`;
 }
 
-export function SettingsScreen() {
+type SettingsScreenProps = {
+  visible: boolean;
+  onRequestClose: () => void;
+};
+
+export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps) {
   const { mode, resolvedTheme, themeId, setMode, setTheme, tokens } = useAppTheme();
   const { authBootstrapReady } = useAppBootstrapState();
+  const { openCommandCenter } = useCommandCenter();
   const commandConfig = useMemo(() => getAiCommandParseConfig(), []);
   const commandInternalRolloutAvailable = useMemo(
     () => isAiCommandInternalRolloutAvailable(commandConfig),
@@ -449,27 +453,27 @@ export function SettingsScreen() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void maybeLoadRestorePreviewForSettings({
-        authBootstrapReady,
-        loadRestorePreview,
-        onAuthBootstrapping: () => {
-          setRestoreLoading(true);
-          setRestoreError(null);
-        },
-      });
-      void loadCommandRolloutPreference();
-      void loadPomodoroDefaults();
-      void loadCalorieDefaults();
-    }, [
+  useEffect(() => {
+    if (!visible) return;
+    void maybeLoadRestorePreviewForSettings({
       authBootstrapReady,
-      loadCalorieDefaults,
-      loadCommandRolloutPreference,
-      loadPomodoroDefaults,
       loadRestorePreview,
-    ]),
-  );
+      onAuthBootstrapping: () => {
+        setRestoreLoading(true);
+        setRestoreError(null);
+      },
+    });
+    void loadCommandRolloutPreference();
+    void loadPomodoroDefaults();
+    void loadCalorieDefaults();
+  }, [
+    visible,
+    authBootstrapReady,
+    loadCalorieDefaults,
+    loadCommandRolloutPreference,
+    loadPomodoroDefaults,
+    loadRestorePreview,
+  ]);
 
   const handleRestore = async () => {
     setRestoreRunning(true);
@@ -618,19 +622,18 @@ export function SettingsScreen() {
           title="Settings"
           subtitle="Everyday settings come first. Internal tools stay separate at the bottom."
           actions={
-            <Link href={OVERVIEW_HREF} asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Back to overview"
-                className="ml-4 flex-row items-center gap-1.5 rounded-2xl border px-3.5 py-2.5"
-                style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-              >
-                <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
-                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                  Back
-                </Text>
-              </Pressable>
-            </Link>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close settings"
+              className="ml-4 flex-row items-center gap-1.5 rounded-2xl border px-3.5 py-2.5"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+              onPress={onRequestClose}
+            >
+              <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Back
+              </Text>
+            </Pressable>
           }
         />
       </ScreenSection>
@@ -920,28 +923,27 @@ export function SettingsScreen() {
           />
 
           {COMMAND_EXPERIMENT_ENABLED ? (
-            <Link href={COMMAND_HREF} asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open command center"
-                className="mt-4 rounded-2xl px-4 py-3"
-                style={{
-                  backgroundColor: tokens.textMuted,
-                  shadowColor: tokens.shadowColor,
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 12,
-                  elevation: 1,
-                }}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open command center from settings"
+              className="mt-4 rounded-2xl px-4 py-3"
+              style={{
+                backgroundColor: tokens.textMuted,
+                shadowColor: tokens.shadowColor,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+                elevation: 1,
+              }}
+              onPress={() => openCommandCenter('overview')}
+            >
+              <Text
+                className="text-center text-sm font-semibold"
+                style={{ color: tokens.textOnAccent }}
               >
-                <Text
-                  className="text-center text-sm font-semibold"
-                  style={{ color: tokens.textOnAccent }}
-                >
-                  Open command center
-                </Text>
-              </Pressable>
-            </Link>
+                Open command center
+              </Text>
+            </Pressable>
           ) : null}
         </Card>
       </ScreenSection>

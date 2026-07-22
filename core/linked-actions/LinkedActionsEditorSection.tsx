@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useAppNavigation } from '@/core/providers/NavigationProvider';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { LinkedActionTargetPickerModal } from '@/core/linked-actions/LinkedActionTargetPickerModal';
@@ -94,7 +94,7 @@ function RuleRow({
   allowCreateNewTarget: boolean;
 }) {
   const { tokens, sectionAccents } = useAppTheme();
-  const router = useRouter();
+  const { setActiveSection } = useAppNavigation();
 
   if (row.isUnsupported) {
     const unsupportedTargetSummary = row.unsupportedTarget
@@ -209,7 +209,7 @@ function RuleRow({
       title: handoff.title,
       description: handoff.description,
       actionLabel: handoff.ctaLabel,
-      actionPress: () => router.push(handoff.destinationHref),
+      actionPress: () => setActiveSection(handoff.destinationSection),
     };
   }
   const orphanedTargetSummary = row.orphanedTarget

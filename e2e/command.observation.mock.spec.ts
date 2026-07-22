@@ -11,6 +11,7 @@ import {
   openCommandScreen,
   parseCommand,
 } from './helpers/commandObservation';
+import { goToTab } from './helpers/navigation';
 
 type ObservationOutcome = 'ready' | 'needs_input' | 'unsupported';
 
@@ -92,7 +93,7 @@ const MOCK_OBSERVATION_CASES: CommandObservationCase[] = [
 
 test.describe('Command observation (mock/default path)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await clearDatabase(page);
   });
 
@@ -124,7 +125,7 @@ test.describe('Command observation (mock/default path)', () => {
     await parseCommand(page, 'Add a todo to call mom tomorrow');
     await expectDraftOutcome(page, 'ready');
 
-    await page.goto('/(tabs)/todos', { waitUntil: 'domcontentloaded' });
+    await goToTab(page, 'todos');
     await expect(page.getByText('Todos', { exact: true })).toBeVisible();
     await expect(page.getByText('call mom', { exact: true })).toHaveCount(0);
   });

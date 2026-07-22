@@ -1,4 +1,4 @@
-import type { Href } from 'expo-router';
+import type { AppSection } from '@/core/providers/NavigationProvider';
 import type {
   LinkedActionFeature,
   LinkedActionTargetEntityType,
@@ -17,7 +17,7 @@ export type LinkedActionTargetCreateNewHandoff = {
   title: string;
   description: string;
   ctaLabel: string;
-  destinationHref: Href;
+  destinationSection: AppSection;
 };
 
 export type LinkedActionTargetPickerExistingConfig = {

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { clearDatabase } from './helpers/db';
+import { goToTab } from './helpers/navigation';
+import { openSettingsScreen } from './helpers/commandObservation';
 
 const INTERNAL_ROLLOUT_BUILD_ENABLED =
   process.env.EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT === 'true' &&
@@ -10,7 +12,7 @@ const INTERNAL_REMOTE_BACKEND_CONFIGURED =
     : Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
 
 async function openCommandScreen(page: Page) {
-  await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   const launcher = page.getByRole('button', { name: 'Open command center' });
   await expect(launcher).toBeVisible({
     timeout: 15_000,
@@ -48,36 +50,31 @@ async function fillById(page: Page, id: string, value: string) {
   await page.locator(`#${id}`).fill(value, { force: true });
 }
 
-async function openSettingsScreen(page: Page) {
-  await page.goto('/settings', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText('Settings', { exact: true })).toBeVisible();
-}
-
 test.describe('Command shell', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await clearDatabase(page);
   });
 
   test('shows the global launcher on main tabs, hides it on settings, and closes the overlay cleanly', async ({
     page,
   }) => {
-    const launcher = page.getByRole('button', { name: 'Open command center' });
+    const launcher = page.getByRole('button', { name: 'Open command center', exact: true });
     const visibleTabs = [
-      '/(tabs)/overview',
-      '/(tabs)/todos',
-      '/(tabs)/habits',
-      '/(tabs)/pomodoro',
-      '/(tabs)/workout',
-      '/(tabs)/calories',
+      'overview',
+      'todos',
+      'habits',
+      'pomodoro',
+      'workout',
+      'calories',
     ] as const;
 
-    for (const href of visibleTabs) {
-      await page.goto(href, { waitUntil: 'domcontentloaded' });
+    for (const tab of visibleTabs) {
+      await goToTab(page, tab as Parameters<typeof goToTab>[1]);
       await expect(launcher).toBeVisible();
     }
 
-    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await openSettingsScreen(page);
     await expect(launcher).toHaveCount(0);
 
     await openCommandScreen(page);
@@ -94,7 +91,7 @@ test.describe('Command shell', () => {
     const startButton = page.getByText('Start focus', { exact: true });
     const pauseButton = page.getByText('Pause', { exact: true });
 
-    await page.goto('/(tabs)/pomodoro', { waitUntil: 'domcontentloaded' });
+    await goToTab(page, 'pomodoro');
     await expect(launcher).toBeVisible();
 
     await startButton.click({ force: true });
@@ -148,7 +145,7 @@ test.describe('Command shell', () => {
     await openCommandScreen(page);
     await parseCommand(page, 'Add a todo to call mom tomorrow');
 
-    await page.goto('/(tabs)/todos', { waitUntil: 'domcontentloaded' });
+    await goToTab(page, 'todos');
     await expect(page.getByText('Todos', { exact: true })).toBeVisible();
     await expect(page.getByText('call mom', { exact: true })).toHaveCount(0);
   });
@@ -218,7 +215,7 @@ test.describe('Command shell internal rollout', () => {
   );
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await clearDatabase(page);
   });
 

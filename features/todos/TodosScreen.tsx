@@ -28,7 +28,7 @@ import { PillChip } from '@/core/ui/PillChip';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
-import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateTodo } from '@/lib/validation';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
@@ -60,7 +60,7 @@ const VIEW_MODE_OPTIONS: readonly {
   { mode: 'grid', icon: 'grid-view' },
 ];
 
-export function TodosScreen() {
+export function TodosScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const colorText = sectionAccents.todos.text;
   const { showNotice } = useInAppNotices();
@@ -128,7 +128,7 @@ export function TodosScreen() {
     setItems(list);
   }, []);
 
-  useFocusForegroundRefresh(loadTodosOnFocus);
+  useActiveForegroundRefresh(isActive, loadTodosOnFocus);
 
   const resetForm = () => {
     setTitle('');

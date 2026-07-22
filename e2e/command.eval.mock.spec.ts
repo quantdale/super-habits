@@ -10,6 +10,7 @@ import {
   writeCommandEvalArtifact,
 } from './helpers/commandEvaluation';
 import { openCommandScreen, parseCommand } from './helpers/commandObservation';
+import { goToTab } from './helpers/navigation';
 
 const MOCK_ARTIFACT_PATH = 'test-results/command-eval-mock.json';
 
@@ -352,7 +353,7 @@ const MOCK_EVAL_CASES: CommandEvalCase[] = [
 
 test.describe('Command evaluation (mock/default path)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await clearDatabase(page);
   });
 
@@ -425,7 +426,7 @@ test.describe('Command evaluation (mock/default path)', () => {
     await openCommandScreen(page);
     await parseCommand(page, 'Add a todo to call mom tomorrow');
 
-    await page.goto('/(tabs)/todos', { waitUntil: 'domcontentloaded' });
+    await goToTab(page, 'todos');
     await expect(page.getByText('Todos', { exact: true })).toBeVisible();
     await expect(page.getByText('call mom', { exact: true })).toHaveCount(0);
   });
@@ -434,7 +435,7 @@ test.describe('Command evaluation (mock/default path)', () => {
     await openCommandScreen(page);
     await parseCommand(page, 'Create a habit to drink water every morning');
 
-    await page.goto('/(tabs)/habits', { waitUntil: 'domcontentloaded' });
+    await goToTab(page, 'habits');
     await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
     await expect(page.getByText('drink water', { exact: true })).toHaveCount(0);
   });

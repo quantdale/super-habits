@@ -20,12 +20,12 @@ function createInAppNoticeId() {
   return `notice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const TAB_HREF_BY_FEATURE = {
-  todos: '/(tabs)/todos',
-  habits: '/(tabs)/habits',
-  calories: '/(tabs)/calories',
-  workout: '/(tabs)/workout',
-  pomodoro: '/(tabs)/pomodoro',
+const TAB_SECTION_BY_FEATURE = {
+  todos: 'todos',
+  habits: 'habits',
+  calories: 'calories',
+  workout: 'workout',
+  pomodoro: 'pomodoro',
 } as const;
 
 function getLinkedActionFeatureSingularLabel(feature: LinkedActionFeature) {
@@ -118,7 +118,7 @@ export function buildLinkedActionsNoticePayload(
       },
       destination: {
         kind: 'linked-actions-target',
-        href: TAB_HREF_BY_FEATURE[plan.rule.target.feature],
+        section: TAB_SECTION_BY_FEATURE[plan.rule.target.feature],
         feature: plan.rule.target.feature,
         entityType: plan.rule.target.entityType,
         entityId: plan.rule.target.entityId ?? plan.plannedProducedEntityId ?? undefined,
@@ -148,7 +148,7 @@ export function buildLinkedActionsNoticePayload(
     },
     destination: {
       kind: 'linked-actions-target',
-      href: TAB_HREF_BY_FEATURE[plan.rule.target.feature],
+      section: TAB_SECTION_BY_FEATURE[plan.rule.target.feature],
       feature: plan.rule.target.feature,
       entityType: plan.rule.target.entityType,
       entityId: plan.rule.target.entityId ?? plan.plannedProducedEntityId ?? undefined,

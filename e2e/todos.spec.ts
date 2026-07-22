@@ -49,20 +49,20 @@ test.describe('Todos', () => {
     await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill('Persistent todo');
     await submitTodoModal(page);
-    await expect(page.getByText('Persistent todo')).toBeVisible();
+    await expect(page.getByText('Persistent todo').filter({ visible: true }).last()).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'todos');
 
-    await expect(page.getByText('Persistent todo')).toBeVisible();
+    await expect(page.getByText('Persistent todo').filter({ visible: true }).last()).toBeVisible();
   });
 
   test('completing a linked source todo completes the target todo', async ({ page }) => {
     await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill('Linked target task');
     await submitTodoModal(page);
-    await expect(page.getByText('Linked target task')).toBeVisible();
+    await expect(page.getByText('Linked target task').filter({ visible: true }).last()).toBeVisible();
 
     await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill('Linked source task');
@@ -94,7 +94,7 @@ test.describe('Todos', () => {
 
     await page.getByRole('button', { name: '' }).nth(1).click({ force: true });
     await expect(page.getByText(/Linked Actions updated/i)).toBeVisible();
-    await expect(page.getByText('No pending tasks', { exact: true })).toBeVisible();
+    await expect(page.getByText('No pending tasks', { exact: true }).filter({ visible: true }).last()).toBeVisible();
   });
 
   test('recurring todos show linked-actions disabled message', async ({ page }) => {

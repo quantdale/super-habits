@@ -48,7 +48,7 @@ test.describe('Command observation (internal real-parser path)', () => {
   test.skip(Boolean(INTERNAL_SUITE_SKIP_REASON), INTERNAL_SUITE_SKIP_REASON ?? '');
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/(tabs)/overview', { waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await clearDatabase(page);
     await setModelParserEnabled(page, false);
   });

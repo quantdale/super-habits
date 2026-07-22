@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { clearDatabase } from './helpers/db';
 import { goToTab, openNewTodoModal, submitTodoModal } from './helpers/navigation';
+import { openSettingsScreen } from './helpers/commandObservation';
 
 async function dismissStartupRestorePromptIfPresent(page: import('@playwright/test').Page) {
   const dismissButton = page.getByText('Not now', { exact: true });
@@ -17,7 +18,7 @@ test.describe('Settings backup restore', () => {
   });
 
   test('shows the backup restore section on an empty device', async ({ page }) => {
-    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await openSettingsScreen(page);
     await dismissStartupRestorePromptIfPresent(page);
 
     await expect(page.getByText('Backup status and restore')).toBeVisible();
@@ -36,7 +37,7 @@ test.describe('Settings backup restore', () => {
     await page.getByPlaceholder(/Add a task/i).type('Local todo');
     await submitTodoModal(page, { waitForClose: true });
 
-    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    await openSettingsScreen(page);
 
     await expect(page.getByText('Backup status and restore')).toBeVisible();
     await expect(

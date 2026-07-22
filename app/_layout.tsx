@@ -4,6 +4,7 @@ import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, Text, View } from 'react-native';
 import { AppProviders } from '@/core/providers/AppProviders';
+import { NavigationProvider } from '@/core/providers/NavigationProvider';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
 import {
@@ -57,7 +58,11 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   return (
     <AppProviders>
-      <ThemedRoot />
+      <NavigationProvider>
+        <CommandCenterProvider>
+          <ThemedRoot />
+        </CommandCenterProvider>
+      </NavigationProvider>
     </AppProviders>
   );
 }
@@ -74,10 +79,7 @@ function ThemedRoot() {
         <meta name="theme-color" content={tokens.webThemeColor} />
       </Head>
       <StatusBar style={tokens.statusBarStyle} />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="command" />
-      </Stack>
+      <Stack screenOptions={{ headerShown: false }} />
       <GlobalCommandCenterHost />
       <InAppNoticeBanner />
     </CommandCenterProvider>

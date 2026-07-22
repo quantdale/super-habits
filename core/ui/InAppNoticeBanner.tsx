@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useAppNavigation } from '@/core/providers/NavigationProvider';
 import { Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
@@ -9,7 +9,7 @@ function formatContextLabel(label?: string, fallbackFeature?: string) {
 }
 
 export function InAppNoticeBanner() {
-  const router = useRouter();
+  const { setActiveSection } = useAppNavigation();
   const { tokens } = useAppTheme();
   const { currentNotice, dismissNotice } = useInAppNotices();
 
@@ -19,7 +19,7 @@ export function InAppNoticeBanner() {
   const { id, onPress, payload } = currentNotice;
   const sourceLabel = formatContextLabel(payload.source.label, payload.source.feature);
   const targetLabel = formatContextLabel(payload.target.label, payload.target.feature);
-  const destinationHref = payload.destination?.href;
+
 
   const handlePress = () => {
     dismissNotice(id);
@@ -27,8 +27,8 @@ export function InAppNoticeBanner() {
       onPress();
       return;
     }
-    if (destinationHref) {
-      router.push(destinationHref);
+    if (payload.destination?.kind === 'section' || payload.destination?.kind === 'linked-actions-target') {
+      setActiveSection(payload.destination.section);
     }
   };
 

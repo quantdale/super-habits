@@ -79,7 +79,7 @@ describe('linked actions target picker providers', () => {
       feature: 'todos',
       entityType: 'todo',
       ctaLabel: 'Open Todos',
-      destinationHref: '/(tabs)/todos',
+      destinationSection: 'todos',
     });
   });
 
@@ -92,7 +92,7 @@ describe('linked actions target picker providers', () => {
       feature: 'calories',
       entityType: 'calorie_log',
       ctaLabel: 'Open Calories',
-      destinationHref: '/(tabs)/calories',
+      destinationSection: 'calories',
     });
   });
 

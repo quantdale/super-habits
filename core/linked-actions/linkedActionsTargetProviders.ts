@@ -1,4 +1,4 @@
-import type { Href } from 'expo-router';
+import type { AppSection } from '@/core/providers/NavigationProvider';
 import type {
   LinkedActionFeature,
   LinkedActionTargetEntityType,
@@ -12,12 +12,12 @@ import { listHabits } from '@/features/habits/habits.data';
 import { listTodos } from '@/features/todos/todos.data';
 import { listRoutines } from '@/features/workout/workout.data';
 
-const TARGET_FEATURE_HREFS: Record<LinkedActionFeature, Href> = {
-  todos: '/(tabs)/todos',
-  habits: '/(tabs)/habits',
-  calories: '/(tabs)/calories',
-  workout: '/(tabs)/workout',
-  pomodoro: '/(tabs)/pomodoro',
+const TARGET_FEATURE_SECTIONS: Record<LinkedActionFeature, AppSection> = {
+  todos: 'todos',
+  habits: 'habits',
+  calories: 'calories',
+  workout: 'workout',
+  pomodoro: 'pomodoro',
 };
 
 function capitalizeLabel(value: string) {
@@ -38,7 +38,7 @@ function createModuleHandoff(input: {
     title: input.title,
     description: input.description,
     ctaLabel: input.ctaLabel,
-    destinationHref: TARGET_FEATURE_HREFS[input.feature],
+    destinationSection: TARGET_FEATURE_SECTIONS[input.feature],
   };
 }
 

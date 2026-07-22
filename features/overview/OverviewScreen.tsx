@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { POMODORO_SECTION_KEY, SECTION_COLORS, type SectionKey } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 
@@ -49,6 +49,7 @@ import {
   computeWorkoutStreakFromHeatmapDays,
 } from '@/features/workout/workout.domain';
 import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
+import { useAppNavigation } from '@/core/providers/NavigationProvider';
 
 type ViewMode = 'grid' | 'column' | 'list';
 type OverviewCardKey = 'pomodoro' | 'habits' | 'calories' | 'todos' | 'workout';
@@ -109,8 +110,6 @@ const GRID_ROWS: OverviewCardKey[][] = [
 ];
 const GRID_TOP_ROW_CARD_CLASS = 'min-h-[248px]';
 const GRID_BOTTOM_ROW_CARD_CLASS = 'min-h-[214px]';
-const SETTINGS_HREF = '/settings' as Href;
-const CALORIES_HREF = '/(tabs)/calories' as Href;
 const OVERVIEW_CARD_ORDER: OverviewCardKey[] = [
   'pomodoro',
   'habits',
@@ -118,7 +117,6 @@ const OVERVIEW_CARD_ORDER: OverviewCardKey[] = [
   'todos',
   'workout',
 ];
-const POMODORO_HREF = '/(tabs)/pomodoro' as Href;
 
 function OverviewMetricCard({
   cardKey,
@@ -167,8 +165,8 @@ function OverviewMetricCard({
   );
 }
 
-export function OverviewScreen() {
-  const router = useRouter();
+export function OverviewScreen({ isActive }: { isActive: boolean }) {
+  const { openSettings, setActiveSection } = useAppNavigation();
   const { tokens, sectionAccents } = useAppTheme();
   const { width } = useWindowDimensions();
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -269,7 +267,8 @@ export function OverviewScreen() {
     }
   }, []);
 
-  useFocusEffect(
+  useActiveForegroundRefresh(
+    isActive,
     useCallback(() => {
       void loadDashboardData();
     }, [loadDashboardData]),
@@ -302,7 +301,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Start focus session"
                     className="rounded-xl px-3.5 py-2.5 active:opacity-80"
                     style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
-                    onPress={() => router.push(POMODORO_HREF)}
+                    onPress={() => setActiveSection('pomodoro')}
                   >
                     <Text
                       className="text-sm font-semibold"
@@ -333,7 +332,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Start focus session"
                     className="mt-5 w-full items-center rounded-xl px-4 py-3.5 active:opacity-80"
                     style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
-                    onPress={() => router.push(POMODORO_HREF)}
+                    onPress={() => setActiveSection('pomodoro')}
                   >
                     <Text
                       className="text-base font-semibold"
@@ -396,7 +395,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Add calorie entry"
                     className="rounded-xl border-2 px-3.5 py-2.5 active:opacity-80"
                     style={{ borderColor: SECTION_COLORS.calories }}
-                    onPress={() => router.push(CALORIES_HREF)}
+                    onPress={() => setActiveSection('calories')}
                   >
                     <Text
                       className="text-sm font-semibold"
@@ -419,7 +418,7 @@ export function OverviewScreen() {
                     accessibilityLabel="Add calorie entry"
                     className="mt-4 self-start rounded-xl border-2 px-4 py-3 active:opacity-80"
                     style={{ borderColor: SECTION_COLORS.calories }}
-                    onPress={() => router.push(CALORIES_HREF)}
+                    onPress={() => setActiveSection('calories')}
                   >
                     <Text
                       className="text-sm font-semibold"
@@ -552,7 +551,8 @@ export function OverviewScreen() {
       viewMode,
       workoutDays,
       workoutStreak,
-      router,
+      setActiveSection,
+      openSettings,
       tokens.border,
       tokens.surface,
       tokens.text,
@@ -572,7 +572,7 @@ export function OverviewScreen() {
             <>
               <IconButton
                 icon="settings"
-                onPress={() => router.push(SETTINGS_HREF)}
+                onPress={openSettings}
                 accessibilityLabel="Open settings"
                 accentColor={sectionAccents.focus.text}
               />

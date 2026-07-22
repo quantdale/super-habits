@@ -27,7 +27,7 @@ describe('in-app notice store', () => {
       },
       destination: {
         kind: 'linked-actions-target',
-        href: '/(tabs)/habits',
+        section: 'habits',
         feature: 'habits',
         entityType: 'habit',
         entityId: 'habit-1',

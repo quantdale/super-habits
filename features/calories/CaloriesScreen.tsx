@@ -45,7 +45,7 @@ import type {
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { toDateKey } from '@/lib/time';
-import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
 import { CalorieGoalModal } from './CalorieGoalModal';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
@@ -309,7 +309,7 @@ function DiaryMealGroupCard({
   );
 }
 
-export function CaloriesScreen() {
+export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const colorText = sectionAccents.calories.text;
   const [food, setFood] = useState('');
@@ -356,7 +356,7 @@ export function CaloriesScreen() {
     setGoal(savedGoal);
   }, []);
 
-  useFocusForegroundRefresh(refresh);
+  useActiveForegroundRefresh(isActive, refresh);
 
   useEffect(() => {
     let active = true;

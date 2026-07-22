@@ -1,19 +1,16 @@
 import { Page } from '@playwright/test';
 
-export const TABS = {
-  todos: '/(tabs)/todos',
-  habits: '/(tabs)/habits',
-  pomodoro: '/(tabs)/pomodoro',
-  workout: '/(tabs)/workout',
-  calories: '/(tabs)/calories',
+export const TAB_LABELS = {
+  overview: 'Overview',
+  todos: 'To Do',
+  habits: 'Habits',
+  pomodoro: 'Focus',
+  workout: 'Workout',
+  calories: 'Calories',
 } as const;
 
 /**
- * Navigate to a tab and wait for the DOM to be ready.
- * Uses "domcontentloaded" instead of "networkidle" — on Metro dev
- * server with HMR, "networkidle" can add 3-5s per navigation because
- * HMR polling never fully stops. "domcontentloaded" fires as soon as
- * the page structure is ready, which is sufficient for React Native Web.
+ * Click a top-tab button to switch sections in the single-page layout.
  */
 /** FAB opens new todo — no visible "Make a Task" copy; use accessible name. */
 export async function openNewTodoModal(page: Page) {
@@ -33,8 +30,9 @@ export async function submitTodoModal(page: Page, options?: { waitForClose?: boo
   }
 }
 
-export async function goToTab(page: Page, tab: keyof typeof TABS) {
-  await page.goto(TABS[tab], { waitUntil: 'domcontentloaded' });
+export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
   // hydration sets DOM values that React immediately overrides with controlled state.

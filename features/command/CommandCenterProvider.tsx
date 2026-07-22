@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSegments } from 'expo-router';
+import { type AppSection, useAppNavigation } from '@/core/providers/NavigationProvider';
 import {
   createContext,
   type PropsWithChildren,
@@ -19,15 +19,6 @@ import {
 } from './commandCenterConfig';
 import { CommandScreen } from './CommandScreen';
 
-const ELIGIBLE_TAB_CONTEXTS: Record<string, CommandCenterLaunchContext> = {
-  overview: 'overview',
-  todos: 'todos',
-  habits: 'habits',
-  pomodoro: 'pomodoro',
-  workout: 'workout',
-  calories: 'calories',
-};
-
 type CommandCenterContextValue = {
   isOpen: boolean;
   launchContext: CommandCenterLaunchContext | null;
@@ -38,17 +29,6 @@ type CommandCenterContextValue = {
 };
 
 const CommandCenterContext = createContext<CommandCenterContextValue | null>(null);
-
-function resolveContextFromSegments(
-  segments: readonly string[],
-): CommandCenterLaunchContext | null {
-  const tabsIndex = segments.indexOf('(tabs)');
-  if (tabsIndex === -1) return null;
-
-  const tabSegment = segments[tabsIndex + 1];
-  if (!tabSegment) return null;
-  return ELIGIBLE_TAB_CONTEXTS[tabSegment] ?? null;
-}
 
 export function CommandCenterProvider({ children }: PropsWithChildren) {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,16 +81,16 @@ export function CommandCenterProvider({ children }: PropsWithChildren) {
   return <CommandCenterContext.Provider value={value}>{children}</CommandCenterContext.Provider>;
 }
 
-function useCommandCenterContext() {
+export function useCommandCenter() {
   const context = useContext(CommandCenterContext);
   if (!context) {
-    throw new Error('useCommandCenterContext must be used within CommandCenterProvider');
+    throw new Error('useCommandCenter must be used within CommandCenterProvider');
   }
   return context;
 }
 
 export function useCommandLauncherSuppressed(key: string, suppressed: boolean) {
-  const { setLauncherSuppressed } = useCommandCenterContext();
+  const { setLauncherSuppressed } = useCommandCenter();
 
   useEffect(() => {
     setLauncherSuppressed(key, suppressed);
@@ -174,19 +154,20 @@ function FloatingCommandLauncher({
 
 export function GlobalCommandCenterHost() {
   const { width } = useWindowDimensions();
-  const segments = useSegments() as readonly string[];
+  const { activeSection, setActiveSection, isSettingsOpen } = useAppNavigation();
   const { isOpen, launchContext, launcherSuppressed, openCommandCenter, closeCommandCenter } =
-    useCommandCenterContext();
+    useCommandCenter();
 
-  const currentContext = useMemo(() => resolveContextFromSegments(segments), [segments]);
-  const launcherVisible =
-    COMMAND_EXPERIMENT_ENABLED && !isOpen && currentContext !== null && !launcherSuppressed;
+  const currentContext = activeSection;
+  const launcherVisible = COMMAND_EXPERIMENT_ENABLED && !isOpen && !launcherSuppressed && !isSettingsOpen;
 
-  useEffect(() => {
-    if (!currentContext && isOpen) {
+  const handleNavigateToDestination = useCallback(
+    (section: AppSection) => {
       closeCommandCenter();
-    }
-  }, [closeCommandCenter, currentContext, isOpen]);
+      setActiveSection(section);
+    },
+    [closeCommandCenter, setActiveSection],
+  );
 
   if (!COMMAND_EXPERIMENT_ENABLED) {
     return null;
@@ -194,7 +175,7 @@ export function GlobalCommandCenterHost() {
 
   return (
     <>
-      {launcherVisible && currentContext ? (
+      {launcherVisible ? (
         <FloatingCommandLauncher
           launchContext={currentContext}
           onPress={() => openCommandCenter(currentContext)}
@@ -210,9 +191,9 @@ export function GlobalCommandCenterHost() {
       >
         {launchContext ? (
           <CommandScreen
-            presentation="overlay"
             launchContext={launchContext}
             onRequestClose={closeCommandCenter}
+            onNavigateToDestination={handleNavigateToDestination}
           />
         ) : null}
       </Modal>

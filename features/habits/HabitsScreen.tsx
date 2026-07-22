@@ -57,7 +57,7 @@ import {
 } from '@/features/habits/habitPresets';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
-import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateHabit } from '@/lib/validation';
 import { ValidationError } from '@/core/ui/ValidationError';
 
@@ -79,7 +79,7 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
   return true;
 }
 
-export function HabitsScreen() {
+export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -143,7 +143,7 @@ export function HabitsScreen() {
     setOverallStreak(bestStreak);
   }, []);
 
-  useFocusForegroundRefresh(refresh);
+  useActiveForegroundRefresh(isActive, refresh);
 
   const openAddModal = (presetCategory?: HabitCategory) => {
     setEditingHabit(null);
