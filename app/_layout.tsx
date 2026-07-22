@@ -71,7 +71,7 @@ function ThemedRoot() {
   const { tokens } = useAppTheme();
 
   return (
-    <CommandCenterProvider>
+    <>
       <Head>
         <title>SuperHabits</title>
         <meta name="description" content="Master your day with offline-first habit tracking." />
@@ -82,6 +82,6 @@ function ThemedRoot() {
       <Stack screenOptions={{ headerShown: false }} />
       <GlobalCommandCenterHost />
       <InAppNoticeBanner />
-    </CommandCenterProvider>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View, type ViewProps } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions, type ViewProps } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
@@ -138,15 +138,8 @@ function SectionContainer({
 export default function Index() {
   const { tokens, resolvedTheme, sectionAccents } = useAppTheme();
   const { activeSection, setActiveSection, isSettingsOpen, closeSettings } = useAppNavigation();
-  const [screenWidth, setScreenWidth] = useState(0);
+  const { width: screenWidth } = useWindowDimensions();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
-
-  useEffect(() => {
-    setScreenWidth(window.innerWidth);
-    const handleResize = () => setScreenWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const [mountedSections, setMountedSections] = useState<Record<AppSection, boolean>>(() => {
     const initial: Record<AppSection, boolean> = {

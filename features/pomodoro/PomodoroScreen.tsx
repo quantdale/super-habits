@@ -17,7 +17,7 @@ import {
   savePomodoroSettings,
 } from '@/features/pomodoro/pomodoro.data';
 import { toDateKey } from '@/lib/time';
-import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import type { PomodoroSession } from './types';
 import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
 import {
@@ -112,7 +112,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const refreshHistoryOnForeground = useCallback(() => {
     setHistoryVersion((v) => v + 1);
   }, []);
-  useForegroundRefresh(refreshHistoryOnForeground);
+  useActiveForegroundRefresh(isActive, refreshHistoryOnForeground);
 
   useEffect(() => {
     if (!isRunning) return;
