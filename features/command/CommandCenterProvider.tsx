@@ -159,7 +159,8 @@ export function GlobalCommandCenterHost() {
     useCommandCenter();
 
   const currentContext = activeSection;
-  const launcherVisible = COMMAND_EXPERIMENT_ENABLED && !isOpen && !launcherSuppressed && !isSettingsOpen;
+  const launcherVisible =
+    COMMAND_EXPERIMENT_ENABLED && !isOpen && !launcherSuppressed && !isSettingsOpen;
 
   const handleNavigateToDestination = useCallback(
     (section: AppSection) => {

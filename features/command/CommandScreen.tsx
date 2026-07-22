@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
-import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
@@ -260,8 +259,7 @@ function DraftPreview({
   onNavigateToDestination?: (section: AppSection) => void;
 }) {
   const { tokens } = useAppTheme();
-  const destinationSection: AppSection =
-    editableDraft.kind === 'create_todo' ? 'todos' : 'habits';
+  const destinationSection: AppSection = editableDraft.kind === 'create_todo' ? 'todos' : 'habits';
   const destinationLabel = editableDraft.kind === 'create_todo' ? 'Go to Todos' : 'Go to Habits';
 
   return (

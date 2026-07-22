@@ -62,7 +62,9 @@ test.describe('Todos', () => {
     await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill('Linked target task');
     await submitTodoModal(page);
-    await expect(page.getByText('Linked target task').filter({ visible: true }).last()).toBeVisible();
+    await expect(
+      page.getByText('Linked target task').filter({ visible: true }).last(),
+    ).toBeVisible();
 
     await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill('Linked source task');
@@ -94,7 +96,9 @@ test.describe('Todos', () => {
 
     await page.getByRole('button', { name: '' }).nth(1).click({ force: true });
     await expect(page.getByText(/Linked Actions updated/i)).toBeVisible();
-    await expect(page.getByText('No pending tasks', { exact: true }).filter({ visible: true }).last()).toBeVisible();
+    await expect(
+      page.getByText('No pending tasks', { exact: true }).filter({ visible: true }).last(),
+    ).toBeVisible();
   });
 
   test('recurring todos show linked-actions disabled message', async ({ page }) => {

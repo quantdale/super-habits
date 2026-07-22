@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { createContext, useCallback, useContext, useState, type PropsWithChildren } from 'react';
 
 /**
  * The six primary app sections. These double as command-center launch contexts

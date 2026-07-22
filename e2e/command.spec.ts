@@ -60,17 +60,10 @@ test.describe('Command shell', () => {
     page,
   }) => {
     const launcher = page.getByRole('button', { name: 'Open command center', exact: true });
-    const visibleTabs = [
-      'overview',
-      'todos',
-      'habits',
-      'pomodoro',
-      'workout',
-      'calories',
-    ] as const;
+    const visibleTabs = ['overview', 'todos', 'habits', 'pomodoro', 'workout', 'calories'] as const;
 
     for (const tab of visibleTabs) {
-      await goToTab(page, tab as Parameters<typeof goToTab>[1]);
+      await goToTab(page, tab);
       await expect(launcher).toBeVisible();
     }
 

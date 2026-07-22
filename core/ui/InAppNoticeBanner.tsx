@@ -20,14 +20,16 @@ export function InAppNoticeBanner() {
   const sourceLabel = formatContextLabel(payload.source.label, payload.source.feature);
   const targetLabel = formatContextLabel(payload.target.label, payload.target.feature);
 
-
   const handlePress = () => {
     dismissNotice(id);
     if (onPress) {
       onPress();
       return;
     }
-    if (payload.destination?.kind === 'section' || payload.destination?.kind === 'linked-actions-target') {
+    if (
+      payload.destination?.kind === 'section' ||
+      payload.destination?.kind === 'linked-actions-target'
+    ) {
       setActiveSection(payload.destination.section);
     }
   };
