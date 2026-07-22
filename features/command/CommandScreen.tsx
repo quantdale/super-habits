@@ -34,7 +34,6 @@ import { COMMAND_EXPERIMENT_ENABLED } from './types';
 const OVERVIEW_HREF = '/(tabs)/overview' as Href;
 const TODOS_HREF = '/(tabs)/todos' as Href;
 const HABITS_HREF = '/(tabs)/habits' as Href;
-const COMMAND_ACCENT = '#475569';
 const TODO_PRIORITIES: { value: DraftCreateTodo['fields']['priority']; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
   { value: 'normal', label: 'Normal' },
@@ -162,10 +161,11 @@ function LaunchContextCard({ launchContext }: { launchContext: CommandCenterLaun
 }
 
 function InternalMetadataCard({ observation }: { observation: CommandParseObservation }) {
+  const { tokens } = useAppTheme();
   return (
     <Card
       variant="header"
-      accentColor={COMMAND_ACCENT}
+      accentColor={tokens.textMuted}
       headerTitle="Internal parser metadata"
       headerSubtitle="Visible only when internal rollout mode is enabled on this device."
       className="mb-0"
@@ -283,7 +283,7 @@ function DraftPreview({
   return (
     <Card
       variant="header"
-      accentColor={COMMAND_ACCENT}
+      accentColor={tokens.textMuted}
       headerTitle="Review before saving"
       headerSubtitle="Nothing has been saved yet."
       className="mb-0"
@@ -342,7 +342,7 @@ function DraftPreview({
                   key={priority.value}
                   label={priority.label}
                   active={editableDraft.fields.priority === priority.value}
-                  color={COMMAND_ACCENT}
+                  color={tokens.textMuted}
                   onPress={() => onEditTodoPriority(priority.value)}
                 />
               ))}
@@ -377,7 +377,7 @@ function DraftPreview({
                   key={category.value}
                   label={category.label}
                   active={editableDraft.fields.category === category.value}
-                  color={COMMAND_ACCENT}
+                  color={tokens.textMuted}
                   onPress={() => onEditHabitCategory(category.value)}
                 />
               ))}
@@ -440,7 +440,7 @@ function DraftPreview({
 
                     router.push(destinationHref);
                   }}
-                  color={COMMAND_ACCENT}
+                  color={tokens.textMuted}
                 />
               </View>
               <View className="flex-1">
@@ -452,7 +452,7 @@ function DraftPreview({
           <Button
             label={busy ? 'Saving...' : 'Confirm and save'}
             onPress={onConfirm}
-            color={COMMAND_ACCENT}
+            color={tokens.textMuted}
             disabled={busy}
           />
         ) : (
@@ -632,7 +632,7 @@ export function CommandScreen({
       <CommandSection presentation={presentation}>
         <Card
           variant="header"
-          accentColor={COMMAND_ACCENT}
+          accentColor={tokens.textMuted}
           headerTitle="Command input"
           headerSubtitle="Experimental draft parsing only. Nothing is saved until you confirm."
           className="mb-0"
@@ -671,7 +671,7 @@ export function CommandScreen({
             <Button
               label={isParsing ? 'Parsing...' : 'Parse command'}
               onPress={handleParseCommand}
-              color={COMMAND_ACCENT}
+              color={tokens.textMuted}
               disabled={!hasCommandText || isParsing}
             />
           </View>
@@ -682,7 +682,7 @@ export function CommandScreen({
         <CommandSection presentation={presentation} className="mb-0">
           <Card
             variant="header"
-            accentColor={COMMAND_ACCENT}
+            accentColor={tokens.textMuted}
             headerTitle="Try rewording your command"
             headerSubtitle="Nothing has been saved yet."
             className="mb-0"
@@ -698,7 +698,7 @@ export function CommandScreen({
         <CommandSection presentation={presentation} className="mb-0">
           <Card
             variant="header"
-            accentColor={COMMAND_ACCENT}
+            accentColor={tokens.textMuted}
             headerTitle="Parse unavailable"
             headerSubtitle="Nothing has been saved yet."
             className="mb-0"
@@ -710,7 +710,7 @@ export function CommandScreen({
               <Button
                 label="Try again"
                 onPress={handleParseCommand}
-                color={COMMAND_ACCENT}
+                color={tokens.textMuted}
                 disabled={!hasCommandText || isParsing}
               />
             </View>

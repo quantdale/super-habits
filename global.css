@@ -2,12 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * ThemeProvider sets --sh-background (and one custom property per token) on
+ * <html> once mounted, covering all 14 catalog themes without a per-theme
+ * CSS rule. The literal fallbacks below only cover the gap between first
+ * paint and that effect running, so they match the Light default.
+ */
 body,
 #root {
-  background-color: #f8f7ff;
+  background-color: var(--sh-background, #f8f7ff);
 }
 
 html[data-theme='dark'] body,
 html[data-theme='dark'] #root {
-  background-color: #0f1221;
+  background-color: var(--sh-background, #0f1221);
 }

@@ -4,8 +4,6 @@ import { Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 
-const NOTICE_ACCENT = '#2563eb';
-
 function formatContextLabel(label?: string, fallbackFeature?: string) {
   return label?.trim() || fallbackFeature || 'item';
 }
@@ -17,6 +15,7 @@ export function InAppNoticeBanner() {
 
   if (!currentNotice) return null;
 
+  const noticeAccent = tokens.accent;
   const { id, onPress, payload } = currentNotice;
   const sourceLabel = formatContextLabel(payload.source.label, payload.source.feature);
   const targetLabel = formatContextLabel(payload.target.label, payload.target.feature);
@@ -45,7 +44,7 @@ export function InAppNoticeBanner() {
           className="overflow-hidden rounded-2xl border"
           onPress={handlePress}
           style={{
-            borderColor: NOTICE_ACCENT,
+            borderColor: noticeAccent,
             backgroundColor: tokens.surface,
             shadowColor: tokens.shadowColor,
             shadowOffset: { width: 0, height: 8 },
@@ -57,9 +56,9 @@ export function InAppNoticeBanner() {
           <View className="flex-row items-start gap-3 px-4 py-3">
             <View
               className="mt-0.5 h-10 w-10 items-center justify-center rounded-xl"
-              style={{ backgroundColor: `${NOTICE_ACCENT}16` }}
+              style={{ backgroundColor: `${noticeAccent}16` }}
             >
-              <MaterialIcons name="bolt" size={20} color={NOTICE_ACCENT} />
+              <MaterialIcons name="bolt" size={20} color={noticeAccent} />
             </View>
 
             <View className="min-w-0 flex-1">
@@ -69,7 +68,7 @@ export function InAppNoticeBanner() {
               <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
                 {payload.reason}
               </Text>
-              <Text className="mt-2 text-xs font-medium uppercase" style={{ color: NOTICE_ACCENT }}>
+              <Text className="mt-2 text-xs font-medium uppercase" style={{ color: noticeAccent }}>
                 {sourceLabel} to {targetLabel}
               </Text>
             </View>

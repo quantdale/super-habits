@@ -56,7 +56,8 @@ jobs:
       # dependency chain (expo -> @expo/cli: shell-quote, tmp, ws) and fixing
       # them requires a coordinated expo-* bump (`npx expo install --fix`) —
       # `npm audit fix` alone produces a lockfile without expo-modules-core and
-      # breaks typecheck. Flip continue-on-error to false once that bump lands.
+      # breaks typecheck (confirmed while attempting this — see DEP-001 notes).
+      # Flip continue-on-error to false once that bump lands.
       - name: Audit runtime dependencies (advisory)
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high

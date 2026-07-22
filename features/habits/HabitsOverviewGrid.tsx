@@ -5,7 +5,7 @@ import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Card } from '@/core/ui/Card';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 
 type Props = {
   consistencyPercent: number;
@@ -13,7 +13,7 @@ type Props = {
 };
 
 function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const heatmapLegend: { label: string; color: string }[] = [
     { label: 'None', color: tokens.border },
     { label: 'Some', color: `${SECTION_COLORS.habits}55` },
@@ -35,7 +35,7 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
               className="h-11 w-11 items-center justify-center rounded-xl"
               style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
             >
-              <MaterialIcons name="track-changes" size={22} color={SECTION_TEXT_COLORS.habits} />
+              <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
             </View>
             <View className="min-w-0 flex-1">
               <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -50,7 +50,7 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
                 style={{
                   fontSize: 28,
                   fontWeight: '700',
-                  color: SECTION_TEXT_COLORS.habits,
+                  color: sectionAccents.habits.text,
                 }}
               >
                 {consistencyPercent}%

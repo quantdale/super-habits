@@ -2,18 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
-import { SECTION_TEXT_COLORS } from '@/constants/sectionColors';
 
-const MACRO_CHIPS: {
-  label: string;
-  key: 'protein' | 'carbs' | 'fats' | 'fiber';
-  color: string;
-}[] = [
-  { label: 'Protein', key: 'protein', color: SECTION_TEXT_COLORS.todos },
-  { label: 'Carbs', key: 'carbs', color: SECTION_TEXT_COLORS.calories },
-  { label: 'Fats', key: 'fats', color: SECTION_TEXT_COLORS.workout },
-  { label: 'Fiber', key: 'fiber', color: SECTION_TEXT_COLORS.habits },
-];
+type MacroChipKey = 'protein' | 'carbs' | 'fats' | 'fiber';
 
 type Props = {
   totalKcal: number;
@@ -34,11 +24,21 @@ export function MacroDonutChart({
   fiber,
   sectionColor,
 }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const ringNeutral = tokens.border;
   const overColor = tokens.dangerSolid;
   const consumed = totalKcal;
   const goal = Math.max(0, goalKcal);
+
+  const macroChips = useMemo<{ label: string; key: MacroChipKey; color: string }[]>(
+    () => [
+      { label: 'Protein', key: 'protein', color: sectionAccents.todos.text },
+      { label: 'Carbs', key: 'carbs', color: sectionAccents.calories.text },
+      { label: 'Fats', key: 'fats', color: sectionAccents.workout.text },
+      { label: 'Fiber', key: 'fiber', color: sectionAccents.habits.text },
+    ],
+    [sectionAccents],
+  );
 
   const progressData = useMemo(() => {
     if (goal <= 0) {
@@ -90,7 +90,7 @@ export function MacroDonutChart({
         )}
       />
       <View className="mt-3 flex-row justify-around px-2">
-        {MACRO_CHIPS.map((m) => (
+        {macroChips.map((m) => (
           <View key={m.label} className="items-center">
             <Text style={{ fontSize: 15, fontWeight: '700', color: m.color }}>
               {Math.round(macroValues[m.key])}g

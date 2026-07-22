@@ -30,6 +30,8 @@ export const appMetaKeys = {
   restorePromptDismissedSignature: defineTextKey('restore_prompt_dismissed_signature', 'sync'),
   lastRestoreSignature: defineTextKey('last_restore_signature', 'sync'),
   lastRestoreAt: defineTextKey('last_restore_at', 'sync'),
+  syncOutbox: defineJsonKey('sync_outbox', 'sync'),
+  syncStatus: defineJsonKey('sync_status', 'sync'),
   calorieGoal: defineJsonKey('calorie_goal', 'calories'),
   pomodoroSettings: defineJsonKey('pomodoro_settings', 'pomodoro'),
 } as const;

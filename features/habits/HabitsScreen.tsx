@@ -55,7 +55,7 @@ import {
   HABIT_COLORS,
   HABIT_ICONS,
 } from '@/features/habits/habitPresets';
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
 import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateHabit } from '@/lib/validation';
@@ -80,7 +80,7 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
 }
 
 export function HabitsScreen() {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -302,7 +302,7 @@ export function HabitsScreen() {
               onPress={() => setEditMode((e) => !e)}
               accessibilityLabel={editMode ? 'Exit habit edit mode' : 'Enter habit edit mode'}
               selected={editMode}
-              accentColor={SECTION_TEXT_COLORS.habits}
+              accentColor={sectionAccents.habits.text}
             />
           }
         />
@@ -316,7 +316,7 @@ export function HabitsScreen() {
                 className="h-11 w-11 items-center justify-center rounded-xl"
                 style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
               >
-                <MaterialIcons name="track-changes" size={22} color={SECTION_TEXT_COLORS.habits} />
+                <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
               </View>
               <View className="min-w-0 flex-1">
                 <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -358,7 +358,7 @@ export function HabitsScreen() {
             description="Pick a time of day and tap Add to create your first habit."
             icon={
               <View className="h-11 w-11 items-center justify-center rounded-xl bg-habits-light">
-                <MaterialIcons name="track-changes" size={22} color={SECTION_TEXT_COLORS.habits} />
+                <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
               </View>
             }
           />
@@ -504,7 +504,7 @@ export function HabitsScreen() {
                       <Text
                         style={{
                           fontSize: 24,
-                          color: SECTION_TEXT_COLORS.habits,
+                          color: sectionAccents.habits.text,
                           lineHeight: 28,
                         }}
                       >
@@ -513,7 +513,7 @@ export function HabitsScreen() {
                     </Pressable>
                     <Text
                       className="mt-2 text-[11px] font-semibold"
-                      style={{ color: SECTION_TEXT_COLORS.habits }}
+                      style={{ color: sectionAccents.habits.text }}
                     >
                       Add
                     </Text>
@@ -632,7 +632,7 @@ export function HabitsScreen() {
           headerSubtitle="Optional explicit rules that run when this habit completes for the day."
         >
           {linkedActionsLoading ? (
-            <Text className="text-sm" style={{ color: SECTION_TEXT_COLORS.habits }}>
+            <Text className="text-sm" style={{ color: sectionAccents.habits.text }}>
               Loading linked actions...
             </Text>
           ) : (

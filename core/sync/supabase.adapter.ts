@@ -1,5 +1,6 @@
 import { getDatabase } from '@/core/db/client';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
+import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
 import { supabase } from '@/lib/supabase';
 
 /** SQLite table names that are enqueued for sync — must match `syncEngine.enqueue` entity strings. */
@@ -33,35 +34,54 @@ export class SupabaseSyncAdapter implements SyncAdapter {
 
     const db = await getDatabase();
     const byEntity = collectIdsByEntity(records);
+    const failedRecords: SyncRecord[] = [];
+    const errorMessages: string[] = [];
 
+    // One entity's failure (missing rows, a schema-drift upsert rejection,
+    // network blip) must not block every other entity's records behind it —
+    // push each entity independently and collect failures instead of
+    // aborting the whole batch on the first error.
     for (const [entity, idSet] of byEntity) {
-      if (!isSyncableEntity(entity)) {
-        throw new Error(`[sync] Unknown entity in queue: ${entity}`);
+      const entityRecords = records.filter((record) => record.entity === entity);
+      try {
+        if (!isSyncableEntity(entity)) {
+          throw new Error(`Unknown entity in queue: ${entity}`);
+        }
+
+        const ids = [...idSet];
+        if (ids.length === 0) continue;
+
+        const placeholders = ids.map(() => '?').join(', ');
+        const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
+
+        const rows = await db.getAllAsync<Record<string, unknown>>(sql, ids);
+        const selectedIds = new Set(
+          rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : [])),
+        );
+        const missingIds = ids.filter((id) => !selectedIds.has(id));
+
+        if (missingIds.length > 0) {
+          throw new Error(`Missing local rows for ${entity}: ${missingIds.join(', ')}`);
+        }
+
+        const { error } = await supabase.from(entity).upsert(rows, {
+          onConflict: 'id',
+        });
+
+        if (error) {
+          throw new Error(`Supabase upsert failed for ${entity}: ${error.message}`);
+        }
+      } catch (error) {
+        failedRecords.push(...entityRecords);
+        errorMessages.push(error instanceof Error ? error.message : String(error));
       }
+    }
 
-      const ids = [...idSet];
-      if (ids.length === 0) continue;
-
-      const placeholders = ids.map(() => '?').join(', ');
-      const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
-
-      const rows = await db.getAllAsync<Record<string, unknown>>(sql, ids);
-      const selectedIds = new Set(
-        rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : [])),
+    if (failedRecords.length > 0) {
+      throw new SyncPushPartialFailureError(
+        `[sync] Push failed for one or more entities: ${errorMessages.join('; ')}`,
+        failedRecords,
       );
-      const missingIds = ids.filter((id) => !selectedIds.has(id));
-
-      if (missingIds.length > 0) {
-        throw new Error(`[sync] Missing local rows for ${entity}: ${missingIds.join(', ')}`);
-      }
-
-      const { error } = await supabase.from(entity).upsert(rows, {
-        onConflict: 'id',
-      });
-
-      if (error) {
-        throw new Error(`[sync] Supabase upsert failed for ${entity}: ${error.message}`);
-      }
     }
   }
 

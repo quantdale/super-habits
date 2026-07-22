@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Link, type Href, useFocusEffect } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
@@ -10,6 +10,8 @@ import type {
   RestorePreview,
   SyncBackedEntity,
 } from '@/core/sync/restore.types';
+import { syncEngine } from '@/core/sync/sync.engine';
+import { DARK_THEME_IDS, LIGHT_THEME_IDS, THEME_REGISTRY } from '@/core/theme';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
@@ -17,6 +19,7 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { PillChip } from '@/core/ui/PillChip';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { ThemePreviewCard } from '@/core/ui/ThemePreviewCard';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { DEFAULT_GOAL, getCalorieGoal, setCalorieGoal } from '@/features/calories/calories.data';
@@ -37,7 +40,6 @@ import { validateCalorieGoal, validatePomodoroSettings } from '@/lib/validation'
 
 const OVERVIEW_HREF = '/(tabs)/overview' as Href;
 const COMMAND_HREF = '/command' as Href;
-const SETTINGS_ACCENT = '#475569';
 const BACKUP_ACCENT = '#0f766e';
 const INTERNAL_ACCENT = '#7c2d12';
 
@@ -114,17 +116,18 @@ const RESTORE_ENTITY_LABELS: Record<SyncBackedEntity, string> = {
 function SettingsStatusPill({
   label,
   tone = 'neutral',
-  accentColor = SETTINGS_ACCENT,
+  accentColor,
 }: {
   label: string;
   tone?: SettingsStatusTone;
   accentColor?: string;
 }) {
   const { tokens } = useAppTheme();
+  const resolvedAccentColor = accentColor ?? tokens.textMuted;
 
   const backgroundColor =
     tone === 'accent'
-      ? `${accentColor}18`
+      ? `${resolvedAccentColor}18`
       : tone === 'warning'
         ? tokens.warningBackground
         : tone === 'danger'
@@ -133,7 +136,7 @@ function SettingsStatusPill({
 
   const textColor =
     tone === 'accent'
-      ? accentColor
+      ? resolvedAccentColor
       : tone === 'warning'
         ? tokens.warningText
         : tone === 'danger'
@@ -157,7 +160,7 @@ function SettingsRow({
   description,
   statusLabel,
   statusTone = 'neutral',
-  accentColor = SETTINGS_ACCENT,
+  accentColor,
   first = false,
   last = false,
 }: SettingsRowProps) {
@@ -239,6 +242,51 @@ function formatBackupTime(value: string | null) {
   return new Date(value).toLocaleString();
 }
 
+type OutboxSummary = {
+  description: string;
+  statusLabel: string;
+  statusTone: SettingsStatusTone;
+};
+
+function describeOutboxStatus(
+  pendingCount: number,
+  status: ReturnType<typeof syncEngine.getStatus>,
+): OutboxSummary {
+  if (status.consecutiveFailures > 0) {
+    const nextRetry = status.nextRetryAt ? new Date(status.nextRetryAt).toLocaleTimeString() : null;
+    return {
+      description:
+        `${pendingCount} record${pendingCount === 1 ? '' : 's'} waiting to sync. ` +
+        `Last attempt failed: ${status.lastErrorMessage ?? 'unknown error'}.` +
+        (nextRetry ? ` Retrying after ${nextRetry}.` : ''),
+      statusLabel: 'Failing',
+      statusTone: 'danger',
+    };
+  }
+
+  if (pendingCount > 0) {
+    return {
+      description: `${pendingCount} record${pendingCount === 1 ? '' : 's'} waiting to sync.`,
+      statusLabel: 'Pending',
+      statusTone: 'warning',
+    };
+  }
+
+  if (status.lastSuccessAt) {
+    return {
+      description: `Up to date. Last synced ${new Date(status.lastSuccessAt).toLocaleString()}.`,
+      statusLabel: 'Synced',
+      statusTone: 'accent',
+    };
+  }
+
+  return {
+    description: 'No changes have been queued for backup yet on this device.',
+    statusLabel: 'Idle',
+    statusTone: 'neutral',
+  };
+}
+
 function describeBackupEntity(status: RemoteBackupEntityStatus) {
   if (status.phaseOneStatus === 'excluded_in_phase_one') {
     const countLabel =
@@ -292,7 +340,7 @@ function formatCalorieGoalSummary(goal: CalorieGoal) {
 }
 
 export function SettingsScreen() {
-  const { mode, resolvedTheme, setMode, tokens } = useAppTheme();
+  const { mode, resolvedTheme, themeId, setMode, setTheme, tokens } = useAppTheme();
   const { authBootstrapReady } = useAppBootstrapState();
   const commandConfig = useMemo(() => getAiCommandParseConfig(), []);
   const commandInternalRolloutAvailable = useMemo(
@@ -300,6 +348,9 @@ export function SettingsScreen() {
     [commandConfig],
   );
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
+  const [outboxSummary, setOutboxSummary] = useState<OutboxSummary>(() =>
+    describeOutboxStatus(syncEngine.getPendingCount(), syncEngine.getStatus()),
+  );
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
   const [restoreLoading, setRestoreLoading] = useState(true);
   const [restoreRunning, setRestoreRunning] = useState(false);
@@ -323,6 +374,15 @@ export function SettingsScreen() {
   const [calorieGoalLoading, setCalorieGoalLoading] = useState(true);
   const [calorieGoalSaving, setCalorieGoalSaving] = useState(false);
   const [calorieGoalError, setCalorieGoalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const refresh = () => {
+      setOutboxSummary(describeOutboxStatus(syncEngine.getPendingCount(), syncEngine.getStatus()));
+    };
+    refresh();
+    const intervalId = setInterval(refresh, 5_000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const loadRestorePreview = useCallback(async () => {
     setRestoreLoading(true);
@@ -565,7 +625,7 @@ export function SettingsScreen() {
                 className="ml-4 flex-row items-center gap-1.5 rounded-2xl border px-3.5 py-2.5"
                 style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
               >
-                <MaterialIcons name="arrow-back" size={18} color={SETTINGS_ACCENT} />
+                <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
                 <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
                   Back
                 </Text>
@@ -581,9 +641,9 @@ export function SettingsScreen() {
           title="Theme and display"
           subtitle="Visual preferences that apply across the app."
           icon="palette"
-          accentColor={SETTINGS_ACCENT}
+          accentColor={tokens.textMuted}
         />
-        <Card accentColor={SETTINGS_ACCENT} className="mb-0">
+        <Card accentColor={tokens.textMuted} className="mb-0">
           <View className="gap-4">
             <View>
               <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
@@ -600,7 +660,7 @@ export function SettingsScreen() {
                   key={option.mode}
                   label={option.label}
                   active={mode === option.mode}
-                  color={SETTINGS_ACCENT}
+                  color={tokens.textMuted}
                   onPress={() => setMode(option.mode)}
                 />
               ))}
@@ -612,14 +672,62 @@ export function SettingsScreen() {
               description={`${THEME_OPTIONS.find((option) => option.mode === mode)?.description} ${appearanceCopy.detail}`}
               statusLabel={mode}
               statusTone="accent"
-              accentColor={SETTINGS_ACCENT}
+              accentColor={tokens.textMuted}
             />
             <SettingsRow
               label="Current behavior"
-              description={appearanceCopy.summary}
+              description={`${appearanceCopy.summary} Active theme: ${THEME_REGISTRY[themeId]?.name ?? themeId}.`}
               statusLabel={resolvedTheme}
               last
             />
+          </View>
+        </Card>
+
+        <Card accentColor={tokens.textMuted} className="mb-0">
+          <View className="gap-4">
+            <View>
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Day theme
+              </Text>
+              <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+                Used whenever the resolved appearance is light.
+                {mode === 'dark' ? ' Switch to System or Light mode to see it applied now.' : ''}
+              </Text>
+            </View>
+            <View className="flex-row flex-wrap gap-2">
+              {LIGHT_THEME_IDS.map((id) => (
+                <ThemePreviewCard
+                  key={id}
+                  theme={THEME_REGISTRY[id]}
+                  selected={themeId === id}
+                  onPress={() => setTheme(id)}
+                />
+              ))}
+            </View>
+          </View>
+        </Card>
+
+        <Card accentColor={tokens.textMuted} className="mb-0">
+          <View className="gap-4">
+            <View>
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Night theme
+              </Text>
+              <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+                Used whenever the resolved appearance is dark.
+                {mode === 'light' ? ' Switch to System or Dark mode to see it applied now.' : ''}
+              </Text>
+            </View>
+            <View className="flex-row flex-wrap gap-2">
+              {DARK_THEME_IDS.map((id) => (
+                <ThemePreviewCard
+                  key={id}
+                  theme={THEME_REGISTRY[id]}
+                  selected={themeId === id}
+                  onPress={() => setTheme(id)}
+                />
+              ))}
+            </View>
           </View>
         </Card>
       </ScreenSection>
@@ -636,6 +744,13 @@ export function SettingsScreen() {
           <Card accentColor={BACKUP_ACCENT} className="mb-0">
             <SettingsRow
               first
+              label="Outbox sync"
+              description={outboxSummary.description}
+              statusLabel={outboxSummary.statusLabel}
+              statusTone={outboxSummary.statusTone}
+              accentColor={BACKUP_ACCENT}
+            />
+            <SettingsRow
               label="Latest restorable backup"
               description={
                 restoreLoading
@@ -779,23 +894,23 @@ export function SettingsScreen() {
           title="Command center"
           subtitle="Status and entry point for the experimental command shell."
           icon="terminal"
-          accentColor={SETTINGS_ACCENT}
+          accentColor={tokens.textMuted}
         />
-        <Card accentColor={SETTINGS_ACCENT} className="mb-0">
+        <Card accentColor={tokens.textMuted} className="mb-0">
           <SettingsRow
             first
             label="Current scope"
             description="Command center drafts one todo or one habit from plain language, then waits for your review and confirmation before anything is saved."
             statusLabel="Experimental"
             statusTone="accent"
-            accentColor={SETTINGS_ACCENT}
+            accentColor={tokens.textMuted}
           />
           <SettingsRow
             label="Effective parser"
             description={effectiveParserDescription}
             statusLabel={effectiveParserLabel}
             statusTone={effectiveParserLabel === 'Model' ? 'accent' : 'neutral'}
-            accentColor={SETTINGS_ACCENT}
+            accentColor={tokens.textMuted}
           />
           <SettingsRow
             label="What it is not"
@@ -811,7 +926,7 @@ export function SettingsScreen() {
                 accessibilityLabel="Open command center"
                 className="mt-4 rounded-2xl px-4 py-3"
                 style={{
-                  backgroundColor: SETTINGS_ACCENT,
+                  backgroundColor: tokens.textMuted,
                   shadowColor: tokens.shadowColor,
                   shadowOffset: { width: 0, height: 6 },
                   shadowOpacity: 0.08,

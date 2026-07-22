@@ -1,6 +1,5 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Modal, Platform, Text, View } from 'react-native';
 import { initializeDatabase } from '@/core/db/client';
@@ -19,8 +18,6 @@ import { ensureAnonymousSession, isRemoteEnabled } from '@/lib/supabase';
 import { ThemeProvider, useAppTheme } from '@/core/providers/ThemeProvider';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
-
-const queryClient = new QueryClient();
 
 type AppBootstrapState = {
   authBootstrapReady: boolean;
@@ -69,6 +66,12 @@ export function AppProviders({ children }: PropsWithChildren) {
         setAuthBootstrapReady(true);
       }
 
+      // Recover any outbox/backoff state a killed process left behind before
+      // the first flush trigger fires.
+      await syncEngine.hydrate().catch((e) => {
+        console.error('[sync] hydrate failed', e);
+      });
+
       try {
         const preview = await getRestorePreview();
         if (cancelled) return;
@@ -95,7 +98,14 @@ export function AppProviders({ children }: PropsWithChildren) {
       });
     };
 
-    const intervalId = setInterval(flush, 30_000);
+    // The fixed interval respects backoff — no point hammering a backend
+    // that just failed. Visibility/reconnect are rarer, event-driven signals
+    // where an opportunistic retry (bypassing backoff) is worth it.
+    const intervalFlush = () => {
+      if (syncEngine.shouldAttemptFlush()) flush();
+    };
+
+    const intervalId = setInterval(intervalFlush, 30_000);
 
     let removeVisibilityListener: (() => void) | undefined;
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -163,23 +173,21 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <InAppNoticeProvider>
-            <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
-              <BootstrapGate dbError={dbError}>
-                {children}
-                <RestorePrompt
-                  preview={restorePreview}
-                  visible={showRestorePrompt}
-                  busy={restorePromptBusy}
-                  errorMessage={restorePromptError}
-                  onDismiss={handleDismissRestorePrompt}
-                  onRestore={handleRestoreFromPrompt}
-                />
-              </BootstrapGate>
-            </AppBootstrapStateContext.Provider>
-          </InAppNoticeProvider>
-        </QueryClientProvider>
+        <InAppNoticeProvider>
+          <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
+            <BootstrapGate dbError={dbError}>
+              {children}
+              <RestorePrompt
+                preview={restorePreview}
+                visible={showRestorePrompt}
+                busy={restorePromptBusy}
+                errorMessage={restorePromptError}
+                onDismiss={handleDismissRestorePrompt}
+                onRestore={handleRestoreFromPrompt}
+              />
+            </BootstrapGate>
+          </AppBootstrapStateContext.Provider>
+        </InAppNoticeProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

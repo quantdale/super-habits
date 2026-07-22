@@ -2,11 +2,7 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import {
-  POMODORO_SECTION_KEY,
-  SECTION_COLORS,
-  SECTION_TEXT_COLORS,
-} from '@/constants/sectionColors';
+import { POMODORO_SECTION_KEY, SECTION_COLORS, type SectionKey } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 import { Card } from '@/core/ui/Card';
@@ -61,7 +57,6 @@ type OverviewCardTone = {
   subtitle: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   accentColor: string;
-  textColor: string;
 };
 
 const VIEW_MODE_OPTIONS: { mode: ViewMode; icon: keyof typeof MaterialIcons.glyphMap }[] = [
@@ -75,36 +70,38 @@ const OVERVIEW_CARD_META: Record<OverviewCardKey, OverviewCardTone> = {
     subtitle: 'This year',
     icon: 'timer',
     accentColor: SECTION_COLORS[POMODORO_SECTION_KEY],
-    textColor: SECTION_TEXT_COLORS[POMODORO_SECTION_KEY],
   },
   habits: {
     title: 'Habits',
     subtitle: 'Current streak',
     icon: 'track-changes',
     accentColor: SECTION_COLORS.habits,
-    textColor: SECTION_TEXT_COLORS.habits,
   },
   calories: {
     title: 'Calories',
     subtitle: 'Daily goal',
     icon: 'restaurant-menu',
     accentColor: SECTION_COLORS.calories,
-    textColor: SECTION_TEXT_COLORS.calories,
   },
   todos: {
     title: 'To-Do',
     subtitle: 'Top priorities',
     icon: 'checklist',
     accentColor: SECTION_COLORS.todos,
-    textColor: SECTION_TEXT_COLORS.todos,
   },
   workout: {
     title: 'Workout',
     subtitle: 'Last 52 weeks',
     icon: 'fitness-center',
     accentColor: SECTION_COLORS.workout,
-    textColor: SECTION_TEXT_COLORS.workout,
   },
+};
+const OVERVIEW_CARD_SECTION_KEY: Record<OverviewCardKey, SectionKey> = {
+  pomodoro: POMODORO_SECTION_KEY,
+  habits: 'habits',
+  calories: 'calories',
+  todos: 'todos',
+  workout: 'workout',
 };
 const GRID_ROWS: OverviewCardKey[][] = [
   ['pomodoro', 'habits'],
@@ -134,8 +131,9 @@ function OverviewMetricCard({
   className?: string;
   children: ReactNode;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const meta = OVERVIEW_CARD_META[cardKey];
+  const textColor = sectionAccents[OVERVIEW_CARD_SECTION_KEY[cardKey]].text;
   const isDetailedView = viewMode !== 'list';
 
   return (
@@ -150,7 +148,7 @@ function OverviewMetricCard({
             className="h-11 w-11 items-center justify-center rounded-xl"
             style={{ backgroundColor: `${meta.accentColor}18` }}
           >
-            <MaterialIcons name={meta.icon} size={22} color={meta.textColor} />
+            <MaterialIcons name={meta.icon} size={22} color={textColor} />
           </View>
           <View className="min-w-0 flex-1">
             <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -171,7 +169,7 @@ function OverviewMetricCard({
 
 export function OverviewScreen() {
   const router = useRouter();
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const { width } = useWindowDimensions();
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [isLoading, setIsLoading] = useState(true);
@@ -308,7 +306,7 @@ export function OverviewScreen() {
                   >
                     <Text
                       className="text-sm font-semibold"
-                      style={{ color: SECTION_TEXT_COLORS.focus }}
+                      style={{ color: sectionAccents.focus.text }}
                     >
                       Start
                     </Text>
@@ -339,7 +337,7 @@ export function OverviewScreen() {
                   >
                     <Text
                       className="text-base font-semibold"
-                      style={{ color: SECTION_TEXT_COLORS.focus }}
+                      style={{ color: sectionAccents.focus.text }}
                     >
                       Start Focus
                     </Text>
@@ -402,7 +400,7 @@ export function OverviewScreen() {
                   >
                     <Text
                       className="text-sm font-semibold"
-                      style={{ color: SECTION_TEXT_COLORS.calories }}
+                      style={{ color: sectionAccents.calories.text }}
                     >
                       Add
                     </Text>
@@ -425,7 +423,7 @@ export function OverviewScreen() {
                   >
                     <Text
                       className="text-sm font-semibold"
-                      style={{ color: SECTION_TEXT_COLORS.calories }}
+                      style={{ color: sectionAccents.calories.text }}
                     >
                       Add entry
                     </Text>
@@ -559,6 +557,8 @@ export function OverviewScreen() {
       tokens.surface,
       tokens.text,
       tokens.textMuted,
+      sectionAccents.focus.text,
+      sectionAccents.calories.text,
     ],
   );
 
@@ -574,7 +574,7 @@ export function OverviewScreen() {
                 icon="settings"
                 onPress={() => router.push(SETTINGS_HREF)}
                 accessibilityLabel="Open settings"
-                accentColor={SECTION_TEXT_COLORS.focus}
+                accentColor={sectionAccents.focus.text}
               />
               {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
                 <IconButton
@@ -583,7 +583,7 @@ export function OverviewScreen() {
                   onPress={() => setViewMode(mode)}
                   accessibilityLabel={`${mode} overview layout`}
                   selected={viewMode === mode}
-                  accentColor={SECTION_TEXT_COLORS.focus}
+                  accentColor={sectionAccents.focus.text}
                 />
               ))}
             </>
@@ -593,7 +593,7 @@ export function OverviewScreen() {
 
       {isLoading ? (
         <ScreenSection className="min-h-[220px] items-center justify-center py-14">
-          <ActivityIndicator size="large" color={SECTION_TEXT_COLORS.focus} />
+          <ActivityIndicator size="large" color={sectionAccents.focus.text} />
         </ScreenSection>
       ) : (
         <ScreenSection>
@@ -638,7 +638,7 @@ export function OverviewScreen() {
             className="mb-0"
             title="Nothing tracked yet"
             description="Start with any feature and this dashboard will begin filling in automatically."
-            icon={<MaterialIcons name="auto-graph" size={24} color={SECTION_TEXT_COLORS.focus} />}
+            icon={<MaterialIcons name="auto-graph" size={24} color={sectionAccents.focus.text} />}
           />
         </ScreenSection>
       ) : null}

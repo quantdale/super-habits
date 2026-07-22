@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef } from 'react';
 import { Dimensions, Platform, View, Text } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
   HorizontalScrollArea,
   type HorizontalScrollAreaHandle,
@@ -37,7 +37,7 @@ function chartContentWidth(barCount: number, barWidth: number, spacing: number):
 }
 
 export function DailyCalorieChart({ data, goalKcal }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const scrollRef = useRef<HorizontalScrollAreaHandle>(null);
 
   const windowWidth = Dimensions.get('window').width;
@@ -89,7 +89,7 @@ export function DailyCalorieChart({ data, goalKcal }: Props) {
           goalKcal ? (
             <View className="mt-1 flex-row items-center gap-1 px-1">
               <View style={{ width: 16, height: 1.5, backgroundColor: SECTION_COLORS.calories }} />
-              <Text className="text-xs" style={{ color: SECTION_TEXT_COLORS.calories }}>
+              <Text className="text-xs" style={{ color: sectionAccents.calories.text }}>
                 Goal: {goalKcal} kcal
               </Text>
             </View>

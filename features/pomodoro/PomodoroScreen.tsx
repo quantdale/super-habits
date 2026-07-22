@@ -8,11 +8,7 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { PillChip } from '@/core/ui/PillChip';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
-import {
-  POMODORO_SECTION_KEY,
-  SECTION_COLORS,
-  SECTION_TEXT_COLORS,
-} from '@/constants/sectionColors';
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useCommandLauncherSuppressed } from '@/features/command/CommandCenterProvider';
 import {
   listPomodoroSessionsForDateRange,
@@ -45,7 +41,6 @@ import { BackgroundWarning } from './BackgroundWarning';
 import { PomodoroSettingsInline } from './PomodoroSettingsInline';
 
 const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
-const TEXT_COLOR = SECTION_TEXT_COLORS[POMODORO_SECTION_KEY];
 
 function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   switch (mode) {
@@ -59,7 +54,8 @@ function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
 }
 
 export function PomodoroScreen() {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
+  const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
   const [currentMode, setCurrentMode] = useState<PomodoroMode>('focus');
   const [completedFocus, setCompletedFocus] = useState(0);
@@ -301,7 +297,7 @@ export function PomodoroScreen() {
           <View className="min-w-[160px] flex-1">
             <FeatureStatCard
               accentColor={COLOR}
-              textColor={TEXT_COLOR}
+              textColor={textColor}
               icon="timer"
               title="Focus sessions"
               value={sessions.length}
@@ -312,7 +308,7 @@ export function PomodoroScreen() {
           <View className="min-w-[160px] flex-1">
             <FeatureStatCard
               accentColor={COLOR}
-              textColor={TEXT_COLOR}
+              textColor={textColor}
               icon="local-fire-department"
               title="Current streak"
               value={pomodoroStreak}

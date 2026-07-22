@@ -4,7 +4,7 @@ import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Modal } from '@/core/ui/Modal';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import { filterSavedMeals } from './calories.domain';
 import { deleteSavedMeal } from './calories.data';
 import type { SavedMeal } from './types';
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDeleted }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => filterSavedMeals(meals, query), [meals, query]);
@@ -73,7 +73,7 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
             description={
               query ? 'Try a shorter search term.' : 'Meals you reuse will show up here.'
             }
-            icon={<Text style={{ fontSize: 22, color: SECTION_TEXT_COLORS.calories }}>⌕</Text>}
+            icon={<Text style={{ fontSize: 22, color: sectionAccents.calories.text }}>⌕</Text>}
           />
         ) : (
           <View className="gap-2 pb-2">

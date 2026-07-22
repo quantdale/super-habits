@@ -33,14 +33,13 @@ import { useFocusForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
 import { WorkoutSessionScreen } from './WorkoutSessionScreen';
 
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { validateRoutineName } from '@/lib/validation';
 
 const COLOR = SECTION_COLORS.workout;
-const TEXT_COLOR = SECTION_TEXT_COLORS.workout;
 
 type ViewState = { type: 'list' } | { type: 'session'; routine: RoutineWithExercises };
 
@@ -85,7 +84,8 @@ function RoutineSwipeRow({
 }
 
 export function WorkoutScreen() {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
+  const colorText = sectionAccents.workout.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -207,7 +207,7 @@ export function WorkoutScreen() {
             <View className="min-w-[160px] flex-1">
               <FeatureStatCard
                 accentColor={COLOR}
-                textColor={TEXT_COLOR}
+                textColor={colorText}
                 icon="fitness-center"
                 title="Workout days"
                 value={workoutDaysCount}
@@ -220,7 +220,7 @@ export function WorkoutScreen() {
             <View className="min-w-[160px] flex-1">
               <FeatureStatCard
                 accentColor={COLOR}
-                textColor={TEXT_COLOR}
+                textColor={colorText}
                 icon="calendar-today"
                 title="Current streak"
                 value={workoutStreak}
@@ -242,7 +242,7 @@ export function WorkoutScreen() {
               className="mb-0"
               title="Complete a workout to start tracking"
               description="Your routine history and yearly intensity map will appear here once you log a session."
-              icon={<MaterialIcons name="self-improvement" size={26} color={TEXT_COLOR} />}
+              icon={<MaterialIcons name="self-improvement" size={26} color={colorText} />}
             />
           </ScreenSection>
         ) : null}

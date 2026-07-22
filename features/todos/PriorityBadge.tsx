@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import type { TodoPriority } from './types';
 
@@ -18,7 +18,7 @@ function withAlpha(color: string, opacity: number) {
 type Props = { priority: TodoPriority; compact?: boolean };
 
 export function PriorityBadge({ priority, compact }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const cfg =
     priority === 'urgent'
       ? {
@@ -30,7 +30,7 @@ export function PriorityBadge({ priority, compact }: Props) {
         ? {
             label: 'Low',
             bg: withAlpha(SECTION_COLORS.habits, 0.12),
-            text: SECTION_TEXT_COLORS.habits,
+            text: sectionAccents.habits.text,
           }
         : {
             label: 'Normal',

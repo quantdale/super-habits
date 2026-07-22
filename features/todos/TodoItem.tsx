@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
-import { SECTION_COLORS, SECTION_TEXT_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import { DueDateBadge } from './DueDateBadge';
@@ -29,7 +29,7 @@ export function TodoItem({
   viewMode = 'content',
   cardWidth,
 }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const done = todo.completed === 1;
   const recurringTint = `${SECTION_COLORS.todos}18`;
 
@@ -117,7 +117,7 @@ export function TodoItem({
               <View className="rounded-full px-2 py-1" style={{ backgroundColor: recurringTint }}>
                 <Text
                   className="text-[10px] font-semibold"
-                  style={{ color: SECTION_TEXT_COLORS.todos }}
+                  style={{ color: sectionAccents.todos.text }}
                 >
                   ↻
                 </Text>
@@ -175,7 +175,7 @@ export function TodoItem({
               >
                 <Text
                   className="text-[11px] font-semibold"
-                  style={{ color: SECTION_TEXT_COLORS.todos }}
+                  style={{ color: sectionAccents.todos.text }}
                 >
                   ↻ daily
                 </Text>

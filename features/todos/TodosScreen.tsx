@@ -50,7 +50,6 @@ import {
 } from '@/features/todos/todos.data';
 
 const COLOR = SECTION_COLORS.todos;
-const COLOR_TEXT = '#1D4ED8';
 const TODO_LINKED_ACTION_SOURCE_KEY = 'todo-linked-actions-source';
 const VIEW_MODE_OPTIONS: readonly {
   mode: TodoViewMode;
@@ -62,7 +61,8 @@ const VIEW_MODE_OPTIONS: readonly {
 ];
 
 export function TodosScreen() {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
+  const colorText = sectionAccents.todos.text;
   const { showNotice } = useInAppNotices();
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
@@ -262,7 +262,7 @@ export function TodosScreen() {
     <EmptyStateCard
       accentColor={SECTION_COLORS.todos}
       className="mb-0"
-      icon={<MaterialIcons name="checklist" size={22} color={COLOR_TEXT} />}
+      icon={<MaterialIcons name="checklist" size={22} color={colorText} />}
       title="No pending tasks"
       description="Offline-first task manager."
     />
@@ -285,7 +285,7 @@ export function TodosScreen() {
                       onPress={() => setViewMode(mode)}
                       accessibilityLabel={`${mode} view`}
                       selected={viewMode === mode}
-                      accentColor={COLOR_TEXT}
+                      accentColor={colorText}
                     />
                   ))}
                 </>
@@ -301,7 +301,7 @@ export function TodosScreen() {
                     className="h-11 w-11 items-center justify-center rounded-xl"
                     style={{ backgroundColor: `${COLOR}18` }}
                   >
-                    <MaterialIcons name="checklist" size={22} color={COLOR_TEXT} />
+                    <MaterialIcons name="checklist" size={22} color={colorText} />
                   </View>
                   <View className="min-w-0 flex-1">
                     <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -585,11 +585,11 @@ export function TodosScreen() {
             headerSubtitle="Optional explicit rules that run when this task is completed."
           >
             {isRecurringLinkedActionSource ? (
-              <Text className="text-sm" style={{ color: COLOR_TEXT }}>
+              <Text className="text-sm" style={{ color: colorText }}>
                 Recurring tasks cannot be Linked Action sources yet.
               </Text>
             ) : linkedActionsLoading ? (
-              <Text className="text-sm" style={{ color: COLOR_TEXT }}>
+              <Text className="text-sm" style={{ color: colorText }}>
                 Loading linked actions...
               </Text>
             ) : (

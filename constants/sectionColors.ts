@@ -50,3 +50,33 @@ export const SECTION_TEXT_COLORS = {
   workout: '#C2410C', // orange-700
   calories: '#92400E', // amber-800 (deeper for yellow-50 / warm surface)
 } as const;
+
+export type SectionAccent = { fill: string; text: string; tint: string };
+
+/**
+ * Section identity colors are theme-invariant by default (a Todos card is
+ * blue in every theme) — but `text`/`tint` must adapt to appearance: the
+ * light-mode 700-level text and *-50 pastel tints go muddy or illegible on
+ * dark surfaces. `overrides` lets a theme replace the whole set for cases
+ * where even the fill clashes (e.g. Cyberpunk Neon, Crimson Red).
+ */
+export function getSectionAccents(
+  appearance: 'light' | 'dark',
+  overrides?: Partial<Record<SectionKey, SectionAccent>>,
+): Record<SectionKey, SectionAccent> {
+  const keys = Object.keys(SECTION_COLORS) as SectionKey[];
+  const result = {} as Record<SectionKey, SectionAccent>;
+  for (const key of keys) {
+    const override = overrides?.[key];
+    if (override) {
+      result[key] = override;
+      continue;
+    }
+    const fill = SECTION_COLORS[key];
+    result[key] =
+      appearance === 'dark'
+        ? { fill, text: fill, tint: `${fill}1F` }
+        : { fill, text: SECTION_TEXT_COLORS[key], tint: SECTION_COLORS_LIGHT[key] };
+  }
+  return result;
+}

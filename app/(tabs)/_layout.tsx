@@ -6,11 +6,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { Tabs, TabList, TabTrigger, TabSlot } from 'expo-router/ui';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
-import {
-  POMODORO_SECTION_KEY,
-  SECTION_COLORS,
-  SECTION_TEXT_COLORS,
-} from '@/constants/sectionColors';
+import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 
 const OVERVIEW_HREF = '/(tabs)/overview' as Href;
@@ -21,42 +17,36 @@ const NAV_ITEMS = [
     href: OVERVIEW_HREF,
     label: 'Overview',
     icon: 'dashboard',
-    color: SECTION_TEXT_COLORS.focus,
   },
   {
     name: 'todos',
     href: '/(tabs)/todos' as const,
     label: 'To Do',
     icon: 'check-circle-outline',
-    color: SECTION_TEXT_COLORS.todos,
   },
   {
     name: 'habits',
     href: '/(tabs)/habits' as const,
     label: 'Habits',
     icon: 'loop',
-    color: SECTION_TEXT_COLORS.habits,
   },
   {
     name: 'pomodoro',
     href: '/(tabs)/pomodoro' as const,
     label: 'Focus',
     icon: 'timer',
-    color: SECTION_TEXT_COLORS.focus,
   },
   {
     name: 'workout',
     href: '/(tabs)/workout' as const,
     label: 'Workout',
     icon: 'fitness-center',
-    color: SECTION_TEXT_COLORS.workout,
   },
   {
     name: 'calories',
     href: '/(tabs)/calories' as const,
     label: 'Calories',
     icon: 'restaurant-menu',
-    color: SECTION_TEXT_COLORS.calories,
   },
 ] as const;
 
@@ -152,7 +142,7 @@ function TopTabItem({
 }
 
 export default function TabsLayout() {
-  const { tokens, resolvedTheme } = useAppTheme();
+  const { tokens, resolvedTheme, sectionAccents } = useAppTheme();
   const router = useRouter();
   const segments = useSegments();
   const { width: screenWidth } = useWindowDimensions();
@@ -240,9 +230,7 @@ export default function TabsLayout() {
               color={
                 item.name === 'overview'
                   ? overviewColor
-                  : resolvedTheme === 'dark'
-                    ? SECTION_COLORS[NAV_TO_SECTION_KEY[item.name]]
-                    : item.color
+                  : sectionAccents[NAV_TO_SECTION_KEY[item.name]].text
               }
               surfaceColor={tokens.background}
               tabRailColor={tokens.tabRail}

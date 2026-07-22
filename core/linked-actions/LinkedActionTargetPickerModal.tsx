@@ -18,8 +18,8 @@ import type { LinkedActionFeature } from '@/core/linked-actions/linkedActions.ty
 import {
   POMODORO_SECTION_KEY,
   SECTION_COLORS,
-  SECTION_COLORS_LIGHT,
-  SECTION_TEXT_COLORS,
+  type SectionAccent,
+  type SectionKey,
 } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 
@@ -44,16 +44,22 @@ function getFeatureAccentColor(feature: LinkedActionFeature) {
   return feature === 'pomodoro' ? SECTION_COLORS[POMODORO_SECTION_KEY] : SECTION_COLORS[feature];
 }
 
-function getFeatureLightColor(feature: LinkedActionFeature) {
+function getFeatureTintColor(
+  feature: LinkedActionFeature,
+  sectionAccents: Record<SectionKey, SectionAccent>,
+) {
   return feature === 'pomodoro'
-    ? SECTION_COLORS_LIGHT[POMODORO_SECTION_KEY]
-    : SECTION_COLORS_LIGHT[feature];
+    ? sectionAccents[POMODORO_SECTION_KEY].tint
+    : sectionAccents[feature].tint;
 }
 
-function getFeatureTextColor(feature: LinkedActionFeature) {
+function getFeatureTextColor(
+  feature: LinkedActionFeature,
+  sectionAccents: Record<SectionKey, SectionAccent>,
+) {
   return feature === 'pomodoro'
-    ? SECTION_TEXT_COLORS[POMODORO_SECTION_KEY]
-    : SECTION_TEXT_COLORS[feature];
+    ? sectionAccents[POMODORO_SECTION_KEY].text
+    : sectionAccents[feature].text;
 }
 
 export function LinkedActionTargetPickerModal({
@@ -64,7 +70,7 @@ export function LinkedActionTargetPickerModal({
   allowedFeatures,
   allowCreateNew = true,
 }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const availableModules = useMemo(() => {
     if (!allowedFeatures || allowedFeatures.length === 0) {
       return MODULES;
@@ -144,8 +150,8 @@ export function LinkedActionTargetPickerModal({
     [selectedFeature],
   );
   const accentColor = getFeatureAccentColor(selectedFeature);
-  const lightColor = getFeatureLightColor(selectedFeature);
-  const textColor = getFeatureTextColor(selectedFeature);
+  const lightColor = getFeatureTintColor(selectedFeature, sectionAccents);
+  const textColor = getFeatureTextColor(selectedFeature, sectionAccents);
   const createNewHandoff = useMemo(() => provider.createNew.buildHandoff(), [provider]);
   const selectedCandidate = candidateState.items.find(
     (candidate) => candidate.id === selectedExistingId,

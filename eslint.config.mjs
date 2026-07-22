@@ -13,6 +13,7 @@ export default [
       'web-build/**',
       '.expo/**',
       'expo/**',
+      '.claude/**',
       '**/*.js',
       '**/*.jsx',
       '*.config.js',

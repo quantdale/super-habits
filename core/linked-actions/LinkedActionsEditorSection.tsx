@@ -31,8 +31,8 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import {
   POMODORO_SECTION_KEY,
   SECTION_COLORS,
-  SECTION_COLORS_LIGHT,
-  SECTION_TEXT_COLORS,
+  type SectionAccent,
+  type SectionKey,
 } from '@/constants/sectionColors';
 
 type Props = {
@@ -58,16 +58,22 @@ function getFeatureAccentColor(feature: LinkedActionFeature) {
   return feature === 'pomodoro' ? SECTION_COLORS[POMODORO_SECTION_KEY] : SECTION_COLORS[feature];
 }
 
-function getFeatureLightColor(feature: LinkedActionFeature) {
+function getFeatureTintColor(
+  feature: LinkedActionFeature,
+  sectionAccents: Record<SectionKey, SectionAccent>,
+) {
   return feature === 'pomodoro'
-    ? SECTION_COLORS_LIGHT[POMODORO_SECTION_KEY]
-    : SECTION_COLORS_LIGHT[feature];
+    ? sectionAccents[POMODORO_SECTION_KEY].tint
+    : sectionAccents[feature].tint;
 }
 
-function getFeatureTextColor(feature: LinkedActionFeature) {
+function getFeatureTextColor(
+  feature: LinkedActionFeature,
+  sectionAccents: Record<SectionKey, SectionAccent>,
+) {
   return feature === 'pomodoro'
-    ? SECTION_TEXT_COLORS[POMODORO_SECTION_KEY]
-    : SECTION_TEXT_COLORS[feature];
+    ? sectionAccents[POMODORO_SECTION_KEY].text
+    : sectionAccents[feature].text;
 }
 
 function RuleRow({
@@ -87,7 +93,7 @@ function RuleRow({
   allowedTriggerTypes?: LinkedActionTriggerType[];
   allowCreateNewTarget: boolean;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const router = useRouter();
 
   if (row.isUnsupported) {
@@ -359,18 +365,18 @@ function RuleRow({
                   className="mt-3 rounded-2xl border px-4 py-3"
                   style={{
                     borderColor: getFeatureAccentColor(selectedTargetFeature),
-                    backgroundColor: getFeatureLightColor(selectedTargetFeature),
+                    backgroundColor: getFeatureTintColor(selectedTargetFeature, sectionAccents),
                   }}
                 >
                   <Text
                     className="text-sm font-semibold"
-                    style={{ color: getFeatureTextColor(selectedTargetFeature) }}
+                    style={{ color: getFeatureTextColor(selectedTargetFeature, sectionAccents) }}
                   >
                     {row.effectType ? getLinkedActionEffectLabel(row.effectType) : 'Effect'}
                   </Text>
                   <Text
                     className="mt-1 text-sm"
-                    style={{ color: getFeatureTextColor(selectedTargetFeature) }}
+                    style={{ color: getFeatureTextColor(selectedTargetFeature, sectionAccents) }}
                   >
                     {selectedEffectDescription}
                   </Text>
