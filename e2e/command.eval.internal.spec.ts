@@ -228,6 +228,8 @@ test.describe('Command evaluation (internal real-parser path)', () => {
     );
     await writeCommandEvalArtifact(INTERNAL_ARTIFACT_PATH, artifact);
 
+    // Intentional eval summary for CI/local log inspection.
+    // eslint-disable-next-line no-console
     console.log(
       '[command-eval-internal]',
       JSON.stringify(

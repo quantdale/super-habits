@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -129,17 +129,6 @@ export function TodosScreen() {
   }, []);
 
   useFocusForegroundRefresh(loadTodosOnFocus);
-
-  useEffect(() => {
-    if (!editingId) return;
-    const t = items.find((x) => x.id === editingId);
-    if (t) {
-      setTitle(t.title);
-      setNotes(t.notes ?? '');
-      setDueDate(t.due_date);
-      setPriority(t.priority);
-    }
-  }, [editingId, items]);
 
   const resetForm = () => {
     setTitle('');

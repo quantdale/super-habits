@@ -42,8 +42,8 @@ describe('formatWorkoutTime', () => {
 describe('parseWorkoutTime', () => {
   it('returns 0 for malformed/undefined/null input', () => {
     expect(parseWorkoutTime('abc')).toBe(0);
-    expect(parseWorkoutTime(undefined as any)).toBe(0);
-    expect(parseWorkoutTime(null as any)).toBe(0);
+    expect(parseWorkoutTime(undefined as unknown as string)).toBe(0);
+    expect(parseWorkoutTime(null as unknown as string)).toBe(0);
   });
   it('parses MM:SS string', () => {
     expect(parseWorkoutTime('1:30')).toBe(90);

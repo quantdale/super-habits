@@ -80,31 +80,33 @@ export function LinkedActionTargetPickerModal({
     error: null,
   });
 
-  useEffect(() => {
-    if (!visible) return;
-    const nextFeature = availableModules.some((module) => module.feature === initialFeature)
-      ? initialFeature
-      : defaultFeature;
-    setSelectedFeature(nextFeature);
-    setSelectedExistingId(null);
-  }, [availableModules, defaultFeature, initialFeature, visible]);
+  // Reset the selection each time the modal opens, without an effect:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      const nextFeature = availableModules.some((module) => module.feature === initialFeature)
+        ? initialFeature
+        : defaultFeature;
+      setSelectedFeature(nextFeature);
+      setSelectedExistingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!visible) return;
 
     const provider = getLinkedActionTargetPickerProvider(selectedFeature);
-    setSelectedExistingId(null);
 
-    if (!provider.existing.supported) {
-      setCandidateState({
-        status: 'ready',
-        items: [],
-        error: null,
-      });
-      return;
-    }
+    // When unsupported, the render path uses provider.existing directly and
+    // never reads candidateState, so there is nothing to seed here.
+    if (!provider.existing.supported) return;
 
     let cancelled = false;
+    // Data fetch on selection change: the terminal states below (ready/error)
+    // are set after loadCandidates() resolves, not synchronously here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCandidateState({
       status: 'loading',
       items: [],
@@ -179,7 +181,10 @@ export function LinkedActionTargetPickerModal({
               label={module.moduleLabel}
               active={selectedFeature === module.feature}
               color={getFeatureAccentColor(module.feature)}
-              onPress={() => setSelectedFeature(module.feature)}
+              onPress={() => {
+                setSelectedFeature(module.feature);
+                setSelectedExistingId(null);
+              }}
             />
           ))}
         </View>

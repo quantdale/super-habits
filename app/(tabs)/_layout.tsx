@@ -210,6 +210,9 @@ export default function TabsLayout() {
             }
           }
         }),
+    // isDeadZone/screenWidthSV/tabIndex are Reanimated SharedValues: stable
+    // refs read via `.value` inside worklets, not render-time dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [navigateToIndex],
   );
 

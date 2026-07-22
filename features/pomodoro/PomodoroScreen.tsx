@@ -82,11 +82,13 @@ export function PomodoroScreen() {
   const totalSecondsRef = useRef(DEFAULT_SETTINGS.focusMinutes * 60);
   const startedAtRef = useRef<Date | null>(null);
 
-  currentModeRef.current = currentMode;
-  completedFocusRef.current = completedFocus;
-  settingsRef.current = settings;
-  totalSecondsRef.current = totalSeconds;
-  startedAtRef.current = startedAt;
+  useEffect(() => {
+    currentModeRef.current = currentMode;
+    completedFocusRef.current = completedFocus;
+    settingsRef.current = settings;
+    totalSecondsRef.current = totalSeconds;
+    startedAtRef.current = startedAt;
+  });
   useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
 
   useEffect(() => {
@@ -132,12 +134,6 @@ export function PomodoroScreen() {
       };
     }
   }, [isRunning]);
-
-  useEffect(() => {
-    if (remaining === 0 && !isRunning) {
-      setShowWarning(false);
-    }
-  }, [remaining, isRunning]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -253,6 +249,7 @@ export function PomodoroScreen() {
     lastTickTime.current = null;
     setIsRunning(false);
     setIsPaused(true);
+    setShowWarning(false);
   };
 
   const resume = async () => {

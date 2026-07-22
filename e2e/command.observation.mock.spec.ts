@@ -53,7 +53,7 @@ const MOCK_OBSERVATION_CASES: CommandObservationCase[] = [
     warningVisible: true,
   },
   { bucket: 'D', command: 'Add a todo tomorrow', expectedOutcome: 'needs_input' },
-  { bucket: 'D', command: 'Create a habit', expectedOutcome: 'ready' },
+  { bucket: 'D', command: 'Create a habit', expectedOutcome: 'needs_input' },
   { bucket: 'D', command: 'Remind me to tomorrow', expectedOutcome: 'needs_input' },
   {
     bucket: 'E',

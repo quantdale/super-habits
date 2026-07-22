@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Modal } from '@/core/ui/Modal';
@@ -21,15 +21,15 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [query, setQuery] = useState('');
-  const [filtered, setFiltered] = useState<SavedMeal[]>(meals);
+  const filtered = useMemo(() => filterSavedMeals(meals, query), [meals, query]);
 
-  useEffect(() => {
-    setFiltered(filterSavedMeals(meals, query));
-  }, [query, meals]);
-
-  useEffect(() => {
+  // Clear the search when the modal closes, without an effect:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (!visible) setQuery('');
-  }, [visible]);
+  }
 
   const handleDelete = (meal: SavedMeal) => {
     void (async () => {

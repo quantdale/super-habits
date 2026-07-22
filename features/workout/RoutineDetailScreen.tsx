@@ -73,12 +73,19 @@ export function RoutineDetailModal({
 
   useEffect(() => {
     if (!visible || !routineId) return;
+    // Data fetch on open: setExercises fires after the awaits inside
+    // refresh(), not synchronously in this effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [visible, routineId, refresh]);
 
-  useEffect(() => {
+  // Collapse the open exercise when the modal closes, without an effect:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (!visible) setExpandedId(null);
-  }, [visible]);
+  }
 
   const handleAddExercise = async () => {
     const err = validateExerciseName(newExerciseName);

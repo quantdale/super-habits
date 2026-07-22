@@ -459,7 +459,7 @@ export function CaloriesScreen() {
         <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
       </Card>
     ),
-    [dailyTrend, goal.calories],
+    [dailyTrend, goal.calories, tokens.textOnAccent],
   );
   const calorieHistorySection = useMemo(
     () => (
@@ -476,7 +476,7 @@ export function CaloriesScreen() {
         </View>
       </Card>
     ),
-    [calorieHeatmapDays],
+    [calorieHeatmapDays, tokens.textOnAccent],
   );
 
   const resetCalorieForm = () => {

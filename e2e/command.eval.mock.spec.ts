@@ -380,6 +380,8 @@ test.describe('Command evaluation (mock/default path)', () => {
     const artifact = buildCommandEvalArtifact('command-eval-mock', 'mock_default_public', results);
     await writeCommandEvalArtifact(MOCK_ARTIFACT_PATH, artifact);
 
+    // Intentional eval summary for CI/local log inspection.
+    // eslint-disable-next-line no-console
     console.log(
       '[command-eval-mock]',
       JSON.stringify(

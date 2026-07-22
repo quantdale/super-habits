@@ -496,15 +496,10 @@ export function CommandScreen({
   > | null>(null);
 
   useEffect(() => {
+    // Defaults to false via useState; nothing to reset when unavailable.
+    if (!internalRolloutAvailable) return;
+
     let cancelled = false;
-
-    if (!internalRolloutAvailable) {
-      setInternalRolloutEnabledOnDevice(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
     void getAiCommandInternalRolloutPreference().then((enabled) => {
       if (!cancelled) {
         setInternalRolloutEnabledOnDevice(enabled);
@@ -571,6 +566,8 @@ export function CommandScreen({
       );
 
       if (internalRolloutAvailable && internalRolloutEnabledOnDevice) {
+        // Intentional diagnostic log, scoped to opted-in internal testers.
+        // eslint-disable-next-line no-console
         console.debug('[command][internal-rollout]', execution.observation);
       }
     } finally {

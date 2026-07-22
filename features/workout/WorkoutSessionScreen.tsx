@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, Pressable, Alert } from 'react-native';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Screen } from '@/core/ui/Screen';
@@ -48,32 +48,32 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
   const currentPhase: TimerPhase | undefined = sequence[currentIndex];
 
+  const currentIndexRef = useRef(currentIndex);
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  });
+
   useEffect(() => {
     if (!isRunning || isComplete) return;
     const id = setInterval(() => {
       setRemaining((prev) => {
         if (prev > 1) return prev - 1;
-        if (prev === 1) return 0;
-        return prev;
+
+        // Phase just hit zero: advance immediately instead of waiting for
+        // a second effect to notice `remaining === 0` on the next render.
+        const nextIdx = currentIndexRef.current + 1;
+        if (nextIdx >= sequence.length) {
+          setIsRunning(false);
+          setIsComplete(true);
+          return 0;
+        }
+        setCurrentIndex(nextIdx);
+        currentIndexRef.current = nextIdx;
+        return sequence[nextIdx].durationSeconds;
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [isRunning, isComplete]);
-
-  useEffect(() => {
-    if (!isRunning || isComplete) return;
-    if (sequence.length === 0) return;
-    if (remaining > 0) return;
-
-    const nextIdx = currentIndex + 1;
-    if (nextIdx >= sequence.length) {
-      setIsRunning(false);
-      setIsComplete(true);
-      return;
-    }
-    setCurrentIndex(nextIdx);
-    setRemaining(sequence[nextIdx].durationSeconds);
-  }, [remaining, isRunning, isComplete, currentIndex, sequence]);
+  }, [isRunning, isComplete, sequence]);
 
   const handleStart = () => setIsRunning(true);
 
@@ -85,6 +85,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
       return;
     }
     setCurrentIndex(nextIndex);
+    currentIndexRef.current = nextIndex;
     setRemaining(sequence[nextIndex].durationSeconds);
   };
 

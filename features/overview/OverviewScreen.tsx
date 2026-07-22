@@ -554,6 +554,11 @@ export function OverviewScreen() {
       viewMode,
       workoutDays,
       workoutStreak,
+      router,
+      tokens.border,
+      tokens.surface,
+      tokens.text,
+      tokens.textMuted,
     ],
   );
 

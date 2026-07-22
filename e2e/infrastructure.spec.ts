@@ -46,7 +46,7 @@ test.describe('Infrastructure', () => {
       return r.text();
     });
     expect(swSource).toContain('superhabits-shell-');
-    expect(swSource).toContain('CACHE_VERSION = "v3"');
+    expect(swSource).toMatch(/CACHE_VERSION\s*=\s*['"]v3['"]/);
   });
 
   test('stale v1 cache is not present', async ({ page }) => {

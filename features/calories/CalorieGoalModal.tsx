@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Modal } from '@/core/ui/Modal';
@@ -24,14 +24,19 @@ export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Prop
   const [fats, setFats] = useState(String(currentGoal.fats));
   const [goalError, setGoalError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!visible) return;
-    setCalories(String(currentGoal.calories));
-    setProtein(String(currentGoal.protein));
-    setCarbs(String(currentGoal.carbs));
-    setFats(String(currentGoal.fats));
-    setGoalError(null);
-  }, [visible, currentGoal]);
+  // Re-seed the form from the latest goal each time the modal opens, without
+  // an effect: https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setCalories(String(currentGoal.calories));
+      setProtein(String(currentGoal.protein));
+      setCarbs(String(currentGoal.carbs));
+      setFats(String(currentGoal.fats));
+      setGoalError(null);
+    }
+  }
 
   const handleSave = () => {
     const err = validateCalorieGoal(calories, protein, carbs, fats);
