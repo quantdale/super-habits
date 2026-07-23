@@ -1,5 +1,11 @@
 export const COMMAND_EXPERIMENT_ENABLED = true;
 
+/**
+ * Off by default until the Ask pipeline is verified (Bedrock invocation is
+ * still pending — see openspec/changes/add-ai-ask-feature/design.md).
+ */
+export const AI_ASK_EXPERIMENT_ENABLED = false;
+
 export type DraftStatus = 'ready' | 'needs_input' | 'unsupported';
 export type DraftParserKind = 'mock_rules' | 'model_proxy' | 'model_proxy_fallback';
 export type ParsePath = 'mock' | 'remote' | 'remote_with_fallback';

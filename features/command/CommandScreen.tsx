@@ -16,6 +16,14 @@ import { executeDraftAction } from './command.executor';
 import { commandParser } from './commandParser';
 import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from './commandConfig';
 import { getAiCommandInternalRolloutPreference } from './commandInternalRollout';
+import { askParser } from './askParser';
+import { useAskConversation } from './AskConversationContext';
+import {
+  getLastUsedCommandMode,
+  setLastUsedCommandMode,
+  type CommandMode,
+} from './commandModePreference';
+import type { AskResult } from './ask.types';
 import {
   type CommandCenterLaunchContext,
   getCommandCenterContextCopy,
@@ -29,7 +37,13 @@ import type {
   DraftMissingField,
   ParseCommandResult,
 } from './types';
-import { COMMAND_EXPERIMENT_ENABLED } from './types';
+import { AI_ASK_EXPERIMENT_ENABLED, COMMAND_EXPERIMENT_ENABLED } from './types';
+
+const COMMAND_MODE_OPTIONS: { value: CommandMode; label: string }[] = [
+  { value: 'ask', label: 'Ask' },
+  { value: 'create', label: 'Create' },
+  { value: 'auto', label: 'Auto' },
+];
 
 const TODO_PRIORITIES: { value: DraftCreateTodo['fields']['priority']; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
@@ -442,6 +456,190 @@ function DraftPreview({
   );
 }
 
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: CommandMode;
+  onChange: (nextMode: CommandMode) => void;
+}) {
+  const { tokens } = useAppTheme();
+
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {COMMAND_MODE_OPTIONS.map((option) => (
+        <PillChip
+          key={option.value}
+          label={option.label}
+          active={mode === option.value}
+          color={tokens.textMuted}
+          onPress={() => onChange(option.value)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function AutoModeNotAvailableCard({ onPickMode }: { onPickMode: (mode: CommandMode) => void }) {
+  const { tokens } = useAppTheme();
+
+  return (
+    <Card
+      variant="header"
+      accentColor={tokens.textMuted}
+      headerTitle="Auto mode isn't available yet"
+      headerSubtitle="Ask/Create routing for Auto is still pending."
+      className="mb-0"
+    >
+      <View className="gap-3">
+        <Text className="text-sm" style={{ color: tokens.textMuted }}>
+          Pick Ask or Create directly for now.
+        </Text>
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Button label="Use Ask" onPress={() => onPickMode('ask')} color={tokens.textMuted} />
+          </View>
+          <View className="flex-1">
+            <Button label="Use Create" variant="ghost" onPress={() => onPickMode('create')} />
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function AskConversationView({ placeholder }: { placeholder: string }) {
+  const { tokens } = useAppTheme();
+  const { turns, addTurn } = useAskConversation();
+  const [question, setQuestion] = useState('');
+  const [isAsking, setIsAsking] = useState(false);
+  const [lastResult, setLastResult] = useState<AskResult | null>(null);
+
+  const hasQuestionText = question.trim().length > 0;
+
+  const handleAsk = async () => {
+    setIsAsking(true);
+    setLastResult(null);
+    const now = new Date();
+    const parserContext = getParserContext();
+
+    const result = await askParser.ask({
+      question,
+      conversationContext: turns,
+      now,
+      locale: parserContext.locale,
+      timeZone: parserContext.timeZone,
+      todayDateKey: toDateKey(now),
+      tomorrowDateKey: getTomorrowDateKey(now),
+    });
+
+    setLastResult(result);
+    if (result.outcome === 'answer') {
+      addTurn({ question: result.question, answer: result.answer });
+      setQuestion('');
+    }
+    setIsAsking(false);
+  };
+
+  return (
+    <View className="gap-4">
+      {turns.length > 0 ? (
+        <CommandSection>
+          <Card
+            variant="header"
+            accentColor={tokens.textMuted}
+            headerTitle="Conversation"
+            headerSubtitle="Cleared only when the app restarts."
+            className="mb-0"
+          >
+            <View className="gap-3">
+              {turns.map((turn, index) => (
+                <View key={`${index}:${turn.question}`} className="gap-1">
+                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                    {turn.question}
+                  </Text>
+                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                    {turn.answer}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </CommandSection>
+      ) : null}
+
+      <CommandSection>
+        <Card
+          variant="header"
+          accentColor={tokens.textMuted}
+          headerTitle="Ask a question"
+          headerSubtitle="Answers come only from your own local data. Nothing is saved."
+          className="mb-0"
+        >
+          <View className="gap-3">
+            <TextField
+              label="Question"
+              value={question}
+              onChangeText={(value) => {
+                setQuestion(value);
+                setLastResult(null);
+              }}
+              placeholder={placeholder}
+              nativeID="ask-input"
+            />
+            <Button
+              label={isAsking ? 'Asking...' : 'Ask'}
+              onPress={handleAsk}
+              color={tokens.textMuted}
+              disabled={!hasQuestionText || isAsking}
+            />
+          </View>
+        </Card>
+      </CommandSection>
+
+      {lastResult?.outcome === 'unsupported' ? (
+        <CommandSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={tokens.textMuted}
+            headerTitle="Out of scope for this version"
+            headerSubtitle="Nothing was saved or changed."
+            className="mb-0"
+          >
+            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+              {lastResult.reason}
+            </Text>
+          </Card>
+        </CommandSection>
+      ) : null}
+
+      {lastResult?.outcome === 'unavailable' ? (
+        <CommandSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={tokens.textMuted}
+            headerTitle="Ask is temporarily unavailable"
+            headerSubtitle="Nothing was saved or changed."
+            className="mb-0"
+          >
+            <View className="gap-3">
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                {lastResult.message}
+              </Text>
+              <Button
+                label="Try again"
+                onPress={handleAsk}
+                color={tokens.textMuted}
+                disabled={!hasQuestionText || isAsking}
+              />
+            </View>
+          </Card>
+        </CommandSection>
+      ) : null}
+    </View>
+  );
+}
+
 export function CommandScreen({
   launchContext = null,
   onRequestClose,
@@ -470,6 +668,27 @@ export function CommandScreen({
     CommandExecutionResult,
     { outcome: 'success' }
   > | null>(null);
+  const [mode, setMode] = useState<CommandMode>('create');
+
+  useEffect(() => {
+    if (!AI_ASK_EXPERIMENT_ENABLED) return;
+
+    let cancelled = false;
+    void getLastUsedCommandMode().then((storedMode) => {
+      if (!cancelled) {
+        setMode(storedMode);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleModeChange = (nextMode: CommandMode) => {
+    setMode(nextMode);
+    void setLastUsedCommandMode(nextMode);
+  };
 
   useEffect(() => {
     // Defaults to false via useState; nothing to reset when unavailable.
@@ -820,5 +1039,16 @@ export function CommandScreen({
     </>
   );
 
-  return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
+  if (!AI_ASK_EXPERIMENT_ENABLED) {
+    return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
+  }
+
+  return (
+    <View className="gap-4 pb-1 pt-1">
+      <ModeToggle mode={mode} onChange={handleModeChange} />
+      {mode === 'create' ? commandContent : null}
+      {mode === 'ask' ? <AskConversationView placeholder={commandPlaceholder} /> : null}
+      {mode === 'auto' ? <AutoModeNotAvailableCard onPickMode={handleModeChange} /> : null}
+    </View>
+  );
 }

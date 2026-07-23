@@ -41,6 +41,27 @@ export async function listTodos(): Promise<Todo[]> {
   );
 }
 
+export async function listPendingTodos(): Promise<Todo[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<Todo>(
+    `SELECT * FROM todos
+     WHERE deleted_at IS NULL
+       AND completed = 0
+     ORDER BY sort_order ASC, created_at DESC`,
+  );
+}
+
+export async function countPendingTodos(): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count
+     FROM todos
+     WHERE deleted_at IS NULL
+       AND completed = 0`,
+  );
+  return row?.count ?? 0;
+}
+
 export async function addTodo(input: {
   title: string;
   notes?: string;

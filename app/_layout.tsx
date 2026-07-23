@@ -11,6 +11,7 @@ import {
   CommandCenterProvider,
   GlobalCommandCenterHost,
 } from '@/features/command/CommandCenterProvider';
+import { AskConversationProvider } from '@/features/command/AskConversationContext';
 
 /**
  * Route-level error boundary so a render-time exception shows recovery UI
@@ -59,9 +60,11 @@ export default function RootLayout() {
   return (
     <AppProviders>
       <NavigationProvider>
-        <CommandCenterProvider>
-          <ThemedRoot />
-        </CommandCenterProvider>
+        <AskConversationProvider>
+          <CommandCenterProvider>
+            <ThemedRoot />
+          </CommandCenterProvider>
+        </AskConversationProvider>
       </NavigationProvider>
     </AppProviders>
   );

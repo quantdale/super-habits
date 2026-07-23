@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   completeTodoFromLinkedAction,
+  countPendingTodos,
+  listPendingTodos,
   removeTodo,
   saveTodoLinkedActionRules,
   toggleTodo,
@@ -426,5 +428,60 @@ describe('features/todos/todos.data', () => {
       operation: 'update',
     });
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+  });
+
+  describe('listPendingTodos', () => {
+    it('queries only non-deleted, incomplete todos', async () => {
+      const pendingRow = {
+        id: 'todo_pending',
+        title: 'Pending todo',
+        notes: null,
+        completed: 0,
+        due_date: null,
+        priority: 'normal',
+        sort_order: 1,
+        recurrence: null,
+        recurrence_id: null,
+        created_at: '2026-04-16T09:00:00.000Z',
+        updated_at: '2026-04-16T09:00:00.000Z',
+        deleted_at: null,
+      };
+      const db = {
+        getAllAsync: vi.fn().mockResolvedValue([pendingRow]),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      const result = await listPendingTodos();
+
+      expect(db.getAllAsync).toHaveBeenCalledWith(
+        expect.stringMatching(/WHERE\s+deleted_at IS NULL\s+AND completed = 0/),
+      );
+      expect(result).toEqual([pendingRow]);
+    });
+  });
+
+  describe('countPendingTodos', () => {
+    it('returns the count of non-deleted, incomplete todos', async () => {
+      const db = {
+        getFirstAsync: vi.fn().mockResolvedValue({ count: 3 }),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      const result = await countPendingTodos();
+
+      expect(db.getFirstAsync).toHaveBeenCalledWith(
+        expect.stringMatching(/WHERE\s+deleted_at IS NULL\s+AND completed = 0/),
+      );
+      expect(result).toBe(3);
+    });
+
+    it('returns 0 when the query yields no row', async () => {
+      const db = {
+        getFirstAsync: vi.fn().mockResolvedValue(undefined),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      await expect(countPendingTodos()).resolves.toBe(0);
+    });
   });
 });
