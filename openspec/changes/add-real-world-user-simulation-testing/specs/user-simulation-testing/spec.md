@@ -33,29 +33,50 @@ A journey SHALL clear application state at most once, at its start, and SHALL NO
 - **WHEN** step 4 of a journey fails
 - **THEN** steps 5 onward in that file are skipped as meaningless, and other journey files still run.
 
-### Requirement: Day-rollover correctness with the application mounted
+### Requirement: Day-rollover write correctness
 
-The suite SHALL cover the local-calendar day boundary being crossed while the application is open and all sections are mounted, using browser clock control installed before first render. The expected behaviour SHALL be a decided, documented contract, and the journey SHALL assert that contract from the UI and from the persisted `date_key` / `consumed_on` values.
-
-#### Scenario: Clock crosses midnight while the app is open
-
-- **WHEN** the browser clock advances from 23:55 to 00:05 with Overview, Habits and Calories all previously activated and still mounted
-- **THEN** each surface's displayed "today" matches the documented contract, and no surface shows a mixture of the old and new day.
+The suite SHALL cover the local-calendar day boundary being crossed while the application is open and all sections are mounted, using browser clock control installed before first render. Writes issued after the boundary SHALL land on the new calendar day, and rows written before it SHALL be left untouched.
 
 #### Scenario: A write after rollover uses the new day's key
 
 - **WHEN** a habit is incremented after the clock has crossed midnight, without a reload
-- **THEN** the `habit_completions` row is written with the **new** day's `date_key`, and the previous day's row is unchanged.
+- **THEN** the `habit_completions` row is written with the **new** day's `date_key`, and the previous day's row is unchanged in both count and `updated_at`.
 
-#### Scenario: Reload after rollover agrees with the pre-reload state
+#### Scenario: Pre-boundary rows are never retroactively rewritten
+
+- **WHEN** the clock crosses midnight with entries already logged for the previous day
+- **THEN** those rows keep their original `date_key` / `consumed_on` values, and the previous day's totals are unchanged when viewed later.
+
+#### Scenario: Reload after rollover agrees with what was written
 
 - **WHEN** the page is reloaded after the rollover and the same surfaces are opened
-- **THEN** the values shown match what the contract required before the reload, with no retroactive change to previously written rows.
+- **THEN** the values shown match the rows actually written on each side of the boundary, with no data appearing on the wrong day.
 
 #### Scenario: Non-UTC timezone is exercised
 
 - **WHEN** the rollover journey runs under a non-UTC timezone
 - **THEN** local date keys, and any timestamp-column query converted through `getUtcIsoRangeForLocalDateKeys()`, select the same calendar day the user sees.
+
+### Requirement: Day-rollover presentation freshness
+
+A mounted surface SHALL NOT present a stale calendar day as "Today". When the local day changes while the application is open, the active section SHALL refresh its day-scoped data, and inactive mounted sections SHALL be marked stale so they refresh on activation rather than rendering values held from the previous day.
+
+This requirement describes a decided contract that the application does not yet satisfy: refresh today is driven by `isActive` transitions and foreground events, neither of which a midnight tick produces. Its tests SHALL be written against this contract and quarantined per the contract-gap protocol, naming the companion change `fix-day-rollover-refresh`.
+
+#### Scenario: The active section does not show yesterday as today
+
+- **WHEN** the clock advances from 23:55 to 00:05 while a day-scoped section is active
+- **THEN** that section's "today" data reflects the new day rather than values held from before the boundary.
+
+#### Scenario: An inactive section refreshes on activation rather than showing memory
+
+- **WHEN** the user switches to a section that was mounted before the boundary and has not been activated since
+- **THEN** it displays the new day's data, not the values it held when it was last active.
+
+#### Scenario: UI and database never disagree about which day a tick belongs to
+
+- **WHEN** a habit is ticked at 00:10 with the app mounted since the previous evening
+- **THEN** the panel that acknowledges the tick is labelled with the same day the row was written to.
 
 ### Requirement: Entity state-machine coverage including invalid transitions
 
@@ -143,10 +164,15 @@ The suite SHALL interrupt workflows at meaningful points — before input, mid-i
 - **WHEN** the user switches sections while a Pomodoro session is running and returns later
 - **THEN** the timer is still running with the correct remaining time, and the session logs correctly on completion.
 
-#### Scenario: Reload during a running timer
+#### Scenario: Reload during a running timer discards the session and logs nothing
 
 - **WHEN** the page is reloaded while a Pomodoro session is running
-- **THEN** the documented contract for in-memory session loss holds, the timer shows a clean idle state, and no partial or duplicate `pomodoro_sessions` row exists.
+- **THEN** the timer returns to a clean idle state at the configured duration, and **no** `pomodoro_sessions` row exists for the interrupted session — a partially-elapsed session is never logged, never half-counted toward a streak, and never duplicated by a later completed session.
+
+#### Scenario: An abandoned workout session logs nothing
+
+- **WHEN** an active workout session is interrupted by a reload or by ending it early
+- **THEN** no `workout_logs` or `workout_session_exercises` rows are written for it, and the routine's history is unchanged.
 
 #### Scenario: Tab hidden mid-session
 
@@ -292,6 +318,22 @@ The suite SHALL cover the full restore lifecycle from the user's perspective, in
 - **WHEN** local synced rows exist at the moment the import transaction re-checks emptiness
 - **THEN** the import is abandoned, local data is unchanged, and the user is returned to a blocked state rather than a partial import.
 
+### Requirement: A device with deleted history is not an empty device
+
+Restore eligibility SHALL consider every row in the synced tables, regardless of `deleted_at`. A device that has ever held synced rows SHALL NOT be treated as empty, so a one-shot `INSERT OR REPLACE` import can never overwrite a local deletion with a stale backup row.
+
+This requirement describes a decided contract that the application does not yet satisfy: `getLocalSyncBackedCounts()` currently filters `deleted_at IS NULL`. Its tests SHALL be written against this contract and quarantined per the contract-gap protocol, naming the companion change `fix-restore-emptiness-counts-deleted-rows`.
+
+#### Scenario: Soft-deleted rows block restore
+
+- **WHEN** a device's only synced rows are soft-deleted and a remote backup is available
+- **THEN** restore is reported as blocked by local data, and the startup prompt is not offered.
+
+#### Scenario: A deleted todo is never resurrected by an import
+
+- **WHEN** a todo is deleted locally while offline, the deletion has not yet been pushed, and a restore is attempted
+- **THEN** the todo does not reappear, and the user's most recent intent is not overwritten by the backup's older view of that row.
+
 ### Requirement: Multi-tab and single-writer behaviour
 
 The suite SHALL cover a second tab being opened on the same origin and SHALL assert the user-visible outcome of the single OPFS writer lock, rather than asserting only a console error.
@@ -415,14 +457,38 @@ The capability SHALL define and implement seeding and reset helpers with explici
 - **WHEN** a test or journey resets state
 - **THEN** the helper documents exactly what is cleared — OPFS SQLite files, AsyncStorage keys, in-memory sync queue — and what deliberately survives.
 
+### Requirement: Contract-gap protocol
+
+Where a decided contract describes behaviour the application does not yet have, the test SHALL be written against the decided contract, quarantined with an explicit expected-failure marker naming its companion change, and registered as a contract gap. A test SHALL NOT be weakened to match current behaviour in order to pass.
+
+#### Scenario: A contract gap is written, not skipped
+
+- **WHEN** a decided contract is not yet satisfied by the application
+- **THEN** the test exists, expresses the contract, is quarantined with a comment naming the companion change, and appears in the known-gap register as a contract gap distinct from a capability gap.
+
+#### Scenario: Quarantine is released by the companion change
+
+- **WHEN** the companion application change lands
+- **THEN** the quarantine marker is removed as part of that change and the test runs in the normal suite — the testing change does not carry the fix.
+
+#### Scenario: Weakening an assertion is not an acceptable resolution
+
+- **WHEN** a journey fails because the application does not meet a decided contract
+- **THEN** the resolution is a filed defect and a quarantined test, never an assertion loosened to match the current behaviour.
+
 ### Requirement: Known-gap register
 
-The capability SHALL maintain a register of what cannot currently be tested, why, and the recommended path to closing each gap. Difficult areas SHALL NOT be silently omitted.
+The capability SHALL maintain a register of what cannot currently be tested, why, and the recommended path to closing each gap, distinguishing contract gaps (decided behaviour not yet implemented) from capability gaps (untestable with this harness). Difficult areas SHALL NOT be silently omitted.
 
 #### Scenario: Every untestable area is named
 
 - **WHEN** the register is reviewed
 - **THEN** it names at minimum native platform behaviour, real Supabase round-trips, true concurrency, load and memory profiling, legacy-database migration journeys, pre-cutover UTC date keys, and the absence of an authorization model — each with a reason and a recommendation.
+
+#### Scenario: Contract gaps are tracked to closure
+
+- **WHEN** the register is reviewed
+- **THEN** each contract gap names its decided contract, its quarantined tests, and the companion change that will close it.
 
 ### Requirement: Authentication and authorization scope statement
 

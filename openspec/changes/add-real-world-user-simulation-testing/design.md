@@ -141,6 +141,53 @@ Plus a **negative oracle**: what must _not_ have changed. Most data-corruption d
 
 No `data-testid` is added to application components. Journeys use accessible names and visible text, exactly as the existing specs do. Where a journey needs a selector the app does not currently expose legibly, the fix is a shared helper in `e2e/helpers/`, not an app change and not a weakened assertion.
 
+### D9 — Day-rollover contract: writes are already correct; presentation must not lie
+
+The day boundary splits into two separable contracts, and conflating them is what made this look unanswerable.
+
+**D9a — Write correctness (already true; asserted as a passing invariant).** Every data-layer write derives its day key from `toDateKey()` at call time, so a write issued after midnight already lands on the new day regardless of how long the app has been mounted. Rows written before the boundary keep their original keys; nothing is retroactively rewritten. This is the property that protects data integrity, it holds today, and the journey asserts it as a regression guard.
+
+**D9b — Presentation freshness (decided target contract; expected to fail today).** The decided contract is: **a mounted surface must never present a stale day as "Today".** Concretely — when the local calendar day changes while the app is open, the **active** section refreshes its day-scoped data, and **inactive** mounted sections are marked stale so they refresh on activation rather than rendering yesterday's numbers from memory.
+
+Chosen over the two alternatives because both fail the user: leaving the old day up until an interaction means a user who ticks a habit at 00:10 sees the tick apply to a "Today" panel that is actually yesterday — the UI and the database disagree, which is precisely the failure this whole change exists to catch. A manual "new day" affordance is better than nothing but puts the burden of noticing on the user, and does nothing for the six sections sitting mounted behind the active one.
+
+Current code cannot satisfy D9b: `useActiveForegroundRefresh` fires on `isActive` transitions and on `visibilitychange`/`AppState` foreground, and a midnight tick is neither. So the D9b journey steps are written now, quarantined under the D13 protocol, and unblocked by a companion application change (`fix-day-rollover-refresh`) that this change does not implement. Recommended shape for that change, recorded so the follow-up is not designed from scratch: a single day-key watcher at the provider level (an interval or a `visibilitychange`-plus-timeout comparison of `toDateKey()` against the last-seen key) that bumps a context value the sections already depend on for refresh.
+
+### D10 — Restore emptiness counts every row, not only undeleted ones
+
+Decided contract: **a device that has ever held rows in a synced table is not an empty device.** `getLocalSyncBackedCounts()` currently filters `deleted_at IS NULL`, so a device whose todos were all deleted counts as empty and restore proceeds — and because the import uses `INSERT OR REPLACE` keyed on `id`, a todo the user deleted while offline (delete never pushed) is silently resurrected by rows the backup still holds as live. That is a data-integrity defect: the user's most recent intent loses to a stale backup, silently, on a device they just set up.
+
+Counting all rows regardless of `deleted_at` is the minimal correct rule. Rejected alternative: per-row `updated_at` comparison during import (keep local when the local tombstone is newer). It is more precise and strictly more work — it turns a one-shot import into a merge, which is exactly the two-way-sync scope this product has deliberately not taken on. If restore v2 ever becomes a merge, that is the moment to revisit; for v1, refusing to import onto a device with history is both safer and simpler to explain.
+
+Also decided, and testable today with no application change: the restore result must be honest about what did **not** come back. Habit completions, saved meals, pomodoro sessions, workout logs and workout routines are outside the restore scope, so streaks legitimately read zero after a restore — the disclosures already list this, and the journey asserts the disclosures match the actual outcome.
+
+Like D9b, the emptiness rule needs an application change (`fix-restore-emptiness-counts-deleted-rows`); the integration test is written now and quarantined under D13.
+
+### D11 — In-memory session loss is the contract for v1
+
+Decided: the Pomodoro timer and the active workout session are **intentionally ephemeral**. A reload yields a clean idle state at the configured duration, and — the part that actually matters — **no partial session is ever logged**. `pomodoro_sessions` rows are written only when the countdown reaches zero, so an interrupted session produces no row, no duplicate, and no half-counted streak day. That is assertable against current code and becomes a regression guard.
+
+This is a real product trade-off, not an accident being laundered into a requirement, so it is recorded as such: persisting `startedAt` + mode + duration to `app_meta` would let a reload resume mid-session, and users who reload a 25-minute timer at minute 20 will be annoyed. That is a UX improvement worth its own change, filed as a recommendation. What this change refuses to do is assert the current behaviour silently, as though nobody had noticed the cost.
+
+### D12 — `better-sqlite3` on Node 20; no CI Node bump
+
+Decided: `better-sqlite3` as the integration driver. `node:sqlite` is the tidier long-term answer (zero dependencies) but requires moving CI from Node 20 to 22+, and coupling a testing change to a runtime bump is how a testing change stops landing. The D2 adapter keeps the driver behind five methods, so the switch is a one-file change whenever the Node version moves for its own reasons.
+
+### D13 — Contract-gap protocol: write the test, quarantine it, name the companion change
+
+Two decided contracts (D9b, D10) describe behaviour the application does not yet have. The rule for those, and for anything similar found during implementation:
+
+1. Write the test against the **decided contract**, not against current behaviour.
+2. Quarantine it with `test.fixme()` (Playwright) or `it.fails()` (Vitest) plus a comment naming the companion change.
+3. Register it in `docs/testing/known-gaps.md` as a **contract gap** — distinct from a **capability gap** (something untestable here, like native platforms).
+4. When the companion change lands, the quarantine is removed in that change, not this one.
+
+This keeps two things true at once: the suite stays green, and the gap is a named, tracked artifact rather than a test nobody wrote because it would have failed. What is explicitly forbidden is the third option — weakening the test to match current behaviour so it passes.
+
+### D14 — Performance thresholds are provisional, generous, and recalibrated from a measurement
+
+Journeys assert cliffs, not milliseconds. Provisional CI ceilings, to be recalibrated in task 6.2 against a measured baseline on CI hardware: cold Overview interactive and populated at HEAVY volume **≤ 5s**; section switch after all six are mounted **≤ 800ms**; list scroll/filter input response at 200+ rows **≤ 500ms**; no step in a journey takes more than 2× its measured baseline. Asserted with `expect.poll` and deliberately loose — a threshold tight enough to flake is a threshold that gets deleted. If a measured baseline exceeds a provisional ceiling, the finding is filed as a performance defect rather than the ceiling being raised to make it pass.
+
 ## User Personas
 
 Six personas, each earning its place by producing scenarios the others do not.
@@ -165,13 +212,13 @@ Ten journeys. Each names: persona, goal, starting state, the realistic action se
 
 **J1 — "A Tuesday" (P1, journey E2E).** One continuous session: open → Overview → tick two habits → add a todo → switch to Calories, log breakfast → back to Overview (counts must reflect both) → start a 25-minute focus → switch to Todos while it runs → complete a todo → return to Focus (timer still running, correct remaining) → let it complete → verify session logged, Overview focus count and streak updated. _Catches:_ stale aggregates across mounted sections, timer death on section switch, `useActiveForegroundRefresh` not firing.
 
-**J2 — "Past midnight" (P1, journey E2E + integration).** App open at 23:55 with today's data visible. Clock advances past midnight. Without reloading: what do Habits, Calories, Overview and the heatmaps show? Then tick a habit — which `date_key` does it write? Then reload and compare. _Catches:_ the single most likely real-world correctness defect in the app. The _expected_ behaviour is currently unspecified — see Open Questions; the journey asserts a decided contract and the decision is made as part of implementing it.
+**J2 — "Past midnight" (P1, journey E2E + integration).** App open at 23:55 with today's data visible. Clock advances past midnight. Split per D9: **J2a** (passing) asserts write correctness — a habit ticked at 00:10 writes the new day's `date_key`, yesterday's rows are untouched, and a reload agrees with what was written. **J2b** (quarantined per D13, pending `fix-day-rollover-refresh`) asserts presentation freshness — no mounted surface still labels yesterday "Today", and an inactive section refreshes rather than rendering memory when it is activated. _Catches:_ the single most likely real-world correctness defect in the app, and separates the half that already works from the half that does not.
 
 **J3 — "The commute" (P5, journey E2E).** Online, create data. Go offline. Create/edit/delete across todos, habits and calories. Observe the outbox grows and dedupes per `(entity, id)`. Kill and reopen the tab (full reload). Assert the outbox survived via `app_meta.sync_outbox`. Come back online → NetInfo reconnect flush → assert every record pushed exactly once, nothing lost, nothing duplicated, status cleared. _Catches:_ outbox durability, dedupe, reconnect wiring.
 
 **J4 — "The backend is having a bad day" (P5, journey E2E).** With a queue pending, the backup returns 503 for `habits` and 200 for `todos`. Assert only the habits records requeue, the backoff timer is set, the interval flush respects it while an opportunistic visibility flush does not, and a later success clears failure state. Then a malformed response, then a timeout. _Catches:_ partial-failure requeue, backoff, error surfacing in Settings.
 
-**J5 — "New phone" (P6, journey E2E).** Empty device with a remote backup available → restore prompt appears at bootstrap → dismiss it ("Not now") → reload (prompt must not reappear for the same backup signature) → add one todo → open Settings and observe restore is now blocked with the local-data-present message. Second run: accept the restore and verify imported counts, the disclosures shown, and — critically — that habit completion history, saved meals, pomodoro sessions and workout logs did **not** come back, so streaks read 0. _Catches:_ eligibility lifecycle, dismissal signature, and the local-only-data expectation gap that will generate real support questions.
+**J5 — "New phone" (P6, journey E2E).** Empty device with a remote backup available → restore prompt appears at bootstrap → dismiss it ("Not now") → reload (prompt must not reappear for the same backup signature) → add one todo → open Settings and observe restore is now blocked with the local-data-present message. Second run: accept the restore and verify imported counts, the disclosures shown, and — critically — that habit completion history, saved meals, pomodoro sessions and workout logs did **not** come back, so streaks read 0. A third branch covers D10's decided contract on a device holding only soft-deleted rows (quarantined per D13, pending `fix-restore-emptiness-counts-deleted-rows`): a locally-deleted todo must not be resurrected by the import. _Catches:_ eligibility lifecycle, dismissal signature, the resurrection defect, and the local-only-data expectation gap that will generate real support questions.
 
 **J6 — "Chain reaction" (P3, journey E2E + integration).** Create a linked action (todo completed → habit incremented → …), complete the source todo, verify the target changed exactly once, the notice appeared, the execution row exists, and re-completing (untick → tick) does not double-apply. Then delete the target entity and re-fire — the effect must skip with `target_missing`, not error. _Catches:_ chain guards, effect-adapter skip paths, cross-feature blast radius.
 
@@ -254,35 +301,45 @@ Reset semantics differ per level and must be stated in the helper, because getti
 
 ## Traceability
 
-| Requirement (spec.md)                   | Journeys / levels            | Primary risk |
-| --------------------------------------- | ---------------------------- | ------------ |
-| Persona-driven journey suite            | J1–J10                       | R6           |
-| Continuity without per-step reset       | all journeys                 | R6           |
-| Day-rollover correctness                | J2, integration              | R1           |
-| Entity state-machine coverage           | J1, J6, J7, integration      | R4, R5, R8   |
-| Cross-feature interaction               | J1, J6, J10                  | R4, R6       |
-| Persistence via independent observation | all mutating steps           | R1, R2       |
-| Interruption coverage                   | J1, J3, J7                   | R8           |
-| Mistake & recovery                      | J7                           | R5           |
-| Failure injection & recovery            | J3, J4                       | R2           |
-| Repetition & accumulation               | J1, J7, J8                   | R5, R6       |
-| Realistic data volumes/values           | J8, integration fixtures     | R9           |
-| Destructive operations                  | J5, J6, J7                   | R3, R4       |
-| Backup/restore lifecycle                | J5                           | R3           |
-| Multi-tab / single-writer               | J9                           | R10          |
-| Background & async processing           | J1, J3, J4                   | R2, R8       |
-| Performance-oriented journeys           | J8                           | R9           |
-| Exploratory missions                    | M1–M10                       | R8, R10, R12 |
-| Regression suite & CI wiring            | J1, J3, J5, J6, J7           | all P0       |
-| Real-SQLite integration level           | `tests/integration/**`       | R7           |
-| Test data & reset strategy              | harness                      | all          |
-| Known-gap register                      | `docs/testing/known-gaps.md` | —            |
-| Multi-surface oracles                   | all mutating steps           | R1, R2       |
-| Auth/authorization scope statement      | — (documented)               | —            |
+| Requirement (spec.md)                   | Journeys / levels                            | Primary risk |
+| --------------------------------------- | -------------------------------------------- | ------------ |
+| Persona-driven journey suite            | J1–J10                                       | R6           |
+| Continuity without per-step reset       | all journeys                                 | R6           |
+| Day-rollover write correctness          | J2a, integration                             | R1           |
+| Day-rollover presentation freshness     | J2b (CG-1, quarantined)                      | R1           |
+| Entity state-machine coverage           | J1, J6, J7, integration                      | R4, R5, R8   |
+| Cross-feature interaction               | J1, J6, J10                                  | R4, R6       |
+| Persistence via independent observation | all mutating steps                           | R1, R2       |
+| Interruption coverage                   | J1, J3, J7                                   | R8           |
+| Mistake & recovery                      | J7                                           | R5           |
+| Failure injection & recovery            | J3, J4                                       | R2           |
+| Repetition & accumulation               | J1, J7, J8                                   | R5, R6       |
+| Realistic data volumes/values           | J8, integration fixtures                     | R9           |
+| Destructive operations                  | J5, J6, J7                                   | R3, R4       |
+| Backup/restore lifecycle                | J5                                           | R3           |
+| Deleted history blocks restore          | J5 branch 3, integration (CG-2, quarantined) | R3           |
+| Multi-tab / single-writer               | J9                                           | R10          |
+| Background & async processing           | J1, J3, J4                                   | R2, R8       |
+| Performance-oriented journeys           | J8                                           | R9           |
+| Exploratory missions                    | M1–M10                                       | R8, R10, R12 |
+| Regression suite & CI wiring            | J1, J3, J5, J6, J7                           | all P0       |
+| Real-SQLite integration level           | `tests/integration/**`                       | R7           |
+| Test data & reset strategy              | harness                                      | all          |
+| Contract-gap protocol                   | CG-1, CG-2                                   | R1, R3       |
+| Known-gap register                      | `docs/testing/known-gaps.md`                 | —            |
+| Multi-surface oracles                   | all mutating steps                           | R1, R2       |
+| Auth/authorization scope statement      | — (documented)                               | —            |
 
 ## Known Gaps (cannot be tested here, and why)
 
-Recorded in `docs/testing/known-gaps.md`; summarised so reviewers see them without opening a second file.
+Recorded in `docs/testing/known-gaps.md`; summarised so reviewers see them without opening a second file. Two kinds, kept distinct because they close in different ways.
+
+**Contract gaps** — the contract is decided, the test is written, the application does not satisfy it yet. Each is quarantined per D13 and closes when its companion change lands.
+
+- **CG-1 — Day-rollover presentation freshness (D9b).** Companion change: `fix-day-rollover-refresh`. Quarantined test: J2b.
+- **CG-2 — Restore emptiness must count soft-deleted rows (D10).** Companion change: `fix-restore-emptiness-counts-deleted-rows`. Quarantined tests: J5's third branch and `tests/integration/restore.test.ts`'s resurrection case.
+
+**Capability gaps** — untestable from this repo and this harness, regardless of application behaviour.
 
 1. **Native platforms.** Playwright drives the web export. iOS/Android behaviour — `expo-notifications` delivery, `AppState` background transitions, WAL journal mode, `Alert.alert` confirmations (a no-op on web, which is why `habits.spec.ts` cannot currently E2E a full delete) — is unreachable. _Recommendation:_ a Maestro/Detox smoke lane, or a documented manual checklist per release. Out of scope here.
 2. **Real Supabase round-trips.** Only injected responses are exercised, so RLS policies, actual upsert conflict behaviour and schema drift between SQLite and Postgres are not verified. _Recommendation:_ a separate contract-test change against a disposable project.
@@ -292,11 +349,26 @@ Recorded in `docs/testing/known-gaps.md`; summarised so reviewers see them witho
 6. **Pre-cutover UTC date keys.** Migration 5 deliberately does not backfill, so real installs contain a mix of UTC and local date keys. Fixtures can simulate this, but no real corpus exists to validate against.
 7. **Authorization.** No roles, no per-user client-side enforcement. Nothing to test; stated rather than faked.
 
-## Open Questions
+## Decision Log
 
-- **Day-rollover expected behaviour is genuinely unspecified.** When the clock crosses midnight with the app mounted, should sections auto-refresh to the new day, show a "new day" affordance, or keep showing the old day until interacted with? The code does not decide this — `useActiveForegroundRefresh` fires on `isActive` and on foreground, neither of which a midnight tick triggers. J2 cannot be written without a decision. **This is a product decision required before implementation**, not something to infer.
-- **In-memory session loss on reload** (Pomodoro, active workout) is current behaviour but not a stated contract. Should the journey assert "the timer is gone and shows a clean idle state" as correct, or file it as a defect? Recommendation: assert the current behaviour as the contract _and_ file a UX note, so the test does not encode an accident as a requirement without anyone noticing.
-- **Restore eligibility with only soft-deleted local rows.** `getLocalSyncBackedCounts()` filters `deleted_at IS NULL`, so a device holding only deleted rows counts as empty and `INSERT OR REPLACE` will overwrite those rows with remote versions — potentially resurrecting a todo the user deleted while offline. Intended, or a defect? The journey asserts whichever is decided; the current code does not say.
-- **Integration driver:** `better-sqlite3` (works on Node 20, native build in CI) vs `node:sqlite` (no dependency, but requires raising CI to Node 22+). Recommendation is `better-sqlite3` to avoid coupling this change to a Node bump, but the adapter in D2 makes it a one-file switch.
-- **Whether sync journeys get their own `dist/` build in CI** (two builds per run, ~+2–3 min) or run only in a nightly lane. Recommendation: nightly plus on-demand, keeping PR feedback fast.
-- **Performance thresholds.** J8's assertions need agreed numbers (e.g. cold Overview interactive < 3s, section switch < 500ms, 200-row todo list scroll without dropped input on CI hardware). These should be set from a measured baseline during implementation, not guessed in advance, and asserted loosely enough to catch cliffs rather than noise.
+Every question this design opened is now closed. Recorded here with its resolution so a reader does not have to reconstruct the reasoning from the decision sections.
+
+| #   | Question                                                                  | Decision                                                                                                                                                            | Consequence                                              |
+| --- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Q1  | Day-rollover behaviour with the app mounted                               | D9: writes are already correct and asserted as-is; presentation must never label a stale day "Today" — active section refreshes, inactive sections mark stale       | J2 splits into J2a (passing) and J2b (contract gap CG-1) |
+| Q2  | In-memory Pomodoro/workout session loss on reload                         | D11: ephemeral is the v1 contract; the binding guarantee is that no partial session is ever logged. Resume-after-reload filed as a UX recommendation, not a defect  | Asserted as a passing regression guard                   |
+| Q3  | Restore eligibility with only soft-deleted local rows                     | D10: a device that has ever held synced rows is not empty. Per-row merge semantics rejected as out-of-scope for a push-only backup                                  | Contract gap CG-2                                        |
+| Q4  | Integration SQLite driver                                                 | D12: `better-sqlite3` on Node 20; no CI Node bump                                                                                                                   | Reversible behind the D2 adapter                         |
+| Q5  | CI lane for sync journeys (needs a `dist/` built with dummy Supabase env) | Second build produces `dist-sync/`, consumed by a dedicated Playwright project, run on `main` and nightly — never on PRs                                            | PR feedback stays fast; +2–3 min on the slower lane only |
+| Q6  | Performance thresholds                                                    | D14: provisional generous ceilings now, recalibrated from a measured baseline in task 6.2; a baseline that misses a ceiling is a filed defect, not a raised ceiling | J8 asserts cliffs, not milliseconds                      |
+
+Two decisions (Q1, Q3) describe behaviour the application does not yet have. Both are handled by the D13 protocol — test written to the decided contract, quarantined, companion change named — rather than by weakening the assertion or deferring the decision.
+
+## Assumptions to Validate During Implementation
+
+Not open questions; things believed true from reading the code that implementation will confirm cheaply, each with what to do if it turns out false.
+
+- **`page.clock` installed before first render is sufficient to drive rollover**, because `toDateKey()` reads `new Date()` at call time and the Pomodoro tick uses `Date.now()` deltas. If some path caches a date at module scope, the clock helper gains an explicit reload after the jump and the finding is filed.
+- **`clearDatabase()` plus explicit AsyncStorage clearing gives a genuinely clean journey start.** If a third store turns out to hold state (service-worker cache serving a stale shell being the likely candidate), the reset helper grows a cache-clearing step.
+- **`better-sqlite3` builds on the CI image without extra system packages.** If it does not, the adapter switches to `node:sqlite` and CI moves to Node 22 in the same commit — the cost of that path is a Node bump, which is why it is not the default.
+- **Injecting failures at the Supabase origin reaches the sync adapter cleanly**, given `supabase-js` uses `fetch` under the hood. If request routing proves unreliable against the client's internals, the fallback is a build-time adapter seam — noted here so the journey is not quietly narrowed to "offline only" if the richer failure modes turn out to be awkward.
