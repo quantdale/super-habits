@@ -65,7 +65,6 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
-  const [historyVersion, setHistoryVersion] = useState(0);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [pomodoroHeatmapDays, setPomodoroHeatmapDays] = useState<HeatmapDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
@@ -97,22 +96,20 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     })();
   }, []);
 
-  useEffect(() => {
-    void (async () => {
-      const start364 = new Date();
-      start364.setDate(start364.getDate() - 363);
-      const startKey = toDateKey(start364);
-      const endKey = toDateKey(new Date());
-      const s = await listPomodoroSessionsForDateRange(startKey, endKey);
-      setSessions(s);
-      setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
-    })();
-  }, [historyVersion]);
-
-  const refreshHistoryOnForeground = useCallback(() => {
-    setHistoryVersion((v) => v + 1);
+  // Loaded on first activation and on every subsequent activation/foreground
+  // via useActiveForegroundRefresh — no separate mount effect, so the history
+  // is not fetched twice on first mount.
+  const loadHistory = useCallback(async () => {
+    const start364 = new Date();
+    start364.setDate(start364.getDate() - 363);
+    const startKey = toDateKey(start364);
+    const endKey = toDateKey(new Date());
+    const s = await listPomodoroSessionsForDateRange(startKey, endKey);
+    setSessions(s);
+    setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
   }, []);
-  useActiveForegroundRefresh(isActive, refreshHistoryOnForeground);
+
+  useActiveForegroundRefresh(isActive, loadHistory);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -166,7 +163,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             ).catch((err) => {
               console.error('[PomodoroScreen] logPomodoroSession failed', err);
             });
-            setHistoryVersion((v) => v + 1);
+            void loadHistory();
             const nextCompleted = completedFocusRef.current + 1;
             setCompletedFocus(nextCompleted);
             completedFocusRef.current = nextCompleted;
@@ -195,7 +192,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isRunning]);
+  }, [isRunning, loadHistory]);
 
   const modeColors = getModeColor(currentMode);
   const growthProgress = calculateGrowthProgress(remaining, totalSeconds);

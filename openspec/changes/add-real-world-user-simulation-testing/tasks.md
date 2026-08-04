@@ -17,10 +17,12 @@ All six questions are closed. Recorded here so implementation starts from a sett
 
 ## 1. Correct the stale architecture documentation
 
-- [ ] 1.1 Update `AGENTS.md`: remove `app/(tabs)/`, `app/settings.tsx`, `app/command.tsx`, the six-tab-route description, and the `ensureGuestProfile()` / `core/auth/guestProfile.ts` bootstrap step (that module does not exist). Replace with the real single-page model from `app/index.tsx` + `NavigationProvider`, and the real `AppProviders` bootstrap order.
-- [ ] 1.2 Apply the same corrections to `CLAUDE.md` (routing section, bootstrap order, `/settings` and `/command` route claims).
-- [ ] 1.3 Update the `useFocusEffect` refresh-pattern guidance in both files to `useActiveForegroundRefresh(isActive, …)`.
-- [ ] 1.4 Correct the stated test baselines in `AGENTS.md` (Vitest version and current test/spec counts) to what the repo actually reports.
+> **Reconciliation (2026-08-04):** tasks 1.1–1.4 were completed by commit `4867c1e` ("Complete OpenSpec changes and resolve deep audit findings") — the same corrections landed as part of the repo-wide deep audit before this change was reachable. AGENTS.md and CLAUDE.md now describe the single-page model (`app/index.tsx` + `NavigationProvider`, no `app/(tabs)/`, `app/settings.tsx`, or `app/command.tsx`), the real `AppProviders` bootstrap order (no `ensureGuestProfile()`/`core/auth/guestProfile.ts`), the `useActiveForegroundRefresh(isActive, …)` refresh pattern, and current test baselines (Vitest 3.2.7; 427 unit / 41 files; 90 E2E / 14 specs).
+
+- [x] 1.1 Update `AGENTS.md`: remove `app/(tabs)/`, `app/settings.tsx`, `app/command.tsx`, the six-tab-route description, and the `ensureGuestProfile()` / `core/auth/guestProfile.ts` bootstrap step (that module does not exist). Replace with the real single-page model from `app/index.tsx` + `NavigationProvider`, and the real `AppProviders` bootstrap order.
+- [x] 1.2 Apply the same corrections to `CLAUDE.md` (routing section, bootstrap order, `/settings` and `/command` route claims).
+- [x] 1.3 Update the `useFocusEffect` refresh-pattern guidance in both files to `useActiveForegroundRefresh(isActive, …)`.
+- [x] 1.4 Correct the stated test baselines in `AGENTS.md` (Vitest version and current test/spec counts) to what the repo actually reports.
 
 ## 2. Integration test level (real SQLite)
 

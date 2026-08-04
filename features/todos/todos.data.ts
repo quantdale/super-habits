@@ -161,19 +161,24 @@ export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<T
   if (recurrenceIds.length === 0) return [];
   const db = await getDatabase();
 
-  const results: Todo[] = [];
-  for (const recId of recurrenceIds) {
-    const row = await db.getFirstAsync<Todo>(
-      `SELECT * FROM todos
-       WHERE recurrence_id = ?
-         AND deleted_at IS NULL
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [recId],
-    );
-    if (row) results.push(row);
+  // Single query instead of one SELECT per id; newest todo per series wins.
+  const placeholders = recurrenceIds.map(() => '?').join(', ');
+  const rows = await db.getAllAsync<Todo>(
+    `SELECT *
+     FROM todos
+     WHERE recurrence_id IN (${placeholders})
+       AND deleted_at IS NULL
+     ORDER BY created_at DESC`,
+    recurrenceIds,
+  );
+
+  const newestBySeries = new Map<string, Todo>();
+  for (const row of rows) {
+    if (row.recurrence_id && !newestBySeries.has(row.recurrence_id)) {
+      newestBySeries.set(row.recurrence_id, row);
+    }
   }
-  return results;
+  return [...newestBySeries.values()];
 }
 
 export async function listAllActiveTodosForRecurrence(): Promise<

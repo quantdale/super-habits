@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import Svg, { Circle, Ellipse, Line, Path } from 'react-native-svg';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
@@ -72,18 +72,12 @@ export function GardenGrid({
       </Text>
       <View className="flex-row flex-wrap gap-3 px-1">
         {sessions.map((session) => (
-          <Pressable
-            key={session.id}
-            className="items-center"
-            onPress={() => {
-              // Future: show session detail tooltip
-            }}
-          >
+          <View key={session.id} className="items-center">
             <MiniPlant color={accentColor} />
             <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
               {formatSessionDuration(session.duration_seconds)}
             </Text>
-          </Pressable>
+          </View>
         ))}
       </View>
     </View>

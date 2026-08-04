@@ -288,7 +288,8 @@ export async function addCalorieEntryFromLinkedAction(input: {
   const existing = await db.getFirstAsync<Pick<CalorieEntry, 'id' | 'food_name'>>(
     `SELECT id, food_name
      FROM calorie_entries
-     WHERE id = ?`,
+     WHERE id = ?
+       AND deleted_at IS NULL`,
     [input.id],
   );
 
