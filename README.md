@@ -11,7 +11,7 @@ Data is stored locally in SQLite first, then optionally backed up to Supabase. T
 - Native support through Expo for Android and iOS
 - Feature modules with strict data/domain/UI layering
 - Optional anonymous Supabase backup/restore integration
-- Global command-center overlay across the main tabs, with a retained `/command` page route for direct/internal access
+- Global command-center overlay across the six sections (no `/command` route)
 - Calories `Form` / `Diary` modes with remembered last-view preference
 - Settings grouped into Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal
 
@@ -88,33 +88,33 @@ Optional platform commands:
 
 ## Routes and Surfaces
 
-Current route surfaces:
+The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Overview, Todos, Habits, Pomodoro, Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a top tab rail of plain `Pressable` items:
 
-- `/` redirects to `/(tabs)/overview`
-- `/(tabs)/overview`
-- `/(tabs)/todos`
-- `/(tabs)/habits`
-- `/(tabs)/pomodoro`
-- `/(tabs)/workout`
-- `/(tabs)/calories`
-- `/settings`
-- `/command` for the retained experimental command page route
+- Overview
+- Todos
+- Habits
+- Pomodoro
+- Workout
+- Calories
 
-The root layout mounts `GlobalCommandCenterHost`, so when `COMMAND_EXPERIMENT_ENABLED` is true the eligible tabs show a floating launcher that opens a drawer on wide web and a bottom sheet elsewhere. The launcher is hidden on `/settings` and suppressed during active pomodoro/workout sessions. `/command` remains the direct-link/internal page route and is still linked from Settings.
+Settings is a full-screen modal (not a route). The Command Center is a global overlay only — there is no `/command` route. Old URLs `/settings`, `/command`, and `/(tabs)/*` no longer exist.
+
+The root layout mounts `GlobalCommandCenterHost`, so when `COMMAND_EXPERIMENT_ENABLED` is true the eligible sections show a floating launcher that opens a drawer on wide web and a bottom sheet elsewhere. The launcher is hidden while Settings is open and suppressed during active pomodoro/workout sessions.
 
 ## Command Shell
 
-`/command` is an experimental quick-command shell, not a general assistant surface.
+The Command Center is an experimental overlay-first quick-command shell, not a general assistant surface.
 
-- The primary user-facing entry is the global overlay launcher on Overview, Todos, Habits, Focus, Workout, and Calories.
-- `/command` is the retained page route for direct access, internal testing, and the Settings entry point.
+- The primary user-facing entry is the global overlay launcher across all six sections.
+- The Command Center is a global overlay only (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`); there is no `/command` route.
 - Supported draft kinds are limited to `create_todo` and `create_habit`.
 - The flow is parse -> review -> confirm before write.
 - Default parser mode is `mock`.
 - Optional model-backed parsing uses `remote_with_fallback`, but only on internal-capable builds after a tester enables it locally.
 - The local parser remains the fallback and guardrail path when remote parsing is disabled or unavailable.
 - Todo due dates stay limited to `today`, `tomorrow`, or explicit `YYYY-MM-DD`.
-- Public `/command` copy stays intentionally experimental and draft-focused; it does not imply broad production AI availability.
+- The CommandScreen's Ask mode toggle is gated behind `AI_ASK_EXPERIMENT_ENABLED` (false by default); Create mode is the primary surface.
+- The Command Center copy stays intentionally experimental and draft-focused; it does not imply broad production AI availability.
 
 Relevant env vars for the optional real parser path:
 
@@ -180,8 +180,8 @@ If unset, the app runs local-only and remote backup/restore operations stay unav
 
 Current local baseline on May 5, 2026:
 
-- `npm test`: `340` Vitest tests across `32` test files
-- `npx playwright test --list`: `87` Playwright tests across `13` spec files
+- `npm test`: `427` Vitest tests across `41` test files
+- `npx playwright test --list`: `90` Playwright tests across `14` spec files
 
 ## Additional Documentation
 

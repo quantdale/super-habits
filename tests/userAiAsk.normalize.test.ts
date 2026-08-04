@@ -25,6 +25,7 @@ describe('supabase/functions/user-ai-ask/normalize', () => {
     const result = normalizeAskRequestBody(buildRequestPayload());
 
     expect(result).toEqual({
+      stage: 'classify',
       question: 'how many calories have I eaten today?',
       conversationContext: [],
       nowIso: '2026-07-12T08:00:00.000Z',
@@ -83,5 +84,31 @@ describe('supabase/functions/user-ai-ask/normalize', () => {
     expect(() =>
       normalizeAskRequestBody(buildRequestPayload({ conversationContext: tooManyTurns })),
     ).toThrow(/at most 20 turns/);
+  });
+
+  it('normalizes a phrase-stage request without the anchor fields', () => {
+    const result = normalizeAskRequestBody({
+      stage: 'phrase',
+      question: 'how many calories have I eaten today?',
+      retrievedFacts: { totalCalories: 1800, entryCount: 3 },
+    });
+
+    expect(result).toEqual({
+      stage: 'phrase',
+      question: 'how many calories have I eaten today?',
+      retrievedFacts: { totalCalories: 1800, entryCount: 3 },
+    });
+  });
+
+  it('throws when a phrase-stage request omits retrievedFacts', () => {
+    expect(() =>
+      normalizeAskRequestBody({ stage: 'phrase', question: 'how many calories today?' }),
+    ).toThrow(/retrievedFacts/);
+  });
+
+  it('throws when stage is not classify or phrase', () => {
+    expect(() => normalizeAskRequestBody({ ...buildRequestPayload(), stage: 'summarize' })).toThrow(
+      /stage must be "classify" or "phrase"/,
+    );
   });
 });

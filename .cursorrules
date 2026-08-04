@@ -26,7 +26,7 @@ For every new feature module, use:
 - `{feature}.domain.ts` — domain layer (add Vitest tests in `tests/`)
 - `{Feature}Screen.tsx` — main screen (PascalCase feature prefix)
 
-Thin route: `app/(tabs)/{feature}.tsx` exports only the screen.
+Sections are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`; there are no per-feature route files.
 
 ## Sync and IDs
 

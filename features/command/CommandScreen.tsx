@@ -523,22 +523,35 @@ function AskConversationView({ placeholder }: { placeholder: string }) {
     const now = new Date();
     const parserContext = getParserContext();
 
-    const result = await askParser.ask({
-      question,
-      conversationContext: turns,
-      now,
-      locale: parserContext.locale,
-      timeZone: parserContext.timeZone,
-      todayDateKey: toDateKey(now),
-      tomorrowDateKey: getTomorrowDateKey(now),
-    });
+    try {
+      const result = await askParser.ask({
+        question,
+        conversationContext: turns,
+        now,
+        locale: parserContext.locale,
+        timeZone: parserContext.timeZone,
+        todayDateKey: toDateKey(now),
+        tomorrowDateKey: getTomorrowDateKey(now),
+      });
 
-    setLastResult(result);
-    if (result.outcome === 'answer') {
-      addTurn({ question: result.question, answer: result.answer });
-      setQuestion('');
+      setLastResult(result);
+      if (result.outcome === 'answer') {
+        addTurn({ question: result.question, answer: result.answer });
+        setQuestion('');
+      }
+    } catch (error) {
+      // Retrieval-layer failures (e.g. a SQLite error) are rethrown by
+      // askParser.ask; surface them as a retryable unavailable result rather
+      // than leaving the button stuck on "Asking…".
+      setLastResult({
+        outcome: 'unavailable',
+        question,
+        message: error instanceof Error ? error.message : 'Ask failed unexpectedly.',
+        reasonCode: 'request_failed',
+      });
+    } finally {
+      setIsAsking(false);
     }
-    setIsAsking(false);
   };
 
   return (
@@ -687,7 +700,10 @@ export function CommandScreen({
 
   const handleModeChange = (nextMode: CommandMode) => {
     setMode(nextMode);
-    void setLastUsedCommandMode(nextMode);
+    void setLastUsedCommandMode(nextMode).catch(() => {
+      // The runtime cache is already updated before the await; a persistence
+      // failure should not surface as an unhandled rejection.
+    });
   };
 
   useEffect(() => {

@@ -1,4 +1,7 @@
-import { getCalorieSummaryByRange } from '@/features/calories/calories.data';
+import {
+  countCalorieEntriesByRange,
+  getCalorieSummaryByRange,
+} from '@/features/calories/calories.data';
 import { caloriesTotal } from '@/features/calories/calories.domain';
 import { getCompletionHistory, listHabits } from '@/features/habits/habits.data';
 import {
@@ -14,7 +17,7 @@ import type {
   PendingTodosFacts,
 } from './ask.types';
 
-const HABIT_STREAK_HISTORY_DAYS = 30;
+const HABIT_STREAK_HISTORY_DAYS = 365;
 
 export class AskRetrievalError extends Error {
   reasonCode: AskUnsupportedReasonCode;
@@ -37,13 +40,16 @@ export async function retrieveCalorieSummary(
   startDateKey: string,
   endDateKey: string,
 ): Promise<CalorieSummaryFacts> {
-  const summaries = await getCalorieSummaryByRange(startDateKey, endDateKey);
+  const [summaries, entryCount] = await Promise.all([
+    getCalorieSummaryByRange(startDateKey, endDateKey),
+    countCalorieEntriesByRange(startDateKey, endDateKey),
+  ]);
   const totalCalories = caloriesTotal(
     summaries.map((summary) => ({ calories: summary.totalCalories })),
   );
   return {
     totalCalories,
-    entryCount: summaries.length,
+    entryCount,
     startDateKey,
     endDateKey,
   };

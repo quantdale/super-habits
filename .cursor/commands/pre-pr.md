@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-Expected: **340** tests passing, 0 failing
+Expected: **427** tests passing, 0 failing
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -94,18 +94,18 @@ still present — user should clear site data and reload.
 If `superhabits-shell-v3` missing: SW may not have activated yet —
 reload once and re-check.
 
-### 2c — All 6 tab surfaces
+### 2c — All 6 sections
 
-Navigate to each URL. Take a screenshot → save as the path in the table. Check for blank/error state.
+The app is a single page: `app/index.tsx` renders all six sections behind the top tab rail. Navigate to BASE_URL, then click each tab-rail item to activate its section (`NavigationContext.activeSection`). Take a screenshot → save as the path in the table. Check for blank/error state.
 
-| URL | Expected | Screenshot | Status |
+| Section | Expected | Screenshot | Status |
 |-----|----------|------------|--------|
-| `http://localhost:8081/(tabs)/overview` | Overview screen renders | `.cursor/playwright-output/pre-pr-overview.png` | ? |
-| `http://localhost:8081/(tabs)/todos` | Todos screen renders | `.cursor/playwright-output/pre-pr-todos.png` | ? |
-| `http://localhost:8081/(tabs)/habits` | Habits screen renders | `.cursor/playwright-output/pre-pr-habits.png` | ? |
-| `http://localhost:8081/(tabs)/pomodoro` | Pomodoro screen renders | `.cursor/playwright-output/pre-pr-pomodoro.png` | ? |
-| `http://localhost:8081/(tabs)/workout` | Workout screen renders | `.cursor/playwright-output/pre-pr-workout.png` | ? |
-| `http://localhost:8081/(tabs)/calories` | Calories screen renders | `.cursor/playwright-output/pre-pr-calories.png` | ? |
+| Overview (default) | Overview section renders | `.cursor/playwright-output/pre-pr-overview.png` | ? |
+| Todos (click "Todos" in tab rail) | Todos section renders | `.cursor/playwright-output/pre-pr-todos.png` | ? |
+| Habits (click "Habits") | Habits section renders | `.cursor/playwright-output/pre-pr-habits.png` | ? |
+| Pomodoro (click "Pomodoro") | Pomodoro section renders | `.cursor/playwright-output/pre-pr-pomodoro.png` | ? |
+| Workout (click "Workout") | Workout section renders | `.cursor/playwright-output/pre-pr-workout.png` | ? |
+| Calories (click "Calories") | Calories section renders | `.cursor/playwright-output/pre-pr-calories.png` | ? |
 
 For each screen, also evaluate `document.body.innerText` — confirm
 it contains screen-specific text (not just a blank or error message).
@@ -161,7 +161,7 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 340 passing | ? | PASS/FAIL |
+| Tests | 427 passing | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
@@ -258,7 +258,7 @@ Report final status using one of:
 - `schema.sql` is a stale reference snapshot, not runtime authority
 - Sync flush gated on isRemoteEnabled() — intentional, remote off
 - tests/calories.data.test.ts — mocked data-layer coverage
-- No ESLint config — not yet set up, not in CI
+- Lint runs via `npm run lint` (`eslint . --max-warnings 81`) — warnings tolerated, not in CI
 
 ---
 

@@ -159,8 +159,8 @@ Q2: Does this change modify an ASSERTION VALUE?
 ### Type A — Selector fixes
 
 For each selector mismatch:
-1. Use Playwright MCP to navigate to the failing screen:
-   `browser_navigate` → `http://localhost:8081/(tabs)/{feature}`
+1. Use Playwright MCP to navigate to the failing section:
+   `browser_navigate` → `http://localhost:8081` then click the section in the tab rail (single-page app; no `/(tabs)/*` routes)
 2. `browser_evaluate`:
    ```js
    Array.from(document.querySelectorAll('button, input, [role="button"]'))
@@ -223,7 +223,7 @@ Then run unit tests to confirm no regressions:
 
 **Failures resolved:** N
 **Failures remaining:** N (with explanation if any)
-**Unit tests:** 180 passing (unless a fix added/changed tests)
+**Unit tests:** 427 passing (unless a fix added/changed tests)
 
 If any failures remain that could not be fixed automatically
 (LOW confidence or require human decision), list them clearly

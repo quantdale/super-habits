@@ -15,10 +15,7 @@ Primary product modules:
 - Workout
 - Calories
 
-Additional shipped utility surfaces:
-
-- `/settings`
-- retained `/command` page route for direct/internal command access
+The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items. Settings is a full-screen modal (not a route); the Command Center is a global overlay only (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`). There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
 ## What this app is
 
@@ -28,8 +25,8 @@ The app is beyond prototype stage: it has working features, a structured archite
 
 Current shell reality to preserve:
 
-- `/` redirects to `/(tabs)/overview`
-- the command center is overlay-first on the six tab surfaces; `/command` remains a retained direct/internal page route
+- all six sections render in `app/index.tsx` behind `NavigationContext.activeSection`, with a plain `Pressable` top tab rail
+- the command center is a global overlay with no `/command` page route; settings is a full-screen modal with no `/settings` route
 - calories supports `Form` and `Diary` modes and remembers the last selected view
 - settings is organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal
 
@@ -43,7 +40,7 @@ Current shell reality to preserve:
 - NativeWind `^4.2.3` + Tailwind
 - expo-sqlite
 - Supabase JS client
-- Vitest `^4.1.1`
+- Vitest `^3.2.7`
 - Playwright `^1.58.2`
 - Vercel static deployment for web
 
@@ -70,8 +67,6 @@ Some repo docs mention newer React Native / TypeScript versions than what packag
   - in-memory sync queue + Supabase push adapter
 - `core/providers/`
   - app bootstrap
-- `core/auth/`
-  - guest profile bootstrap
 - `core/pwa/`
   - service worker registration
 - `core/ui/`
@@ -100,13 +95,13 @@ Some repo docs mention newer React Native / TypeScript versions than what packag
 - `features/{feature}/{feature}.domain.ts`
 - `features/{feature}/{Feature}Screen.tsx`
 - optional `types.ts`
-- route wrapper in `app/(tabs)/{feature}.tsx`
+- screens are mounted inside `app/index.tsx`; there are no per-route wrappers
 
 Exceptions:
 
 - `features/overview/` is dashboard-only
-- `features/settings/` is screen-only and rendered by `app/settings.tsx`
-- `features/command/` is an overlay-first command shell with a retained direct page route at `app/command.tsx`
+- `features/settings/` is screen-only and rendered inside `app/index.tsx` (full-screen modal)
+- `features/command/` is a global overlay shell only (no page route)
 - `features/shared/` is for shared cross-feature UI
 - some features have nested screens, especially workout flows
 
@@ -239,20 +234,19 @@ If remote mode is disabled, listeners are skipped and the in-memory queue can gr
 
 ## Auth model
 
-- local guest profile is created and stored in `app_meta`
+- `app_meta` defines a `guest_profile` key, but bootstrap no longer calls `ensureGuestProfile()`; there is no `core/auth/` module
 - if Supabase is configured, anonymous sign-in is attempted
 - if Supabase env vars are missing, app stays local-only and remote work safely no-ops
 
 ## Navigation
 
-- root route redirects to `/(tabs)/overview`
-- `app/_layout.tsx` wraps the shell, mounts `CommandCenterProvider`, and renders the global command-center host
-- `app/(tabs)/_layout.tsx` defines the custom top tab bar
-- route files are thin wrappers that render screen components
-- the command launcher appears on the six tab surfaces, opens a drawer on wide web and a bottom sheet elsewhere, and is hidden on `/settings`
-- `/command` still renders `CommandScreen` directly for Settings access, direct navigation, and internal testing
+- `app/index.tsx` renders all six sections behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items
+- `app/_layout.tsx` wraps the shell in `AppProviders`, mounts `GlobalCommandCenterHost`, and renders the global command-center overlay
+- `NavigationContext` (`core/providers/NavigationProvider.tsx`) exposes `activeSection`, `setActiveSection`, `openSettings`, `closeSettings`, `openCommand`, `closeCommand`
+- settings is a full-screen modal opened via `openSettings`; the command center is a global overlay opened via `openCommand`
+- the command launcher appears on the six sections, opens a drawer on wide web and a bottom sheet elsewhere, and is suppressed during active pomodoro/workout sessions
 
-Current tabs:
+Current sections:
 
 - Overview
 - Todos
@@ -280,9 +274,8 @@ Section color identity:
 ## State management
 
 - local `useState` is the dominant pattern
-- explicit refresh/reload after mutations
-- React Query provider exists but feature query hooks are not actively used
-- Zustand is not actively used in app code
+- explicit refresh/reload after mutations using `useActiveForegroundRefresh(isActive, ...)` (keyed on the section's `isActive`) plus `useForegroundRefresh` for app-state/visibility refresh
+- neither `@tanstack/react-query` nor `zustand` is installed
 
 ## Critical invariants
 
@@ -333,9 +326,9 @@ Web/PWA constraints:
 Current verified quality baseline:
 
 - `npm run typecheck` passes
-- `npm test` passes with 340 tests in 32 files
+- `npm test` passes with 427 tests in 41 files
 - `npm run build:web` passes
-- `npx playwright test --list` reports 87 tests in 13 spec files
+- `npx playwright test --list` reports 90 tests in 14 spec files
 
 ## Known drift / caution areas
 

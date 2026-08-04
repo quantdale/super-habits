@@ -45,7 +45,6 @@ Usually limited to:
 
 - `core/db/*`
 - `core/sync/*`
-- `core/auth/*`
 - `features/*/*.data.ts`
 - `lib/id.ts`
 - `lib/time.ts`
@@ -65,7 +64,7 @@ Do not do these:
 - do not edit older migration blocks
 - do not treat `schema.sql` as the source of runtime truth
 - do not casually add new global state libraries or patterns
-- do not wire React Query feature hooks unless explicitly asked
+- do not add `@tanstack/react-query` or `zustand` — neither is a dependency
 
 ## Data-layer rules
 
@@ -102,7 +101,7 @@ Known intentional exceptions exist for some non-synced or special tables such as
 
 Current shell facts that should not be regressed accidentally:
 
-- the command center is overlay-first on Overview, Todos, Habits, Pomodoro, Workout, and Calories; `/command` remains the retained page route
+- the command center is a global overlay on Overview, Todos, Habits, Pomodoro, Workout, and Calories; there is no `/command` page route
 - the command flow is still command-first and limited to `create_todo` / `create_habit`, not general assistant chat
 - calories supports `Form` and `Diary` modes and remembers the last selected view
 - settings keeps six buckets in order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal
@@ -134,14 +133,14 @@ After meaningful changes:
 
 - run `npm run typecheck`
 - run `npm test`
-- keep the current Vitest baseline honest: 340 tests passing unless the suite changes
+- keep the current Vitest baseline honest: 427 tests passing unless the suite changes
 
 If web UI or behavior changed:
 
 - rebuild static web when needed
 - run E2E path as appropriate
 
-Current Playwright inventory baseline is 87 tests across 13 spec files.
+Current Playwright inventory baseline is 90 tests across 14 spec files.
 
 When business logic changes:
 

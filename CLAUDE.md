@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-SuperHabits is an offline-first productivity app (Overview + six tabs: Todos, Habits, Pomodoro, Workout, Calories; plus non-tab `/settings` and experimental `/command`). One Expo + React Native codebase ships to web (PWA), iOS, and Android. Local **SQLite is the source of truth**; writes are optionally pushed to Supabase as backup (push-only, plus restore v1 onto empty devices — **not** two-way sync).
+SuperHabits is an offline-first productivity app built as a single-page experience: six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) rendered in `app/index.tsx` behind a `NavigationContext.activeSection` state, with Settings as a full-screen modal and the Command Center as a global overlay. One Expo + React Native codebase ships to web (PWA), iOS, and Android. Local **SQLite is the source of truth**; writes are optionally pushed to Supabase as backup (push-only, plus restore v1 onto empty devices — **not** two-way sync).
 
 Stack: Expo SDK 55, React Native 0.83.4, React 19, TypeScript 5.9 (strict), Expo Router (file-based), NativeWind 4 + Tailwind 3, `expo-sqlite` (WAL native / SQLite WASM + OPFS on web), Supabase (anonymous auth), Vitest (unit), Playwright (E2E).
 
@@ -51,12 +51,12 @@ features/{name}/
   {name}.data.ts    ← ALL SQLite CRUD; soft delete; syncEngine.enqueue; createId/toDateKey. No React, no UI imports.
   {name}.domain.ts  ← pure logic only. No DB, no React, no side effects. Unit-tested in tests/.
   {Name}Screen.tsx  ← UI/orchestration. Imports .data + .domain. NEVER imports getDatabase/expo-sqlite.
-app/(tabs)/{name}.tsx  ← thin route wrapper, renders one <{Name}Screen/>. No business logic.
+app/index.tsx  ← section rendered behind NavigationContext.activeSection (no per-feature route file)
 ```
 
 `app/` = Expo Router only. `core/` = cross-cutting infra (DB client+migrations in `core/db/client.ts`, entity types in `core/db/types.ts`, sync in `core/sync/`, linked actions, `AppProviders`, shared `core/ui/` primitives). `lib/` = pure helpers (`id`, `time`, `validation`, `supabase`) — no DB, no feature imports. Path alias `@/` → project root.
 
-Any component calling a `*.data.ts` function must be a descendant of `AppProviders`, which bootstraps in order: GestureHandler → QueryClient (dormant) → `initializeDatabase()` → service worker (web) → `ensureGuestProfile()` → `ensureAnonymousSession()` (when Supabase env set) → restore prompt check.
+Any component calling a `*.data.ts` function must be a descendant of `AppProviders`, which bootstraps in order: GestureHandler → `initializeDatabase()` → service worker (web) → `ensureAnonymousSession()` (when Supabase env set) → sync engine hydrate → restore prompt check.
 
 ## Non-negotiable invariants (violating these silently corrupts data)
 
@@ -72,13 +72,13 @@ Any component calling a `*.data.ts` function must be a descendant of `AppProvide
 
 - Styling: NativeWind `className` with Tailwind utilities. Do **not** use `StyleSheet.create()` for new code (inline `StyleSheet` only for JS-dynamic values). Section colors from `constants/sectionColors.ts`.
 - Lists: `@shopify/flash-list` (`FlashList`), not `FlatList`. Safe area: `<Screen>` from `core/ui/Screen.tsx`. Animations: `react-native-reanimated`. SVG: `react-native-svg`.
-- Refresh pattern: re-call the list function after every mutation; `useFocusEffect` to reload on tab focus.
+- Refresh pattern: re-call the list function after every mutation; `useActiveForegroundRefresh(isActive, ...)` from `lib/useForegroundRefresh.ts` keyed on `isActive`, plus `useForegroundRefresh` for app-state/visibility.
 - Every new `*.domain.ts` function needs a Vitest test in `tests/`. Component rendering tests are intentionally limited.
 - Do **not** add `data-testid` to app components to satisfy E2E; fix broken selectors in the spec instead. If an E2E test reveals a real bug, fix the app, not the test.
 
 ## Installed-but-unused (do not wire up without an explicit decision)
 
-`zustand`, `@tanstack/react-query` (QueryClient mounted but dormant), `date-fns`, `expo-background-fetch`, `expo-task-manager`. State today is local `useState` + `useFocusEffect` only.
+`date-fns`, `expo-background-fetch`, `expo-task-manager`. State today is local `useState` only.
 
 ## Environment variables (all optional; app runs local-only if unset)
 

@@ -18,7 +18,6 @@ Before reading any files, classify which layer is affected:
   - features/*/*.data.ts
   - core/db/ (client, types, schema, migrations)
   - core/sync/sync.engine.ts
-  - core/auth/guestProfile.ts
   - lib/id.ts or lib/time.ts
   - SQLite queries, IDs, timestamps, migrations, sync enqueue
 
@@ -79,10 +78,10 @@ State your classification and routing decision before proceeding.
 - Use FlashList (not FlatList) for list rendering
 - Use NativeWind className (not StyleSheet.create) for styling
 - Use <Screen> from core/ui for screen wrappers
-- Do not wire zustand or React Query without explicit instruction
+- Neither zustand nor React Query is installed — do not wire either in without explicit instruction
 - Do not fix toDateKey() UTC bug silently — flag it
 - Do not revert mealType to hard-coded "snack"
-- Do not overstate the experimental command route: current scope is single create-todo or create-habit parse -> review -> confirm, not a general AI assistant
+- Do not overstate the experimental command center: current scope is single create-todo or create-habit parse -> review -> confirm, not a general AI assistant
 
 ---
 

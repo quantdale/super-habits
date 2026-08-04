@@ -157,6 +157,9 @@ async function invokeOpenAiParse(input) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    // Deno fetch has no default timeout; a hung upstream would otherwise hold
+    // the invocation open indefinitely and burn model quota.
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       model,
       store: false,
@@ -181,7 +184,16 @@ async function invokeOpenAiParse(input) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI request failed with status ${response.status}: ${errorText}`);
+    // Log the provider detail server-side but do not echo it to the caller —
+    // upstream request/schema details can contain sensitive data.
+    console.log(
+      JSON.stringify({
+        event: "parse_ai_command_upstream_error",
+        status: response.status,
+        errorBody: String(errorText).slice(0, 500),
+      }),
+    );
+    throw new Error(`OpenAI request failed with status ${response.status}.`);
   }
 
   const payload = await response.json();

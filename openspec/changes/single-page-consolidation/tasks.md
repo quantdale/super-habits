@@ -37,4 +37,4 @@
 - [x] **3.4** Rewrite E2E navigation helpers in `e2e/helpers/` to use in-page interactions instead of `page.goto('/(tabs)/...')` or `page.goto('/settings')`.
 - [x] **3.5** Run Playwright E2E specs and update selectors/route navigation to match the single-page model.
 - [x] **3.6** Smoke test on web: tab switching, swipe gestures, Pomodoro timer state across switches, settings modal, and command overlay.
-- [ ] **3.7** Smoke test on at least one native target to confirm gesture dead zones and modal behavior.
+- [ ] **3.7** Smoke test on at least one native target to confirm gesture dead zones and modal behavior. **BLOCKED — external**: no native device or emulator is available in the development environment. All other verification (3.1–3.6, including the Playwright web E2E suite that exercises tab switching, swipe gestures, Pomodoro timer state across switches, the settings modal, and the command overlay) passes. The RNGH gesture tie-break between the section-switch pan and child swipables (e.g. swipeable cards) is exercised by web E2E but should be confirmed on a native target before release.

@@ -1,6 +1,6 @@
 # new-feature
 
-Scaffold a new SuperHabits feature module end-to-end: DB table, migration, data layer, domain logic, screen, and route.
+Scaffold a new SuperHabits feature module end-to-end: DB table, migration, data layer, domain logic, and screen.
 
 ---
 
@@ -23,8 +23,8 @@ Phase 2 — Plan (list every file to create or modify):
 - New data file: features/{name}/{name}.data.ts
 - New domain file: features/{name}/{name}.domain.ts
 - New screen: features/{name}/{name}Screen.tsx
-- New route: app/(tabs)/{name}.tsx
-- Tab entry: app/(tabs)/_layout.tsx
+- Section render: add the section to app/index.tsx behind NavigationContext.activeSection
+- Tab entry: add a Pressable to the top tab rail in app/index.tsx
 - New tests: tests/{name}.domain.test.ts
 
 Phase 3 — Wait for plan approval.

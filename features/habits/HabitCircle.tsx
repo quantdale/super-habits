@@ -49,6 +49,8 @@ export function HabitCircle({
         delayLongPress={400}
         style={{ width: ringSize, height: ringSize }}
         className="items-center justify-center"
+        accessibilityRole="button"
+        accessibilityLabel={`${habit.name}: ${todayCount} of ${habit.target_per_day} today. Tap to add one. Long press to remove one.`}
       >
         <View
           style={{

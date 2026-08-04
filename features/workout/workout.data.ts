@@ -222,7 +222,8 @@ export async function updateExerciseOrder(orderedIds: string[]): Promise<void> {
   for (let i = 0; i < orderedIds.length; i++) {
     await db.runAsync(
       `UPDATE routine_exercises
-       SET sort_order = ?, updated_at = ? WHERE id = ?`,
+       SET sort_order = ?, updated_at = ? WHERE id = ?
+         AND deleted_at IS NULL`,
       [i + 1, now, orderedIds[i]],
     );
   }
@@ -287,14 +288,16 @@ export async function updateSet(
   if (updates.activeSeconds !== undefined) {
     await db.runAsync(
       `UPDATE routine_exercise_sets
-       SET active_seconds = ?, updated_at = ? WHERE id = ?`,
+       SET active_seconds = ?, updated_at = ? WHERE id = ?
+         AND deleted_at IS NULL`,
       [updates.activeSeconds, now, id],
     );
   }
   if (updates.restSeconds !== undefined) {
     await db.runAsync(
       `UPDATE routine_exercise_sets
-       SET rest_seconds = ?, updated_at = ? WHERE id = ?`,
+       SET rest_seconds = ?, updated_at = ? WHERE id = ?
+         AND deleted_at IS NULL`,
       [updates.restSeconds, now, id],
     );
   }

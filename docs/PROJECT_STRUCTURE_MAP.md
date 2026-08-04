@@ -10,9 +10,9 @@ Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABI
 
 Current shell truth:
 
-- `/` redirects to `/(tabs)/overview`; top-level tabs are `overview`, `todos`, `habits`, `pomodoro`, `workout`, and `calories`.
-- `app/_layout.tsx` mounts the global command-center host; eligible tabs get a floating launcher, while `/command` remains a retained internal/direct-link page route.
-- The command launcher is hidden on `/settings` and suppressed during active pomodoro/workout sessions.
+- The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — `overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories` — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection` (from `core/providers/NavigationProvider.tsx`), with a top tab rail of plain `Pressable` items.
+- `app/_layout.tsx` mounts the global command-center host (`GlobalCommandCenterHost`); the Command Center is a global overlay only — there is no `/command` route.
+- Settings is a full-screen modal (not a route); the command launcher is hidden while it is open and suppressed during active pomodoro/workout sessions.
 - Calories supports `form` and `diary` modes and remembers the last selected mode in AsyncStorage (`superhabits.calories.viewMode`).
 - Settings is now a six-bucket IA: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
 
@@ -22,14 +22,14 @@ Current shell truth:
 
 | Path             | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`app/`**       | Expo Router only: root stack, index redirect, retained `command.tsx` / `settings.tsx`, command-center host wiring in `app/_layout.tsx`, `(tabs)/_layout` + **thin** `*.tsx` per tab (each renders one `*Screen`). No business logic.                                                                                                                                                                                                                                                                                        |
-| **`core/`**      | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **restore v1 coordinator + types** (`core/sync/restore.*`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), theme state (`core/providers/ThemeProvider.tsx`), guest profile (`core/auth/guestProfile.ts`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
+| **`app/`**       | Expo Router only: root stack + single-page shell — `app/_layout.tsx` (root layout + global command-center host wiring) and `app/index.tsx` (renders the six sections behind `NavigationContext.activeSection`). No business logic.                                                                                                                                                                                                                                                                                        |
+| **`core/`**      | Cross-cutting infra: **DB singleton + migrations** (`core/db/client.ts`), **entity types** (`core/db/types.ts`), **sync queue** (`core/sync/sync.engine.ts`), **restore v1 coordinator + types** (`core/sync/restore.*`), **Linked Actions** (`core/linked-actions/*`), provider bootstrap (`core/providers/AppProviders.tsx`), theme state (`core/providers/ThemeProvider.tsx`), section-switch state (`core/providers/NavigationProvider.tsx`), PWA SW registration (`core/pwa/registerServiceWorker.ts`), shared **`core/ui/`** primitives. |
 | **`features/`**  | Product modules: `{feature}.data.ts` (SQLite + enqueue), optional `{feature}.domain.ts` (pure), `*Screen.tsx` + subcomponents, `types.ts` barrel, `features/shared/` for cross-feature UI. Current screen-only exceptions are `features/overview/` and `features/settings/`; `features/command/` is an experimental overlay-first shell with `CommandCenterProvider.tsx`, `CommandScreen.tsx`, parser/config helpers, and an executor instead of a normal feature data file.                                                |
 | **`lib/`**       | Pure / platform helpers: `id`, `time`, `validation`, **`supabase`** (client + anonymous session + `remoteMode`), `useForegroundRefresh`, notifications, horizontal scroll style. **No** `features/`, **no** DB.                                                                                                                                                                                                                                                                                                             |
 | **`constants/`** | Design tokens (e.g. `sectionColors.ts` — per-tab section palette).                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **`tests/`**     | Vitest: `lib/`, `*.domain.ts`, command parser/config/executor, linked actions, restore/settings preview flows, sync engine tests, and selected data/DB tests (`todos.data`, `habits.data`, `calories.data`, `pomodoro.data`, `workout.data`, `db.client`).                                                                                                                                                                                                                                                                  |
 
-**Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`, `13` spec files + helpers); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
+**Also:** `e2e/` Playwright (+ `playwright.config.ts`, `scripts/serve-e2e.js`, `14` spec files + helpers); `public/` static (`sw.js`, `manifest.json`); `assets/` images; `patches/` patch-package; deployment config `vercel.json` (web PWA) and `eas.json` (native builds); Expo app config in `app.json`.
 
 ---
 
@@ -41,10 +41,9 @@ features/{name}/
   {name}.domain.ts  ← pure logic, no DB/React (optional but preferred for rules/math)
   {Name}Screen.tsx  ← UI: calls .data + .domain, core/ui, constants, lib/validation
   types.ts          ← re-exports / narrow types
-app/(tabs)/{name}.tsx → default export <{Name}Screen /> only
 ```
 
-Screen-only utility routes such as `app/settings.tsx` and `app/command.tsx` follow the same thin-wrapper rule and render a single screen component.
+Screens are mounted in the single-page shell `app/index.tsx` behind `NavigationContext.activeSection`; there are no per-feature route wrappers.
 
 - **Screen** orchestrates; **never** `getDatabase()` in screen.
 - **Data** owns writes, soft delete, `syncEngine.enqueue` where applicable.
@@ -87,7 +86,7 @@ Remote flush (30s interval / visibility hidden / NetInfo reconnect) when `isRemo
 
 ## 5. Entity prefix registry (`createId` in `lib/id.ts`)
 
-Format: `{prefix}_{ms}_{rand8}` — not crypto-strong; local IDs only.
+Format: `{prefix}_{ms}_{rand8}` — rand8 from a CSPRNG (`expo-crypto` / `crypto.getRandomValues`); local IDs only.
 
 | Prefix  | Entity / use                                        |
 | ------- | --------------------------------------------------- |
@@ -120,7 +119,7 @@ Format: `{prefix}_{ms}_{rand8}` — not crypto-strong; local IDs only.
 | Feature CRUD + enqueue          | `features/*/*.data.ts`                                                                   |
 | Pure rules, streaks, formatting | `features/*/*.domain.ts`                                                                 |
 | Screens & wiring                | `features/*/*Screen.tsx`                                                                 |
-| Global command-center shell     | `features/command/*`, `app/_layout.tsx`, retained route `app/command.tsx`                |
+| Global command-center shell     | `features/command/*`, `app/_layout.tsx`                |
 | Calories view-mode preference   | `features/calories/CaloriesScreen.tsx`, AsyncStorage key `superhabits.calories.viewMode` |
 | Settings IA buckets             | `features/settings/SettingsScreen.tsx`                                                   |
 | IDs / date keys                 | `lib/id.ts`, `lib/time.ts` (`toDateKey` for YYYY-MM-DD)                                  |

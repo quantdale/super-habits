@@ -10,7 +10,7 @@
 
 ## 1. Executive summary
 
-SuperHabits is in better shape than most solo-built products of this size: strict TypeScript passes clean, 340 unit tests pass, e2e runs on every PR, SQL is consistently parameterized, and the feature-module layering (data/domain/UI) is real and mostly respected. The domain logic core (sync engine, restore coordinator, linked-actions engine, command parsing) is genuinely well tested.
+SuperHabits is in better shape than most solo-built products of this size: strict TypeScript passes clean, 427 unit tests pass, e2e runs on every PR, SQL is consistently parameterized, and the feature-module layering (data/domain/UI) is real and mostly respected. The domain logic core (sync engine, restore coordinator, linked-actions engine, command parsing) is genuinely well tested.
 
 The biggest risks cluster in four places:
 
@@ -19,7 +19,7 @@ The biggest risks cluster in four places:
 3. **Web deploys don't reach users.** The hand-rolled service worker (`public/sw.js`) is cache-first for everything with a manually-bumped `CACHE_VERSION`; forget the bump and existing users stay pinned to the old bundle indefinitely, while the runtime cache grows without eviction.
 4. **Dark mode is systemically broken and accessibility is the weakest quality dimension.** A complete dark token system ships (`core/providers/ThemeProvider.tsx`), but `app.json` pins native to light, zero `dark:` Tailwind variants exist repo-wide, and dozens of components hardcode slate-on-white classes — dark mode renders dark-on-dark text. Interactive primitives (Button, PillChip, habit circle, todo checkbox) lack accessibility roles/labels/state.
 
-Highest-leverage moves, in order: fix the edge-function bug (one line), remove the unused-but-vulnerable dependencies (six packages incl. `uuid@13.0.0` with a CVE), make sync failures visible + isolated, commit the remote schema/RLS to the repo, replace the SW versioning with build-derived versioning, add ESLint (there is currently **no linter at all**), and then execute the already-written multi-theme design doc to fix dark mode.
+Highest-leverage moves, in order: fix the edge-function bug (one line), remove the unused-but-vulnerable dependencies (six packages incl. `uuid@13.0.0` with a CVE), make sync failures visible + isolated, commit the remote schema/RLS to the repo, replace the SW versioning with build-derived versioning, ratchet the ESLint warnings (`npm run lint` exists, `eslint . --max-warnings 81`), and then execute the already-written multi-theme design doc to fix dark mode.
 
 Counts: **7 High**, **18 Medium**, **14 Low** findings. No Critical: nothing observed loses local data or crashes a common path today — the High findings are "silently broken/abusable subsystems," not burning buildings.
 
@@ -29,15 +29,15 @@ Counts: **7 High**, **18 Medium**, **14 Low** findings. No Critical: nothing obs
 
 **Product:** offline-first productivity PWA + native app (todos, habits, pomodoro, workout, calories, experimental AI quick-command shell).
 
-**Stack:** Expo SDK 55 / React Native 0.83.4 / React 19.2 / expo-router (typed routes) / NativeWind 4 + Tailwind 3 / Zustand-style local state via hooks / expo-sqlite (WAL on native, WASM+OPFS on web) / Supabase (anonymous auth, push backup, restore v1, edge function for AI parse) / Vitest 4 / Playwright 1.58 / Vercel static hosting (COOP/COEP for SharedArrayBuffer) / EAS for Android APK.
+**Stack:** Expo SDK 55 / React Native 0.83.4 / React 19.2 / expo-router / NativeWind 4 + Tailwind 3 / local state via hooks / expo-sqlite (WAL on native, WASM+OPFS on web) / Supabase (anonymous auth, push backup, restore v1, edge function for AI parse) / Vitest 3 / Playwright 1.58 / Vercel static hosting (COOP/COEP for SharedArrayBuffer) / EAS for Android APK.
 
 **Size:** ~31,300 lines of TS/TSX/JS/SQL; 179 TS/TSX files.
 
 **Layering (consistently applied):**
 
 ```
-app/                      expo-router routes (thin re-exports; 5-line files)
-  (tabs)/_layout.tsx      custom top-tab rail (expo-router/ui) + swipe gesture
+app/                      expo-router single-page: _layout.tsx + index.tsx only
+  index.tsx               all six sections behind NavigationContext.activeSection + top tab rail
 features/<f>/             one module per feature
   <f>.data.ts             SQLite reads/writes + syncEngine.enqueue()
   <f>.domain.ts           pure functions (well unit-tested)
@@ -48,11 +48,11 @@ core/
   sync/sync.engine.ts     in-memory queue → adapter.push(); restore-on-failure
   sync/supabase.adapter.ts groups queue by entity, SELECT * local rows, upsert to Supabase
   sync/restore.coordinator.ts  empty-device-only restore of todos/habits/calorie_entries
-  auth/guestProfile.ts    local guest id (written once, never read — dead)
   linked-actions/         rule engine: events, executions, dedupe/chain guards, effects registry
-  providers/AppProviders  bootstrap: SW → DB → guest → anon auth → restore prompt; flush every 30s + visibility + NetInfo
+  providers/AppProviders  bootstrap: SW → DB init → anon auth → sync hydrate → restore prompt; flush every 30s + visibility + NetInfo
+  providers/NavigationProvider  activeSection / setActiveSection / openSettings / closeSettings / openCommand / closeCommand
   ui/                     themed primitives (tokens via ThemeProvider)
-lib/                      id, time (local date keys), validation, notifications, supabase client
+lib/                      id (CSPRNG via expo-crypto), time (local date keys), validation, notifications, supabase client
 supabase/functions/parse-ai-command/  Deno edge fn → OpenAI chat completions (strict JSON schema)
 public/sw.js              hand-rolled cache-first service worker (CACHE_VERSION = "v3")
 ```
@@ -61,7 +61,7 @@ public/sw.js              hand-rolled cache-first service worker (CACHE_VERSION 
 
 **Synced entities:** `todos`, `habits`, `calorie_entries`, `workout_routines` (parent row only). Local-only: completions, pomodoro sessions, workout logs/exercises/sets, saved meals, linked-action tables, app_meta.
 
-**State:** no server-state library in use (React Query is installed and mounted but has zero `useQuery`/`useMutation` callers); screens hold list state in `useState` and refresh manually on focus/foreground.
+**State:** no state-management library, no server-state library in use (React Query is not installed); screens hold list state in `useState` and refresh via `useActiveForegroundRefresh(isActive, ...)` / `useForegroundRefresh` on section/visibility change.
 
 **Docs vs reality drift is called out in findings DOC-001/DOC-002.**
 
@@ -77,7 +77,7 @@ Commands actually executed this session (full output in Appendix):
 | ------------------ | -------------------------------------------------------------- |
 | `npm ci`           | success (exit 0)                                               |
 | `npx tsc --noEmit` | **exit 0, no errors**                                          |
-| `npx vitest run`   | **32 files, 340 tests, all passed** (2.52s)                    |
+| `npx vitest run`   | **41 files, 427 tests, all passed** (2.52s)                    |
 | `npm audit --json` | **23 vulnerabilities: 1 critical, 6 high, 15 moderate, 1 low** |
 
 Every source file in `core/`, `lib/`, `features/*/(data|domain)`, `app/`, `supabase/functions/`, `public/sw.js`, and all configs/CI were read directly. UI components, the full test suite, and screen files were additionally swept by focused read-only subagent passes whose load-bearing claims (ThemeProvider behavior, `app.json` light lock, absence of `dark:` variants, absence of any lint config, CI job structure) I re-verified directly against the files before including them here.
@@ -145,13 +145,13 @@ Severity model: impact × likelihood, weighted toward reliability/security. Effo
 - **Status:** CONFIRMED (repo-side facts); HYPOTHESIS (actual remote posture)
 - **Lens:** B, K, F
 - **Location:** `core/db/migrations/001_initial_supabase.sql:1-7` (the only remote migration — creates just `profiles`); `core/sync/supabase.adapter.ts:51` (`SELECT * FROM ${entity}` — pushes every local column); `core/sync/restore.coordinator.ts:304-309` (`.select("*")` with no user filter); `lib/id.ts:21-24`
-- **Evidence:** The adapter upserts whatever columns the local row has (`supabase.from(entity).upsert(rows, {onConflict:"id"})`, adapter lines 65-67) with **no `user_id`**; restore reads back with **no user predicate** — row scoping rests 100% on RLS policies that exist only in the Supabase dashboard. Local `todos` has gained `due_date`, `priority`, `sort_order`, `recurrence`, `recurrence_id` via migrations v6/v9 (`core/db/client.ts:126-229`) — nothing in the repo proves the remote table was altered in lockstep; any missing remote column makes every `todos` upsert fail, which (see ERR-001) jams the whole sync queue silently and permanently. Additionally, IDs are `Math.random()`-based (`lib/id.ts:22-24`, ~41 bits of entropy + timestamp), and they are primary keys in **shared multi-tenant tables** upserted with `onConflict:"id"`.
-- **Problem:** (a) A schema-drift class of total-backup-failure that can't be caught in review or CI; (b) if RLS is even slightly wrong, users can read (restore path) or overwrite (upsert path, ID collision or malicious forged ID) each other's rows — the client would never notice; (c) weak ID entropy makes cross-user PK collision unlikely but not negligible at scale, and forged-ID overwrites are only stopped by RLS you can't see.
+- **Evidence:** The adapter upserts whatever columns the local row has (`supabase.from(entity).upsert(rows, {onConflict:"id"})`, adapter lines 65-67) with **no `user_id`**; restore reads back with **no user predicate** — row scoping rests 100% on RLS policies that exist only in the Supabase dashboard. Local `todos` has gained `due_date`, `priority`, `sort_order`, `recurrence`, `recurrence_id` via migrations v6/v9 (`core/db/client.ts:126-229`) — nothing in the repo proves the remote table was altered in lockstep; any missing remote column makes every `todos` upsert fail, which (see ERR-001) jams the whole sync queue silently and permanently. IDs use a CSPRNG (`lib/id.ts:30-31` — `crypto.getRandomValues` on web / `expo-crypto` `getRandomValues` on native), so entropy is not a concern, but they are primary keys in **shared multi-tenant tables** upserted with `onConflict:"id"`.
+- **Problem:** (a) A schema-drift class of total-backup-failure that can't be caught in review or CI; (b) if RLS is even slightly wrong, users can read (restore path) or overwrite (upsert path, ID collision or malicious forged ID) each other's rows — the client would never notice; (c) forged-ID overwrites are only stopped by RLS you can't see.
 - **Severity:** High — this is the data-privacy and backup-integrity backbone resting on invisible configuration.
 - **Impact:** Worst case cross-user data exposure/tampering; likely case silent backup death after a local-only migration.
 - **Likelihood:** Drift: high over time (it may already have happened — unverifiable). RLS misconfig: unknown, unverifiable from repo.
 - **Root cause:** Infrastructure-as-click instead of infrastructure-as-code; adapter design pushes implicit schema (`SELECT *`).
-- **Recommendation:** (1) Export the live schema + policies into `supabase/migrations/` (`supabase db pull`) and make it the reviewed source of truth; (2) add `user_id uuid not null default auth.uid()` scoping columns and canonical RLS (`using (user_id = auth.uid())`, `with check (user_id = auth.uid())`) to every synced table, and change upsert conflict target to `(user_id, id)` or keep `id` PK but verify insert-check policies; (3) replace `SELECT *` with explicit column lists per entity so client/remote contract drift becomes a compile-visible diff; (4) switch `createId` to `crypto.randomUUID()` (available in Hermes/modern web; the `uuid` package is already a dependency — currently unused, see DEP-002).
+- **Recommendation:** (1) Export the live schema + policies into `supabase/migrations/` (`supabase db pull`) and make it the reviewed source of truth; (2) add `user_id uuid not null default auth.uid()` scoping columns and canonical RLS (`using (user_id = auth.uid())`, `with check (user_id = auth.uid())`) to every synced table, and change upsert conflict target to `(user_id, id)` or keep `id` PK but verify insert-check policies; (3) replace `SELECT *` with explicit column lists per entity so client/remote contract drift becomes a compile-visible diff; (4) `createId` already uses a CSPRNG (`expo-crypto`/`crypto.getRandomValues`, see above) — no `uuid` swap needed.
 - **Trade-offs & alternatives:** Explicit column lists add maintenance, but that is exactly the point — schema changes must touch the sync contract consciously.
 - **Complexity & risk:** Medium (repo work) + care applying policies to a live project; test with a second anon user.
 - **Implementation steps:** pull schema → commit → add missing columns/policies as a new migration → adapter column lists → ID generator swap → integration test with two anon sessions asserting isolation.
@@ -409,11 +409,11 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 ---
 
-### [TST-002] No linter or formatter exists in the repository at all; CI gates are typecheck + tests only
+### [TST-002] Lint/format was absent at audit time; CI gates were typecheck + tests only
 
-- **Status:** CONFIRMED
+- **Status:** CONFIRMED (partially resolved)
 - **Lens:** H, J, G
-- **Location:** No `eslint.config.*`/`.eslintrc*`/`biome.json`/`.prettierrc*` anywhere (verified against the full file inventory); `package.json:5-19` has no lint script; `.github/workflows/ci.yml:44-48` runs only typecheck + vitest (+e2e job)
+- **Location:** No `eslint.config.*`/`.eslintrc*`/`biome.json`/`.prettierrc*` anywhere at the pinned commit (verified against the full file inventory); `package.json:5-19` has no lint script; `.github/workflows/ci.yml:44-48` runs only typecheck + vitest (+e2e job). **Current state:** `npm run lint` exists (`eslint . --max-warnings 81`) and CI runs it.
 - **Problem:** Whole bug classes this audit found by hand — unused deps, missing hook deps, floating promises, hardcoded colors — are exactly what `eslint-config-expo` + `@tanstack/eslint-plugin-query` + `eslint-plugin-react-hooks` catch mechanically. tsc alone doesn't flag unused dependencies, `no-floating-promises`, or exhaustive-deps.
 - **Severity:** Medium (multiplier on everything else).
 - **Recommendation:** `npx expo lint` (installs `eslint-config-expo` flat config), enable `@typescript-eslint/no-floating-promises` (type-aware) and `react-hooks/exhaustive-deps` as errors, add `npm run lint` to CI. Add Prettier (or Biome) for format consistency.
@@ -444,25 +444,25 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 ---
 
-### [OPS-002] CI gaps: no lint/audit steps, Playwright browsers re-downloaded every run, full e2e on every branch push, TZ/locale unpinned, retries mask flakes, and the AI-path e2e never runs
+### [OPS-002] CI gaps: no audit step, Playwright browsers re-downloaded every run, full e2e on every branch push, TZ/locale unpinned, retries mask flakes, and the AI-path e2e never runs
 
 - **Status:** CONFIRMED
 - **Lens:** J, H
-- **Location:** `.github/workflows/ci.yml` (whole file): no lint/audit steps; `:74` `npx playwright install --with-deps chromium` uncached; `on.push.branches: ["**"]` (:4-5) runs the ~full pipeline including e2e for every branch push _and_ again for the PR; `playwright.config.ts:16` `retries: process.env.CI ? 2 : 0`; skip guards at `e2e/command.eval.internal.spec.ts:182`, `e2e/command.spec.ts:138` with no env provided in CI
+- **Location:** `.github/workflows/ci.yml` (whole file): no audit step; `:74` `npx playwright install --with-deps chromium` uncached; `on.push.branches: ["**"]` (:4-5) runs the ~full pipeline including e2e for every branch push _and_ again for the PR; `playwright.config.ts:16` `retries: process.env.CI ? 2 : 0`; skip guards at `e2e/command.eval.internal.spec.ts:182`, `e2e/command.spec.ts:138` with no env provided in CI. **Current state:** CI now runs `npm run lint`.
 - **Severity:** Medium (cost + blind spots, not breakage).
-- **Recommendation:** Cache `~/.cache/ms-playwright` keyed on the Playwright version; scope push-trigger e2e to `main` (PRs already cover branches); add lint (TST-002) + `npm audit --omit=dev` steps; pin `TZ` matrix (TST-001); track retry-passed tests (`--reporter` flake surfacing) instead of silently accepting 2 retries; add a nightly job with AI env secrets so the remote-parse path (and SEC-001's fix) gets exercised.
+- **Recommendation:** Cache `~/.cache/ms-playwright` keyed on the Playwright version; scope push-trigger e2e to `main` (PRs already cover branches); add `npm audit --omit=dev` step (lint is already in CI, per TST-002); pin `TZ` matrix (TST-001); track retry-passed tests (`--reporter` flake surfacing) instead of silently accepting 2 retries; add a nightly job with AI env secrets so the remote-parse path (and SEC-001's fix) gets exercised.
 - **Complexity & risk:** Quick wins each.
 
 ---
 
-### [DEP-002] Six runtime dependencies are unused or unused-in-effect: `uuid`, `expo-background-fetch`, `expo-task-manager`, `expo-file-system`, `expo-linear-gradient`, and React Query (mounted, never queried)
+### [DEP-002] Five runtime dependencies unused or unused-in-effect: `uuid`, `expo-background-fetch`, `expo-task-manager`, `expo-file-system`, `expo-linear-gradient` (React Query was assessed at audit time but is no longer installed)
 
 - **Status:** CONFIRMED (import-graph greps; expo packages flagged for verification against transitive/plugin use before removal)
 - **Lens:** I, G, F
-- **Location:** `package.json:31,33,35,41,57`; React Query: provider mounted at `core/providers/AppProviders.tsx:29,174,190` with **zero** `useQuery`/`useMutation`/`queryClient.` usages repo-wide
+- **Location:** `package.json:31,33,35,41,57`; React Query was installed at the pinned commit (provider mounted at `core/providers/AppProviders.tsx:29,174,190` with **zero** `useQuery`/`useMutation`/`queryClient.` usages repo-wide) but is **no longer a dependency**.
 - **Problem:** Bundle weight, audit surface (DEP-001), and — for React Query — a misleading architecture signal: the app hand-rolls the exact problems RQ solves (focus refetch, cache invalidation, loading state) with `useState` + manual `refresh()` in every screen, which is where several Medium bugs above live.
 - **Severity:** Medium.
-- **Recommendation:** Remove `uuid`, `expo-background-fetch`, `expo-task-manager`, `expo-linear-gradient` (verify `expo-file-system` isn't required by `expo-sqlite`'s native config plugin before dropping). For React Query: **decide** — either adopt it for reads (`useQuery(["todos"], listTodos)` + invalidation on writes; a natural follow-on to ERR-001/PERF-001 that deletes a lot of bespoke refresh code) or remove the provider. Adoption is recommended; it directly replaces the fragile manual-refresh pattern.
+- **Recommendation:** Remove `uuid`, `expo-background-fetch`, `expo-task-manager`, `expo-linear-gradient` (verify `expo-file-system` isn't required by `expo-sqlite`'s native config plugin before dropping). React Query: no longer installed, so the adoption-vs-removal decision is resolved — keep it removed unless a deliberate decision re-adds it for reads.
 - **Complexity & risk:** Removal: quick. RQ adoption: medium-large, per-feature increments.
 
 ---
@@ -505,7 +505,7 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 ### [ERR-003] `ensureGuestProfile` failure swallowed with `.catch(() => undefined)`; profile never read anywhere
 
-- CONFIRMED — E/G. `core/providers/AppProviders.tsx:70`; `core/auth/guestProfile.ts:11-22` has no consumers. Dead scaffolding pretending to be a bootstrap step. **Fix:** delete the module + call (or wire it to something real). Quick win.
+- CONFIRMED at pinned commit — E/G. `core/providers/AppProviders.tsx:70`; `core/auth/guestProfile.ts:11-22` has no consumers. Dead scaffolding pretending to be a bootstrap step. **Current state:** resolved — `core/auth/guestProfile.ts` was deleted and the `ensureGuestProfile()` call removed from bootstrap.
 
 ### [QUA-001] Dead/vestigial code inventory
 
@@ -533,7 +533,7 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 ### [MOD-001] Modernization opportunities (deliberate, low-churn)
 
-- CONFIRMED — N. (a) `crypto.randomUUID()` over `Math.random()` ids (pairs with SEC-003); (b) SQLite `ON CONFLICT` upserts over read-modify-write (pairs with COR-001); (c) adopt the installed React Query for reads (pairs with DEP-002); (d) Workbox `injectManifest` over hand-rolled SW (pairs with OPS-001); (e) `expo lint` flat-config ESLint (pairs with TST-002); (f) consider `expo-sqlite`'s built-in `useSQLiteContext`/hooks only if it reduces code — current singleton is fine. No framework migrations recommended: Expo 55/RN 0.83/React 19.2 are current.
+- CONFIRMED — N. (a) IDs already use a CSPRNG (`expo-crypto`/`crypto.getRandomValues`) — the `crypto.randomUUID()` swap is moot (pairs with SEC-003); (b) SQLite `ON CONFLICT` upserts over read-modify-write (pairs with COR-001); (c) React Query adoption is moot — it is no longer installed (pairs with DEP-002); (d) Workbox `injectManifest` over hand-rolled SW (pairs with OPS-001); (e) `expo lint` flat-config ESLint — done, `npm run lint` exists (pairs with TST-002); (f) consider `expo-sqlite`'s built-in `useSQLiteContext`/hooks only if it reduces code — current singleton is fine. No framework migrations recommended: Expo 55/RN 0.83/React 19.2 are current.
 
 ### [DOC-002] README/docs describe behaviors that don't exist
 
@@ -549,7 +549,7 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 | 2   | DEP-001/002 | Remove unused deps (`uuid` +4 expo pkgs), audit-fix dev chain, CI audit gate | High | Quick      | —                     |
 | 3   | SEC-004     | Untrack `supabase/.temp`, debug logs; fix `.gitignore`                       | Med  | Quick      | —                     |
 | 4   | ERR-002     | Error boundary + rewrite destructive bootstrap message                       | Med  | Quick      | —                     |
-| 5   | TST-002     | Add ESLint (+hooks, floating-promises) & CI lint step                        | Med  | Quick      | —                     |
+| 5   | TST-002     | Add ESLint (+hooks, floating-promises) & CI lint step                        | Med  | Quick      | — **done**             |
 | 6   | OPS-002     | CI: cache Playwright, scope e2e triggers, TZ env, audit step                 | Med  | Quick      | 5                     |
 | 7   | DATA-001    | Transactional migrations + narrow duplicate-column catch                     | Med  | Quick-Med  | —                     |
 | 8   | COR-001     | `ON CONFLICT` upserts for habit completions & saved meals; guard-first       | Med  | Quick      | —                     |
@@ -561,7 +561,7 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 | 14  | ERR-001     | Durable outbox, failure isolation, backoff, Settings surface                 | High | Med        | 7, 12                 |
 | 15  | CON-001     | Flush in-flight guard + queue dedupe                                         | Med  | Quick      | 14                    |
 | 16  | ARC-001     | Define delete/`operation` semantics in adapter                               | Med  | Quick      | 14                    |
-| 17  | SEC-003     | Commit remote schema+RLS, explicit column lists, UUID ids, isolation test    | High | Med        | — (before 14 ideally) |
+| 17  | SEC-003     | Commit remote schema+RLS, explicit column lists, isolation test (ID entropy already CSPRNG) | High | Med        | — (before 14 ideally) |
 | 18  | SEC-002     | Edge fn auth hardening, rate limit, max_tokens, CORS, config.toml            | High | Med        | 1                     |
 | 19  | OPS-001     | Build-derived SW versioning, cache headers, eviction                         | High | Med        | —                     |
 | 20  | OPS-003     | vercel.json security/caching headers                                         | Low  | Quick      | with 19               |
@@ -569,7 +569,7 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 | 22  | PERF-001    | Memoize rows/charts, hoist callbacks                                         | Med  | Quick      | 5                     |
 | 23  | UX-002      | A11y roles/labels/targets on shared primitives → rows → charts               | Med  | Med        | —                     |
 | 24  | UX-001      | Execute multi-theme design; remove light lock; migrate hardcoded colors      | High | Large      | 5, 22, 23             |
-| 25  | DEP-002(b)  | Adopt React Query for reads (or remove provider)                             | Med  | Large      | 14                    |
+| 25  | DEP-002(b)  | React Query — resolved: no longer installed; keep it removed                  | Med  | Large      | 14                    |
 | 26  | DOC-001/002 | Docs consolidation; delete/generate schema.sql                               | Med  | Quick      | after 17              |
 | 27  | Low items   | COR-005..008, SEC-005, ERR-003, QUA-001/002, UX-003/004                      | Low  | Quick each | opportunistic         |
 
@@ -577,7 +577,7 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 ## 6. Implementation roadmap
 
-**Stage 0 — Same-day quick wins (items 1-6).** Independent, near-zero risk: the edge-fn one-liner, dependency removals + audit gate, gitignore hygiene, error boundary + message rewrite, ESLint, CI tuning. These de-risk everything after (lint catches regressions in later refactors; CI gets faster and stricter).
+**Stage 0 — Same-day quick wins (items 1-6).** Independent, near-zero risk: the edge-fn one-liner, dependency removals + audit gate, gitignore hygiene, error boundary + message rewrite, CI tuning. ESLint (item 5, TST-002) has since landed — `npm run lint` exists and runs in CI. These de-risk everything after (lint catches regressions in later refactors; CI gets faster and stricter).
 
 **Stage 1 — Data-layer integrity (items 7-13).** Transactional migrations first (7) because stages 2-3 add migrations; then atomic upserts (8), silent-failure removal (9-11), indexes/transactions (12), linked-actions retention (13). Each is locally testable against the existing strong unit suites.
 
@@ -585,9 +585,9 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 **Stage 3 — Web delivery & UX platform (items 19-24).** SW rebuild + headers (19-20) is self-contained and urgent-ish (every deploy compounds it). Then TZ tests (21), memoization (22), a11y primitives (23) — all three are prerequisites-in-practice for the theme migration (24), which touches every file those efforts also touch; batching them avoids double churn.
 
-**Stage 4 — Architecture consolidation (items 25-26).** React Query adoption replaces the manual refresh layer (the source of several Stage 1 bugs) once sync is stable; docs consolidation last, documenting the _new_ reality once.
+**Stage 4 — Architecture consolidation (items 25-26).** React Query adoption is moot — it is no longer installed (DEP-002); docs consolidation last, documenting the _new_ reality once.
 
-**Conflicts/competition:** (a) OPS-001's Workbox rewrite vs minimal version-injection — pick injection now if Stage 3 capacity is tight; Workbox later. (b) DEP-002 React Query removal vs adoption — adoption is recommended, but if declined, remove the provider in Stage 0 instead. (c) SEC-003's `(user_id,id)` conflict-target change must land together with adapter changes in Stage 2 to avoid a window of failing upserts.
+**Conflicts/competition:** (a) OPS-001's Workbox rewrite vs minimal version-injection — pick injection now if Stage 3 capacity is tight; Workbox later. (b) DEP-002 React Query — resolved by removal (no longer installed); do not re-add without a deliberate decision. (c) SEC-003's `(user_id,id)` conflict-target change must land together with adapter changes in Stage 2 to avoid a window of failing upserts.
 
 ---
 
@@ -626,9 +626,9 @@ $ npx tsc --noEmit
 
 ```
 $ npx vitest run
- RUN  v4.1.2 /home/user/super-habits
- Test Files  32 passed (32)
-      Tests  340 passed (340)
+ RUN  v3.2.7 /home/user/super-habits
+ Test Files  41 passed (41)
+      Tests  427 passed (427)
    Duration  2.52s (transform 1.09s, setup 431ms, import 1.40s, tests 641ms)
 (exit code 0)
 ```

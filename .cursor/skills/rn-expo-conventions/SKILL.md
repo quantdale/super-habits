@@ -7,15 +7,14 @@ description: React Native and Expo conventions for SuperHabits. Use when writing
 
 Apply this when writing any UI, navigation, or platform-specific code.
 
-## Routing (expo-router v55)
-- File-based routing: app/ directory mirrors URL structure
-- Tab routes: app/(tabs)/{name}.tsx
-- Root layout: app/_layout.tsx — wraps everything in AppProviders and mounts the global command-center host
-- Tabs layout: app/(tabs)/_layout.tsx — defines 6 tab items including Overview
-- Non-tab utility routes: app/command.tsx and app/settings.tsx
-- Primary command-center entry is the global overlay launcher on the six tab surfaces; `/command` remains the retained direct/internal page route
-- Navigation: use expo-router's <Link> or router.push(), never React Navigation directly
-- Tab names and hrefs defined in (tabs)/_layout.tsx
+## Routing (single-page — expo-router v55)
+- Single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. There are no `app/(tabs)/`, no `app/settings.tsx`, no `app/command.tsx`.
+- Root layout: app/_layout.tsx — wraps everything in AppProviders and mounts the global command-center host (`GlobalCommandCenterHost`)
+- Sections: app/index.tsx renders all six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items
+- Settings is a full-screen **modal** (via `NavigationProvider.openSettings`), not a route
+- Command Center is a **global overlay** only (no `/command` route); `COMMAND_EXPERIMENT_ENABLED` is true
+- Navigation between sections: use `NavigationContext.activeSection` / `setActiveSection`; do not use expo-router's `<Link>` or `router.push()` for section switching
+- Tab rail items defined in app/index.tsx
 
 ## Styling (NativeWind v4 + Tailwind v3)
 - Use className prop with Tailwind utility classes everywhere
@@ -41,9 +40,9 @@ Apply this when writing any UI, navigation, or platform-specific code.
 ## State management
 - Local UI state: useState (only pattern currently in use)
 - Persistent state: SQLite via *.data.ts functions
-- Global state: zustand is installed but UNUSED — do not wire up without discussion
-- Server cache: React Query is installed but UNUSED — do not add hooks without discussion
-- Refresh pattern: after any mutation, re-call the list function and setState
+- Global state: cross-section navigation via `NavigationContext` (`core/providers/NavigationProvider.tsx`); `zustand` is NOT installed — do not add it without discussion
+- Server cache: React Query is NOT installed — do not add hooks without discussion
+- Refresh pattern: after any mutation, re-call the list function and setState; feature screens use `useActiveForegroundRefresh(isActive, ...)` from `lib/useForegroundRefresh.ts` (keyed on section `isActive`) plus `useForegroundRefresh` for app-state/visibility. `useFocusEffect` is not used for section refresh.
 
 ## Notifications (lib/notifications.ts)
 - expo-notifications
@@ -53,23 +52,17 @@ Apply this when writing any UI, navigation, or platform-specific code.
 
 ## AppProviders (core/providers/AppProviders.tsx)
 The following are initialized here in order:
-1. QueryClient (React Query — dormant)
-2. GestureHandlerRootView (required for @shopify/flash-list + gestures)
+1. GestureHandlerRootView (wraps the app tree; required for @shopify/flash-list + gestures)
+2. Service worker registration (web only)
 3. DB init (initializeDatabase / getDatabase on mount)
-4. Service worker registration (web only)
-5. Guest profile creation (core/auth/guestProfile.ts)
-6. **`ensureAnonymousSession()`** (`lib/supabase.ts`) when Supabase env is configured
+4. **`ensureAnonymousSession()`** (`lib/supabase.ts`) when Supabase env is configured
+5. Sync engine hydrate (load queued records)
+6. Restore preview
 
 When **`isRemoteEnabled()`** is true (`lib/supabase.ts` — **`remoteMode` defaults to `"enabled"`**), a separate effect registers **`syncEngine.flush()`** on a **30s** interval, on web visibility (hidden), and on NetInfo reconnect — **not** when `setRemoteMode("disabled")` is used.
 
 Do NOT add DB calls before AppProviders initializes. Any component that
 calls a *.data.ts function must be a descendant of AppProviders.
-
-## Guest profile (core/auth/guestProfile.ts)
-- Creates a guest user row in app_meta table on first launch
-- Returns existing profile on subsequent launches
-- Local **`app_meta`** identity for the app; **remote** backup uses **Supabase anonymous auth** + `SupabaseSyncAdapter` (separate from guest JSON)
-- Do not remove guest profile without considering onboarding / local-only flows
 
 ## TypeScript
 - Strict mode enabled (tsconfig.json)
@@ -77,13 +70,13 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - All DB entity types in core/db/types.ts
 - No any types — use unknown and narrow, or add proper types
 
-## Testing (Vitest v4)
+## Testing (Vitest v3)
 - Config: vitest.config.ts (node environment, @/ alias)
 - Test files: tests/ directory
 - Run: npm test
 - Current suite covers domain logic plus command parser/config, data-layer contracts, restore flows, linked actions, and selected provider/DB behavior
 - Every new domain function needs a test
-- Current count: 340 tests passing — update whenever tests are added or removed
+- Current count: 427 tests passing — update whenever tests are added or removed
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)

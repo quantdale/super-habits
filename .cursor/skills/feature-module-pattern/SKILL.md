@@ -14,14 +14,14 @@ features/{featureName}/
   {featureName}.domain.ts     ← pure business logic (no DB)
   {featureName}Screen.tsx     ← React Native screen component
 
-Route file (thin wrapper):
-  app/(tabs)/{featureName}.tsx
+Section render (single-page, no per-feature route):
+  app/index.tsx — add the section to the top tab rail behind `NavigationContext.activeSection`
 
 ## Exceptions (current repo)
-- **`features/overview/`** — `OverviewScreen.tsx` only (dashboard tab). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
-- **`features/settings/`** — `SettingsScreen.tsx` only. It is a utility route rendered by `app/settings.tsx`, not a tab module.
-- **`features/command/`** — experimental overlay-first shell rendered globally from `app/_layout.tsx`, with retained direct page access at `app/command.tsx`; current files include `CommandCenterProvider.tsx`, `CommandScreen.tsx`, `commandCenterConfig.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `commandParser.ts`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, and `types.ts` rather than the standard `{feature}.data.ts` pattern.
-- **`features/shared/`** — cross-feature UI (`GitHubHeatmap`, `ActivityPreviewStrip`). Not a tab-routed module.
+- **`features/overview/`** — `OverviewScreen.tsx` only (dashboard section). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
+- **`features/settings/`** — `SettingsScreen.tsx` only. It is a full-screen **modal** (opened via `NavigationProvider.openSettings`), not a tab module or a route.
+- **`features/command/`** — experimental overlay-first shell rendered globally from `app/_layout.tsx` (`GlobalCommandCenterHost`); there is **no** `app/command.tsx` route. Current files include `CommandCenterProvider.tsx`, `CommandScreen.tsx`, `commandCenterConfig.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `commandParser.ts`, `command.domain.ts`, `command.executor.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, and `types.ts` rather than the standard `{feature}.data.ts` pattern.
+- **`features/shared/`** — cross-feature UI (`GitHubHeatmap`, `ActivityPreviewStrip`). Not a section-routed module.
 - **Nested screens** — e.g. `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx` alongside `WorkoutScreen.tsx` under `features/workout/` for multi-step flows.
 
 ## types.ts (feature-local barrel)
@@ -57,12 +57,10 @@ Each feature may include `types.ts` that re-exports entity types from `@/core/db
 - Uses NativeWind className for styling (Tailwind utility classes)
 - Wraps content in <Screen> component from core/ui/Screen.tsx
 
-## Route file (app/(tabs)/{name}.tsx) — rules
-- ONLY renders the Screen component
-- No logic, no state, no imports from data/domain
-- Example:
-    import { WorkoutScreen } from "@/features/workout/WorkoutScreen";
-    export default function WorkoutTab() { return <WorkoutScreen />; }
+## Section registration (app/index.tsx) — rules
+- The single-page shell (`app/index.tsx`) renders each feature's Screen behind `NavigationContext.activeSection`
+- No per-feature route files exist; do not recreate `app/(tabs)/{name}.tsx`
+- Register the section in the top tab rail (a plain `Pressable` that calls `setActiveSection`) in `app/index.tsx`
 
 ## Shared UI components (core/ui/)
 - Button: variants = "primary" | "ghost" | "danger"
@@ -107,16 +105,15 @@ calories:
   e2e: `e2e/calories.spec.ts`
 
 overview:
-  screen: OverviewScreen — dashboard tab only
-  route: `app/(tabs)/overview.tsx`
+  screen: OverviewScreen — dashboard section only
+  section: registered in app/index.tsx as the default (`activeSection`)
 
 ## Adding a new feature checklist
 - [ ] Create features/{name}/ directory
 - [ ] Create {name}.data.ts with CRUD functions (getDatabase, soft delete, enqueue)
 - [ ] Create {name}.domain.ts with pure logic functions
 - [ ] Create {name}Screen.tsx using shared UI components
-- [ ] Create app/(tabs)/{name}.tsx as thin route wrapper
-- [ ] Add tab entry in app/(tabs)/_layout.tsx
+- [ ] Register the section in app/index.tsx (add a Pressable to the top tab rail that calls `setActiveSection`)
 - [ ] Add TypeScript types to core/db/types.ts
 - [ ] Add migration to core/db/client.ts (version N+1)
 - [ ] Write Vitest tests for all domain functions in tests/

@@ -34,7 +34,7 @@ npm run build:web        # Expo web export (needed before e2e in CI)
 
 | Path         | Role                                                                                                                                                                                                             |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`       | Expo Router only — root stack, `(tabs)/_layout`, thin `*.tsx` per tab (each renders one `*Screen`). No business logic.                                                                                           |
+| `app/`       | Expo Router only — single-page entry: `_layout.tsx` mounts `GlobalCommandCenterHost` + `NavigationProvider`; `index.tsx` renders all six sections behind `NavigationContext.activeSection`. No business logic.   |
 | `features/`  | Product modules — one subdirectory per feature (see pattern below).                                                                                                                                              |
 | `core/`      | Cross-cutting infra: DB singleton + migrations (`core/db/client.ts`), entity types (`core/db/types.ts`), sync (`core/sync/sync.engine.ts`, `supabase.adapter.ts`), `AppProviders`, shared `core/ui/` primitives. |
 | `lib/`       | Pure/platform helpers: `id`, `time`, `validation`, `supabase` (client + anonymous session + `remoteMode`), notifications. No DB, no feature imports.                                                             |
@@ -52,15 +52,15 @@ features/{name}/
   {name}.domain.ts  ← Pure logic only — no DB, no React (unit-tested in tests/)
   {Name}Screen.tsx  ← UI: calls .data and .domain; no getDatabase() import
   types.ts          ← Narrow/re-exported types
-app/(tabs)/{name}.tsx → default export <{Name}Screen /> only
+app/index.tsx → section mounted behind NavigationContext.activeSection (no per-feature route file)
 ```
 
 ### State management
 
 - **Local UI state:** `useState` per screen (forms, modals, filters).
-- **Tab-focus refresh:** `useFocusEffect` (Expo Router) to reload data when a tab gains focus.
+- **Section refresh:** `useActiveForegroundRefresh(isActive, ...)` (from `lib/useForegroundRefresh.ts`) keyed on `isActive`, plus `useForegroundRefresh` for app-state/visibility.
 - **Sync state:** `SyncEngine` + **`SupabaseSyncAdapter`** — in-memory queue, flush upserts to Supabase when configured; not Redux/Zustand.
-- **`@tanstack/react-query`** and **`zustand`** are installed but not yet actively used in screens.
+- **Navigation:** `NavigationProvider` (`core/providers/NavigationProvider.tsx`) exposes `activeSection`, `setActiveSection`, `openSettings`, `closeSettings`, `openCommand`, `closeCommand`.
 
 ---
 

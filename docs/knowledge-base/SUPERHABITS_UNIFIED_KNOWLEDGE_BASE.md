@@ -56,7 +56,7 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. Top-level navigation includes an **Overview** tab plus five core tabs: **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal). Non-tab routes include **settings** as a six-bucket shell for appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls, plus the retained **`/command`** page route for the experimental quick-command shell.
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **11**. Next migration: `if (version < 12)`.
 
@@ -66,24 +66,24 @@
 
 **Linked Actions:** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, shipped source entrypoints exist for `habit.completed_for_day` and non-recurring `todo.completed`, and the current habit editor flow exposes supported rule paths instead of a placeholder preview.
 
-**Command shell:** the primary command-center entry is a global overlay launcher on Overview, Todos, Habits, Pomodoro, Workout, and Calories; `/command` is the retained direct/internal page route, not the main launcher surface. Current command scope is limited to `create_todo` and `create_habit`, always with parse -> review -> confirm before write. Parser mode defaults to **`mock`**; optional model-backed parsing uses **`remote_with_fallback`**, but remote parsing is now intended for internal rollout only via an internal-capable build flag plus a device-local tester toggle. The local parser remains the fallback guardrail. Todo due dates stay limited to **today**, **tomorrow**, or explicit **`YYYY-MM-DD`**.
+**Command shell:** the Command Center is a global overlay, mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`; there is no `/command` page route. Current command scope is limited to `create_todo` and `create_habit`, always with parse -> review -> confirm before write. Parser mode defaults to **`mock`**; optional model-backed parsing uses **`remote_with_fallback`**, but remote parsing is now intended for internal rollout only via an internal-capable build flag plus a device-local tester toggle. The local parser remains the fallback guardrail. Todo due dates stay limited to **today**, **tomorrow**, or explicit **`YYYY-MM-DD`**.
 
 **Calories shell:** `CaloriesScreen` now supports **`Form`** and **`Diary`** modes and remembers the last selected mode in AsyncStorage (`superhabits.calories.viewMode`).
 
-**UI:** NativeWind + `core/ui` primitives; custom top tab bar in `app/(tabs)/_layout.tsx`.
+**UI:** NativeWind + `core/ui` primitives; top tab rail of plain `Pressable` items inside `app/index.tsx`.
 
-**Quality (May 5, 2026):** `npm run typecheck` passes; `npm test` passes with **340** tests; `npm run build:web` passes; `npx playwright test --list` reports **87** tests in **13** spec files. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (May 5, 2026):** `npm run typecheck` passes; `npm test` passes with **427** tests; `npm run build:web` passes; `npx playwright test --list` reports **90** tests in **14** spec files. CI runs quality (`typecheck` + `test`) then E2E.
 
 ### Cross-cutting concerns
 
 | Concern    | Where                                                       | Behavior                                                                                                                               |
 | ---------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Navigation | `app/_layout.tsx`, `app/(tabs)/_layout.tsx`                 | Stack → `AppProviders`; `Tabs` + `TabTrigger` + `TabSlot`                                                                              |
+| Navigation | `app/_layout.tsx`, `app/index.tsx`                         | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay |
 | Database   | `core/db/client.ts`                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                       |
 | Types      | `core/db/types.ts`                                          | Entity TypeScript shapes                                                                                                               |
 | IDs & time | `lib/id.ts`, `lib/time.ts`                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                     |
 | Sync       | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | In-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                                         |
-| Bootstrap  | `core/providers/AppProviders.tsx`                           | DB init, SW register, guest profile, **`ensureAnonymousSession()`**; second effect registers sync flush when remote on                 |
+| Bootstrap  | `core/providers/AppProviders.tsx`                           | DB init, SW register, **`ensureAnonymousSession()`**, `syncEngine.hydrate()`, restore preview; second effect registers sync flush when remote on |
 | PWA        | `registerServiceWorker.ts`, `public/sw.js`                  | Workbox registration; cache-first GET handler                                                                                          |
 | Web deploy | Root **`vercel.json`**                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html` |
 | Styling    | `tailwind.config.js`, `global.css`                          | Section palette + brand scale; NativeWind                                                                                              |
@@ -97,21 +97,21 @@
 | Attribute               | Value                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Name                    | `superhabits` (npm package, private)                                                                                                        |
-| Purpose                 | Offline-first Expo + React Native client; Overview + five core tabs, plus utility command/settings routes                                   |
+| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay                                           |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                              |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`)                                                                                                       |
 | Next migration          | `12` (new `if (version < 12)` block in `runMigrations`)                                                                                     |
-| Unit tests              | **340** passing (Vitest)                                                                                                                    |
-| E2E tests               | **87** Playwright tests in **13** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Unit tests              | **427** passing (Vitest)                                                                                                                    |
+| E2E tests               | **90** Playwright tests in **14** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
 | Path                   | Role                                                                                                                                                     |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`                 | Expo Router routes: root layout, index redirect, `command.tsx`, `settings.tsx`, `(tabs)` layout + thin tab route files                                   |
+| `app/`                 | Expo Router single-page root: `_layout.tsx` (providers + shell hosts) and `index.tsx` (renders all six sections)                            |
 | `assets/`              | Icons, splash, favicon (referenced from `app.json`)                                                                                                      |
 | `constants/`           | Shared design tokens (section colors)                                                                                                                    |
-| `core/`                | DB singleton, types, sync engine, restore coordinator, guest profile, `AppProviders`, PWA registration, shared `ui/`                                     |
+| `core/`                | DB singleton, types, sync engine, restore coordinator, `AppProviders`, PWA registration, providers, shared `ui/`                                         |
 | `features/`            | Feature modules: `{name}.data.ts`, `{name}Screen.tsx`, optional `{name}.domain.ts`, `types.ts` re-exports                                                |
 | `lib/`                 | Pure utilities: `id`, `time`, `validation`, `notifications`, **`supabase`** (client + anonymous session + `remoteMode`), `horizontalScrollViewportStyle` |
 | `public/`              | Web static assets; `sw.js` service worker                                                                                                                |
@@ -127,21 +127,12 @@
 
 ### Complete file inventory
 
-#### `app/` (11 files)
+#### `app/` (2 files)
 
-| File                  | Role                                                  |
-| --------------------- | ----------------------------------------------------- |
-| `_layout.tsx`         | Root stack; `AppProviders`, `StatusBar`, hides header |
-| `command.tsx`         | Renders `CommandScreen`                               |
-| `index.tsx`           | Redirect to `/(tabs)/overview`                        |
-| `settings.tsx`        | Renders `SettingsScreen`                              |
-| `(tabs)/_layout.tsx`  | Top tab bar, `TabList` / `TabTrigger` / `TabSlot`     |
-| `(tabs)/overview.tsx` | Renders `OverviewScreen`                              |
-| `(tabs)/todos.tsx`    | Renders `TodosScreen`                                 |
-| `(tabs)/habits.tsx`   | Renders `HabitsScreen`                                |
-| `(tabs)/pomodoro.tsx` | Renders `PomodoroScreen`                              |
-| `(tabs)/workout.tsx`  | Renders `WorkoutScreen`                               |
-| `(tabs)/calories.tsx` | Renders `CaloriesScreen`                              |
+| File          | Role                                                          |
+| ------------- | ------------------------------------------------------------- |
+| `_layout.tsx` | Root layout; `AppProviders`, `StatusBar`, hides header; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner` |
+| `index.tsx`   | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items |
 
 #### `features/` (unique source files)
 
@@ -157,13 +148,13 @@
 
 **workout:** `WorkoutScreen.tsx`, `RoutineDetailScreen.tsx`, `WorkoutSessionScreen.tsx`, `workout.data.ts`, `workout.domain.ts`, `types.ts`
 
-**settings:** `SettingsScreen.tsx`, `settingsRestorePreview.ts` (screen-only utility route with six IA buckets; no feature `.data.ts` / `.domain.ts`)
+**settings:** `SettingsScreen.tsx`, `settingsRestorePreview.ts` (screen-only full-screen modal with six IA buckets; no feature `.data.ts` / `.domain.ts`)
 
-**command:** `CommandCenterProvider.tsx`, `commandCenterConfig.ts`, `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `commandParser.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, `types.ts` (experimental overlay-first shell for single create-todo / create-habit flow; default parser mode `mock`, optional `remote_with_fallback`, local parser kept as fallback/guardrail; internal remote rollout uses a device-local tester toggle)
+**command:** `CommandCenterProvider.tsx`, `commandCenterConfig.ts`, `CommandScreen.tsx`, `command.domain.ts`, `command.executor.ts`, `commandConfig.ts`, `commandInternalRollout.ts`, `commandParser.ts`, `mockCommandParser.ts`, `realCommandParser.ts`, `types.ts` (experimental global-overlay shell for single create-todo / create-habit flow; default parser mode `mock`, optional `remote_with_fallback`, local parser kept as fallback/guardrail; internal remote rollout uses a device-local tester toggle)
 
 **shared:** `GitHubHeatmap.tsx`, `activityTypes.ts`
 
-#### `core/` (21 logical paths)
+#### `core/` (20 logical paths)
 
 | Path                                     | Role                                                                                                                              |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -175,8 +166,7 @@
 | `sync/supabase.adapter.ts`               | `SupabaseSyncAdapter` — push upserts for synced entities                                                                          |
 | `sync/restore.coordinator.ts`            | Restore v1 preview, eligibility, dismissal, and empty-device import flow                                                          |
 | `sync/restore.types.ts`                  | Restore entity scope, preview, and result types                                                                                   |
-| `auth/guestProfile.ts`                   | `ensureGuestProfile` → `app_meta.guest_profile`                                                                                   |
-| `providers/AppProviders.tsx`             | DB init, SW, guest profile, **`ensureAnonymousSession`**, React Query, NetInfo/interval/visibility sync flush when remote enabled |
+| `providers/AppProviders.tsx`             | DB init, SW, **`ensureAnonymousSession`**, `syncEngine.hydrate()`, restore preview, NetInfo/interval/visibility sync flush when remote enabled |
 | `pwa/registerServiceWorker.ts`           | Workbox `/sw.js` on web                                                                                                           |
 | `ui/Card.tsx`                            | Card shell + optional left accent strip                                                                                           |
 | `ui/Screen.tsx`                          | `SafeAreaView` + scroll/fill                                                                                                      |
@@ -206,7 +196,7 @@
 | ------------------ | ------------------------------------------------------ |
 | `sectionColors.ts` | `SECTION_COLORS`, `SECTION_COLORS_LIGHT`, `SectionKey` |
 
-#### `tests/` (32 files)
+#### `tests/` (41 files)
 
 | File                                | Role                                                                                            |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -233,7 +223,7 @@
 | `db.client.test.ts`                 | `core/db/client` error-handling smoke (invalid SQL; connection placeholder)                     |
 | `sync.engine.test.ts`               | `SyncEngine.flush` in-flight enqueue + failed push / adapter batch mutation recovery            |
 
-#### `e2e/` (22 files total: 13 spec files + support files)
+#### `e2e/` (14 spec files + support files)
 
 | File                                   | Role                                              |
 | -------------------------------------- | ------------------------------------------------- |
@@ -250,6 +240,7 @@
 | `command.observation.internal.spec.ts` | Internal real-parser observation coverage         |
 | `infrastructure.spec.ts`               | COEP/COOP, SW, OPFS, DB                           |
 | `boundary.spec.ts`                     | Stress / boundary cases                           |
+| `theming.spec.ts`                      | Theme selection / contrast cases                  |
 | `global.setup.ts`                      | `crossOriginIsolated` gate                        |
 | `global.teardown.ts`                   | No-op placeholder                                 |
 | `helpers/commandEvaluation.ts`         | Shared command evaluation helpers                 |
@@ -281,8 +272,8 @@
 #### Import graph (high level)
 
 ```
-app → AppProviders → core/db, sync, auth, lib/supabase
-app/(tabs)/* → features/*Screen
+app → AppProviders → core/db, sync, lib/supabase
+app/index.tsx → features/*Screen (all six sections)
 features/*Screen → features/*.data, *.domain, core/ui, constants, lib/validation
 features/*.data → core/db, core/sync, lib/id, lib/time, (optional) features/*.domain
 features/*.domain → lib/time, constants, features/shared (types/components as needed)
@@ -293,7 +284,7 @@ core/ui → react-native, nativewind, lib/horizontalScrollViewportStyle
 
 | Area         | Contents                                                                 | Rationale                          |
 | ------------ | ------------------------------------------------------------------------ | ---------------------------------- |
-| `core/`      | DB singleton, sync engine, shared UI primitives, PWA hook, guest profile | Cross-cutting infrastructure       |
+| `core/`      | DB singleton, sync engine, shared UI primitives, PWA hook, providers | Cross-cutting infrastructure       |
 | `features/`  | Product modules with clear data/domain/UI split                          | Scalable MVP boundaries            |
 | `lib/`       | Small pure or platform helpers used everywhere                           | Reuse without circular deps        |
 | `constants/` | Visual / marketing color semantics                                       | Single source for section identity |
@@ -302,7 +293,7 @@ core/ui → react-native, nativewind, lib/horizontalScrollViewportStyle
 
 | Kind                 | Pattern                                        | Examples                                 |
 | -------------------- | ---------------------------------------------- | ---------------------------------------- |
-| Source utilities     | camelCase                                      | `todos.data.ts`, `guestProfile.ts`       |
+| Source utilities     | camelCase                                      | `todos.data.ts`, `time.ts`          |
 | React components     | PascalCase                                     | `TodosScreen.tsx`, `GitHubHeatmap.tsx`   |
 | Screens              | `{Feature}Screen.tsx`                          | `CaloriesScreen.tsx`                     |
 | Data layer           | `{feature}.data.ts`                            | `workout.data.ts`                        |
@@ -410,13 +401,11 @@ Shared foreground trigger used by feature screens:
 | `@supabase/supabase-js`                     | ^2.x    | Remote DB client; anonymous auth; `SupabaseSyncAdapter` upserts                  |
 | `@react-native-async-storage/async-storage` | ^3.x    | Supabase auth session persistence (browser/native; not during static export SSR) |
 
-### State / data fetching (installed, dormant)
+### Utilities (installed, not imported)
 
-| Package                 | Version | Purpose                                               |
-| ----------------------- | ------- | ----------------------------------------------------- |
-| `@tanstack/react-query` | ^5.95.2 | `QueryClient` in `AppProviders`; **no feature hooks** |
-| `zustand`               | ^5.0.12 | Reserved; **not wired**                               |
-| `date-fns`              | ^4.1.0  | Listed; **not imported** in app source                |
+| Package    | Version | Purpose                                       |
+| ---------- | ------- | --------------------------------------------- |
+| `date-fns` | ^4.1.0  | Listed; **not imported** in app source        |
 
 ### IDs & PWA
 
@@ -430,7 +419,7 @@ Shared foreground trigger used by feature screens:
 | Package             | Version  | Purpose                                               |
 | ------------------- | -------- | ----------------------------------------------------- |
 | `typescript`        | ~5.9.2   | Typecheck                                             |
-| `vitest`            | ^4.1.1   | Unit tests                                            |
+| `vitest`            | ^3.2.7   | Unit tests                                            |
 | `@playwright/test`  | ^1.58.2  | E2E (Chromium)                                        |
 | `babel-preset-expo` | ^55.0.12 | Babel                                                 |
 | `cross-env`         | ^10.1.0  | `EXPO_UNSTABLE_HEADLESS` for web script               |
@@ -463,81 +452,54 @@ Shared foreground trigger used by feature screens:
 | Entry       | File                                                               | Behavior                                                                                                          |
 | ----------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | npm `main`  | `package.json` → `"expo-router/entry"`                             | Expo Router bootstraps `app/` tree                                                                                |
-| Root layout | `app/_layout.tsx`                                                  | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; `Stack` with `headerShown: false` |
-| Index       | `app/index.tsx`                                                    | `<Redirect href="/(tabs)/overview" />` — `/` → Overview tab                                                       |
-| Tabs layout | `app/(tabs)/_layout.tsx`                                           | Custom top tab bar                                                                                                |
-| Tab routes  | `app/(tabs)/{overview,todos,habits,pomodoro,workout,calories}.tsx` | Each renders one `*Screen` from `features/`                                                                       |
+| Root layout | `app/_layout.tsx`                                                  | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner` |
+| Index       | `app/index.tsx`                                                    | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items |
 
 ### `app/_layout.tsx`
 
-- Imports: `@/global.css`, `expo-router` `Stack`, `expo-status-bar` `StatusBar`, `@/core/providers/AppProviders`, `@/features/command/CommandCenterProvider`, `GlobalCommandCenterHost`, and `@/core/ui/InAppNoticeBanner`
-- Renders: `AppProviders` → themed root → `CommandCenterProvider` → `StatusBar` → `Stack` with `(tabs)` plus retained `command` route, then `GlobalCommandCenterHost` and `InAppNoticeBanner`
+- Imports: `@/global.css`, `@/core/providers/AppProviders`, `GlobalCommandCenterHost`, and `@/core/ui/InAppNoticeBanner`
+- Renders: `AppProviders` → themed root → `StatusBar` → `GlobalCommandCenterHost` and `InAppNoticeBanner`
 
-### `app/(tabs)/_layout.tsx` — top tab bar
+### `app/index.tsx` — single page with top tab rail
 
 #### Layout model
 
-- The tab rail colors now come from `useAppTheme()` tokens (`tokens.tabRail`, `tokens.tabRailBorder`, `tokens.background`) instead of hard-coded shell constants.
-- `overview` uses a muted slate accent that shifts with theme; the other five tabs use their section colors from `SECTION_COLORS` / `SECTION_TEXT_COLORS`.
+- The six sections render behind a `NavigationContext.activeSection` state; the top tab rail is a row of plain `Pressable` items (Overview, Todos, Habits, Pomodoro, Workout, Calories).
+- The tab rail colors come from `useAppTheme()` tokens (`tokens.tabRail`, `tokens.tabRailBorder`, `tokens.background`) instead of hard-coded shell constants.
+- `overview` uses a muted slate accent that shifts with theme; the other five sections use their section colors from `SECTION_COLORS` / `SECTION_TEXT_COLORS`.
 - `TopTabItem` keeps the row-style icon + label layout, active rounded top corners, and inset inactive tabs, but the actual surface colors are theme-driven.
 
 #### `NAV_ITEMS` (exact)
 
-| `name`     | `href`               | `label`  | `icon`                 | `color`                        |
-| ---------- | -------------------- | -------- | ---------------------- | ------------------------------ |
-| `overview` | `"/(tabs)/overview"` | Overview | `dashboard`            | `#475569`                      |
-| `todos`    | `"/(tabs)/todos"`    | To Do    | `check-circle-outline` | `SECTION_TEXT_COLORS.todos`    |
-| `habits`   | `"/(tabs)/habits"`   | Habits   | `loop`                 | `SECTION_TEXT_COLORS.habits`   |
-| `pomodoro` | `"/(tabs)/pomodoro"` | Focus    | `timer`                | `SECTION_TEXT_COLORS.focus`    |
-| `workout`  | `"/(tabs)/workout"`  | Workout  | `fitness-center`       | `SECTION_TEXT_COLORS.workout`  |
-| `calories` | `"/(tabs)/calories"` | Calories | `restaurant-menu`      | `SECTION_TEXT_COLORS.calories` |
+| `name`     | `label`  | `icon`                 | `color`                        |
+| ---------- | -------- | ---------------------- | ------------------------------ |
+| `overview` | Overview | `dashboard`            | `#475569`                      |
+| `todos`    | To Do    | `check-circle-outline` | `SECTION_TEXT_COLORS.todos`    |
+| `habits`   | Habits   | `loop`                 | `SECTION_TEXT_COLORS.habits`   |
+| `pomodoro` | Focus    | `timer`                | `SECTION_TEXT_COLORS.focus`    |
+| `workout`  | Workout  | `fitness-center`       | `SECTION_TEXT_COLORS.workout`  |
+| `calories` | Calories | `restaurant-menu`      | `SECTION_TEXT_COLORS.calories` |
 
 #### `TopTabItem` behavior
 
-- Active tabs use the screen background token, drop the bottom border, and sit flush with content.
-- Inactive tabs keep the rail background/border token colors and a slight top inset.
+- Active items use the screen background token, drop the bottom border, and sit flush with content.
+- Inactive items keep the rail background/border token colors and a slight top inset.
 - Icons are `16px`; labels are `12px`; active labels are semibold and inactive labels use the muted icon token.
-- `TabList` stays a full-width horizontal rail with `gap: 2`, `paddingHorizontal: 4`, and `paddingTop: 4`.
-- `TabSlot` fills the rest of the screen and uses the themed background token.
+- The rail stays a full-width horizontal row with `gap: 2`, `paddingHorizontal: 4`, and `paddingTop: 4`.
 
-#### Swipe navigation implementation
+#### Section switching
 
-The tabs layout also supports horizontal swipe navigation between tab routes:
-
-- Uses `GestureDetector` + `Gesture.Pan()` from `react-native-gesture-handler`.
-- Uses Reanimated shared values (`tabIndex`, `screenWidthSV`, `isDeadZone`) for gesture state.
-- `activeOffsetX([-30, 30])` avoids accidental horizontal gestures.
-- A 40px edge dead-zone on left/right reduces conflicts with OS back/swipe gestures.
-- On pan end, navigation commits when either:
-  - drag distance crosses one-third of screen width, or
-  - velocity crosses `±500`.
-- Route switch happens through `runOnJS(navigateToIndex)` and `router.navigate(...)`.
-
-#### Tab route files (thin wrappers)
-
-Each file: import `*Screen` from `@/features/...`; default export returns `<XxxScreen />` only. No local state, no data hooks — routing only.
+Tapping a `Pressable` in the rail calls `setActiveSection(name)` from `NavigationContext` (`core/providers/NavigationProvider.tsx`). Each section screen refreshes on activation via `useActiveForegroundRefresh(isActive, ...)`.
 
 ### Client navigation surface
 
-| Path               | Screen                        |
-| ------------------ | ----------------------------- |
-| `/`                | Redirect → `/(tabs)/overview` |
-| `/(tabs)/overview` | Overview                      |
-| `/(tabs)/todos`    | Todos                         |
-| `/(tabs)/habits`   | Habits                        |
-| `/(tabs)/pomodoro` | Pomodoro                      |
-| `/(tabs)/workout`  | Workout                       |
-| `/(tabs)/calories` | Calories                      |
-| `/settings`        | Settings                      |
-| `/command`         | Retained command page route   |
+There are no distinct URL routes. The app is a single page: all six sections are rendered in `app/index.tsx` and switched via `NavigationContext.activeSection`. Settings is a full-screen modal opened via `NavigationContext.openSettings`; the Command Center is a global overlay opened via `NavigationContext.openCommand`.
 
 ### Command-center shell
 
-- `GlobalCommandCenterHost` resolves launch context from the active tab segment and shows a floating launcher when `COMMAND_EXPERIMENT_ENABLED` is true, the current route is one of the six tabs, and the launcher is not suppressed.
+- `GlobalCommandCenterHost` shows a floating launcher when `COMMAND_EXPERIMENT_ENABLED` is true and the launcher is not suppressed.
 - Overlay layout is **drawer** on wide web (`Platform.OS === "web"` and width `>= 960`) and **bottom-sheet** elsewhere.
-- The launcher is intentionally hidden on `/settings`.
 - `useCommandLauncherSuppressed(...)` currently hides the launcher during active pomodoro sessions and active workout sessions.
-- `/command` still renders `CommandScreen` directly for the Settings entry point, direct navigation, and internal testing, but the user-facing command flow is overlay-first now.
 
 ---
 
@@ -923,7 +885,7 @@ export type SavedMeal = {
 | `db_schema_version` | migrations             | string integer            | Schema version                 |
 | `date_key_format`   | migration 5            | `'local'`                 | Date keys are local calendar   |
 | `date_key_cutover`  | migration 5            | ISO timestamp             | When local format was recorded |
-| `guest_profile`     | `ensureGuestProfile`   | JSON `{"id","createdAt"}` | Anonymous profile id           |
+| `guest_profile`     | — (key defined but no longer written) | JSON `{"id","createdAt"}` | Anonymous profile id           |
 | `calorie_goal`      | `setCalorieGoal`       | JSON `CalorieGoal`        | Daily calorie + macro targets  |
 | `pomodoro_settings` | `savePomodoroSettings` | JSON `PomodoroSettings`   | Timer durations                |
 
@@ -948,12 +910,12 @@ export type SavedMeal = {
 
 ```ts
 export function createId(prefix: string): string {
-  const random = Math.random().toString(36).slice(2, 10);
+  const random = getRandomChars(8); // CSPRNG via expo-crypto (native) / crypto.getRandomValues (web)
   return `${prefix}_${Date.now()}_${random}`;
 }
 ```
 
-**Properties:** Not cryptographically strong — `Math.random()` is predictable; acceptable for local-only row IDs. Collision risk extremely low for single-device ms + 8 chars.
+**Properties:** Cryptographically strong — random chars come from `getRandomValues` via `expo-crypto` (native) / `crypto.getRandomValues` (web), a CSPRNG, not `Math.random()`. Collision risk extremely low for single-device ms + 8 chars.
 
 ### Soft delete pattern
 
@@ -1059,42 +1021,32 @@ export interface SyncAdapter {
 
 Singleton: **`new SyncEngine(new SupabaseSyncAdapter())`** — production path uses Supabase push when configured.
 
-### `core/auth/guestProfile.ts`
-
-**`ensureGuestProfile(): Promise<GuestProfile>`** (`GuestProfile`: `{ id: string; createdAt: string }`)
-
-1. `getDatabase()`
-2. `SELECT value FROM app_meta WHERE key = ?` with `["guest_profile"]`
-3. If row exists → `JSON.parse` and return
-4. Else: `id = createId("guest")`, `createdAt = new Date().toISOString()`, INSERT, return profile
-
-**Error:** Callers use `.catch(() => undefined)` — swallows errors (silent guest failure).
-
 ### `core/providers/AppProviders.tsx`
 
-**`queryClient`:** `new QueryClient()` — default options; no global error/retry customization.
+There is no `core/auth/guestProfile.ts` and no `ensureGuestProfile()` call. A `guest_profile` key is still defined in `core/db/appMeta.ts`, but nothing writes it.
 
 **Effect 1 — bootstrap (deps: `[]`):**
 
 | Order | Call                                          | Error handling                                                                  |
 | ----- | --------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1     | `initializeDatabase().catch(...)`             | Log only                                                                        |
-| 2     | `registerServiceWorker()`                     | Fire-and-forget                                                                 |
-| 3     | `ensureGuestProfile().catch(() => undefined)` | Swallowed                                                                       |
-| 4     | `ensureAnonymousSession().catch(...)`         | Log on failure — establishes **anonymous** Supabase session when env configured |
+| 1     | `registerServiceWorker()`                     | Fire-and-forget                                                                 |
+| 2     | `initializeDatabase().catch(...)`             | Log only; db error surfaces in `BootstrapGate`                                  |
+| 3     | `ensureAnonymousSession().catch(...)`         | Log on failure — establishes **anonymous** Supabase session when env configured |
+| 4     | `syncEngine.hydrate().catch(...)`             | Log on failure — recovers outbox/backoff state after a killed process           |
+| 5     | `getRestorePreview()`                         | Sets restore preview + startup prompt eligibility                               |
 
 **Effect 2 — sync flush (deps: `[]`):**
 
 1. If `!isRemoteEnabled()` → return early (no listeners)
 2. Define `flush`: `void syncEngine.flush().catch(...)`
-3. `setInterval(flush, 30_000)`
+3. `setInterval(flush, 30_000)` gated by `syncEngine.shouldAttemptFlush()` (backoff-aware interval)
 4. Web only: `visibilitychange` → when hidden, call `flush`
 5. `NetInfo.addEventListener`: if connected, call `flush`
 6. Cleanup: `clearInterval`, remove visibility listener, `unsubscribeNetInfo()`
 
 **Remote default:** `remoteMode = "enabled"` — flush machinery runs unless `setRemoteMode("disabled")` is used (e.g. tests or explicit local-only mode).
 
-**Tree:** `GestureHandlerRootView` → `QueryClientProvider` → `children`
+**Tree:** `GestureHandlerRootView` → `ThemeProvider` → `InAppNoticeProvider` → `AppBootstrapStateContext.Provider` → `BootstrapGate` → `children` + `RestorePrompt`
 
 ### `core/pwa/registerServiceWorker.ts`
 
@@ -1250,13 +1202,13 @@ Web: `View` with `nativeID` + `overflow-x-auto`. Native: horizontal `ScrollView`
 #### `createId(prefix: string): string`
 
 ```ts
-const random = Math.random().toString(36).slice(2, 10);
+const random = getRandomChars(8); // {prefix}_{Date.now()}_{8 chars}
 return `${prefix}_${Date.now()}_${random}`;
 ```
 
 **Algorithm:** `{prefix}_{Date.now() as ms}_{8 chars from base36 random}`
 
-**Properties:** Not cryptographically strong — `Math.random()` is predictable; acceptable for local-only row IDs. Callers: all `*.data.ts` files, `core/auth/guestProfile.ts`.
+**Properties:** Cryptographically strong — random chars come from `getRandomValues` via `expo-crypto` (`Crypto.getRandomValues`) on native and `crypto.getRandomValues` on web, a CSPRNG, not `Math.random()`. Callers: all `*.data.ts` files.
 
 ---
 
@@ -1397,7 +1349,7 @@ SELECT id FROM todos
 
 **State:** `title`, `notes`, `dueDate`, `priority`, `showDatePicker`, `isRecurring`, `items`, `createExpanded`, `showCompleted`, `editingId`, `todoError`
 
-**Flow:** `useFocusEffect` → `loadTodosOnFocus`: fill missing recurring instances via `findMissingRecurrenceIds` + `createRecurringInstance`, then `listTodos`. Create/edit card validates with `validateTodo`. Draggable list calls `updateTodoOrder` on drag end.
+**Flow:** `useActiveForegroundRefresh(isActive, ...)` → `loadTodosOnFocus`: fill missing recurring instances via `findMissingRecurrenceIds` + `createRecurringInstance`, then `listTodos`. Create/edit card validates with `validateTodo`. Draggable list calls `updateTodoOrder` on drag end.
 
 **Navigation:** Single tab screen. Web uses text field for due date; native uses `DateTimePicker`.
 
@@ -1836,7 +1788,7 @@ Primary stats + forms **above**; overview heatmaps / charts **below**. Todos inv
 
 **Command:** `npm test` (`vitest run`)
 **Config:** `vitest.config.ts` — `environment: "node"`, `resolve.alias["@"]` → project root
-**Latest run (May 5, 2026):** **340 tests passed**; **32 test files passed** (Vitest v4)
+**Latest run (May 5, 2026):** **427 tests passed**; **41 test files passed** (Vitest v3)
 
 #### `tests/time.test.ts`
 
@@ -1971,8 +1923,8 @@ Launches Chromium, navigates `http://localhost:8081`, asserts `window.crossOrigi
 
 **`navigation.ts`:**
 
-- `TABS` map to `/(tabs)/...` paths
-- `goToTab(page, tab)` — `goto` `domcontentloaded`, loose root wait
+- `TAB_LABELS` map section names to their top-tab accessible labels (`Overview`, `To Do`, `Habits`, `Focus`, `Workout`, `Calories`)
+- `goToTab(page, tab)` — `goto` `/` `domcontentloaded`, then click the top-tab `Pressable` with the matching label
 - `hardReload(page)` — `reload` `domcontentloaded`
 - `waitForDb(page, timeout?)` — `waitForTimeout(500)`
 
@@ -2148,7 +2100,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `check.md`
 
-**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 340 passing.
+**Purpose:** Run `npm run typecheck` and `npm test`; report pass/fail. Expected baselines: typecheck 0 errors; npm test 427 passing.
 
 ---
 
@@ -2188,7 +2140,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Route issues to data-agent vs feature-agent (or both, data first).
 
-**Data-agent scope:** `*.data.ts`, `core/db/`, `sync.engine.ts`, `guestProfile.ts`, `lib/id.ts`, `lib/time.ts`
+**Data-agent scope:** `*.data.ts`, `core/db/`, `sync.engine.ts`, `lib/id.ts`, `lib/time.ts`
 
 **Feature-agent scope:** `*Screen.tsx`, `*.domain.ts`, `core/ui/`, `app/`, `lib/notifications.ts`, `AppProviders.tsx`
 
@@ -2218,7 +2170,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 **Purpose:** Full pre-PR health: local gates + Playwright MCP inspection + GitHub MCP for CI on PR.
 
-**Phase 1:** `npm run typecheck`, `npm test` (340 tests)
+**Phase 1:** `npm run typecheck`, `npm test` (427 tests)
 
 **Phase 2:** Playwright MCP: cross-origin isolation, SW cache name `superhabits-shell-v3`, screenshots per tab to `.cursor/playwright-output/pre-pr-*.png`, console error summary
 
@@ -2248,7 +2200,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 | Aspect          | Content                                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Scope           | `core/db/*`, `core/sync/sync.engine.ts`, `core/auth/guestProfile.ts`, `features/*/*.data.ts`, `lib/id.ts`, `lib/time.ts` |
+| Scope           | `core/db/*`, `core/sync/sync.engine.ts`, `features/*/*.data.ts`, `lib/id.ts`, `lib/time.ts` |
 | Out of scope    | Screens, `app/`, `core/ui/`                                                                                              |
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception    |
 | Workflow        | Read → plan → approval → implement → typecheck + test → report                                                           |
@@ -2393,9 +2345,9 @@ Tag phase completions: `git tag phaseN-complete`
 | Calories             | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap, plus `Form` / `Diary` modes with remembered last view                                                                                                                                                                                                                                                                         |
 | Settings             | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal                                                                                                                                                                                                                                                                             |
 | PWA / web            | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json`                                                                                                                                                                                                                                                                                                                       |
-| Command shell        | Experimental command center for single `create_todo` / `create_habit` drafts only; primary entry is the global overlay launcher, while `/command` remains the retained direct route; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; internal remote rollout is gated by build config plus a device-local toggle; not a chat assistant |
-| Unit tests           | **340** passing (Vitest)                                                                                                                                                                                                                                                                                                                                                                                                      |
-| E2E                  | **87** Playwright tests in **13** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e`                                                                                                                                                                                                                                                                                                                     |
+| Command shell        | Experimental command center for single `create_todo` / `create_habit` drafts only; the entry is a global overlay launcher (`GlobalCommandCenterHost`), no `/command` page route; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; internal remote rollout is gated by build config plus a device-local toggle; not a chat assistant |
+| Unit tests           | **427** passing (Vitest)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| E2E                  | **90** Playwright tests in **14** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e`                                                                                                                                                                                                                                                                                                                     |
 | Schema version       | **11**                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Linked Actions       | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix                                                                                                                                                                                                                                                        |
 | Cloud sync / restore | Push backup via `SupabaseSyncAdapter` + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; adapter **pull** not implemented; restore v1 separately supports empty-device import for todos, habits, and calorie entries only                                                                                                                                                                  |
@@ -2409,8 +2361,6 @@ Tag phase completions: `git tag phaseN-complete`
 | Pull / restore / conflict policy | Server → client sync, multi-device merge | `SupabaseSyncAdapter.pull` currently returns `[]`                                              |
 | Native background detection (7F) | Plant dies if user leaves app mid-focus  | `expo-background-fetch` / `expo-task-manager` installed, unused — requires real device testing |
 | Workout nested entities sync     | Only routine row enqueued today          | Comment in `workout.data.ts` — bump parent for remote refetch story                            |
-| React Query                      | `QueryClientProvider` only               | No cached queries in features                                                                  |
-| Zustand                          | Installed, unused                        | Global state deferred                                                                          |
 | `date-fns`                       | Unused                                   | Could replace ad-hoc date formatting                                                           |
 | Native `Alert` on web            | No-op                                    | E2E documents delete flows don't confirm on web                                                |
 
@@ -2467,7 +2417,7 @@ Tag phase completions: `git tag phaseN-complete`
 | **Soft delete**          | `deleted_at` set to timestamp; filter `deleted_at IS NULL` on reads                                                                                   |
 | **SuperHabits**          | App name; DB file `superhabits.db`                                                                                                                    |
 | **SyncRecord**           | Queue payload: `entity`, `id`, `updatedAt`, `operation`                                                                                               |
-| **TabTrigger / TabSlot** | `expo-router/ui` custom tab UI primitives                                                                                                             |
+| **NavigationContext**   | `core/providers/NavigationProvider.tsx` — `activeSection`, `setActiveSection`, `openSettings` / `closeSettings`, `openCommand` / `closeCommand` |
 | **TimerPhase**           | `{ exerciseName, exerciseIndex, setNumber, totalSets, phase: "active" \| "rest", durationSeconds }`                                                   |
 | **WAL**                  | SQLite write-ahead log — native bootstrap only (not web)                                                                                              |
 | **Workbox**              | Registers `/sw.js` on web via `core/pwa/registerServiceWorker.ts`                                                                                     |
@@ -2504,6 +2454,6 @@ When the codebase changes, update:
 
 ### Documentation drift warnings
 
-- Cursor commands `test.md` / `check.md` baseline: **340** Vitest tests (update when the count changes)
+- Cursor commands `test.md` / `check.md` baseline: **427** Vitest tests (update when the count changes)
 - `schema.sql` — not runtime authority; lags bootstrap DDL
-- Run `npx playwright test --list` when E2E spec count changes; keep **87** / **13 files** in sync
+- Run `npx playwright test --list` when E2E spec count changes; keep **90** / **14 files** in sync

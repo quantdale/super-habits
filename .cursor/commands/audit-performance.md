@@ -125,6 +125,6 @@ List the top 3 issues by impact on user experience, with:
 **Known acceptable issues:**
 - localhost is used (some PWA checks require HTTPS — expected in dev)
 - expo-notifications warning on web — known Expo limitation
-- No ESLint configured — not a Lighthouse concern
+- Lint (`npm run lint`) runs with warnings tolerated — not a Lighthouse concern
 - Output screenshots are for local reference only —
   .cursor/playwright-output/ is gitignored

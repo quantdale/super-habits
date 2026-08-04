@@ -7,17 +7,15 @@ alwaysApply: true
 
 ## Project identity
 
-SuperHabits is an offline-first React Native + Expo app with 5 core tabs:
-todos, habits, pomodoro, workout, calories.
-It also ships the Overview tab plus non-tab `/settings` and experimental `/command` routes.
+SuperHabits is an offline-first React Native + Expo app rendered as a **single-page experience**: the six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) are rendered inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. Settings is a full-screen **modal** (not a route); the Command Center is a **global overlay** only (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`). There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 Stack: React Native 0.83.4, Expo 55, TypeScript 5.9, expo-router, SQLite
-(expo-sqlite WAL mode), NativeWind 4, React Query 5, Vitest.
+(expo-sqlite WAL mode), NativeWind 4, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
 Current stored schema version: **11** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 12) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 Current product-shell facts to preserve:
-- The command center is overlay-first on the six tab surfaces; `/command` remains the retained direct/internal page route.
+- The command center is a **global overlay** only; `/command` is not a route anymore.
 - Calories supports `Form` and `Diary` modes and remembers the last selected view.
 - Settings is organized into six sections: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
 - Remote backup wording must stay conservative: push backup plus restore v1 preview/import, not full two-way sync.
@@ -73,7 +71,7 @@ Current product-shell facts to preserve:
 - Data layer: {feature}.data.ts (e.g. todos.data.ts)
 - Domain/pure logic: {feature}.domain.ts (e.g. habits.domain.ts)
 - Screens: {Feature}Screen.tsx (e.g. TodosScreen.tsx)
-- Route wrappers: app/(tabs)/{feature}.tsx — thin, just renders the Screen
+- Sections render inside app/index.tsx behind the top tab rail — no per-feature route files
 
 ## Adding a new feature — required structure
 
@@ -82,25 +80,25 @@ features/{name}/
 {name}.domain.ts ← pure logic, no DB imports, fully testable
 {name}Screen.tsx ← React Native UI, imports from .data and .domain
 
-Route file: app/(tabs)/{name}.tsx → renders {Name}Screen
-Tab entry: app/(tabs)/\_layout.tsx → add tab icon + href
+Route file: app/index.tsx → add the section to the tab rail + render it behind `NavigationContext.activeSection`
+Tab entry: app/index.tsx → add a Pressable to the top tab rail
 
 ## Unused dependencies — do NOT add usage without discussion
 
 The following are installed but intentionally unused:
 
-- zustand (state management — may be used for future global state)
-- @tanstack/react-query (no hooks used — QueryClient provided but dormant)
 - date-fns (listed in package.json, not imported anywhere in source)
-- expo-background-fetch, expo-task-manager (deferred background sync)
-  Do not wire these up without an explicit decision to do so.
+
+`zustand`, `@tanstack/react-query`, `expo-background-fetch`, and `expo-task-manager`
+are **not** installed — do not add them without an explicit decision.
+Do not wire these up without an explicit decision to do so.
 
 ## Testing requirements
 
 - Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 340 tests passing — **update this count whenever tests are added or removed**
+- Current count: 427 tests passing — **update this count whenever tests are added or removed**
 - Data/DB, restore, linked-actions, and provider-model tests already exist. Component rendering tests are still limited — document that gap honestly instead of describing the suite as domain-only.
 
 ## E2E Tests (Playwright)
@@ -120,6 +118,7 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - `e2e/command.observation.mock.spec.ts` / `e2e/command.observation.internal.spec.ts` — command observation/fallback coverage
 - `e2e/boundary.spec.ts` — cross-feature boundary and regression cases
 - `e2e/infrastructure.spec.ts` — Headers, SW, OPFS, DB init
+- `e2e/theming.spec.ts` — theme switching/contrast coverage
 
 **Config:** `playwright.config.ts`
 

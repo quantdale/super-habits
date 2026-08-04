@@ -8,9 +8,9 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 | Path        | Responsibility                                                                                        | Key files                                                                                                                                                                                          |
 | ----------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`      | Expo Router entry, stacks, tab shell, thin tab routes, command-center host wiring                     | `app/_layout.tsx`, `app/index.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/*.tsx`, `app/command.tsx`, `app/settings.tsx`                                                                            |
+| `app/`      | Expo Router entry, single-page shell, command-center host wiring                     | `app/_layout.tsx`, `app/index.tsx`                                                                            |
 | `features/` | Feature modules with data/domain/screen layering plus the overlay-first command shell                 | `features/{feature}/{feature}.data.ts`, `features/{feature}/{feature}.domain.ts`, `features/{feature}/{Feature}Screen.tsx`, `features/command/*`                                                   |
-| `core/`     | Shared infra: DB, sync, auth bootstrap, providers, UI primitives                                      | `core/db/client.ts`, `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/providers/AppProviders.tsx`, `core/auth/guestProfile.ts`, `core/pwa/registerServiceWorker.ts`, `core/ui/*` |
+| `core/`     | Shared infra: DB, sync, auth bootstrap, providers, UI primitives                                      | `core/db/client.ts`, `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/providers/AppProviders.tsx`, `core/providers/NavigationProvider.tsx`, `core/pwa/registerServiceWorker.ts`, `core/ui/*` |
 | `lib/`      | Pure helpers and platform utilities                                                                   | `lib/id.ts`, `lib/time.ts`, `lib/validation.ts`, `lib/supabase.ts`, `lib/useForegroundRefresh.ts`, `lib/notifications.ts`                                                                          |
 | `tests/`    | Unit coverage for domain, command parsing/config, restore, linked actions, and selected data/db logic | `tests/*.test.ts` (including `sync.engine`, `db.client`, `calories.data`, `commandParser.facade`)                                                                                                  |
 
@@ -28,12 +28,11 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 ## Routing and navigation
 
-- Root provider wrapper + global command-center host: `app/_layout.tsx`
-- Top tab UI + swipe navigation: `app/(tabs)/_layout.tsx`
-- Thin route wrappers: `app/(tabs)/overview.tsx`, `todos.tsx`, `habits.tsx`, `pomodoro.tsx`, `workout.tsx`, `calories.tsx`
-- Utility routes: `app/settings.tsx`, retained `app/command.tsx`
-- `/` redirects to `/(tabs)/overview`
-- Command launcher shows on the six tab surfaces, opens as a drawer on wide web and a bottom sheet elsewhere, and stays hidden on `/settings`
+- Root provider wrapper + single-page shell: `app/_layout.tsx` and `app/index.tsx`
+- Six sections (`overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories`) render inside `app/index.tsx`, switched by `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`) with a top tab rail of plain `Pressable` items
+- Settings is a full-screen modal (`isSettingsOpen` / `openSettings` / `closeSettings`), not a route
+- Global command-center host: `app/_layout.tsx` mounts `GlobalCommandCenterHost`; the Command Center is a global overlay only (`features/command/CommandCenterProvider.tsx`) — no `/command` route
+- Command launcher shows across the six sections, opens as a drawer on wide web and a bottom sheet elsewhere, and stays hidden while Settings is open
 
 ## Current product-shell facts
 
@@ -43,8 +42,8 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 ## Quality baseline
 
-- `npm test`: 340 tests in 32 files
-- `npx playwright test --list`: 87 tests in 13 spec files
+- `npm test`: 427 tests in 41 files
+- `npx playwright test --list`: 90 tests in 14 spec files
 - Runtime schema version: 11
 - Next migration slot: `if (version < 12)`
 

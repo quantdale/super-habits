@@ -33,6 +33,22 @@ export async function getCalorieSummaryByRange(
   );
 }
 
+export async function countCalorieEntriesByRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count
+     FROM calorie_entries
+     WHERE deleted_at IS NULL
+       AND consumed_on >= ?
+       AND consumed_on <= ?`,
+    [startDateKey, endDateKey],
+  );
+  return row?.count ?? 0;
+}
+
 export const DEFAULT_GOAL: CalorieGoal = {
   calories: 2000,
   protein: 150,
@@ -135,7 +151,8 @@ export async function updateCalorieEntry(
        fiber = ?,
        meal_type = ?,
        updated_at = ?
-     WHERE id = ?`,
+     WHERE id = ?
+       AND deleted_at IS NULL`,
     [
       updates.foodName,
       calories,

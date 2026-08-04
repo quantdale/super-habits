@@ -38,7 +38,7 @@ If this file conflicts with current code, trust the code and document the confli
 ### Confirmed from code and docs
 
 - `app/` is Expo Router only.
-- `app/(tabs)/*.tsx` should stay thin route wrappers that only render screens.
+- `app/index.tsx` renders all six sections behind `NavigationContext.activeSection`; there are no per-feature route files (`app/(tabs)/` was removed).
 - `features/{feature}/{feature}.data.ts` owns SQLite reads/writes, soft delete behavior, ID/date helpers, and sync enqueue.
 - `features/{feature}/{feature}.domain.ts` stays pure.
 - `*Screen.tsx` and feature components orchestrate and render UI; they do not open the DB directly.
@@ -48,9 +48,9 @@ If this file conflicts with current code, trust the code and document the confli
 
 ### Confirmed from code
 
-- `/` redirects to `/(tabs)/overview`.
-- The command center is overlay-first now: `app/_layout.tsx` mounts a global launcher/host on the six tab surfaces, while `/command` remains a retained internal/direct-link page route.
-- The command launcher is hidden on `/settings` and is suppressed during active pomodoro/workout sessions.
+- The app is single-page: `app/index.tsx` renders all six sections behind `NavigationContext.activeSection`; there is no `/` redirect or `/(tabs)/` routes.
+- The command center is overlay-first: `app/_layout.tsx` mounts a global launcher/host, and there is no retained `/command` page route.
+- The command launcher is hidden on the settings modal and is suppressed during active pomodoro/workout sessions.
 - Calories supports `Form` and `Diary` modes and remembers the last selected mode.
 - Settings keeps six buckets in this order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
 - Backup wording must stay conservative: push backup + restore v1 preview/import, not full two-way sync.

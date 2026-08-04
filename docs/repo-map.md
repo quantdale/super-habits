@@ -17,16 +17,13 @@ Use with:
 
 ## App Shell and Routing
 
-- `app/_layout.tsx` - root providers, retained `/command` stack route, global command-center host, in-app notices
-- `app/index.tsx` - root redirect to overview
-- `app/command.tsx` - thin retained direct/internal command route wrapper
-- `app/settings.tsx` - thin settings route wrapper
-- `app/(tabs)/_layout.tsx` - custom top tabs and swipe navigation
-- `app/(tabs)/*.tsx` - thin route wrappers
+- `app/_layout.tsx` - root providers, `GlobalCommandCenterHost` (command overlay), in-app notices
+- `app/index.tsx` - single-page entry: renders all six sections behind `NavigationContext.activeSection`, top tab rail, settings modal
 
 ## Core Infrastructure
 
-- `core/providers/AppProviders.tsx` - DB bootstrap, service worker, guest profile, anonymous auth, sync flush lifecycle
+- `core/providers/AppProviders.tsx` - DB bootstrap, service worker, anonymous auth, sync flush lifecycle
+- `core/providers/NavigationProvider.tsx` - `activeSection`, `setActiveSection`, `openSettings`/`closeSettings`, `openCommand`/`closeCommand`
 - `core/providers/ThemeProvider.tsx` - persisted theme mode and shared UI tokens
 - `core/db/client.ts` - SQLite bootstrap, singleton, migrations
 - `core/db/types.ts` - entity types
@@ -35,7 +32,6 @@ Use with:
 - `core/sync/supabase.adapter.ts` - Supabase push backup adapter
 - `core/sync/restore.coordinator.ts` - restore v1 preview, eligibility, and empty-device import
 - `core/sync/restore.types.ts` - restore v1 scope and result types
-- `core/auth/guestProfile.ts` - local guest metadata
 - `core/pwa/registerServiceWorker.ts` - web service worker registration
 
 ## Shared Utilities
@@ -44,7 +40,7 @@ Use with:
 - `lib/time.ts` - date keys and date ranges
 - `lib/validation.ts` - form/business validation messages
 - `lib/supabase.ts` - Supabase config, remote mode, anonymous session
-- `lib/useForegroundRefresh.ts` - focus/foreground refresh hooks
+- `lib/useForegroundRefresh.ts` - foreground/`isActive` refresh hooks
 - `lib/notifications.ts` - timer notifications
 - `constants/sectionColors.ts` - feature color tokens
 
@@ -112,9 +108,14 @@ Use with:
 - `features/command/command.domain.ts`
 - `features/command/command.executor.ts`
 - `features/command/commandInternalRollout.ts`
+- `features/command/commandModePreference.ts`
 - `features/command/commandParser.ts`
 - `features/command/mockCommandParser.ts`
 - `features/command/realCommandParser.ts`
+- `features/command/ask.retrieval.ts`
+- `features/command/ask.types.ts`
+- `features/command/askParser.ts`
+- `features/command/AskConversationContext.tsx`
 
 ### Cross-feature visuals
 

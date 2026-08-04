@@ -1,5 +1,4 @@
 import { useCallback, useEffect } from 'react';
-import { useFocusEffect } from 'expo-router';
 import { AppState, Platform } from 'react-native';
 
 export function useForegroundRefresh(onRefresh: () => void | Promise<void>) {
@@ -29,17 +28,8 @@ export function useForegroundRefresh(onRefresh: () => void | Promise<void>) {
   }, [onRefresh]);
 }
 
-export function useFocusForegroundRefresh(onRefresh: () => void | Promise<void>) {
-  const handleRefresh = useCallback(() => {
-    void onRefresh();
-  }, [onRefresh]);
-
-  useFocusEffect(handleRefresh);
-  useForegroundRefresh(handleRefresh);
-}
-
 /**
- * Like `useFocusForegroundRefresh`, but triggers the refresh when `isActive`
+ * Like `useForegroundRefresh`, but also triggers the refresh when `isActive`
  * becomes true instead of when the route gains focus. Use this for screens
  * rendered inside a single-route section switcher.
  */

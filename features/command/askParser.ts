@@ -137,7 +137,11 @@ async function callAskFunction(
   return { ok: true, payload };
 }
 
-function normalizeClassifyPayload(payload: unknown, question: string): ClassifyResult {
+function isDateKey(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function normalizeClassifyPayload(payload: unknown): ClassifyResult {
   if (!isRecord(payload)) {
     throw new Error('Classify response must be an object.');
   }
@@ -156,11 +160,18 @@ function normalizeClassifyPayload(payload: unknown, question: string): ClassifyR
     throw new Error('Classify response intent is invalid.');
   }
 
-  void question;
+  const params = (payload.params ?? {}) as Record<string, unknown>;
+  if (intent === 'calorie_summary') {
+    const { startDateKey, endDateKey } = params;
+    if (!isDateKey(startDateKey) || !isDateKey(endDateKey)) {
+      throw new Error('Classify response calorie_summary params must include valid date keys.');
+    }
+  }
+
   return {
     outcome: 'classified',
     intent,
-    params: (payload.params ?? {}) as ClassifyParams[AskIntent],
+    params: params as ClassifyParams[AskIntent],
   };
 }
 
@@ -210,7 +221,7 @@ export class AskParser implements AiAskParser {
 
     let classifyResult: ClassifyResult;
     try {
-      classifyResult = normalizeClassifyPayload(classifyCall.payload, input.question);
+      classifyResult = normalizeClassifyPayload(classifyCall.payload);
     } catch (error) {
       return {
         outcome: 'unavailable',

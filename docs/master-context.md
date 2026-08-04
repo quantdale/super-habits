@@ -27,10 +27,8 @@ Companion docs in this folder:
 
 - Single-package Expo/React Native repository, not a monorepo.
 - Main runtime entry is `expo-router/entry` from root `package.json`.
-- App shell is an Expo Router app with a root stack and a custom top-tab layout.
-- Product modules in active use: Overview, Todos, Habits, Pomodoro/Focus, Workout, Calories.
-- Additional active utility routes: `/command` for the experimental quick-command shell and `/settings` for theme plus backup restore status.
-- The primary command-center UX is no longer page-first: `app/_layout.tsx` mounts a global launcher/overlay host across the tab routes, while `/command` remains a retained internal/direct-link page route.
+- App shell is a single-page Expo Router experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections (Overview, Todos, Habits, Pomodoro/Focus, Workout, Calories) render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
+- Settings is a full-screen modal (not a route) opened via `NavigationContext.openSettings`; the Command Center is a global overlay only, mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`. There are no `/command`, `/settings`, or `/(tabs)/*` routes.
 - The command shell is limited to single-action drafting for `create_todo` and `create_habit`, with parse -> review -> confirm flow rather than assistant chat.
 - Command parser mode defaults to `mock`; optional model-backed parsing uses `remote_with_fallback`, but internal rollout now requires both an internal-capable build flag and a device-local tester opt-in before remote parsing is attempted.
 - Calories supports `Form` and `Diary` modes, and the last selected mode is remembered in AsyncStorage.
@@ -99,8 +97,7 @@ Companion docs in this folder:
 - NativeWind `^4.2.3` + Tailwind config
 - `expo-sqlite`
 - Supabase JS client
-- React Query `^5.95.2` provider installed
-- Playwright `^1.58.2` and Vitest `^4.1.1` for testing
+- Playwright `^1.58.2` and Vitest `^3.2.7` for testing
 - Vercel static deployment config for web
 
 ### Confirmed from docs
@@ -117,13 +114,12 @@ Companion docs in this folder:
 
 | Path               | Owns                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------- |
-| `app/`             | Expo Router layouts and thin route wrappers only                                            |
+| `app/`             | Single-page root: `_layout.tsx` (providers + shell hosts) and `index.tsx` (renders all six sections) |
 | `features/`        | Feature modules: data/domain/screen/components                                              |
 | `features/shared/` | Cross-feature visualizations such as heatmaps/activity views                                |
 | `core/db/`         | SQLite bootstrap, migrations, types, reference schema                                       |
 | `core/sync/`       | In-memory sync queue, Supabase push adapter, and restore v1 coordinator                     |
-| `core/providers/`  | App bootstrap for DB, sync, auth, query client, gestures, and theme                         |
-| `core/auth/`       | Guest profile bootstrap                                                                     |
+| `core/providers/`  | App bootstrap (DB init, SW, anonymous Supabase session, sync hydrate, restore preview) and providers (Navigation, Theme, InAppNotice) |
 | `core/pwa/`        | Service worker registration                                                                 |
 | `core/ui/`         | Shared UI primitives                                                                        |
 | `lib/`             | Pure/platform helpers: IDs, time, validation, notifications, Supabase config, focus refresh |
@@ -142,7 +138,7 @@ Companion docs in this folder:
 
 - UI -> feature `*.data.ts` for persistence, never directly to SQLite from screens.
 - Feature `*.domain.ts` files hold pure calculations and formatting rules.
-- `AppProviders` bootstraps `initializeDatabase()`, service worker registration, guest profile creation, optional anonymous Supabase session, and startup restore-preview checks.
+- `AppProviders` bootstraps `initializeDatabase()`, service worker registration, an optional anonymous Supabase session, `syncEngine.hydrate()`, and startup restore-preview checks. There is no `ensureGuestProfile()` call and no `core/auth/` module.
 - `getDatabase()` in `core/db/client.ts` is the single SQLite entrypoint and uses a singleton promise.
 - On web, SQLite runs through Expo web export with OPFS-compatible isolation headers; native enables WAL.
 - Mutating writes in synced entities enqueue records into `syncEngine`.
@@ -179,9 +175,7 @@ Companion docs in this folder:
 ### Confirmed from code
 
 - Screen-local `useState` is the dominant state model.
-- Data reloads usually happen through `useFocusForegroundRefresh()` or `useFocusEffect`.
-- React Query is only used as a top-level `QueryClientProvider`; no feature currently uses query hooks.
-- No Zustand stores are used in app code.
+- Data reloads use `useActiveForegroundRefresh(isActive, ...)` from `lib/useForegroundRefresh.ts` (keyed on the section's `isActive` from `NavigationContext`) plus `useForegroundRefresh` for app-state/visibility refresh. `useFocusEffect` is no longer used for section refresh; `useFocusForegroundRefresh` was deleted.
 
 ### Inferred / uncertain
 
@@ -191,15 +185,13 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- Root redirect sends `/` to `/(tabs)/overview`.
-- `app/_layout.tsx` wraps the shell in `CommandCenterProvider`, renders a stack with `(tabs)` plus the retained `command` route, and mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`.
-- `app/(tabs)/_layout.tsx` defines a custom top tab bar and swipe navigation between tabs.
-- Tab routes are thin wrappers such as `app/(tabs)/todos.tsx` -> `<TodosScreen />`.
+- `app/index.tsx` renders all six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
+- `app/_layout.tsx` wraps the shell in `AppProviders` and mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`.
+- `NavigationContext` (`core/providers/NavigationProvider.tsx`) exposes `activeSection`, `setActiveSection`, `openSettings`, `closeSettings`, `openCommand`, `closeCommand`.
+- Settings is a full-screen modal opened via `openSettings`; the Command Center is a global overlay opened via `openCommand`.
 - The command launcher appears on Overview, Todos, Habits, Pomodoro, Workout, and Calories when the experiment flag is enabled; it opens a drawer on wide web and a bottom sheet elsewhere.
-- The command launcher is hidden on `/settings` and is suppressed during active pomodoro/workout sessions.
-- `app/command.tsx` is a thin non-tab route that renders `CommandScreen`; it is retained for direct access, internal testing, and the Settings entry point.
-- `app/settings.tsx` is a thin non-tab route that renders `SettingsScreen`.
-- Current tabs: Overview, Todos, Habits, Pomodoro, Workout, Calories.
+- The command launcher is suppressed during active pomodoro/workout sessions.
+- Current sections: Overview, Todos, Habits, Pomodoro, Workout, Calories.
 
 ## UI / Design System Conventions
 
@@ -269,7 +261,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- Local app bootstrap creates a guest profile stored in `app_meta`.
+- `app_meta` defines a `guest_profile` key (in `core/db/appMeta.ts`), but bootstrap no longer calls `ensureGuestProfile()`; there is no `core/auth/` module.
 - If Supabase is configured, app startup attempts anonymous sign-in.
 - If Supabase env vars are missing, the app stays local-only and remote operations no-op safely.
 
@@ -308,7 +300,7 @@ Companion docs in this folder:
 | Workout  | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history                                                                                                                                                                                                                                                                                                                                                                                   |
 | Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference                                                                                                                                                                                                                                                                                            |
 | Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls                                                                                                                                                                                                                                                                                                                         |
-| Command  | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the primary entry is a global overlay launcher on the six tab surfaces, while `/command` remains the retained page route. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
+| Command  | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the entry is a global overlay launcher (`GlobalCommandCenterHost`) on the six sections. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
 
 ## Domain Concepts and Glossary
 
@@ -368,13 +360,13 @@ Companion docs in this folder:
 ### Confirmed from code on May 5, 2026
 
 - `npm run typecheck`: passes.
-- `npm test`: passes with `340` tests.
+- `npm test`: passes with `427` tests.
 - `npm run build:web`: passes.
-- `npx playwright test --list`: reports `87` tests in `13` spec files.
+- `npx playwright test --list`: reports `90` tests in `14` spec files.
 
 ### Confirmed from code
 
-- No lint script or lint config was found.
+- `npm run lint` exists (`eslint . --max-warnings 81`).
 
 ## Coding Conventions Detected
 
@@ -385,7 +377,7 @@ Companion docs in this folder:
   - `{feature}.data.ts`
   - `{feature}.domain.ts`
   - `{Feature}Screen.tsx`
-  - thin route wrappers in `app/(tabs)/`
+- Screens are mounted inside `app/index.tsx`; there are no per-route wrappers in `app/`.
 - Shared UI lives in `core/ui`.
 - Validation is centralized in `lib/validation.ts`.
 - Date and ID helpers are centralized in `lib/time.ts` and `lib/id.ts`.
@@ -411,7 +403,6 @@ Companion docs in this folder:
 ### Confirmed from code and docs
 
 - Extend restore/sync beyond the current conservative v1 scope and define conflict handling.
-- Decide whether to activate or remove dormant React Query and Zustand usage.
 - Clarify or improve background/off-app behavior for long-running Pomodoro sessions.
 - Continue cleaning documentation drift around schema, E2E flow, and stack versions.
 

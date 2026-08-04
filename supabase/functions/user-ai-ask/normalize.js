@@ -61,18 +61,38 @@ export function normalizeAskRequestBody(payload) {
     throw new Error("Request body must be an object.");
   }
 
+  const stage = payload.stage ?? "classify";
+  if (stage !== "classify" && stage !== "phrase") {
+    throw new Error('stage must be "classify" or "phrase".');
+  }
+
   const question = toNonEmptyString(payload.question);
+  if (!question) {
+    throw new Error("Missing required ask request fields.");
+  }
+  if (question.length > MAX_QUESTION_LENGTH) {
+    throw new Error(`question must be ${MAX_QUESTION_LENGTH} characters or less.`);
+  }
+
+  if (stage === "phrase") {
+    if (!isRecord(payload.retrievedFacts)) {
+      throw new Error("phrase requests must include a retrievedFacts object.");
+    }
+    return {
+      stage: "phrase",
+      question,
+      retrievedFacts: payload.retrievedFacts,
+    };
+  }
+
   const nowIso = toNonEmptyString(payload.nowIso);
   const locale = toNonEmptyString(payload.locale);
   const timeZone = toNonEmptyString(payload.timeZone);
   const todayDateKey = toNonEmptyString(payload.todayDateKey);
   const tomorrowDateKey = toNonEmptyString(payload.tomorrowDateKey);
 
-  if (!question || !nowIso || !locale || !timeZone || !todayDateKey || !tomorrowDateKey) {
+  if (!nowIso || !locale || !timeZone || !todayDateKey || !tomorrowDateKey) {
     throw new Error("Missing required ask request fields.");
-  }
-  if (question.length > MAX_QUESTION_LENGTH) {
-    throw new Error(`question must be ${MAX_QUESTION_LENGTH} characters or less.`);
   }
   if (Number.isNaN(new Date(nowIso).getTime())) {
     throw new Error("nowIso must be a valid ISO timestamp.");
@@ -82,6 +102,7 @@ export function normalizeAskRequestBody(payload) {
   }
 
   return {
+    stage: "classify",
     question,
     conversationContext: normalizeConversationContext(payload.conversationContext),
     nowIso,

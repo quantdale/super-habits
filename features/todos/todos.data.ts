@@ -193,7 +193,8 @@ export async function updateTodoOrder(orderedIds: string[]): Promise<void> {
   for (let i = 0; i < orderedIds.length; i++) {
     await db.runAsync(
       `UPDATE todos SET sort_order = ?, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?
+         AND deleted_at IS NULL`,
       [i + 1, now, orderedIds[i]],
     );
     syncEngine.enqueue({
@@ -238,7 +239,12 @@ export async function updateTodo(
   }
 
   values.push(id);
-  await db.runAsync(`UPDATE todos SET ${fields.join(', ')} WHERE id = ?`, values);
+  await db.runAsync(
+    `UPDATE todos SET ${fields.join(', ')}
+     WHERE id = ?
+       AND deleted_at IS NULL`,
+    values,
+  );
   syncEngine.enqueue({
     entity: 'todos',
     id,

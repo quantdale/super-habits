@@ -11,7 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **340** tests passing, 0 failing
+Expected: **427** tests passing, 0 failing
 
 Report:
 
@@ -56,6 +56,7 @@ SW cache name, no stale v1 cache,
 localhost network-first, OPFS lock,
 clean DB init
 boundary.spec.ts — cross-feature boundary, volume, and no-NaN/no-undefined checks
+theming.spec.ts — theme switching and contrast coverage
 
 Report:
 
@@ -69,8 +70,8 @@ Report:
 
 | Suite            | Tests | Passed | Failed | Skipped |
 | ---------------- | ----- | ------ | ------ | ------- |
-| Unit (Vitest)    | 340   | ?      | ?      | 0       |
-| E2E (Playwright) | 87    | ?      | ?      | ?       |
+| Unit (Vitest)    | 427   | ?      | ?      | 0       |
+| E2E (Playwright) | 90    | ?      | ?      | ?       |
 | **Total**        | ?     | ?      | ?      | ?       |
 
 **OVERALL: PASS or FAIL**

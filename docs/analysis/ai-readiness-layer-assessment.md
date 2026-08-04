@@ -170,7 +170,7 @@ This is important because it proves the app already has enough local data for a 
 
 ### Operational context AI can use
 
-- guest identity exists locally in [`core/auth/guestProfile.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/core/auth/guestProfile.ts)
+- a local guest/profile key exists in `app_meta` (via `core/db/appMeta.ts`), though nothing writes it today
 - syncable vs local-only entities are already explicit in [`core/sync/supabase.adapter.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/core/sync/supabase.adapter.ts)
 - remote mode can be disabled in [`lib/supabase.ts`](/C:/Users/palac/.codex/worktrees/c2b8/superhabits/lib/supabase.ts)
 

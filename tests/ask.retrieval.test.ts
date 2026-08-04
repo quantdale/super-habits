@@ -7,8 +7,9 @@ import {
   retrievePendingTodos,
 } from '@/features/command/ask.retrieval';
 
-const { getCalorieSummaryByRange } = vi.hoisted(() => ({
+const { getCalorieSummaryByRange, countCalorieEntriesByRange } = vi.hoisted(() => ({
   getCalorieSummaryByRange: vi.fn(),
+  countCalorieEntriesByRange: vi.fn(),
 }));
 const { listHabits, getCompletionHistory } = vi.hoisted(() => ({
   listHabits: vi.fn(),
@@ -19,7 +20,10 @@ const { countPendingTodos, listPendingTodos } = vi.hoisted(() => ({
   listPendingTodos: vi.fn(),
 }));
 
-vi.mock('@/features/calories/calories.data', () => ({ getCalorieSummaryByRange }));
+vi.mock('@/features/calories/calories.data', () => ({
+  getCalorieSummaryByRange,
+  countCalorieEntriesByRange,
+}));
 vi.mock('@/features/habits/habits.data', () => ({ listHabits, getCompletionHistory }));
 vi.mock('@/features/todos/todos.data', () => ({ countPendingTodos, listPendingTodos }));
 
@@ -63,12 +67,16 @@ describe('features/command/ask.retrieval', () => {
           totalFiber: 5,
         },
       ]);
+      // Three raw entries logged across the two summarized days: the fact
+      // must report the true entry count (3), not the day-count (2).
+      countCalorieEntriesByRange.mockResolvedValue(3);
 
       const facts = await retrieveCalorieSummary('2026-04-16', '2026-04-17');
 
+      expect(countCalorieEntriesByRange).toHaveBeenCalledWith('2026-04-16', '2026-04-17');
       expect(facts).toEqual({
         totalCalories: 1800,
-        entryCount: 2,
+        entryCount: 3,
         startDateKey: '2026-04-16',
         endDateKey: '2026-04-17',
       });
@@ -84,7 +92,7 @@ describe('features/command/ask.retrieval', () => {
 
       const facts = await retrieveHabitStreak('drink water');
 
-      expect(getCompletionHistory).toHaveBeenCalledWith('habit_1', 30);
+      expect(getCompletionHistory).toHaveBeenCalledWith('habit_1', 365);
       expect(facts).toEqual({
         scope: 'single',
         habitName: 'Drink Water',

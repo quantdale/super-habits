@@ -37,7 +37,7 @@ Read `AGENTS.md`, `docs/master-context.md`, and `docs/working-rules.md` first.
 This is feature/UI work in:
 
 - `features/[feature]/`
-- `app/(tabs)/[route].tsx` [only if needed]
+- `app/index.tsx` [only if you need to register a new section]
 
 Goal:
 

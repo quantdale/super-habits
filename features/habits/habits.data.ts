@@ -144,22 +144,19 @@ export async function incrementHabit(
 export async function decrementHabit(habitId: string, dateKey = toDateKey()): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  const existing = await db.getFirstAsync<{ id: string; count: number }>(
-    'SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
+  // Atomic decrement instead of a read-modify-write: two rapid taps previously
+  // SELECTed the same count and both wrote count-1, losing a decrement (the
+  // same race incrementHabit was fixed for). Decrement count > 0, then hard
+  // delete the row when it reaches 0 (habit_completions is the documented
+  // non-synced toggle-off exception).
+  await db.runAsync(
+    'UPDATE habit_completions SET count = count - 1, updated_at = ? WHERE habit_id = ? AND date_key = ? AND count > 0',
+    [now, habitId, dateKey],
+  );
+  await db.runAsync(
+    'DELETE FROM habit_completions WHERE habit_id = ? AND date_key = ? AND count = 0',
     [habitId, dateKey],
   );
-  if (!existing || existing.count <= 0) return;
-  if (existing.count === 1) {
-    // Hard delete intentional: habit_completions is a toggle-off
-    // operation (non-synced entity, allowed exception per db-and-sync-invariants)
-    await db.runAsync('DELETE FROM habit_completions WHERE id = ?', [existing.id]);
-    return;
-  }
-  await db.runAsync('UPDATE habit_completions SET count = ?, updated_at = ? WHERE id = ?', [
-    existing.count - 1,
-    now,
-    existing.id,
-  ]);
 }
 
 export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()): Promise<number> {
@@ -226,7 +223,7 @@ export async function updateHabit(
   const now = nowIso();
   const db = await getDatabase();
   await db.runAsync(
-    'UPDATE habits SET name = ?, target_per_day = ?, category = ?, icon = ?, color = ?, updated_at = ? WHERE id = ?',
+    'UPDATE habits SET name = ?, target_per_day = ?, category = ?, icon = ?, color = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
     [
       updates.name,
       updates.targetPerDay,

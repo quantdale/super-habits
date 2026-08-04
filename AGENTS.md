@@ -35,10 +35,10 @@ SuperHabits is an offline-first productivity app that runs as a Progressive Web 
 Key product facts:
 
 - Six tab surfaces: **Overview**, **Todos**, **Habits**, **Pomodoro**, **Workout**, and **Calories**.
-- A non-tab **Settings** route and an experimental **Command Center** route (`/command`).
+- A single-page experience: the six sections are rendered inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items. Settings is a full-screen **modal**; the Command Center is a **global overlay** (no `/command` route).
 - Local **SQLite** is the source of truth; writes may optionally be pushed to **Supabase** as a backup.
 - **Restore v1** can import a limited entity set (`todos`, `habits`, `calorie_entries`) onto an empty device. It is not full two-way sync.
-- The command center launches as a **global overlay** on the main tabs; `/command` remains a retained direct/internal page route.
+- The command center launches as a **global overlay** mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`; there is no `/command` route.
 - Calories supports **Form** and **Diary** modes and remembers the last selected view in AsyncStorage (`superhabits.calories.viewMode`).
 - Settings is organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
 
@@ -49,13 +49,13 @@ Key product facts:
 - **Routing:** Expo Router `^55.0.7` (file-based routing in `app/`)
 - **Styling:** NativeWind `^4.2.3` + Tailwind CSS `^3.4.19`
 - **Database:** `expo-sqlite` (`^55.0.11`); WAL mode on native, SQLite WASM + OPFS on web
-- **State:** Local `useState` only; `zustand` and `@tanstack/react-query` are installed but unused
+- **State:** Local `useState` only; section switching via `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`).
 - **Backup/Auth:** Supabase (`@supabase/supabase-js`) with anonymous sign-in
 - **Networking:** `@react-native-community/netinfo`
 - **Notifications:** `expo-notifications` (iOS/Android only)
 - **Charts/Lists:** `react-native-gifted-charts`, `@shopify/flash-list`
 - **Animations:** `react-native-reanimated`
-- **Testing:** Vitest `^4.1.1` (unit), Playwright `^1.58.2` (E2E)
+- **Testing:** Vitest `^3.2.7` (unit), Playwright `^1.58.2` (E2E)
 - **Patching:** `patch-package` (runs in `postinstall`)
 
 ## Key Configuration Files
@@ -79,7 +79,7 @@ Key product facts:
 
 | Path         | Role                                                                                                                                                                                                                                                                |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`       | Expo Router only. Thin route wrappers and layouts. No business logic. Root layout mounts the global command-center host.                                                                                                                                            |
+| `app/`       | Expo Router only. Single-page entry: `_layout.tsx` mounts `GlobalCommandCenterHost` + `NavigationProvider`; `index.tsx` renders all six sections behind `NavigationContext.activeSection`. No business logic.                          |
 | `features/`  | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions: `overview/` and `settings/` are screen-only; `command/` is an overlay-first shell; `shared/` holds cross-feature UI. |
 | `core/`      | Cross-cutting infrastructure: DB client/migrations, entity types, sync engine + restore, linked actions, providers, PWA service-worker registration, shared UI primitives (`core/ui/`).                                                                             |
 | `lib/`       | Pure helpers only. No DB access, no feature imports. Includes `id.ts`, `time.ts`, `validation.ts`, `supabase.ts`, `notifications.ts`, etc.                                                                                                                          |
@@ -117,21 +117,20 @@ Key product facts:
 `AppProviders` initializes the app in this order:
 
 1. `GestureHandlerRootView`
-2. `QueryClient` (React Query — dormant)
-3. `initializeDatabase()`
-4. Service worker registration (web only)
-5. `ensureGuestProfile()` (`core/auth/guestProfile.ts`)
-6. `ensureAnonymousSession()` (`lib/supabase.ts`) when Supabase env vars are present
-7. Restore preview check and optional restore prompt
+2. `initializeDatabase()`
+3. Service worker registration (web only)
+4. `ensureAnonymousSession()` (`lib/supabase.ts`) when Supabase env vars are present
+5. Sync engine hydrate
+6. Restore preview check and optional restore prompt
 
 Any component that calls a `*.data.ts` function must be a descendant of `AppProviders`.
 
 ### Routing
 
-- File-based Expo Router: `app/(tabs)/{feature}.tsx` for tabs, `app/_layout.tsx` for root, `app/settings.tsx` and `app/command.tsx` for utility routes.
-- Route files are thin wrappers that render a single `*Screen` component.
-- `app/(tabs)/_layout.tsx` defines the six tab entries.
-- `app/_layout.tsx` mounts `GlobalCommandCenterHost`, which shows the floating launcher on eligible tabs when `COMMAND_EXPERIMENT_ENABLED` is true.
+- Single-page model: `app/` contains only `_layout.tsx` and `index.tsx`. There are no `app/(tabs)/`, `app/settings.tsx`, or `app/command.tsx` routes.
+- `app/_layout.tsx` mounts `GlobalCommandCenterHost` (shows the floating launcher when `COMMAND_EXPERIMENT_ENABLED` is true) and `NavigationProvider`.
+- `app/index.tsx` renders the six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind `NavigationContext.activeSection`, with a top tab rail of plain `Pressable` items.
+- Settings is a full-screen **modal** opened via `openSettings`; the Command Center is a **global overlay** opened via `openCommand`. Old URLs `/settings`, `/command`, and `/(tabs)/*` no longer exist.
 
 ### Linked Actions
 
@@ -188,13 +187,13 @@ features/{name}/
   {name}.domain.ts     ← pure logic
   {Name}Screen.tsx     ← React Native screen
   types.ts             ← local type barrel (optional)
-app/(tabs)/{name}.tsx  ← thin route wrapper
+app/index.tsx  ← section mounted in the single-page shell behind NavigationContext.activeSection
 ```
 
 Current exceptions:
 
 - `features/overview/OverviewScreen.tsx` only (dashboard composes existing modules).
-- `features/settings/SettingsScreen.tsx` only (utility route).
+- `features/settings/SettingsScreen.tsx` only (full-screen modal).
 - `features/command/` is an overlay-first shell with its own provider, screen, parser, config, and executor files.
 - `features/shared/` holds cross-feature UI (`GitHubHeatmap`, etc.).
 - `features/workout/` includes nested screens (`RoutineDetailScreen`, `WorkoutSessionScreen`).
@@ -250,8 +249,8 @@ Current verified baselines:
 
 - `npm run typecheck`: 0 errors
 - `npm run lint`: 0 errors (warnings allowed)
-- `npm test`: **343 tests passing** across **33 test files**
-- `npx playwright test --list`: **87 tests** across **13 spec files**
+- `npm test`: **427 tests passing** across **41 test files**
+- `npx playwright test --list`: **90 tests** across **14 spec files**
 
 ## Testing Strategy
 
@@ -266,7 +265,7 @@ Current verified baselines:
 ### E2E Tests (Playwright)
 
 - Config: `playwright.config.ts`
-- Files: `e2e/*.spec.ts` (13 spec files)
+- Files: `e2e/*.spec.ts` (14 spec files)
 - Runs against the **static web export** in `dist/` served by `node scripts/serve-e2e.js` on `http://localhost:8081`.
 - `workers: 1` locally because OPFS + SQLite hold one lock per origin.
 - `clearDatabase()` runs in `test.beforeEach`.
@@ -333,7 +332,7 @@ Because Expo public env vars are bundled into the client, never put real secrets
 - Data layer: `{feature}.data.ts`
 - Domain layer: `{feature}.domain.ts`
 - Screens: `{Feature}Screen.tsx`
-- Route wrappers: `app/(tabs)/{feature}.tsx`
+- Sections: rendered in `app/index.tsx` behind `NavigationContext.activeSection` (no per-feature route files)
 - Styling: NativeWind `className` with Tailwind utility classes. Do **not** use `StyleSheet.create()` for new code.
 - Lists: use `@shopify/flash-list` (`FlashList`), not `FlatList`.
 - Animations: `react-native-reanimated`.
