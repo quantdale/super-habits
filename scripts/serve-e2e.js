@@ -1,13 +1,43 @@
 /**
  * Minimal static file server for E2E (Node built-ins only).
- * Serves Expo web export from `dist/` with COOP/COEP headers for OPFS SQLite.
+ * Serves an Expo web export (default `dist/`) with COOP/COEP headers for OPFS
+ * SQLite.
+ *
+ * Usage:
+ *   node scripts/serve-e2e.js                 # dist/ on :8081 (default)
+ *   node scripts/serve-e2e.js --port 8082     # dist/ on :8082
+ *   node scripts/serve-e2e.js -p 8082 --dist dist-sync   # dist-sync/ on :8082
+ *
+ * The `--port`/`-p` and `--dist`/`-d` arguments let the dedicated
+ * `journeys-sync` Playwright project serve the `dist-sync/` (dummy-Supabase)
+ * export on a second port. Defaults are unchanged (8081 → dist/).
  */
 const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
 
-const PORT = 8081;
-const DIST = path.resolve(__dirname, '..', 'dist');
+function parseArgs(argv) {
+  const args = { port: 8081, dist: 'dist' };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--port' || a === '-p') {
+      args.port = Number(argv[++i]);
+    } else if (a === '--dist' || a === '-d') {
+      args.dist = argv[++i];
+    }
+  }
+  return args;
+}
+
+const args = parseArgs(process.argv.slice(2));
+if (!Number.isInteger(args.port) || args.port <= 0 || !args.dist) {
+  console.error(
+    'usage: node scripts/serve-e2e.js [--port <port>] [--dist <export-dir>] (defaults: 8081, dist)',
+  );
+  process.exit(1);
+}
+const PORT = args.port;
+const DIST = path.resolve(__dirname, '..', args.dist);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

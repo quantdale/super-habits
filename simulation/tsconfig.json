@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": ".build",
+    "rootDir": "..",
+    "noEmitOnError": false
+  },
+  "include": [
+    "runner/**/*.ts",
+    "observe/**/*.ts",
+    "model/**/*.ts",
+    "repro/**/*.ts",
+    "matrix.ts",
+    "personas/**/*.ts",
+    "workflows/**/*.ts",
+    "scenarios/**/*.ts",
+    "fixtures/**/*.ts"
+  ],
+  "exclude": ["runner/specs/**", ".build/**", "node_modules/**"]
+}

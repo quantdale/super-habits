@@ -239,7 +239,8 @@ npm test             # vitest run
 npm run build:web    # npx expo export -p web → dist/
 
 # E2E (requires dist/ to be up to date)
-npm run e2e          # playwright test
+npm run e2e          # playwright test (chromium + journeys + simulation projects)
+npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — opt-in, main/nightly only
 npm run e2e:report   # open HTML report
 npm run e2e:headed   # visible browser for debugging
 npm run e2e:debug    # Playwright inspector
@@ -249,8 +250,11 @@ Current verified baselines:
 
 - `npm run typecheck`: 0 errors
 - `npm run lint`: 0 errors (warnings allowed)
-- `npm test`: **427 tests passing** across **41 test files**
-- `npx playwright test --list`: **90 tests** across **14 spec files**
+- `npm test`: **630 tests passing** across **56 test files** (586 unit + 44 integration under the `tests/integration/` Vitest project)
+- `npx playwright test --list`: **181 tests** across **19 spec files** — the `chromium` project (14 `e2e/*.spec.ts`), the `journeys` project (12 `e2e/journeys/*.spec.ts`), the `simulation` project (`simulation/runner/specs/`), and the `journeys-sync` project (`e2e/journeys` `grep /@sync/` — the 19 remote-boundary steps, opt-in via `npm run e2e:sync` against the dummy-Supabase `dist-sync/` build on :8082; main/nightly only)
+- `npm run e2e:sync`: **18 passed / 1 skipped** (J3, J4, J5 @sync steps; the skip is J5's CG-2 quarantine) — 0 failed
+
+> The simulation platform (`simulation/`) adds scenario/runner/repro layers on top of the journey suite — see `simulation/README.md` and `docs/testing/known-gaps.md`.
 
 ## Testing Strategy
 
@@ -274,6 +278,17 @@ Current verified baselines:
 - Failure artifacts: `.cursor/playwright-output/e2e-failures/`
 - Do **not** add `data-testid` attributes to app components to make tests pass.
 - If a selector breaks after a UI change, update the selector in the spec; do not weaken assertions.
+
+### Simulation platform (user-simulation)
+
+The user-simulation platform (`simulation/`) layers a typed model + multiple
+execution lanes over the journey harness: deterministic/seeded scenarios, repro
+bundles, AI exploratory missions, and a disposable-Supabase lane. The runner
+now exists (`sim:run`, `sim:validate`) and the lane matrix lives in
+`simulation/matrix.ts`. **Read `simulation/README.md` before touching the
+platform layer** — it defines the model authoring guide, the lane matrix, the
+repro workflow, the isolation rules, and the "which tool for which job"
+decision rule.
 
 ### Pre-PR / Useful Commands
 
@@ -303,10 +318,32 @@ eas build -p android --profile preview
 
 ### CI (GitHub Actions)
 
-`.github/workflows/ci.yml` runs two jobs:
+`.github/workflows/ci.yml` runs three jobs (lane ids match `simulation/matrix.ts`):
 
-1. **quality** — `npm run typecheck` + `npm test`
-2. **e2e** — runs only if `quality` passes; installs Playwright Chromium, runs `npm run build:web`, then `npm run e2e`; uploads the HTML report artifact.
+1. **quality** — `npm run typecheck` + `npm run lint` + `npm run test` (Vitest
+   runs **both** projects — unit **and** integration — under `TZ=Asia/Manila`).
+   Runs on every trigger (PR, push, schedule, dispatch).
+2. **e2e** — runs after `quality`, on PRs and on `push` to `main` (and manual
+   `workflow_dispatch`); skipped on `schedule` (the `nightly` job covers it).
+   - **PR lane:** `npx playwright test --project=chromium` (feature suite) +
+     `npm run e2e:journeys:p0` (P0 journeys) + `npm run sim:validate` +
+     `npm run sim:run -- --mode deterministic --scenario @p0` (deterministic
+     scenario subset, ≤ 10 min budget).
+   - **main lane:** full `npm run e2e` (feature + full journeys + simulation
+     self-test) + `npm run sim:run -- --mode deterministic` (full library) +
+     `dist-sync/` build with DUMMY Supabase env (never PRs, never quality) +
+     `npm run e2e:sync` (the dedicated `journeys-sync` project runs the
+     remote-boundary journey steps against `dist-sync/` on :8082).
+   - Uploads `e2e-report`, `simulation-output/` (run reports, digests, traces,
+     repro bundles), and `dist-sync/` — all 7-day retention.
+3. **nightly** — `schedule`-only, after `quality`: full `npm run e2e` (full
+   journeys) + seeded scenario lane (`sim:run -- --mode seeded`) + `dist-sync/`
+   build + the disposable-backend lane (runs only when `SUPABASE_ACCESS_TOKEN`
+   is configured; `simulation/backend/guard.ts` hard-isolates it). Non-gating.
+
+The AI exploratory lane and the disposable backend never run on PRs, and the
+`dist-sync` build never runs in the quality job — forbidden combinations are
+enforced by `validateMatrix()` in `simulation/matrix.ts`.
 
 ## Environment Variables
 

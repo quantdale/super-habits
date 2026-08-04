@@ -56,5 +56,24 @@ yarn-error.*
 # Supabase CLI local state (contains project ref / pooler URL)
 supabase/.temp/
 
+# Simulation platform: run reports, screenshots, digests, repro bundles and
+# the compiled runner output are all derived artifacts — never committed.
+/simulation-output/
+/simulation/.build/
+
+# Repro bundles (task 5) live under the gitignored simulation-output by default;
+# this explicit entry guards any tooling that captures to a custom root.
+/simulation-output/bundles/
+
+# Disposable-backend lane (task 8.4): the `dist-live/` export is produced only
+# inside the guarded disposable job and must never be committed; state/ holds
+# the short-lived disposable env + marker (contains an anon key).
+/dist-live/
+/simulation/backend/state/
+
+# Parent task 6.1a: the `dist-sync/` export (dummy Supabase env) is produced on
+# main/nightly CI and by the documented local command — never committed.
+/dist-sync/
+
 # Editor debug traces
 .cursor/debug-*.log

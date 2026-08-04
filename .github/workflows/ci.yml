@@ -4,11 +4,22 @@ on:
   push:
     branches: ['**']
   pull_request:
+  # Nightly platform lane (parent task 6.1 + `add-user-simulation-platform`
+  # task 9.2, lane matrix in simulation/matrix.ts): full journeys + seeded
+  # scenario mode + dist-sync build + disposable-backend lane. Runs on the
+  # default branch only (schedules only fire there). 17:00 UTC is a quiet
+  # hour in Asia/Manila (the TZ the suite runs under); the hour is a knob.
+  schedule:
+    - cron: '0 17 * * *'
+  # Manual full-lane runs (AI exploratory / repro replay are on-demand).
+  workflow_dispatch:
 
 # Cancel any in-progress run for the same branch/PR when a new commit is pushed.
 # This prevents redundant runs when you push quick follow-up commits.
+# The event type is part of the group so a nightly (schedule on refs/heads/main)
+# is not cancelled by a main push and vice versa.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -45,9 +56,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # `npm test` is `vitest run`, which runs BOTH configured projects
+      # (vitest.config.ts test.projects): the `unit` project AND the
+      # real-SQLite `integration` project (parent task 2.4). No separate
+      # test:integration invocation is needed; the explicit comment keeps
+      # that fact visible (parent task 6.1).
+      #
       # Non-UTC zone so the local-date-key logic in lib/time.ts is not only
-      # ever exercised where local == UTC. Full TZ/DST matrix is TST-001.
-      - name: Test
+      # ever exercised where local == UTC (parent task 2.10 needs it). Full
+      # TZ/DST matrix is TST-001.
+      - name: Test (unit + integration projects)
         run: npm run test
         env:
           TZ: Asia/Manila
@@ -65,8 +83,16 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: quality
-    # PRs already cover feature branches; direct pushes only run e2e on main.
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    # Lanes (see simulation/matrix.ts):
+    #   - PR: journeys@pr (chromium feature suite + @p0 journey subset) and
+    #     scenarios-pr (deterministic scenario subset, gates, ≤ 10 min budget).
+    #   - main: journeys@main (full suite incl. full journeys + simulation
+    #     self-test), scenarios-main (full deterministic library), dist-sync.
+    #   - schedule: superseded by the `nightly` job below (avoids a double
+    #     full-suite run); workflow_dispatch runs the main lane manually.
+    # The disposable backend and the AI lane NEVER run here — forbidden
+    # combinations in matrix.ts; dist-sync is main/nightly only (never PRs).
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -104,12 +130,91 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      # Web export must exist before serve-e2e (Playwright webServer only runs the static server).
+      # Web export must exist before the E2E/server steps (Playwright
+      # webServer only starts the static server; sim:run needs it too).
       - name: Build web export for E2E
         run: npm run build:web
 
-      - name: Run E2E tests
+      # ---- PR lane: fast, fake-backed, deterministic ----
+      - name: Run feature E2E suite (lane journeys@pr — chromium project)
+        if: github.event_name == 'pull_request'
+        run: npx playwright test --project=chromium
+        env:
+          TZ: Asia/Manila
+
+      - name: Run P0 journey subset (lane journeys@pr — @p0, J1, J2a, J2b)
+        if: github.event_name == 'pull_request'
+        run: npm run e2e:journeys:p0
+        env:
+          TZ: Asia/Manila
+
+      - name: Validate simulation model + lane matrix (lane scenarios-pr)
+        if: github.event_name == 'pull_request'
+        run: npm run sim:validate
+
+      # ---- main lane: full suite ----
+      - name: Run full E2E suite incl. full journeys + simulation self-test (lane journeys@main)
+        if: github.event_name != 'pull_request'
         run: npm run e2e
+        env:
+          TZ: Asia/Manila
+
+      # ---- scenario lane (deterministic; needs the served dist/) ----
+      - name: Start static server for the scenario lane
+        run: |
+          node scripts/serve-e2e.js > /tmp/serve-e2e.log 2>&1 &
+          echo $! > /tmp/serve-e2e.pid
+
+      - name: Run deterministic scenario subset (lane scenarios-pr, ≤ 10 min budget)
+        if: github.event_name == 'pull_request'
+        run: |
+          for i in $(seq 1 90); do curl -sf http://localhost:8081 >/dev/null 2>&1 && break; sleep 1; done
+          npm run sim:run -- --mode deterministic --scenario @p0
+
+      - name: Run full deterministic scenario library (lane scenarios-main)
+        if: github.event_name != 'pull_request'
+        run: |
+          for i in $(seq 1 90); do curl -sf http://localhost:8081 >/dev/null 2>&1 && break; sleep 1; done
+          npm run sim:run -- --mode deterministic
+
+      - name: Stop static server
+        if: always()
+        run: kill "$(cat /tmp/serve-e2e.pid)" 2>/dev/null || true
+
+      # ---- dist-sync build (parent task 6.1a, lane dist-sync) ----
+      # A second static export with DUMMY Supabase env baked in (EXPO_NO_DOTENV
+      # blocks any real .env from leaking in; the URL is a non-routable host,
+      # the key is a literal placeholder). main/nightly ONLY — never PRs,
+      # never the quality job; never real credentials. Consumed by the
+      # dedicated `journeys-sync` Playwright project below (task 6.1a / Q5).
+      - name: Build dist-sync/ with dummy Supabase env (lane dist-sync)
+        if: github.event_name != 'pull_request'
+        env:
+          EXPO_NO_DOTENV: '1'
+          EXPO_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+        run: npx expo export -p web --output-dir dist-sync
+
+      - name: Verify dummy Supabase env is baked into dist-sync/
+        if: github.event_name != 'pull_request'
+        run: |
+          if ! grep -rlq "dummy.supabase.co" dist-sync; then
+            echo "abort: 'https://dummy.supabase.co' not found in dist-sync/ — the export did not bake the dummy env" >&2
+            exit 1
+          fi
+          echo "dist-sync/ carries the dummy Supabase env (non-routable host; no real credentials in any build)."
+
+      # ---- dist-sync lane (parent task 6.1a / Q5) ----
+      # The dedicated journeys-sync Playwright project runs the remote-boundary
+      # journeys (J3 reconnect-push, J4 backend failures, J5 restore round-trip,
+      # all tagged @sync) against dist-sync/ on :8082 (serve-e2e --port). This
+      # step runs only where dist-sync was built (main/nightly, never PRs) and
+      # AFTER the build (the e2e:sync env points the harness at dist-sync).
+      - name: Run remote-boundary journey lane against dist-sync/ (lane dist-sync)
+        if: github.event_name != 'pull_request'
+        run: npm run e2e:sync
+        env:
+          TZ: Asia/Manila
 
       - name: Upload E2E report
         if: always()
@@ -118,3 +223,157 @@ jobs:
           name: e2e-report
           path: .cursor/playwright-output/e2e-report/
           retention-days: 7
+
+      # Platform run reports, failure digests, screenshots, traces and any
+      # repro bundles (task 9.3) — same 7-day retention as e2e-report.
+      - name: Upload simulation artifacts (run reports, digests, traces, repro)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-output
+          path: simulation-output/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload dist-sync build artifact
+        if: github.event_name != 'pull_request' && !cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-sync
+          path: dist-sync/
+          retention-days: 7
+          if-no-files-found: error
+
+  nightly:
+    runs-on: ubuntu-latest
+    needs: quality
+    # Schedule-only superset of the e2e job: full journeys + seeded scenario
+    # mode (scenarios-seeded) + dist-sync + the disposable-backend lane.
+    # Non-gating by design (everything here is report-only).
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build web export for E2E
+        run: npm run build:web
+
+      - name: Run full suite incl. full journeys (lane journeys@nightly)
+        run: npm run e2e
+        env:
+          TZ: Asia/Manila
+
+      - name: Start static server for the scenario lanes
+        run: |
+          node scripts/serve-e2e.js > /tmp/serve-e2e.log 2>&1 &
+          echo $! > /tmp/serve-e2e.pid
+
+      - name: Run seeded scenario lane (lane scenarios-seeded)
+        run: |
+          for i in $(seq 1 90); do curl -sf http://localhost:8081 >/dev/null 2>&1 && break; sleep 1; done
+          npm run sim:run -- --mode seeded
+
+      - name: Stop static server
+        if: always()
+        run: kill "$(cat /tmp/serve-e2e.pid)" 2>/dev/null || true
+
+      - name: Build dist-sync/ with dummy Supabase env (lane dist-sync)
+        env:
+          EXPO_NO_DOTENV: '1'
+          EXPO_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+        run: npx expo export -p web --output-dir dist-sync
+
+      - name: Verify dummy Supabase env is baked into dist-sync/
+        run: |
+          if ! grep -rlq "dummy.supabase.co" dist-sync; then
+            echo "abort: 'https://dummy.supabase.co' not found in dist-sync/ — the export did not bake the dummy env" >&2
+            exit 1
+          fi
+          echo "dist-sync/ carries the dummy Supabase env (non-routable host; no real credentials in any build)."
+
+      # ---- dist-sync lane (parent task 6.1a / Q5) ----
+      # The dedicated journeys-sync Playwright project runs the remote-boundary
+      # journeys (J3/J4/J5, tagged @sync) against dist-sync/ on :8082. Nightly
+      # is non-gating by design (report-only), but the lane still runs so the
+      # remote-boundary branches are exercised on the schedule.
+      - name: Run remote-boundary journey lane against dist-sync/ (lane dist-sync)
+        run: npm run e2e:sync
+        env:
+          TZ: Asia/Manila
+
+      # ---- disposable-backend lane (lane disposable-backend) ----
+      # Runs ONLY when a Supabase access token is configured as a repo secret;
+      # otherwise this step is skipped and nightly stays green with the lane
+      # visibly "not configured". The hard-isolation guard (guard.ts /
+      # provision.ts check / build-dist-live.sh) runs BEFORE any build or
+      # network call and aborts non-zero if a rule fires. Round-trip scenario
+      # execution against dist-live/ (roundTripScenarios.ts) is task 8.5
+      # wiring — pending; the next nightly's create-or-wipe cleans up the
+      # previous project (task 8.2 semantics). Live-run verification is
+      # pending credential configuration.
+      - name: Disposable-backend lane (guarded; needs SUPABASE_ACCESS_TOKEN)
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        env:
+          SIMULATION_PRODUCTION_SUPABASE_HOSTS: ${{ vars.SIMULATION_PRODUCTION_SUPABASE_HOSTS }}
+        run: |
+          set -euo pipefail
+          npx tsx simulation/backend/provision.ts run --with-parser --no-teardown
+          bash simulation/backend/build-dist-live.sh
+          test -f dist-live/index.html && echo "dist-live/ produced by the guarded job (never committed; gitignored)."
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-nightly
+          path: .cursor/playwright-output/e2e-report/
+          retention-days: 7
+
+      - name: Upload simulation artifacts (run reports, digests, traces, repro)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-output-nightly
+          path: simulation-output/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload dist-sync build artifact
+        if: '!cancelled()'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-sync-nightly
+          path: dist-sync/
+          retention-days: 7
+          if-no-files-found: error
