@@ -1,5 +1,7 @@
 # SuperHabits — Project Core Context
 
+> **SUPERSEDED** — AGENTS.md is the primary agent guide; this document is historical and its baselines (e.g. 427 tests) are stale. Last verified: 2026-05.
+
 SuperHabits is an offline-first productivity app built with Expo + React Native from a single TypeScript codebase targeting:
 
 - Web as a PWA

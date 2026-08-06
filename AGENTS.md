@@ -53,7 +53,7 @@ Key product facts:
 - **Backup/Auth:** Supabase (`@supabase/supabase-js`) with anonymous sign-in
 - **Networking:** `@react-native-community/netinfo`
 - **Notifications:** `expo-notifications` (iOS/Android only)
-- **Charts/Lists:** `react-native-gifted-charts`, `@shopify/flash-list`
+- **Charts/Lists:** `react-native-gifted-charts`, `@shopify/flash-list`; **drag-reorder:** `react-native-draggable-flatlist` (TodosScreen intentionally uses `DraggableFlatList` — do not convert it to `FlashList`); **date/time picker:** `@react-native-community/datetimepicker`
 - **Animations:** `react-native-reanimated`
 - **Testing:** Vitest `^3.2.7` (unit), Playwright `^1.58.2` (E2E)
 - **Patching:** `patch-package` (runs in `postinstall`)
@@ -77,21 +77,21 @@ Key product facts:
 
 ## Directory Structure
 
-| Path         | Role                                                                                                                                                                                                                                                                |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`       | Expo Router only. Single-page entry: `_layout.tsx` mounts `GlobalCommandCenterHost` + `NavigationProvider`; `index.tsx` renders all six sections behind `NavigationContext.activeSection`. No business logic.                          |
-| `features/`  | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions: `overview/` and `settings/` are screen-only; `command/` is an overlay-first shell; `shared/` holds cross-feature UI. |
-| `core/`      | Cross-cutting infrastructure: DB client/migrations, entity types, sync engine + restore, linked actions, providers, PWA service-worker registration, shared UI primitives (`core/ui/`).                                                                             |
-| `lib/`       | Pure helpers only. No DB access, no feature imports. Includes `id.ts`, `time.ts`, `validation.ts`, `supabase.ts`, `notifications.ts`, etc.                                                                                                                          |
-| `constants/` | Design tokens such as `sectionColors.ts`.                                                                                                                                                                                                                           |
-| `tests/`     | Vitest unit tests for domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider tests.                                                                                               |
-| `e2e/`       | Playwright E2E specs and helpers. Runs against the static web export in `dist/`.                                                                                                                                                                                    |
-| `public/`    | Static PWA assets: `sw.js`, `manifest.json`, icons.                                                                                                                                                                                                                 |
-| `assets/`    | App icons and splash images.                                                                                                                                                                                                                                        |
-| `scripts/`   | Build/test helpers such as `serve-e2e.js`.                                                                                                                                                                                                                          |
-| `supabase/`  | Supabase Edge Functions (`supabase/functions/parse-ai-command/`).                                                                                                                                                                                                   |
-| `patches/`   | `patch-package` patches for Metro / React Native CLI plugins.                                                                                                                                                                                                       |
-| `docs/`      | Architecture maps, knowledge base, and agent workflows.                                                                                                                                                                                                             |
+| Path         | Role                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/`       | Expo Router only. Single-page entry: `_layout.tsx` mounts `GlobalCommandCenterHost` + `NavigationProvider`; `index.tsx` renders all six sections behind `NavigationContext.activeSection`. No business logic.                                                                                                                                                                              |
+| `features/`  | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions: `overview/` is screen-only; `settings/` is a screen plus `settingsRestorePreview.ts`; `command/` is an overlay-first shell; `shared/` holds cross-feature UI and shared types (`activityTypes.ts`).                                         |
+| `core/`      | Cross-cutting infrastructure: DB client/migrations, entity types, `app_meta` key registry (`core/db/appMeta.ts`), sync engine + restore, linked actions, in-app notices (`core/notifications/` + `core/providers/InAppNoticeProvider.tsx` + `core/ui/InAppNoticeBanner.tsx`), theme system (`core/theme/`), providers, PWA service-worker registration, shared UI primitives (`core/ui/`). |
+| `lib/`       | No DB access, no feature imports — but not all pure: `supabase.ts` has auth side effects (module-scope client), `notifications.ts` registers a module-scope notification handler, `useForegroundRefresh.ts` is React hooks. Includes `id.ts`, `time.ts`, `validation.ts`, etc.                                                                                                             |
+| `constants/` | Design tokens such as `sectionColors.ts`.                                                                                                                                                                                                                                                                                                                                                  |
+| `tests/`     | Vitest unit tests for domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider tests.                                                                                                                                                                                                                      |
+| `e2e/`       | Playwright E2E specs and helpers. Runs against the static web export in `dist/`.                                                                                                                                                                                                                                                                                                           |
+| `public/`    | Static PWA assets: `sw.js`, `manifest.json`, icons.                                                                                                                                                                                                                                                                                                                                        |
+| `assets/`    | App icons and splash images.                                                                                                                                                                                                                                                                                                                                                               |
+| `scripts/`   | Build/test helpers such as `serve-e2e.js`.                                                                                                                                                                                                                                                                                                                                                 |
+| `supabase/`  | Supabase Edge Functions (`supabase/functions/parse-ai-command/`).                                                                                                                                                                                                                                                                                                                          |
+| `patches/`   | `patch-package` patches for Metro / React Native CLI plugins.                                                                                                                                                                                                                                                                                                                              |
+| `docs/`      | Architecture maps, knowledge base, and agent workflows.                                                                                                                                                                                                                                                                                                                                    |
 
 ## Architecture & Runtime
 
@@ -100,7 +100,7 @@ Key product facts:
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
 - Current stored schema version: **11** (`app_meta.db_schema_version`). Next migration: add a new `if (version < 12) { ... }` block.
-- `schema.sql` is **reference-only**; it is never executed at runtime.
+- `core/db/schema.sql` is **stale** (a v4-era snapshot missing 7 of 15 tables) and **reference-only** — it is never executed at runtime. Derive the real schema from the bootstrap DDL + migration blocks in `core/db/client.ts`.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 
 ### Sync
@@ -169,13 +169,13 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 Violating these can cause silent data corruption or break the app on cold start.
 
 1. **Soft delete only** for main entities. Use `UPDATE ... SET deleted_at = datetime('now')` and `WHERE deleted_at IS NULL`. Do not use `DELETE FROM` on synced entity tables.
-2. **Sync enqueue on every applicable write.** Call `syncEngine.enqueue(...)` immediately after `INSERT`/`UPDATE` on `todos`, `habits`, `calorie_entries`, and `workout_routines`. Not synced: `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, nested workout tables.
+2. **Sync enqueue on every applicable write.** Call `syncEngine.enqueue(...)` immediately after `INSERT`/`UPDATE` on `todos`, `habits`, `calorie_entries`, and `workout_routines`. Not synced: `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `linked_action_rules`, `linked_action_events`, `linked_action_executions`, nested workout tables.
 3. **DB singleton.** `getDatabase()` in `core/db/client.ts` is the only entrypoint. Never open a second SQLite connection or access the DB before initialization.
 4. **IDs via `createId(prefix)` from `lib/id.ts`.** Format: `{prefix}_{timestamp_ms}_{8_random_chars}`. Never use `Math.random()`, `crypto.randomUUID()`, or `Date.now()` alone.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
 6. **Migrations are append-only.** Never edit existing migration blocks. Add a new `if (version < N+1) { ... }` block in `runMigrations()` in `core/db/client.ts`.
-7. **`schema.sql` is reference-only**, not runtime authority.
-8. **Habit completions exception.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0. This table is not synced.
+7. **`schema.sql` is a stale v4-era snapshot** (missing 7 of 15 tables) and reference-only, not runtime authority — the runtime truth is the bootstrap DDL + migration blocks in `core/db/client.ts`.
+8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`). Neither table is synced.
 
 ## Feature Module Pattern
 
@@ -193,9 +193,9 @@ app/index.tsx  ← section mounted in the single-page shell behind NavigationCon
 Current exceptions:
 
 - `features/overview/OverviewScreen.tsx` only (dashboard composes existing modules).
-- `features/settings/SettingsScreen.tsx` only (full-screen modal).
+- `features/settings/` is a screen (`SettingsScreen.tsx`) plus restore-preview logic (`settingsRestorePreview.ts`), shown as a full-screen modal.
 - `features/command/` is an overlay-first shell with its own provider, screen, parser, config, and executor files.
-- `features/shared/` holds cross-feature UI (`GitHubHeatmap`, etc.).
+- `features/shared/` holds cross-feature UI (`GitHubHeatmap`, etc.) and shared types (`activityTypes.ts`, used by 4 domain layers).
 - `features/workout/` includes nested screens (`RoutineDetailScreen`, `WorkoutSessionScreen`).
 
 ## Entity ID Prefixes (`createId`)
@@ -229,8 +229,8 @@ npm run web          # headless web dev server
 
 # Quality gates
 npm run typecheck    # tsc --noEmit
-npm run lint         # eslint . --ext .ts,.tsx
-npm run lint:fix     # eslint . --ext .ts,.tsx --fix
+npm run lint         # eslint . --max-warnings 25
+npm run lint:fix     # eslint . --fix
 npm run format       # prettier --write .
 npm run format:check # prettier --check .
 npm test             # vitest run
@@ -257,6 +257,8 @@ Current verified baselines:
 > The simulation platform (`simulation/`) adds scenario/runner/repro layers on top of the journey suite — see `simulation/README.md` and `docs/testing/known-gaps.md`.
 
 ## Testing Strategy
+
+> Test counts in this file (and in `docs/`) are **point-in-time**. Before relying on them, verify with `npx vitest list` and `npx playwright test --list` — they drift as specs are added/removed.
 
 ### Unit Tests (Vitest)
 
@@ -371,7 +373,7 @@ Because Expo public env vars are bundled into the client, never put real secrets
 - Screens: `{Feature}Screen.tsx`
 - Sections: rendered in `app/index.tsx` behind `NavigationContext.activeSection` (no per-feature route files)
 - Styling: NativeWind `className` with Tailwind utility classes. Do **not** use `StyleSheet.create()` for new code.
-- Lists: use `@shopify/flash-list` (`FlashList`), not `FlatList`.
+- Lists: use `@shopify/flash-list` (`FlashList`), not `FlatList` — except `features/todos/TodosScreen.tsx`, which intentionally uses `DraggableFlatList` (`react-native-draggable-flatlist`) for drag-reorder; do not convert it.
 - Animations: `react-native-reanimated`.
 - SVG: `react-native-svg`.
 - Safe area: use `<Screen>` from `core/ui/Screen.tsx`.

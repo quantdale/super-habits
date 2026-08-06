@@ -1,5 +1,7 @@
 # SuperHabits Master Context
 
+> **SUPERSEDED** — AGENTS.md is the primary agent guide; this document is historical and its baselines (e.g. 427 tests) are stale. Last verified: 2026-05.
+
 Purpose: a compact, repo-grounded briefing file for future AI agents and human contributors. This is not a replacement for the larger knowledge base; it is the shortest useful path to correct implementation context.
 
 Primary references:
@@ -112,21 +114,21 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-| Path               | Owns                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| `app/`             | Single-page root: `_layout.tsx` (providers + shell hosts) and `index.tsx` (renders all six sections) |
-| `features/`        | Feature modules: data/domain/screen/components                                              |
-| `features/shared/` | Cross-feature visualizations such as heatmaps/activity views                                |
-| `core/db/`         | SQLite bootstrap, migrations, types, reference schema                                       |
-| `core/sync/`       | In-memory sync queue, Supabase push adapter, and restore v1 coordinator                     |
+| Path               | Owns                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`             | Single-page root: `_layout.tsx` (providers + shell hosts) and `index.tsx` (renders all six sections)                                  |
+| `features/`        | Feature modules: data/domain/screen/components                                                                                        |
+| `features/shared/` | Cross-feature visualizations such as heatmaps/activity views                                                                          |
+| `core/db/`         | SQLite bootstrap, migrations, types, reference schema                                                                                 |
+| `core/sync/`       | In-memory sync queue, Supabase push adapter, and restore v1 coordinator                                                               |
 | `core/providers/`  | App bootstrap (DB init, SW, anonymous Supabase session, sync hydrate, restore preview) and providers (Navigation, Theme, InAppNotice) |
-| `core/pwa/`        | Service worker registration                                                                 |
-| `core/ui/`         | Shared UI primitives                                                                        |
-| `lib/`             | Pure/platform helpers: IDs, time, validation, notifications, Supabase config, focus refresh |
-| `constants/`       | Section color tokens                                                                        |
-| `tests/`           | Vitest tests                                                                                |
-| `e2e/`             | Playwright tests                                                                            |
-| `public/`          | Manifest and service worker for PWA                                                         |
+| `core/pwa/`        | Service worker registration                                                                                                           |
+| `core/ui/`         | Shared UI primitives                                                                                                                  |
+| `lib/`             | Pure/platform helpers: IDs, time, validation, notifications, Supabase config, focus refresh                                           |
+| `constants/`       | Section color tokens                                                                                                                  |
+| `tests/`           | Vitest tests                                                                                                                          |
+| `e2e/`             | Playwright tests                                                                                                                      |
+| `public/`          | Manifest and service worker for PWA                                                                                                   |
 
 ### Confirmed from docs
 
@@ -291,15 +293,15 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-| Feature  | Current behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview | Dashboard aggregates pending todos, calories vs goal, best habit streak, focus sessions/streak, workout days/streak                                                                                                                                                                                                                                                                                                                                                                |
-| Todos    | Add/edit/delete, swipe actions, priority, due date, drag reorder, daily recurrence, completed toggle                                                                                                                                                                                                                                                                                                                                                                               |
-| Habits   | Create/edit/delete, time-of-day grouping, icon/color presets, increment/decrement counts, streaks, yearly consistency view                                                                                                                                                                                                                                                                                                                                                         |
-| Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history                                                                                                                                                                                                                                                                                                                                                                  |
-| Workout  | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history                                                                                                                                                                                                                                                                                                                                                                                   |
-| Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference                                                                                                                                                                                                                                                                                            |
-| Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls                                                                                                                                                                                                                                                                                                                         |
+| Feature  | Current behavior                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview | Dashboard aggregates pending todos, calories vs goal, best habit streak, focus sessions/streak, workout days/streak                                                                                                                                                                                                                                                                                                                              |
+| Todos    | Add/edit/delete, swipe actions, priority, due date, drag reorder, daily recurrence, completed toggle                                                                                                                                                                                                                                                                                                                                             |
+| Habits   | Create/edit/delete, time-of-day grouping, icon/color presets, increment/decrement counts, streaks, yearly consistency view                                                                                                                                                                                                                                                                                                                       |
+| Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history                                                                                                                                                                                                                                                                                                                                |
+| Workout  | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history                                                                                                                                                                                                                                                                                                                                                 |
+| Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference                                                                                                                                                                                                                                                          |
+| Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls                                                                                                                                                                                                                                                                                       |
 | Command  | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the entry is a global overlay launcher (`GlobalCommandCenterHost`) on the six sections. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
 
 ## Domain Concepts and Glossary

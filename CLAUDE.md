@@ -23,7 +23,7 @@ If this file conflicts with those, follow the more specific one.
 
 ```bash
 npm run typecheck            # tsc --noEmit
-npm run lint                 # eslint . --max-warnings 81  (warnings allowed under the cap)
+npm run lint                 # eslint . --max-warnings 25  (warnings allowed under the cap)
 npm run lint:fix
 npm run format               # prettier --write .
 npm test                     # vitest run
@@ -54,31 +54,31 @@ features/{name}/
 app/index.tsx  ← section rendered behind NavigationContext.activeSection (no per-feature route file)
 ```
 
-`app/` = Expo Router only. `core/` = cross-cutting infra (DB client+migrations in `core/db/client.ts`, entity types in `core/db/types.ts`, sync in `core/sync/`, linked actions, `AppProviders`, shared `core/ui/` primitives). `lib/` = pure helpers (`id`, `time`, `validation`, `supabase`) — no DB, no feature imports. Path alias `@/` → project root.
+`app/` = Expo Router only. `core/` = cross-cutting infra (DB client+migrations in `core/db/client.ts`, entity types in `core/db/types.ts`, `app_meta` key registry in `core/db/appMeta.ts`, sync in `core/sync/`, linked actions, in-app notices in `core/notifications/` + `core/providers/InAppNoticeProvider.tsx` + `core/ui/InAppNoticeBanner.tsx`, themes in `core/theme/`, `AppProviders`, shared `core/ui/` primitives). `lib/` = no DB, no feature imports — but not all pure (`supabase.ts` has auth side effects, `notifications.ts` registers a module-scope handler, `useForegroundRefresh.ts` is React hooks). Path alias `@/` → project root.
 
 Any component calling a `*.data.ts` function must be a descendant of `AppProviders`, which bootstraps in order: GestureHandler → `initializeDatabase()` → service worker (web) → `ensureAnonymousSession()` (when Supabase env set) → sync engine hydrate → restore prompt check.
 
 ## Non-negotiable invariants (violating these silently corrupts data)
 
 1. **Soft delete only** on main entity tables — `UPDATE ... SET deleted_at = datetime('now')` and always `WHERE deleted_at IS NULL`. Never `DELETE FROM` synced tables.
-2. **Enqueue on every write** — call `syncEngine.enqueue(...)` immediately after INSERT/UPDATE on synced entities: `todos`, `habits`, `calorie_entries`, `workout_routines`. **Not** synced: `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, nested workout tables.
+2. **Enqueue on every write** — call `syncEngine.enqueue(...)` immediately after INSERT/UPDATE on synced entities: `todos`, `habits`, `calorie_entries`, `workout_routines`. **Not** synced: `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `linked_action_rules`, `linked_action_events`, `linked_action_executions`, nested workout tables.
 3. **DB singleton** — `getDatabase()` in `core/db/client.ts` is the only entrypoint; every data function starts with `const db = await getDatabase()`. Never open a second connection.
 4. **IDs via `createId(prefix)`** from `lib/id.ts` (`{prefix}_{ms}_{rand8}`). Never `Math.random()`, `crypto.randomUUID()`, or bare `Date.now()`. Prefixes: `todo`, `habit`, `hcmp`, `cal`, `smeal`, `wrk`, `ex`, `eset`, `wsex`, `pom`, `rec`, `guest`.
 5. **Date keys via `toDateKey()`** from `lib/time.ts` — local-calendar `YYYY-MM-DD` since migration 5 (`app_meta.date_key_cutover`; old UTC rows are not backfilled).
-6. **Migrations are append-only** — never edit an existing block. Current stored schema version is **11**; add a new `if (version < 12) { ... }` block in `runMigrations()` in `core/db/client.ts`. `core/db/schema.sql` is reference-only, never executed at runtime.
-7. **`habit_completions` exception** — SELECT existing `(habit_id, date_key)` → INSERT (`hcmp`) or UPDATE count; hard `DELETE` allowed only when decrementing from 1 to 0. Not synced.
+6. **Migrations are append-only** — never edit an existing block. Current stored schema version is **11**; add a new `if (version < 12) { ... }` block in `runMigrations()` in `core/db/client.ts`. `core/db/schema.sql` is a stale v4-era snapshot (missing 7 of 15 tables) and reference-only — never executed at runtime; the runtime truth is `core/db/client.ts`.
+7. **Hard-delete exceptions** — `habit_completions`: SELECT existing `(habit_id, date_key)` → INSERT (`hcmp`) or UPDATE count; hard `DELETE` allowed only when decrementing from 1 to 0. `saved_meals` also hard-deletes by design (`deleteSavedMeal` in `features/calories/calories.data.ts`). Neither is synced.
 
 ## Conventions
 
 - Styling: NativeWind `className` with Tailwind utilities. Do **not** use `StyleSheet.create()` for new code (inline `StyleSheet` only for JS-dynamic values). Section colors from `constants/sectionColors.ts`.
-- Lists: `@shopify/flash-list` (`FlashList`), not `FlatList`. Safe area: `<Screen>` from `core/ui/Screen.tsx`. Animations: `react-native-reanimated`. SVG: `react-native-svg`.
+- Lists: `@shopify/flash-list` (`FlashList`), not `FlatList` — except `features/todos/TodosScreen.tsx`, which intentionally uses `DraggableFlatList` (`react-native-draggable-flatlist`) for drag-reorder; do not convert it. Safe area: `<Screen>` from `core/ui/Screen.tsx`. Animations: `react-native-reanimated`. SVG: `react-native-svg`.
 - Refresh pattern: re-call the list function after every mutation; `useActiveForegroundRefresh(isActive, ...)` from `lib/useForegroundRefresh.ts` keyed on `isActive`, plus `useForegroundRefresh` for app-state/visibility.
 - Every new `*.domain.ts` function needs a Vitest test in `tests/`. Component rendering tests are intentionally limited.
 - Do **not** add `data-testid` to app components to satisfy E2E; fix broken selectors in the spec instead. If an E2E test reveals a real bug, fix the app, not the test.
 
 ## Installed-but-unused (do not wire up without an explicit decision)
 
-`date-fns`, `expo-background-fetch`, `expo-task-manager`. State today is local `useState` only.
+`date-fns`. State today is local `useState` only.
 
 ## Environment variables (all optional; app runs local-only if unset)
 

@@ -79,7 +79,6 @@ State your classification and routing decision before proceeding.
 - Use NativeWind className (not StyleSheet.create) for styling
 - Use <Screen> from core/ui for screen wrappers
 - Neither zustand nor React Query is installed — do not wire either in without explicit instruction
-- Do not fix toDateKey() UTC bug silently — flag it
 - Do not revert mealType to hard-coded "snack"
 - Do not overstate the experimental command center: current scope is single create-todo or create-habit parse -> review -> confirm, not a general AI assistant
 

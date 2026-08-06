@@ -1,10 +1,13 @@
 # SuperHabits — Unified Knowledge Base
 
+> **SUPERSEDED** — AGENTS.md is the primary agent guide; this document is historical and its baselines (e.g. 427 tests) are stale. Last verified: 2026-05.
+
 > Generated from: `00_INDEX.md`, `01_APP_ROUTING.md`, `01_ARCHITECTURE.md`,
 > `02_CORE_INFRA.md`, `02_DATABASE.md`, `03_LIB_SHARED.md`, `03_FEATURES.md`,
 > `04_FEATURES.md`, `04_UI_DESIGN_SYSTEM.md`, `05_QA_AND_TOOLING.md`,
 > `05_TESTING.md`, `06_CURSOR_WORKFLOW.md`, `06_EDITOR_AND_DOCS.md`,
 > `07_INVARIANTS_AND_CONSTRAINTS.md`, `08_FEATURE_ROADMAP.md`, `KNOWLEDGE_BASE.md`
+> (The generator-source files listed above no longer exist in the repo.)
 
 ---
 
@@ -76,17 +79,17 @@
 
 ### Cross-cutting concerns
 
-| Concern    | Where                                                       | Behavior                                                                                                                               |
-| ---------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Navigation | `app/_layout.tsx`, `app/index.tsx`                         | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay |
-| Database   | `core/db/client.ts`                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                       |
-| Types      | `core/db/types.ts`                                          | Entity TypeScript shapes                                                                                                               |
-| IDs & time | `lib/id.ts`, `lib/time.ts`                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                     |
-| Sync       | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | In-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                                         |
+| Concern    | Where                                                       | Behavior                                                                                                                                         |
+| ---------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Navigation | `app/_layout.tsx`, `app/index.tsx`                          | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay                                           |
+| Database   | `core/db/client.ts`                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                                 |
+| Types      | `core/db/types.ts`                                          | Entity TypeScript shapes                                                                                                                         |
+| IDs & time | `lib/id.ts`, `lib/time.ts`                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                               |
+| Sync       | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | In-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                                                   |
 | Bootstrap  | `core/providers/AppProviders.tsx`                           | DB init, SW register, **`ensureAnonymousSession()`**, `syncEngine.hydrate()`, restore preview; second effect registers sync flush when remote on |
-| PWA        | `registerServiceWorker.ts`, `public/sw.js`                  | Workbox registration; cache-first GET handler                                                                                          |
-| Web deploy | Root **`vercel.json`**                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html` |
-| Styling    | `tailwind.config.js`, `global.css`                          | Section palette + brand scale; NativeWind                                                                                              |
+| PWA        | `registerServiceWorker.ts`, `public/sw.js`                  | Workbox registration; cache-first GET handler                                                                                                    |
+| Web deploy | Root **`vercel.json`**                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html`           |
+| Styling    | `tailwind.config.js`, `global.css`                          | Section palette + brand scale; NativeWind                                                                                                        |
 
 ---
 
@@ -97,7 +100,7 @@
 | Attribute               | Value                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Name                    | `superhabits` (npm package, private)                                                                                                        |
-| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay                                           |
+| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay       |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                              |
 | Schema version (stored) | **11** (`app_meta.db_schema_version`)                                                                                                       |
 | Next migration          | `12` (new `if (version < 12)` block in `runMigrations`)                                                                                     |
@@ -108,7 +111,7 @@
 
 | Path                   | Role                                                                                                                                                     |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`                 | Expo Router single-page root: `_layout.tsx` (providers + shell hosts) and `index.tsx` (renders all six sections)                            |
+| `app/`                 | Expo Router single-page root: `_layout.tsx` (providers + shell hosts) and `index.tsx` (renders all six sections)                                         |
 | `assets/`              | Icons, splash, favicon (referenced from `app.json`)                                                                                                      |
 | `constants/`           | Shared design tokens (section colors)                                                                                                                    |
 | `core/`                | DB singleton, types, sync engine, restore coordinator, `AppProviders`, PWA registration, providers, shared `ui/`                                         |
@@ -129,9 +132,9 @@
 
 #### `app/` (2 files)
 
-| File          | Role                                                          |
-| ------------- | ------------------------------------------------------------- |
-| `_layout.tsx` | Root layout; `AppProviders`, `StatusBar`, hides header; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner` |
+| File          | Role                                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `_layout.tsx` | Root layout; `AppProviders`, `StatusBar`, hides header; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`                |
 | `index.tsx`   | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items |
 
 #### `features/` (unique source files)
@@ -156,28 +159,28 @@
 
 #### `core/` (20 logical paths)
 
-| Path                                     | Role                                                                                                                              |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `db/client.ts`                           | Singleton DB, bootstrap DDL, `runMigrations`                                                                                      |
-| `db/types.ts`                            | Entity TypeScript types                                                                                                           |
-| `db/schema.sql`                          | Reference only (not executed at runtime)                                                                                          |
-| `db/migrations/001_initial_supabase.sql` | Reference / future Supabase                                                                                                       |
-| `sync/sync.engine.ts`                    | `SyncRecord`, `SyncAdapter`, `NoopSyncAdapter`, `SyncEngine`, **`syncEngine`** singleton (`SupabaseSyncAdapter`)                  |
-| `sync/supabase.adapter.ts`               | `SupabaseSyncAdapter` — push upserts for synced entities                                                                          |
-| `sync/restore.coordinator.ts`            | Restore v1 preview, eligibility, dismissal, and empty-device import flow                                                          |
-| `sync/restore.types.ts`                  | Restore entity scope, preview, and result types                                                                                   |
+| Path                                     | Role                                                                                                                                           |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `db/client.ts`                           | Singleton DB, bootstrap DDL, `runMigrations`                                                                                                   |
+| `db/types.ts`                            | Entity TypeScript types                                                                                                                        |
+| `db/schema.sql`                          | Reference only (not executed at runtime)                                                                                                       |
+| `db/migrations/001_initial_supabase.sql` | Reference / future Supabase                                                                                                                    |
+| `sync/sync.engine.ts`                    | `SyncRecord`, `SyncAdapter`, `NoopSyncAdapter`, `SyncEngine`, **`syncEngine`** singleton (`SupabaseSyncAdapter`)                               |
+| `sync/supabase.adapter.ts`               | `SupabaseSyncAdapter` — push upserts for synced entities                                                                                       |
+| `sync/restore.coordinator.ts`            | Restore v1 preview, eligibility, dismissal, and empty-device import flow                                                                       |
+| `sync/restore.types.ts`                  | Restore entity scope, preview, and result types                                                                                                |
 | `providers/AppProviders.tsx`             | DB init, SW, **`ensureAnonymousSession`**, `syncEngine.hydrate()`, restore preview, NetInfo/interval/visibility sync flush when remote enabled |
-| `pwa/registerServiceWorker.ts`           | Workbox `/sw.js` on web                                                                                                           |
-| `ui/Card.tsx`                            | Card shell + optional left accent strip                                                                                           |
-| `ui/Screen.tsx`                          | `SafeAreaView` + scroll/fill                                                                                                      |
-| `ui/Button.tsx`                          | Primary / ghost / danger                                                                                                          |
-| `ui/TextField.tsx`                       | Labeled input; optional unsigned integer                                                                                          |
-| `ui/PillChip.tsx`                        | Pill selector                                                                                                                     |
-| `ui/ValidationError.tsx`                 | Inline error banner                                                                                                               |
-| `ui/SectionTitle.tsx`                    | Title + subtitle                                                                                                                  |
-| `ui/NumberStepperField.tsx`              | Numeric stepper + text field                                                                                                      |
-| `ui/SwipeRightActions.tsx`               | Edit/Delete swipe actions                                                                                                         |
-| `ui/HorizontalScrollArea.tsx`            | Horizontal scroll; web div vs native `ScrollView`; `scrollToEnd` ref                                                              |
+| `pwa/registerServiceWorker.ts`           | Workbox `/sw.js` on web                                                                                                                        |
+| `ui/Card.tsx`                            | Card shell + optional left accent strip                                                                                                        |
+| `ui/Screen.tsx`                          | `SafeAreaView` + scroll/fill                                                                                                                   |
+| `ui/Button.tsx`                          | Primary / ghost / danger                                                                                                                       |
+| `ui/TextField.tsx`                       | Labeled input; optional unsigned integer                                                                                                       |
+| `ui/PillChip.tsx`                        | Pill selector                                                                                                                                  |
+| `ui/ValidationError.tsx`                 | Inline error banner                                                                                                                            |
+| `ui/SectionTitle.tsx`                    | Title + subtitle                                                                                                                               |
+| `ui/NumberStepperField.tsx`              | Numeric stepper + text field                                                                                                                   |
+| `ui/SwipeRightActions.tsx`               | Edit/Delete swipe actions                                                                                                                      |
+| `ui/HorizontalScrollArea.tsx`            | Horizontal scroll; web div vs native `ScrollView`; `scrollToEnd` ref                                                                           |
 
 #### `lib/` (8 paths)
 
@@ -282,18 +285,18 @@ core/ui → react-native, nativewind, lib/horizontalScrollViewportStyle
 
 ### Module boundaries
 
-| Area         | Contents                                                                 | Rationale                          |
-| ------------ | ------------------------------------------------------------------------ | ---------------------------------- |
+| Area         | Contents                                                             | Rationale                          |
+| ------------ | -------------------------------------------------------------------- | ---------------------------------- |
 | `core/`      | DB singleton, sync engine, shared UI primitives, PWA hook, providers | Cross-cutting infrastructure       |
-| `features/`  | Product modules with clear data/domain/UI split                          | Scalable MVP boundaries            |
-| `lib/`       | Small pure or platform helpers used everywhere                           | Reuse without circular deps        |
-| `constants/` | Visual / marketing color semantics                                       | Single source for section identity |
+| `features/`  | Product modules with clear data/domain/UI split                      | Scalable MVP boundaries            |
+| `lib/`       | Small pure or platform helpers used everywhere                       | Reuse without circular deps        |
+| `constants/` | Visual / marketing color semantics                                   | Single source for section identity |
 
 ### Naming conventions
 
 | Kind                 | Pattern                                        | Examples                                 |
 | -------------------- | ---------------------------------------------- | ---------------------------------------- |
-| Source utilities     | camelCase                                      | `todos.data.ts`, `time.ts`          |
+| Source utilities     | camelCase                                      | `todos.data.ts`, `time.ts`               |
 | React components     | PascalCase                                     | `TodosScreen.tsx`, `GitHubHeatmap.tsx`   |
 | Screens              | `{Feature}Screen.tsx`                          | `CaloriesScreen.tsx`                     |
 | Data layer           | `{feature}.data.ts`                            | `workout.data.ts`                        |
@@ -403,9 +406,9 @@ Shared foreground trigger used by feature screens:
 
 ### Utilities (installed, not imported)
 
-| Package    | Version | Purpose                                       |
-| ---------- | ------- | --------------------------------------------- |
-| `date-fns` | ^4.1.0  | Listed; **not imported** in app source        |
+| Package    | Version | Purpose                                |
+| ---------- | ------- | -------------------------------------- |
+| `date-fns` | ^4.1.0  | Listed; **not imported** in app source |
 
 ### IDs & PWA
 
@@ -416,15 +419,15 @@ Shared foreground trigger used by feature screens:
 
 ### Testing & tooling
 
-| Package             | Version  | Purpose                                               |
-| ------------------- | -------- | ----------------------------------------------------- |
-| `typescript`        | ~5.9.2   | Typecheck                                             |
-| `vitest`            | ^3.2.7   | Unit tests                                            |
-| `@playwright/test`  | ^1.58.2  | E2E (Chromium)                                        |
-| `babel-preset-expo` | ^55.0.12 | Babel                                                 |
-| `cross-env`         | ^10.1.0  | `EXPO_UNSTABLE_HEADLESS` for web script               |
-| `patch-package`     | ^8.0.1   | Post-install patches                                  |
-| `wait-on`           | ^9.0.4   | Optional dev tooling (not used by current CI E2E job) |
+| Package             | Version  | Purpose                                                        |
+| ------------------- | -------- | -------------------------------------------------------------- |
+| `typescript`        | ~5.9.2   | Typecheck                                                      |
+| `vitest`            | ^3.2.7   | Unit tests                                                     |
+| `@playwright/test`  | ^1.58.2  | E2E (Chromium)                                                 |
+| `babel-preset-expo` | ^55.0.12 | Babel                                                          |
+| `cross-env`         | ^10.1.0  | `EXPO_UNSTABLE_HEADLESS` for web script                        |
+| `patch-package`     | ^8.0.1   | Post-install patches                                           |
+| `wait-on`           | removed  | Was optional dev tooling; unused, dropped from devDependencies |
 
 ### Dependency security (Snyk)
 
@@ -449,11 +452,11 @@ Shared foreground trigger used by feature screens:
 
 ### Entry points
 
-| Entry       | File                                                               | Behavior                                                                                                          |
-| ----------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| npm `main`  | `package.json` → `"expo-router/entry"`                             | Expo Router bootstraps `app/` tree                                                                                |
-| Root layout | `app/_layout.tsx`                                                  | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner` |
-| Index       | `app/index.tsx`                                                    | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items |
+| Entry       | File                                   | Behavior                                                                                                                               |
+| ----------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| npm `main`  | `package.json` → `"expo-router/entry"` | Expo Router bootstraps `app/` tree                                                                                                     |
+| Root layout | `app/_layout.tsx`                      | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner` |
+| Index       | `app/index.tsx`                        | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items          |
 
 ### `app/_layout.tsx`
 
@@ -880,14 +883,14 @@ export type SavedMeal = {
 
 ### `app_meta` keys registry
 
-| Key                 | Written by             | Value shape               | Purpose                        |
-| ------------------- | ---------------------- | ------------------------- | ------------------------------ |
-| `db_schema_version` | migrations             | string integer            | Schema version                 |
-| `date_key_format`   | migration 5            | `'local'`                 | Date keys are local calendar   |
-| `date_key_cutover`  | migration 5            | ISO timestamp             | When local format was recorded |
+| Key                 | Written by                            | Value shape               | Purpose                        |
+| ------------------- | ------------------------------------- | ------------------------- | ------------------------------ |
+| `db_schema_version` | migrations                            | string integer            | Schema version                 |
+| `date_key_format`   | migration 5                           | `'local'`                 | Date keys are local calendar   |
+| `date_key_cutover`  | migration 5                           | ISO timestamp             | When local format was recorded |
 | `guest_profile`     | — (key defined but no longer written) | JSON `{"id","createdAt"}` | Anonymous profile id           |
-| `calorie_goal`      | `setCalorieGoal`       | JSON `CalorieGoal`        | Daily calorie + macro targets  |
-| `pomodoro_settings` | `savePomodoroSettings` | JSON `PomodoroSettings`   | Timer durations                |
+| `calorie_goal`      | `setCalorieGoal`                      | JSON `CalorieGoal`        | Daily calorie + macro targets  |
+| `pomodoro_settings` | `savePomodoroSettings`                | JSON `PomodoroSettings`   | Timer durations                |
 
 ### ID prefix registry
 
@@ -1027,13 +1030,13 @@ There is no `core/auth/guestProfile.ts` and no `ensureGuestProfile()` call. A `g
 
 **Effect 1 — bootstrap (deps: `[]`):**
 
-| Order | Call                                          | Error handling                                                                  |
-| ----- | --------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1     | `registerServiceWorker()`                     | Fire-and-forget                                                                 |
-| 2     | `initializeDatabase().catch(...)`             | Log only; db error surfaces in `BootstrapGate`                                  |
-| 3     | `ensureAnonymousSession().catch(...)`         | Log on failure — establishes **anonymous** Supabase session when env configured |
-| 4     | `syncEngine.hydrate().catch(...)`             | Log on failure — recovers outbox/backoff state after a killed process           |
-| 5     | `getRestorePreview()`                         | Sets restore preview + startup prompt eligibility                               |
+| Order | Call                                  | Error handling                                                                  |
+| ----- | ------------------------------------- | ------------------------------------------------------------------------------- |
+| 1     | `registerServiceWorker()`             | Fire-and-forget                                                                 |
+| 2     | `initializeDatabase().catch(...)`     | Log only; db error surfaces in `BootstrapGate`                                  |
+| 3     | `ensureAnonymousSession().catch(...)` | Log on failure — establishes **anonymous** Supabase session when env configured |
+| 4     | `syncEngine.hydrate().catch(...)`     | Log on failure — recovers outbox/backoff state after a killed process           |
+| 5     | `getRestorePreview()`                 | Sets restore preview + startup prompt eligibility                               |
 
 **Effect 2 — sync flush (deps: `[]`):**
 
@@ -2068,9 +2071,9 @@ Tests:
 
 ### Patches
 
-**`@react-native+community-cli-plugin+0.83.2.patch`:** Injects `unstable_experiments: { enableStandaloneFuseboxShell: false }` into dev middleware.
+**`@react-native+community-cli-plugin+0.83.4.patch`:** Injects `unstable_experiments: { enableStandaloneFuseboxShell: false }` into dev middleware.
 
-**`metro-file-map+0.83.3.patch`:** `isIgnorableFileError` returns true for `EACCES` (in addition to `ENOENT`/`EPERM`). Reduces Metro watcher crashes on permission-denied paths on Windows.
+**`metro-file-map+0.83.5.patch`:** `isIgnorableFileError` returns true for `EACCES` (in addition to `ENOENT`/`EPERM`). Reduces Metro watcher crashes on permission-denied paths on Windows.
 
 ---
 
@@ -2198,13 +2201,13 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 #### `data-agent.md`
 
-| Aspect          | Content                                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Scope           | `core/db/*`, `core/sync/sync.engine.ts`, `features/*/*.data.ts`, `lib/id.ts`, `lib/time.ts` |
-| Out of scope    | Screens, `app/`, `core/ui/`                                                                                              |
-| Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception    |
-| Workflow        | Read → plan → approval → implement → typecheck + test → report                                                           |
-| Schema          | Current version **11**, next migration `version < 12`                                                                    |
+| Aspect          | Content                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Scope           | `core/db/*`, `core/sync/sync.engine.ts`, `features/*/*.data.ts`, `lib/id.ts`, `lib/time.ts`                           |
+| Out of scope    | Screens, `app/`, `core/ui/`                                                                                           |
+| Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
+| Workflow        | Read → plan → approval → implement → typecheck + test → report                                                        |
+| Schema          | Current version **11**, next migration `version < 12`                                                                 |
 
 #### `feature-agent.md`
 
@@ -2335,24 +2338,24 @@ Tag phase completions: `git tag phaseN-complete`
 
 ### Current state (verified)
 
-| Area                 | Status                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview             | Cross-module dashboard tab (`OverviewScreen`); read-only / aggregate presentation                                                                                                                                                                                                                                                                                                                                             |
-| Todos                | List, priorities, due dates, drag reorder, daily recurrence, soft delete, swipe edit/delete                                                                                                                                                                                                                                                                                                                                   |
-| Habits               | Categories, icons/colors, increment/decrement, aggregate 52-week heatmap, consistency %, Avocation-style layout                                                                                                                                                                                                                                                                                                               |
-| Focus                | Pomodoro timer, 3 modes, classic sequence, custom durations, garden grid, yearly heatmap                                                                                                                                                                                                                                                                                                                                      |
-| Workout              | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete                                                                                                                                                                                                                                                                                                                                             |
-| Calories             | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap, plus `Form` / `Diary` modes with remembered last view                                                                                                                                                                                                                                                                         |
-| Settings             | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal                                                                                                                                                                                                                                                                             |
-| PWA / web            | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json`                                                                                                                                                                                                                                                                                                                       |
+| Area                 | Status                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview             | Cross-module dashboard tab (`OverviewScreen`); read-only / aggregate presentation                                                                                                                                                                                                                                                                                                                                         |
+| Todos                | List, priorities, due dates, drag reorder, daily recurrence, soft delete, swipe edit/delete                                                                                                                                                                                                                                                                                                                               |
+| Habits               | Categories, icons/colors, increment/decrement, aggregate 52-week heatmap, consistency %, Avocation-style layout                                                                                                                                                                                                                                                                                                           |
+| Focus                | Pomodoro timer, 3 modes, classic sequence, custom durations, garden grid, yearly heatmap                                                                                                                                                                                                                                                                                                                                  |
+| Workout              | Routines, exercises, sets, timed session flow, session logging, swipe edit/delete                                                                                                                                                                                                                                                                                                                                         |
+| Calories             | Macro-based kcal, meal types, saved meals + search, goals, progress arc donut, 52-week heatmap, plus `Form` / `Diary` modes with remembered last view                                                                                                                                                                                                                                                                     |
+| Settings             | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal                                                                                                                                                                                                                                                                         |
+| PWA / web            | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json`                                                                                                                                                                                                                                                                                                                   |
 | Command shell        | Experimental command center for single `create_todo` / `create_habit` drafts only; the entry is a global overlay launcher (`GlobalCommandCenterHost`), no `/command` page route; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; internal remote rollout is gated by build config plus a device-local toggle; not a chat assistant |
-| Unit tests           | **427** passing (Vitest)                                                                                                                                                                                                                                                                                                                                                                                                      |
-| E2E                  | **90** Playwright tests in **14** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e`                                                                                                                                                                                                                                                                                                                     |
-| Schema version       | **11**                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Linked Actions       | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix                                                                                                                                                                                                                                                        |
-| Cloud sync / restore | Push backup via `SupabaseSyncAdapter` + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; adapter **pull** not implemented; restore v1 separately supports empty-device import for todos, habits, and calorie entries only                                                                                                                                                                  |
-| Validation           | Hard rejection in feature screens via `lib/validation.ts`                                                                                                                                                                                                                                                                                                                                                                     |
-| Design system        | Per-section colors, card accent strips, GitHub heatmaps, PillChips                                                                                                                                                                                                                                                                                                                                                            |
+| Unit tests           | **427** passing (Vitest)                                                                                                                                                                                                                                                                                                                                                                                                  |
+| E2E                  | **90** Playwright tests in **14** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e`                                                                                                                                                                                                                                                                                                                 |
+| Schema version       | **11**                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Linked Actions       | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix                                                                                                                                                                                                                                                    |
+| Cloud sync / restore | Push backup via `SupabaseSyncAdapter` + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; adapter **pull** not implemented; restore v1 separately supports empty-device import for todos, habits, and calorie entries only                                                                                                                                                              |
+| Validation           | Hard rejection in feature screens via `lib/validation.ts`                                                                                                                                                                                                                                                                                                                                                                 |
+| Design system        | Per-section colors, card accent strips, GitHub heatmaps, PillChips                                                                                                                                                                                                                                                                                                                                                        |
 
 ### Next-phase items
 
@@ -2389,39 +2392,39 @@ Tag phase completions: `git tag phaseN-complete`
 
 ## 14. Glossary
 
-| Term                     | Meaning                                                                                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **app_meta**             | Key/value SQLite table: `db_schema_version`, `guest_profile`, `calorie_goal`, `pomodoro_settings`, `date_key_format`, `date_key_cutover`              |
-| **BaseEntity**           | `id`, `created_at`, `updated_at`, `deleted_at`                                                                                                        |
-| **CalorieEntryTotals**   | Type in `features/calories/types.ts`: `{ calories: number }` — minimal shape for `caloriesTotal()` rollup                                             |
-| **CATEGORY_ORDER**       | SQL `CASE` in `features/habits/habits.data.ts`: sorts by `anytime → morning → afternoon → evening → else`, then `created_at DESC`                     |
-| **COOP / COEP**          | Cross-origin policies — Metro + `app.json` for dev; production web also via root **`vercel.json`** headers; enables `SharedArrayBuffer` / SQLite WASM |
-| **data-agent**           | Cursor agent: DB, migrations, `*.data.ts`, `lib/id`, `lib/time`                                                                                       |
-| **date_key**             | `YYYY-MM-DD` string from `toDateKey()` (local calendar, post-migration 5)                                                                             |
-| **feature-agent**        | Cursor agent: screens, domain, `core/ui`, `app/`                                                                                                      |
-| **FlashList**            | `@shopify/flash-list` — high-performance virtualized list                                                                                             |
-| **FOCUS_SECONDS**        | Constant `25 * 60 = 1500` in `pomodoro.domain.ts` — focus duration in seconds                                                                         |
-| **guest**                | `createId("guest")` profile JSON in `app_meta`                                                                                                        |
-| **hcmp**                 | ID prefix for `habit_completions`                                                                                                                     |
-| **HABIT_COLORS**         | Readonly array of hex strings in `habitPresets.ts` — palette for habit color dots                                                                     |
-| **HABIT_ICONS**          | Readonly array of `HabitIcon` literals in `habitPresets.ts` — Material icon names                                                                     |
-| **HeatmapDay**           | `{ dateKey: string; value: number }` — input type for `GitHubHeatmap`                                                                                 |
-| **ActivityDay**          | `{ dateKey: string; active: boolean; value?: number }` — shared day-level activity input used by domain rollups                                       |
-| **MealType**             | `"breakfast" \| "lunch" \| "dinner" \| "snack"` — alias from `CalorieEntry["meal_type"]`                                                              |
-| **MEAL_OPTIONS**         | Constant in `CaloriesScreen.tsx`: four `{ value, label }` pairs for meal-type `PillChip`                                                              |
-| **NoopSyncAdapter**      | No-op `SyncAdapter` — `SyncEngine` constructor default and tests; production **`syncEngine`** uses **`SupabaseSyncAdapter`**                          |
-| **SupabaseSyncAdapter**  | Push path: SQLite → Supabase `upsert` for synced entities; `pull` stub                                                                                |
-| **PomodoroState**        | `"idle" \| "running" \| "finished"` from `nextPomodoroState`                                                                                          |
-| **PomodoroMode**         | `"focus" \| "short_break" \| "long_break"`                                                                                                            |
-| **SectionKey**           | `keyof typeof SECTION_COLORS` — `"todos" \| "habits" \| "focus" \| "workout" \| "calories"`                                                           |
-| **Soft delete**          | `deleted_at` set to timestamp; filter `deleted_at IS NULL` on reads                                                                                   |
-| **SuperHabits**          | App name; DB file `superhabits.db`                                                                                                                    |
-| **SyncRecord**           | Queue payload: `entity`, `id`, `updatedAt`, `operation`                                                                                               |
-| **NavigationContext**   | `core/providers/NavigationProvider.tsx` — `activeSection`, `setActiveSection`, `openSettings` / `closeSettings`, `openCommand` / `closeCommand` |
-| **TimerPhase**           | `{ exerciseName, exerciseIndex, setNumber, totalSets, phase: "active" \| "rest", durationSeconds }`                                                   |
-| **WAL**                  | SQLite write-ahead log — native bootstrap only (not web)                                                                                              |
-| **Workbox**              | Registers `/sw.js` on web via `core/pwa/registerServiceWorker.ts`                                                                                     |
-| **wrk**                  | Prefix for **both** `workout_routines` and `workout_logs` IDs                                                                                         |
+| Term                    | Meaning                                                                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **app_meta**            | Key/value SQLite table: `db_schema_version`, `guest_profile`, `calorie_goal`, `pomodoro_settings`, `date_key_format`, `date_key_cutover`              |
+| **BaseEntity**          | `id`, `created_at`, `updated_at`, `deleted_at`                                                                                                        |
+| **CalorieEntryTotals**  | Type in `features/calories/types.ts`: `{ calories: number }` — minimal shape for `caloriesTotal()` rollup                                             |
+| **CATEGORY_ORDER**      | SQL `CASE` in `features/habits/habits.data.ts`: sorts by `anytime → morning → afternoon → evening → else`, then `created_at DESC`                     |
+| **COOP / COEP**         | Cross-origin policies — Metro + `app.json` for dev; production web also via root **`vercel.json`** headers; enables `SharedArrayBuffer` / SQLite WASM |
+| **data-agent**          | Cursor agent: DB, migrations, `*.data.ts`, `lib/id`, `lib/time`                                                                                       |
+| **date_key**            | `YYYY-MM-DD` string from `toDateKey()` (local calendar, post-migration 5)                                                                             |
+| **feature-agent**       | Cursor agent: screens, domain, `core/ui`, `app/`                                                                                                      |
+| **FlashList**           | `@shopify/flash-list` — high-performance virtualized list                                                                                             |
+| **FOCUS_SECONDS**       | Constant `25 * 60 = 1500` in `pomodoro.domain.ts` — focus duration in seconds                                                                         |
+| **guest**               | `createId("guest")` profile JSON in `app_meta`                                                                                                        |
+| **hcmp**                | ID prefix for `habit_completions`                                                                                                                     |
+| **HABIT_COLORS**        | Readonly array of hex strings in `habitPresets.ts` — palette for habit color dots                                                                     |
+| **HABIT_ICONS**         | Readonly array of `HabitIcon` literals in `habitPresets.ts` — Material icon names                                                                     |
+| **HeatmapDay**          | `{ dateKey: string; value: number }` — input type for `GitHubHeatmap`                                                                                 |
+| **ActivityDay**         | `{ dateKey: string; active: boolean; value?: number }` — shared day-level activity input used by domain rollups                                       |
+| **MealType**            | `"breakfast" \| "lunch" \| "dinner" \| "snack"` — alias from `CalorieEntry["meal_type"]`                                                              |
+| **MEAL_OPTIONS**        | Constant in `CaloriesScreen.tsx`: four `{ value, label }` pairs for meal-type `PillChip`                                                              |
+| **NoopSyncAdapter**     | No-op `SyncAdapter` — `SyncEngine` constructor default and tests; production **`syncEngine`** uses **`SupabaseSyncAdapter`**                          |
+| **SupabaseSyncAdapter** | Push path: SQLite → Supabase `upsert` for synced entities; `pull` stub                                                                                |
+| **PomodoroState**       | `"idle" \| "running" \| "finished"` from `nextPomodoroState`                                                                                          |
+| **PomodoroMode**        | `"focus" \| "short_break" \| "long_break"`                                                                                                            |
+| **SectionKey**          | `keyof typeof SECTION_COLORS` — `"todos" \| "habits" \| "focus" \| "workout" \| "calories"`                                                           |
+| **Soft delete**         | `deleted_at` set to timestamp; filter `deleted_at IS NULL` on reads                                                                                   |
+| **SuperHabits**         | App name; DB file `superhabits.db`                                                                                                                    |
+| **SyncRecord**          | Queue payload: `entity`, `id`, `updatedAt`, `operation`                                                                                               |
+| **NavigationContext**   | `core/providers/NavigationProvider.tsx` — `activeSection`, `setActiveSection`, `openSettings` / `closeSettings`, `openCommand` / `closeCommand`       |
+| **TimerPhase**          | `{ exerciseName, exerciseIndex, setNumber, totalSets, phase: "active" \| "rest", durationSeconds }`                                                   |
+| **WAL**                 | SQLite write-ahead log — native bootstrap only (not web)                                                                                              |
+| **Workbox**             | Registers `/sw.js` on web via `core/pwa/registerServiceWorker.ts`                                                                                     |
+| **wrk**                 | Prefix for **both** `workout_routines` and `workout_logs` IDs                                                                                         |
 
 ### Acronyms
 

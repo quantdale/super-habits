@@ -1,5 +1,7 @@
 # SuperHabits — Working Rules
 
+> **SUPERSEDED** — AGENTS.md is the primary agent guide; this document is historical and its baselines (e.g. 427 tests) are stale. Last verified: 2026-05.
+
 This file is for AI agents and contributors. Follow these rules unless the user explicitly asks for a deliberate exception.
 
 ## Read order before editing

@@ -137,7 +137,7 @@ export const SIMULATION_LANES: readonly SimulationLane[] = [
     retentionDays: 7,
     buildOutput: 'dist-sync/',
     notes:
-      'EXPO_NO_DOTENV=1 EXPO_PUBLIC_SUPABASE_URL=https://dummy.supabase.co EXPO_PUBLIC_SUPABASE_ANON_KEY=dummy-anon-key npx expo export -p web --output-dir dist-sync. Never real credentials; never PRs; never the quality job. Sync journeys that need the baked-in env run against this export (dedicated Playwright project deferred until the harness can serve two dists — see README isolation rules).',
+      'EXPO_NO_DOTENV=1 EXPO_PUBLIC_SUPABASE_URL=https://dummy.supabase.co EXPO_PUBLIC_SUPABASE_ANON_KEY=dummy-anon-key npx expo export -p web --output-dir dist-sync. Never real credentials; never PRs; never the quality job. Sync journeys that need the baked-in env run against this export via the registered journeys-sync Playwright project (`npm run e2e:sync`, dist-sync/ on :8082 — see README isolation rules).',
   },
   {
     id: 'repro-replay',

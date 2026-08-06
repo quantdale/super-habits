@@ -23,6 +23,11 @@ npm run e2e:debug        # Playwright inspector
 # Single E2E spec
 npx playwright test e2e/todos.spec.ts
 
+# E2E projects: chromium (root specs), journeys (e2e/journeys), simulation (simulation/runner/specs)
+npm run e2e:sync          # journeys-sync project: @sync journeys vs dist-sync/ on :8082 (opt-in, main/nightly CI only)
+npm run sim:run           # simulation-platform scenario runner
+npm run sim:validate      # validate simulation lane matrix / scenarios
+
 npm run build:web        # Expo web export (needed before e2e in CI)
 ```
 
@@ -40,7 +45,7 @@ npm run build:web        # Expo web export (needed before e2e in CI)
 | `lib/`       | Pure/platform helpers: `id`, `time`, `validation`, `supabase` (client + anonymous session + `remoteMode`), notifications. No DB, no feature imports.                                                             |
 | `constants/` | Design tokens — `sectionColors.ts` (per-tab palette).                                                                                                                                                            |
 | `tests/`     | Vitest unit specs for `*.domain.ts` and `lib/` helpers.                                                                                                                                                          |
-| `e2e/`       | Playwright specs + `helpers/` (`db.ts`, `navigation.ts`, `forms.ts`).                                                                                                                                            |
+| `e2e/`       | Playwright specs (`e2e/*.spec.ts` + `e2e/journeys/`) + `helpers/` (`db.ts`, `navigation.ts`, `forms.ts`, `journey.ts`); simulation project specs in `simulation/runner/specs/`.                                  |
 
 ### Feature module pattern
 
@@ -78,7 +83,7 @@ Never `DELETE FROM` main entity tables. Use `deleted_at` timestamp + filter `WHE
 
 ### Sync enqueue
 
-After **every** mutating write on synced entities, call `syncEngine.enqueue` immediately — only from `*.data.ts`. Synced entities: `todos`, `habits`, `calorie_entries`, `workout_routines` (+ routine bump after nested edits). Not synced: `pomodoro_sessions`, `habit_completions`, `workout_logs`, nested workout tables.
+After **every** mutating write on synced entities, call `syncEngine.enqueue` immediately — only from `*.data.ts`. Synced entities: `todos`, `habits`, `calorie_entries`, `workout_routines` (+ routine bump after nested edits). Not synced: `pomodoro_sessions`, `habit_completions`, `saved_meals`, `workout_logs`, `linked_action_rules`, `linked_action_events`, `linked_action_executions`, nested workout tables.
 
 ### IDs and date keys
 
@@ -133,16 +138,18 @@ E2E tests run against a static web export served on `localhost:8081`. Each spec 
 
 Use `getByText` for `Button`/`Pressable` labels (RN Web doesn't always expose `role=button` + accessible name). Playwright workers stay at 1 locally (OPFS lock per origin).
 
+The suite spans **four Playwright projects**: `chromium` (root `e2e/*.spec.ts`), `journeys` (`e2e/journeys/`, continuity journeys), `simulation` (`simulation/runner/specs/`, the simulation platform's own specs), and `journeys-sync` (the `@sync`-tagged remote-boundary steps, opt-in via `npm run e2e:sync` against `dist-sync/` on :8082, main/nightly CI only). Counts are point-in-time — currently **630 Vitest tests** (586 unit + 44 integration) and **181 Playwright tests in 19 spec files**; verify with `npx vitest list` / `npx playwright test --list` before relying on them. Read `simulation/README.md` before touching the simulation platform.
+
 ---
 
 ## MCP Servers (`.vscode/mcp.json`)
 
-| Server         | Use in this project                                                                                                                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **playwright** | Browser automation — interact with the Expo web app on `localhost:8081`, inspect the DOM, fill forms, click elements during E2E debugging |
-| **github**     | Issues, PRs, code search across the repo (requires Docker + GitHub PAT prompt)                                                            |
-| **fetch**      | Fetch external URLs, docs, or APIs and return them as markdown/JSON                                                                       |
-| **lighthouse** | Run PWA / performance / accessibility audits against `localhost:8081`                                                                     |
+| Server             | Use in this project                                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **playwright**     | Browser automation — interact with the Expo web app on `localhost:8081`, inspect the DOM, fill forms, click elements during E2E debugging |
+| **github**         | Issues, PRs, code search across the repo (requires Docker + GitHub PAT prompt)                                                            |
+| **fetch**          | Fetch external URLs, docs, or APIs and return them as markdown/JSON                                                                       |
+| **lighthouse-mcp** | Run PWA / performance / accessibility audits against `localhost:8081` (`npx -y lighthouse-mcp`)                                           |
 
 E2E work: run `npm run build:web` before Playwright; `npm run e2e` serves `dist/` via `node scripts/serve-e2e.js`.
 
@@ -150,18 +157,18 @@ E2E work: run `npm run build:web` before Playwright; `npm run e2e` serves `dist/
 
 ## Where Does X Live?
 
-| Need                            | Location                      |
-| ------------------------------- | ----------------------------- |
-| SQL, getDatabase, migrations    | `core/db/client.ts` only      |
-| Entity TypeScript types         | `core/db/types.ts`            |
-| Sync queue API                  | `core/sync/sync.engine.ts`    |
-| Reusable RN components          | `core/ui/`                    |
-| Feature CRUD + enqueue          | `features/*/{name}.data.ts`   |
-| Pure rules, streaks, formatting | `features/*/{name}.domain.ts` |
-| Screens and wiring              | `features/*/*Screen.tsx`      |
-| ID generation                   | `lib/id.ts`                   |
-| Date keys (YYYY-MM-DD)          | `lib/time.ts` (`toDateKey`)   |
-| Form validation messages        | `lib/validation.ts`           |
-| Section color tokens            | `constants/sectionColors.ts`  |
-| Unit tests                      | `tests/*.test.ts`             |
-| E2E specs                       | `e2e/*.spec.ts`               |
+| Need                            | Location                                                        |
+| ------------------------------- | --------------------------------------------------------------- |
+| SQL, getDatabase, migrations    | `core/db/client.ts` only                                        |
+| Entity TypeScript types         | `core/db/types.ts`                                              |
+| Sync queue API                  | `core/sync/sync.engine.ts`                                      |
+| Reusable RN components          | `core/ui/`                                                      |
+| Feature CRUD + enqueue          | `features/*/{name}.data.ts`                                     |
+| Pure rules, streaks, formatting | `features/*/{name}.domain.ts`                                   |
+| Screens and wiring              | `features/*/*Screen.tsx`                                        |
+| ID generation                   | `lib/id.ts`                                                     |
+| Date keys (YYYY-MM-DD)          | `lib/time.ts` (`toDateKey`)                                     |
+| Form validation messages        | `lib/validation.ts`                                             |
+| Section color tokens            | `constants/sectionColors.ts`                                    |
+| Unit tests                      | `tests/*.test.ts`                                               |
+| E2E specs                       | `e2e/*.spec.ts` (+ `e2e/journeys/`, `simulation/runner/specs/`) |

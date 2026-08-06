@@ -1,19 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
-import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
-import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { Modal } from '@/core/ui/Modal';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
-import { SwipeableCard } from '@/core/ui/SwipeableCard';
-import { TextField } from '@/core/ui/TextField';
 import {
   DEFAULT_GOAL,
   addCalorieEntry,
@@ -48,23 +44,18 @@ import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
 import { CalorieGoalModal } from './CalorieGoalModal';
+import { CaloriesDiaryView } from './CaloriesDiaryView';
+import type { MealSection } from './CaloriesDiaryView';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
+import { CaloriesFormView } from './CaloriesFormView';
 import { DailyCalorieChart } from './DailyCalorieChart';
 import { MacroDonutChart } from './MacroDonutChart';
-import { SavedMealChips } from './SavedMealChips';
 import { SavedMealSearchModal } from './SavedMealSearchModal';
 
 const COLOR = SECTION_COLORS.calories;
 const CALORIES_VIEW_MODE_STORAGE_KEY = 'superhabits.calories.viewMode';
 
 type CaloriesViewMode = 'form' | 'diary';
-
-type MealSection = {
-  mealType: MealType;
-  label: string;
-  entries: CalorieEntry[];
-  totalCalories: number;
-};
 
 const MEAL_OPTIONS: readonly { value: MealType; label: string }[] = [
   { value: 'breakfast', label: 'Breakfast' },
@@ -84,85 +75,6 @@ function formatDayContext(dateKey: string) {
     month: 'long',
     day: 'numeric',
   });
-}
-
-function formatEntryTimestamp(timestamp: string) {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function formatMealCount(count: number) {
-  return count === 1 ? '1 item' : `${count} items`;
-}
-
-const CalorieEntrySwipeRow = memo(
-  function CalorieEntrySwipeRow({
-    entry,
-    onEdit,
-    onDelete,
-  }: {
-    entry: CalorieEntry;
-    onEdit: () => void;
-    onDelete: () => void;
-  }) {
-    const { tokens } = useAppTheme();
-
-    return (
-      <SwipeableCard
-        accentColor={COLOR}
-        style={{ marginBottom: 12 }}
-        onEdit={onEdit}
-        onDelete={onDelete}
-      >
-        <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-          {entry.food_name} - {entry.calories} kcal
-        </Text>
-        <Text className="mt-1 text-sm capitalize" style={{ color: tokens.textMuted }}>
-          {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{' '}
-          {entry.fiber}g
-        </Text>
-      </SwipeableCard>
-    );
-  },
-  (prev, next) =>
-    prev.entry.id === next.entry.id &&
-    prev.entry.food_name === next.entry.food_name &&
-    prev.entry.calories === next.entry.calories &&
-    prev.entry.protein === next.entry.protein &&
-    prev.entry.carbs === next.entry.carbs &&
-    prev.entry.fats === next.entry.fats &&
-    prev.entry.fiber === next.entry.fiber &&
-    prev.entry.meal_type === next.entry.meal_type,
-);
-
-function DiaryActionButton({
-  icon,
-  accessibilityLabel,
-  color,
-  backgroundColor,
-  onPress,
-}: {
-  icon: keyof typeof MaterialIcons.glyphMap;
-  accessibilityLabel: string;
-  color: string;
-  backgroundColor: string;
-  onPress: () => void;
-}) {
-  const { tokens } = useAppTheme();
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      className="h-11 w-11 items-center justify-center rounded-2xl border"
-      style={{ borderColor: tokens.border, backgroundColor }}
-    >
-      <MaterialIcons name={icon} size={18} color={color} />
-    </Pressable>
-  );
 }
 
 function ViewModeSwitch({
@@ -201,111 +113,6 @@ function ViewModeSwitch({
         );
       })}
     </View>
-  );
-}
-
-function DiaryMealGroupCard({
-  section,
-  collapsed,
-  onToggle,
-  onEdit,
-  onDelete,
-}: {
-  section: MealSection;
-  collapsed: boolean;
-  onToggle: () => void;
-  onEdit: (entry: CalorieEntry) => void;
-  onDelete: (entry: CalorieEntry) => void;
-}) {
-  const { tokens, sectionAccents } = useAppTheme();
-  const colorText = sectionAccents.calories.text;
-
-  return (
-    <Card className="mb-3" innerClassName="p-0">
-      <Pressable onPress={onToggle} className="px-4 py-4">
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="min-w-0 flex-1">
-            <View className="flex-row flex-wrap items-center gap-2">
-              <View
-                className="rounded-full px-3 py-1"
-                style={{ backgroundColor: sectionAccents.calories.tint }}
-              >
-                <Text className="text-xs font-semibold" style={{ color: colorText }}>
-                  {section.label}
-                </Text>
-              </View>
-              <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
-                {formatMealCount(section.entries.length)}
-              </Text>
-            </View>
-            <Text className="mt-3 text-lg font-semibold" style={{ color: tokens.text }}>
-              {section.totalCalories} kcal
-            </Text>
-          </View>
-          <MaterialIcons
-            name={collapsed ? 'expand-more' : 'expand-less'}
-            size={22}
-            color={tokens.iconMuted}
-          />
-        </View>
-      </Pressable>
-
-      {!collapsed ? (
-        <View className="gap-3 border-t px-4 pb-4 pt-3" style={{ borderColor: tokens.border }}>
-          {section.entries.map((entry) => (
-            <View
-              key={entry.id}
-              className="rounded-2xl border px-4 py-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-            >
-              <View className="flex-row items-start justify-between gap-3">
-                <View className="min-w-0 flex-1">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                      {entry.food_name}
-                    </Text>
-                    <View
-                      className="rounded-full px-2.5 py-1"
-                      style={{
-                        backgroundColor: tokens.surface,
-                        borderColor: tokens.border,
-                        borderWidth: 1,
-                      }}
-                    >
-                      <Text className="text-[11px] font-semibold" style={{ color: colorText }}>
-                        {entry.calories} kcal
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
-                    P {entry.protein}g · C {entry.carbs}g · F {entry.fats}g · Fiber {entry.fiber}g
-                  </Text>
-                  <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                    Logged {formatEntryTimestamp(entry.created_at)}
-                  </Text>
-                </View>
-                <View className="flex-row gap-2">
-                  <DiaryActionButton
-                    icon="edit"
-                    accessibilityLabel={`Edit ${entry.food_name}`}
-                    color={colorText}
-                    backgroundColor={tokens.surface}
-                    onPress={() => onEdit(entry)}
-                  />
-                  <DiaryActionButton
-                    icon="delete-outline"
-                    accessibilityLabel={`Delete ${entry.food_name}`}
-                    color={tokens.dangerText}
-                    backgroundColor={tokens.dangerBackground}
-                    onPress={() => onDelete(entry)}
-                  />
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </Card>
   );
 }
 
@@ -607,7 +414,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     })();
   };
 
-  const addEntryFooter = <Button label="Add entry" onPress={handleSubmit} color={COLOR} />;
   const editEntryFooter = (
     <View className="flex-row gap-2">
       <View className="flex-1">
@@ -695,242 +501,74 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       </ScreenSection>
 
       {viewMode === 'form' ? (
-        <>
-          <ScreenSection>
-            <View className="flex-row flex-wrap gap-3">
-              <View className="min-w-[160px] flex-1">
-                <FeatureStatCard
-                  accentColor={COLOR}
-                  textColor={colorText}
-                  icon="restaurant-menu"
-                  title="Days logged"
-                  value={calorieActivityDays.filter((day) => day.active).length}
-                  subtitle="Rolling year"
-                  note={
-                    hasCalorieStripActivity
-                      ? 'Daily intake history is active'
-                      : 'No intake history yet'
-                  }
-                />
-              </View>
-              <View className="min-w-[160px] flex-1">
-                <FeatureStatCard
-                  accentColor={COLOR}
-                  textColor={colorText}
-                  icon="track-changes"
-                  title="Goal progress"
-                  value={`${goalProgress.percent}%`}
-                  subtitle="Today"
-                  note={
-                    goalProgress.over
-                      ? 'You are over goal'
-                      : `${goalProgress.remaining} kcal remaining`
-                  }
-                />
-              </View>
-            </View>
-          </ScreenSection>
-
-          <ScreenSection>
-            <Card
-              variant="header"
-              accentColor={COLOR}
-              headerTitle="Add entry"
-              headerSubtitle="Keep the current macro form and reuse foods when they repeat."
-              className="mb-0"
-            >
-              <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
-              {allSavedMeals.length > 0 ? (
-                <Pressable
-                  onPress={() => setSearchSheetVisible(true)}
-                  className="mb-3 self-start flex-row items-center gap-2 rounded-full border px-3 py-2"
-                  style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-                >
-                  <MaterialIcons name="search" size={16} color={colorText} />
-                  <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
-                    Browse saved meals ({allSavedMeals.length})
-                  </Text>
-                </Pressable>
-              ) : null}
-              <CaloriesEntryFields
-                fieldIdPrefix="cal-entry"
-                food={food}
-                protein={protein}
-                carbs={carbs}
-                fats={fats}
-                fiber={fiber}
-                mealType={mealType}
-                mealOptions={MEAL_OPTIONS}
-                computedKcal={computedKcal}
-                calorieError={calorieError}
-                accentColor={COLOR}
-                onFoodChange={(value) => {
-                  setCalorieError(null);
-                  setFood(value);
-                }}
-                onProteinChange={(value) => {
-                  setCalorieError(null);
-                  setProtein(value);
-                }}
-                onCarbsChange={(value) => {
-                  setCalorieError(null);
-                  setCarbs(value);
-                }}
-                onFatsChange={(value) => {
-                  setCalorieError(null);
-                  setFats(value);
-                }}
-                onFiberChange={(value) => {
-                  setCalorieError(null);
-                  setFiber(value);
-                }}
-                onMealTypeChange={(value) => {
-                  setCalorieError(null);
-                  setMealType(value);
-                }}
-                footer={addEntryFooter}
-              />
-            </Card>
-          </ScreenSection>
-
-          <ScreenSection>{dailySummaryCard}</ScreenSection>
-
-          {entries.length > 0 ? (
-            <ScreenSection>
-              <View className="mb-4 px-1">
-                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                  Logged today
-                </Text>
-                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                  Swipe an entry to edit or remove it.
-                </Text>
-              </View>
-
-              {entries.map((entry) => (
-                <CalorieEntrySwipeRow
-                  key={entry.id}
-                  entry={entry}
-                  onEdit={() => openEntryEditModal(entry)}
-                  onDelete={() => handleDeleteEntry(entry)}
-                />
-              ))}
-            </ScreenSection>
-          ) : null}
-        </>
+        <CaloriesFormView
+          accentColor={COLOR}
+          colorText={colorText}
+          calorieActivityDays={calorieActivityDays}
+          goalProgress={goalProgress}
+          hasCalorieStripActivity={hasCalorieStripActivity}
+          recentMeals={recentMeals}
+          allSavedMeals={allSavedMeals}
+          entries={entries}
+          todayCard={dailySummaryCard}
+          food={food}
+          protein={protein}
+          carbs={carbs}
+          fats={fats}
+          fiber={fiber}
+          mealType={mealType}
+          mealOptions={MEAL_OPTIONS}
+          computedKcal={computedKcal}
+          calorieError={calorieError}
+          onSelectSavedMeal={handleSelectSavedMeal}
+          onBrowseSavedMeals={() => setSearchSheetVisible(true)}
+          onFoodChange={(value) => {
+            setCalorieError(null);
+            setFood(value);
+          }}
+          onProteinChange={(value) => {
+            setCalorieError(null);
+            setProtein(value);
+          }}
+          onCarbsChange={(value) => {
+            setCalorieError(null);
+            setCarbs(value);
+          }}
+          onFatsChange={(value) => {
+            setCalorieError(null);
+            setFats(value);
+          }}
+          onFiberChange={(value) => {
+            setCalorieError(null);
+            setFiber(value);
+          }}
+          onMealTypeChange={(value) => {
+            setCalorieError(null);
+            setMealType(value);
+          }}
+          onAddEntry={handleSubmit}
+          onEditEntry={openEntryEditModal}
+          onDeleteEntry={handleDeleteEntry}
+        />
       ) : (
-        <>
-          <ScreenSection>{dailySummaryCard}</ScreenSection>
-
-          <ScreenSection>
-            <Card
-              variant="header"
-              accentColor={COLOR}
-              headerTitle="Quick add"
-              headerSubtitle="Recent foods, saved meals, search-first add, and manual entry."
-              headerRight={
-                <MaterialIcons name="playlist-add" size={22} color={tokens.textOnAccent} />
-              }
-              className="mb-0"
-            >
-              <SavedMealChips meals={recentMeals} onSelect={handleSelectSavedMeal} />
-              <TextField
-                label="Search saved meals / start with a food name"
-                value={diarySearch}
-                onChangeText={setDiarySearch}
-                placeholder="Chicken breast"
-              />
-
-              {diarySearch.trim() ? (
-                diarySearchMatches.length > 0 ? (
-                  <View className="mb-3 gap-2">
-                    <Text
-                      className="text-xs font-semibold uppercase"
-                      style={{ color: tokens.textMuted }}
-                    >
-                      Matches
-                    </Text>
-                    {diarySearchMatches.map((meal) => (
-                      <Pressable
-                        key={meal.id}
-                        onPress={() => handleSelectSavedMeal(meal)}
-                        className="rounded-2xl border px-4 py-3"
-                        style={{
-                          borderColor: tokens.border,
-                          backgroundColor: tokens.surfaceElevated,
-                        }}
-                      >
-                        <Text className="text-sm font-medium" style={{ color: tokens.text }}>
-                          {meal.food_name}
-                        </Text>
-                        <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                          {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fats}
-                          g{meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ''}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : (
-                  <View
-                    className="mb-3 rounded-2xl border px-4 py-3"
-                    style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-                  >
-                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                      No saved meal matches “{diarySearch.trim()}”. Use Manual add to log it as a
-                      new food.
-                    </Text>
-                  </View>
-                )
-              ) : null}
-
-              <View className="flex-row gap-2">
-                <View className="flex-1">
-                  <Button
-                    label="Browse saved"
-                    variant="ghost"
-                    disabled={allSavedMeals.length === 0}
-                    onPress={() => setSearchSheetVisible(true)}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Button label="Manual add" onPress={openManualAddModal} color={COLOR} />
-                </View>
-              </View>
-            </Card>
-          </ScreenSection>
-
-          <ScreenSection>
-            {groupedEntries.length === 0 ? (
-              <EmptyStateCard
-                accentColor={COLOR}
-                className="mb-0"
-                icon={<MaterialIcons name="menu-book" size={22} color={colorText} />}
-                title="No meals logged today"
-                description="Use quick add or manual add to start your diary."
-              />
-            ) : (
-              <>
-                <View className="mb-4 px-1">
-                  <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                    Daily log
-                  </Text>
-                  <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                    Entries are grouped by stored meal type and default to expanded.
-                  </Text>
-                </View>
-                {groupedEntries.map((section) => (
-                  <DiaryMealGroupCard
-                    key={section.mealType}
-                    section={section}
-                    collapsed={collapsedMeals[section.mealType] ?? false}
-                    onToggle={() => toggleMealGroup(section.mealType)}
-                    onEdit={openEntryEditModal}
-                    onDelete={handleDeleteEntry}
-                  />
-                ))}
-              </>
-            )}
-          </ScreenSection>
-        </>
+        <CaloriesDiaryView
+          accentColor={COLOR}
+          colorText={colorText}
+          todayCard={dailySummaryCard}
+          recentMeals={recentMeals}
+          allSavedMeals={allSavedMeals}
+          diarySearch={diarySearch}
+          diarySearchMatches={diarySearchMatches}
+          groupedEntries={groupedEntries}
+          collapsedMeals={collapsedMeals}
+          onSelectSavedMeal={handleSelectSavedMeal}
+          onBrowseSavedMeals={() => setSearchSheetVisible(true)}
+          onDiarySearchChange={setDiarySearch}
+          onManualAdd={openManualAddModal}
+          onToggleMealGroup={toggleMealGroup}
+          onEditEntry={openEntryEditModal}
+          onDeleteEntry={handleDeleteEntry}
+        />
       )}
 
       <CalorieGoalModal

@@ -11,7 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **427** tests passing, 0 failing
+Expected: **630** tests passing (compare against `npx vitest list`) — 0 failing is the gate
 
 Report:
 
@@ -34,7 +34,7 @@ Report:
 
 Run: `npm run e2e`
 
-Expected: all tests passing across:
+Expected: all **181** tests passing across 19 spec files (compare against `npx playwright test --list`) — 0 failing is the gate. `npm run e2e` covers the chromium (90), journeys (69), and simulation (3) projects; the journeys-sync project (19 `@sync` steps) is opt-in via `npm run e2e:sync` against the `dist-sync/` build on :8082. Specs:
 todos.spec.ts — add, complete, delete, empty state,
 validation, persistence
 habits.spec.ts — add, increment, decrement, delete,
@@ -57,6 +57,8 @@ localhost network-first, OPFS lock,
 clean DB init
 boundary.spec.ts — cross-feature boundary, volume, and no-NaN/no-undefined checks
 theming.spec.ts — theme switching and contrast coverage
+journeys/*.spec.ts — cross-feature user journeys (chromium + journeys projects;
+@sync steps also run as the opt-in journeys-sync project)
 
 Report:
 
@@ -70,8 +72,8 @@ Report:
 
 | Suite            | Tests | Passed | Failed | Skipped |
 | ---------------- | ----- | ------ | ------ | ------- |
-| Unit (Vitest)    | 427   | ?      | ?      | 0       |
-| E2E (Playwright) | 90    | ?      | ?      | ?       |
+| Unit (Vitest)    | 630   | ?      | ?      | 0       |
+| E2E (Playwright) | 181   | ?      | ?      | ?       |
 | **Total**        | ?     | ?      | ?      | ?       |
 
 **OVERALL: PASS or FAIL**

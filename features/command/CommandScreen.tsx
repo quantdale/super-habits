@@ -1,14 +1,9 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Pressable, Text, View } from 'react-native';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
-import { Card } from '@/core/ui/Card';
-import { Button } from '@/core/ui/Button';
-import { PillChip } from '@/core/ui/PillChip';
-import { TextField } from '@/core/ui/TextField';
-import { ValidationError } from '@/core/ui/ValidationError';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { type AppSection } from '@/core/providers/NavigationProvider';
 import { toDateKey } from '@/lib/time';
@@ -16,189 +11,38 @@ import { executeDraftAction } from './command.executor';
 import { commandParser } from './commandParser';
 import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from './commandConfig';
 import { getAiCommandInternalRolloutPreference } from './commandInternalRollout';
-import { askParser } from './askParser';
-import { useAskConversation } from './AskConversationContext';
-import { classifyForAutoMode } from './autoModeRouter';
 import {
   getLastUsedCommandMode,
   setLastUsedCommandMode,
   type CommandMode,
 } from './commandModePreference';
-import type { AskResult } from './ask.types';
 import {
   type CommandCenterLaunchContext,
   getCommandCenterContextCopy,
 } from './commandCenterConfig';
+import { getParserContext, getTomorrowDateKey } from './commandScreenUtils';
 import type {
   CommandExecutionResult,
   CommandParseObservation,
   DraftAiAction,
-  DraftCreateHabit,
-  DraftCreateTodo,
   DraftMissingField,
   ParseCommandResult,
 } from './types';
 import { AI_ASK_EXPERIMENT_ENABLED, COMMAND_EXPERIMENT_ENABLED } from './types';
-
-const COMMAND_MODE_OPTIONS: { value: CommandMode; label: string }[] = [
-  { value: 'ask', label: 'Ask' },
-  { value: 'create', label: 'Create' },
-  { value: 'auto', label: 'Auto' },
-];
-
-const TODO_PRIORITIES: { value: DraftCreateTodo['fields']['priority']; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'low', label: 'Low' },
-];
-const HABIT_CATEGORIES: { value: DraftCreateHabit['fields']['category']; label: string }[] = [
-  { value: 'anytime', label: 'Anytime' },
-  { value: 'morning', label: 'Morning' },
-  { value: 'afternoon', label: 'Afternoon' },
-  { value: 'evening', label: 'Evening' },
-];
+import { AskConversationView } from './AskConversationView';
+import { AutoModeView } from './AutoModeView';
+import { CommandInputCard } from './CommandInputCard';
+import { CommandParseResultCard } from './CommandParseResultCard';
+import { CommandSection } from './CommandSection';
+import { DraftPreview } from './DraftPreview';
+import { InternalMetadataCard, LaunchContextCard } from './CommandPreview';
+import { ModeToggle } from './ModeToggle';
 
 type CommandScreenProps = {
   launchContext?: CommandCenterLaunchContext | null;
   onRequestClose?: () => void;
   onNavigateToDestination?: (section: AppSection) => void;
 };
-
-function getParserContext() {
-  if (typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') {
-    return { locale: 'en-US', timeZone: 'UTC' };
-  }
-
-  const options = Intl.DateTimeFormat().resolvedOptions();
-  return {
-    locale: options.locale ?? 'en-US',
-    timeZone: options.timeZone ?? 'UTC',
-  };
-}
-
-function PreviewSectionTitle({ children }: { children: string }) {
-  const { tokens } = useAppTheme();
-  return (
-    <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-      {children}
-    </Text>
-  );
-}
-
-function PreviewInfoRow({ label, value }: { label: string; value: string }) {
-  const { tokens } = useAppTheme();
-  return (
-    <View
-      className="flex-row items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-    >
-      <Text className="text-sm font-medium" style={{ color: tokens.textMuted }}>
-        {label}
-      </Text>
-      <Text className="flex-1 text-right text-sm" style={{ color: tokens.text }}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function PreviewWarning({ message }: { message: string }) {
-  const { tokens } = useAppTheme();
-  return (
-    <View
-      className="rounded-xl border px-3 py-2.5"
-      style={{ borderColor: tokens.warningBorder, backgroundColor: tokens.warningBackground }}
-    >
-      <Text className="text-sm" style={{ color: tokens.warningText }}>
-        {message}
-      </Text>
-    </View>
-  );
-}
-
-function PreviewMissingField({ message }: { message: string }) {
-  const { tokens } = useAppTheme();
-  return (
-    <View
-      className="rounded-xl border px-3 py-2.5"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-    >
-      <Text className="text-sm" style={{ color: tokens.textMuted }}>
-        {message}
-      </Text>
-    </View>
-  );
-}
-
-function CommandSection({ children, className }: { children: ReactNode; className?: string }) {
-  return <View className={className}>{children}</View>;
-}
-
-function LaunchContextCard({ launchContext }: { launchContext: CommandCenterLaunchContext }) {
-  const { tokens } = useAppTheme();
-  const contextCopy = getCommandCenterContextCopy(launchContext);
-
-  if (!contextCopy) return null;
-
-  return (
-    <Card accentColor={contextCopy.accentColor} className="mb-0">
-      <Text
-        className="text-xs font-semibold uppercase tracking-[1px]"
-        style={{ color: tokens.textMuted }}
-      >
-        Current section
-      </Text>
-      <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
-        {contextCopy.sectionLabel}
-      </Text>
-      <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-        {contextCopy.helperCopy}
-      </Text>
-    </Card>
-  );
-}
-
-function InternalMetadataCard({ observation }: { observation: CommandParseObservation }) {
-  const { tokens } = useAppTheme();
-  return (
-    <Card
-      variant="header"
-      accentColor={tokens.textMuted}
-      headerTitle="Internal parser metadata"
-      headerSubtitle="Visible only when internal rollout mode is enabled on this device."
-      className="mb-0"
-    >
-      <View className="gap-3">
-        <PreviewInfoRow label="Effective path" value={observation.effectivePath} />
-        <PreviewInfoRow label="Outcome" value={observation.outcome} />
-        <PreviewInfoRow label="Draft status" value={observation.draftStatus ?? 'n/a'} />
-        <PreviewInfoRow
-          label="Latency"
-          value={`${observation.latencyMs} ms (${observation.latencyBucket})`}
-        />
-        <PreviewInfoRow label="Reason code" value={observation.reasonCode ?? 'none'} />
-        <PreviewInfoRow
-          label="Warning codes"
-          value={observation.warningCodes.length > 0 ? observation.warningCodes.join(', ') : 'none'}
-        />
-        <PreviewInfoRow
-          label="Missing fields"
-          value={
-            observation.missingFieldNames.length > 0
-              ? observation.missingFieldNames.join(', ')
-              : 'none'
-          }
-        />
-      </View>
-    </Card>
-  );
-}
-
-function getTomorrowDateKey(base = new Date()): string {
-  const nextDay = new Date(base);
-  nextDay.setDate(nextDay.getDate() + 1);
-  return toDateKey(nextDay);
-}
 
 function cloneDraft(draft: DraftAiAction): DraftAiAction {
   return draft.kind === 'create_todo'
@@ -228,531 +72,6 @@ function isFieldStillMissing(draft: DraftAiAction, field: string): boolean {
   }
 
   return false;
-}
-
-function DraftPreview({
-  parsedDraft,
-  editableDraft,
-  visibleMissingFields,
-  canConfirm,
-  busy,
-  executionError,
-  successResult,
-  onEditTodoTitle,
-  onEditTodoNotes,
-  onEditTodoDueDate,
-  onSetTodoDueDateToday,
-  onSetTodoDueDateTomorrow,
-  onClearTodoDueDate,
-  onEditTodoPriority,
-  onEditHabitName,
-  onEditHabitTargetPerDay,
-  onEditHabitCategory,
-  onConfirm,
-  onReset,
-  onNavigateToDestination,
-}: {
-  parsedDraft: DraftAiAction;
-  editableDraft: DraftAiAction;
-  visibleMissingFields: DraftMissingField[];
-  canConfirm: boolean;
-  busy: boolean;
-  executionError: string | null;
-  successResult: Extract<CommandExecutionResult, { outcome: 'success' }> | null;
-  onEditTodoTitle: (value: string) => void;
-  onEditTodoNotes: (value: string) => void;
-  onEditTodoDueDate: (value: string) => void;
-  onSetTodoDueDateToday: () => void;
-  onSetTodoDueDateTomorrow: () => void;
-  onClearTodoDueDate: () => void;
-  onEditTodoPriority: (value: DraftCreateTodo['fields']['priority']) => void;
-  onEditHabitName: (value: string) => void;
-  onEditHabitTargetPerDay: (value: string) => void;
-  onEditHabitCategory: (value: DraftCreateHabit['fields']['category']) => void;
-  onConfirm: () => void;
-  onReset: () => void;
-  onNavigateToDestination?: (section: AppSection) => void;
-}) {
-  const { tokens } = useAppTheme();
-  const destinationSection: AppSection = editableDraft.kind === 'create_todo' ? 'todos' : 'habits';
-  const destinationLabel = editableDraft.kind === 'create_todo' ? 'Go to Todos' : 'Go to Habits';
-
-  return (
-    <Card
-      variant="header"
-      accentColor={tokens.textMuted}
-      headerTitle="Review before saving"
-      headerSubtitle="Nothing has been saved yet."
-      className="mb-0"
-    >
-      <View className="gap-3">
-        <PreviewInfoRow
-          label="Intent"
-          value={editableDraft.kind === 'create_todo' ? 'Create todo' : 'Create habit'}
-        />
-        <PreviewInfoRow label="Parser status" value={parsedDraft.status} />
-        <PreviewInfoRow label="Ready to save" value={canConfirm ? 'yes' : 'no'} />
-        <PreviewInfoRow
-          label="Parser"
-          value={`${parsedDraft.parserKind} ${parsedDraft.parserVersion}`}
-        />
-
-        {editableDraft.kind === 'create_todo' ? (
-          <>
-            <PreviewSectionTitle>Todo fields</PreviewSectionTitle>
-            <TextField
-              label="Title"
-              value={editableDraft.fields.title ?? ''}
-              onChangeText={onEditTodoTitle}
-              placeholder="Task title"
-              nativeID="command-edit-todo-title"
-            />
-            <TextField
-              label="Notes"
-              value={editableDraft.fields.notes ?? ''}
-              onChangeText={onEditTodoNotes}
-              placeholder="Optional notes"
-              nativeID="command-edit-todo-notes"
-            />
-            <TextField
-              label="Due date (YYYY-MM-DD)"
-              value={editableDraft.fields.dueDate ?? ''}
-              onChangeText={onEditTodoDueDate}
-              placeholder="YYYY-MM-DD"
-              nativeID="command-edit-todo-due-date"
-            />
-            <View className="-mt-2 flex-row flex-wrap gap-2">
-              <View>
-                <Button label="Today" variant="ghost" onPress={onSetTodoDueDateToday} />
-              </View>
-              <View>
-                <Button label="Tomorrow" variant="ghost" onPress={onSetTodoDueDateTomorrow} />
-              </View>
-              <View>
-                <Button label="Clear" variant="ghost" onPress={onClearTodoDueDate} />
-              </View>
-            </View>
-            <PreviewSectionTitle>Priority</PreviewSectionTitle>
-            <View className="flex-row flex-wrap">
-              {TODO_PRIORITIES.map((priority) => (
-                <PillChip
-                  key={priority.value}
-                  label={priority.label}
-                  active={editableDraft.fields.priority === priority.value}
-                  color={tokens.textMuted}
-                  onPress={() => onEditTodoPriority(priority.value)}
-                />
-              ))}
-            </View>
-          </>
-        ) : (
-          <>
-            <PreviewSectionTitle>Habit fields</PreviewSectionTitle>
-            <TextField
-              label="Name"
-              value={editableDraft.fields.name ?? ''}
-              onChangeText={onEditHabitName}
-              placeholder="Habit name"
-              nativeID="command-edit-habit-name"
-            />
-            <TextField
-              label="Target per day"
-              value={
-                Number.isFinite(editableDraft.fields.targetPerDay)
-                  ? String(editableDraft.fields.targetPerDay)
-                  : ''
-              }
-              onChangeText={onEditHabitTargetPerDay}
-              placeholder="1"
-              unsignedInteger
-              nativeID="command-edit-habit-target"
-            />
-            <PreviewSectionTitle>Category</PreviewSectionTitle>
-            <View className="flex-row flex-wrap">
-              {HABIT_CATEGORIES.map((category) => (
-                <PillChip
-                  key={category.value}
-                  label={category.label}
-                  active={editableDraft.fields.category === category.value}
-                  color={tokens.textMuted}
-                  onPress={() => onEditHabitCategory(category.value)}
-                />
-              ))}
-            </View>
-            <PreviewInfoRow
-              label="Defaults on save"
-              value={`${editableDraft.fields.icon ?? 'default icon'}, ${editableDraft.fields.color ?? 'default color'}`}
-            />
-          </>
-        )}
-
-        {parsedDraft.warnings.length > 0 ? (
-          <>
-            <PreviewSectionTitle>Warnings</PreviewSectionTitle>
-            {parsedDraft.warnings.map((warning) => (
-              <PreviewWarning
-                key={`${warning.code}:${warning.message}`}
-                message={warning.message}
-              />
-            ))}
-          </>
-        ) : null}
-
-        {visibleMissingFields.length > 0 ? (
-          <>
-            <PreviewSectionTitle>Needs input</PreviewSectionTitle>
-            {visibleMissingFields.map((missing) => (
-              <PreviewMissingField
-                key={`${missing.field}:${missing.message}`}
-                message={missing.message}
-              />
-            ))}
-            {!canConfirm ? (
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                Fill required fields before saving.
-              </Text>
-            ) : null}
-          </>
-        ) : null}
-
-        <ValidationError message={executionError} />
-
-        {successResult ? (
-          <View
-            className="gap-2 rounded-xl border px-3 py-3"
-            style={{ borderColor: tokens.successBorder, backgroundColor: tokens.successBackground }}
-          >
-            <Text className="text-sm font-semibold" style={{ color: tokens.successText }}>
-              {successResult.message}
-            </Text>
-            <View className="flex-row gap-2">
-              <View className="flex-1">
-                <Button
-                  label={destinationLabel}
-                  onPress={() => {
-                    onNavigateToDestination?.(destinationSection);
-                  }}
-                  color={tokens.textMuted}
-                />
-              </View>
-              <View className="flex-1">
-                <Button label="New command" variant="ghost" onPress={onReset} />
-              </View>
-            </View>
-          </View>
-        ) : canConfirm ? (
-          <Button
-            label={busy ? 'Saving...' : 'Confirm and save'}
-            onPress={onConfirm}
-            color={tokens.textMuted}
-            disabled={busy}
-          />
-        ) : (
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            Fill required fields before saving.
-          </Text>
-        )}
-      </View>
-    </Card>
-  );
-}
-
-function ModeToggle({
-  mode,
-  onChange,
-}: {
-  mode: CommandMode;
-  onChange: (nextMode: CommandMode) => void;
-}) {
-  const { tokens } = useAppTheme();
-
-  return (
-    <View className="flex-row flex-wrap gap-2">
-      {COMMAND_MODE_OPTIONS.map((option) => (
-        <PillChip
-          key={option.value}
-          label={option.label}
-          active={mode === option.value}
-          color={tokens.textMuted}
-          onPress={() => onChange(option.value)}
-        />
-      ))}
-    </View>
-  );
-}
-
-function AutoModeView({
-  placeholder,
-  onSwitchToMode,
-}: {
-  placeholder: string;
-  onSwitchToMode: (mode: CommandMode) => void;
-}) {
-  const { tokens } = useAppTheme();
-  const [question, setQuestion] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastResult, setLastResult] = useState<AskResult | null>(null);
-  const [routedTo, setRoutedTo] = useState<'ask' | 'create' | null>(null);
-
-  const hasQuestionText = question.trim().length > 0;
-
-  const handleAutoSubmit = async () => {
-    if (!hasQuestionText || isLoading) return;
-    setIsLoading(true);
-    setLastResult(null);
-    setRoutedTo(null);
-
-    const now = new Date();
-    const parserContext = getParserContext();
-
-    try {
-      const { route } = await classifyForAutoMode({
-        question,
-        conversationContext: [],
-        now,
-        locale: parserContext.locale,
-        timeZone: parserContext.timeZone,
-        todayDateKey: toDateKey(now),
-        tomorrowDateKey: getTomorrowDateKey(now),
-      });
-
-      if (route.route === 'ask') {
-        setRoutedTo('ask');
-        const result = await askParser.ask({
-          question,
-          conversationContext: [],
-          now,
-          locale: parserContext.locale,
-          timeZone: parserContext.timeZone,
-          todayDateKey: toDateKey(now),
-          tomorrowDateKey: getTomorrowDateKey(now),
-        });
-        setLastResult(result);
-      } else {
-        setRoutedTo('create');
-        // For Create route, delegate to the command parser.
-        // The auto-mode view surfaces the route decision; the user is directed
-        // to the Create tab to submit the same text there via the "switch to
-        // Create" affordance.
-      }
-    } catch (error) {
-      setLastResult({
-        outcome: 'unavailable',
-        question,
-        message: error instanceof Error ? error.message : 'Auto mode classification failed.',
-        reasonCode: 'request_failed',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <View className="gap-4">
-      <TextField
-        label=""
-        placeholder={placeholder}
-        value={question}
-        onChangeText={setQuestion}
-        accessibilityLabel="Auto mode question"
-      />
-      <Button
-        label={isLoading ? 'Sending…' : 'Send'}
-        onPress={handleAutoSubmit}
-        disabled={!hasQuestionText || isLoading}
-      />
-
-      {lastResult ? (
-        <Card
-          variant="header"
-          accentColor={
-            lastResult.outcome === 'answer'
-              ? tokens.primary
-              : lastResult.outcome === 'unsupported'
-                ? tokens.textMuted
-                : tokens.dangerText
-          }
-          headerTitle={
-            lastResult.outcome === 'answer'
-              ? 'Auto → Ask'
-              : lastResult.outcome === 'unsupported'
-                ? 'Unsupported'
-                : 'Unavailable'
-          }
-          headerSubtitle={
-            lastResult.outcome === 'answer'
-              ? lastResult.answer
-              : lastResult.outcome === 'unsupported'
-                ? lastResult.reason
-                : lastResult.message
-          }
-          className="mb-0"
-        >
-          {routedTo === 'create' && (
-            <View className="gap-3">
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                Auto routed this to Create. Switch to the Create tab and try again.
-              </Text>
-              <View className="flex-row gap-2">
-                <View className="flex-1">
-                  <Button
-                    label="Switch to Create"
-                    onPress={() => onSwitchToMode('create')}
-                    color={tokens.textMuted}
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-        </Card>
-      ) : null}
-    </View>
-  );
-}
-
-function AskConversationView({ placeholder }: { placeholder: string }) {
-  const { tokens } = useAppTheme();
-  const { turns, addTurn } = useAskConversation();
-  const [question, setQuestion] = useState('');
-  const [isAsking, setIsAsking] = useState(false);
-  const [lastResult, setLastResult] = useState<AskResult | null>(null);
-
-  const hasQuestionText = question.trim().length > 0;
-
-  const handleAsk = async () => {
-    setIsAsking(true);
-    setLastResult(null);
-    const now = new Date();
-    const parserContext = getParserContext();
-
-    try {
-      const result = await askParser.ask({
-        question,
-        conversationContext: turns,
-        now,
-        locale: parserContext.locale,
-        timeZone: parserContext.timeZone,
-        todayDateKey: toDateKey(now),
-        tomorrowDateKey: getTomorrowDateKey(now),
-      });
-
-      setLastResult(result);
-      if (result.outcome === 'answer') {
-        addTurn({ question: result.question, answer: result.answer });
-        setQuestion('');
-      }
-    } catch (error) {
-      // Retrieval-layer failures (e.g. a SQLite error) are rethrown by
-      // askParser.ask; surface them as a retryable unavailable result rather
-      // than leaving the button stuck on "Asking…".
-      setLastResult({
-        outcome: 'unavailable',
-        question,
-        message: error instanceof Error ? error.message : 'Ask failed unexpectedly.',
-        reasonCode: 'request_failed',
-      });
-    } finally {
-      setIsAsking(false);
-    }
-  };
-
-  return (
-    <View className="gap-4">
-      {turns.length > 0 ? (
-        <CommandSection>
-          <Card
-            variant="header"
-            accentColor={tokens.textMuted}
-            headerTitle="Conversation"
-            headerSubtitle="Cleared only when the app restarts."
-            className="mb-0"
-          >
-            <View className="gap-3">
-              {turns.map((turn, index) => (
-                <View key={`${index}:${turn.question}`} className="gap-1">
-                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                    {turn.question}
-                  </Text>
-                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                    {turn.answer}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </Card>
-        </CommandSection>
-      ) : null}
-
-      <CommandSection>
-        <Card
-          variant="header"
-          accentColor={tokens.textMuted}
-          headerTitle="Ask a question"
-          headerSubtitle="Answers come only from your own local data. Nothing is saved."
-          className="mb-0"
-        >
-          <View className="gap-3">
-            <TextField
-              label="Question"
-              value={question}
-              onChangeText={(value) => {
-                setQuestion(value);
-                setLastResult(null);
-              }}
-              placeholder={placeholder}
-              nativeID="ask-input"
-            />
-            <Button
-              label={isAsking ? 'Asking...' : 'Ask'}
-              onPress={handleAsk}
-              color={tokens.textMuted}
-              disabled={!hasQuestionText || isAsking}
-            />
-          </View>
-        </Card>
-      </CommandSection>
-
-      {lastResult?.outcome === 'unsupported' ? (
-        <CommandSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={tokens.textMuted}
-            headerTitle="Out of scope for this version"
-            headerSubtitle="Nothing was saved or changed."
-            className="mb-0"
-          >
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
-              {lastResult.reason}
-            </Text>
-          </Card>
-        </CommandSection>
-      ) : null}
-
-      {lastResult?.outcome === 'unavailable' ? (
-        <CommandSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={tokens.textMuted}
-            headerTitle="Ask is temporarily unavailable"
-            headerSubtitle="Nothing was saved or changed."
-            className="mb-0"
-          >
-            <View className="gap-3">
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                {lastResult.message}
-              </Text>
-              <Button
-                label="Try again"
-                onPress={handleAsk}
-                color={tokens.textMuted}
-                disabled={!hasQuestionText || isAsking}
-              />
-            </View>
-          </Card>
-        </CommandSection>
-      ) : null}
-    </View>
-  );
 }
 
 export function CommandScreen({
@@ -905,6 +224,16 @@ export function CommandScreen({
     setIsExecuting(false);
   };
 
+  const handleRawTextChange = (nextText: string) => {
+    setRawText(nextText);
+    setParseResult(null);
+    setEditableDraft(null);
+    setParseObservation(null);
+    setExecutionError(null);
+    setIsParsing(false);
+    setSuccessResult(null);
+  };
+
   const hasCommandText = rawText.trim().length > 0;
 
   if (!COMMAND_EXPERIMENT_ENABLED) {
@@ -942,92 +271,24 @@ export function CommandScreen({
       ) : null}
 
       <CommandSection>
-        <Card
-          variant="header"
-          accentColor={tokens.textMuted}
-          headerTitle="Command input"
-          headerSubtitle="Experimental draft parsing only. Nothing is saved until you confirm."
-          className="mb-0"
-        >
-          <View className="gap-3">
-            <TextField
-              label="Command"
-              value={rawText}
-              onChangeText={(nextText) => {
-                setRawText(nextText);
-                setParseResult(null);
-                setEditableDraft(null);
-                setParseObservation(null);
-                setExecutionError(null);
-                setIsParsing(false);
-                setSuccessResult(null);
-              }}
-              placeholder={commandPlaceholder}
-              nativeID="command-input"
-            />
-
-            <View
-              className="rounded-xl border px-3 py-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-            >
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                Supported examples
-              </Text>
-              {supportedExamples.map((example) => (
-                <Text key={example} className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                  {example}
-                </Text>
-              ))}
-            </View>
-
-            <Button
-              label={isParsing ? 'Parsing...' : 'Parse command'}
-              onPress={handleParseCommand}
-              color={tokens.textMuted}
-              disabled={!hasCommandText || isParsing}
-            />
-          </View>
-        </Card>
+        <CommandInputCard
+          value={rawText}
+          onChangeText={handleRawTextChange}
+          placeholder={commandPlaceholder}
+          examples={supportedExamples}
+          isParsing={isParsing}
+          parseDisabled={!hasCommandText || isParsing}
+          onParse={handleParseCommand}
+        />
       </CommandSection>
 
-      {parseResult?.outcome === 'unsupported' ? (
-        <CommandSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={tokens.textMuted}
-            headerTitle="Try rewording your command"
-            headerSubtitle="Nothing has been saved yet."
-            className="mb-0"
-          >
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
-              {parseResult.reason}
-            </Text>
-          </Card>
-        </CommandSection>
-      ) : null}
-
-      {parseResult?.outcome === 'unavailable' ? (
-        <CommandSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={tokens.textMuted}
-            headerTitle="Parse unavailable"
-            headerSubtitle="Nothing has been saved yet."
-            className="mb-0"
-          >
-            <View className="gap-3">
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                {parseResult.message}
-              </Text>
-              <Button
-                label="Try again"
-                onPress={handleParseCommand}
-                color={tokens.textMuted}
-                disabled={!hasCommandText || isParsing}
-              />
-            </View>
-          </Card>
-        </CommandSection>
+      {parseResult?.outcome === 'unsupported' || parseResult?.outcome === 'unavailable' ? (
+        <CommandParseResultCard
+          outcome={parseResult.outcome}
+          message={parseResult.outcome === 'unsupported' ? parseResult.reason : parseResult.message}
+          onRetry={handleParseCommand}
+          retryDisabled={!hasCommandText || isParsing}
+        />
       ) : null}
 
       {parsedDraft && editableDraft ? (

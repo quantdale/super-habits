@@ -1,5 +1,7 @@
 # SuperHabits — AI Task Brief Template
 
+> **SUPERSEDED** — AGENTS.md is the primary agent guide; this document is historical and its baselines (e.g. 427 tests) are stale. Last verified: 2026-05.
+
 Use this template when briefing ChatGPT or Codex for a task in this repo.
 
 ---

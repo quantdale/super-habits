@@ -116,11 +116,11 @@ If this file conflicts with current code, trust the code and document the confli
 
 ### Confirmed from code
 
-- Validation baseline on May 5, 2026:
-  - `npm run typecheck` passes.
-- `npm test` passes with `340` tests.
+- Validation baseline (point-in-time; re-verify with `npx vitest list` / `npx playwright test --list` instead of trusting the numbers below):
+  - `npm run typecheck` passes (0 errors).
+  - `npm test` passes with `630` tests across `56` test files (586 unit + 44 integration).
   - `npm run build:web` passes.
-  - `npx playwright test --list` reports `87` tests in `13` spec files.
+  - `npx playwright test --list` reports `181` tests across `19` spec files in 4 projects (chromium 90, journeys 69, simulation 3, journeys-sync 19).
 
 ## Web / PWA Constraints
 

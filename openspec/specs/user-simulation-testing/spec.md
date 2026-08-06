@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Define the real-world user-simulation testing capability layered on top of the existing suite: persona-driven, journey-shaped E2E tests in `e2e/journeys/` that exercise the app under realistic, repeated, interrupted, day-crossing, and long-running human use, with outcomes verified from multiple independent surfaces and persisted SQLite rows — plus a real-SQLite integration test level (`tests/integration/`), deterministic clock and failure-injection harnesses, a contract-gap protocol with a known-gap register, and CI wiring for fast and full regression lanes.
+
+## Requirements
 
 ### Requirement: Persona-driven journey suite
 

@@ -107,6 +107,18 @@ Untestable with this repo and this harness, regardless of application behaviour.
 
 **Resolution (closed 2026-08-04, task 6.1a/Q5):** against `dist-sync/` in the `journeys-sync` project, the counting upsert injector observes the flush at the network boundary and asserts each of the four outbox records (todos ×2, habits, calorie_entries) is delivered **exactly once** and the outbox drains — **passing** (verified). J4's backend-failure steps (503 / malformed / timeout / partial / backoff) run under the same lane and pass 6/6. The gates remain so the standard `dist/` lane skips them with an honest reason instead of failing on a no-op flush.
 
+### 10. Internal command evaluation suite — env-gated opt-in lane
+
+**Reason:** `e2e/command.eval.internal.spec.ts` (2 tests) drives the real remote parser path (model-proxy outcomes, forced fallback) against a live backend. The whole describe is gated with `test.skip(...)` unless `E2E_COMMAND_INTERNAL_EVAL=true` AND the internal-rollout build flags are set (`EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT=true`, `EXPO_PUBLIC_AI_COMMAND_PARSE_MODE=remote_with_fallback`) AND a remote backend is configured (`EXPO_PUBLIC_AI_COMMAND_PROXY_URL`, or Supabase env vars). The standard lane and CI never set the gate, so the suite shows as skipped there — an opt-in lane attribute, not a coverage hole: the same assertions run on the standard lane against the mock parser (`e2e/command.eval.mock.spec.ts`).
+
+**Closing path:** opt in on demand — `E2E_COMMAND_INTERNAL_EVAL=true` against an internal-capable build with a reachable backend. The run writes its quality artifact to `test-results/command-eval-internal.json` and fails on semantic mismatches or unexpected mock effective paths.
+
+### 11. Internal command observation suite — env-gated opt-in lane
+
+**Reason:** `e2e/command.observation.internal.spec.ts` (4 tests) observes the internal real-parser flow (opt-in metadata visibility, representative todo/habit outcomes, parse→preview→confirm, forced-fallback metadata) against a live backend. Gated identically to entry 10 at describe level via `E2E_COMMAND_INTERNAL_OBSERVATION=true` plus the same build flags and backend requirements; never set by the standard lane or CI, so it shows as skipped there. The mock-parser twin (`e2e/command.observation.mock.spec.ts`) covers the same surface on the standard lane.
+
+**Closing path:** opt in on demand — `E2E_COMMAND_INTERNAL_OBSERVATION=true` against an internal-capable build with a reachable backend.
+
 ---
 
 ## Related
@@ -119,7 +131,7 @@ Untestable with this repo and this harness, regardless of application behaviour.
 
 ## Platform capability gaps — `add-user-simulation-platform`
 
-The user-simulation platform (`simulation/`) layers a model + multiple runners over the parent harness. Its own additional capability gaps are listed below, kept distinct from the parent's nine above — the parent's gaps remain open (the disposable-backend lane partially closes parent gap #2 — real Supabase round-trips — which is exactly why it is report-only while it builds a flake-free track record). These four gaps exist _regardless of application behaviour_: they are properties of the platform's lanes and environment.
+The user-simulation platform (`simulation/`) layers a model + multiple runners over the parent harness. Its own additional capability gaps are listed below, kept distinct from the parent's eleven above — the parent's gaps remain open (the disposable-backend lane partially closes parent gap #2 — real Supabase round-trips — which is exactly why it is report-only while it builds a flake-free track record). These four gaps exist _regardless of application behaviour_: they are properties of the platform's lanes and environment.
 
 ### P1 — Native-device exploration
 

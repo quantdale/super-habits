@@ -33,15 +33,15 @@ jobs:
           node-version: 20
           cache: npm
 
-      # Cache node_modules keyed on the lockfile hash.
-      # patch-package runs on postinstall, so this also caches patched modules.
-      # Cache is invalidated automatically whenever package-lock.json changes.
+      # Cache node_modules keyed on the lockfile hash plus the patch-package
+      # patch files: postinstall re-applies patches, so a patches/ change must
+      # bust the cache even when the lockfile is unchanged.
       - name: Cache node_modules
         uses: actions/cache@v4
         id: node-modules-cache
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json', 'patches/*') }}
           restore-keys: |
             node-modules-${{ runner.os }}-
 
@@ -53,8 +53,34 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Supabase edge-function smoke check (parse-ai-command, user-ai-ask).
+      # The entrypoints are plain JS importing only local relative modules —
+      # no remote npm:/jsr: specifiers — so a direct `deno check` is
+      # offline-stable and is the lightest invocation that still type-checks
+      # the whole graph (the shared normalize.js helpers are fully checked;
+      # the entrypoints run under their own @ts-nocheck). No deno.json exists
+      # in the repo, so the check uses stock Deno 2 defaults.
+      - name: Install Deno (edge-function smoke check)
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check Supabase edge functions
+        run: deno check supabase/functions/parse-ai-command/index.js supabase/functions/user-ai-ask/index.js
+
       - name: Lint
         run: npm run lint
+
+      # Fast, hermetic contract gates that pair with lint: theme-token
+      # validation against the registry and the openspec contract suite.
+      # Kept before tests so drift fails early. (No Prettier gate here: the
+      # repo is not yet prettier-clean repo-wide; formatting is enforced
+      # incrementally by the lint-staged pre-commit hook instead.)
+      - name: Validate theme tokens
+        run: npm run validate:themes
+
+      - name: Validate openspec contracts
+        run: npm run openspec:validate
 
       # `npm test` is `vitest run`, which runs BOTH configured projects
       # (vitest.config.ts test.projects): the `unit` project AND the
@@ -106,7 +132,7 @@ jobs:
         id: node-modules-cache
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json', 'patches/*') }}
           restore-keys: |
             node-modules-${{ runner.os }}-
 
@@ -182,27 +208,17 @@ jobs:
         run: kill "$(cat /tmp/serve-e2e.pid)" 2>/dev/null || true
 
       # ---- dist-sync build (parent task 6.1a, lane dist-sync) ----
-      # A second static export with DUMMY Supabase env baked in (EXPO_NO_DOTENV
-      # blocks any real .env from leaking in; the URL is a non-routable host,
-      # the key is a literal placeholder). main/nightly ONLY — never PRs,
-      # never the quality job; never real credentials. Consumed by the
-      # dedicated `journeys-sync` Playwright project below (task 6.1a / Q5).
+      # Delegated to `npm run build:sync` (scripts/build-dist-sync.mjs): the
+      # script exports dist-sync/ with the DUMMY Supabase env baked in
+      # (EXPO_NO_DOTENV blocks any real .env from leaking in; non-routable
+      # host, literal placeholder key), then verifies the dummy URL is in the
+      # output and cleans a stale dist-sync/ first — the old inline export +
+      # grep-verify steps, now shared with local runs. main/nightly ONLY —
+      # never PRs, never the quality job; never real credentials. Consumed by
+      # the dedicated `journeys-sync` Playwright project below (task 6.1a/Q5).
       - name: Build dist-sync/ with dummy Supabase env (lane dist-sync)
         if: github.event_name != 'pull_request'
-        env:
-          EXPO_NO_DOTENV: '1'
-          EXPO_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
-        run: npx expo export -p web --output-dir dist-sync
-
-      - name: Verify dummy Supabase env is baked into dist-sync/
-        if: github.event_name != 'pull_request'
-        run: |
-          if ! grep -rlq "dummy.supabase.co" dist-sync; then
-            echo "abort: 'https://dummy.supabase.co' not found in dist-sync/ — the export did not bake the dummy env" >&2
-            exit 1
-          fi
-          echo "dist-sync/ carries the dummy Supabase env (non-routable host; no real credentials in any build)."
+        run: npm run build:sync
 
       # ---- dist-sync lane (parent task 6.1a / Q5) ----
       # The dedicated journeys-sync Playwright project runs the remote-boundary
@@ -264,7 +280,7 @@ jobs:
         id: node-modules-cache
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json', 'patches/*') }}
           restore-keys: |
             node-modules-${{ runner.os }}-
 
@@ -307,20 +323,11 @@ jobs:
         if: always()
         run: kill "$(cat /tmp/serve-e2e.pid)" 2>/dev/null || true
 
+      # Delegated to `npm run build:sync` (scripts/build-dist-sync.mjs) — the
+      # script exports dist-sync/ with the dummy Supabase env baked in and
+      # verifies the dummy URL is in the output (was two inline steps).
       - name: Build dist-sync/ with dummy Supabase env (lane dist-sync)
-        env:
-          EXPO_NO_DOTENV: '1'
-          EXPO_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
-        run: npx expo export -p web --output-dir dist-sync
-
-      - name: Verify dummy Supabase env is baked into dist-sync/
-        run: |
-          if ! grep -rlq "dummy.supabase.co" dist-sync; then
-            echo "abort: 'https://dummy.supabase.co' not found in dist-sync/ — the export did not bake the dummy env" >&2
-            exit 1
-          fi
-          echo "dist-sync/ carries the dummy Supabase env (non-routable host; no real credentials in any build)."
+        run: npm run build:sync
 
       # ---- dist-sync lane (parent task 6.1a / Q5) ----
       # The dedicated journeys-sync Playwright project runs the remote-boundary

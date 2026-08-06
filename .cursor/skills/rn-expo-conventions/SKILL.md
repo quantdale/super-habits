@@ -76,7 +76,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - Run: npm test
 - Current suite covers domain logic plus command parser/config, data-layer contracts, restore flows, linked actions, and selected provider/DB behavior
 - Every new domain function needs a test
-- Current count: 427 tests passing — update whenever tests are added or removed
+- Baseline: `npx vitest list` shows the current inventory (630 tests as of the last full pass); the gate is **0 failures** on `npm test` — never maintain a magic total count
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)
@@ -97,10 +97,10 @@ Three MCP servers are commonly configured for this project in the user’s MCP c
 | Server | Package | Key tools | Used for |
 |--------|---------|-----------|----------|
 | playwright | `@playwright/mcp@latest` | browser_navigate, browser_evaluate, browser_take_screenshot, browser_console_messages | Web inspection, pre-PR checks |
-| lighthouse | `@danielsogl/lighthouse-mcp@latest` | Lighthouse audit tools | Performance, PWA, accessibility |
+| lighthouse | `lighthouse-mcp` | Lighthouse audit tools | Performance, PWA, accessibility |
 | fetch | mcp-server-fetch (uvx) | fetch | HTTP header verification |
 
-Use **/inspect-web** and **/pre-pr** for browser-based checks. Use **/audit-performance** for Lighthouse scores.
+Use **/pre-pr** for browser-based checks. Use **/audit-performance** for Lighthouse scores.
 
 ## E2E Testing (Playwright)
 

@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-Expected: **427** tests passing, 0 failing
+Expected: **630** tests passing (compare against `npx vitest list`) — 0 failing is the gate
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -161,7 +161,7 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 427 passing | ? | PASS/FAIL |
+| Tests | 630 passing (vs `npx vitest list`) | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
@@ -199,8 +199,9 @@ Use **GitHub MCP** to:
 2. Find the **open PR** for this branch on the **superhabits** repo.
 3. Fetch the **latest workflow run** associated with that PR (or the run for the latest push to the PR branch).
 4. Report the status of each job:
-   - **quality** (typecheck + unit tests)
-   - **e2e** (Playwright)
+   - **quality** (typecheck + lint + unit tests)
+   - **e2e** (Playwright chromium + journeys + simulation lanes; the main lane also builds `dist-sync/` and runs `e2e:sync`)
+   - **nightly** (schedule-only, non-gating — not part of PR runs)
 
 **If no PR exists** for this branch, skip the CI check and note:
 
@@ -258,7 +259,7 @@ Report final status using one of:
 - `schema.sql` is a stale reference snapshot, not runtime authority
 - Sync flush gated on isRemoteEnabled() — intentional, remote off
 - tests/calories.data.test.ts — mocked data-layer coverage
-- Lint runs via `npm run lint` (`eslint . --max-warnings 81`) — warnings tolerated, not in CI
+- Lint runs via `npm run lint` (eslint with a `--max-warnings` cap in package.json) — warnings tolerated; lint runs in the CI quality job
 
 ---
 

@@ -41,7 +41,7 @@ WORKFLOW
 5. Run: npm run typecheck, npm test.
 6. Report: what changed, any new domain functions tested.
 
-Use **/inspect-web** or **/pre-pr** with the Playwright MCP to verify web rendering after screen changes.
+Use **/pre-pr** with the Playwright MCP to verify web rendering after screen changes.
 
 NON-NEGOTIABLES
 
@@ -60,7 +60,7 @@ NON-NEGOTIABLES
 - SettingsScreen currently keeps six buckets in order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal. Preserve that IA unless the task explicitly changes it.
 - `features/overview/` is a **dashboard-only** module: `OverviewScreen.tsx` only (no `.data.ts` / `.domain.ts` in that folder). `features/shared/` holds cross-feature UI (e.g. `GitHubHeatmap`, `ActivityPreviewStrip`). Deeper flows may use extra screens in a module (e.g. `RoutineDetailScreen`, `WorkoutSessionScreen` under `features/workout/`).
 - `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
-- 427 tests must pass after every change — update this count whenever tests are added or removed
+- 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` (630 tests as of the last full pass) — never maintain a magic total count
 
 E2E TESTS
 E2E uses the **static** web bundle: run `npm run build:web` when you change screens or components, then `npm run e2e` (Playwright serves `dist/` via `node scripts/serve-e2e.js`). Metro is not used for E2E. **Keep `workers: 1` locally** for OPFS SQLite.

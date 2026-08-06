@@ -1,0 +1,14 @@
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
+index 8a2260f..1b7a1bc 100644
+--- a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
++++ b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
+@@ -123,6 +123,9 @@ async function runServer(_argv, cliConfig, args) {
+   _devMiddleware.createDevMiddleware)({
+     serverBaseUrl: devServerUrl,
+     logger: (0, _createDevMiddlewareLogger.default)(terminalReporter),
++    unstable_experiments: {
++      enableStandaloneFuseboxShell: false,
++    },
+   });
+   metroConfig.reporter = {
+     update(event) {

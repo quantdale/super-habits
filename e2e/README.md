@@ -68,10 +68,10 @@ See `docs/testing/known-gaps.md` and the change's `design.md` for the full model
 
 The app persists to **two different stores with different clear semantics**:
 
-1. **OPFS SQLite** — `superhabits.db{,-wal,-shm}`. `clearDatabase()` removes these and reloads.
+1. **OPFS SQLite** — the real `expo-sqlite/` AccessHandlePoolVFS pool dir.
 2. **AsyncStorage** — user preferences: `superhabits.theme.mode`, `superhabits.theme.slots.v2`, `superhabits.calories.viewMode`, `superhabits.command.last-used-mode`, `superhabits.command.internal-rollout.remote-enabled`.
 
-**`clearDatabase()` alone leaves AsyncStorage intact**, so theme, calories view mode and command-mode preferences leak between tests and journeys unless cleared explicitly. The journey reset helper (`e2e/helpers/reset.ts`) clears both stores; feature specs that care about preferences must clear the relevant AsyncStorage keys themselves (e.g. `e2e/calories.spec.ts` removes `superhabits.calories.viewMode`). A genuinely clean journey start also needs a fresh service-worker cache if a stale shell is suspected — see the assumptions in the change's `design.md`.
+**`clearDatabase()` now clears both stores** (it delegates to the journey reset helper in `e2e/helpers/reset.ts`) and returns to a freshly booted app. A genuinely clean start also needs a fresh service-worker cache if a stale shell is suspected — see the assumptions in the change's `design.md`.
 
 ## Clock helper
 

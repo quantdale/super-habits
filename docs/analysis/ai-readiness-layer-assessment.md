@@ -1,5 +1,7 @@
 # AI Readiness Layer Assessment
 
+> **SUPERSEDED** — this inspection predates the shipped Linked Actions engine and the Command Center; treat its findings as historical context, not current truth. It also embeds machine-specific worktree paths (`/C:/Users/palac/.codex/worktrees/...`) that do not exist in this checkout.
+
 Date: 2026-04-13
 Branch: `inspect/ai-readiness-layer`
 Scope: inspection only, no runtime changes

@@ -5,12 +5,11 @@ import { DB_HARNESS_URL, installDbHarness, unregisterServiceWorker } from './dbH
  * Full persistence reset for a journey: clears the OPFS SQLite database (the
  * real `expo-sqlite/` AccessHandlePoolVFS layout) AND the AsyncStorage keys.
  *
- * The legacy `clearDatabase()` in `e2e/helpers/db.ts` only removes
- * `superhabits.db*` from the OPFS root — files that do not exist in the real
- * layout (the app stores its DB under `expo-sqlite/` with random filenames).
- * It therefore clears nothing today; tests only pass because each Playwright
- * context gets a fresh OPFS partition. Journeys share one page across steps so
- * they need a reset that actually wipes state, including AsyncStorage.
+ * `clearDatabase()` in `e2e/helpers/db.ts` delegates to this module
+ * (`resetAll` + `returnToApp`), so both feature specs and journeys now get a
+ * real wipe of the OPFS `expo-sqlite/` pool dir, AsyncStorage keys, and SW
+ * caches. Journeys share one page across steps, so they need a reset that
+ * actually wipes state, including AsyncStorage.
  *
  * This navigates to the DB harness document (same origin) so the app page's
  * worker is gone and the OPFS lock is free, then removes everything.

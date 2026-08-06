@@ -41,16 +41,16 @@ table is a documented mirror of that module, and `.github/workflows/ci.yml` is
 written lane-for-lane against it. `validateMatrix()` runs inside `sim:validate`
 and `sim:run`, so a forbidden combination fails fast with a named rule.
 
-| Lane id | Backend | Mode | Trigger | Gates? | CI retention |
-| --- | --- | --- | --- | --- | --- |
-| `journeys` (parent's deterministic suite) | none (fakes) | off | PR (P0 subset) / main / nightly (full) | **yes** | 7 days |
-| `scenarios-pr` | none (fakes) | `deterministic` | PR (subset ≤ 10 min budget) | **yes** (subset) | 7 days |
-| `scenarios-main` | none (fakes) | `deterministic` | main | no (report) | 7 days |
-| `scenarios-seeded` | none (fakes) | `seeded` | nightly, local | no | 7 days |
-| `dist-sync` | dummy Supabase (non-routable host) | `deterministic` | main / nightly | no | 7 days |
-| `repro-replay` | none or disposable | n/a (replay) | on-demand | no | 7 days |
-| `ai-exploratory` | none (fakes) | `exploratory` | on-demand, nightly | no | 7 days |
-| `disposable-backend` | disposable Supabase | `deterministic` | main / nightly | no (report-only) | 7 days |
+| Lane id                                   | Backend                            | Mode            | Trigger                                | Gates?           | CI retention |
+| ----------------------------------------- | ---------------------------------- | --------------- | -------------------------------------- | ---------------- | ------------ |
+| `journeys` (parent's deterministic suite) | none (fakes)                       | off             | PR (P0 subset) / main / nightly (full) | **yes**          | 7 days       |
+| `scenarios-pr`                            | none (fakes)                       | `deterministic` | PR (subset ≤ 10 min budget)            | **yes** (subset) | 7 days       |
+| `scenarios-main`                          | none (fakes)                       | `deterministic` | main                                   | no (report)      | 7 days       |
+| `scenarios-seeded`                        | none (fakes)                       | `seeded`        | nightly, local                         | no               | 7 days       |
+| `dist-sync`                               | dummy Supabase (non-routable host) | `deterministic` | main / nightly                         | no               | 7 days       |
+| `repro-replay`                            | none or disposable                 | n/a (replay)    | on-demand                              | no               | 7 days       |
+| `ai-exploratory`                          | none (fakes)                       | `exploratory`   | on-demand, nightly                     | no               | 7 days       |
+| `disposable-backend`                      | disposable Supabase                | `deterministic` | main / nightly                         | no (report-only) | 7 days       |
 
 Forbidden combinations (each is a named rule in `matrix.ts`): `seeded` and
 `exploratory` never appear in the PR lane; the disposable backend and the
@@ -77,13 +77,13 @@ Decide the tool by the question the work is asking, not by habit:
   script across lanes or parameterize it. The parent's suite keeps its gating
   role; it is never replaced.
 - **A scenario (this platform)** — write a `defineScenario()` in
-  `simulation/scenarios/` when you want to *reuse* a persona or behaviour
+  `simulation/scenarios/` when you want to _reuse_ a persona or behaviour
   across features/lanes/tools, compose a complete business process from
   reusable workflow fragments, or get seeded variability / repro capability.
   Scenarios are semantic (no selectors); they resolve at runtime through the
   parent's helpers.
 - **An AI mission (this platform)** — write a mission file in
-  `simulation/ai/missions/` when you want an agent to *explore* what nobody
+  `simulation/ai/missions/` when you want an agent to _explore_ what nobody
   scripted (unexpected states, usability friction), beyond any fixed script.
   Missions are non-gating by design.
 
@@ -123,7 +123,11 @@ const logBreakfast = defineWorkflow({
       calories: 320,
       mealType: 'breakfast',
       oracles: [
-        { kind: 'rows', sql: "SELECT food_name FROM calorie_entries WHERE food_name = 'Oatmeal' AND deleted_at IS NULL", expected: [{ food_name: 'Oatmeal' }] },
+        {
+          kind: 'rows',
+          sql: "SELECT food_name FROM calorie_entries WHERE food_name = 'Oatmeal' AND deleted_at IS NULL",
+          expected: [{ food_name: 'Oatmeal' }],
+        },
       ],
     },
   ],
@@ -138,11 +142,11 @@ export const model = defineModel({
       personaId: 'daily-driver',
       goal: 'A realistic Monday: habit ticks plus breakfast.',
       fixture: 'TYPICAL',
-      mode: 'deterministic',           // or 'seeded'
+      mode: 'deterministic', // or 'seeded'
       risks: ['R1'],
-      tags: ['@p0'],                   // tags select the PR subset via --scenario @p0
+      tags: ['@p0'], // tags select the PR subset via --scenario @p0
       workflows: [{ workflowId: 'log-breakfast' }],
-      steps: [ /* semantic steps; see simulation/model/steps.ts */ ],
+      steps: [/* semantic steps; see simulation/model/steps.ts */],
     }),
   ],
 });
@@ -155,7 +159,7 @@ Rules every author must follow:
 - **Every mutating step carries its own oracles** (validator rule 4): at least
   one persisted-row or second-surface check, never only a toast.
 - **Fixtures call the real data layers** (design D9): `fixture: 'SMALL' |
-  'TYPICAL' | 'HEAVY'`, or `apiLeg` steps for headless writes — never raw SQL in
+'TYPICAL' | 'HEAVY'`, or `apiLeg` steps for headless writes — never raw SQL in
   the step graph (`assertApiLegSafe` guards it).
 - **`deterministic` for anything gating**; `seeded` locally/nightly (the seed is
   recorded in `run-report.json` and replays exactly); `exploratory` only for AI
@@ -197,14 +201,15 @@ bundles persist beyond that only as attachments to filed defects.
   aborts before any build/network call on production host, ambient production
   credentials, or a missing disposable marker; the `dist-live/` export is
   produced only inside the guarded job.
-- **The harness serves one dist at a time**: `scripts/serve-e2e.js` and the
-  Playwright `webServer` hardcode serving `dist/` on `:8081`. A dedicated
-  Playwright project for `dist-sync/` is therefore NOT registered yet — serving
-  a second export needs a server/port parameter on `serve-e2e.js` plus a new
-  project in `playwright.config.ts` (deferred; both files are outside this
-  change). CI currently builds `dist-sync/` and verifies the dummy env is baked
-  in (steps documented in `.github/workflows/ci.yml`); the sync journeys that
-  need that build run against it once the wiring lands.
+- **The harness serves one dist per server instance, on separate ports**:
+  `scripts/serve-e2e.js` supports `--port`/`--dist` (defaults 8081, `dist/`).
+  The dedicated **`journeys-sync` Playwright project** is registered in
+  `playwright.config.ts` (grep `/@sync/` over `e2e/journeys/`) and serves
+  `dist-sync/` on `:8082` via its own webServer. The lane is opt-in through
+  `npm run e2e:sync` (main/nightly CI builds `dist-sync/` first, then runs it)
+  and stays out of the default `npm run e2e` run, so PR feedback never waits on
+  the dummy-env build. The sync journeys that need that build run against it
+  there.
 
 ## Baselines and budgets (recorded local measurements — CI numbers pending)
 
@@ -229,12 +234,12 @@ Parent task 6.2 — J8 responsiveness baselines (recorded from the J8 journey
 header, local measurements on the authoring machine; **CI-hardware baseline
 still pending** — measurement on CI was not possible in this environment):
 
-| D14 provisional ceiling | Measured locally (J8, HEAVY) | Headroom |
-| --- | --- | --- |
-| cold Overview ≤ 5000 ms | 219–547 ms | ≥ 9× |
-| section switch ≤ 800 ms | 436–518 ms (max over 6 switches; all mounted) | ≥ 1.5× |
-| diary search input ≤ 500 ms | 232–327 ms | ≥ 1.5× |
-| saved-meal picker ≤ 500 ms | 37–73 ms | ≥ 7× |
+| D14 provisional ceiling     | Measured locally (J8, HEAVY)                  | Headroom |
+| --------------------------- | --------------------------------------------- | -------- |
+| cold Overview ≤ 5000 ms     | 219–547 ms                                    | ≥ 9×     |
+| section switch ≤ 800 ms     | 436–518 ms (max over 6 switches; all mounted) | ≥ 1.5×   |
+| diary search input ≤ 500 ms | 232–327 ms                                    | ≥ 1.5×   |
+| saved-meal picker ≤ 500 ms  | 37–73 ms                                      | ≥ 7×     |
 
 Every ceiling clears locally with ≥ 3× headroom (cold start aside). If CI turns
 out slower, re-measure and file a performance defect per D14 — the ceiling is

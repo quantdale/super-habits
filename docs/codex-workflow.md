@@ -64,6 +64,14 @@ Cursor rule files (for example `.cursorrules` and `.cursor/rules/superhabits-rul
 - For pre-PR validation: `npm test`, `npm run build:web`, `npm run e2e`, `npm run typecheck`.
 - If the worktree is fresh and tools are missing (for example `tsc` not found), run `npm ci` first, then rerun the full validation sequence.
 
+## Validation Toolbox
+
+Beyond the core checks above, the repo ships these validation tools:
+
+- **Openspec platform**: `openspec/` (specs + changes + `config.yaml`) drives spec-first change management through the `opsx-*` prompts (`.github/prompts/opsx-*.prompt.md`, mirrored as `/opsx-*` commands under `.opencode/commands/`): propose, apply, update, continue, and archive changes against the spec.
+- **Simulation scripts**: `npm run sim:validate` (model + lane-matrix validation), `npm run sim:run -- <args>` (scenario runs with `--mode deterministic|seeded`, `--scenario`, `--seed`, `--base-url`), and `npm run sim:repro:capture` / `npm run sim:repro:replay` for bug-repro bundles. See `simulation/README.md`.
+- **Sync lane**: `npm run e2e:sync` runs the dedicated `journeys-sync` Playwright project against the dummy-Supabase `dist-sync/` build on `:8082` (`scripts/serve-e2e.js --port 8082 --dist dist-sync`); main/nightly only.
+
 ## Reporting Expectations
 
 For each task, report:

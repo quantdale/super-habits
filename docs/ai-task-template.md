@@ -123,7 +123,7 @@ If schema changes:
 Validation:
 
 - `npm test`
-- `npm run typecheck` if it becomes valid in the repo
+- `npm run typecheck`
 ```
 
 ## Refactor Task
@@ -194,7 +194,7 @@ Checks:
 - `npm test`
 - `npm run build:web` if web UI changed
 - `npm run e2e` if web behavior changed and static build was updated
-- `npm run typecheck` only if the repo-level config issue has been fixed
+- `npm run typecheck`
 ```
 
 ## What Good Briefs Include

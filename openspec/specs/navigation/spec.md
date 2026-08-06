@@ -1,6 +1,10 @@
 # Single-page navigation
 
-## ADDED Requirements
+## Purpose
+
+Define the app's single-page navigation model: all six feature sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) render from one root screen behind local `activeSection` state, sections stay mounted (lazily on first activation) so their state survives switching, Settings is a modal overlay, the Command Center is a global overlay, and routed tab/settings/command URLs no longer exist.
+
+## Requirements
 
 ### Requirement: Single root entry point with section state
 

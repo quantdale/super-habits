@@ -135,6 +135,6 @@ Use with:
 
 ## Known Navigation Traps
 
-- `App.tsx` and `index.ts` are legacy Expo starter files, not the active runtime entry.
+- The runtime entry is `expo-router/entry` (`package.json` `main`); the legacy Expo starter `App.tsx` and `index.ts` no longer exist — all app code lives in `app/` (`_layout.tsx` shell + single-page `index.tsx`).
 - `core/db/schema.sql` is not the runtime schema authority.
 - E2E runs against static `dist/` via `scripts/serve-e2e.js`; verify details in `playwright.config.ts` and `e2e/README.md`.

@@ -52,9 +52,9 @@ Current product-shell facts to preserve:
    see `app_meta.date_key_cutover` — no silent backfill of old rows.
 
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
-   Never modify an existing migration. Always add a new file numbered N+1.
-   Current stored version: 11. Next migration number: 12 (new `if (version < 12)` block in `runMigrations` in `core/db/client.ts`).
-   Migration logic runs in core/db/client.ts — append a new block in runMigrations() (if (version < N)).
+   Never modify an existing migration. Always append a new `if (version < N) { ... }`
+   block in `runMigrations()` in `core/db/client.ts` — there are no numbered migration
+   files. Current stored version: 11; the next block is `if (version < 12)`.
    schema.sql is a reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions
@@ -98,7 +98,7 @@ Do not wire these up without an explicit decision to do so.
 - Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Current count: 427 tests passing — **update this count whenever tests are added or removed**
+- Baseline: `npx vitest list` shows the current inventory (630 tests as of the last full pass); the gate is **0 failures** on `npm test` — never maintain a magic total count in this file
 - Data/DB, restore, linked-actions, and provider-model tests already exist. Component rendering tests are still limited — document that gap honestly instead of describing the suite as domain-only.
 
 ## E2E Tests (Playwright)
@@ -119,6 +119,7 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - `e2e/boundary.spec.ts` — cross-feature boundary and regression cases
 - `e2e/infrastructure.spec.ts` — Headers, SW, OPFS, DB init
 - `e2e/theming.spec.ts` — theme switching/contrast coverage
+- `e2e/journeys/*.spec.ts` — cross-feature user journeys (the `journeys` project; its `@sync` steps also run as the opt-in `journeys-sync` project)
 
 **Config:** `playwright.config.ts`
 
@@ -132,7 +133,8 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 
 **Commands:**
 
-- `npm run e2e` — run all E2E tests
+- `npm run e2e` — run all E2E tests (chromium + journeys + simulation projects; baseline 181 tests in 19 files — compare against `npx playwright test --list`, 0 failures is the gate)
+- `npm run e2e:sync` — opt-in `journeys-sync` project (`@sync` steps) against the `dist-sync/` build on :8082; main/nightly only, not part of the default `npm run e2e`
 - `npm run e2e:report` — open HTML report
 - `npm run e2e:headed` — run with visible browser (debug only)
 - `npm run e2e:debug` — Playwright inspector
@@ -153,10 +155,11 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 
 ## CI (GitHub Actions)
 
-Two jobs (see `.github/workflows/ci.yml`):
+Three jobs (see `.github/workflows/ci.yml`; lane matrix enforced by `validateMatrix()` in `simulation/matrix.ts`):
 
-- **quality** — typecheck + unit tests (runs first)
-- **e2e** — Playwright Chromium tests (runs only if **quality** passes); runs `npm run build:web`, then `npm run e2e` (Playwright starts `node scripts/serve-e2e.js` per `webServer` in `playwright.config.ts`)
+- **quality** — typecheck + lint + unit tests (runs first, on every trigger)
+- **e2e** — runs after **quality** on PRs and main pushes (and manual `workflow_dispatch`): the PR lane runs the chromium suite + P0 journeys + simulation validation/deterministic subset; the main lane runs the full `npm run e2e`, the full deterministic simulation library, a `dist-sync/` build, and `npm run e2e:sync` (the `journeys-sync` project)
+- **nightly** — schedule-only, non-gating: full `npm run e2e` + seeded simulation lane + `dist-sync/` build (+ optional disposable-backend lane when `SUPABASE_ACCESS_TOKEN` is configured)
 
 ## Current known bugs (do not silently fix — coordinate first)
 
@@ -180,8 +183,8 @@ Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.t
 
 Configured in the user’s MCP settings (e.g. `~/.cursor/mcp.json` on Unix; equivalent on Windows). Useful servers for this repo:
 
-- **Playwright MCP** — live browser inspection; use with `/inspect-web`, `/pre-pr`, and `/e2e-fix`.
+- **Playwright MCP** — live browser inspection; use with `/pre-pr` and `/e2e-fix`.
 - **Lighthouse MCP** — performance, PWA, accessibility; use with `/audit-performance`.
 - **Fetch MCP** — HTTP header verification (e.g. COOP/COEP); use in `/audit-performance` phase 1.
 
-**Slash commands (summary):** `/inspect-web`, `/pre-pr`, `/audit-performance`, `/test` (unit + E2E), `/e2e-fix` (E2E run + report-driven fixes).
+**Slash commands (summary):** `/pre-pr`, `/audit-performance`, `/test` (unit + E2E), `/e2e-fix` (E2E run + report-driven fixes).

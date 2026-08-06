@@ -21,7 +21,12 @@ import { seedFixture } from './seed';
  * - Optional `clock.startAt` installs `page.clock` in `beforeAll`, BEFORE the
  *   first render, so day-rollover journeys control time from the start.
  * - Optional `tags` (e.g. `['@p0']`) are appended to every step title so
- *   `npx playwright test --grep @p0` selects the prioritized subset.
+ *   `npx playwright test --grep @p0` selects the prioritized subset. Tags stay
+ *   at the END of the title — CI greps for them (`/@sync/`, `@p0`).
+ * - `test()` runs from this helper file, so Playwright attributes every step
+ *   here (`helpers/journey.ts`) instead of the spec file. Each step title is
+ *   therefore prefixed with the journey's persona so `--list`, `--grep` and
+ *   the HTML report remain navigable per journey.
  */
 
 export interface JourneyContext {
@@ -82,7 +87,9 @@ export function defineJourney(declaration: JourneyDeclaration): JourneyDeclarati
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      test(`${i + 1}. ${step.name}${tagSuffix}`, async () => {
+      // Step titles carry the journey persona (see the header note on
+      // attribution); tags must stay appended at the very end for CI greps.
+      test(`${persona} — ${i + 1}. ${step.name}${tagSuffix}`, async () => {
         const ctx: JourneyContext = {
           page,
           switchSection: async (tab) => {
