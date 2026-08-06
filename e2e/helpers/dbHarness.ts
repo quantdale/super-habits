@@ -244,13 +244,21 @@ export async function unregisterServiceWorker(page: Page): Promise<void> {
 }
 
 /**
- * Wait for the app shell (tab rail) to render and give the SQLite WASM
- * bootstrap + migrations a beat to finish. There is no DOM signal for "DB
- * ready", so this is: tab rail visible, then a settle delay.
+ * Wait for the app shell (tab rail) to render and for the SQLite bootstrap +
+ * migrations to finish. The shell renders before `initializeDatabase()`
+ * completes, so a fixed sleep would race migrations under load; instead the
+ * app sets `data-db-ready` on `documentElement` once the schema is fully
+ * migrated (see AppProviders). Navigating the page away mid-migration would
+ * kill the in-flight migrations and permanently strand the schema at a
+ * partial version, so this wait is load-bearing for every DB-context handoff.
  */
 export async function waitForAppReady(page: Page, timeout = 30_000): Promise<void> {
   await page.getByRole('button', { name: 'Overview', exact: true }).first().waitFor({ timeout });
-  await page.waitForTimeout(800);
+  await page.waitForFunction(() => document.documentElement.dataset.dbReady === 'true', null, {
+    timeout,
+  });
+  // Give the app's first post-bootstrap queries/renders a beat to settle.
+  await page.waitForTimeout(300);
 }
 
 /**

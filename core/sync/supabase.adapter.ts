@@ -30,7 +30,14 @@ function isSyncableEntity(entity: string): entity is SyncableEntity {
 export class SupabaseSyncAdapter implements SyncAdapter {
   async push(records: SyncRecord[]): Promise<void> {
     if (records.length === 0) return;
-    if (!supabase) return;
+    if (!supabase) {
+      // No remote backend configured: a "successful" no-op push would let the
+      // sync engine drop the outbox (queue cleared on success), silently
+      // losing pending records. Fail instead so the engine restores them —
+      // same path as any other unavailable backend (see sync.engine flush
+      // snapshot/restore contract).
+      throw new Error('Supabase is not configured; keeping the outbox intact.');
+    }
 
     const db = await getDatabase();
     const byEntity = collectIdsByEntity(records);

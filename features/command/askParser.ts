@@ -57,7 +57,7 @@ function buildRequestHeaders(accessToken: string | null): Record<string, string>
   return headers;
 }
 
-async function callAskFunction(
+export async function callAskFunction(
   body: Record<string, unknown>,
 ): Promise<
   | { ok: true; payload: unknown }
@@ -141,7 +141,7 @@ function isDateKey(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function normalizeClassifyPayload(payload: unknown): ClassifyResult {
+export function normalizeClassifyPayload(payload: unknown): ClassifyResult {
   if (!isRecord(payload)) {
     throw new Error('Classify response must be an object.');
   }

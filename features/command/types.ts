@@ -1,10 +1,12 @@
 export const COMMAND_EXPERIMENT_ENABLED = true;
 
 /**
- * Off by default until the Ask pipeline is verified (Bedrock invocation is
- * still pending — see openspec/changes/add-ai-ask-feature/design.md).
+ * Ask mode (and Auto mode) — enabled 2026-08-05 after the user-ai-ask edge
+ * function was deployed with the DeepSeek v4 Flash backend and all three
+ * intents + the phrase stage were verified live against
+ * project kruubbynsmxzxfdunaal.
  */
-export const AI_ASK_EXPERIMENT_ENABLED = false;
+export const AI_ASK_EXPERIMENT_ENABLED = true;
 
 export type DraftStatus = 'ready' | 'needs_input' | 'unsupported';
 export type DraftParserKind = 'mock_rules' | 'model_proxy' | 'model_proxy_fallback';

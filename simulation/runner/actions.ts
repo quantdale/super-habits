@@ -99,6 +99,13 @@ export async function actionOpenCommand(page: Page): Promise<string> {
     if (count > 0) {
       await launcher.first().click({ force: true });
       try {
+        // The command center remembers the last-used mode and defaults to
+        // Auto on a fresh origin (AI_ASK_EXPERIMENT_ENABLED). The runner's
+        // openCommand contract is the Create parser input, so pin the Create
+        // mode before waiting on #command-input.
+        const createMode = page.getByRole('button', { name: 'Create', exact: true });
+        await createMode.waitFor({ state: 'visible', timeout: 8_000 });
+        await createMode.click({ force: true });
         await page.locator('#command-input').waitFor({ state: 'visible', timeout: 8_000 });
         break;
       } catch {

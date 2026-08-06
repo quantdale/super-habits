@@ -31,6 +31,13 @@ async function openCommandScreen(page: Page) {
       }
     }
     try {
+      // The command center remembers the last-used mode and defaults to Auto
+      // on a fresh origin (AI_ASK_EXPERIMENT_ENABLED). These specs exercise
+      // the Create/parser flow, so pin the Create mode before interacting
+      // with #command-input.
+      const createMode = page.getByRole('button', { name: 'Create', exact: true });
+      await expect(createMode).toBeVisible({ timeout: 5_000 });
+      await createMode.click({ force: true });
       await expect(page.locator('#command-input')).toBeVisible({ timeout: 5_000 });
       return;
     } catch {

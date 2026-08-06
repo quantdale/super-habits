@@ -247,11 +247,12 @@ describe('workout soft delete', () => {
 
     // Reviving the routine restores it with its exercises intact — the whole
     // delete was cursory at the row level, so a restore can bring it back.
+    // Both routines share the same created_at millisecond, so listRoutines'
+    // ORDER BY created_at DESC tie-break order is nondeterministic — assert
+    // the revived set, not its display order.
     await revive(db, 'workout_routines', doomedRoutine.id);
-    expect((await workout.listRoutines()).map((r) => r.name)).toEqual([
-      'Keep routine',
-      'Doomed routine',
-    ]);
+    const revivedRoutineNames = (await workout.listRoutines()).map((r) => r.name);
+    expect([...revivedRoutineNames].sort()).toEqual(['Doomed routine', 'Keep routine']);
     const revived = await workout.getRoutineWithExercises(doomedRoutine.id);
     expect(revived?.exercises.map((e) => e.name)).toEqual(['Push-ups', 'Squats']);
 

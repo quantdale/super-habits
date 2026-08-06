@@ -77,12 +77,14 @@ describe('SupabaseSyncAdapter', () => {
     expect(getDatabase).not.toHaveBeenCalled();
   });
 
-  it('returns early when supabase is unavailable', async () => {
+  it('fails the push when supabase is unavailable so the engine retains the records', async () => {
     const { adapter, getDatabase } = await setupAdapter({
       supabase: null,
     });
 
-    await adapter.push([record('todos', 'todo_1')]);
+    await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow(
+      'Supabase is not configured',
+    );
 
     expect(getDatabase).not.toHaveBeenCalled();
   });

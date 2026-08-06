@@ -46,6 +46,13 @@ export function AppProviders({ children }: PropsWithChildren) {
     const bootstrap = async () => {
       try {
         await initializeDatabase();
+        // Web only: expose a boot-readiness marker so test harnesses (and
+        // future boot-gated code) can observe that the schema is fully
+        // migrated. The shell renders before initializeDatabase() completes,
+        // so a fixed-sleep wait races migrations under load.
+        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+          document.documentElement.dataset.dbReady = 'true';
+        }
       } catch (e) {
         console.error('[db] initializeDatabase failed', e);
         if (!cancelled) {
