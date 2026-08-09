@@ -51,9 +51,10 @@ Git history while excluding secrets, caches, and machine-specific state.
 - Completed: Added `docs/development/workstation-bootstrap.md` and the
   read-only `npm run dev:doctor`; made standard web/sync builds clear Metro
   state and documented the safe no-dotenv export path.
-- Completed: Committed the reviewed batch as `dfed4cf` and pushed it to
-  `origin/main`; preserved all reviewed local branches, stash work, meaningful
-  unreachable worktree/WIP heads, and local tags on remote backup refs/tags.
+- Completed: Committed the reviewed batch as `dfed4cf`, committed the completed
+  plan state as `8715699`, and pushed both to `origin/main`; preserved all
+  reviewed local branches, stash work, meaningful unreachable worktree/WIP
+  heads, and local tags on remote backup refs/tags.
 - Important modified areas: `.github`, `.mcp.json`, `AGENTS.md`, `app.json`,
   QA/native E2E docs and scripts, E2E helpers/specs, Expo/EAS config,
   `package.json`, Playwright/simulation tooling, and selected feature files.
@@ -70,8 +71,8 @@ Git history while excluding secrets, caches, and machine-specific state.
   environment evidence, not product passes or failures.
 - Relevant quarantines: None identified yet.
 - Blockers: None yet.
-- Exact next action: Commit this completed-plan state, push it fast-forward to
-  `origin/main`, then verify the final HEAD and remote backup/tag counts.
+- Exact next action: No further repository work remains; verify the final
+  completion push and hand off the exact remote HEAD to Nitro.
 - Remaining definition of done: Safe workstation bootstrap documentation,
   required agent configuration preserved, no secrets staged, meaningful local
   Git state preserved remotely, validation passed or explicitly classified,
@@ -184,8 +185,9 @@ Git history while excluding secrets, caches, and machine-specific state.
   literals; no `.env` or `.env.local` tracked/staged.
 - 2026-08-09 — `git commit` — PASS — `dfed4cf` contains 94 intended files;
   commit hooks completed successfully.
-- 2026-08-09 — remote preservation — PASS — `origin/main` at `dfed4cf`, 31
-  `backup/predator/*` heads, and 11 tags visible via `git ls-remote`.
+- 2026-08-09 — remote preservation — PASS — The migration batch and completed
+  plan are visible on `origin/main`; 31 `backup/predator/*` heads and 11 tags
+  are visible via `git ls-remote`.
 
 ## Changed Files / Areas
 
