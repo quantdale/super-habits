@@ -42,7 +42,8 @@ Git history while excluding secrets, caches, and machine-specific state.
 
 ## Current Checkpoint
 
-- Milestone: Recovery, classification, reproducible setup, and validation.
+- Milestone: Recovery, classification, reproducible setup, validation, and
+  remote preservation complete.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `docs/codex-workflow.md`,
   `docs/PROJECT_STRUCTURE_MAP.md`, `.cursorrules`, and
   `.cursor/rules/superhabits-rules.mdc`; inspected active OpenSpec directories;
@@ -50,8 +51,9 @@ Git history while excluding secrets, caches, and machine-specific state.
 - Completed: Added `docs/development/workstation-bootstrap.md` and the
   read-only `npm run dev:doctor`; made standard web/sync builds clear Metro
   state and documented the safe no-dotenv export path.
-- In progress: Finish the final validation ledger, stage the reviewed files,
-  preserve local-only Git refs, then commit and push.
+- Completed: Committed the reviewed batch as `dfed4cf` and pushed it to
+  `origin/main`; preserved all reviewed local branches, stash work, meaningful
+  unreachable worktree/WIP heads, and local tags on remote backup refs/tags.
 - Important modified areas: `.github`, `.mcp.json`, `AGENTS.md`, `app.json`,
   QA/native E2E docs and scripts, E2E helpers/specs, Expo/EAS config,
   `package.json`, Playwright/simulation tooling, and selected feature files.
@@ -68,13 +70,12 @@ Git history while excluding secrets, caches, and machine-specific state.
   environment evidence, not product passes or failures.
 - Relevant quarantines: None identified yet.
 - Blockers: None yet.
-- Exact next action: Run the final staged-file secret/status review, commit the
-  classified project and migration work, then create and push named backup refs
-  for meaningful local-only branches/stash history.
+- Exact next action: Commit this completed-plan state, push it fast-forward to
+  `origin/main`, then verify the final HEAD and remote backup/tag counts.
 - Remaining definition of done: Safe workstation bootstrap documentation,
   required agent configuration preserved, no secrets staged, meaningful local
   Git state preserved remotely, validation passed or explicitly classified,
-  active and backup refs pushed, and remote HEAD verified.
+  active and backup refs pushed, and final remote HEAD verified.
 
 ## Progress
 
@@ -84,11 +85,11 @@ Git history while excluding secrets, caches, and machine-specific state.
 - [x] Audit secrets and `.gitignore` coverage.
 - [x] Inventory Predator/Nitro toolchain requirements and actual Predator versions.
 - [x] Add generic workstation bootstrap guidance and a read-only doctor.
-- [ ] Preserve meaningful local-only branches, stash contents, and worktree commits.
+- [x] Preserve meaningful local-only branches, stash contents, and worktree commits.
 - [x] Run required validation and inspect failures/artifacts.
-- [ ] Commit logical task-owned changes without unrelated user work.
-- [ ] Push active branch and backup refs; verify remote visibility.
-- [ ] Complete this plan with outcomes and exact Nitro handoff.
+- [x] Commit logical task-owned changes without unrelated user work.
+- [x] Push active branch and backup refs; verify remote visibility.
+- [x] Complete this plan with outcomes and exact Nitro handoff.
 
 ## Surprises & Discoveries
 
@@ -179,6 +180,12 @@ Git history while excluding secrets, caches, and machine-specific state.
 - 2026-08-09 — `npm run format:check` — EXISTING BASELINE GAP — 95 existing
   files, chiefly agent/OpenSpec/docs artifacts, are not Prettier-formatted;
   focused formatting checks for migration files pass.
+- 2026-08-09 — staged-file secret scan — PASS — No high-risk credential
+  literals; no `.env` or `.env.local` tracked/staged.
+- 2026-08-09 — `git commit` — PASS — `dfed4cf` contains 94 intended files;
+  commit hooks completed successfully.
+- 2026-08-09 — remote preservation — PASS — `origin/main` at `dfed4cf`, 31
+  `backup/predator/*` heads, and 11 tags visible via `git ls-remote`.
 
 ## Changed Files / Areas
 
@@ -203,7 +210,13 @@ Git history while excluding secrets, caches, and machine-specific state.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Recovery, classification, bootstrap documentation, doctor tooling,
-  and static validation are complete; commit and remote preservation remain.
-- Follow-up: None yet.
+- Status: Complete.
+- Summary: Predator's legitimate SuperHabits QA/native/agent configuration and
+  migration handoff are committed in `dfed4cf` and pushed to `origin/main`.
+  Repository bootstrap instructions and `npm run dev:doctor` let Nitro
+  reconstruct and verify the web toolchain; native prerequisites and secret
+  transfer names are documented without copying machine state or credentials.
+  Local-only branches, stash work, meaningful unreachable WIP/worktree heads,
+  and tags are preserved remotely under explicit backup refs.
+- Follow-up: Nitro must manually install native tooling if native E2E is needed
+  and transfer only the documented secret values through a secure channel.
