@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
 import { goToTab } from './helpers/navigation';
 import { openSettingsScreen } from './helpers/commandObservation';
@@ -40,9 +40,7 @@ async function openCommandScreen(page: Page) {
       await createMode.click({ force: true });
       await expect(page.locator('#command-input')).toBeVisible({ timeout: 5_000 });
       return;
-    } catch {
-      await page.waitForTimeout(250);
-    }
+    } catch {}
   }
 
   await expect(page.locator('#command-input')).toBeVisible({ timeout: 15_000 });

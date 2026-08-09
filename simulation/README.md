@@ -62,6 +62,14 @@ Gating lanes are deterministic, fast, and fake-backed. Everything
 realistic-but-slow or non-deterministic is report-only until an explicit later
 change promotes it.
 
+For the autonomous QA loop, use `docs/testing/autonomous-qa.md` as the
+agent-facing escalation guide. `npm run qa:simulation` builds a fresh static
+export, serves it on the configured E2E port, validates the model, and runs the
+deterministic `@p0` scenarios. Use `E2E_PORT=8092 npm run qa:simulation` when a
+development server already owns :8081. Seeded discovery remains report-only;
+preserve the printed seed and replay it with `npm run sim:repro:replay` or the
+runner's recorded repro command.
+
 Run modes (design D4): `deterministic` (fixed seed, all injectors off —
 mandatory in gating lanes), `seeded` (seed chosen per run, recorded in the run
 report; a failure replays exactly via `--seed S`), `exploratory` (AI lane, no

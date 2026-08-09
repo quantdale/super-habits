@@ -249,10 +249,15 @@ defineJourney({
     {
       name: 'offline: outbox grew to one record per (entity, id) and persisted to app_meta',
       run: async ({ page }) => {
-        // Entering the DB harness (document + worker + wasm route-fulfilled)
-        // works offline; it destroys the app page, so its 30s interval dies
-        // with it and no flush can clear the outbox mid-assertion.
+        // Chromium's offline emulation blocks a new document navigation even
+        // when the navigation's resources are fulfilled by Playwright routes.
+        // Enter the harness while online, then take the context offline while
+        // the already-loaded harness owns the page. Its worker and OPFS reads
+        // are local, so this still asserts the offline outbox state without
+        // allowing the app's 30s flush interval to run.
+        await setOffline(page, false);
         const { rideId, draftId, stretchId, trailId } = await fetchJourneyIds(page);
+        await setOffline(page, true);
         await expectOutboxRecords(page, [
           { entity: 'todos', id: rideId, operation: 'create' },
           // create → complete deduped to a single 'update' record
@@ -365,7 +370,7 @@ defineJourney({
         // it — same finding as J4), so toggle offline→online and dispatch the
         // change event the listener is actually bound to.
         await setOffline(page, true);
-        await page.waitForTimeout(300);
+        await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
         await setOffline(page, false);
         await page.evaluate(() => {
           const nav = navigator as unknown as {
@@ -377,10 +382,10 @@ defineJourney({
           if (conn) conn.dispatchEvent(new Event('change'));
           window.dispatchEvent(new Event('online'));
         });
-        // Let the flush complete on the live app page before navigating to the
-        // DB harness — navigating away mid-push would abort the in-flight
-        // upsert and requeue instead of draining.
-        await page.waitForTimeout(3000);
+        // Let the network boundary tell us the flush completed before
+        // navigating to the DB harness. Navigating away mid-push would abort
+        // the in-flight upsert and requeue instead of draining.
+        await expect.poll(() => pushed.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(4);
 
         const { rideId, draftId, stretchId, trailId } = await fetchJourneyIds(page);
         const expected = [

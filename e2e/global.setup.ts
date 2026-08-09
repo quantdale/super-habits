@@ -2,11 +2,11 @@ import { chromium } from '@playwright/test';
 import type { FullConfig } from '@playwright/test';
 
 async function globalSetup(_config: FullConfig) {
-  // The standard projects serve dist/ on :8081 (the default); the dedicated
-  // journeys-sync lane serves dist-sync/ on :8082 via `npm run e2e:sync`,
-  // which sets E2E_BASE_URL. Validate whichever base this run targets
-  // (Playwright starts that project's webServer before globalSetup runs).
-  const baseUrl = process.env.E2E_BASE_URL ?? 'http://localhost:8081';
+  // The standard projects serve dist/ on :8081 by default. E2E_PORT allows an
+  // isolated local server when another development server owns that port;
+  // journeys-sync sets E2E_BASE_URL explicitly.
+  const port = process.env.E2E_PORT ?? (process.env.E2E_DIST_DIR === 'dist-sync' ? '8082' : '8081');
+  const baseUrl = process.env.E2E_BASE_URL ?? `http://localhost:${port}`;
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();

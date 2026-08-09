@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { goToTab, hardReload, openNewTodoModal, submitTodoModal } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import {
@@ -26,7 +26,10 @@ test.describe('Todos — boundary inputs', () => {
     await goToTab(page, 'todos');
     await openNewTodoModal(page);
     await submitTodoModal(page);
-    await expect(page.getByText(/No pending tasks/i)).toBeVisible();
+    // The mounted Overview and active Todos surfaces both render this empty
+    // state. Assert the last active-surface instance instead of relying on
+    // strict-mode resolution of two legitimate semantic matches.
+    await expect(page.getByText('No pending tasks', { exact: true }).last()).toBeVisible();
   });
 
   test('very long title (200 chars) saves and displays without layout break', async ({ page }) => {
@@ -133,6 +136,7 @@ test.describe('Habits — boundary inputs', () => {
       await expect(page.getByLabel('Habit name')).toBeVisible({ timeout: 15_000 });
       await page.getByLabel('Habit name').fill(`Boundary habit ${i + 1}`);
       await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+      await expect(page.getByLabel('Habit name')).toBeHidden({ timeout: 15_000 });
     }
     await expect(page.getByText('ANYTIME').first()).toBeVisible();
     await expect(page.getByText('MORNING').first()).toBeVisible();
@@ -169,7 +173,6 @@ test.describe('Calories — boundary inputs', () => {
     // Per-macro max is 999g — push total kcal near 9999 cap (validation)
     await fillCaloriesMacros(page, 'Stress load', '999', '999', '222', '0');
     await clickCaloriesAddEntry(page);
-    await page.waitForTimeout(500);
     await expect(page.getByText('Stress load', { exact: false }).first()).toBeVisible({
       timeout: 15_000,
     });
@@ -279,7 +282,7 @@ test.describe('Global — no NaN, undefined, or Error text anywhere', () => {
   for (const tab of tabs) {
     test(`${tab} tab has no NaN or undefined in rendered text`, async ({ page }) => {
       await goToTab(page, tab);
-      await page.waitForTimeout(1000);
+      await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
       await expect(page.locator('body')).not.toContainText('NaN');
       await expect(page.locator('body')).not.toContainText('undefined');
       await expect(page.locator('body')).not.toContainText('Infinity');

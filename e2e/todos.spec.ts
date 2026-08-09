@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { goToTab, openNewTodoModal, submitTodoModal } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { clickSwipeDeleteAction, swipeLeftToRevealRowActions } from './helpers/gestures';
@@ -11,13 +11,13 @@ test.describe('Todos', () => {
   });
 
   test('shows empty state when no todos exist', async ({ page }) => {
-    await expect(page.getByText(/No pending tasks/i)).toBeVisible();
+    await expect(page.getByText('No pending tasks', { exact: true }).last()).toBeVisible();
   });
 
   test('does not add todo with empty title', async ({ page }) => {
     await openNewTodoModal(page);
     await submitTodoModal(page);
-    await expect(page.getByText(/No pending tasks/i)).toBeVisible();
+    await expect(page.getByText('No pending tasks', { exact: true }).last()).toBeVisible();
   });
 
   test('adds a new todo', async ({ page }) => {

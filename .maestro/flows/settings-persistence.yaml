@@ -1,0 +1,25 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - settings
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Close settings'
+    timeout: 5000
+- tapOn: 'Dark'
+- tapOn: 'Close settings'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Open settings'
+- assertVisible: 'Dark'
+- tapOn: 'Close settings'

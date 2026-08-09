@@ -18,6 +18,7 @@
  */
 
 import type { Oracle, RunMode, SectionName, SemanticStepName } from '../model/types';
+import { validateFailureTriage, type FailureTriage } from './failure';
 
 /** Current schema version. Bump on any breaking change to the JSON shape. */
 export const RUN_REPORT_SCHEMA_VERSION = 1;
@@ -160,6 +161,8 @@ export interface RunReport {
   steps: RunStepEntry[];
   artifacts: RunArtifacts;
   failure?: FailureSummary;
+  /** Evidence-backed triage; absent means the failure is still untriaged. */
+  triage?: FailureTriage;
 }
 
 /** A validation finding, mirroring the model validator's shape. */
@@ -347,6 +350,11 @@ export function validateRunReport(report: unknown): ReportValidationIssue[] {
   }
   if (report.failure !== undefined && !isRecord(report.failure)) {
     push(issues, 'failure', 'must be an object');
+  }
+  if (report.triage !== undefined) {
+    for (const issue of validateFailureTriage(report.triage)) {
+      push(issues, `triage.${issue.path}`, issue.message);
+    }
   }
   // A failed run must carry a failure summary.
   if (report.outcome === 'failed' && report.failure === undefined) {

@@ -14,6 +14,11 @@ on:
   # Manual full-lane runs (AI exploratory / repro replay are on-demand).
   workflow_dispatch:
 
+# Native Maestro/device jobs are intentionally defined in
+# `.eas/workflows/native-e2e.yml` and run only by explicit dispatch or the
+# `native-e2e` pull-request label. This web CI workflow remains credential-free
+# and does not claim Android/iOS coverage.
+
 # Cancel any in-progress run for the same branch/PR when a new commit is pushed.
 # This prevents redundant runs when you push quick follow-up commits.
 # The event type is part of the group so a nightly (schedule on refs/heads/main)

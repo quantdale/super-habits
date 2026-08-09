@@ -42,9 +42,7 @@ function collectTextFiles(dir, out = []) {
 
 function verifyBakedEnv() {
   if (!existsSync(EXPORT_DIR)) {
-    throw new Error(
-      `abort: dist-sync/ not found — the export produced no output directory`,
-    );
+    throw new Error(`abort: dist-sync/ not found — the export produced no output directory`);
   }
   const files = collectTextFiles(EXPORT_DIR);
   for (const file of files) {
@@ -64,22 +62,22 @@ function verifyBakedEnv() {
 // re-verify. rmSync force ignores a missing dir.
 rmSync(EXPORT_DIR, { recursive: true, force: true });
 
-const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
-  'expo',
-  'export',
-  '-p',
-  'web',
-  '--output-dir',
-  'dist-sync',
-], {
-  stdio: 'inherit',
-  env: {
-    ...process.env,
-    EXPO_NO_DOTENV: '1',
-    EXPO_PUBLIC_SUPABASE_URL: DUMMY_URL,
-    EXPO_PUBLIC_SUPABASE_ANON_KEY: DUMMY_KEY,
+const isWindows = process.platform === 'win32';
+const child = spawn(
+  isWindows ? (process.env.ComSpec ?? 'cmd.exe') : 'npx',
+  isWindows
+        ? ['/d', '/s', '/c', 'npx expo export -p web --clear --output-dir dist-sync']
+        : ['expo', 'export', '-p', 'web', '--clear', '--output-dir', 'dist-sync'],
+  {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      EXPO_NO_DOTENV: '1',
+      EXPO_PUBLIC_SUPABASE_URL: DUMMY_URL,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: DUMMY_KEY,
+    },
   },
-});
+);
 
 child.on('error', (err) => {
   console.error(`build:sync — failed to start npx expo export: ${err.message}`);

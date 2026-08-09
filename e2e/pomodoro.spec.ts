@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 
@@ -28,7 +28,6 @@ test.describe('Pomodoro', () => {
 
   test('resets timer', async ({ page }) => {
     await page.getByText('Start focus', { exact: true }).click();
-    await page.waitForTimeout(2_000);
     await page.getByText('Reset', { exact: true }).click();
     await expect(page.getByText('25:00')).toBeVisible();
     await expect(page.getByText('Start focus', { exact: true })).toBeVisible();

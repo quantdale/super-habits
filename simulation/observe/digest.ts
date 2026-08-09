@@ -53,6 +53,10 @@ export function buildFailureDigest(report: RunReport, ctx: DigestContext = {}): 
       `${report.environment.browser} (${report.environment.platform}) @ ${report.environment.baseUrl}`,
   );
   lines.push('- **Outcome**: ' + report.outcome);
+  lines.push(
+    '- **Classification**: ' +
+      (report.triage?.classification ?? 'UNTRIAGED — reproduce and classify before changing code'),
+  );
   lines.push('- **Run report**: `' + report.artifacts.report + '`');
   lines.push('');
 
@@ -108,6 +112,11 @@ export function buildFailureDigest(report: RunReport, ctx: DigestContext = {}): 
       ? `Replay exactly with: \`npm run sim:run -- --scenario ${report.scenario?.id ?? '<scenario>'} --mode ${report.mode} --seed ${report.seed}\``
       : 'No deterministic seed available for this lane; replay via the captured trace/state bundle.';
   lines.push(seedNote);
+  lines.push(
+    report.triage
+      ? `Triage rationale: ${codeOrText(report.triage.rationale)}\nEvidence: ${report.triage.evidence.map((entry) => `\`${entry}\``).join(', ')}`
+      : 'Do not label this failure flaky solely because a retry passes. Use the six-value triage contract and retain the original evidence.',
+  );
   lines.push('');
 
   return lines.join('\n');

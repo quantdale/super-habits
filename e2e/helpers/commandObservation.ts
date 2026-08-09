@@ -41,7 +41,8 @@ export async function openCommandScreen(page: Page) {
       await expect(page.locator('#command-input')).toBeVisible({ timeout: 5_000 });
       return;
     } catch {
-      await page.waitForTimeout(250);
+      // The next attempt reuses Playwright's locator auto-waiting; no fixed
+      // delay is needed between two observable overlay attempts.
     }
   }
 

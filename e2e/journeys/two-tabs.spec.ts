@@ -98,8 +98,6 @@ defineJourney({
             await p.close();
           }
         }
-        await page.waitForTimeout(500);
-
         // The first tab still shows its data and can be written to.
         await switchSection(page, 'todos');
         await expect(page.getByText(FIRST_NOTE, { exact: true }).first()).toBeVisible();

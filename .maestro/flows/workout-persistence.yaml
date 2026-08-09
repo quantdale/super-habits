@@ -1,0 +1,32 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - workout
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Workout'
+- tapOn: 'Routine name'
+- inputText: 'Native strength routine'
+- tapOn: 'Description'
+- inputText: 'Native routine'
+- tapOn: 'Add routine'
+- extendedWaitUntil:
+    visible: 'Open Native strength routine routine'
+    timeout: 5000
+- tapOn: 'Open Native strength routine routine'
+- tapOn: 'Exercise name'
+- inputText: 'Native rows'
+- tapOn: 'Add'
+- assertVisible: 'Native rows'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Workout'
+- assertVisible: 'Native strength routine'

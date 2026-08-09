@@ -1,17 +1,22 @@
 {
   "mcpServers": {
     "playwright": {
-      "type": "stdio",
       "command": "npx",
-      "args": ["@playwright/mcp@latest", "--browser", "chromium"]
+      "args": ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github@latest"]
     },
     "fetch": {
-      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-fetch"]
     },
     "lighthouse": {
-      "type": "stdio",
       "command": "npx",
       "args": ["-y", "lighthouse-mcp"]
     }

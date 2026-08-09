@@ -47,6 +47,22 @@ Every entry below is either a contract gap or a capability gap. If a new uncover
 - **Quarantined tests:** `e2e/journeys/fat-fingers.spec.ts` step 11 (`test.fixme()`, strict `expect(n).toBe(1)` retained in place), asserting exactly one row after two complete presses of the Add-task submit in the same tick.
 - **Companion change:** `fix-todo-add-double-submit` — a re-entry guard (`isSubmitting` / disabled submit) in `onSave()`. When it lands, the quarantine is removed in that change, not here.
 
+### CG-4 — Recurring-todo expansion can miss the D14 switch ceiling
+
+**Decided contract (D14):** after the HEAVY fixture has mounted all sections, each section switch remains within the measured 800ms responsiveness ceiling. The threshold is intentionally unchanged; it catches a user-visible performance cliff rather than hiding it in a slower assertion.
+
+- **Reason:** the first Todos activation expands recurring todos asynchronously. The existing HEAVY journey consistently measures the subsequent `overview→todos` switch at roughly 1.1s while the other switches remain within the ceiling. This is the known recurring-expansion/performance issue represented by `fix-recurring-todo-expansion-idempotency`, not a timing flake.
+- **Quarantined tests:** `e2e/journeys/three-months-in.spec.ts` step 3 (`test.fixme()`, with the strict `≤ 800ms` assertion retained in the step body).
+- **Companion change:** `fix-recurring-todo-expansion-idempotency` — make expansion idempotent and remove the quarantine there after measuring the unchanged D14 contract.
+
+### CG-5 — HEAVY diary saved-meal search exceeds the D14 ceiling
+
+**Decided contract (D14):** the HEAVY Calories diary's saved-meal search responds within 500ms after the user enters a query. The assertion and ceiling remain unchanged.
+
+- **Reason:** after rebuilding the current application, three isolated full HEAVY journey runs measured the diary search at 712ms, 677ms, and 771ms. The failure is reproducible in the current environment and is not resolved by a retry or a larger timeout; it needs a focused performance investigation.
+- **Quarantined tests:** `e2e/journeys/three-months-in.spec.ts` step 6 (`test.fixme()`, with the strict `≤ 500ms` assertion retained in the step body).
+- **Companion change:** a focused calorie-diary performance change must profile and optimize the input path, then remove this quarantine without changing the D14 ceiling.
+
 ---
 
 ## Capability gaps
@@ -55,9 +71,9 @@ Untestable with this repo and this harness, regardless of application behaviour.
 
 ### 1. Native platforms
 
-**Reason:** Playwright drives the web export only. iOS/Android behaviour — `expo-notifications` delivery, `AppState` background transitions, WAL journal mode, `Alert.alert` confirmations (a no-op on web, which is why the habit-delete path cannot be fully E2E'd today) — is unreachable from this harness.
+**Reason:** the committed `.maestro/` layer now reaches a built Android/iOS app for semantic smoke, persistence, and lifecycle-path checks. However, Playwright and the local Windows host still cannot prove all native behavior: notification tray delivery, long-running background execution, `Alert.alert` confirmations, system offline toggling, and platform-specific performance remain dependent on a booted device or EAS/macOS lane.
 
-**Closing path:** a Maestro/Detox smoke lane, or a documented manual checklist per release. Out of scope for this change. (Supplemented by the manual exploratory missions in `docs/testing/exploratory-missions.md` — M1, M2.)
+**Closing path:** run `npm run qa:native:android` on an Android-capable host and the `.eas/workflows/native-e2e.yml` Android/iOS jobs for cross-platform coverage. Add stable notification-shade and system-network assertions only after selecting a supported device-lab mechanism. (Supplemented by the manual exploratory missions in `docs/testing/exploratory-missions.md` — M1, M2.)
 
 ### 2. Real Supabase round-trips
 
@@ -135,9 +151,9 @@ The user-simulation platform (`simulation/`) layers a model + multiple runners o
 
 ### P1 — Native-device exploration
 
-**Reason:** every platform lane (deterministic / seeded scenario, seeded variability, repro replay, AI exploratory) drives the Playwright web export only, exactly like the parent suite. Notification delivery, `AppState` background transitions, WAL journal mode, `Alert.alert` confirmations, and real-device performance are unreachable from any lane, not just the parent's — the platform does not change the native boundary (design non-goal).
+**Reason:** the simulation platform remains web-only by design. The native Maestro layer is a separate focused gate; it does not attempt to replay every seeded persona scenario on a device. Notification delivery, native alerts, and real-device performance therefore remain outside simulation lanes.
 
-**Closing path:** a Maestro/Detox smoke lane or a documented manual checklist per release (parent capability gap #1 stands; the manual exploratory missions in `docs/testing/exploratory-missions.md` remain the supplement). Out of scope for this change.
+**Closing path:** use the focused native flows for platform reality and keep seeded simulation for web behavioral stress; expand native scenarios only when a native-specific defect justifies them. The manual exploratory missions in `docs/testing/exploratory-missions.md` remain the supplement.
 
 ### P2 — AI-lane non-determinism and cost
 

@@ -1,0 +1,26 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - todos
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Todos'
+- tapOn: 'Add task'
+- tapOn: 'Title'
+- inputText: 'Native persistence todo'
+- tapOn: 'Add task'
+- extendedWaitUntil:
+    visible: 'Native persistence todo'
+    timeout: 5000
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Todos'
+- assertVisible: 'Native persistence todo'

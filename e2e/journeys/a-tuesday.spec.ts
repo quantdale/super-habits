@@ -318,12 +318,15 @@ defineJourney({
         await expect(page.getByText('Task 5', { exact: true })).toBeHidden();
 
         // Return to Focus: the timer must still be running (Pause visible) and
-        // actively counting — wait for it to advance past 25:00 into 24:xx. This
-        // is the R6 multi-live-screen regression: a timer that died on section
-        // switch would never reach 24:xx; one that restarted would still show
-        // 25:00 forever.
+        // actively counting. Advance the already-installed browser clock by
+        // one second so this assertion does not depend on an arbitrary amount
+        // of wall-clock time elapsing while the previous step tears down.
+        // This is the R6 multi-live-screen regression: a timer that died on
+        // section switch would never reach 24:xx; one that restarted would
+        // still show 25:00 forever.
         await switchTab(page, 'pomodoro');
         await expect(page.getByText('Pause', { exact: true })).toBeVisible({ timeout: 5_000 });
+        await page.clock.fastForward(1_000);
         await expect(page.locator('.text-5xl').getByText(/^24:/)).toBeVisible({ timeout: 5_000 });
         const nowSec = parseTime(await readTimer(page), false);
         // Advanced past 25:00 but nowhere near 0 — a sane short-detour delta.

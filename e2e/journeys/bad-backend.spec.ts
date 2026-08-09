@@ -97,7 +97,7 @@ async function stubOutServiceWorker(page: Page): Promise<void> {
 async function triggerReconnectFlush(page: Page, settleMs = 2500): Promise<void> {
   await ensureAppContext(page);
   await setOffline(page, true);
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
   await setOffline(page, false);
   await page.evaluate(() => {
     const nav = navigator as unknown as {

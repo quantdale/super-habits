@@ -26,13 +26,14 @@ import * as path from 'node:path';
 
 /**
  * Where the app under test is served from. The standard projects serve
- * `dist/` on :8081 (the default); the dedicated `journeys-sync` project serves
- * the dummy-Supabase `dist-sync/` export on :8082 via
- * `npm run e2e:sync`, which sets `E2E_BASE_URL` and `E2E_DIST_DIR` (see
- * package.json). The defaults keep every existing project byte-for-byte on
- * :8081/dist.
+ * `dist/` on :8081 by default; E2E_PORT can select an isolated local port. The
+ * dedicated `journeys-sync` project serves the dummy-Supabase `dist-sync/`
+ * export on :8082 via `npm run e2e:sync`, which sets `E2E_BASE_URL` and
+ * `E2E_DIST_DIR` (see package.json).
  */
-export const APP_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:8081';
+const defaultPort =
+  process.env.E2E_PORT ?? (process.env.E2E_DIST_DIR === 'dist-sync' ? '8082' : '8081');
+export const APP_BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${defaultPort}`;
 
 /**
  * The on-disk export directory that holds the wa-sqlite WASM assets the
@@ -42,10 +43,15 @@ export const APP_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:8081';
 export const DIST_DIR = process.env.E2E_DIST_DIR ?? 'dist';
 
 /** Harness document URL (same origin as the app, so OPFS is shared). */
-export const DB_HARNESS_URL = `${APP_BASE_URL}/__sh__/db/`;
+// Keep the harness navigation out of an old service-worker cache entry. The
+// query is not part of application state and is constant within one worker.
+export const DB_HARNESS_URL = `${APP_BASE_URL}/__sh__/db/?e2e-harness=${process.pid}`;
 
-/** Route glob covering the harness document + its worker imports. */
-const DB_HARNESS_ROUTE = '**/__sh__/db/**';
+/** Route covering the harness document + its worker imports. */
+// Match both slash-normalized and slashless URLs before Expo's SPA fallback
+// turns the harness into an "Unmatched Route" document. A pathname check in
+// the handler below keeps query strings from affecting the dispatch.
+const DB_HARNESS_ROUTE = /\/__sh__\/db(?:\/.*)?(?:\?.*)?$/;
 
 const WA_DIR = path.resolve(process.cwd(), 'node_modules', 'expo-sqlite', 'web', 'wa-sqlite');
 const WA_ESM_FILES = [
@@ -186,7 +192,8 @@ export async function installDbHarness(page: Page): Promise<void> {
 
   await page.route(DB_HARNESS_ROUTE, (route) => {
     const url = route.request().url();
-    if (url === DB_HARNESS_URL || url.endsWith('/__sh__/db/')) {
+    const pathname = new URL(url).pathname;
+    if (pathname === '/__sh__/db' || pathname === '/__sh__/db/') {
       return route.fulfill({
         status: 200,
         contentType: 'text/html',
@@ -194,7 +201,7 @@ export async function installDbHarness(page: Page): Promise<void> {
         body: HARNESS_HTML,
       });
     }
-    if (url.endsWith('/__sh__/db/worker.mjs')) {
+    if (pathname === '/__sh__/db/worker.mjs') {
       return route.fulfill({
         status: 200,
         contentType: 'application/javascript',
@@ -202,7 +209,7 @@ export async function installDbHarness(page: Page): Promise<void> {
         body: workerSource,
       });
     }
-    if (url.endsWith('/__sh__/db/wa-sqlite.js')) {
+    if (pathname === '/__sh__/db/wa-sqlite.js') {
       let body = readWaModule('wa-sqlite.js');
       body = body.replace(
         'if(typeof exports==="object"&&typeof module==="object"){module.exports=Module;module.exports.default=Module}else if(typeof define==="function"&&define["amd"])define([],()=>Module);',
@@ -216,7 +223,7 @@ export async function installDbHarness(page: Page): Promise<void> {
       });
     }
     for (const file of WA_ESM_FILES) {
-      if (url.endsWith('/__sh__/db/' + file)) {
+      if (pathname === '/__sh__/db/' + file) {
         return route.fulfill({
           status: 200,
           contentType: 'application/javascript',
@@ -232,12 +239,30 @@ export async function installDbHarness(page: Page): Promise<void> {
 /** Unregister the app's service worker so page.route can intercept navigations. */
 export async function unregisterServiceWorker(page: Page): Promise<void> {
   try {
-    await page.evaluate(() =>
-      navigator.serviceWorker
-        .getRegistrations()
-        .then((rs) => Promise.all(rs.map((r) => r.unregister()))),
+    await page.evaluate(async () => {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    });
+    await page.waitForFunction(
+      async () => (await navigator.serviceWorker.getRegistrations()).length === 0,
+      null,
+      { timeout: 5_000 },
     );
-    await page.waitForTimeout(150);
+    // An unregistered worker can still control a same-origin document until it
+    // navigates. Move through the loopback alias when the local server permits
+    // it; this guarantees a new origin before the routed localhost harness
+    // navigation and avoids an intermittent SPA fallback after repeated
+    // service-worker registrations. `about:blank` remains the fallback for
+    // remote/custom E2E origins.
+    const escapeUrl = new URL(APP_BASE_URL);
+    if (escapeUrl.hostname === 'localhost' || escapeUrl.hostname === '127.0.0.1') {
+      escapeUrl.hostname = escapeUrl.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+      escapeUrl.pathname = '/__sh__/e2e-escape';
+      escapeUrl.search = `?t=${Date.now()}`;
+      await page.goto(escapeUrl.href, { waitUntil: 'domcontentloaded' });
+    } else {
+      await page.goto('about:blank', { waitUntil: 'domcontentloaded' });
+    }
   } catch {
     // Page may already be gone or not service-worker-capable.
   }

@@ -303,8 +303,7 @@ defineJourney({
         // Resume continues from the same remaining time.
         await page.getByText('Resume', { exact: true }).click();
         await expect(page.getByText('Pause', { exact: true })).toBeVisible();
-        await page.waitForTimeout(2_200);
-        expect((await timerText.textContent()) ?? '').not.toBe(pausedText);
+        await expect.poll(() => timerText.textContent(), { timeout: 5_000 }).not.toBe(pausedText);
 
         // End the session with Reset (no focus session completes).
         await page.getByText('Reset', { exact: true }).click();

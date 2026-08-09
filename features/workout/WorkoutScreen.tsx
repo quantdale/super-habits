@@ -66,7 +66,12 @@ function RoutineSwipeRow({
       onEdit={onOpenDetail}
       onDelete={onRequestDelete}
     >
-      <RectButton onPress={onOpenDetail} style={{ backgroundColor: 'transparent' }}>
+      <RectButton
+        onPress={onOpenDetail}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${routine.name} routine`}
+        style={{ backgroundColor: 'transparent' }}
+      >
         <Text className="text-base font-semibold" style={{ color: tokens.text }}>
           {routine.name}
         </Text>

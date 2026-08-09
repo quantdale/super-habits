@@ -103,6 +103,8 @@ async function swipeLeftOnRowRect(page: Page, rowRect: RowRect): Promise<void> {
     await page.mouse.move(endX, y, { steps: 28 });
     await page.mouse.up();
   }
+  // RN Web's synthetic touch sequence has no completion event exposed to the
+  // test. This bounded settle models gesture-end processing, not app readiness.
   await page.waitForTimeout(500);
 }
 

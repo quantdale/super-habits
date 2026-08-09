@@ -1,0 +1,31 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - calories
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Calories'
+- tapOn: 'Calories entry food'
+- inputText: 'Native breakfast'
+- tapOn: 'Calories entry protein'
+- inputText: '20'
+- tapOn: 'Calories entry carbs'
+- inputText: '50'
+- tapOn: 'Calories entry fat'
+- inputText: '10'
+- tapOn: 'Add entry'
+- extendedWaitUntil:
+    visible: 'Native breakfast'
+    timeout: 5000
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Calories'
+- assertVisible: 'Native breakfast'

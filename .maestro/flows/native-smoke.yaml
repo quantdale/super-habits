@@ -1,0 +1,28 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - smoke
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- assertVisible: 'Overview'
+- tapOn: 'Todos'
+- assertVisible: 'Todos'
+- tapOn: 'Habits'
+- assertVisible: 'Habits'
+- tapOn: 'Focus'
+- assertVisible: 'Start focus'
+- tapOn: 'Workout'
+- assertVisible: 'Workout'
+- tapOn: 'Calories'
+- assertVisible: 'Calories'
+- tapOn: 'Overview'
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Close settings'
+    timeout: 5000
+- tapOn: 'Close settings'
+- assertVisible: 'Overview'

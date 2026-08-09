@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "default": {
+    "gates": ["qa:fast", "qa:full"],
+    "reason": "Unmapped files receive conservative static and full regression coverage."
+  },
+  "rules": [
+    {
+      "id": "habits",
+      "patterns": ["features/habits/**", "tests/habits.*", "e2e/habits.spec.ts"],
+      "gates": ["qa:fast", "qa:integration", "e2e:journeys:p0"],
+      "tests": ["tests/habits.*.test.ts", "tests/integration/constraints.test.ts"],
+      "journeys": ["@p0", "linked-actions"],
+      "broadRegression": false
+    },
+    {
+      "id": "todos",
+      "patterns": ["features/todos/**", "tests/todos.*", "e2e/todos.spec.ts"],
+      "gates": ["qa:fast", "qa:integration", "e2e:journeys:p0"],
+      "tests": ["tests/todos.*.test.ts", "tests/integration/constraints.test.ts"],
+      "journeys": ["@p0", "recurring-todo", "linked-actions"],
+      "broadRegression": false
+    },
+    {
+      "id": "calories",
+      "patterns": ["features/calories/**", "tests/calories.*", "e2e/calories.spec.ts"],
+      "gates": ["qa:fast", "qa:integration", "e2e:journeys:p0"],
+      "tests": ["tests/calories.*.test.ts", "tests/integration/dateKeys.test.ts"],
+      "journeys": ["@p0", "offline/reconnect"],
+      "broadRegression": false
+    },
+    {
+      "id": "sync-and-restore",
+      "patterns": [
+        "core/sync/**",
+        "lib/supabase.ts",
+        "tests/*sync*",
+        "tests/*restore*",
+        "e2e/helpers/failure.ts"
+      ],
+      "gates": ["qa:fast", "qa:integration", "e2e:journeys", "e2e:sync"],
+      "tests": [
+        "tests/sync.engine.test.ts",
+        "tests/restore.coordinator.test.ts",
+        "tests/integration/restore.test.ts"
+      ],
+      "journeys": ["@sync", "offline/reconnect", "restore"],
+      "broadRegression": true
+    },
+    {
+      "id": "linked-actions",
+      "patterns": [
+        "core/linked-actions/**",
+        "tests/linkedActions*",
+        "tests/integration/linkedActions.test.ts"
+      ],
+      "gates": ["qa:fast", "qa:integration", "e2e:journeys", "qa:simulation"],
+      "tests": ["tests/linkedActions*.test.ts", "tests/integration/linkedActions.test.ts"],
+      "journeys": ["linked-actions", "power-user"],
+      "broadRegression": true
+    },
+    {
+      "id": "date-and-time",
+      "patterns": [
+        "lib/time.ts",
+        "tests/time.test.ts",
+        "tests/integration/dateKeys.test.ts",
+        "e2e/helpers/clock.ts",
+        "e2e/journeys/past-midnight-*.spec.ts"
+      ],
+      "gates": ["qa:fast", "qa:integration", "qa:timezones", "e2e:journeys", "qa:full"],
+      "tests": ["tests/time.test.ts", "tests/integration/dateKeys.test.ts"],
+      "journeys": ["past-midnight", "recurring-todo", "streaks", "calories", "pomodoro"],
+      "broadRegression": true
+    },
+    {
+      "id": "e2e-and-simulation-infrastructure",
+      "patterns": [
+        "e2e/**",
+        "simulation/**",
+        "playwright.config.ts",
+        "vitest.config.ts",
+        "scripts/serve-e2e.js"
+      ],
+      "gates": ["qa:fast", "qa:integration", "qa:journeys", "qa:simulation", "qa:full"],
+      "tests": ["tests/simulation.*.test.ts"],
+      "journeys": ["@p0", "full deterministic library"],
+      "broadRegression": true
+    },
+    {
+      "id": "database-and-migrations",
+      "patterns": [
+        "core/db/**",
+        "tests/db.*",
+        "tests/integration/migrations.test.ts",
+        "tests/integration/constraints.test.ts"
+      ],
+      "gates": ["qa:fast", "qa:integration", "qa:full"],
+      "tests": [
+        "tests/db.client.test.ts",
+        "tests/integration/migrations.test.ts",
+        "tests/integration/constraints.test.ts"
+      ],
+      "journeys": ["cold start", "restore"],
+      "broadRegression": true
+    },
+    {
+      "id": "native-ui-and-persistence",
+      "patterns": [
+        "app/**",
+        "core/ui/**",
+        "features/*/*Screen.tsx",
+        "features/settings/**",
+        "app.json",
+        "eas.json"
+      ],
+      "gates": ["qa:fast", "qa:integration", "qa:native:smoke", "qa:native:targeted"],
+      "tests": [],
+      "journeys": ["native-smoke", "native-persistence"],
+      "broadRegression": false
+    },
+    {
+      "id": "native-pomodoro-notifications",
+      "patterns": ["features/pomodoro/**", "lib/notifications.ts", "core/providers/**", "eas.json"],
+      "gates": [
+        "qa:fast",
+        "qa:integration",
+        "qa:native:lifecycle",
+        "qa:native:android",
+        "qa:native:ios"
+      ],
+      "tests": [],
+      "journeys": ["native-lifecycle", "native-notifications"],
+      "broadRegression": true
+    },
+    {
+      "id": "native-e2e-infrastructure",
+      "patterns": [".maestro/**", ".eas/workflows/**", "scripts/qa-native.mjs"],
+      "gates": ["qa:fast", "qa:native:smoke", "qa:native:lifecycle", "qa:full"],
+      "tests": [],
+      "journeys": ["native smoke and targeted flows"],
+      "broadRegression": true
+    }
+  ]
+}

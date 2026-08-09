@@ -1,4 +1,8 @@
-import { test, expect, chromium } from '@playwright/test';
+import { chromium } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { APP_BASE_URL } from './helpers/dbHarness';
+
+test.use({ serviceWorkers: 'allow' });
 
 test.describe('Infrastructure', () => {
   test('crossOriginIsolated is true', async ({ page }) => {
@@ -73,10 +77,12 @@ test.describe('Infrastructure', () => {
     // Same browser context = shared OPFS (separate contexts each have their own OPFS)
     const context = await browser.newContext();
     const page1 = await context.newPage();
-    await page1.goto('http://localhost:8081');
+    await page1.goto(APP_BASE_URL);
     await page1.waitForLoadState('load');
     await page1.waitForFunction(() => window.crossOriginIsolated === true, { timeout: 30_000 });
-    await page1.waitForTimeout(3_000);
+    await page1.waitForFunction(() => document.documentElement.dataset.dbReady === 'true', null, {
+      timeout: 30_000,
+    });
 
     const page2 = await context.newPage();
     const errors: string[] = [];
@@ -88,9 +94,11 @@ test.describe('Infrastructure', () => {
       pageErrors.push(String(err));
     });
 
-    await page2.goto('http://localhost:8081');
+    await page2.goto(APP_BASE_URL);
     await page2.waitForLoadState('load');
-    await page2.waitForTimeout(4_000);
+    await expect(page2.getByText('Unable to start', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
 
     const combined = [...errors, ...pageErrors].join('\n');
     const hasLockError =
@@ -112,7 +120,9 @@ test.describe('Infrastructure', () => {
 
     await page.goto('/');
     await page.waitForLoadState('load');
-    await page.waitForTimeout(2_000);
+    await page.waitForFunction(() => document.documentElement.dataset.dbReady === 'true', null, {
+      timeout: 30_000,
+    });
 
     const dbError = errors.find((e) => e.includes('initializeDatabase failed'));
     expect(dbError).toBeUndefined();

@@ -495,6 +495,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                   <View className="items-center" style={{ width: editMode ? 104 : 84 }}>
                     <Pressable
                       onPress={() => handleAddHabitToGroup(group.key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add ${group.label.toLowerCase()} habit`}
                       className="h-[68px] w-[68px] shrink-0 grow-0 items-center justify-center rounded-2xl border-2 border-dashed"
                       style={{
                         borderColor: SECTION_COLORS.habits + '60',

@@ -19,6 +19,32 @@ For Codex-based workflows, also read: `docs/codex-workflow.md`
    - Data/DB/sync/migration issues: `.cursor/agents/data-agent.md`
    - UI/domain/routing/component issues: `.cursor/agents/feature-agent.md`
 
+## Durable Agent Work (ExecPlans)
+
+- Substantial, multi-step, delegated, QA-infrastructure, or context-loss-prone
+  work requires a task-specific ExecPlan. Follow `.agent/PLANS.md`.
+- OpenSpec-backed work stores its living plan at
+  `openspec/changes/<change-slug>/execplan.md`; other substantial work uses
+  `.agent/execplans/<task-slug>.md`. Never use one global current-task file.
+- Keep the plan's `Current Checkpoint` current throughout the task, including
+  the exact next action, decisions, discoveries, changed areas, validation,
+  blockers, and remaining definition of done. Update it at every meaningful
+  milestone, failure, decision, delegation boundary, and before finishing.
+- After context compaction or in a fresh session, reread `AGENTS.md`,
+  `.agent/PLANS.md`, and the task plan; inspect `git status --short`,
+  `git diff --stat`, `git diff --name-only`, relevant diffs, and recent QA
+  evidence; reconcile the checkpoint; run `npm run qa:affected` when
+  applicable; then resume from `Exact next action`.
+- Conversation history and compaction summaries are not authoritative task
+  state. Git is authoritative for actual files; OpenSpec is authoritative for
+  required behavior; the ExecPlan is authoritative for implementation state
+  and recovery context. Update the plan when those sources disagree.
+- Use `docs/testing/autonomous-qa.md` and `qa/impact-map.json` for escalation;
+  preserve failures and known gaps, never weaken meaningful tests, and do not
+  claim completion without validated definition-of-done evidence.
+- Keep this section stable. Do not put volatile progress for an individual task
+  in `AGENTS.md`.
+
 ## Authoritative Docs
 
 - `docs/PROJECT_STRUCTURE_MAP.md`
@@ -244,13 +270,19 @@ npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — o
 npm run e2e:report   # open HTML report
 npm run e2e:headed   # visible browser for debugging
 npm run e2e:debug    # Playwright inspector
+
+# Native E2E (requires a built app installed on a booted target)
+npm run qa:native:android  # local Android smoke
+npm run qa:native:ios      # local macOS/iOS smoke when available
+npm run qa:native:lifecycle
+npm run qa:native:targeted
 ```
 
 Current verified baselines:
 
 - `npm run typecheck`: 0 errors
 - `npm run lint`: 0 errors (warnings allowed)
-- `npm test`: **630 tests passing** across **56 test files** (586 unit + 44 integration under the `tests/integration/` Vitest project)
+- `npm test`: **633 tests passing** across **57 test files** (589 unit + 44 integration under the `tests/integration/` Vitest project)
 - `npx playwright test --list`: **181 tests** across **19 spec files** — the `chromium` project (14 `e2e/*.spec.ts`), the `journeys` project (12 `e2e/journeys/*.spec.ts`), the `simulation` project (`simulation/runner/specs/`), and the `journeys-sync` project (`e2e/journeys` `grep /@sync/` — the 19 remote-boundary steps, opt-in via `npm run e2e:sync` against the dummy-Supabase `dist-sync/` build on :8082; main/nightly only)
 - `npm run e2e:sync`: **18 passed / 1 skipped** (J3, J4, J5 @sync steps; the skip is J5's CG-2 quarantine) — 0 failed
 
@@ -292,6 +324,31 @@ platform layer** — it defines the model authoring guide, the lane matrix, the
 repro workflow, the isolation rules, and the "which tool for which job"
 decision rule.
 
+### Native E2E (Maestro)
+
+- Native flows live in `.maestro/`; they are a focused complement to Playwright,
+  not a duplicate feature suite.
+- The dedicated EAS profile is `e2e-test`; it creates an Android APK or iOS
+  simulator build without production credentials. Do not use Expo Go for native
+  lifecycle validation.
+- `scripts/qa-native.mjs` performs preflight and writes reports under
+  `simulation-output/native/`. Missing Maestro, a booted target, or an
+  installed app is an `ENVIRONMENT` blocker, not a pass.
+- Native UI/navigation changes require smoke. Native persistence/settings
+  changes require targeted persistence flows. Pomodoro, notifications,
+  AppState, or lifecycle changes require the lifecycle/notification lane on
+  Android and iOS when available.
+- `.eas/workflows/native-e2e.yml` is the cloud iOS path and an explicit broader
+  native path. It runs manually or with the `native-e2e` pull-request label;
+  ordinary web PRs do not implicitly wait for it.
+- Notification scheduling-path coverage is not notification-tray delivery.
+  Long-running background timers, native `Alert.alert`, and system network
+  toggling remain explicit capability gaps in `docs/testing/known-gaps.md`.
+- Native failures use the same six classifications as web failures. Preserve
+  the flow, platform, target, report, screenshot/log artifacts, and replay
+  command before deciding whether the cause is product, test, flake,
+  environment, known gap, or ambiguity.
+
 ### Pre-PR / Useful Commands
 
 - `/test` — run unit + E2E suite
@@ -317,6 +374,9 @@ eas build -p android --profile preview
 
 - Android package: `com.dale16.superhabits`
 - Build type: `apk`
+- Native E2E profile: `eas build -p android --profile e2e-test` or
+  `eas build -p ios --profile e2e-test`; do not submit these builds.
+- EAS workflow: `.eas/workflows/native-e2e.yml`.
 
 ### CI (GitHub Actions)
 
@@ -346,6 +406,32 @@ eas build -p android --profile preview
 The AI exploratory lane and the disposable backend never run on PRs, and the
 `dist-sync` build never runs in the quality job — forbidden combinations are
 enforced by `validateMatrix()` in `simulation/matrix.ts`.
+
+Native E2E is intentionally outside the ordinary GitHub quality job because
+Maestro/device workers and EAS credentials are platform infrastructure. The
+EAS workflow is the explicit/manual or `native-e2e`-labeled path; unavailable
+iOS or Android infrastructure must be reported as `EXTERNAL BLOCKER`/`NOT RUN`,
+never as cross-platform success.
+
+### Autonomous QA workflow
+
+Use `docs/testing/autonomous-qa.md` as the agent-facing escalation guide. Start
+with `npm run qa:fast`, inspect `npm run qa:affected` for changed-file impact,
+then run the required integration, focused journey, deterministic simulation,
+timezone, or full gates. Verification lanes stay deterministic; seeded and AI
+exploration preserve their seed/evidence and never replace a gate. On failure,
+preserve the assertion and artifacts, reproduce with the same scenario/persona/
+seed when applicable, classify as `PRODUCT_BUG`, `TEST_BUG`, `FLAKY_TEST`,
+`ENVIRONMENT`, `EXPECTED_KNOWN_GAP`, or `SPEC_AMBIGUITY`, then fix the underlying
+issue and rerun. Never delete/skip/weaken a meaningful test, add blind retries
+or arbitrary timeout increases, or ignore persisted DB state because the UI
+looks correct.
+
+For every change, use `qa/impact-map.json` through `npm run qa:affected` before
+choosing the cheapest sufficient gates. A pure domain change normally stops at
+its unit/integration gates; native UI, settings persistence, Pomodoro,
+notifications, and lifecycle changes escalate to the corresponding native
+commands. A native command that cannot run must remain visible in the handoff.
 
 ## Environment Variables
 

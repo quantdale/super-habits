@@ -1,0 +1,28 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - habits
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Habits'
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native daily habit'
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native daily habit: 0 of 1 today. Tap to add one.'
+    timeout: 5000
+- tapOn: 'Native daily habit: 0 of 1 today. Tap to add one.'
+- assertVisible: 'Native daily habit: 1 of 1 today. Tap to remove one.'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Habits'
+- assertVisible: 'Native daily habit: 1 of 1 today. Tap to remove one.'

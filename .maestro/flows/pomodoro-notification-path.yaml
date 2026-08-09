@@ -1,0 +1,21 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - lifecycle
+  - notifications
+  - pomodoro
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- tapOn: 'Focus'
+- tapOn: 'Start focus'
+- assertVisible: 'Pause'
+- pressKey: home
+- launchApp:
+    stopApp: false
+- assertVisible: 'Pause'

@@ -1,13 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const e2ePort =
+  process.env.E2E_PORT ?? (process.env.E2E_DIST_DIR === 'dist-sync' ? '8082' : '8081');
+if (!/^\d+$/.test(e2ePort)) {
+  throw new Error(`E2E_PORT must be numeric, received ${JSON.stringify(e2ePort)}`);
+}
+
+const e2eBaseUrl = process.env.E2E_BASE_URL ?? `http://localhost:${e2ePort}`;
+const reuseExistingServer = process.env.E2E_REUSE_SERVER === '1';
+
 export default defineConfig({
   testDir: './e2e',
 
   // Tests within the same file run serially by default (fullyParallel: false).
   fullyParallel: false,
 
-  // OPFS + expo-sqlite hold one lock per origin; parallel workers against
-  // localhost:8081 cause flaky navigation/reload (see config comments).
+  // OPFS + expo-sqlite hold one lock per origin; parallel workers against the
+  // app origin can cause flaky navigation/reload (see config comments).
   // Keep fullyParallel false so tests within a file stay serial (clearDatabase()
   // in beforeEach must not race).
   workers: process.env.CI ? 2 : 1,
@@ -37,7 +46,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'http://localhost:8081',
+    baseURL: e2eBaseUrl,
     headless: true,
 
     // Only capture screenshot on failure — avoids disk bloat
@@ -47,8 +56,10 @@ export default defineConfig({
     // Note: Playwright uses outputDir for test artifacts
     video: 'off',
 
-    // Capture trace on first retry — helps diagnose flaky tests in CI
-    trace: 'on-first-retry',
+    // Retain a trace for every failed attempt, including local failures where
+    // retries are disabled. A retry is evidence to inspect, not a substitute
+    // for diagnosing synchronization or product state.
+    trace: 'retain-on-failure',
 
     // Use "domcontentloaded" instead of "networkidle" by default.
     // "networkidle" waits for ALL network activity to stop — can be slow on
@@ -65,7 +76,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      // Feature tests use the DB harness through Playwright routing. Blocking
+      // service workers here prevents a previously registered worker from
+      // bypassing that route; infrastructure.spec.ts opts back into worker
+      // control for the dedicated service-worker assertions.
+      use: { ...devices['Desktop Chrome'], serviceWorkers: 'block' },
       // Journey specs must not run in the default E2E suite (they have their
       // own project, longer timeouts, and are serial/continuity-based).
       testIgnore: '**/e2e/journeys/**',
@@ -97,7 +112,11 @@ export default defineConfig({
       workers: 1,
       fullyParallel: false,
       retries: 0,
-      use: { ...devices['Desktop Chrome'] },
+      // The scenario executor owns tracing for its independently-created
+      // contexts so repro bundles can stop/retain the focused trace. The
+      // global retain-on-failure policy would auto-start a second trace under
+      // current Playwright and fail before the scenario executes.
+      use: { ...devices['Desktop Chrome'], trace: 'off' },
     },
     {
       // Dedicated dist-sync lane (OpenSpec task 6.1a / Q5): the remote-boundary
@@ -122,7 +141,7 @@ export default defineConfig({
       expect: { timeout: 10_000 },
       workers: 1,
       fullyParallel: false,
-      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:8082' },
+      use: { ...devices['Desktop Chrome'], baseURL: e2eBaseUrl },
     },
   ],
 
@@ -130,22 +149,16 @@ export default defineConfig({
   globalTeardown: './e2e/global.teardown.ts',
 
   // The web server is config-global in this Playwright version (no per-project
-  // webServer), so it branches on the targeted build env: the default projects
-  // serve dist/ on :8081; the dedicated journeys-sync lane (`npm run e2e:sync`)
-  // sets E2E_DIST_DIR=dist-sync and serves dist-sync/ on :8082 via the
-  // port-arg server. Default behavior (8081 → dist/) is unchanged.
-  webServer:
-    process.env.E2E_DIST_DIR === 'dist-sync'
-      ? {
-          command: 'node scripts/serve-e2e.js --port 8082 --dist dist-sync',
-          url: 'http://localhost:8082',
-          reuseExistingServer: !process.env.CI,
-          timeout: 180_000,
-        }
-      : {
-          command: 'node scripts/serve-e2e.js',
-          url: 'http://localhost:8081',
-          reuseExistingServer: !process.env.CI,
-          timeout: 180_000,
-        },
+  // webServer). Use E2E_PORT when another development server owns :8081;
+  // reuse is opt-in because a stale dev server can silently become the system
+  // under test.
+  webServer: {
+    command:
+      process.env.E2E_DIST_DIR === 'dist-sync'
+        ? `node scripts/serve-e2e.js --port ${e2ePort} --dist dist-sync`
+        : `node scripts/serve-e2e.js --port ${e2ePort}`,
+    url: e2eBaseUrl,
+    reuseExistingServer,
+    timeout: 180_000,
+  },
 });

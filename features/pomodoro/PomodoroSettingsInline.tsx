@@ -58,6 +58,7 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
           </Text>
           <TextInput
             value={value}
+            accessibilityLabel={label}
             onChangeText={(t) => {
               setSettingsError(null);
               set(t);

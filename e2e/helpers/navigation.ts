@@ -67,7 +67,7 @@ export async function hardReload(page: Page) {
  * Call this after navigation if a test is DB-sensitive.
  */
 export async function waitForDb(page: Page, timeout = 5_000) {
-  // Give SQLite WASM time to initialize — 500ms is usually enough
-  // after domcontentloaded fires
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => document.documentElement.dataset.dbReady === 'true', null, {
+    timeout,
+  });
 }
