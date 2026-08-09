@@ -54,7 +54,8 @@ Git history while excluding secrets, caches, and machine-specific state.
 - Completed: Committed the reviewed batch as `dfed4cf`, committed the completed
   plan state as `8715699`, and pushed both to `origin/main`; preserved all
   reviewed local branches, stash work, meaningful unreachable worktree/WIP
-  heads, and local tags on remote backup refs/tags.
+  heads, local tags, and the detached `c074` linked-actions worktree on remote
+  backup refs/tags.
 - Important modified areas: `.github`, `.mcp.json`, `AGENTS.md`, `app.json`,
   QA/native E2E docs and scripts, E2E helpers/specs, Expo/EAS config,
   `package.json`, Playwright/simulation tooling, and selected feature files.
@@ -99,6 +100,9 @@ Git history while excluding secrets, caches, and machine-specific state.
 - One stash exists (`pre-recovery-local-changes`) and several local branches
   track deleted remote refs; their content must be inspected before deciding
   which backup refs are warranted.
+- A detached Codex worktree (`c074`) contained 14 modified linked-actions files
+  that were not represented by a branch. They were committed unchanged as
+  `37a4f2a` and pushed to `backup/predator/worktree-c074-linked-actions`.
 - The candidate changes are internally coherent with the completed OpenSpec
   changes `add-durable-agent-execplans`, `strengthen-autonomous-qa-loop`, and
   `add-native-real-user-e2e`; no unrelated product change was found in the
@@ -186,8 +190,12 @@ Git history while excluding secrets, caches, and machine-specific state.
 - 2026-08-09 — `git commit` — PASS — `dfed4cf` contains 94 intended files;
   commit hooks completed successfully.
 - 2026-08-09 — remote preservation — PASS — The migration batch and completed
-  plan are visible on `origin/main`; 31 `backup/predator/*` heads and 11 tags
+  plan are visible on `origin/main`; 32 `backup/predator/*` heads and 11 tags
   are visible via `git ls-remote`.
+- 2026-08-09 — worktree preservation — PASS — The dirty detached `c074`
+  worktree was committed as `37a4f2a` and pushed; the remaining live worktrees
+  are clean, while two entries are prunable directories without Git metadata
+  and were left untouched.
 
 ## Changed Files / Areas
 
