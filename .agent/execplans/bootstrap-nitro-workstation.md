@@ -70,9 +70,8 @@ supports it. No product or feature development is in scope.
 - Portable fixes made: `eslint.config.mjs` ignores generated `expo-env.d.ts`,
   and `docs/development/workstation-bootstrap.md` documents the Windows
   `better-sqlite3`/Python/MSVC prerequisite. No product behavior was changed.
-- Exact next action: Hand off the verified local commit and the external push
-  blocker; no further repository action is required for the workstation
-  bootstrap.
+- Exact next action: Hand off the verified local and remote repository state;
+  no further repository action is required for the workstation bootstrap.
 - Remaining definition of done: Final plan contains exact evidence, known
   skips, failed invocation classification, native manual steps, final Git SHA,
   and the requested 16-part handoff with no secret values.
@@ -184,6 +183,8 @@ supports it. No product or feature development is in scope.
 - 2026-08-09 — `git push origin main` — ENVIRONMENT — HTTPS push hung twice
   without output (including with terminal prompts disabled); only the push
   process tree was stopped. The local commit and clean worktree remain intact.
+- 2026-08-09 — authenticated `git push origin main` — PASS — `origin/main`
+  advanced from `6c358bc` to `e32cc48` and matches the local bootstrap commit.
 
 ## Changed Files / Areas
 
@@ -208,14 +209,12 @@ supports it. No product or feature development is in scope.
 
 ## Outcomes & Retrospective
 
-- Status: Complete after final commit verification; remote push remains
-  externally blocked.
+- Status: Complete after final local and remote verification.
 - Summary: Web and autonomous Codex development are fully verified. Android
   development is partially ready: the JDK/SDK/adb/emulator executables and
   environment variables are configured, but no AVD/device or Maestro is ready.
   iOS native execution is cloud-only from Windows. The repository-only
-  bootstrap commit is local and one commit ahead of `origin/main` because the
-  HTTPS push did not complete.
+  bootstrap commit is present on `origin/main`.
 - Follow-up: Install the official Maestro CLI, download an API-34-or-supported
   Android system image/create an AVD, boot it, obtain/install the credential-free
   `e2e-test` APK, and rerun `npm run qa:native:android` before claiming native
