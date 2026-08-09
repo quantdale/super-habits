@@ -36,6 +36,7 @@ export default [
     ignores: [
       'node_modules/**',
       'dist/**',
+      'expo-env.d.ts',
       'web-build/**',
       '.expo/**',
       'expo/**',

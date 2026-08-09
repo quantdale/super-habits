@@ -19,8 +19,12 @@ Expo Router `55.x`, TypeScript `5.9.x`, Vitest `3.2.7`, and Playwright `1.59.1`.
 Use repository-local CLIs through `npx`; do not depend on globally installed
 Expo, TypeScript, Vitest, or Playwright versions.
 
-Python is not a project prerequisite: the repository has no Python runtime
-path. The app uses Node.js scripts and TypeScript tooling.
+Python is not an application runtime prerequisite: the app uses Node.js
+scripts and TypeScript tooling. However, the lockfile includes the
+`better-sqlite3` integration-test dependency, whose native `node-gyp` build can
+run during `npm ci`. On Windows, install Python 3.x and the Visual Studio C++
+Build Tools workload before `npm ci`; this is a dependency-build prerequisite,
+not an application language requirement.
 
 ### Optional native/cloud capabilities
 
