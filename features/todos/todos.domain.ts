@@ -55,3 +55,24 @@ export function findMissingRecurrenceIds(
 
   return Array.from(allRecurrenceIds).filter((id) => !coveredToday.has(id));
 }
+
+/**
+ * Synchronous guard for async modal submissions. The closure flips before the
+ * first await, so two presses delivered in the same task can start only one
+ * save. Call finish() from the caller's finally block so validation/errors do
+ * not permanently lock the form.
+ */
+export function createSubmitGuard(): { tryStart: () => boolean; finish: () => void } {
+  let inFlight = false;
+
+  return {
+    tryStart: () => {
+      if (inFlight) return false;
+      inFlight = true;
+      return true;
+    },
+    finish: () => {
+      inFlight = false;
+    },
+  };
+}

@@ -14,6 +14,7 @@ import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessa
 import { resolveRestorePromptOutcome } from '@/core/providers/restorePromptFlow';
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { InAppNoticeProvider } from '@/core/providers/InAppNoticeProvider';
+import { DayRolloverProvider } from '@/core/providers/DayRolloverProvider';
 import { ensureAnonymousSession, isRemoteEnabled } from '@/lib/supabase';
 import { ThemeProvider, useAppTheme } from '@/core/providers/ThemeProvider';
 import { Button } from '@/core/ui/Button';
@@ -181,19 +182,21 @@ export function AppProviders({ children }: PropsWithChildren) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <InAppNoticeProvider>
-          <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
-            <BootstrapGate dbError={dbError}>
-              {children}
-              <RestorePrompt
-                preview={restorePreview}
-                visible={showRestorePrompt}
-                busy={restorePromptBusy}
-                errorMessage={restorePromptError}
-                onDismiss={handleDismissRestorePrompt}
-                onRestore={handleRestoreFromPrompt}
-              />
-            </BootstrapGate>
-          </AppBootstrapStateContext.Provider>
+          <DayRolloverProvider>
+            <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
+              <BootstrapGate dbError={dbError}>
+                {children}
+                <RestorePrompt
+                  preview={restorePreview}
+                  visible={showRestorePrompt}
+                  busy={restorePromptBusy}
+                  errorMessage={restorePromptError}
+                  onDismiss={handleDismissRestorePrompt}
+                  onRestore={handleRestoreFromPrompt}
+                />
+              </BootstrapGate>
+            </AppBootstrapStateContext.Provider>
+          </DayRolloverProvider>
         </InAppNoticeProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

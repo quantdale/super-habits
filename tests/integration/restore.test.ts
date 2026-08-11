@@ -20,12 +20,9 @@ import { freshDatabase } from './helpers/db';
  *   - `applyRemote*` behavioural contract: idempotent `INSERT OR REPLACE` keyed
  *     on `id`, replacing an existing row's fields, never duplicating.
  *
- * Task 2.8a — CG-2, quarantined with `it.fails()` per the D13 protocol. The
- * DECIDED contract (design.md D10) is that a device that has ever held rows is
- * not empty: tombstones count, and an import never resurrects a locally-deleted
- * todo whose delete was never pushed. The application does not satisfy this yet
- * (companion change: fix-restore-emptiness-counts-deleted-rows), so these two
- * tests are expected to fail today — that is correct and deliberate.
+ * Task 2.8a — CG-2. The DECIDED contract (design.md D10) is that a device that
+ * has ever held rows is not empty: tombstones count, and an import never
+ * resurrects a locally-deleted todo whose delete was never pushed.
  */
 
 type RemoteRowsByEntity = Record<string, readonly unknown[]>;
@@ -280,6 +277,8 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
     const db = await freshDatabase();
     const { applyRemoteHabits } = await import('@/features/habits/habits.data');
     const { applyRemoteCalorieEntries } = await import('@/features/calories/calories.data');
+    const { getHabitRuleForDate, parseHabitRuleHistory } =
+      await import('@/features/habits/habits.domain');
 
     await applyRemoteHabits(await getRealDb(), [
       {
@@ -290,6 +289,9 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
         category: 'anytime',
         icon: 'check-circle',
         color: '#64748b',
+        rule_history: JSON.stringify([
+          { effective_from_date: '2026-06-01', weekdays: [1, 3, 5], target_per_day: 2 },
+        ]),
         created_at: '2026-06-01T00:00:00.000Z',
         updated_at: '2026-06-02T00:00:00.000Z',
         deleted_at: null,
@@ -315,6 +317,15 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
     const habits = await import('@/features/habits/habits.data');
     const calories = await import('@/features/calories/calories.data');
     expect((await habits.listHabits()).map((h) => h.name)).toEqual(['Hydrate']);
+    const importedHabit = (await habits.listHabits())[0];
+    expect(
+      getHabitRuleForDate(
+        parseHabitRuleHistory(importedHabit?.rule_history),
+        '2026-06-02',
+        importedHabit?.target_per_day,
+        '2026-06-01',
+      ),
+    ).toMatchObject({ weekdays: [1, 3, 5], target_per_day: 2 });
     expect((await calories.listCalorieEntries('2026-07-01')).map((e) => e.food_name)).toEqual([
       'Oats',
     ]);
@@ -322,63 +333,54 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
   });
 });
 
-describe('CG-2: restore emptiness counts deleted rows (quarantined, it.fails)', () => {
-  it.fails(
-    'a device holding only soft-deleted todos is not empty — restore must be blocked (CG-2: fix-restore-emptiness-counts-deleted-rows)',
-    async () => {
-      const { db, coordinator } = await load(AVAILABLE_REMOTE_TODOS);
-      const todos = await import('@/features/todos/todos.data');
+describe('CG-2: restore emptiness counts deleted rows', () => {
+  it('a device holding only soft-deleted todos is not empty — restore must be blocked (CG-2: fix-restore-emptiness-counts-deleted-rows)', async () => {
+    const { db, coordinator } = await load(AVAILABLE_REMOTE_TODOS);
+    const todos = await import('@/features/todos/todos.data');
 
-      // The user deleted every todo; the deletes were never pushed. The only
-      // rows left are tombstones.
-      const id = await todos.addTodo({ title: 'gone forever' });
-      await todos.removeTodo(id);
+    // The user deleted every todo; the deletes were never pushed. The only
+    // rows left are tombstones.
+    const id = await todos.addTodo({ title: 'gone forever' });
+    await todos.removeTodo(id);
 
-      const preview = await coordinator.getRestorePreview();
+    const preview = await coordinator.getRestorePreview();
 
-      // Decided contract (D10): a device that has ever held rows is not empty;
-      // tombstones count, so eligibility is blocked — TODAY the count excludes
-      // `deleted_at IS NULL`, so this is empty_device and the test fails.
-      expect(preview.eligibility).toMatchObject({
-        kind: 'blocked',
-        reason: 'local_data_present',
-      });
-      expect(preview.startupPromptEligible).toBe(false);
-      await db.closeAsync();
-    },
-  );
+    // Decided contract (D10): a device that has ever held rows is not empty;
+    // Tombstones count, so eligibility is blocked.
+    expect(preview.eligibility).toMatchObject({
+      kind: 'blocked',
+      reason: 'local_data_present',
+    });
+    expect(preview.startupPromptEligible).toBe(false);
+    await db.closeAsync();
+  });
 
-  it.fails(
-    'an import never resurrects a locally-deleted todo whose deletion was not yet pushed (CG-2: fix-restore-emptiness-counts-deleted-rows)',
-    async () => {
-      // The backup still holds the todo as live because the delete was never
-      // pushed. The device holds only its tombstone.
-      const { db, coordinator } = await load({
-        todos: [remoteTodo({ id: 'todo_offline_deleted', title: 'user deleted me offline' })],
-        habits: [],
-        calorie_entries: [],
-        workout_routines: [],
-      });
-      const todos = await import('@/features/todos/todos.data');
+  it('an import never resurrects a locally-deleted todo whose deletion was not yet pushed (CG-2: fix-restore-emptiness-counts-deleted-rows)', async () => {
+    // The backup still holds the todo as live because the delete was never
+    // pushed. The device holds only its tombstone.
+    const { db, coordinator } = await load({
+      todos: [remoteTodo({ id: 'todo_offline_deleted', title: 'user deleted me offline' })],
+      habits: [],
+      calorie_entries: [],
+      workout_routines: [],
+    });
+    const todos = await import('@/features/todos/todos.data');
 
-      const id = await todos.addTodo({ title: 'user deleted me offline' });
-      await todos.removeTodo(id);
+    const id = await todos.addTodo({ title: 'user deleted me offline' });
+    await todos.removeTodo(id);
 
-      const result = await coordinator.restoreFromRemoteBackup();
+    const result = await coordinator.restoreFromRemoteBackup();
 
-      // Decided contract: the import must not run at all on a tombstoned
-      // device, and regardless of the outcome the user's most recent intent
-      // must win — the todo stays deleted. TODAY the import runs and the
-      // INSERT OR REPLACE resurrects it with deleted_at null, so this fails.
-      if (result.status === 'restored') {
-        expect(result.importedCounts.todos).toBe(0);
-      }
-      const row = await db.getFirstAsync<{ deleted_at: string | null }>(
-        'SELECT deleted_at FROM todos WHERE id = ?',
-        [id],
-      );
-      expect(row?.deleted_at).not.toBeNull();
-      await db.closeAsync();
-    },
-  );
+    // The import must not run on a tombstoned device, so the user's most
+    // recent intent wins and the tombstone remains intact.
+    if (result.status === 'restored') {
+      expect(result.importedCounts.todos).toBe(0);
+    }
+    const row = await db.getFirstAsync<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM todos WHERE id = ?',
+      [id],
+    );
+    expect(row?.deleted_at).not.toBeNull();
+    await db.closeAsync();
+  });
 });

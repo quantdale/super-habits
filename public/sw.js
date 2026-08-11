@@ -42,6 +42,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // The service worker owns the same-origin app shell only. API/auth and
+  // restore requests belong to their remote origin and must reach the browser
+  // fetch stack directly (including Playwright's route interception).
+  if (url.origin !== self.location.origin) return;
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -56,7 +61,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(() => cached ?? fetch(event.request));
     }),
   );
 });

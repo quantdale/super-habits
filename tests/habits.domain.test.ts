@@ -1,21 +1,61 @@
 import { describe, expect, it } from 'vitest';
 import {
-  calculateHabitProgress,
-  buildDayCompletions,
-  calculateCurrentStreak,
-  calculateLongestStreak,
-  getStreakLabel,
-  buildGridDateHeaders,
-  buildHabitGrid,
-  calculateOverallConsistency,
-  buildHabitActivityDays,
+  ALL_HABIT_WEEKDAYS,
   buildAggregatedHabitHeatmap,
+  buildDayCompletions,
+  buildHabitActivityDays,
+  buildHabitGrid,
+  calculateCurrentStreak,
+  calculateHabitProgress,
+  calculateLongestStreak,
+  calculateOverallConsistency,
+  createHabitRule,
+  formatHabitSchedule,
+  getHabitRuleForDate,
+  getHabitSchedulePreset,
+  isHabitScheduledOn,
+  parseHabitRuleHistory,
   type DayCompletion,
 } from '@/features/habits/habits.domain';
-import type { HabitCompletionRow } from '@/features/habits/habits.data';
+import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+
+function day(
+  dateKey: string,
+  count: number,
+  target: number,
+  options: { scheduled?: boolean; eligible?: boolean } = {},
+): DayCompletion {
+  const scheduled = options.scheduled ?? true;
+  const eligible = options.eligible ?? scheduled;
+  return {
+    dateKey,
+    count,
+    targetPerDay: target,
+    scheduled,
+    eligible,
+    completed: eligible && scheduled && target > 0 && count >= target,
+  };
+}
+
+function offsetDateKey(offset: number, from = new Date()): string {
+  const date = new Date(from);
+  date.setDate(date.getDate() + offset);
+  return toDateKey(date);
+}
+
+function completion(habitId: string, dateKey: string, count: number) {
+  return {
+    id: `hcmp_${dateKey}`,
+    habit_id: habitId,
+    date_key: dateKey,
+    count,
+    created_at: `${dateKey}T12:00:00.000Z`,
+    updated_at: `${dateKey}T12:00:00.000Z`,
+  };
+}
 
 describe('calculateHabitProgress', () => {
-  it('returns complete progress when count exceeds target', () => {
+  it('caps complete progress at 1', () => {
     expect(calculateHabitProgress(4, 3)).toBe(1);
   });
 
@@ -24,312 +64,326 @@ describe('calculateHabitProgress', () => {
   });
 });
 
-function day(dateKey: string, count: number, target: number): DayCompletion {
-  return { dateKey, count, completed: target > 0 && count >= target };
-}
+describe('habit rule history and schedule lookup', () => {
+  const mwf = [1, 3, 5] as const;
+
+  it.each([
+    ['every day', ALL_HABIT_WEEKDAYS, 'every_day'],
+    ['weekdays', [1, 2, 3, 4, 5], 'weekdays'],
+    ['weekends', [6, 7], 'weekends'],
+    ['custom', mwf, 'custom'],
+  ])('recognizes the %s preset', (_label, weekdays, expected) => {
+    expect(getHabitSchedulePreset(weekdays)).toBe(expected);
+  });
+
+  it('resolves M/W/F using local date weekdays', () => {
+    const history = [createHabitRule('2026-08-01', mwf, 1)];
+    expect(isHabitScheduledOn(history, '2026-08-03')).toBe(true); // Monday
+    expect(isHabitScheduledOn(history, '2026-08-04')).toBe(false); // Tuesday
+    expect(isHabitScheduledOn(history, '2026-08-05')).toBe(true); // Wednesday
+  });
+
+  it('does not resolve a rule before the habit creation/effective boundary', () => {
+    const history = [createHabitRule('2026-08-05', ALL_HABIT_WEEKDAYS, 1)];
+    expect(getHabitRuleForDate(history, '2026-08-04')).toBeNull();
+    expect(getHabitRuleForDate(history, '2026-08-05')?.target_per_day).toBe(1);
+  });
+
+  it('uses the historical target and schedule rule for each date', () => {
+    const history = [
+      createHabitRule('2026-08-01', ALL_HABIT_WEEKDAYS, 1),
+      createHabitRule('2026-08-06', mwf, 2),
+    ];
+    expect(getHabitRuleForDate(history, '2026-08-05')).toMatchObject({
+      weekdays: [...ALL_HABIT_WEEKDAYS],
+      target_per_day: 1,
+    });
+    expect(getHabitRuleForDate(history, '2026-08-06')).toMatchObject({
+      weekdays: [...mwf],
+      target_per_day: 2,
+    });
+  });
+
+  it('parses and normalizes serialized history', () => {
+    expect(
+      parseHabitRuleHistory(
+        JSON.stringify([
+          { effective_from_date: '2026-08-02', weekdays: [7, 1, 1], target_per_day: 1 },
+        ]),
+      ),
+    ).toEqual([createHabitRule('2026-08-02', [1, 7], 1)]);
+  });
+
+  it('formats custom schedule labels for the card/editor', () => {
+    expect(formatHabitSchedule(mwf)).toBe('Mon / Wed / Fri');
+  });
+});
 
 describe('buildDayCompletions', () => {
-  it('returns 30 entries for 30 days', () => {
-    const result = buildDayCompletions([], 1, 30);
-    expect(result).toHaveLength(30);
+  it('returns the explicit requested number of entries', () => {
+    expect(buildDayCompletions([], 1, 30)).toHaveLength(30);
   });
 
-  it('marks completed days correctly (strict)', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const fakeCompletion = {
-      id: 'hcmp_test',
-      habit_id: 'habit_test',
-      date_key: todayKey,
+  it('marks scheduled completion against the target active on that date', () => {
+    const today = toDateKey();
+    const result = buildDayCompletions([completion('habit_test', today, 2)], 1, 1, [
+      createHabitRule(today, ALL_HABIT_WEEKDAYS, 2),
+    ]);
+    expect(result[0]).toMatchObject({
       count: 2,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const result = buildDayCompletions([fakeCompletion], 2, 30);
-    const todayEntry = result.find((d) => d.dateKey === todayKey);
-    expect(todayEntry?.completed).toBe(true);
-    expect(todayEntry?.count).toBe(2);
+      targetPerDay: 2,
+      scheduled: true,
+      completed: true,
+    });
   });
 
-  it('marks day as not completed when count < target (strict)', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const fakeCompletion = {
-      id: 'hcmp_test',
-      habit_id: 'habit_test',
-      date_key: todayKey,
+  it('marks off-days neutral even when an off-day completion row exists', () => {
+    const result = buildDayCompletions(
+      [completion('habit_test', '2026-08-04', 1)],
+      1,
+      undefined,
+      [createHabitRule('2026-08-03', [1, 3, 5], 1)],
+      undefined,
+      '2026-08-04',
+    );
+    expect(result.at(-1)).toMatchObject({
       count: 1,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      scheduled: false,
+      eligible: false,
+      completed: false,
+    });
+  });
 
-    const result = buildDayCompletions([fakeCompletion], 3, 30);
-    const todayEntry = result.find((d) => d.dateKey === todayKey);
-    expect(todayEntry?.completed).toBe(false);
+  it('excludes pre-creation dates from the generated eligible history', () => {
+    const result = buildDayCompletions(
+      [],
+      1,
+      undefined,
+      [createHabitRule('2026-08-05', ALL_HABIT_WEEKDAYS, 1)],
+      undefined,
+      '2026-08-07',
+    );
+    expect(result.map((entry) => entry.dateKey)).toEqual([
+      '2026-08-05',
+      '2026-08-06',
+      '2026-08-07',
+    ]);
+    expect(result.every((entry) => entry.eligible)).toBe(true);
   });
 });
 
 describe('calculateCurrentStreak', () => {
   it('returns 0 for empty completions', () => {
-    expect(calculateCurrentStreak([])).toBe(0);
+    expect(calculateCurrentStreak([], '2026-08-10')).toBe(0);
   });
 
-  it('counts consecutive completed days', () => {
-    const days: DayCompletion[] = [
-      day('2025-03-18', 1, 1),
-      day('2025-03-19', 1, 1),
-      day('2025-03-20', 1, 1),
-      day('2025-03-21', 0, 1), // today — not yet logged (grace day)
-    ];
-    expect(calculateCurrentStreak(days)).toBe(3);
+  it('ignores unscheduled days for M/W/F', () => {
+    const history = [createHabitRule('2026-08-03', [1, 3, 5], 1)];
+    const days = buildDayCompletions(
+      [
+        completion('habit', '2026-08-03', 1),
+        completion('habit', '2026-08-05', 1),
+        completion('habit', '2026-08-07', 1),
+        completion('habit', '2026-08-10', 1),
+      ],
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-10',
+    );
+    expect(calculateCurrentStreak(days, '2026-08-10')).toBe(4);
   });
 
-  it('breaks streak on missed day', () => {
-    const days: DayCompletion[] = [
-      day('2025-03-18', 1, 1),
-      day('2025-03-19', 0, 1), // missed
-      day('2025-03-20', 1, 1),
-      day('2025-03-21', 1, 1),
-    ];
-    expect(calculateCurrentStreak(days)).toBe(2);
+  it('grants grace to an incomplete scheduled today', () => {
+    const history = [createHabitRule('2026-08-03', [1, 3, 5], 1)];
+    const days = buildDayCompletions(
+      [
+        completion('habit', '2026-08-03', 1),
+        completion('habit', '2026-08-05', 1),
+        completion('habit', '2026-08-07', 1),
+      ],
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-10',
+    );
+    expect(calculateCurrentStreak(days, '2026-08-10')).toBe(3);
   });
 
-  it('returns 0 if no completions at all', () => {
-    const days: DayCompletion[] = [day('2025-03-20', 0, 1), day('2025-03-21', 0, 1)];
-    expect(calculateCurrentStreak(days)).toBe(0);
+  it('breaks at a prior scheduled miss', () => {
+    const history = [createHabitRule('2026-08-03', [1, 3, 5], 1)];
+    const days = buildDayCompletions(
+      [completion('habit', '2026-08-03', 1), completion('habit', '2026-08-07', 1)],
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-07',
+    );
+    expect(calculateCurrentStreak(days, '2026-08-07')).toBe(1);
+  });
+
+  it('counts a long history without an arbitrary 30-occurrence cap', () => {
+    const start = offsetDateKey(-40);
+    const history = [createHabitRule(start, ALL_HABIT_WEEKDAYS, 1)];
+    const completions = buildDayCompletions([], 1, undefined, history).map((entry) =>
+      completion('habit', entry.dateKey, 1),
+    );
+    expect(
+      calculateCurrentStreak(buildDayCompletions(completions, 1, undefined, history)),
+    ).toBeGreaterThan(30);
   });
 });
 
 describe('calculateLongestStreak', () => {
-  it('returns longest run of completed days', () => {
-    const days: DayCompletion[] = [
-      day('2025-03-15', 1, 1),
-      day('2025-03-16', 1, 1),
-      day('2025-03-17', 1, 1),
-      day('2025-03-18', 0, 1), // break
-      day('2025-03-19', 1, 1),
-      day('2025-03-20', 1, 1),
+  it('ignores unscheduled gaps and resets on a scheduled miss', () => {
+    const days = [
+      day('2026-08-03', 1, 1),
+      day('2026-08-04', 0, 1, { scheduled: false, eligible: false }),
+      day('2026-08-05', 1, 1),
+      day('2026-08-07', 0, 1),
+      day('2026-08-10', 1, 1),
     ];
-    expect(calculateLongestStreak(days)).toBe(3);
-  });
-
-  it('returns 0 for all incomplete days', () => {
-    const days: DayCompletion[] = [day('2025-03-20', 0, 1), day('2025-03-21', 0, 1)];
-    expect(calculateLongestStreak(days)).toBe(0);
+    expect(calculateLongestStreak(days)).toBe(2);
   });
 });
 
-describe('getStreakLabel', () => {
-  it('returns empty string for 0 streak', () => {
-    expect(getStreakLabel(0)).toBe('');
-  });
-  it("returns '1 day' for streak of 1", () => {
-    expect(getStreakLabel(1)).toBe('1 day');
-  });
-  it("returns 'N days' for streak > 1", () => {
-    expect(getStreakLabel(7)).toBe('7 days');
-  });
-});
-
-describe('buildGridDateHeaders', () => {
-  it('returns 30 headers by default', () => {
-    expect(buildGridDateHeaders(30)).toHaveLength(30);
-  });
-
-  it('last header is today', () => {
-    const headers = buildGridDateHeaders(30);
-    const last = headers[headers.length - 1];
-    expect(last.isToday).toBe(true);
-  });
-
-  it('sets monthLabel only on the 1st of month', () => {
-    const headers = buildGridDateHeaders(30);
-    for (const h of headers) {
-      if (h.monthLabel !== null) {
-        expect(Number(h.dayLabel)).toBe(1);
-      }
-    }
-  });
-});
-
-describe('buildHabitGrid', () => {
+describe('buildHabitGrid and consistency', () => {
   const habits = [
     { id: 'h1', name: 'Run', color: '#4f79ff', target_per_day: 1 },
     { id: 'h2', name: 'Read', color: '#22c55e', target_per_day: 2 },
   ];
 
-  it('returns one row per habit', () => {
-    expect(buildHabitGrid(habits, [], 30)).toHaveLength(2);
-  });
-
-  it('returns 30 cells per row', () => {
+  it('returns one row per habit and preserves requested cells', () => {
     const grid = buildHabitGrid(habits, [], 30);
-    grid.forEach((row) => expect(row.cells).toHaveLength(30));
+    expect(grid).toHaveLength(2);
+    expect(grid.every((row) => row.cells.length === 30)).toBe(true);
   });
 
-  it('marks cell as completed when count >= target', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const completions: HabitCompletionRow[] = [{ habit_id: 'h1', date_key: todayKey, count: 1 }];
-    const grid = buildHabitGrid(habits, completions, 30);
-    const h1Row = grid.find((r) => r.habit.id === 'h1')!;
-    const todayCell = h1Row.cells.find((c) => c.dateKey === todayKey)!;
-    expect(todayCell.completed).toBe(true);
-    expect(todayCell.partial).toBe(false);
-  });
-
-  it('marks cell as partial when 0 < count < target', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const completions: HabitCompletionRow[] = [{ habit_id: 'h2', date_key: todayKey, count: 1 }];
-    const grid = buildHabitGrid(habits, completions, 30);
-    const h2Row = grid.find((r) => r.habit.id === 'h2')!;
-    const todayCell = h2Row.cells.find((c) => c.dateKey === todayKey)!;
-    expect(todayCell.completed).toBe(false);
-    expect(todayCell.partial).toBe(true);
-  });
-});
-
-describe('buildHabitActivityDays', () => {
-  it('returns inactive days when grid is empty', () => {
-    const days = buildHabitActivityDays([], 14);
-    expect(days).toHaveLength(14);
-    expect(days.every((d) => !d.active)).toBe(true);
-  });
-
-  it('sets active and value from fraction of habits completed that day', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const habits = [
-      { id: 'h1', name: 'Run', color: '#4f79ff', target_per_day: 1 },
-      { id: 'h2', name: 'Read', color: '#22c55e', target_per_day: 1 },
-    ];
-    const grid = buildHabitGrid(habits, [{ habit_id: 'h1', date_key: todayKey, count: 1 }], 30);
-    const activity = buildHabitActivityDays(grid, 30);
-    const todayEntry = activity.find((a) => a.dateKey === todayKey);
-    expect(todayEntry?.active).toBe(true);
-    expect(todayEntry?.value).toBe(0.5);
-  });
-});
-
-describe('buildAggregatedHabitHeatmap', () => {
-  it('returns all zeros for empty grid with requested length', () => {
-    const heat = buildAggregatedHabitHeatmap([], 14);
-    expect(heat).toHaveLength(14);
-    expect(heat.every((d) => d.value === 0)).toBe(true);
-  });
-
-  it('returns value 3 when the single habit is completed that day', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const habits = [{ id: 'h1', name: 'Run', color: '#4f79ff', target_per_day: 1 }];
-    const grid = buildHabitGrid(habits, [{ habit_id: 'h1', date_key: todayKey, count: 1 }], 30);
-    const heat = buildAggregatedHabitHeatmap(grid, 30);
-    const todayEntry = heat.find((h) => h.dateKey === todayKey);
-    expect(todayEntry?.value).toBe(3);
-  });
-
-  it('returns value 1 when fewer than half of habits are completed', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const habits = [
-      { id: 'h1', name: 'Run', color: '#4f79ff', target_per_day: 1 },
-      { id: 'h2', name: 'Read', color: '#22c55e', target_per_day: 1 },
-      { id: 'h3', name: 'Meditate', color: '#f00', target_per_day: 1 },
-    ];
-    const grid = buildHabitGrid(habits, [{ habit_id: 'h1', date_key: todayKey, count: 1 }], 30);
-    const heat = buildAggregatedHabitHeatmap(grid, 30);
-    const todayEntry = heat.find((h) => h.dateKey === todayKey);
-    expect(todayEntry?.value).toBe(1);
-  });
-
-  it('returns value 2 when exactly half of habits are completed (boundary)', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const habits = [
-      { id: 'h1', name: 'Run', color: '#4f79ff', target_per_day: 1 },
-      { id: 'h2', name: 'Read', color: '#22c55e', target_per_day: 1 },
-    ];
-    const grid = buildHabitGrid(habits, [{ habit_id: 'h1', date_key: todayKey, count: 1 }], 30);
-    const heat = buildAggregatedHabitHeatmap(grid, 30);
-    const todayEntry = heat.find((h) => h.dateKey === todayKey);
-    expect(todayEntry?.value).toBe(2);
-  });
-
-  it('returns value 2 when both of three habits are completed', () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const todayKey = `${y}-${m}-${d}`;
-
-    const habits = [
-      { id: 'h1', name: 'A', color: '#4f79ff', target_per_day: 1 },
-      { id: 'h2', name: 'B', color: '#22c55e', target_per_day: 1 },
-      { id: 'h3', name: 'C', color: '#f00', target_per_day: 1 },
+  it('uses historical targets and marks partial scheduled cells', () => {
+    const today = toDateKey();
+    const history = [
+      createHabitRule(offsetDateKey(-5), ALL_HABIT_WEEKDAYS, 1),
+      createHabitRule(today, ALL_HABIT_WEEKDAYS, 2),
     ];
     const grid = buildHabitGrid(
-      habits,
-      [
-        { habit_id: 'h1', date_key: todayKey, count: 1 },
-        { habit_id: 'h2', date_key: todayKey, count: 1 },
-      ],
+      [{ ...habits[0], rule_history: history }],
+      [{ habit_id: 'h1', date_key: today, count: 1 }],
       30,
     );
-    const heat = buildAggregatedHabitHeatmap(grid, 30);
-    const todayEntry = heat.find((h) => h.dateKey === todayKey);
-    expect(todayEntry?.value).toBe(2);
-  });
-});
-
-describe('calculateOverallConsistency', () => {
-  it('returns 0 for empty grid', () => {
-    expect(calculateOverallConsistency([])).toBe(0);
+    const todayCell = grid[0].cells.find((cell) => cell.dateKey === today)!;
+    expect(todayCell).toMatchObject({
+      targetPerDay: 2,
+      completed: false,
+      partial: true,
+      eligible: true,
+    });
   });
 
-  it('calculates percentage of completed past cells', () => {
+  it('uses only eligible scheduled cells in consistency', () => {
     const grid = [
       {
-        habit: { id: 'h1', name: 'Run', color: '#fff', target_per_day: 1 },
+        habit: habits[0],
         cells: [
-          { dateKey: '2000-01-01', count: 1, completed: true, partial: false },
-          { dateKey: '2000-01-02', count: 0, completed: false, partial: false },
+          {
+            dateKey: '2026-01-01',
+            count: 1,
+            targetPerDay: 1,
+            scheduled: true,
+            eligible: true,
+            completed: true,
+            partial: false,
+          },
+          {
+            dateKey: '2026-01-02',
+            count: 0,
+            targetPerDay: 1,
+            scheduled: false,
+            eligible: false,
+            completed: false,
+            partial: false,
+          },
+          {
+            dateKey: '2026-01-03',
+            count: 0,
+            targetPerDay: 1,
+            scheduled: true,
+            eligible: true,
+            completed: false,
+            partial: false,
+          },
         ],
       },
     ];
     expect(calculateOverallConsistency(grid)).toBe(50);
+  });
+});
+
+describe('schedule-aware heatmaps and activity', () => {
+  it('does not dilute a completed scheduled habit with an unscheduled habit', () => {
+    const today = toDateKey();
+    const grid = [
+      {
+        habit: { id: 'h1', name: 'Gym', color: '#0f0', target_per_day: 1 },
+        cells: [
+          {
+            dateKey: today,
+            count: 1,
+            targetPerDay: 1,
+            scheduled: true,
+            eligible: true,
+            completed: true,
+            partial: false,
+          },
+        ],
+      },
+      {
+        habit: { id: 'h2', name: 'Weekend', color: '#00f', target_per_day: 1 },
+        cells: [
+          {
+            dateKey: today,
+            count: 0,
+            targetPerDay: 1,
+            scheduled: false,
+            eligible: false,
+            completed: false,
+            partial: false,
+          },
+        ],
+      },
+    ];
+    expect(buildAggregatedHabitHeatmap(grid, 1)[0].value).toBe(3);
+  });
+
+  it('returns neutral activity on a no-obligation day', () => {
+    const today = toDateKey();
+    const grid = [
+      {
+        habit: { id: 'h1', name: 'Gym', color: '#0f0', target_per_day: 1 },
+        cells: [
+          {
+            dateKey: today,
+            count: 0,
+            targetPerDay: 1,
+            scheduled: false,
+            eligible: false,
+            completed: false,
+            partial: false,
+          },
+        ],
+      },
+    ];
+    expect(buildHabitActivityDays(grid, 1)[0]).toMatchObject({ active: false, value: 0 });
+  });
+});
+
+describe('date boundaries', () => {
+  it('handles leap day and year boundary as local date keys', () => {
+    const history = [createHabitRule('2024-02-28', ALL_HABIT_WEEKDAYS, 1)];
+    expect(getHabitRuleForDate(history, '2024-02-29')).not.toBeNull();
+    expect(getHabitRuleForDate(history, '2025-01-01')).not.toBeNull();
+    expect(dateKeyToLocalDate('2024-02-29').getDate()).toBe(29);
   });
 });

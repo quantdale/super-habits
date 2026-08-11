@@ -113,48 +113,69 @@ export async function addTodo(input: {
   return id;
 }
 
-export async function createRecurringInstance(input: {
+type RecurringInstanceInput = {
   title: string;
   notes: string | null;
   priority: TodoPriority;
   recurrenceId: string;
   dueDate: string;
-}): Promise<void> {
-  const db = await getDatabase();
-  const id = createId('todo');
-  const now = nowIso();
+};
 
+export async function createRecurringInstance(input: RecurringInstanceInput): Promise<void> {
+  await createRecurringInstances([input]);
+}
+
+export async function createRecurringInstances(inputs: RecurringInstanceInput[]): Promise<void> {
+  if (inputs.length === 0) return;
+
+  const db = await getDatabase();
   const maxRow = await db.getFirstAsync<{ maxOrder: number }>(
     `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
      FROM todos WHERE deleted_at IS NULL AND completed = 0`,
   );
-  const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
+  const firstSortOrder = (maxRow?.maxOrder ?? 0) + 1;
 
-  await db.runAsync(
-    `INSERT INTO todos
-       (id, title, notes, completed, due_date, priority,
-        sort_order, recurrence, recurrence_id,
-        created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, 0, ?, ?, ?, 'daily', ?, ?, ?, NULL)`,
-    [
-      id,
-      input.title,
-      input.notes,
-      input.dueDate,
-      input.priority,
-      sortOrder,
-      input.recurrenceId,
-      now,
-      now,
-    ],
+  await Promise.all(
+    inputs.map(async (input, index) => {
+      const id = createId('todo');
+      const now = nowIso();
+      const result = await db.runAsync(
+        `INSERT INTO todos
+           (id, title, notes, completed, due_date, priority,
+            sort_order, recurrence, recurrence_id,
+            created_at, updated_at, deleted_at)
+         SELECT ?, ?, ?, 0, ?, ?, ?, 'daily', ?, ?, ?, NULL
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM todos
+           WHERE recurrence_id = ?
+             AND due_date = ?
+             AND deleted_at IS NULL
+         )`,
+        [
+          id,
+          input.title,
+          input.notes,
+          input.dueDate,
+          input.priority,
+          firstSortOrder + index,
+          input.recurrenceId,
+          now,
+          now,
+          input.recurrenceId,
+          input.dueDate,
+        ],
+      );
+
+      if (result.changes !== 1) return;
+      syncEngine.enqueue({
+        entity: 'todos',
+        id,
+        updatedAt: now,
+        operation: 'create',
+      });
+    }),
   );
-
-  syncEngine.enqueue({
-    entity: 'todos',
-    id,
-    updatedAt: now,
-    operation: 'create',
-  });
 }
 
 export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<Todo[]> {

@@ -12,7 +12,7 @@
  *   node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -54,26 +54,78 @@ function parseArgs(argv) {
 }
 
 function commandCandidates(command) {
-  return process.platform === 'win32' ? [`${command}.cmd`, `${command}.bat`, command] : [command];
+  const names =
+    process.platform === 'win32' ? [`${command}.cmd`, `${command}.bat`, command] : [command];
+  if (process.platform !== 'win32') return names;
+
+  // A long-running Codex/IDE process can retain the PATH that existed before
+  // a user-level installer updated HKCU\Environment. Read that persisted
+  // PATH as a fallback so normal Windows installs remain discoverable without
+  // committing a machine-specific path or injecting one into every command.
+  const currentPath = process.env.PATH ?? process.env.Path ?? '';
+  const persistedPath = readPersistedWindowsUserPath();
+  const directories = [...currentPath.split(';'), ...persistedPath.split(';')]
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const absoluteCandidates = directories.flatMap((directory) =>
+    names.map((name) => join(directory, name)),
+  );
+  return [...new Set([...names, ...absoluteCandidates])];
+}
+
+function readPersistedWindowsUserPath() {
+  try {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        "[Environment]::GetEnvironmentVariable('Path', 'User')",
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    return result.status === 0 ? String(result.stdout ?? '').trim() : '';
+  } catch {
+    return '';
+  }
 }
 
 function findCommand(command) {
   for (const candidate of commandCandidates(command)) {
-    const result = spawnSync(candidate, ['--version'], {
-      cwd: ROOT,
-      stdio: 'ignore',
-      shell: false,
-    });
-    if (!result.error && result.status === 0) return candidate;
+    const useWindowsBatchShell =
+      process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(candidate);
+    for (const versionArgs of [['--version'], ['-v']]) {
+      const spawnCommand = useWindowsBatchShell
+        ? [quoteWindowsShellArg(candidate), ...versionArgs].join(' ')
+        : candidate;
+      const result = spawnSync(spawnCommand, useWindowsBatchShell ? [] : versionArgs, {
+        cwd: ROOT,
+        stdio: 'ignore',
+        shell: useWindowsBatchShell,
+      });
+      if (!result.error && result.status === 0) return candidate;
+    }
   }
   return null;
 }
 
+function quoteWindowsShellArg(value) {
+  const text = String(value);
+  return /[\s"]/.test(text) ? `"${text.replaceAll('"', '\\"')}"` : text;
+}
+
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const useWindowsBatchShell =
+    process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+  const spawnCommand = useWindowsBatchShell
+    ? [command, ...args].map(quoteWindowsShellArg).join(' ')
+    : command;
+  const spawnArgs = useWindowsBatchShell ? [] : args;
+  const result = spawnSync(spawnCommand, spawnArgs, {
     cwd: ROOT,
     encoding: 'utf8',
-    shell: false,
+    shell: useWindowsBatchShell,
     ...options,
   });
   return {

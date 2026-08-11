@@ -3,10 +3,10 @@
 -- ============================================================
 -- The authoritative schema is the bootstrapStatements array
 -- in core/db/client.ts, plus the runMigrations() cases.
--- Current stored schema version: 11 (next migration: case 12).
+-- Current stored schema version: 12 (next migration: case 13).
 -- This file is hand-maintained from core/db/client.ts — copy
 -- the bootstrap DDL and every `if (version < N)` block through
--- v11. It may lag behind the live schema. Do not rely on it
+-- v12. It may lag behind the live schema. Do not rely on it
 -- for migrations or type generation.
 -- ============================================================
 
@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS habits (
   category TEXT NOT NULL DEFAULT 'anytime',
   icon TEXT NOT NULL DEFAULT 'check-circle',
   color TEXT NOT NULL DEFAULT '#64748b',
+  rule_history TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT

@@ -157,7 +157,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `core/db/client.ts` includes linked actions migrations through schema version `11`:
+- `core/db/client.ts` includes linked actions migrations through schema version `12`:
   - `linked_action_rules`
   - `linked_action_events`
   - `linked_action_executions`
@@ -236,7 +236,7 @@ Companion docs in this folder:
 - `linked_action_events`
 - `linked_action_executions`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `11`; next migration slot is `if (version < 12)`.
+- Current runtime schema version is `12`; next migration slot is `if (version < 13)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; existing rows migrate to an every-day rule effective on their local creation date.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
@@ -388,7 +388,7 @@ Companion docs in this folder:
 
 ### Confirmed from code vs docs
 
-- `core/db/schema.sql` is stale: it still says schema version `4`, while runtime code is version `11`.
+- `core/db/schema.sql` is a hand-maintained reference snapshot; runtime code is currently schema version `12` and the next append-only slot is `if (version < 13)`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 

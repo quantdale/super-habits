@@ -9,12 +9,22 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Workout'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
 - tapOn: 'Routine name'
 - inputText: 'Native strength routine'
 - tapOn: 'Description'
 - inputText: 'Native routine'
 - tapOn: 'Add routine'
+- scrollUntilVisible:
+    element: 'Open Native strength routine routine'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Open Native strength routine routine'
     timeout: 5000
@@ -28,5 +38,15 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Workout'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- scrollUntilVisible:
+    element: 'Native strength routine'
+    direction: DOWN
 - assertVisible: 'Native strength routine'

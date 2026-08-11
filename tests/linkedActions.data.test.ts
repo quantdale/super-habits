@@ -3,6 +3,7 @@ import {
   createLinkedActionRule,
   deleteLinkedActionRulesForTargetEntity,
   deleteLinkedActionRule,
+  getAppliedHabitIncrementExecution,
   getAppliedHabitDayCalorieExecution,
   getLinkedActionRule,
   listActiveLinkedActionRulesForSource,
@@ -295,6 +296,52 @@ describe('core/linked-actions/linkedActions.data', () => {
     expect(db.getFirstAsync).toHaveBeenCalledWith(
       expect.stringContaining('ev.source_date_key = ?'),
       ['link_calorie', 'habit_1', '2026-04-14'],
+    );
+  });
+
+  it('looks up an applied habit increment by source identity and day', async () => {
+    const executionRow = {
+      id: 'lexec_increment',
+      rule_id: 'link_increment',
+      source_event_id: 'levt_1',
+      chain_id: 'lchain_1',
+      root_event_id: 'levt_1',
+      origin_rule_id: null,
+      effect_type: 'habit.increment',
+      effect_fingerprint: 'fingerprint',
+      status: 'applied',
+      target_feature: 'habits',
+      target_entity_type: 'habit',
+      target_entity_id: 'habit_1',
+      produced_entity_type: null,
+      produced_entity_id: null,
+      notice_payload: null,
+      error_message: null,
+      created_at: '2026-04-14T00:00:00.000Z',
+      updated_at: '2026-04-14T00:00:00.000Z',
+    };
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValue(executionRow),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(
+      getAppliedHabitIncrementExecution(
+        'link_increment',
+        'todos',
+        'todo',
+        'todo_1',
+        'todo.completed',
+        '2026-04-14',
+      ),
+    ).resolves.toMatchObject({
+      id: 'lexec_increment',
+      effectType: 'habit.increment',
+    });
+
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining("e.effect_type = 'habit.increment'"),
+      ['link_increment', 'todos', 'todo', 'todo_1', 'todo.completed', '2026-04-14'],
     );
   });
 

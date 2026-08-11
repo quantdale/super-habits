@@ -1,0 +1,51 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - habits
+  - habit-v2
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native M-W-F habit'
+- hideKeyboard
+- tapOn: 'Custom'
+- tapOn: 'Tuesday scheduled'
+- tapOn: 'Thursday scheduled'
+- tapOn: 'Saturday scheduled'
+- tapOn: 'Sunday scheduled'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+    centerElement: true
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native M-W-F habit'
+    timeout: 5000
+- scrollUntilVisible:
+    element: 'Mon / Wed / Fri'
+    direction: UP
+- assertVisible: 'Mon / Wed / Fri'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- scrollUntilVisible:
+    element: 'Mon / Wed / Fri'
+    direction: UP
+- assertVisible: 'Native M-W-F habit'
+- assertVisible: 'Mon / Wed / Fri'

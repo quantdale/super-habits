@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -26,6 +26,7 @@ import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
@@ -34,10 +35,10 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
 import type { Todo, TodoPriority, TodoViewMode } from './types';
 import { TodoItem } from './TodoItem';
-import { findMissingRecurrenceIds, getTodayDateKey } from './todos.domain';
+import { createSubmitGuard, findMissingRecurrenceIds, getTodayDateKey } from './todos.domain';
 import {
   addTodo,
-  createRecurringInstance,
+  createRecurringInstances,
   getRecurringTodosByIds,
   listTodoLinkedActionRules,
   listAllActiveTodosForRecurrence,
@@ -62,6 +63,7 @@ const VIEW_MODE_OPTIONS: readonly {
 
 export function TodosScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.todos.text;
   const { showNotice } = useInAppNotices();
   const [title, setTitle] = useState('');
@@ -72,6 +74,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const [isRecurring, setIsRecurring] = useState(false);
   const [items, setItems] = useState<Todo[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [todoError, setTodoError] = useState<string | null>(null);
@@ -80,8 +83,32 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<TodoViewMode>('content');
   const { width: screenWidth } = useWindowDimensions();
+  const submitGuardRef = useRef(createSubmitGuard());
+  const lastRecurrenceExpansionDateKeyRef = useRef<string | null>(null);
   const gridColumns = screenWidth >= 1200 ? 4 : screenWidth >= 768 ? 3 : 2;
   const gridCardWidth = (screenWidth - 32 - 4 * (gridColumns * 2)) / gridColumns;
+
+  const setItemsIfChanged = useCallback((nextItems: Todo[]) => {
+    setItems((currentItems) => {
+      if (
+        currentItems.length === nextItems.length &&
+        currentItems.every((current, index) => {
+          const next = nextItems[index];
+          return (
+            current.id === next.id &&
+            current.updated_at === next.updated_at &&
+            current.completed === next.completed &&
+            current.sort_order === next.sort_order &&
+            current.due_date === next.due_date &&
+            current.deleted_at === next.deleted_at
+          );
+        })
+      ) {
+        return currentItems;
+      }
+      return nextItems;
+    });
+  }, []);
 
   const pendingTasks = useMemo(() => items.filter((t) => t.completed === 0), [items]);
   const completedTasks = useMemo(() => items.filter((t) => t.completed === 1), [items]);
@@ -102,33 +129,42 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   }, [pendingTasks]);
 
   const refresh = useCallback(() => {
-    void listTodos().then(setItems);
-  }, []);
+    void listTodos().then(setItemsIfChanged);
+  }, [setItemsIfChanged]);
 
   const loadTodosOnFocus = useCallback(async () => {
-    const allTodos = await listAllActiveTodosForRecurrence();
     const todayKey = getTodayDateKey();
-    const missingIds = findMissingRecurrenceIds(allTodos, todayKey);
+    if (lastRecurrenceExpansionDateKeyRef.current !== todayKey) {
+      const allTodos = await listAllActiveTodosForRecurrence();
+      const missingIds = findMissingRecurrenceIds(allTodos, todayKey);
 
-    if (missingIds.length > 0) {
-      const templates = await getRecurringTodosByIds(missingIds);
-      for (const template of templates) {
-        const recurrenceId = template.recurrence_id;
-        if (!recurrenceId) continue;
-        await createRecurringInstance({
-          title: template.title,
-          notes: template.notes,
-          priority: template.priority,
-          recurrenceId,
-          dueDate: todayKey,
-        });
+      if (missingIds.length > 0) {
+        const templates = await getRecurringTodosByIds(missingIds);
+        await createRecurringInstances(
+          templates.flatMap((template) => {
+            const recurrenceId = template.recurrence_id;
+            if (!recurrenceId) return [];
+            return [
+              {
+                title: template.title,
+                notes: template.notes,
+                priority: template.priority,
+                recurrenceId,
+                dueDate: todayKey,
+              },
+            ];
+          }),
+        );
       }
+      // Same-day focus/foreground events still refresh the list, but do not
+      // repeat the full recurrence snapshot scan for this mounted screen.
+      lastRecurrenceExpansionDateKeyRef.current = todayKey;
     }
     const list = await listTodos();
-    setItems(list);
-  }, []);
+    setItemsIfChanged(list);
+  }, [setItemsIfChanged]);
 
-  useActiveForegroundRefresh(isActive, loadTodosOnFocus);
+  useActiveForegroundRefresh(isActive, loadTodosOnFocus, dayGeneration);
 
   const resetForm = () => {
     setTitle('');
@@ -145,6 +181,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   };
 
   const closeModal = () => {
+    if (isSubmitting) return;
     setModalVisible(false);
     resetForm();
   };
@@ -155,56 +192,64 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   };
 
   const onSave = async () => {
-    const err = validateTodo(title, notes, dueDate);
-    if (err) {
-      setTodoError(err);
-      return;
-    }
-    setTodoError(null);
-    setLinkedActionsError(null);
+    if (!submitGuardRef.current.tryStart()) return;
+    setIsSubmitting(true);
 
-    let linkedActionRules: SaveLinkedActionRuleForSourceInput[] = [];
-    if (!isRecurringLinkedActionSource) {
-      try {
-        linkedActionRules = linkedActionRows.map(createSaveLinkedActionRuleInputFromEditorRow);
-      } catch (error) {
-        setLinkedActionsError(
-          error instanceof Error
-            ? error.message
-            : 'Finish or remove incomplete linked actions before saving this task.',
-        );
+    try {
+      const err = validateTodo(title, notes, dueDate);
+      if (err) {
+        setTodoError(err);
         return;
       }
-    }
+      setTodoError(null);
+      setLinkedActionsError(null);
 
-    if (editingId) {
-      await updateTodo(editingId, {
-        title: title.trim(),
-        notes: notes.trim() || undefined,
-        dueDate: dueDate ?? null,
-        priority,
-      });
+      let linkedActionRules: SaveLinkedActionRuleForSourceInput[] = [];
       if (!isRecurringLinkedActionSource) {
-        await saveTodoLinkedActionRules(editingId, linkedActionRules);
+        try {
+          linkedActionRules = linkedActionRows.map(createSaveLinkedActionRuleInputFromEditorRow);
+        } catch (error) {
+          setLinkedActionsError(
+            error instanceof Error
+              ? error.message
+              : 'Finish or remove incomplete linked actions before saving this task.',
+          );
+          return;
+        }
       }
-    } else {
-      const todoId = await addTodo({
-        title: title.trim(),
-        notes: notes.trim() || undefined,
-        dueDate: dueDate ?? null,
-        priority,
-        recurrence: isRecurring ? 'daily' : null,
-      });
-      if (!isRecurringLinkedActionSource) {
-        await saveTodoLinkedActionRules(todoId, linkedActionRules);
+
+      if (editingId) {
+        await updateTodo(editingId, {
+          title: title.trim(),
+          notes: notes.trim() || undefined,
+          dueDate: dueDate ?? null,
+          priority,
+        });
+        if (!isRecurringLinkedActionSource) {
+          await saveTodoLinkedActionRules(editingId, linkedActionRules);
+        }
+      } else {
+        const todoId = await addTodo({
+          title: title.trim(),
+          notes: notes.trim() || undefined,
+          dueDate: dueDate ?? null,
+          priority,
+          recurrence: isRecurring ? 'daily' : null,
+        });
+        if (!isRecurringLinkedActionSource) {
+          await saveTodoLinkedActionRules(todoId, linkedActionRules);
+        }
       }
+      setModalVisible(false);
+      resetForm();
+      void refresh();
+    } finally {
+      submitGuardRef.current.finish();
+      setIsSubmitting(false);
     }
-    setModalVisible(false);
-    resetForm();
-    void refresh();
   };
 
-  const startEdit = async (todo: Todo) => {
+  const startEdit = useCallback(async (todo: Todo) => {
     setEditingId(todo.id);
     setTitle(todo.title);
     setNotes(todo.notes ?? '');
@@ -231,7 +276,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     } finally {
       setLinkedActionsLoading(false);
     }
-  };
+  }, []);
 
   const handleToggleTodo = useCallback(
     async (todo: Todo) => {
@@ -244,6 +289,40 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     [refresh, showNotice],
   );
 
+  const todoKeyExtractor = useCallback((item: Todo) => item.id, []);
+  const handleDragBegin = useCallback(() => {}, []);
+  const handleDragEnd = useCallback(
+    async ({ data }: { data: Todo[] }) => {
+      setItems((prev) =>
+        prev.map((item) => {
+          const newIndex = data.findIndex((d) => d.id === item.id);
+          return newIndex !== -1 ? { ...item, sort_order: newIndex + 1 } : item;
+        }),
+      );
+      await updateTodoOrder(data.map((d) => d.id));
+      void refresh();
+    },
+    [refresh],
+  );
+  const renderTodoItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<Todo>) => (
+      <ScaleDecorator>
+        <TodoItem
+          todo={item}
+          onLongPress={drag}
+          isActive={isActive}
+          onToggle={() => handleToggleTodo(item)}
+          onDelete={() => removeTodo(item.id).then(refresh)}
+          onEdit={() => {
+            void startEdit(item);
+          }}
+          viewMode={viewMode}
+          cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
+        />
+      </ScaleDecorator>
+    ),
+    [gridCardWidth, handleToggleTodo, refresh, startEdit, viewMode],
+  );
   const todoLinkedActionSource: LinkedActionEditorSourceOption = {
     key: TODO_LINKED_ACTION_SOURCE_KEY,
     feature: 'todos',
@@ -257,7 +336,6 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     pendingTasks.length === 0 && !showCompleted && items.length > 0 && hasCompleted;
   const totallyEmpty = items.length === 0;
   const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
-
   const noPendingTasksCard = (
     <EmptyStateCard
       accentColor={SECTION_COLORS.todos}
@@ -369,22 +447,13 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
               <DraggableFlatList
                 key={viewMode}
                 data={pendingTasks}
-                keyExtractor={(item) => item.id}
+                keyExtractor={todoKeyExtractor}
                 containerStyle={{ flex: 1 }}
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
                 activationDistance={10}
                 numColumns={viewMode === 'grid' ? gridColumns : 1}
-                onDragBegin={() => {}}
-                onDragEnd={async ({ data }) => {
-                  setItems((prev) =>
-                    prev.map((item) => {
-                      const newIndex = data.findIndex((d) => d.id === item.id);
-                      return newIndex !== -1 ? { ...item, sort_order: newIndex + 1 } : item;
-                    }),
-                  );
-                  await updateTodoOrder(data.map((d) => d.id));
-                  void refresh();
-                }}
+                onDragBegin={handleDragBegin}
+                onDragEnd={handleDragEnd}
                 ListEmptyComponent={
                   hasCompleted ? (
                     <View className="mb-3">{noPendingTasksCard}</View>
@@ -440,22 +509,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                     </View>
                   ) : null
                 }
-                renderItem={({ item, drag, isActive }: RenderItemParams<Todo>) => (
-                  <ScaleDecorator>
-                    <TodoItem
-                      todo={item}
-                      onLongPress={drag}
-                      isActive={isActive}
-                      onToggle={() => handleToggleTodo(item)}
-                      onDelete={() => removeTodo(item.id).then(refresh)}
-                      onEdit={() => {
-                        void startEdit(item);
-                      }}
-                      viewMode={viewMode}
-                      cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
-                    />
-                  </ScaleDecorator>
-                )}
+                renderItem={renderTodoItem}
               />
             </ScreenSection>
           ) : null}
@@ -613,12 +667,18 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
             <View className="mt-3 flex-row gap-2">
               <View className="flex-1">
-                <Button label="Cancel" variant="ghost" onPress={closeModal} />
+                <Button
+                  label="Cancel"
+                  variant="ghost"
+                  onPress={closeModal}
+                  disabled={isSubmitting}
+                />
               </View>
               <View className="flex-1">
                 <Button
                   label={editingId ? 'Save changes' : 'Add task'}
                   onPress={onSave}
+                  disabled={isSubmitting}
                   color={COLOR}
                 />
               </View>

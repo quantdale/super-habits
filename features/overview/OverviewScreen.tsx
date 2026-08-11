@@ -27,6 +27,7 @@ import {
   buildHabitGrid,
   calculateCurrentStreak,
   calculateOverallConsistency,
+  isHabitScheduledOn,
 } from '@/features/habits/habits.domain';
 import {
   listPomodoroSessions,
@@ -50,6 +51,7 @@ import {
 } from '@/features/workout/workout.domain';
 import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
 import { useAppNavigation } from '@/core/providers/NavigationProvider';
+import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 
 type ViewMode = 'grid' | 'column' | 'list';
 type OverviewCardKey = 'pomodoro' | 'habits' | 'calories' | 'todos' | 'workout';
@@ -167,6 +169,7 @@ function OverviewMetricCard({
 
 export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const { openSettings, setActiveSection } = useAppNavigation();
+  const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
   const { width } = useWindowDimensions();
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -175,6 +178,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const [topPendingTodos, setTopPendingTodos] = useState<Todo[]>([]);
   const [bestHabitStreak, setBestHabitStreak] = useState(0);
   const [habitConsistency, setHabitConsistency] = useState(0);
+  const [todayScheduledHabits, setTodayScheduledHabits] = useState(0);
   const [pomodoroSessions, setPomodoroSessions] = useState(0);
   const [pomodoroStreak, setPomodoroStreak] = useState(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
@@ -230,6 +234,11 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           recentWorkoutLogs.length > 0 ||
           routines.length > 0,
       );
+      setTodayScheduledHabits(
+        habits.filter((habit) =>
+          isHabitScheduledOn(habit.rule_history, today, habit.target_per_day),
+        ).length,
+      );
 
       const pomHeatmap = buildPomodoroHeatmapDays(pomodoroSessions, 364);
       setPomodoroSessions(pomodoroSessions.length);
@@ -246,6 +255,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           name: h.name,
           color: h.color,
           target_per_day: h.target_per_day,
+          rule_history: h.rule_history,
+          created_at: h.created_at,
         })),
         allHabitCompletions,
         364,
@@ -254,8 +265,13 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
 
       const streakEntries = await Promise.all(
         habits.map(async (habit) => {
-          const completions = await getCompletionHistory(habit.id, 30);
-          const dayCompletions = buildDayCompletions(completions, habit.target_per_day, 30);
+          const completions = await getCompletionHistory(habit.id);
+          const dayCompletions = buildDayCompletions(
+            completions,
+            habit.target_per_day,
+            undefined,
+            habit.rule_history,
+          );
           return calculateCurrentStreak(dayCompletions);
         }),
       );
@@ -272,6 +288,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     useCallback(() => {
       void loadDashboardData();
     }, [loadDashboardData]),
+    dayGeneration,
   );
 
   const isListView = viewMode === 'list';
@@ -349,17 +366,37 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           return (
             <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
               {isListView ? (
-                <View className="flex-row items-center justify-between gap-3">
-                  <View className="min-w-0 flex-1">
-                    <Text
-                      className="text-lg font-semibold tabular-nums"
-                      style={{ color: tokens.text }}
-                    >
-                      {bestHabitStreak} day streak
+                todayScheduledHabits === 0 ? (
+                  <View>
+                    <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                      Rest day
+                    </Text>
+                    <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                      No habits scheduled today
                     </Text>
                   </View>
-                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                    {habitConsistency}% consistent
+                ) : (
+                  <View className="flex-row items-center justify-between gap-3">
+                    <View className="min-w-0 flex-1">
+                      <Text
+                        className="text-lg font-semibold tabular-nums"
+                        style={{ color: tokens.text }}
+                      >
+                        {bestHabitStreak} day streak
+                      </Text>
+                    </View>
+                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      {habitConsistency}% consistent
+                    </Text>
+                  </View>
+                )
+              ) : todayScheduledHabits === 0 ? (
+                <View className="items-start">
+                  <Text className="text-2xl font-bold" style={{ color: tokens.text }}>
+                    Rest day
+                  </Text>
+                  <Text className="mt-2 text-sm" style={{ color: tokens.textMuted }}>
+                    No habits scheduled today
                   </Text>
                 </View>
               ) : (
@@ -545,6 +582,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       pomodoroSessions,
       pomodoroStreak,
       habitConsistency,
+      todayScheduledHabits,
       isListView,
       pendingTodosCount,
       topPendingTodos,

@@ -20,6 +20,28 @@ export const DEFAULT_SETTINGS: PomodoroSettings = {
   sessionsBeforeLongBreak: 4,
 };
 
+export function applySettingsToTimerState(
+  nextSettings: PomodoroSettings,
+  state: {
+    currentMode: PomodoroMode;
+    isRunning: boolean;
+    isPaused: boolean;
+    totalSeconds: number;
+    remaining: number;
+  },
+): { settings: PomodoroSettings; totalSeconds: number; remaining: number } {
+  if (state.isRunning || state.isPaused) {
+    return {
+      settings: nextSettings,
+      totalSeconds: state.totalSeconds,
+      remaining: state.remaining,
+    };
+  }
+
+  const duration = getModeDuration(state.currentMode, nextSettings);
+  return { settings: nextSettings, totalSeconds: duration, remaining: duration };
+}
+
 /** Kept for backward compatibility with existing tests */
 export const FOCUS_SECONDS = DEFAULT_SETTINGS.focusMinutes * 60;
 

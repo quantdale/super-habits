@@ -8,27 +8,11 @@ import { seedFixture } from '../helpers/seed';
  * J2b — "Past midnight", presentation half (decided contract D9b). Priority
  * P1, tag @p0.
  *
- * QUARANTINED CONTRACT GAP **CG-1** (see docs/testing/known-gaps.md, D13
- * protocol). The DECIDED contract: a mounted surface must never label a stale
- * day "Today". When the local calendar day changes while the app is open, the
- * ACTIVE section refreshes its day-scoped data, and INACTIVE mounted sections
- * are marked stale so they refresh on activation rather than rendering held
- * values from memory.
- *
- * The application does NOT satisfy this contract today: `useActiveForegroundRefresh`
- * fires on `isActive` transitions and on `visibilitychange`/`AppState`
- * foreground, and a midnight tick is neither — so an active section keeps
- * yesterday's numbers under a "Today" label until some interaction. The
- * companion change **fix-day-rollover-refresh** (a provider-level day-key
- * watcher that bumps a context value the sections already consume for refresh)
- * implements the decided contract. Per D13, the quarantine is removed IN THAT
- * CHANGE, never here.
- *
- * The journey is written to the DECIDED contract, not to current behaviour,
- * and registered with `test.describe.fixme` — it is expected to FAIL today if
- * un-quarantined (step 3's assertion is the one that cannot pass while the
- * active section holds yesterday's "Today: 410 kcal"). Kept fixme'd, it is
- * reported as skipped: a named, tracked gap rather than a red suite.
+ * FIXED CONTRACT GAP **CG-1** (closed by `fix-day-rollover-refresh`): a
+ * provider-level day-key watcher now bumps the refresh generation when the
+ * local calendar day changes. Active sections refresh immediately, and
+ * inactive mounted sections refresh when activated through the existing
+ * `useActiveForegroundRefresh` path.
  *
  * Wiring mirrors J2a (hand-rolled shared context): the harness
  * `defineJourney()` cannot express a non-UTC `timezoneId`, so the context is
@@ -48,12 +32,7 @@ const HABIT_NAME = 'Habit 1 — ☕';
 /** Regex matching the habit ring's accessible name for a given today-count. */
 const ringLabel = (count: number) => new RegExp(`Habit 1 — ☕: ${count} of 1 today`);
 
-// test.describe.fixme = the D13 quarantine: the journey is registered against
-// the decided contract (D9b) but must not execute until the companion change
-// `fix-day-rollover-refresh` lands. All steps below follow that decided
-// contract; step 3 is the assertion that cannot pass today.
-test.describe
-  .fixme('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0', () => {
+test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0', () => {
   let context: BrowserContext;
   let page: Page;
 

@@ -308,6 +308,13 @@ defineJourney({
         // End the session with Reset (no focus session completes).
         await page.getByText('Reset', { exact: true }).click();
 
+        // Live-section contract: after the paused session is reset, the
+        // already-mounted idle timer must use the newly saved default before
+        // any reload.
+        await expect(page.locator('.text-5xl').getByText(/^\d{2}:\d{2}$/)).toHaveText('40:00', {
+          timeout: 15_000,
+        });
+
         // The changed default is persisted and, after a reload, is what a fresh
         // Focus section shows.
         await expectRows(

@@ -12,6 +12,7 @@ import {
   parseMinutesSeconds,
   DEFAULT_SETTINGS,
   buildPomodoroHeatmapDays,
+  applySettingsToTimerState,
   computePomodoroStreakFromHeatmapDays,
 } from '@/features/pomodoro/pomodoro.domain';
 import type { PomodoroSession } from '@/core/db/types';
@@ -125,6 +126,46 @@ describe('getModeDuration', () => {
   it('respects custom settings', () => {
     const custom = { ...DEFAULT_SETTINGS, focusMinutes: 50 };
     expect(getModeDuration('focus', custom)).toBe(50 * 60);
+  });
+});
+
+describe('applySettingsToTimerState', () => {
+  const updated = { ...DEFAULT_SETTINGS, focusMinutes: 40 };
+
+  it('updates an idle timer to the new mode duration', () => {
+    expect(
+      applySettingsToTimerState(updated, {
+        currentMode: 'focus',
+        isRunning: false,
+        isPaused: false,
+        totalSeconds: 25 * 60,
+        remaining: 25 * 60,
+      }),
+    ).toEqual({ settings: updated, totalSeconds: 40 * 60, remaining: 40 * 60 });
+  });
+
+  it('keeps a running timer state while updating settings', () => {
+    expect(
+      applySettingsToTimerState(updated, {
+        currentMode: 'focus',
+        isRunning: true,
+        isPaused: false,
+        totalSeconds: 25 * 60,
+        remaining: 21 * 60,
+      }),
+    ).toEqual({ settings: updated, totalSeconds: 25 * 60, remaining: 21 * 60 });
+  });
+
+  it('keeps a paused timer state while updating settings', () => {
+    expect(
+      applySettingsToTimerState(updated, {
+        currentMode: 'focus',
+        isRunning: false,
+        isPaused: true,
+        totalSeconds: 25 * 60,
+        remaining: 18 * 60 + 12,
+      }),
+    ).toEqual({ settings: updated, totalSeconds: 25 * 60, remaining: 18 * 60 + 12 });
   });
 });
 

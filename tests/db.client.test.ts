@@ -15,7 +15,7 @@ type LoadClientOptions = {
   openDatabaseAsync?: ReturnType<typeof vi.fn>;
 };
 
-function buildDb(version: string | null = '11'): MockDatabase {
+function buildDb(version: string | null = '12'): MockDatabase {
   return {
     execAsync: vi.fn().mockResolvedValue(undefined),
     runAsync: vi.fn().mockResolvedValue(undefined),
@@ -34,7 +34,7 @@ function buildDb(version: string | null = '11'): MockDatabase {
 async function loadDbClient(options: LoadClientOptions = {}) {
   vi.resetModules();
   const platform = options.platform ?? 'ios';
-  const schemaVersion = options.schemaVersion === undefined ? '11' : options.schemaVersion;
+  const schemaVersion = options.schemaVersion === undefined ? '12' : options.schemaVersion;
   const db = buildDb(schemaVersion);
   const openDatabaseAsync = options.openDatabaseAsync ?? vi.fn().mockResolvedValue(db);
 
@@ -152,7 +152,7 @@ describe('core/db/client', () => {
     expect(cutoverCall?.[1]).toEqual(['date_key_cutover', expect.any(String)]);
   });
 
-  it('applies migrations from version 0 and bumps to schema version 11', async () => {
+  it('applies migrations from version 0 and bumps to schema version 12', async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
@@ -162,7 +162,7 @@ describe('core/db/client', () => {
         String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
         Array.isArray(args) &&
         args[0] === 'db_schema_version' &&
-        args[1] === '11',
+        args[1] === '12',
     );
     expect(hasSchemaV10Write).toBe(true);
   });
@@ -207,13 +207,34 @@ describe('core/db/client', () => {
     ).toBe(false);
   });
 
+  it('adds habit rule history in migration 12', async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: '11' });
+
+    await client.getDatabase();
+
+    expect(
+      db.runAsync.mock.calls.some(([sql]) =>
+        String(sql).includes('ALTER TABLE habits ADD COLUMN rule_history'),
+      ),
+    ).toBe(true);
+    expect(
+      db.runAsync.mock.calls.some(
+        ([sql, args]) =>
+          String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
+          Array.isArray(args) &&
+          args[0] === 'db_schema_version' &&
+          args[1] === '12',
+      ),
+    ).toBe(true);
+  });
+
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 and v11 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(2);
+    // v10, v11, and v12 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(3);
 
-    const upToDate = await loadDbClient({ schemaVersion: '11' });
+    const upToDate = await loadDbClient({ schemaVersion: '12' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });

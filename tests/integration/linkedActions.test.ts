@@ -98,6 +98,48 @@ describe('full source → rule → effect → execution cycle', () => {
 });
 
 describe('re-fire suppression', () => {
+  it('deduplicates fresh source events for the same completion day', async () => {
+    const db = await freshDatabase();
+    const { sourceTodoId, engineModule, targetHabitId } = await createTodoHabitIncrementCycle(db);
+    const engine = engineModule.linkedActionsEngine;
+    const source = {
+      feature: 'todos' as const,
+      entityType: 'todo' as const,
+      entityId: sourceTodoId,
+      triggerType: 'todo.completed' as const,
+      label: 'Ship the report',
+      sourceDateKey: '2026-07-01',
+    };
+
+    const first = await engine.processSourceAction(source);
+    const second = await engine.processSourceAction(source);
+
+    expect(first.effects[0]).toMatchObject({ status: 'applied' });
+    expect(second.effects[0]).toMatchObject({
+      status: 'duplicate',
+      reason: 'source_identity_already_executed',
+    });
+
+    const completion = await db.getFirstAsync<{ count: number }>(
+      'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
+      [targetHabitId, '2026-07-01'],
+    );
+    expect(completion?.count).toBe(1);
+
+    const nextDay = await engine.processSourceAction({
+      ...source,
+      sourceDateKey: '2026-07-02',
+    });
+    expect(nextDay.effects[0]).toMatchObject({ status: 'applied' });
+    const nextDayCompletion = await db.getFirstAsync<{ count: number }>(
+      'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
+      [targetHabitId, '2026-07-02'],
+    );
+    expect(nextDayCompletion?.count).toBe(1);
+
+    await db.closeAsync();
+  });
+
   it('reprocessing the same source event is a duplicate: no new execution, no second increment', async () => {
     const db = await freshDatabase();
     const { todos, targetHabitId, sourceTodoId, engineModule } =

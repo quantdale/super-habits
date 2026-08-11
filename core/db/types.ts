@@ -43,6 +43,9 @@ export type Habit = BaseEntity & {
   category: HabitCategory;
   icon: HabitIcon;
   color: string;
+  /** JSON-serialized effective-dated schedule/target rules. */
+  /** Optional in the TypeScript boundary so older remote/test rows normalize safely. */
+  rule_history?: string;
 };
 
 export type HabitCompletion = {

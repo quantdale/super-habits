@@ -15,6 +15,7 @@ type HabitCircleProps = {
   showName?: boolean;
   /** Outer ring fits around this diameter (default 56). */
   size?: number;
+  scheduledToday?: boolean;
   onIncrement: () => void;
   onDecrement: () => void;
 };
@@ -28,11 +29,12 @@ export function HabitCircle({
   showStreak = true,
   showName = true,
   size = DEFAULT_SIZE,
+  scheduledToday = true,
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
   const { tokens } = useAppTheme();
-  const progress = calculateHabitProgress(todayCount, habit.target_per_day);
+  const progress = scheduledToday ? calculateHabitProgress(todayCount, habit.target_per_day) : 0;
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
   const habitColor = habit.color ?? tokens.textMuted;
   const iconTint = `${habitColor}18`;
@@ -44,13 +46,19 @@ export function HabitCircle({
   return (
     <View className="items-center" style={{ width: Math.max(64, ringSize) }}>
       <Pressable
-        onPress={onIncrement}
-        onLongPress={onDecrement}
+        onPress={scheduledToday ? onIncrement : undefined}
+        onLongPress={scheduledToday ? onDecrement : undefined}
+        disabled={!scheduledToday}
         delayLongPress={400}
         style={{ width: ringSize, height: ringSize }}
         className="items-center justify-center"
         accessibilityRole="button"
-        accessibilityLabel={`${habit.name}: ${todayCount} of ${habit.target_per_day} today. Tap to add one. Long press to remove one.`}
+        accessibilityLabel={
+          scheduledToday
+            ? `${habit.name}: ${todayCount} of ${habit.target_per_day} today. Tap to add one. Long press to remove one.`
+            : `${habit.name}: not scheduled today. Rest day.`
+        }
+        accessibilityState={{ disabled: !scheduledToday }}
       >
         <View
           style={{
@@ -77,14 +85,23 @@ export function HabitCircle({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: iconTint,
+            backgroundColor: scheduledToday ? iconTint : tokens.surfaceElevated,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <MaterialIcons name={iconName} size={iconSize} color={habitColor} />
+          <MaterialIcons
+            name={iconName}
+            size={iconSize}
+            color={scheduledToday ? habitColor : tokens.iconMuted}
+          />
         </View>
       </Pressable>
+      {!scheduledToday ? (
+        <Text className="mt-1 text-[10px] font-medium" style={{ color: tokens.textMuted }}>
+          Rest day
+        </Text>
+      ) : null}
       {showStreak && streak > 0 && (
         <Text className="mt-0.5 text-xs font-medium text-amber-500">
           {streak > 2 ? '🔥' : '⚡'} {streak}

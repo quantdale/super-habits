@@ -8,6 +8,7 @@ import type {
 const dataMocks = vi.hoisted(() => ({
   createLinkedActionEvent: vi.fn(),
   createLinkedActionExecution: vi.fn(),
+  getAppliedHabitIncrementExecution: vi.fn(),
   getAppliedHabitDayCalorieExecution: vi.fn(),
   getLinkedActionEvent: vi.fn(),
   getLinkedActionExecutionByChainFingerprint: vi.fn(),
@@ -56,6 +57,7 @@ function buildRule(
 describe('core/linked-actions/linkedActions.engine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dataMocks.getAppliedHabitIncrementExecution.mockResolvedValue(null);
     dataMocks.getAppliedHabitDayCalorieExecution.mockResolvedValue(null);
     dataMocks.getLinkedActionEvent.mockResolvedValue(null);
     dataMocks.getLinkedActionExecutionByRuleAndSourceEvent.mockResolvedValue(null);
@@ -176,6 +178,81 @@ describe('core/linked-actions/linkedActions.engine', () => {
       targetEntityType: 'habit',
       targetEntityId: 'habit_2',
     });
+  });
+
+  it('deduplicates fresh source events for the same habit increment day', async () => {
+    const priorExecution: LinkedActionExecutionRecord = {
+      id: 'lexec_habit_increment',
+      ruleId: 'link_todo_habit_increment',
+      sourceEventId: 'levt_first',
+      chainId: 'lchain_first',
+      rootEventId: 'levt_first',
+      originRuleId: null,
+      effectType: 'habit.increment',
+      effectFingerprint: 'fingerprint',
+      status: 'applied',
+      targetFeature: 'habits',
+      targetEntityType: 'habit',
+      targetEntityId: 'habit_2',
+      producedEntityType: null,
+      producedEntityId: null,
+      noticePayload: null,
+      errorMessage: null,
+      createdAt: '2026-04-14T00:00:00.000Z',
+      updatedAt: '2026-04-14T00:00:00.000Z',
+    };
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([
+      buildRule({
+        id: 'link_todo_habit_increment',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: 'habit_2',
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
+        },
+        rawTargetFeature: 'habits',
+        rawTargetEntityType: 'habit',
+        rawEffectType: 'habit.increment',
+      }),
+    ]);
+    dataMocks.getAppliedHabitIncrementExecution
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(priorExecution);
+
+    const executor = vi.fn().mockResolvedValue({ status: 'applied', targetLabel: 'Hydrate' });
+    const engine = new LinkedActionsEngine({ effectRegistry: { 'habit.increment': executor } });
+    const source = {
+      feature: 'todos' as const,
+      entityType: 'todo' as const,
+      entityId: 'todo_1',
+      triggerType: 'todo.completed' as const,
+      sourceDateKey: '2026-04-14',
+    };
+
+    const first = await engine.processSourceAction({ ...source, eventId: 'levt_first' });
+    const second = await engine.processSourceAction({ ...source, eventId: 'levt_second' });
+
+    expect(first.effects[0]?.status).toBe('applied');
+    expect(second.effects[0]).toMatchObject({
+      status: 'duplicate',
+      reason: 'source_identity_already_executed',
+      executionId: 'lexec_habit_increment',
+    });
+    expect(executor).toHaveBeenCalledTimes(1);
+
+    const nextDay = await engine.processSourceAction({
+      ...source,
+      eventId: 'levt_next_day',
+      sourceDateKey: '2026-04-15',
+    });
+
+    expect(nextDay.effects[0]?.status).toBe('applied');
+    expect(executor).toHaveBeenCalledTimes(2);
   });
 
   it('returns duplicate results when the same source event already executed a rule', async () => {

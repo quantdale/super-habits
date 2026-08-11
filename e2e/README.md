@@ -60,7 +60,7 @@ The journeys layer simulates how a real person uses the app over time — create
 - **Session scoping.** One `test.describe.serial` block per journey file, one shared `page`, a single `clearDatabase()` + seed at the start, then ordered steps. A failed step aborts the rest of that journey file only. Do not `clearDatabase()` inside a journey that must accumulate state.
 - **Fixtures.** Named volumes shared with the integration level: `SMALL` (empty/1–3 rows), `TYPICAL` (~14 days), `HEAVY` (~90 days, ≥200 todos, ≥600 calorie entries). Heavy fixtures are seeded via `page.evaluate()` through the real data layers, not clicked.
 - **Oracles.** Mutating steps assert a triple: the acting surface's UI, an independent surface (Overview aggregate, Settings eligibility, heatmap), and persisted state after a reload — plus a **negative oracle** for what must _not_ have changed.
-- **Quarantined steps.** Two decided contracts the application does not yet satisfy run as `test.fixme()` and are tracked in `docs/testing/known-gaps.md` (CG-1 day-rollover freshness → `fix-day-rollover-refresh`; CG-2 restore emptiness → `fix-restore-emptiness-counts-deleted-rows`). They are released by those companion changes, never weakened here.
+- **Quarantined steps.** The remaining decided performance contracts run as `test.fixme()` and are tracked in `docs/testing/known-gaps.md` (CG-4 recurring section-switch latency and CG-5 HEAVY diary search). Their strict assertions remain in place until the measured thresholds pass; released correctness contracts such as CG-1 day-rollover and CG-2 restore emptiness stay unquarantined.
 
 See `docs/testing/known-gaps.md` and the change's `design.md` for the full model.
 
@@ -129,8 +129,8 @@ defaults unchanged (`8081` → `dist/`), the sync lane passes
 
 On a standard `dist/` build the remote-boundary steps stay runtime-gated
 (`test.fixme(!<boundaryDetected>, …)` — J4/J5 already were; J3's reconnect-push
-step is now gated the same way) and show as skipped there; J5's CG-2 branch
-remains quarantined pending `fix-restore-emptiness-counts-deleted-rows`.
+step is now gated the same way) and show as skipped there. The real restore and
+reconnect assertions run in the `journeys-sync` lane against `dist-sync/`.
 
 ## Audit and Failure Handling
 

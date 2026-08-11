@@ -9,10 +9,15 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Todos'
+- swipe:
+    direction: LEFT
 - tapOn: 'Add task'
 - tapOn: 'Title'
 - inputText: 'Native persistence todo'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Add task'
+    direction: DOWN
 - tapOn: 'Add task'
 - extendedWaitUntil:
     visible: 'Native persistence todo'
@@ -22,5 +27,6 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Todos'
+- swipe:
+    direction: LEFT
 - assertVisible: 'Native persistence todo'

@@ -36,6 +36,7 @@ export function useForegroundRefresh(onRefresh: () => void | Promise<void>) {
 export function useActiveForegroundRefresh(
   isActive: boolean,
   onRefresh: () => void | Promise<void>,
+  dayGeneration = 0,
 ) {
   const handleRefresh = useCallback(() => {
     void onRefresh();
@@ -45,7 +46,7 @@ export function useActiveForegroundRefresh(
     if (isActive) {
       handleRefresh();
     }
-  }, [isActive, handleRefresh]);
+  }, [dayGeneration, isActive, handleRefresh]);
 
   useForegroundRefresh(handleRefresh);
 }

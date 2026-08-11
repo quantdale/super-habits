@@ -15,8 +15,7 @@ import { seedSql } from '../helpers/seed';
  * imported rows, the disclosures shown, and — critically — that habit
  * completion history, saved meals, pomodoro sessions and workout logs did NOT
  * come back, so streaks read 0. A third branch covers D10's decided contract
- * on a device holding only soft-deleted rows (quarantined per D13, pending
- * `fix-restore-emptiness-counts-deleted-rows`).
+ * on a device holding only soft-deleted rows.
  *
  * Restore ROUND-TRIP / remote boundary: the restore flow requires a
  * Supabase-backed remote to restore FROM. That boundary only exists in the
@@ -222,42 +221,6 @@ async function installMockRemoteBackup(page: Page): Promise<void> {
   await page.route('**/*.supabase.co/**', handleDummySupabaseRequest);
 }
 
-/**
- * Disable the app's service worker for the whole journey via `addInitScript`.
- *
- * FINDING (see report): the app's Workbox SW (`public/sw.js`) breaks the
- * restore round-trip in the browser. The restore eligibility check issues a
- * cross-origin GET (`/rest/v1/<entity>?select=updated_at&...`) that the SW
- * routes through its `fetch` handler, which does `caches.match → fetch →
- * cache.put → return`. When the cross-origin fetch/cache fails, the handler's
- * `.catch(() => cached)` resolves `respondWith(undefined)`, producing
- * `net::ERR_FAILED` / "TypeError: Failed to fetch" — so `getRestorePreview()`
- * reports `remoteState: 'error'` and the restore prompt never appears. This
- * makes restore unusable on the web PWA whenever the SW is active.
- *
- * This is a test-side mitigation (no app change, no weakened assertion): the
- * SW is a shell-caching concern; restore is a data concern. Stubbing it out
- * lets the journey observe the restore contract. The fix belongs in the app
- * (e.g. `respondWith(cached ?? fetch(event.request))` or a SW bypass for
- * cross-origin data requests) and should be filed separately.
- */
-async function stubOutServiceWorker(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'serviceWorker', {
-      value: {
-        register: () => Promise.resolve({}),
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        getRegistrations: () => Promise.resolve([]),
-        getRegistration: () => Promise.resolve(undefined),
-        controller: null,
-        ready: Promise.resolve(undefined),
-      },
-      configurable: true,
-    });
-  });
-}
-
 // --- SQL oracles ------------------------------------------------------------
 
 const EMPTY_DEVICE_SQL = `
@@ -308,11 +271,6 @@ defineJourney({
         // The mock must be installed before the first app load so bootstrap's
         // getRestorePreview() can discover the backup on the dist-sync/ lane.
         await installMockRemoteBackup(page);
-        // The app's Workbox SW breaks cross-origin restore GETs (see
-        // stubOutServiceWorker). Disable it before the app ever loads so the
-        // restore contract is observable.
-        await stubOutServiceWorker(page);
-
         await resetAll(page);
         await returnToApp(page);
 
@@ -494,22 +452,15 @@ defineJourney({
       },
     },
     {
-      name: 'CG-2: a device holding only soft-deleted rows is not empty (decided contract, quarantined)',
+      name: 'CG-2: a device holding only soft-deleted rows is not empty (decided contract)',
       run: async ({ page }) => {
-        // CG-2 (D10, quarantined per D13): the decided contract is that a
+        // CG-2 (D10): the decided contract is that a
         // device which has EVER held sync-backed rows is not empty, so a
         // device whose only synced rows are soft-deleted must NOT be prompted
         // and must NOT accept a restore (a stale backup would resurrect the
-        // user's deleted todo). Current code counts only `deleted_at IS NULL`
-        // rows in getLocalSyncBackedCounts(), so it sees this device as empty.
-        // Companion change: fix-restore-emptiness-counts-deleted-rows
-        // (docs/testing/known-gaps.md, CG-2). Release the quarantine there,
-        // never here. Also needs the dist-sync/ remote lane (task 6.1a) for
-        // the prompt boundary.
-        test.fixme(
-          true,
-          'CG-2 decided contract not implemented yet: fix-restore-emptiness-counts-deleted-rows (also needs the dist-sync/ lane, task 6.1a)',
-        );
+        // user's deleted todo). The count includes tombstones, so this device
+        // is non-empty. The branch runs against the remote boundary in the
+        // journeys-sync lane (task 6.1a).
 
         await resetAll(page);
         await returnToApp(page);

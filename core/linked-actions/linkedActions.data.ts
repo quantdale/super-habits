@@ -480,6 +480,35 @@ export async function getAppliedHabitDayCalorieExecution(
   return row ? normalizeLinkedActionExecutionRow(row) : null;
 }
 
+export async function getAppliedHabitIncrementExecution(
+  ruleId: string,
+  sourceFeature: LinkedActionFeature,
+  sourceEntityType: LinkedActionSourceEntityType,
+  sourceEntityId: string,
+  triggerType: LinkedActionTriggerType,
+  sourceDateKey: string,
+): Promise<LinkedActionExecutionRecord | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<LinkedActionExecutionRow>(
+    `SELECT e.*
+     FROM linked_action_executions e
+     INNER JOIN linked_action_events ev
+       ON ev.id = e.source_event_id
+     WHERE e.rule_id = ?
+       AND e.effect_type = 'habit.increment'
+       AND e.status = 'applied'
+       AND ev.source_feature = ?
+       AND ev.source_entity_type = ?
+       AND ev.source_entity_id = ?
+       AND ev.trigger_type = ?
+       AND ev.source_date_key = ?
+     ORDER BY e.created_at DESC
+     LIMIT 1`,
+    [ruleId, sourceFeature, sourceEntityType, sourceEntityId, triggerType, sourceDateKey],
+  );
+  return row ? normalizeLinkedActionExecutionRow(row) : null;
+}
+
 export async function createLinkedActionExecution(
   execution: Omit<LinkedActionExecutionRecord, 'id' | 'createdAt' | 'updatedAt'> & {
     id?: string;

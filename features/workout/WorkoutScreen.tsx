@@ -8,6 +8,7 @@ import { useCommandLauncherSuppressed } from '@/features/command/CommandCenterPr
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
@@ -90,6 +91,7 @@ function RoutineSwipeRow({
 
 export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.workout.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [name, setName] = useState('');
@@ -115,7 +117,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
   }, []);
 
-  useActiveForegroundRefresh(isActive, refresh);
+  useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   const onCreate = async () => {
     const err = validateRoutineName(name);

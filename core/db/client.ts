@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
+import { timestampToLocalDateKey, toDateKey } from '@/lib/time';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -350,7 +351,42 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_linked_action_executions_chain
       ON linked_action_executions (chain_id, created_at DESC);
-    `);
+      `);
+    });
+  }
+  if (version < 12) {
+    await applyMigration(db, 12, async () => {
+      await addColumnIfMissing(db, 'habits', 'rule_history', "TEXT NOT NULL DEFAULT '[]'");
+
+      const habits = await db.getAllAsync<{
+        id: string;
+        target_per_day: number;
+        created_at: string;
+        rule_history: string | null;
+      }>('SELECT id, target_per_day, created_at, rule_history FROM habits');
+
+      for (const habit of habits) {
+        if (habit.rule_history && habit.rule_history.trim() !== '[]') continue;
+
+        const createdAt = new Date(habit.created_at);
+        const effectiveFromDate = Number.isNaN(createdAt.getTime())
+          ? toDateKey()
+          : timestampToLocalDateKey(habit.created_at);
+        const targetPerDay =
+          Number.isInteger(habit.target_per_day) && habit.target_per_day > 0
+            ? habit.target_per_day
+            : 1;
+        await db.runAsync('UPDATE habits SET rule_history = ? WHERE id = ?', [
+          JSON.stringify([
+            {
+              effective_from_date: effectiveFromDate,
+              weekdays: [1, 2, 3, 4, 5, 6, 7],
+              target_per_day: targetPerDay,
+            },
+          ]),
+          habit.id,
+        ]);
+      }
     });
   }
 }

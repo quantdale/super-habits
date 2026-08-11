@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { Button } from '@/core/ui/Button';
@@ -8,6 +9,7 @@ import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { SavedMealChips } from './SavedMealChips';
+import { filterSavedMeals } from './calories.domain';
 import type { CalorieEntry, MealType, SavedMeal } from './types';
 
 export type MealSection = {
@@ -167,18 +169,169 @@ type CaloriesDiaryViewProps = {
   todayCard: ReactNode;
   recentMeals: SavedMeal[];
   allSavedMeals: SavedMeal[];
-  diarySearch: string;
-  diarySearchMatches: SavedMeal[];
   groupedEntries: MealSection[];
   collapsedMeals: Partial<Record<MealType, boolean>>;
   onSelectSavedMeal: (meal: SavedMeal) => void;
   onBrowseSavedMeals: () => void;
-  onDiarySearchChange: (value: string) => void;
-  onManualAdd: () => void;
+  onManualAdd: (query: string) => void;
   onToggleMealGroup: (mealType: MealType) => void;
   onEditEntry: (entry: CalorieEntry) => void;
   onDeleteEntry: (entry: CalorieEntry) => void;
 };
+
+const DiaryQuickAddSearch = memo(function DiaryQuickAddSearch({
+  accentColor,
+  allSavedMeals,
+  onSelectSavedMeal,
+  onBrowseSavedMeals,
+  onManualAdd,
+}: {
+  accentColor: string;
+  allSavedMeals: SavedMeal[];
+  onSelectSavedMeal: (meal: SavedMeal) => void;
+  onBrowseSavedMeals: () => void;
+  onManualAdd: (query: string) => void;
+}) {
+  const { tokens } = useAppTheme();
+  const [query, setQuery] = useState('');
+  const matches = useMemo(() => {
+    if (!query.trim()) return [];
+    return filterSavedMeals(allSavedMeals, query).slice(0, 4);
+  }, [allSavedMeals, query]);
+
+  const handleSelect = (meal: SavedMeal) => {
+    setQuery('');
+    onSelectSavedMeal(meal);
+  };
+
+  return (
+    <>
+      <TextField
+        label="Search saved meals / start with a food name"
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Chicken breast"
+      />
+
+      {query.trim() ? (
+        matches.length > 0 ? (
+          <View className="mb-3 gap-2">
+            <Text className="text-xs font-semibold uppercase" style={{ color: tokens.textMuted }}>
+              Matches
+            </Text>
+            {matches.map((meal) => (
+              <Pressable
+                key={meal.id}
+                onPress={() => handleSelect(meal)}
+                className="rounded-2xl border px-4 py-3"
+                style={{
+                  borderColor: tokens.border,
+                  backgroundColor: tokens.surfaceElevated,
+                }}
+              >
+                <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+                  {meal.food_name}
+                </Text>
+                <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+                  {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fats}g
+                  {meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ''}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View
+            className="mb-3 rounded-2xl border px-4 py-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          >
+            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+              No saved meal matches “{query.trim()}”. Use Manual add to log it as a new food.
+            </Text>
+          </View>
+        )
+      ) : null}
+
+      <View className="flex-row gap-2">
+        <View className="flex-1">
+          <Button
+            label="Browse saved"
+            variant="ghost"
+            disabled={allSavedMeals.length === 0}
+            onPress={onBrowseSavedMeals}
+          />
+        </View>
+        <View className="flex-1">
+          <Button label="Manual add" onPress={() => onManualAdd(query)} color={accentColor} />
+        </View>
+      </View>
+    </>
+  );
+});
+
+const DiaryQuickAdd = memo(function DiaryQuickAdd({
+  accentColor,
+  allSavedMeals,
+  recentMeals,
+  onSelectSavedMeal,
+  onBrowseSavedMeals,
+  onManualAdd,
+}: {
+  accentColor: string;
+  allSavedMeals: SavedMeal[];
+  recentMeals: SavedMeal[];
+  onSelectSavedMeal: (meal: SavedMeal) => void;
+  onBrowseSavedMeals: () => void;
+  onManualAdd: (query: string) => void;
+}) {
+  const { tokens } = useAppTheme();
+
+  return (
+    <ScreenSection>
+      <Card
+        variant="header"
+        accentColor={accentColor}
+        headerTitle="Quick add"
+        headerSubtitle="Recent foods, saved meals, search-first add, and manual entry."
+        headerRight={<MaterialIcons name="playlist-add" size={22} color={tokens.textOnAccent} />}
+        className="mb-0"
+      >
+        <SavedMealChips meals={recentMeals} onSelect={onSelectSavedMeal} />
+        <DiaryQuickAddSearch
+          accentColor={accentColor}
+          allSavedMeals={allSavedMeals}
+          onSelectSavedMeal={onSelectSavedMeal}
+          onBrowseSavedMeals={onBrowseSavedMeals}
+          onManualAdd={onManualAdd}
+        />
+      </Card>
+    </ScreenSection>
+  );
+}, areDiaryQuickAddDataEqual);
+
+function areDiaryQuickAddDataEqual(
+  previous: Readonly<{
+    accentColor: string;
+    allSavedMeals: SavedMeal[];
+    recentMeals: SavedMeal[];
+    onSelectSavedMeal: (meal: SavedMeal) => void;
+    onBrowseSavedMeals: () => void;
+    onManualAdd: (query: string) => void;
+  }>,
+  next: Readonly<{
+    accentColor: string;
+    allSavedMeals: SavedMeal[];
+    recentMeals: SavedMeal[];
+    onSelectSavedMeal: (meal: SavedMeal) => void;
+    onBrowseSavedMeals: () => void;
+    onManualAdd: (query: string) => void;
+  }>,
+): boolean {
+  return (
+    previous.accentColor === next.accentColor &&
+    previous.allSavedMeals === next.allSavedMeals &&
+    previous.recentMeals === next.recentMeals
+  );
+}
 
 export function CaloriesDiaryView({
   accentColor,
@@ -186,13 +339,10 @@ export function CaloriesDiaryView({
   todayCard,
   recentMeals,
   allSavedMeals,
-  diarySearch,
-  diarySearchMatches,
   groupedEntries,
   collapsedMeals,
   onSelectSavedMeal,
   onBrowseSavedMeals,
-  onDiarySearchChange,
   onManualAdd,
   onToggleMealGroup,
   onEditEntry,
@@ -204,80 +354,14 @@ export function CaloriesDiaryView({
     <>
       <ScreenSection>{todayCard}</ScreenSection>
 
-      <ScreenSection>
-        <Card
-          variant="header"
-          accentColor={accentColor}
-          headerTitle="Quick add"
-          headerSubtitle="Recent foods, saved meals, search-first add, and manual entry."
-          headerRight={<MaterialIcons name="playlist-add" size={22} color={tokens.textOnAccent} />}
-          className="mb-0"
-        >
-          <SavedMealChips meals={recentMeals} onSelect={onSelectSavedMeal} />
-          <TextField
-            label="Search saved meals / start with a food name"
-            value={diarySearch}
-            onChangeText={onDiarySearchChange}
-            placeholder="Chicken breast"
-          />
-
-          {diarySearch.trim() ? (
-            diarySearchMatches.length > 0 ? (
-              <View className="mb-3 gap-2">
-                <Text
-                  className="text-xs font-semibold uppercase"
-                  style={{ color: tokens.textMuted }}
-                >
-                  Matches
-                </Text>
-                {diarySearchMatches.map((meal) => (
-                  <Pressable
-                    key={meal.id}
-                    onPress={() => onSelectSavedMeal(meal)}
-                    className="rounded-2xl border px-4 py-3"
-                    style={{
-                      borderColor: tokens.border,
-                      backgroundColor: tokens.surfaceElevated,
-                    }}
-                  >
-                    <Text className="text-sm font-medium" style={{ color: tokens.text }}>
-                      {meal.food_name}
-                    </Text>
-                    <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                      {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fats}g
-                      {meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ''}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : (
-              <View
-                className="mb-3 rounded-2xl border px-4 py-3"
-                style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-              >
-                <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                  No saved meal matches “{diarySearch.trim()}”. Use Manual add to log it as a new
-                  food.
-                </Text>
-              </View>
-            )
-          ) : null}
-
-          <View className="flex-row gap-2">
-            <View className="flex-1">
-              <Button
-                label="Browse saved"
-                variant="ghost"
-                disabled={allSavedMeals.length === 0}
-                onPress={onBrowseSavedMeals}
-              />
-            </View>
-            <View className="flex-1">
-              <Button label="Manual add" onPress={onManualAdd} color={accentColor} />
-            </View>
-          </View>
-        </Card>
-      </ScreenSection>
+      <DiaryQuickAdd
+        accentColor={accentColor}
+        allSavedMeals={allSavedMeals}
+        recentMeals={recentMeals}
+        onSelectSavedMeal={onSelectSavedMeal}
+        onBrowseSavedMeals={onBrowseSavedMeals}
+        onManualAdd={onManualAdd}
+      />
 
       <ScreenSection>
         {groupedEntries.length === 0 ? (

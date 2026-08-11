@@ -3,6 +3,7 @@ import {
   getTodayDateKey,
   getTomorrowDateKey,
   findMissingRecurrenceIds,
+  createSubmitGuard,
 } from '@/features/todos/todos.domain';
 
 describe('getTodayDateKey', () => {
@@ -57,5 +58,28 @@ describe('findMissingRecurrenceIds', () => {
     const missing = findMissingRecurrenceIds(todos, '2025-01-02');
     expect(missing).toHaveLength(1);
     expect(missing).toContain('rec_002');
+  });
+});
+
+describe('createSubmitGuard', () => {
+  it('allows one submission and rejects re-entry until it finishes', () => {
+    const guard = createSubmitGuard();
+
+    expect(guard.tryStart()).toBe(true);
+    expect(guard.tryStart()).toBe(false);
+
+    guard.finish();
+
+    expect(guard.tryStart()).toBe(true);
+  });
+
+  it('can be finished after validation fails and used again', () => {
+    const guard = createSubmitGuard();
+
+    expect(guard.tryStart()).toBe(true);
+    guard.finish();
+
+    expect(guard.tryStart()).toBe(true);
+    expect(guard.tryStart()).toBe(false);
   });
 });

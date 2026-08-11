@@ -8,6 +8,7 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { PillChip } from '@/core/ui/PillChip';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useCommandLauncherSuppressed } from '@/features/command/CommandCenterProvider';
 import {
@@ -22,6 +23,7 @@ import type { PomodoroSession } from './types';
 import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
 import {
   buildPomodoroHeatmapDays,
+  applySettingsToTimerState,
   calculateGrowthProgress,
   computePomodoroStreakFromHeatmapDays,
   DEFAULT_SETTINGS,
@@ -55,6 +57,7 @@ function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
 
 export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const dayGeneration = useDayRolloverGeneration();
   const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
   const [currentMode, setCurrentMode] = useState<PomodoroMode>('focus');
@@ -86,19 +89,23 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   });
   useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
 
-  useEffect(() => {
-    void (async () => {
-      const s = await getPomodoroSettings();
-      setSettings(s);
-      const d = getModeDuration('focus', s);
-      setTotalSeconds(d);
-      setRemaining(d);
-    })();
-  }, []);
+  const loadSettings = useCallback(async () => {
+    const nextSettings = await getPomodoroSettings();
+    const nextTimer = applySettingsToTimerState(nextSettings, {
+      currentMode,
+      isRunning,
+      isPaused,
+      totalSeconds,
+      remaining,
+    });
+    setSettings(nextTimer.settings);
+    if (!isRunning && !isPaused) {
+      setTotalSeconds(nextTimer.totalSeconds);
+      setRemaining(nextTimer.remaining);
+      totalSecondsRef.current = nextTimer.totalSeconds;
+    }
+  }, [currentMode, isPaused, isRunning, remaining, totalSeconds]);
 
-  // Loaded on first activation and on every subsequent activation/foreground
-  // via useActiveForegroundRefresh — no separate mount effect, so the history
-  // is not fetched twice on first mount.
   const loadHistory = useCallback(async () => {
     const start364 = new Date();
     start364.setDate(start364.getDate() - 363);
@@ -109,7 +116,11 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
   }, []);
 
-  useActiveForegroundRefresh(isActive, loadHistory);
+  const refresh = useCallback(async () => {
+    await Promise.all([loadHistory(), loadSettings()]);
+  }, [loadHistory, loadSettings]);
+
+  useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   useEffect(() => {
     if (!isRunning) return;

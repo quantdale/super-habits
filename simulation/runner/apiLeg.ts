@@ -254,8 +254,19 @@ export async function execCreateTodo(page: Page, args: Record<string, unknown>):
 export async function execCreateHabit(page: Page, args: Record<string, unknown>): Promise<string> {
   resolveSpec('createHabit', args);
   const now = new Date().toISOString();
+  const effectiveFromDate = await pageDateKey(page);
   const id = makeId('habit');
   const target = Number(args.targetPerDay ?? 1);
+  const weekdays = [
+    ...new Set(
+      (Array.isArray(args.weekdays) ? args.weekdays : [1, 2, 3, 4, 5, 6, 7])
+        .map(Number)
+        .filter((weekday) => Number.isInteger(weekday) && weekday >= 1 && weekday <= 7),
+    ),
+  ].sort((a, b) => a - b);
+  const ruleHistory = JSON.stringify([
+    { effective_from_date: effectiveFromDate, weekdays, target_per_day: target },
+  ]);
   await withDb(
     page,
     insertSql(
@@ -268,6 +279,7 @@ export async function execCreateHabit(page: Page, args: Record<string, unknown>)
         'category',
         'icon',
         'color',
+        'rule_history',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -280,13 +292,14 @@ export async function execCreateHabit(page: Page, args: Record<string, unknown>)
         esc('anytime'),
         esc('check-circle'),
         esc('#6366f1'),
+        esc(ruleHistory),
         esc(now),
         esc(now),
         'NULL',
       ],
     ),
   );
-  return `createHabit(${JSON.stringify(args.name)}, target=${String(target)})`;
+  return `createHabit(${JSON.stringify(args.name)}, target=${String(target)}, weekdays=${weekdays.join(',')})`;
 }
 
 /** Handler for `tickHabit`: SELECT→INSERT/UPDATE on habit_completions (today). */

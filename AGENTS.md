@@ -42,6 +42,14 @@ For Codex-based workflows, also read: `docs/codex-workflow.md`
 - Use `docs/testing/autonomous-qa.md` and `qa/impact-map.json` for escalation;
   preserve failures and known gaps, never weaken meaningful tests, and do not
   claim completion without validated definition-of-done evidence.
+- New plans declare `Plan-Version: 2` and `Status: ACTIVE`, `BLOCKED`, or
+  `COMPLETED`. Use `npm run agent:plans` to discover plans,
+  `npm run agent:resume -- --plan <path>` for read-only recovery orientation,
+  and `npm run agent:plan:validate -- --plan <path>` before complex-task
+  completion. These tools never create a second task-state store.
+- After suspected compaction or in a fresh session, run the resume command,
+  inspect its Git discrepancy warnings and QA impact, reread relevant files,
+  update the task plan, and continue only from its `Exact next action`.
 - Keep this section stable. Do not put volatile progress for an individual task
   in `AGENTS.md`.
 
@@ -125,7 +133,7 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **11** (`app_meta.db_schema_version`). Next migration: add a new `if (version < 12) { ... }` block.
+- Current stored schema version: **12** (`app_meta.db_schema_version`). Next migration: add a new `if (version < 13) { ... }` block.
 - `core/db/schema.sql` is **stale** (a v4-era snapshot missing 7 of 15 tables) and **reference-only** — it is never executed at runtime. Derive the real schema from the bootstrap DDL + migration blocks in `core/db/client.ts`.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 

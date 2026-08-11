@@ -9,17 +9,36 @@ tags:
     visible: 'Overview'
     timeout: 10000
 - assertVisible: 'Overview'
-- tapOn: 'Todos'
+- swipe:
+    direction: LEFT
 - assertVisible: 'Todos'
-- tapOn: 'Habits'
+- swipe:
+    direction: LEFT
 - assertVisible: 'Habits'
-- tapOn: 'Focus'
+- swipe:
+    direction: LEFT
 - assertVisible: 'Start focus'
-- tapOn: 'Workout'
+- swipe:
+    direction: LEFT
 - assertVisible: 'Workout'
-- tapOn: 'Calories'
+- swipe:
+    direction: LEFT
 - assertVisible: 'Calories'
-- tapOn: 'Overview'
+- swipe:
+    direction: RIGHT
+- assertVisible: 'Workout'
+- swipe:
+    direction: RIGHT
+- assertVisible: 'Start focus'
+- swipe:
+    direction: RIGHT
+- assertVisible: 'Habits'
+- swipe:
+    direction: RIGHT
+- assertVisible: 'Todos'
+- swipe:
+    direction: RIGHT
+- assertVisible: 'Overview'
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Close settings'

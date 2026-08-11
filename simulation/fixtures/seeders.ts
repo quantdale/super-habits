@@ -54,15 +54,26 @@ export function todoStep(
   );
 }
 
-/** Create one habit via the data layer; oracle: exactly one row with name + target. */
-export function habitStep(name: string, targetPerDay = 1): SemanticStep {
+/** Create one habit via the data layer; oracle includes its effective schedule rule. */
+export function habitStep(
+  name: string,
+  targetPerDay = 1,
+  weekdays: readonly number[] = [1, 2, 3, 4, 5, 6, 7],
+): SemanticStep {
+  const normalizedWeekdays = [...new Set(weekdays)].sort((a, b) => a - b);
   return apiStep(
     'createHabit',
-    { name, targetPerDay },
+    { name, targetPerDay, weekdays: normalizedWeekdays },
     {
       kind: 'rows',
-      sql: `SELECT name, target_per_day FROM habits WHERE name = '${esc(name)}' AND deleted_at IS NULL`,
-      expected: [{ name, target_per_day: targetPerDay }],
+      sql: `SELECT name, target_per_day, json_extract(rule_history, '$[0].weekdays') AS scheduled_weekdays FROM habits WHERE name = '${esc(name)}' AND deleted_at IS NULL`,
+      expected: [
+        {
+          name,
+          target_per_day: targetPerDay,
+          scheduled_weekdays: JSON.stringify(normalizedWeekdays),
+        },
+      ],
     },
   );
 }
@@ -139,12 +150,12 @@ export function typicalPreamble(): SemanticStep[] {
   for (let i = 1; i <= 5; i++) {
     steps.push(todoStep(`Task ${i}`, i % 3 === 0 ? 'low' : 'normal'));
   }
-  for (const [name, ticks] of [
-    ['Drink water', 3],
-    ['Walk outside', 1],
-    ['Read 20 minutes', 2],
+  for (const [name, ticks, weekdays] of [
+    ['Drink water', 3, [1, 2, 3, 4, 5, 6, 7]],
+    ['Walk outside', 1, [1, 2, 3, 4, 5]],
+    ['Read 20 minutes', 2, [1, 3, 5]],
   ] as const) {
-    steps.push(habitStep(name, ticks)); // target = today's intended count
+    steps.push(habitStep(name, ticks, weekdays)); // target = today's intended count
     for (let k = 1; k <= ticks; k++) steps.push(habitTickStep(name, k));
   }
   const meals: [string, number, 'breakfast' | 'lunch' | 'dinner' | 'snack'][] = [
@@ -177,14 +188,14 @@ export function heavyPreamble(): SemanticStep[] {
   for (let i = 1; i <= 12; i++) {
     steps.push(todoStep(`Task ${i}`, i % 4 === 0 ? 'urgent' : 'normal'));
   }
-  for (const name of [
-    'Drink water',
-    'Morning stretch',
-    'Read 20 minutes',
-    'Walk outside',
-    'Plan tomorrow',
-  ]) {
-    steps.push(habitStep(name, 1));
+  for (const [name, weekdays] of [
+    ['Drink water', [1, 2, 3, 4, 5, 6, 7]],
+    ['Morning stretch', [1, 2, 3, 4, 5]],
+    ['Weekend reset', [6, 7]],
+    ['Read 20 minutes', [1, 3, 5]],
+    ['Plan tomorrow', [2, 6]],
+  ] as const) {
+    steps.push(habitStep(name, 1, weekdays));
     steps.push(habitTickStep(name, 1));
   }
   const foods = [

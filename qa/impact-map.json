@@ -140,6 +140,27 @@
       "tests": [],
       "journeys": ["native smoke and targeted flows"],
       "broadRegression": true
+    },
+    {
+      "id": "agent-workflow-and-documentation",
+      "patterns": [
+        "AGENTS.md",
+        ".agent/**",
+        ".agents/**",
+        ".codex/**",
+        ".cursor/**",
+        ".github/workflows/ci.yml",
+        "docs/**",
+        "openspec/**",
+        "qa/impact-map.json",
+        "scripts/agent-execplan.mjs",
+        "scripts/qa-impact.mjs",
+        "tests/agent-execplan.test.ts"
+      ],
+      "gates": ["qa:fast"],
+      "tests": ["tests/agent-execplan.test.ts"],
+      "journeys": [],
+      "broadRegression": false
     }
   ]
 }

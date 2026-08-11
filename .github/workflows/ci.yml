@@ -87,6 +87,12 @@ jobs:
       - name: Validate openspec contracts
         run: npm run openspec:validate
 
+      # Historical ExecPlans predate the versioned lifecycle and remain
+      # discoverable without being CI-enforced. New Plan-Version: 2 plans must
+      # be structurally valid before the quality tests run.
+      - name: Validate versioned ExecPlans
+        run: npm run agent:plan:validate:all
+
       # `npm test` is `vitest run`, which runs BOTH configured projects
       # (vitest.config.ts test.projects): the `unit` project AND the
       # real-SQLite `integration` project (parent task 2.4). No separate

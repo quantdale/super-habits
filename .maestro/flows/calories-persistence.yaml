@@ -9,7 +9,16 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Calories'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
 - tapOn: 'Calories entry food'
 - inputText: 'Native breakfast'
 - tapOn: 'Calories entry protein'
@@ -18,7 +27,17 @@ tags:
 - inputText: '50'
 - tapOn: 'Calories entry fat'
 - inputText: '10'
-- tapOn: 'Add entry'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Add entry'
+      index: 1
+    direction: DOWN
+- tapOn:
+    text: 'Add entry'
+    index: 1
+    point: '50%,10%'
+- tapOn: 'Diary'
 - extendedWaitUntil:
     visible: 'Native breakfast'
     timeout: 5000
@@ -27,5 +46,15 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Calories'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Diary'
 - assertVisible: 'Native breakfast'

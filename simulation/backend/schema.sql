@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS public.habits (
   category       TEXT NOT NULL DEFAULT 'anytime', -- anytime | morning | afternoon | evening
   icon           TEXT NOT NULL DEFAULT 'check-circle',
   color          TEXT NOT NULL DEFAULT '#64748b',
+  rule_history   TEXT NOT NULL DEFAULT '[]',       -- JSON effective-dated ISO-weekday rules
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL,
   deleted_at     TEXT

@@ -143,6 +143,7 @@ describe('restore helper writers', () => {
         'morning',
         'check-circle',
         '#22c55e',
+        '[{"effective_from_date":"2026-04-11","weekdays":[1,2,3,4,5,6,7],"target_per_day":3}]',
         '2026-04-11T10:00:00.000Z',
         '2026-04-20T10:00:00.000Z',
         '2026-04-21T00:00:00.000Z',

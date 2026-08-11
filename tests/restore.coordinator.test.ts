@@ -96,9 +96,7 @@ function buildDb(localCounts: Record<string, number>, initialMeta: Record<string
 
   return {
     getFirstAsync: vi.fn(async (sql: string, params?: unknown[]) => {
-      const countMatch = sql.match(
-        /^SELECT COUNT\(\*\) AS total FROM ([a-z_]+) WHERE deleted_at IS NULL$/i,
-      );
+      const countMatch = sql.match(/^SELECT COUNT\(\*\) AS total FROM ([a-z_]+)$/i);
       if (countMatch) {
         const entity = countMatch[1] ?? '';
         return { total: localCounts[entity] ?? 0 };
@@ -279,10 +277,10 @@ describe('core/sync/restore.coordinator', () => {
     expect(preview.startupPromptEligible).toBe(false);
   });
 
-  it('keeps empty-device eligibility when local synced tables have only tombstones', async () => {
+  it('blocks restore when local synced tables contain tombstones', async () => {
     const { getRestorePreview } = await loadCoordinator({
       localCounts: {
-        todos: 0,
+        todos: 1,
         habits: 0,
         calorie_entries: 0,
         workout_routines: 0,
@@ -301,7 +299,10 @@ describe('core/sync/restore.coordinator', () => {
 
     const preview = await getRestorePreview();
 
-    expect(preview.eligibility.kind).toBe('empty_device');
+    expect(preview.eligibility).toMatchObject({
+      kind: 'blocked',
+      reason: 'local_data_present',
+    });
   });
 
   it('returns workout restore as excluded in phase one with a concrete reason', async () => {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   completeTodoFromLinkedAction,
   countPendingTodos,
+  createRecurringInstance,
   listPendingTodos,
   removeTodo,
   saveTodoLinkedActionRules,
@@ -177,9 +178,8 @@ describe('features/todos/todos.data', () => {
           updated_at: '2026-04-16T09:00:00.000Z',
           deleted_at: null,
         })
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ maxOrder: 1 }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+        .mockResolvedValueOnce(null),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 
@@ -190,6 +190,57 @@ describe('features/todos/todos.data', () => {
       expect.stringContaining('INSERT INTO todos'),
       expect.arrayContaining(['rec_1']),
     );
+  });
+
+  it('skips a recurring instance when the same active series/day already exists', async () => {
+    const db = {
+      getFirstAsync: vi.fn(),
+      runAsync: vi.fn().mockResolvedValue({ changes: 0 }),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await createRecurringInstance({
+      title: 'Daily review',
+      notes: null,
+      priority: 'normal',
+      recurrenceId: 'rec_1',
+      dueDate: '2026-04-17',
+    });
+
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE NOT EXISTS'),
+      expect.arrayContaining(['rec_1', '2026-04-17']),
+    );
+    expect(syncEngine.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('inserts and enqueues one recurring instance when the series/day is missing', async () => {
+    const db = {
+      getFirstAsync: vi.fn(),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await createRecurringInstance({
+      title: 'Daily review',
+      notes: null,
+      priority: 'normal',
+      recurrenceId: 'rec_1',
+      dueDate: '2026-04-17',
+    });
+
+    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO todos'),
+      expect.arrayContaining(['rec_1', '2026-04-17']),
+    );
+    expect(syncEngine.enqueue).toHaveBeenCalledTimes(1);
+    expect(syncEngine.enqueue).toHaveBeenCalledWith({
+      entity: 'todos',
+      id: expect.stringMatching(/^todo_/),
+      updatedAt: expect.any(String),
+      operation: 'create',
+    });
   });
 
   it('rejects saving non-empty source rules for recurring todos based on persisted row', async () => {

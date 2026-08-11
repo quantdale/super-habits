@@ -72,6 +72,22 @@ function buildCalendarGrid(days: HeatmapDay[]): (HeatmapDay | null)[][] {
   return weeks;
 }
 
+/**
+ * Build the visible calendar columns while honoring the explicit `weeks`
+ * contract. A date window can need one leading partial column for alignment;
+ * keep the most recent columns when that padding would exceed the requested
+ * width.
+ */
+export function buildHeatmapWeekColumns(
+  days: HeatmapDay[],
+  weeks: number = DEFAULT_WEEKS,
+): (HeatmapDay | null)[][] {
+  const maxDays = weeks * 7;
+  const trimmedDays = days.length > maxDays ? days.slice(-maxDays) : days;
+  const calendarGrid = buildCalendarGrid(trimmedDays);
+  return calendarGrid.length > weeks ? calendarGrid.slice(-weeks) : calendarGrid;
+}
+
 function firstDayInWeek(week: (HeatmapDay | null)[]): HeatmapDay | null {
   for (const d of week) {
     if (d) return d;
@@ -116,13 +132,7 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
     };
   }, []);
 
-  const maxDays = weeks * 7;
-  const trimmedDays = useMemo(
-    () => (days.length > maxDays ? days.slice(-maxDays) : days),
-    [days, maxDays],
-  );
-
-  const weekColumns = useMemo(() => buildCalendarGrid(trimmedDays), [trimmedDays]);
+  const weekColumns = useMemo(() => buildHeatmapWeekColumns(days, weeks), [days, weeks]);
   const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
 
   const footer = label ? (

@@ -1,6 +1,8 @@
 import { test, expect, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
+import { advanceToNextDay, installClock } from './helpers/clock';
+import { expectRows } from './helpers/oracles';
 
 /** Opens add-habit modal via the first time-group + (scoped to Habit groups a11y region). */
 async function openAddHabitModal(page: Page) {
@@ -89,5 +91,122 @@ test.describe('Habits', () => {
     await page.getByText('Delete', { exact: true }).first().click();
     await page.getByText('Delete habit', { exact: true }).last().click({ force: true });
     await expect(page.getByText('Delete this habit').first()).not.toBeVisible();
+  });
+});
+
+test.describe('Scheduled habits', () => {
+  test.beforeEach(async ({ page }) => {
+    await installClock(page, '2026-08-10T12:00:00');
+    await goToTab(page, 'habits');
+    await clearDatabase(page);
+    await goToTab(page, 'habits');
+    await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('creates an M/W/F habit and treats off-days as neutral', async ({ page }) => {
+    await openAddHabitModal(page);
+    await page.getByLabel('Habit name').fill('Gym');
+    await page.getByText('Custom', { exact: true }).click();
+    for (const weekday of ['Tuesday', 'Thursday', 'Saturday', 'Sunday']) {
+      await page.getByRole('checkbox', { name: `${weekday} scheduled` }).click();
+    }
+    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+
+    await expect(page.getByText('Mon / Wed / Fri', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', {
+        name: 'Gym: 0 of 1 today. Tap to add one. Long press to remove one.',
+      }),
+    ).toBeVisible();
+
+    await advanceToNextDay(page);
+    await expect(
+      page.getByRole('button', { name: 'Gym: not scheduled today. Rest day.' }),
+    ).toBeVisible();
+    await expect(page.getByText('Rest', { exact: true })).toBeVisible();
+
+    await advanceToNextDay(page);
+    const gymButton = page.getByRole('button', {
+      name: 'Gym: 0 of 1 today. Tap to add one. Long press to remove one.',
+    });
+    await expect(gymButton).toBeVisible();
+    await gymButton.click();
+    await expect(
+      page.getByRole('button', {
+        name: 'Gym: 1 of 1 today. Tap to add one. Long press to remove one.',
+      }),
+    ).toBeVisible();
+  });
+
+  test('schedule edits remain visible after reload', async ({ page }) => {
+    await openAddHabitModal(page);
+    await page.getByLabel('Habit name').fill('Study weekdays');
+    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Every day', { exact: true })).toBeVisible();
+
+    await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
+    await page.getByLabel('Enter habit edit mode').click();
+    await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
+    await page
+      .getByLabel('Habit groups')
+      .getByText('Edit', { exact: true })
+      .first()
+      .click({ force: true });
+    await page.getByText('Weekdays', { exact: true }).click();
+    await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
+
+    await page.reload();
+    await page.waitForLoadState('load');
+    await goToTab(page, 'habits');
+    await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
+  });
+
+  test('target edits keep a prior completed date complete', async ({ page }) => {
+    await openAddHabitModal(page);
+    await page.getByLabel('Habit name').fill('Read target history');
+    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Read target history', { exact: true })).toBeVisible();
+
+    await page
+      .getByRole('button', {
+        name: 'Read target history: 0 of 1 today. Tap to add one. Long press to remove one.',
+      })
+      .click();
+    await expect(
+      page.getByRole('button', {
+        name: 'Read target history: 1 of 1 today. Tap to add one. Long press to remove one.',
+      }),
+    ).toBeVisible();
+
+    await advanceToNextDay(page);
+    await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
+    await page.getByLabel('Enter habit edit mode').click();
+    await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
+    await page.getByLabel('Habit groups').getByText('Edit', { exact: true }).first().click();
+    await page.getByLabel('Target per day', { exact: true }).fill('2');
+    await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Read target history', { exact: true })).toBeVisible();
+
+    await expectRows(page, "SELECT count FROM habit_completions WHERE date_key = '2026-08-10'", [
+      { count: 1 },
+    ]);
+    await expectRows(
+      page,
+      "SELECT rule_history FROM habits WHERE name = 'Read target history'",
+      (rows) => {
+        expect(rows).toHaveLength(1);
+        const history = JSON.parse(String(rows[0].rule_history)) as {
+          effective_from_date: string;
+          target_per_day: number;
+        }[];
+        expect(history).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ effective_from_date: '2026-08-10', target_per_day: 1 }),
+            expect.objectContaining({ effective_from_date: '2026-08-11', target_per_day: 2 }),
+          ]),
+        );
+      },
+    );
   });
 });

@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
+import { memo } from 'react';
 import { RectButton } from 'react-native-gesture-handler';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
@@ -19,7 +20,7 @@ type Props = {
   cardWidth?: number;
 };
 
-export function TodoItem({
+export const TodoItem = memo(function TodoItem({
   todo,
   onLongPress,
   isActive,
@@ -194,5 +195,19 @@ export function TodoItem({
         </View>
       </View>
     </SwipeableCard>
+  );
+}, areTodoItemPropsEqual);
+
+function areTodoItemPropsEqual(previous: Props, next: Props): boolean {
+  return (
+    previous.todo.id === next.todo.id &&
+    previous.todo.updated_at === next.todo.updated_at &&
+    previous.todo.completed === next.todo.completed &&
+    previous.todo.sort_order === next.todo.sort_order &&
+    previous.todo.due_date === next.todo.due_date &&
+    previous.todo.deleted_at === next.todo.deleted_at &&
+    previous.viewMode === next.viewMode &&
+    previous.cardWidth === next.cardWidth &&
+    previous.isActive === next.isActive
   );
 }

@@ -92,7 +92,7 @@ describe('features/command/ask.retrieval', () => {
 
       const facts = await retrieveHabitStreak('drink water');
 
-      expect(getCompletionHistory).toHaveBeenCalledWith('habit_1', 365);
+      expect(getCompletionHistory).toHaveBeenCalledWith('habit_1');
       expect(facts).toEqual({
         scope: 'single',
         habitName: 'Drink Water',

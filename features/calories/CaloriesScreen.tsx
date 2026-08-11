@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { Modal } from '@/core/ui/Modal';
@@ -28,7 +29,6 @@ import {
   buildDailyTrend,
   calculateGoalProgress,
   caloriesTotal,
-  filterSavedMeals,
   kcalFromMacros,
 } from '@/features/calories/calories.domain';
 import type {
@@ -118,6 +118,7 @@ function ViewModeSwitch({
 
 export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.calories.text;
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
@@ -138,32 +139,40 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<CaloriesViewMode>('form');
-  const [diarySearch, setDiarySearch] = useState('');
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
 
   const refresh = useCallback(async () => {
-    const nextEntries = await listCalorieEntries();
-    setEntries(nextEntries);
-
     const startYear = new Date();
     startYear.setDate(startYear.getDate() - 364);
-    const [recent, all, rangeYear, savedGoal] = await Promise.all([
-      listRecentSavedMeals(5),
-      searchSavedMeals(''),
-      getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date())),
-      getCalorieGoal(),
+
+    // The diary's saved-meal search is interactive as soon as the Calories
+    // section appears. Start its small catalog independently of the heavier
+    // entry/summary reads and publish it as soon as it is ready so an early
+    // search never waits for unrelated aggregate work.
+    const entriesPromise = listCalorieEntries();
+    const savedMealsPromise = Promise.all([listRecentSavedMeals(5), searchSavedMeals('')]);
+    const summaryPromise = getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date()));
+    const goalPromise = getCalorieGoal();
+
+    const [recent, all] = await savedMealsPromise;
+    setRecentMeals(recent);
+    setAllSavedMeals(all);
+
+    const [nextEntries, rangeYear, savedGoal] = await Promise.all([
+      entriesPromise,
+      summaryPromise,
+      goalPromise,
     ]);
     const activityDaysYear = buildCalorieActivityDays(rangeYear, savedGoal.calories, 365);
 
-    setRecentMeals(recent);
-    setAllSavedMeals(all);
+    setEntries(nextEntries);
     setSummary364(rangeYear);
     setCalorieActivityDays(activityDaysYear);
     setCalorieHeatmapDays(buildCalorieHeatmapDays(rangeYear, savedGoal.calories, 365));
     setGoal(savedGoal);
   }, []);
 
-  useActiveForegroundRefresh(isActive, refresh);
+  useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   useEffect(() => {
     let active = true;
@@ -211,10 +220,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       }).filter((section) => section.entries.length > 0),
     [entries],
   );
-  const diarySearchMatches = useMemo(() => {
-    if (!diarySearch.trim()) return [];
-    return filterSavedMeals(allSavedMeals, diarySearch).slice(0, 4);
-  }, [allSavedMeals, diarySearch]);
   const hasCalorieStripActivity = calorieActivityDays.some((day) => day.active);
   const consistencyText = hasCalorieStripActivity
     ? `${goalProgress.percent}% of daily goal today`
@@ -289,9 +294,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
   const setAndPersistViewMode = useCallback((nextMode: CaloriesViewMode) => {
     setViewMode(nextMode);
-    if (nextMode === 'form') {
-      setDiarySearch('');
-    }
     void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
   }, []);
 
@@ -308,7 +310,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
   const handleSelectSavedMeal = (meal: SavedMeal) => {
     applySavedMealToDraft(meal);
-    setDiarySearch('');
     if (viewMode === 'diary') {
       setEntryModalVisible(true);
     }
@@ -326,8 +327,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setEntryModalVisible(true);
   };
 
-  const openManualAddModal = () => {
-    const prefilledFood = diarySearch.trim();
+  const openManualAddModal = (query = '') => {
+    const prefilledFood = query.trim();
     resetCalorieForm();
     if (prefilledFood) {
       setFood(prefilledFood);
@@ -400,7 +401,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
         resetCalorieForm();
         setEntryModalVisible(false);
-        setDiarySearch('');
         await refresh();
       } catch (error) {
         const message =
@@ -557,13 +557,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           todayCard={dailySummaryCard}
           recentMeals={recentMeals}
           allSavedMeals={allSavedMeals}
-          diarySearch={diarySearch}
-          diarySearchMatches={diarySearchMatches}
           groupedEntries={groupedEntries}
           collapsedMeals={collapsedMeals}
           onSelectSavedMeal={handleSelectSavedMeal}
           onBrowseSavedMeals={() => setSearchSheetVisible(true)}
-          onDiarySearchChange={setDiarySearch}
           onManualAdd={openManualAddModal}
           onToggleMealGroup={toggleMealGroup}
           onEditEntry={openEntryEditModal}

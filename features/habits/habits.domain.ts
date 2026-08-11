@@ -1,18 +1,244 @@
 import type { HabitCompletion } from './types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
-import { buildDateRange, buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
+import {
+  buildDateRange,
+  buildDateRangeOldestFirst,
+  dateKeyToLocalDate,
+  timestampToLocalDateKey,
+  toDateKey,
+} from '@/lib/time';
 
-function buildEmptyActivityDays(days: number): ActivityDay[] {
-  return buildDateRange(days).map((dateKey) => ({
+export type HabitWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export const ALL_HABIT_WEEKDAYS: readonly HabitWeekday[] = [1, 2, 3, 4, 5, 6, 7];
+export const WEEKDAY_HABIT_WEEKDAYS: readonly HabitWeekday[] = [1, 2, 3, 4, 5];
+export const WEEKEND_HABIT_WEEKDAYS: readonly HabitWeekday[] = [6, 7];
+
+export type HabitSchedulePreset = 'every_day' | 'weekdays' | 'weekends' | 'custom';
+
+export type HabitRule = {
+  effective_from_date: string;
+  weekdays: HabitWeekday[];
+  target_per_day: number;
+};
+
+export type HabitRuleHistoryInput = HabitRule[] | string | null | undefined;
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+function isDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isHabitWeekday(value: number): value is HabitWeekday {
+  return Number.isInteger(value) && value >= 1 && value <= 7;
+}
+
+export function normalizeHabitWeekdays(values: readonly number[]): HabitWeekday[] {
+  return [...new Set(values.filter(isHabitWeekday))].sort((a, b) => a - b);
+}
+
+export function createHabitRule(
+  effectiveFromDate: string,
+  weekdays: readonly number[],
+  targetPerDay: number,
+): HabitRule {
+  const normalizedWeekdays = normalizeHabitWeekdays(weekdays);
+  if (!isDateKey(effectiveFromDate)) {
+    throw new Error(`Invalid habit rule effective date: ${effectiveFromDate}`);
+  }
+  if (normalizedWeekdays.length === 0) {
+    throw new Error('A habit schedule must include at least one weekday.');
+  }
+  if (!Number.isInteger(targetPerDay) || targetPerDay <= 0) {
+    throw new Error('A habit target must be a positive integer.');
+  }
+  return {
+    effective_from_date: effectiveFromDate,
+    weekdays: normalizedWeekdays,
+    target_per_day: targetPerDay,
+  };
+}
+
+function normalizeRule(value: unknown): HabitRule | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<HabitRule>;
+  if (typeof candidate.effective_from_date !== 'string') return null;
+  if (!Array.isArray(candidate.weekdays)) return null;
+  if (typeof candidate.target_per_day !== 'number') return null;
+  try {
+    return createHabitRule(
+      candidate.effective_from_date,
+      candidate.weekdays,
+      candidate.target_per_day,
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function parseHabitRuleHistory(value: HabitRuleHistoryInput): HabitRule[] {
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const rules = parsed.flatMap((entry) => {
+    const rule = normalizeRule(entry);
+    return rule ? [rule] : [];
+  });
+  rules.sort((a, b) => a.effective_from_date.localeCompare(b.effective_from_date));
+
+  const byDate = new Map<string, HabitRule>();
+  for (const rule of rules) byDate.set(rule.effective_from_date, rule);
+  return [...byDate.values()].sort((a, b) =>
+    a.effective_from_date.localeCompare(b.effective_from_date),
+  );
+}
+
+export function serializeHabitRuleHistory(value: HabitRuleHistoryInput): string {
+  return JSON.stringify(parseHabitRuleHistory(value));
+}
+
+export function buildInitialHabitRule(
+  effectiveFromDate: string,
+  targetPerDay: number,
+  weekdays: readonly number[] = ALL_HABIT_WEEKDAYS,
+): HabitRule[] {
+  return [createHabitRule(effectiveFromDate, weekdays, targetPerDay)];
+}
+
+export function upsertHabitRule(history: HabitRuleHistoryInput, nextRule: HabitRule): HabitRule[] {
+  const next = parseHabitRuleHistory(history).filter(
+    (rule) => rule.effective_from_date !== nextRule.effective_from_date,
+  );
+  next.push(
+    createHabitRule(nextRule.effective_from_date, nextRule.weekdays, nextRule.target_per_day),
+  );
+  next.sort((a, b) => a.effective_from_date.localeCompare(b.effective_from_date));
+  return next;
+}
+
+function weekdayForDateKey(dateKey: string): HabitWeekday {
+  const day = dateKeyToLocalDate(dateKey).getDay();
+  return (day === 0 ? 7 : day) as HabitWeekday;
+}
+
+/**
+ * Resolve the rule active on a local date. A null result is an ineligible
+ * pre-creation date when valid history exists. Legacy-shaped callers without
+ * history get a conservative every-day fallback for compatibility.
+ */
+export function getHabitRuleForDate(
+  history: HabitRuleHistoryInput,
+  dateKey: string,
+  fallbackTargetPerDay = 1,
+  fallbackEffectiveFromDate?: string,
+): HabitRule | null {
+  const rules = parseHabitRuleHistory(history);
+  if (rules.length === 0) {
+    if (fallbackEffectiveFromDate && dateKey < fallbackEffectiveFromDate) return null;
+    return createHabitRule(
+      fallbackEffectiveFromDate ?? '0000-01-01',
+      ALL_HABIT_WEEKDAYS,
+      fallbackTargetPerDay,
+    );
+  }
+
+  let active: HabitRule | null = null;
+  for (const rule of rules) {
+    if (rule.effective_from_date > dateKey) break;
+    active = rule;
+  }
+  return active;
+}
+
+export function getHabitTargetForDate(
+  history: HabitRuleHistoryInput,
+  dateKey: string,
+  fallbackTargetPerDay = 1,
+  fallbackEffectiveFromDate?: string,
+): number {
+  return (
+    getHabitRuleForDate(history, dateKey, fallbackTargetPerDay, fallbackEffectiveFromDate)
+      ?.target_per_day ?? fallbackTargetPerDay
+  );
+}
+
+export function isHabitScheduledOn(
+  history: HabitRuleHistoryInput,
+  dateKey: string,
+  fallbackTargetPerDay = 1,
+  fallbackEffectiveFromDate?: string,
+): boolean {
+  const rule = getHabitRuleForDate(
+    history,
     dateKey,
-    active: false,
-  }));
+    fallbackTargetPerDay,
+    fallbackEffectiveFromDate,
+  );
+  return rule ? rule.weekdays.includes(weekdayForDateKey(dateKey)) : false;
+}
+
+export function getHabitSchedulePreset(weekdays: readonly number[]): HabitSchedulePreset {
+  const normalized = normalizeHabitWeekdays(weekdays);
+  if (normalized.join(',') === ALL_HABIT_WEEKDAYS.join(',')) return 'every_day';
+  if (normalized.join(',') === WEEKDAY_HABIT_WEEKDAYS.join(',')) return 'weekdays';
+  if (normalized.join(',') === WEEKEND_HABIT_WEEKDAYS.join(',')) return 'weekends';
+  return 'custom';
+}
+
+export function formatHabitSchedule(weekdays: readonly number[]): string {
+  const normalized = normalizeHabitWeekdays(weekdays);
+  const preset = getHabitSchedulePreset(normalized);
+  if (preset === 'every_day') return 'Every day';
+  if (preset === 'weekdays') return 'Weekdays';
+  if (preset === 'weekends') return 'Weekends';
+  return normalized.map((weekday) => WEEKDAY_LABELS[weekday - 1]).join(' / ');
+}
+
+function buildDateKeysBetween(startDateKey: string, endDateKey: string): string[] {
+  if (startDateKey > endDateKey) return [];
+  const result: string[] = [];
+  const cursor = dateKeyToLocalDate(startDateKey);
+  const end = dateKeyToLocalDate(endDateKey);
+  while (cursor <= end) {
+    result.push(toDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return result;
+}
+
+function firstHistoryDate(
+  rules: HabitRule[],
+  completions: HabitCompletion[],
+  fallbackEffectiveFromDate?: string,
+): string {
+  return (
+    rules[0]?.effective_from_date ??
+    fallbackEffectiveFromDate ??
+    completions.map((completion) => completion.date_key).sort()[0] ??
+    toDateKey()
+  );
+}
+
+function creationDateKeyFromTimestamp(timestamp: string | undefined): string | undefined {
+  if (!timestamp || Number.isNaN(new Date(timestamp).getTime())) return undefined;
+  return timestampToLocalDateKey(timestamp);
 }
 
 export type DayCompletion = {
-  dateKey: string; // YYYY-MM-DD
+  dateKey: string;
   count: number;
-  completed: boolean; // true if count >= targetPerDay (strict rule)
+  targetPerDay: number;
+  scheduled: boolean;
+  eligible: boolean;
+  completed: boolean;
 };
 
 export function calculateHabitProgress(count: number, targetPerDay: number): number {
@@ -20,110 +246,110 @@ export function calculateHabitProgress(count: number, targetPerDay: number): num
   return Math.min(1, count / targetPerDay);
 }
 
-/**
- * Build a full 30-day (or N-day) grid of DayCompletion objects
- * including days with zero completions (not just days with records).
- * Used for heatmap rendering — every day in range must have an entry.
- */
+/** Build the requested local-date history, resolving each date's rule. */
 export function buildDayCompletions(
   completions: HabitCompletion[],
   targetPerDay: number,
-  days: number = 30,
+  days?: number,
+  history?: HabitRuleHistoryInput,
+  fallbackEffectiveFromDate?: string,
+  todayKey = toDateKey(),
 ): DayCompletion[] {
+  const rules = parseHabitRuleHistory(history);
+  const startDateKey = firstHistoryDate(rules, completions, fallbackEffectiveFromDate);
+  const dateKeys =
+    days === undefined
+      ? buildDateKeysBetween(startDateKey, todayKey)
+      : buildDateRangeOldestFirst(days);
   const map = new Map<string, number>();
-  for (const c of completions) {
-    map.set(c.date_key, c.count);
-  }
+  for (const completion of completions) map.set(completion.date_key, completion.count);
 
-  return buildDateRangeOldestFirst(days).map((dateKey) => {
+  return dateKeys.map((dateKey) => {
+    const rule = getHabitRuleForDate(rules, dateKey, targetPerDay, fallbackEffectiveFromDate);
+    const scheduled = rule ? rule.weekdays.includes(weekdayForDateKey(dateKey)) : false;
+    const eligible = scheduled && dateKey <= todayKey;
     const count = map.get(dateKey) ?? 0;
+    const target = rule?.target_per_day ?? targetPerDay;
     return {
       dateKey,
       count,
-      completed: targetPerDay > 0 && count >= targetPerDay,
+      targetPerDay: target,
+      scheduled,
+      eligible,
+      completed: eligible && target > 0 && count >= target,
     };
   });
 }
 
 /**
- * Calculate the current streak — consecutive days ending on today
- * (or yesterday if today has no completion yet) where count >= target.
- *
- * STRICT rule: a day only counts if count >= targetPerDay.
- * If targetPerDay <= 0, every day with count > 0 counts.
- *
- * Strategy: walk backwards from today. Stop at the first day
- * that is not completed. If today is not completed, check if
- * yesterday was — allow a 1-day grace so the streak doesn't
- * break just because today hasn't been logged yet.
+ * Count completed scheduled occurrences ending at today. An incomplete
+ * scheduled today is granted grace while today is active; a prior scheduled
+ * miss breaks the streak. Unscheduled and ineligible dates are ignored.
  */
-export function calculateCurrentStreak(dayCompletions: DayCompletion[]): number {
-  if (dayCompletions.length === 0) return 0;
+export function calculateCurrentStreak(
+  dayCompletions: DayCompletion[],
+  todayKey = toDateKey(),
+): number {
+  const eligibleDays = dayCompletions
+    .filter((day) => day.scheduled && day.eligible && day.dateKey <= todayKey)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  if (eligibleDays.length === 0) return 0;
 
-  const days = [...dayCompletions].reverse();
+  let index = eligibleDays.length - 1;
+  const latest = eligibleDays[index];
+  if (latest.dateKey === todayKey && !latest.completed) index -= 1;
 
   let streak = 0;
-  let allowedGap = 1;
-
-  for (const day of days) {
-    if (day.completed) {
-      streak++;
-      allowedGap = 0;
-    } else {
-      if (allowedGap > 0) {
-        allowedGap--;
-        continue;
-      }
-      break;
-    }
+  for (; index >= 0; index -= 1) {
+    const day = eligibleDays[index];
+    if (!day.completed) break;
+    streak += 1;
   }
-
   return streak;
 }
 
-/**
- * Calculate the longest streak ever achieved in the provided
- * day completion history.
- */
+/** Calculate the longest completed run across all eligible scheduled dates. */
 export function calculateLongestStreak(dayCompletions: DayCompletion[]): number {
   let longest = 0;
   let current = 0;
-
-  for (const day of dayCompletions) {
+  for (const day of [...dayCompletions].sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
+    if (!day.scheduled || !day.eligible) continue;
     if (day.completed) {
-      current++;
-      if (current > longest) longest = current;
+      current += 1;
+      longest = Math.max(longest, current);
     } else {
       current = 0;
     }
   }
-
   return longest;
 }
 
-/**
- * Returns a display label for the streak count.
- * Used in HabitCircle below the ring.
- */
 export function getStreakLabel(streak: number): string {
   if (streak === 0) return '';
   if (streak === 1) return '1 day';
   return `${streak} days`;
 }
 
+export type HabitGridHabit = {
+  id: string;
+  name: string;
+  color: string;
+  target_per_day: number;
+  rule_history?: HabitRuleHistoryInput;
+  created_at?: string;
+};
+
 export type HabitGridRow = {
-  habit: {
-    id: string;
-    name: string;
-    color: string;
-    target_per_day: number;
-  };
+  habit: HabitGridHabit;
   cells: DayCell[];
 };
 
 export type DayCell = {
   dateKey: string;
   count: number;
+  targetPerDay: number;
+  scheduled: boolean;
+  eligible: boolean;
   completed: boolean;
   partial: boolean;
 };
@@ -135,149 +361,119 @@ export type GridDateHeader = {
   isToday: boolean;
 };
 
-/**
- * Build the date header row for the grid.
- * Returns 30 entries from oldest to newest.
- * Shows month label only on the 1st of each month.
- */
 export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
   const headers: GridDateHeader[] = [];
   const todayKey = toDateKey();
-
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const dateKey = `${y}-${m}-${dd}`;
-
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateKey = toDateKey(date);
     headers.push({
       dateKey,
-      dayLabel: String(d.getDate()),
-      monthLabel: d.getDate() === 1 ? d.toLocaleDateString('en', { month: 'short' }) : null,
+      dayLabel: String(date.getDate()),
+      monthLabel: date.getDate() === 1 ? date.toLocaleDateString('en', { month: 'short' }) : null,
       isToday: dateKey === todayKey,
     });
   }
   return headers;
 }
 
-/**
- * Build the full habits × days grid for the overview.
- */
 export function buildHabitGrid(
-  habits: {
-    id: string;
-    name: string;
-    color: string;
-    target_per_day: number;
-  }[],
+  habits: HabitGridHabit[],
   completions: { habit_id: string; date_key: string; count: number }[],
   days: number = 364,
+  todayKey = toDateKey(),
 ): HabitGridRow[] {
   const lookup = new Map<string, Map<string, number>>();
-  for (const c of completions) {
-    if (!lookup.has(c.habit_id)) {
-      lookup.set(c.habit_id, new Map());
-    }
-    lookup.get(c.habit_id)!.set(c.date_key, c.count);
+  for (const completion of completions) {
+    if (!lookup.has(completion.habit_id)) lookup.set(completion.habit_id, new Map());
+    lookup.get(completion.habit_id)!.set(completion.date_key, completion.count);
   }
 
   const dateKeys = buildDateRangeOldestFirst(days);
-
   return habits.map((habit) => {
     const habitMap = lookup.get(habit.id) ?? new Map<string, number>();
-    const cells: DayCell[] = dateKeys.map((dateKey) => {
+    const rules = parseHabitRuleHistory(habit.rule_history);
+    const fallbackCreationDate = creationDateKeyFromTimestamp(habit.created_at);
+    const cells = dateKeys.map((dateKey) => {
+      const rule = getHabitRuleForDate(rules, dateKey, habit.target_per_day, fallbackCreationDate);
+      const scheduled = rule ? rule.weekdays.includes(weekdayForDateKey(dateKey)) : false;
+      const eligible = scheduled && dateKey <= todayKey;
       const count = habitMap.get(dateKey) ?? 0;
+      const target = rule?.target_per_day ?? habit.target_per_day;
       return {
         dateKey,
         count,
-        completed: habit.target_per_day > 0 && count >= habit.target_per_day,
-        partial: count > 0 && count < habit.target_per_day,
+        targetPerDay: target,
+        scheduled,
+        eligible,
+        completed: eligible && target > 0 && count >= target,
+        partial: eligible && count > 0 && count < target,
       };
     });
     return { habit, cells };
   });
 }
 
-/**
- * Overall consistency = completed cells / total possible cells (excluding future days).
- */
 export function calculateOverallConsistency(grid: HabitGridRow[]): number {
-  if (grid.length === 0) return 0;
-  const todayKey = toDateKey();
   let completed = 0;
   let total = 0;
   for (const row of grid) {
     for (const cell of row.cells) {
-      if (cell.dateKey > todayKey) continue;
-      total++;
-      if (cell.completed) completed++;
+      if (!cell.eligible) continue;
+      total += 1;
+      if (cell.completed) completed += 1;
     }
   }
-  if (total === 0) return 0;
-  return Math.round((completed / total) * 100);
+  return total === 0 ? 0 : Math.round((completed / total) * 100);
 }
 
-/**
- * Build a single aggregated HeatmapDay array for all habits.
- * A day's value reflects how many habits were completed:
- *   0 = no habits completed
- *   1 = some habits completed (< 50%)
- *   2 = most habits completed (50–99%)
- *   3 = all habits completed (100%)
- *
- * Uses existing HabitGridRow data — no new DB query needed.
- */
+/** Build the aggregate 0–3 habit heatmap without any per-cell DB work. */
 export function buildAggregatedHabitHeatmap(
   grid: HabitGridRow[],
   days: number = 364,
 ): HeatmapDay[] {
-  if (grid.length === 0) {
-    return buildDateRangeOldestFirst(days).map((dateKey) => ({
-      dateKey,
-      value: 0,
-    }));
-  }
-
   const dateKeys = buildDateRangeOldestFirst(days);
+  if (grid.length === 0) return dateKeys.map((dateKey) => ({ dateKey, value: 0 }));
 
+  const indexedRows = grid.map((row) => new Map(row.cells.map((cell) => [cell.dateKey, cell])));
   return dateKeys.map((dateKey) => {
     let completed = 0;
-    const total = grid.length;
-    for (const row of grid) {
-      const cell = row.cells.find((c) => c.dateKey === dateKey);
-      if (cell?.completed) completed++;
+    let scheduled = 0;
+    for (const row of indexedRows) {
+      const cell = row.get(dateKey);
+      if (!cell?.eligible) continue;
+      scheduled += 1;
+      if (cell.completed) completed += 1;
     }
-    if (completed === 0) return { dateKey, value: 0 };
-    const pct = completed / total;
-    if (pct < 0.5) return { dateKey, value: 1 };
-    if (pct < 1.0) return { dateKey, value: 2 };
-    return { dateKey, value: 3 };
+    if (scheduled === 0 || completed === 0) return { dateKey, value: 0 };
+    const pct = completed / scheduled;
+    return { dateKey, value: pct < 0.5 ? 1 : pct < 1 ? 2 : 3 };
   });
 }
 
-/**
- * Build ActivityDay array from the habits grid.
- * A day is "active" if at least one habit was completed.
- * value = fraction of habits completed that day (0–1).
- */
+function buildEmptyActivityDays(days: number): ActivityDay[] {
+  return buildDateRange(days).map((dateKey) => ({ dateKey, active: false }));
+}
+
 export function buildHabitActivityDays(grid: HabitGridRow[], days: number = 30): ActivityDay[] {
   if (grid.length === 0) return buildEmptyActivityDays(days);
-
-  const dateKeys = grid[0].cells.map((c) => c.dateKey).reverse();
+  const dateKeys = (grid[0].cells.slice(-days) ?? []).map((cell) => cell.dateKey).reverse();
+  const indexedRows = grid.map((row) => new Map(row.cells.map((cell) => [cell.dateKey, cell])));
 
   return dateKeys.map((dateKey) => {
     let completed = 0;
-    const total = grid.length;
-    for (const row of grid) {
-      const cell = row.cells.find((c) => c.dateKey === dateKey);
-      if (cell?.completed) completed++;
+    let scheduled = 0;
+    for (const row of indexedRows) {
+      const cell = row.get(dateKey);
+      if (!cell?.eligible) continue;
+      scheduled += 1;
+      if (cell.completed) completed += 1;
     }
     return {
       dateKey,
       active: completed > 0,
-      value: total > 0 ? completed / total : 0,
+      value: scheduled > 0 ? completed / scheduled : 0,
     };
   });
 }

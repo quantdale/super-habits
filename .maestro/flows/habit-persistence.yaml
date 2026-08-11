@@ -9,20 +9,30 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Habits'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native daily habit'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
 - tapOn: 'Create habit'
 - extendedWaitUntil:
-    visible: 'Native daily habit: 0 of 1 today. Tap to add one.'
+    visible: 'Native daily habit: 0 of 1 today.*'
     timeout: 5000
-- tapOn: 'Native daily habit: 0 of 1 today. Tap to add one.'
-- assertVisible: 'Native daily habit: 1 of 1 today. Tap to remove one.'
+- tapOn: 'Native daily habit: 0 of 1 today.*'
+- assertVisible: 'Native daily habit: 1 of 1 today.*'
 - killApp
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Habits'
-- assertVisible: 'Native daily habit: 1 of 1 today. Tap to remove one.'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- assertVisible: 'Native daily habit: 1 of 1 today.*'

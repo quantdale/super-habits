@@ -108,7 +108,7 @@ async function getLocalSyncBackedCounts(): Promise<LocalSyncBackedCounts> {
   const entries = await Promise.all(
     SYNC_BACKED_ENTITIES.map(async (entity) => {
       const row = await db.getFirstAsync<{ total: number }>(
-        `SELECT COUNT(*) AS total FROM ${entity} WHERE deleted_at IS NULL`,
+        `SELECT COUNT(*) AS total FROM ${entity}`,
       );
       return [entity, row?.total ?? 0] as const;
     }),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View, useWindowDimensions, type ViewProps } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -35,12 +35,16 @@ const NAV_TAB_COUNT = NAV_ITEMS.length;
 const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
 
 const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolean }>> = {
-  overview: OverviewScreen,
-  todos: TodosScreen,
-  habits: HabitsScreen,
-  pomodoro: PomodoroScreen,
-  workout: WorkoutScreen,
-  calories: CaloriesScreen,
+  // Navigation changes only the active screen's `isActive` prop. Memoizing
+  // the permanently mounted screens prevents inactive HEAVY lists/charts
+  // from rebuilding on every tab switch while preserving their own state and
+  // activation/foreground refresh effects.
+  overview: memo(OverviewScreen),
+  todos: memo(TodosScreen),
+  habits: memo(HabitsScreen),
+  pomodoro: memo(PomodoroScreen),
+  workout: memo(WorkoutScreen),
+  calories: memo(CaloriesScreen),
 };
 
 type TopTabItemProps = {
@@ -119,16 +123,19 @@ function SectionContainer({
   return (
     <View
       {...rest}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        opacity: isActive ? 1 : 0,
-        pointerEvents: isActive ? 'auto' : 'none',
-        zIndex: isActive ? 1 : 0,
-      }}
+      aria-hidden={!isActive}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          opacity: isActive ? 1 : 0,
+          pointerEvents: isActive ? 'auto' : 'none',
+          zIndex: isActive ? 1 : 0,
+        },
+      ]}
     >
       {children}
     </View>

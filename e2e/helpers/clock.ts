@@ -19,19 +19,21 @@ import { type Page } from '@playwright/test';
 
 export type ClockTime = number | string | Date;
 
-// Module-level per test file: `page.clock.install()` is context-scoped and
-// survives navigations, but the page's `window` flag is lost on navigation.
-let clockInstalled = false;
+// `page.clock.install()` is page/context-scoped and survives navigations, but
+// the page's `window` flag is lost on navigation. Track pages individually so
+// separate journey files in the same worker never suppress one another's
+// clock installation.
+const clockInstalledPages = new WeakSet<Page>();
 
 /**
  * Install the fake clock BEFORE any app render. Must be called before the
  * first navigation that mounts the app. No-op if already installed for this
- * journey file.
+ * page.
  */
 export async function installClock(page: Page, time?: ClockTime): Promise<void> {
-  if (clockInstalled) return;
+  if (clockInstalledPages.has(page)) return;
   await page.clock.install({ time });
-  clockInstalled = true;
+  clockInstalledPages.add(page);
 }
 
 /**

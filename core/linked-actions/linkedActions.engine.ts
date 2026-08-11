@@ -2,6 +2,7 @@ import { createId } from '@/lib/id';
 import {
   createLinkedActionEvent,
   createLinkedActionExecution,
+  getAppliedHabitIncrementExecution,
   getAppliedHabitDayCalorieExecution,
   getLinkedActionEvent,
   getLinkedActionExecutionByChainFingerprint,
@@ -148,6 +149,28 @@ async function findPriorAppliedExecutionForFirstRealPath(
     plan.rule.id,
     plan.sourceEvent.entityId,
     plan.sourceEvent.sourceDateKey,
+  );
+}
+
+async function findPriorAppliedExecutionForStableSourceIdentity(
+  plan: LinkedActionEffectPlan,
+): Promise<LinkedActionExecutionRecord | null> {
+  if (plan.rule.target.effect.type !== 'habit.increment') {
+    return null;
+  }
+
+  const sourceEvent = plan.sourceEvent;
+  if (!sourceEvent.entityId || !sourceEvent.sourceDateKey) {
+    return null;
+  }
+
+  return getAppliedHabitIncrementExecution(
+    plan.rule.id,
+    sourceEvent.feature,
+    sourceEvent.entityType,
+    sourceEvent.entityId,
+    sourceEvent.triggerType,
+    sourceEvent.sourceDateKey,
   );
 }
 
@@ -320,6 +343,19 @@ export class LinkedActionsEngine {
       );
       if (chainGuardHit) {
         effects.push(mapExecutionToDuplicateResult(chainGuardHit, plan, 'chain_guard_duplicate'));
+        continue;
+      }
+
+      const priorStableSourceExecution =
+        await findPriorAppliedExecutionForStableSourceIdentity(plan);
+      if (priorStableSourceExecution) {
+        effects.push(
+          mapExecutionToDuplicateResult(
+            priorStableSourceExecution,
+            plan,
+            'source_identity_already_executed',
+          ),
+        );
         continue;
       }
 

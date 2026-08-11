@@ -50,37 +50,6 @@ let supabaseRequestsSeen = 0;
 let remoteBoundaryDetected = false;
 
 /**
- * Disable the app's service worker for the whole journey via `addInitScript`.
- *
- * The app's Workbox SW (`public/sw.js`) routes cross-origin data fetches
- * through its own `fetch` handler, which is NOT intercepted by Playwright's
- * `page.route`. On a Supabase-capable build that means a flush's REST calls can
- * escape the failure injectors and hit the real origin — draining the outbox
- * and making the requeue assertions flaky (observed in the full-suite run:
- * step 2's outbox came back empty instead of `['habits','todos']`). Stubbing
- * `navigator.serviceWorker` (same pattern as J5) forces every request through
- * `page.route`, so the injected behaviour is deterministic. This is a test-side
- * mitigation (no app change, no weakened assertion); the SW bypass is filed as
- * `fix-restore-service-worker`.
- */
-async function stubOutServiceWorker(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'serviceWorker', {
-      value: {
-        register: () => Promise.resolve({}),
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        getRegistrations: () => Promise.resolve([]),
-        getRegistration: () => Promise.resolve(undefined),
-        controller: null,
-        ready: Promise.resolve(undefined),
-      },
-      configurable: true,
-    });
-  });
-}
-
-/**
  * Trigger a flush through the NetInfo reconnect path, bypassing
  * `shouldAttemptFlush()`. Headless Chromium exposes the Network Information API
  * (`navigator.connection`), and @react-native-community/netinfo's web module
@@ -252,9 +221,8 @@ defineJourney({
       run: async ({ page }) => {
         // Reset to a clean device (OPFS + AsyncStorage), then install the
         // blocking injector BEFORE the app's first render so no real remote is
-        // ever hit and no record can silently push. Stub the service worker
-        // first so no fetch can bypass page.route (see helper comment).
-        await stubOutServiceWorker(page);
+        // ever hit and no record can silently push. Cross-origin remote
+        // requests bypass the app-shell service worker in the product path.
         await resetAll(page);
         await injectRest503(page);
 

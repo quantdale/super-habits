@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Locator } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { resetAll } from '../helpers/reset';
 import { returnToApp } from '../helpers/dbHarness';
@@ -28,12 +28,9 @@ import { swipeLeftToRevealRowActions } from '../helpers/gestures';
  * `clickSwipeDeleteAction` helper drives RN Web Pressables). This is the
  * degenerate "fastest possible double-tap" — the exact case J7 exists to catch.
  *
- * QUARANTINE (D13): step 11 ("double-submit add-todo lands exactly ONE row")
- * FAILS on a real app defect — `TodosScreen.onSave()` has no re-entry guard,
- * so two rapid presses create TWO rows. The step is quarantined with
- * `test.fixme()` naming companion `fix-todo-add-double-submit`; its strict
- * `expect(n).toBe(1)` assertion is kept in place and releases automatically
- * when that change lands. See docs/testing/known-gaps.md.
+ * Step 11 preserves the strict one-row contract and now runs as a normal
+ * regression after `fix-todo-add-double-submit` added a synchronous re-entry
+ * guard around the async modal save path.
  *
  * ORDERING: the steps that SHOULD pass deterministically run first; the
  * double-submit probe (the most likely to expose an R5 duplicate-write defect)
@@ -478,17 +475,6 @@ defineJourney({
     {
       name: 'double-submit add-todo lands exactly ONE row (never two)',
       run: async ({ page }) => {
-        // QUARANTINED (D13): the decided one-row contract fails on a real app
-        // defect — TodosScreen.onSave() has no re-entry guard, so two rapid
-        // presses create TWO rows (reproduced consistently: row count = 2).
-        // Companion change: fix-todo-add-double-submit. The strict assertion
-        // below stays in place; removing this test.fixme() in that change is
-        // what releases the quarantine. Never weaken expect(n).toBe(1).
-        test.fixme(
-          true,
-          'todo double-submit defect (Two rows on rapid Add-task press): fix-todo-add-double-submit',
-        );
-
         await returnToApp(page);
         await switchSection(page, 'todos');
         await openNewTodoModal(page);

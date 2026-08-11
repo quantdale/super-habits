@@ -27,33 +27,26 @@ import { ensureDbContext, queryRows, returnToApp } from '../helpers/dbHarness';
  * defect, fixed in the seed helper itself (this file no longer carries an
  * inline workaround).
  *
- * FINDING (defect class, recorded per D14/task 7.6, companion change
- * `fix-recurring-todo-expansion-idempotency`): the daily-recurring-todo
- * expansion (`TodosScreen` → `createRecurringInstance`) is NOT idempotent per
- * activation. Repeated rapid activations of the Todos section kept creating
- * additional "today" instances (this run: pending went 127 → 158 → 161+ as the
- * section was activated 3–4 times; runs varied 12–34 instances).
- * `findMissingRecurrenceIds` snapshots the uncovered set before the previous
- * activation's awaited inserts commit, so a fast switch away and back
- * duplicates today's instance. Row-level oracles in this spec therefore assert
- * invariants (non-deleted list self-consistency, exactly 16 seeded soft-deletes
- * untouched, outbox create-count == row growth, all non-todo tables
- * byte-identical) rather than an exact recurrence count.
+ * FIXED FINDING (D14/task 7.6, `fix-recurring-todo-expansion-idempotency`):
+ * the daily-recurring-todo expansion now re-checks the active
+ * (recurrence_id, due_date) pair at the data-layer insertion boundary. Rapid
+ * activation remains exercised below, and the row-level oracle now requires
+ * exactly one active today-instance per daily series.
  *
- * MEASURED BASELINES (task 6.2) — recorded from the most recent full runs of
- * this file on this machine (`npx playwright test --project=journeys ...`,
- * three consecutive runs, all green). D14 provisional ceilings are asserted
- * unchanged; the measured values below are the honest numbers, NOT raised
- * ceilings:
+ * HISTORICAL BASELINES — recorded before `close-cg4-cg5-performance-gaps`
+ * from fresh-build runs of this file. The D14 ceilings remain unchanged.
  *
  *   cold Overview at HEAVY (interactive + populated):  219–547 ms  (≤ 5000 ms)
- *   section switch, max over 6 switches (all mounted): 436–518 ms  (≤ 800 ms)
- *       representative: overview→todos=436 | todos→habits=408 | habits→focus=227
- *       focus→workout=252 | workout→calories=221 | calories→overview=205
- *   diary "Search saved meals" input response:         232–327 ms  (≤ 500 ms)
- *   saved-meal picker "Search meals..." response:       37–73 ms   (≤ 500 ms)
- *   Every ceiling clears with ≥3× headroom locally. If CI is slower, re-measure
- *   and file a perf defect per D14 — do not raise the ceiling.
+ *   section switch, max over 6 switches (all mounted): 760–813 ms (≤ 800 ms)
+ *   diary "Search saved meals" input response:         501–603 ms (≤ 500 ms)
+ *   saved-meal picker "Search meals..." response:       within 500 ms
+ *
+ * RESOLUTION STATUS — the strict assertions and fixture remain unchanged:
+ *   CG-4 overview→Todos: 573–644 ms (median 608.5, p90 642, max 644) in
+ *     10/10 focused strict CG-4 runs; the step is released.
+ *   CG-5 diary search:    after the Calories refresh-order correction, Batch A
+ *     measured 351–396 ms (median 369, p90 386, max 396) and independent Batch
+ *     B measured 354–412 ms (median 365, p90 369, max 412), both 10/10; released.
  */
 
 defineJourney({
@@ -98,6 +91,13 @@ defineJourney({
           ),
         );
         store('todosTotalAtStart', 200);
+        store(
+          'dailyRecurrenceSeriesAtStart',
+          await num(
+            page,
+            "SELECT COUNT(DISTINCT recurrence_id) AS n FROM todos WHERE recurrence = 'daily' AND recurrence_id IS NOT NULL AND deleted_at IS NULL",
+          ),
+        );
         store(
           'completionsTodayAtStart',
           await num(
@@ -169,8 +169,6 @@ defineJourney({
     },
     {
       name: 'Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches)',
-      quarantine:
-        'EXPECTED_KNOWN_GAP: recurring-todo expansion can make overview→todos exceed D14; see fix-recurring-todo-expansion-idempotency.',
       run: async ({ page }) => {
         // Warm-up: mount every section once (first activation does the heavy
         // data work; the D14 ceiling applies to switches AFTER all are mounted).
@@ -226,10 +224,8 @@ defineJourney({
     {
       name: 'Todos: 200+ rows rendered, list scrolls to the end, Show/Hide-completed filter',
       run: async ({ page }) => {
-        // The recurring-todo expansion is NOT idempotent per activation (see
-        // step 7), so the exact running count is not stable here — assert the
-        // stable facts: completed is exactly the 57 seeded, and the pending
-        // list has grown past the seeded 127.
+        // The recurring-todo expansion is idempotent per activation: repeated
+        // visits do not add another today-instance for a covered series.
         await goToSection(page, 'todos');
         await expectSectionActive(page, SECTION_MARKERS.todos);
         const headerEl = page.getByText(/^\d+ pending, 57 completed$/).first();
@@ -319,8 +315,6 @@ defineJourney({
     },
     {
       name: 'Calories diary: meal groups, expand/collapse, persistence, filter-input response ≤ 500ms',
-      quarantine:
-        'EXPECTED_KNOWN_GAP: HEAVY diary saved-meal search currently exceeds the unchanged D14 500ms ceiling; preserve and fix in the calorie diary performance change.',
       run: async ({ page }) => {
         const anchor = anchorKey;
         // Row-level expectations for today's diary.
@@ -423,10 +417,8 @@ defineJourney({
         const anchor = anchorKey;
         const seedTotal = Number(storeOf('todosTotalAtStart')); // 200
 
-        // Todos: read the FULL post-walk picture — the recurring-todo expansion
-        // is NOT idempotent per activation (repeated section visits keep
-        // creating today's instances; observed 12→34 across visits) — so assert
-        // invariants rather than a brittle exact count.
+        // Todos: read the FULL post-walk picture and require exactly one active
+        // today-instance for every daily recurrence series.
         const total7 = await num(page, 'SELECT COUNT(*) AS n FROM todos');
         const pending7 = await num(
           page,
@@ -441,6 +433,17 @@ defineJourney({
           instances7,
           `expected recurring-todo expansion, got ${instances7} new rows`,
         ).toBeGreaterThan(0);
+        await expectRowsNum(
+          page,
+          `SELECT COUNT(*) AS n FROM (
+             SELECT recurrence_id
+             FROM todos
+             WHERE recurrence = 'daily' AND recurrence_id IS NOT NULL
+             GROUP BY recurrence_id
+             HAVING SUM(CASE WHEN deleted_at IS NULL AND due_date = '${anchor}' THEN 1 ELSE 0 END) = 1
+           )`,
+          (n) => n === Number(storeOf('dailyRecurrenceSeriesAtStart')),
+        );
         // List state is self-consistent and seeded rows were never hard-deleted:
         // exactly the 16 seeded soft-deletes remain deleted_at IS NOT NULL.
         await expectRowsNum(

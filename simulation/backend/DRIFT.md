@@ -6,15 +6,23 @@ the Supabase dashboard configuration for the four synced tables
 
 ## Why this file exists
 
-The remote schema and RLS live **only in the Supabase dashboard**, not in this
-repo (audit SEC-003). `schema.sql` is a checked-in reference copy so the
-disposable-backend lane can provision throwaway projects — and so that a
-divergence between the dashboard and the repo is *visible* instead of silent.
+The full remote schema and RLS were historically maintained **only in the
+Supabase dashboard**, not in this repo (audit SEC-003). `schema.sql` remains a
+checked-in reference copy so the disposable-backend lane can provision
+throwaway projects — and so that a divergence between the dashboard and the
+repo is _visible_ instead of silent. Habit Engine V2 now also has an additive,
+repository-managed migration at
+`supabase/migrations/20260810130000_add_habits_rule_history.sql`; the intended
+remote project has not been verified from this workstation.
 The drift procedure below makes that divergence a finding, never a quiet edit.
 
 ## Current snapshot
 
 - Tables: `todos`, `habits`, `calorie_entries`, `workout_routines`.
+- The v12 habit contract includes `habits.rule_history`, an effective-dated
+  JSON rule array containing local ISO-weekday schedules and historical daily
+  targets. The live Supabase dashboard must receive this additive column before
+  production backup pushes can report success.
 - Column source of truth: `core/db/client.ts` (`bootstrapStatements` +
   `runMigrations`) and the entity types in `core/db/types.ts`. The sync
   adapter (`core/sync/supabase.adapter.ts`) selects the full local row
@@ -43,7 +51,7 @@ The drift procedure below makes that divergence a finding, never a quiet edit.
    - Either way the finding names the exact diff; it is never absorbed
      silently into another change.
 2. **Round-trip failures** in the disposable lane that trace to a schema
-   difference (a rejected upsert, a missing column) are *also* drift findings
+   difference (a rejected upsert, a missing column) are _also_ drift findings
    following the same rule — they are evidence the reference copy and the
    dashboard have parted ways.
 3. **During maintenance**, update all of: `schema.sql`, the header's snapshot
@@ -52,10 +60,16 @@ The drift procedure below makes that divergence a finding, never a quiet edit.
    change MUST be mirrored here or the sync adapter will push rows the remote
    cannot hold.
 
-## Follow-up change (recorded, not implemented by this task)
+## Repository-managed migration status
 
-Move the Supabase schema **into version control** so the dashboard is derived
-from (and reconciled against) a committed definition instead of the reverse.
+The Habit Engine V2 migration is intentionally narrow: it adds only the
+`habits.rule_history` column and does not alter existing policies or rows.
+Applying it to the intended project remains a separate deployment gate because
+the target project and credentials must be identified first.
+
+The remaining infrastructure follow-up is to move the complete Supabase
+schema **into version control** so the dashboard is derived from (and
+reconciled against) a committed definition instead of the reverse.
 
 Recommended shape: Supabase-managed migrations (a `supabase/migrations/*.sql`
 convention applied by `supabase db push` in CI against a staging project, or a

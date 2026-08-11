@@ -61,7 +61,7 @@
 
 **SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **11**. Next migration: `if (version < 12)`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **12**. Next migration: `if (version < 13)`. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
 **Sync / backup:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
@@ -102,8 +102,8 @@
 | Name                    | `superhabits` (npm package, private)                                                                                                        |
 | Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay       |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                              |
-| Schema version (stored) | **11** (`app_meta.db_schema_version`)                                                                                                       |
-| Next migration          | `12` (new `if (version < 12)` block in `runMigrations`)                                                                                     |
+| Schema version (stored) | **12** (`app_meta.db_schema_version`)                                                                                                       |
+| Next migration          | `13` (new `if (version < 13)` block in `runMigrations`)                                                                                     |
 | Unit tests              | **427** passing (Vitest)                                                                                                                    |
 | E2E tests               | **90** Playwright tests in **14** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
 
@@ -510,7 +510,7 @@ There are no distinct URL routes. The app is a single page: all six sections are
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **11**. Next migration: `if (version < 12)` in `runMigrations()`.
+Current `app_meta.db_schema_version`: **12**. Next migration: `if (version < 13)` in `runMigrations()`.
 
 ### Bootstrap DDL (verbatim)
 
@@ -541,6 +541,7 @@ CREATE TABLE IF NOT EXISTS habits (
   category TEXT NOT NULL DEFAULT 'anytime',
   icon TEXT NOT NULL DEFAULT 'check-circle',
   color TEXT NOT NULL DEFAULT '#64748b',
+  rule_history TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT

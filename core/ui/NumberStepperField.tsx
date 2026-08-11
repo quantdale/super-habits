@@ -57,6 +57,7 @@ export function NumberStepperField({
         </Pressable>
         <TextInput
           className="flex-1 border px-3 py-2 text-center text-base"
+          accessibilityLabel={label}
           style={{
             height: 48,
             borderColor: tokens.border,

@@ -17,8 +17,6 @@ import type {
   PendingTodosFacts,
 } from './ask.types';
 
-const HABIT_STREAK_HISTORY_DAYS = 365;
-
 export class AskRetrievalError extends Error {
   reasonCode: AskUnsupportedReasonCode;
 
@@ -55,9 +53,9 @@ export async function retrieveCalorieSummary(
   };
 }
 
-async function computeHabitStreaks(habitId: string, targetPerDay: number) {
-  const completions = await getCompletionHistory(habitId, HABIT_STREAK_HISTORY_DAYS);
-  const dayCompletions = buildDayCompletions(completions, targetPerDay, HABIT_STREAK_HISTORY_DAYS);
+async function computeHabitStreaks(habitId: string, targetPerDay: number, ruleHistory?: string) {
+  const completions = await getCompletionHistory(habitId);
+  const dayCompletions = buildDayCompletions(completions, targetPerDay, undefined, ruleHistory);
   return {
     currentStreak: calculateCurrentStreak(dayCompletions),
     longestStreak: calculateLongestStreak(dayCompletions),
@@ -70,7 +68,11 @@ export async function retrieveHabitStreak(habitName: string | null): Promise<Hab
   if (!habitName) {
     const habitSummaries = await Promise.all(
       habits.map(async (habit) => {
-        const streaks = await computeHabitStreaks(habit.id, habit.target_per_day);
+        const streaks = await computeHabitStreaks(
+          habit.id,
+          habit.target_per_day,
+          habit.rule_history,
+        );
         return {
           habitName: habit.name,
           currentStreak: streaks.currentStreak,
@@ -88,7 +90,7 @@ export async function retrieveHabitStreak(habitName: string | null): Promise<Hab
     throw new AskRetrievalError('habit_not_found', `No habit named "${habitName}" was found.`);
   }
 
-  const streaks = await computeHabitStreaks(habit.id, habit.target_per_day);
+  const streaks = await computeHabitStreaks(habit.id, habit.target_per_day, habit.rule_history);
   return {
     scope: 'single',
     habitName: habit.name,

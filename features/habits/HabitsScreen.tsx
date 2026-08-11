@@ -24,6 +24,7 @@ import { Button } from '@/core/ui/Button';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
 import type { Habit, HabitCategory, HabitIcon } from './types';
 import {
@@ -40,11 +41,21 @@ import {
   updateHabit,
 } from '@/features/habits/habits.data';
 import {
+  ALL_HABIT_WEEKDAYS,
+  WEEKDAY_HABIT_WEEKDAYS,
+  WEEKEND_HABIT_WEEKDAYS,
   buildAggregatedHabitHeatmap,
   buildDayCompletions,
   buildHabitGrid,
   calculateCurrentStreak,
   calculateOverallConsistency,
+  formatHabitSchedule,
+  getHabitRuleForDate,
+  getHabitSchedulePreset,
+  isHabitScheduledOn,
+  normalizeHabitWeekdays,
+  type HabitSchedulePreset,
+  type HabitWeekday,
 } from '@/features/habits/habits.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { HabitCircle } from '@/features/habits/HabitCircle';
@@ -70,6 +81,21 @@ const TIME_GROUPS = [
 
 const COLOR = SECTION_COLORS.habits;
 const HABIT_LINKED_ACTION_SOURCE_KEY = 'habit-linked-actions-source';
+const SCHEDULE_OPTIONS: { value: HabitSchedulePreset; label: string; weekdays: HabitWeekday[] }[] =
+  [
+    { value: 'every_day', label: 'Every day', weekdays: [...ALL_HABIT_WEEKDAYS] },
+    { value: 'weekdays', label: 'Weekdays', weekdays: [...WEEKDAY_HABIT_WEEKDAYS] },
+    { value: 'weekends', label: 'Weekends', weekdays: [...WEEKEND_HABIT_WEEKDAYS] },
+  ];
+const WEEKDAY_OPTIONS: { value: HabitWeekday; label: string; fullLabel: string }[] = [
+  { value: 1, label: 'M', fullLabel: 'Monday' },
+  { value: 2, label: 'T', fullLabel: 'Tuesday' },
+  { value: 3, label: 'W', fullLabel: 'Wednesday' },
+  { value: 4, label: 'T', fullLabel: 'Thursday' },
+  { value: 5, label: 'F', fullLabel: 'Friday' },
+  { value: 6, label: 'S', fullLabel: 'Saturday' },
+  { value: 7, label: 'S', fullLabel: 'Sunday' },
+];
 
 function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
   if (a.length !== b.length) return false;
@@ -81,6 +107,7 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
 
 export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const dayGeneration = useDayRolloverGeneration();
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -94,6 +121,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [category, setCategory] = useState<HabitCategory>('anytime');
   const [icon, setIcon] = useState<HabitIcon>(DEFAULT_HABIT_ICON);
   const [color, setColor] = useState(DEFAULT_HABIT_COLOR);
+  const [schedulePreset, setSchedulePreset] = useState<HabitSchedulePreset>('every_day');
+  const [weekdays, setWeekdays] = useState<HabitWeekday[]>([...ALL_HABIT_WEEKDAYS]);
   const [habitHeatmapDays, setHabitHeatmapDays] = useState<HeatmapDay[]>([]);
   const [consistencyPct, setConsistencyPct] = useState(0);
   const [overallStreak, setOverallStreak] = useState(0);
@@ -110,8 +139,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
 
     const streaks: Record<string, number> = {};
     for (const habit of list) {
-      const completions = await getCompletionHistory(habit.id, 30);
-      const dayCompletions = buildDayCompletions(completions, habit.target_per_day, 30);
+      const completions = await getCompletionHistory(habit.id);
+      const dayCompletions = buildDayCompletions(
+        completions,
+        habit.target_per_day,
+        undefined,
+        habit.rule_history,
+      );
       streaks[habit.id] = calculateCurrentStreak(dayCompletions);
     }
     setStreakMap(streaks);
@@ -128,6 +162,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         name: h.name,
         color: h.color,
         target_per_day: h.target_per_day,
+        rule_history: h.rule_history,
+        created_at: h.created_at,
       })),
       allCompletions,
       364,
@@ -143,7 +179,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setOverallStreak(bestStreak);
   }, []);
 
-  useActiveForegroundRefresh(isActive, refresh);
+  useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   const openAddModal = (presetCategory?: HabitCategory) => {
     setEditingHabit(null);
@@ -152,6 +188,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setCategory(presetCategory ?? 'anytime');
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
+    setSchedulePreset('every_day');
+    setWeekdays([...ALL_HABIT_WEEKDAYS]);
     setHabitError(null);
     setLinkedActionRows([]);
     setLinkedActionsError(null);
@@ -170,6 +208,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setCategory(habit.category ?? 'anytime');
     setIcon(HABIT_ICONS.includes(habit.icon) ? habit.icon : DEFAULT_HABIT_ICON);
     setColor(HABIT_COLORS.includes(habit.color) ? habit.color : DEFAULT_HABIT_COLOR);
+    const currentRule = getHabitRuleForDate(habit.rule_history, toDateKey(), habit.target_per_day);
+    const currentWeekdays = currentRule?.weekdays ?? [...ALL_HABIT_WEEKDAYS];
+    setWeekdays(currentWeekdays);
+    setSchedulePreset(getHabitSchedulePreset(currentWeekdays));
     setModalVisible(true);
 
     try {
@@ -189,6 +231,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     const err = validateHabit(name, targetNum);
     if (err) {
       setHabitError(err);
+      return;
+    }
+    if (weekdays.length === 0) {
+      setHabitError('Choose at least one day for this habit.');
       return;
     }
     setHabitError(null);
@@ -213,10 +259,11 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         category,
         icon,
         color,
+        weekdays,
       });
       await saveHabitLinkedActionRules(editingHabit.id, linkedActionRules);
     } else {
-      const habitId = await addHabit(name.trim(), targetNum, category, icon, color);
+      const habitId = await addHabit(name.trim(), targetNum, category, icon, color, weekdays);
       await saveHabitLinkedActionRules(habitId, linkedActionRules);
     }
     setEditingHabit(null);
@@ -225,6 +272,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setCategory('anytime');
     setIcon(DEFAULT_HABIT_ICON);
     setColor(DEFAULT_HABIT_COLOR);
+    setSchedulePreset('every_day');
+    setWeekdays([...ALL_HABIT_WEEKDAYS]);
     setHabitError(null);
     setLinkedActionRows([]);
     setLinkedActionsError(null);
@@ -279,6 +328,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setLinkedActionRows([]);
     setLinkedActionsError(null);
     setLinkedActionsLoading(false);
+    setSchedulePreset('every_day');
+    setWeekdays([...ALL_HABIT_WEEKDAYS]);
   }, []);
 
   const linkedActionSource: LinkedActionEditorSourceOption = {
@@ -289,6 +340,20 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     label: name.trim() || 'This habit',
     description: 'Rules below run when this habit completes for the day.',
   };
+
+  const todayKey = toDateKey();
+  const scheduledTodayCount = habits.filter((habit) =>
+    isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day),
+  ).length;
+  const completedTodayCount = habits.filter(
+    (habit) =>
+      isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day) &&
+      (completionMap[habit.id] ?? 0) >= habit.target_per_day,
+  ).length;
+  const todayProgress =
+    scheduledTodayCount === 0
+      ? null
+      : Math.round((completedTodayCount / scheduledTodayCount) * 100);
 
   return (
     <Screen scroll padded>
@@ -344,6 +409,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 value={`${consistencyPct}%`}
                 label="Consistency"
                 detail="over the last year"
+              />
+              <StatBlock
+                accentColor={SECTION_COLORS.habits}
+                className="min-w-[148px] flex-1"
+                icon={<Text style={{ fontSize: 20 }}>🗓️</Text>}
+                value={todayProgress === null ? 'Rest' : `${todayProgress}%`}
+                label="Today"
+                detail={
+                  todayProgress === null
+                    ? 'no habits scheduled'
+                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`
+                }
               />
             </View>
           </View>
@@ -457,6 +534,16 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                     : groupHabits.map((habit) => {
                         const todayCount = completionMap[habit.id] ?? 0;
                         const streak = streakMap[habit.id] ?? 0;
+                        const scheduledToday = isHabitScheduledOn(
+                          habit.rule_history,
+                          todayKey,
+                          habit.target_per_day,
+                        );
+                        const currentRule = getHabitRuleForDate(
+                          habit.rule_history,
+                          todayKey,
+                          habit.target_per_day,
+                        );
                         return (
                           <View
                             key={habit.id}
@@ -470,6 +557,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                               size={60}
                               showName={false}
                               showStreak={false}
+                              scheduledToday={scheduledToday}
                               onIncrement={() => handleIncrement(habit.id)}
                               onDecrement={() => handleDecrement(habit.id)}
                             />
@@ -479,6 +567,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                               numberOfLines={2}
                             >
                               {habit.name}
+                            </Text>
+                            <Text
+                              className="mt-0.5 w-[84px] text-center text-[10px] leading-4"
+                              style={{ color: tokens.textMuted }}
+                              numberOfLines={1}
+                            >
+                              {formatHabitSchedule(currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS)}
                             </Text>
                             {streak > 0 ? (
                               <View className="mt-1 flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1">
@@ -558,6 +653,71 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             max={99}
             placeholder="1"
           />
+          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+            Schedule
+          </Text>
+          <View className="mb-2 flex-row flex-wrap">
+            {SCHEDULE_OPTIONS.map((option) => (
+              <PillChip
+                key={option.value}
+                label={option.label}
+                active={schedulePreset === option.value}
+                color={COLOR}
+                onPress={() => {
+                  setHabitError(null);
+                  setSchedulePreset(option.value);
+                  setWeekdays([...option.weekdays]);
+                }}
+              />
+            ))}
+            <PillChip
+              label="Custom"
+              active={schedulePreset === 'custom'}
+              color={COLOR}
+              onPress={() => {
+                setHabitError(null);
+                setSchedulePreset('custom');
+              }}
+            />
+          </View>
+          {schedulePreset === 'custom' ? (
+            <View className="mb-3 flex-row justify-between gap-2">
+              {WEEKDAY_OPTIONS.map((weekday) => {
+                const selected = weekdays.includes(weekday.value);
+                return (
+                  <Pressable
+                    key={`${weekday.value}-${weekday.fullLabel}`}
+                    onPress={() => {
+                      setHabitError(null);
+                      setSchedulePreset('custom');
+                      setWeekdays((current) =>
+                        normalizeHabitWeekdays(
+                          selected
+                            ? current.filter((value) => value !== weekday.value)
+                            : [...current, weekday.value],
+                        ),
+                      );
+                    }}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`${weekday.fullLabel} scheduled`}
+                    accessibilityState={{ checked: selected }}
+                    className="h-11 min-w-[36px] flex-1 items-center justify-center rounded-xl border"
+                    style={{
+                      borderColor: selected ? COLOR : tokens.border,
+                      backgroundColor: selected ? COLOR : tokens.surfaceElevated,
+                    }}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: selected ? tokens.textOnAccent : tokens.textMuted }}
+                    >
+                      {weekday.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
             Category
           </Text>

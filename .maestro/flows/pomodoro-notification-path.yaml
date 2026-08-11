@@ -12,7 +12,12 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- tapOn: 'Focus'
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
 - tapOn: 'Start focus'
 - assertVisible: 'Pause'
 - pressKey: home

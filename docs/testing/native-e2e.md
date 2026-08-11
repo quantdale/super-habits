@@ -14,14 +14,18 @@ Maestro → built native app, lifecycle, platform reality
 ## Workspace and flows
 
 The committed workspace is `.maestro/`. Flows are independently runnable and
-use visible text/accessibility labels, `extendedWaitUntil`, and explicit app
-lifecycle operations. They contain no arbitrary sleeps or coordinate taps.
+use visible text/accessibility labels, `extendedWaitUntil`, state-based
+scrolling, and explicit app lifecycle operations. They contain no arbitrary
+sleeps or raw absolute-coordinate taps. The Calories footer uses an indexed
+semantic selector with a relative point only to keep the matched control above
+the Android API-36 navigation-bar boundary.
 
 | Flow                              | Tags                                               | Proof                                                                                    |
 | --------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `native-smoke.yaml`               | `native`, `smoke`                                  | Native launch, all six sections, Settings open/close                                     |
 | `todo-persistence.yaml`           | `native`, `persistence`, `todos`                   | Create a todo, terminate, relaunch, verify it remains                                    |
 | `habit-persistence.yaml`          | `native`, `persistence`, `habits`                  | Create/increment a habit, terminate, relaunch, verify count                              |
+| `habit-schedule-persistence.yaml` | `native`, `persistence`, `habits`, `habit-v2`      | Create an M/W/F habit, terminate, relaunch, verify the schedule remains                  |
 | `calories-persistence.yaml`       | `native`, `persistence`, `calories`                | Create a calorie entry and verify it after relaunch                                      |
 | `workout-persistence.yaml`        | `native`, `persistence`, `workout`                 | Create a routine/exercise and verify the routine after relaunch                          |
 | `settings-persistence.yaml`       | `native`, `persistence`, `settings`                | Change theme mode and verify it after relaunch                                           |
@@ -49,6 +53,61 @@ The local runner does not build or install an app. Install the `e2e-test`
 profile build on a booted target first. Missing Maestro, `adb`, Xcode/simctl,
 a booted target, or the installed app returns `ENVIRONMENT` and a focused JSON
 report under `simulation-output/native/`; it is not reported as a pass.
+
+## Nitro validation evidence (2026-08-10)
+
+The Windows Nitro workstation has a working local Android lane:
+
+- JDK 17, Android SDK/platform tools, API-36 x86_64 default system image, and
+  the `Nitro_API_36` AVD with hardware acceleration are available.
+- Maestro 2.8.0 is installed and the credential-free local release APK for
+  the `e2e-test` package (`com.dale16.superhabits`) was built, installed, and
+  launched successfully. This is the Windows-supported local equivalent of
+  the EAS profile; the EAS local-build command itself remains a macOS/Linux
+  capability.
+- Build details: the generated Expo Android project was assembled for
+  `x86_64` with CMake 3.30.5. The successful local build also needed a C++
+  shared-runtime linker correction in generated/dependency inputs; those
+  workstation-only changes were not committed. Recheck this toolchain detail
+  before treating a clean-machine rebuild as portable.
+- The first Codex shell could not resolve Maestro because the long-running
+  process retained a stale PATH even though the official launcher existed in
+  the persisted Windows user PATH. `scripts/qa-native.mjs` now probes that
+  persisted user PATH and supports `.bat`/`.cmd` launchers without committing
+  a machine-specific path.
+- `npm run qa:native:android` passed. The aggregate targeted lane passed 6/6
+  persistence flows, including the scheduled M/W/F flow, and the lifecycle
+  lane passed 2/2 Pomodoro flows.
+- Every committed Android flow has executed successfully in the focused
+  lanes. Smoke, Todo persistence, and Pomodoro lifecycle were rerun after the
+  target stabilized and passed again. Reports are retained under
+  `simulation-output/native/` and Maestro artifacts under the user Maestro
+  test directory.
+
+### Proven on Nitro
+
+Native launch/navigation, SQLite-backed Todo, scheduled and daily Habit,
+Calories, Workout, and
+Settings persistence across process termination, Pomodoro background/foreground
+state, notification permission setup, and the native notification scheduling
+path.
+
+### Cloud-only or not run locally
+
+iOS native execution remains cloud-only on Nitro. `npm run qa:native:ios`
+correctly reports `ENVIRONMENT` because Windows has no Xcode `xcrun/simctl`.
+The EAS workflow remains the executable iOS path and was not claimed as a
+local pass.
+
+### Remaining unproven
+
+The scheduled flow proves schedule persistence but does not mutate the Android
+system clock to prove a date-specific off-day card; deterministic off-day
+semantics remain covered by domain, timezone, and web clock lanes. The
+notification-path flow does not prove system notification-tray delivery.
+Long-duration/background timer completion after process death, focused native
+`Alert.alert` confirmation coverage, deterministic Android system offline /
+reconnect toggling, and platform-specific performance remain unproven.
 
 ## Build and cloud path
 

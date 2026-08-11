@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
+import { timestampToLocalDateKey } from '@/lib/time';
 
 /**
  * Integration tests for the REAL bootstrap DDL + `runMigrations()` from
@@ -60,7 +61,7 @@ vi.mock('@/core/db/appMeta', async (importOriginal) => {
   };
 });
 
-/** All tables the app creates (bootstrap DDL + migrations 2–11). */
+/** All tables the app creates (bootstrap DDL + migrations 2–12). */
 const EXPECTED_TABLES = [
   'todos',
   'habits',
@@ -113,14 +114,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 11', async () => {
+  it('bootstraps from zero and reaches stored schema version 12', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('11');
+    expect(row?.value).toBe('12');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -151,21 +152,23 @@ describe('tests/integration/migrations', () => {
 
     // The UNIQUE(habit_id, date_key) table constraint materialises an auto-index.
     expect(indexNames).toContain('sqlite_autoindex_habit_completions_1');
+    const habitColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(habits)');
+    expect(habitColumns.map((column) => column.name)).toContain('rule_history');
     await db.closeAsync();
   });
 
-  it('re-running migrations on an existing v11 database is a no-op', async () => {
+  it('re-running migrations on an existing v12 database is a no-op', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-integration-'));
     const file = path.join(dir, 'superhabits.db');
 
     try {
-      // Session 1: a fresh empty file gets bootstrapped + migrated to v11.
+      // Session 1: a fresh empty file gets bootstrapped + migrated to v12.
       const session1 = await openDb({ filename: file });
       const v1 = await session1.getFirstAsync<{ value: string }>(
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('11');
+      expect(v1?.value).toBe('12');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -176,13 +179,61 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('11');
+      expect(v2?.value).toBe('12');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
       );
       expect(sessions.map((t) => t.name)).toEqual(expect.arrayContaining(EXPECTED_TABLES));
       await session2.closeAsync();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates a legacy habit to an every-day rule at its local creation date', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-legacy-'));
+    const file = path.join(dir, 'superhabits.db');
+    const createdAt = '2026-01-15T23:00:00.000Z';
+
+    try {
+      const legacy = (await import('./helpers/db')).createTestDatabase(file);
+      legacy.raw.exec(`
+        CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+        INSERT INTO app_meta (key, value) VALUES ('db_schema_version', '11');
+        CREATE TABLE habits (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          target_per_day INTEGER NOT NULL DEFAULT 1,
+          reminder_time TEXT,
+          category TEXT NOT NULL DEFAULT 'anytime',
+          icon TEXT NOT NULL DEFAULT 'check-circle',
+          color TEXT NOT NULL DEFAULT '#64748b',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        INSERT INTO habits (
+          id, name, target_per_day, reminder_time, category, icon, color,
+          created_at, updated_at, deleted_at
+        ) VALUES ('habit_legacy', 'Legacy', 3, NULL, 'anytime', 'check-circle', '#64748b', '${createdAt}', '${createdAt}', NULL);
+      `);
+      await legacy.closeAsync();
+
+      const db = await openDb({ filename: file });
+      const row = await db.getFirstAsync<{ target_per_day: number; rule_history: string }>(
+        'SELECT target_per_day, rule_history FROM habits WHERE id = ?',
+        ['habit_legacy'],
+      );
+      expect(row?.target_per_day).toBe(3);
+      expect(JSON.parse(row?.rule_history ?? '[]')).toEqual([
+        {
+          effective_from_date: timestampToLocalDateKey(createdAt),
+          weekdays: [1, 2, 3, 4, 5, 6, 7],
+          target_per_day: 3,
+        },
+      ]);
+      await db.closeAsync();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
