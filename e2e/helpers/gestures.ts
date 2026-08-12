@@ -142,7 +142,7 @@ export async function swipeLeftRevealWorkoutRoutineRow(page: Page): Promise<void
 }
 
 /**
- * TodoItem rows: drag handle (child 0) + checkbox button (child 1) + title (child 2).
+ * TodoItem rows: drag handle (child 0) + semantic checkbox (child 1) + title (child 2).
  * Clicking the title toggles completion but is flaky after list refresh; the checkbox column is a stable target.
  */
 export async function clickTodoCheckboxForTitle(page: Page, title: string): Promise<void> {

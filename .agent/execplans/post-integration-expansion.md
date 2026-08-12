@@ -1,7 +1,7 @@
 # ExecPlan: Post-integration autonomous expansion and hardening campaign
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -18,8 +18,8 @@ leave a tested campaign branch with an honest final handoff.
   serialized Android Maestro validation.
 - Starting branch: `integration/reminder-actions-headless`.
 - Starting commit: `aa63cb3` (`docs: record controlled performance evidence`).
-- Campaign branch/worktree: `campaign/post-integration-expansion` at
-  `C:\Users\Michael Roy\Documents\super-habits-expansion`.
+- Campaign branch/worktree: `campaign/post-integration-expansion` in the
+  current repository worktree.
 - `main` remains `15a1a92`; recovery branches
   `codex/add-schedule-aware-habit-reminders` and
   `parallel/headless-hardening` remain preserved in their worktrees.
@@ -67,13 +67,14 @@ leave a tested campaign branch with an honest final handoff.
 
 ## Current Checkpoint
 
-- Current milestone: Fresh baseline is green, the audit is ranked, the
-  complete Insights domain/data/UI slice is implemented, D14 has been
-  compared against the preserved integrated control, serialized Android
-  persistence/lifecycle evidence is recorded, and a task accessibility bug is
-  fixed with focused web proof and checkpointed as `78ae6ea`; current-source
-  sync, P0, and Chromium feature gates are green. Journey helpers were then
-  updated to follow the new checkbox semantics after two selector regressions.
+- Current milestone: Campaign complete. The fresh baseline was established,
+  the audit was ranked, the Insights domain/data/UI slice was implemented, D14
+  was compared against the preserved integrated control, serialized Android
+  persistence/lifecycle evidence was recorded, and a task accessibility bug
+  was fixed with focused web proof. Journey helpers were aligned with the new
+  checkbox semantics after two selector regressions; final timezone,
+  simulation, controlled D14, dependency, Expo, web, sync, and repository
+  audit evidence are recorded below.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -107,11 +108,20 @@ leave a tested campaign branch with an honest final handoff.
   action helpers: their old first-`role=button` assumption clicked Edit after
   completion became a semantic checkbox. Both helpers now locate the nearest
   checkbox-bearing row and the focused linked-action journey set passes 7/7.
-- In progress: Finish the campaign’s final static/web regression and audit
-  checkpoint. The current-source local Android build is separately classified
-  as a CMake/libc++ toolchain blocker; do not claim current-tree Insights
-  native UI coverage from the older installed APK. Keep the D14 threshold,
-  HEAVY fixture, and assertion unchanged.
+- Completed: Final headless regression is green outside the known HEAVY
+  performance contract: the current-source sync suite is 19/19, P0 is 16/16,
+  Chromium is 88 passed with 7 contractually skipped internal-mode cases, and
+  non-HEAVY journeys are 55 passed with 10 expected sync-continuity skips.
+  The full deterministic simulation is 17/17 and the five-zone timezone
+  matrix is 42/42 in every zone.
+- Completed: The final repository audit found no campaign-generated secrets,
+  APKs, SDK/cache files, temporary databases, or unrelated paths. The current
+  source Android build remains separately classified as a CMake/libc++
+  toolchain blocker; no current-tree Insights native UI coverage is claimed
+  from the older installed APK. The D14 threshold, HEAVY fixture, and
+  assertion remain unchanged.
+- In progress: None — campaign complete; no implementation work remains in
+  this plan.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -121,14 +131,18 @@ leave a tested campaign branch with an honest final handoff.
   `features/todos/TodoItem.tsx`, `features/todos/TodosScreen.tsx`,
   `e2e/todos.spec.ts`, and the journey comment in
   `e2e/journeys/a-tuesday.spec.ts`.
+- `e2e/helpers/gestures.ts`, `e2e/journeys/fat-fingers.spec.ts`, and
+  `e2e/journeys/the-commute.spec.ts` — stale completion-control comments
+  aligned with the semantic checkbox implementation.
 - Last successful validation: after the task fix, `qa:fast` passed typecheck,
   lint (0 errors/19 warnings), and 672 unit tests/59 files; `qa:integration`
   passed 68 real-SQLite tests/11 files; strict OpenSpec passed 21/21, impact
   validation passed 12/12, and all versioned plan validation passed. The
   focused Chromium task suite remains 8/8, and the rebuilt web export passes.
   The complete Vitest run also passes 740 tests across 70 files.
-  The broader baseline uses `npm ci` with 1138 packages and Expo Doctor
-  19/19.
+  The broader baseline uses `npm ci` with 1138 packages. Final Expo Doctor is
+  19/19; final runtime/full npm audit remains 16 advisories (6 moderate, 10
+  high) with only framework-breaking downgrade paths.
 - Current failures: the post-repair `npm audit` reports 16 advisories (6
   moderate, 10 high), all remaining through transitive Expo/Metro/image-size,
   config, and uuid edges; the force-fix path still proposes Expo 53 or React
@@ -145,17 +159,15 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run the non-HEAVY journey set after the helper fix, then
-  rerun current-source timezone/simulation gates and finish dependency and
-  final audit reconciliation.
-- Remaining definition of done: Baseline classified; prioritized queue
-  addressed through multiple meaningful commits; Insights OpenSpec and
-  implementation complete or safely deferred with evidence; relevant
-  correctness/accessibility/sync/performance/test/tooling improvements
-  regression-tested; web/headless and serialized native QA run/classified;
-  dependencies/security understood; final branch audit clean of artifacts and
-  secrets; this plan validated and completed only when no required campaign
-  work remains.
+- Exact next action: None — campaign complete; use this plan and the final
+  repository audit for handoff.
+- Remaining definition of done: No remaining work in the safe in-scope
+  campaign; baseline classified; prioritized queue addressed through multiple
+  meaningful commits; Insights OpenSpec and implementation complete with
+  evidence; relevant correctness/accessibility/sync/performance/test/tooling
+  improvements regression-tested; web/headless and serialized native QA
+  run/classified; dependencies/security understood; final branch audit clean
+  of artifacts and secrets; this plan validated.
 
 ## Progress
 
@@ -193,10 +205,12 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Capture current-tree J8 evidence: the canonical journey reproduced the
       D14 miss, while an isolated HEAVY downstream diagnostic measured CG-5
       diary/picker response under the unchanged 500 ms ceiling.
-- [ ] Audit test runtime/simulation, security/dependencies, types/lint,
-      cross-platform scripts, and current documentation.
-- [ ] Run broad headless QA and serialized Android lanes; classify all gaps.
-- [ ] Inspect final diff/history, validate all plans/OpenSpec, and decide
+- [x] Audit test runtime/simulation, security/dependencies, types/lint,
+      cross-platform scripts, and current documentation; simulation is 17/17,
+      lint is 0 errors/19 warnings, Expo Doctor is 19/19, and the remaining
+      16 audit advisories are classified as framework-breaking deferrals.
+- [x] Run broad headless QA and serialized Android lanes; classify all gaps.
+- [x] Inspect final diff/history, validate all plans/OpenSpec, and decide
       whether the branch is READY TO MERGE to `main`.
 
 ## Audit Queue
@@ -492,6 +506,26 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - 2026-08-13 — focused linked-action journey rerun after selector fix — PASS;
   7/7 steps passed across habit-increment and todo-chain scenarios, including
   exactly-once execution and deleted-target guards.
+- 2026-08-13 — non-HEAVY journey set with `--grep-invert '@p2'` — PASS;
+  55 steps passed and 10 expected sync-continuity steps were skipped. No
+  linked-action selector or accessibility-induced journey failure remained.
+- 2026-08-13 — `npm run qa:timezones` — PASS; 42/42 tests passed in each of
+  Asia/Manila, UTC, America/New_York, Pacific/Honolulu, and Pacific/Kiritimati.
+- 2026-08-13 — `E2E_PORT=8091 npm run qa:simulation -- --all --mode
+deterministic` — PASS; web build, simulation validation, and all 17/17
+  deterministic scenarios passed in 354.8 seconds. No scenario was skipped.
+- 2026-08-13 — final controlled D14 probe — ENVIRONMENT/HOST-SENSITIVE;
+  ten post-accessibility HEAVY repetitions measured 916, 965, 890, 788, 765,
+  826, 791, 804, 835, and 900 ms. Min 765, median 830.5, nearest-rank P90
+  916, max 965, pass count 3/10. The strict 800 ms contract and fixture were
+  unchanged; preserved control evidence fails on the same host.
+- 2026-08-13 — final `npm audit --omit=dev` and `npm audit` —
+  FAIL/KNOWN DEPENDENCY AUDIT; both report 16 advisories (6 moderate, 10 high).
+  The remaining image-size/Metro/Expo-config/uuid chains propose Expo 53 or
+  React Native 0.72 through `--force`; no framework-breaking repair was run.
+- 2026-08-13 — final `npx expo-doctor` — PASS; all 19/19 checks passed.
+- 2026-08-13 — temporary CMake patch audit — PASS; no temporary
+  `CMAKE_ANDROID_STL_TYPE` change remains in `node_modules`.
 
 ## Changed Files / Areas
 
@@ -536,11 +570,13 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Campaign branch has completed the baseline, dependency
-  classification, Insights implementation, deterministic simulation, timezone
-  matrix, D14 control comparison, serialized native evidence, real Android
-  notification-shade proof, and a focused Todo accessibility fix. The final
-  static/web matrix and repository audit remain.
-- Follow-up: Run the final matrix, preserve any classifications, validate the
-  plan, and leave the branch clean without mutating main.
+- Status: Completed.
+- Summary: Campaign branch completed the baseline, dependency classification,
+  Insights implementation, deterministic simulation, timezone matrix, D14
+  control comparison, serialized native evidence, real Android
+  notification-shade proof, task accessibility fix, linked-journey selector
+  repair, and final static/web/repository audit. The branch remains separate
+  from `main`.
+- Follow-up: Revisit the host-sensitive D14 result and current-source Android
+  CMake/libc++ toolchain when the required external environment is available;
+  no framework-breaking dependency repair or remote mutation was performed.

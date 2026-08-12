@@ -27,7 +27,11 @@
 
 - [x] 4.1 Run focused typecheck/lint/unit/integration and `qa:affected`; fix
       root causes without weakening assertions.
-- [ ] 4.2 Run OpenSpec validation, web build/E2E, and serialized native
-      targeted validation where the UI change is supported.
-- [ ] 4.3 Update the campaign ExecPlan with evidence, mark these tasks
+- [x] 4.2 Run OpenSpec validation, web build/E2E, and serialized native
+      targeted validation where the UI change is supported. Web build and
+      current headless coverage pass; serialized Android persistence/lifecycle
+      lanes pass on the installed integration APK. The current-source Android
+      build is an explicitly documented CMake/libc++ environment blocker, so
+      no unsupported native Insights UI claim is made.
+- [x] 4.3 Update the campaign ExecPlan with evidence, mark these tasks
       complete, and create a coherent checkpoint commit.
