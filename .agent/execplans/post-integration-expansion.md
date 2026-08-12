@@ -78,10 +78,10 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Complete the post-dependency focused journey gates, then
-  perform the serialized Android preflight and one supported reminder
-  OS-interaction attempt. Keep the D14 threshold, HEAVY fixture, and assertion
-  unchanged.
+- In progress: Perform the serialized Android preflight and one supported
+  reminder OS-interaction attempt, then complete the final static/headless
+  regression and documentation audit. Keep the D14 threshold, HEAVY fixture,
+  and assertion unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -106,9 +106,10 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run the current P0 journey gate on isolated port 8091,
-  record its result, and then run the remaining current journeys before native
-  preflight.
+- Exact next action: Inspect the native runner and current Android/AVD
+  availability, then run the applicable Android lanes serially or record the
+  precise ENVIRONMENT result before attempting reminder shade/cold-start
+  interaction.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -145,8 +146,9 @@ leave a tested campaign branch with an honest final handoff.
       or UX work from the ranked queue.
 - [x] Reassess D14/CG-4 and the current Insights performance impact against
       the preserved integrated baseline; classify the current host variance.
-- [ ] Complete a current-tree full J8 pass for fresh CG-5 evidence when the
-      host is idle; do not alter D14/CG-5 thresholds or fixtures.
+- [x] Capture current-tree J8 evidence: the canonical journey reproduced the
+      D14 miss, while an isolated HEAVY downstream diagnostic measured CG-5
+      diary/picker response under the unchanged 500 ms ceiling.
 - [ ] Audit test runtime/simulation, security/dependencies, types/lint,
       cross-platform scripts, and current documentation.
 - [ ] Run broad headless QA and serialized Android lanes; classify all gaps.
@@ -369,6 +371,18 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   one worker, covering malformed/503/timeout/partial sync failures, backoff,
   restore lifecycle and safety, offline outbox persistence/deduplication, and
   reconnect delivery.
+- 2026-08-12 — `E2E_PORT=8091 npm run e2e:journeys:p0` — PASS; all 16/16
+  prioritized journey steps passed, including focus continuity and both
+  past-midnight freshness/write paths.
+- 2026-08-12 — `E2E_PORT=8091 npm run e2e:journeys` — PARTIAL / KNOWN
+  ENVIRONMENT PERFORMANCE; 57 steps passed, 10 expected continuity skips and
+  4 later steps did not run after the canonical HEAVY D14 step measured the
+  unchanged `overview→todos` switch at 833 ms (>800 ms). This reproduces the
+  controlled host-sensitive D14 evidence; no functional assertion failed.
+- 2026-08-12 — isolated temporary HEAVY CG-5 diagnostic on port 8091 — PASS;
+  the unchanged diary search measured 273 ms and the saved-meal picker 106 ms,
+  both below the unchanged 500 ms ceiling. The diagnostic was deleted after
+  measurement and is not part of the committed suite.
 
 ## Changed Files / Areas
 
