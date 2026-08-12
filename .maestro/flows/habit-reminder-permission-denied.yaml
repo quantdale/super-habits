@@ -22,7 +22,7 @@ tags:
 - hideKeyboard
 - scrollUntilVisible:
     element: 'Enable habit reminder'
-    direction: DOWN
+    direction: UP
 - tapOn: 'Enable habit reminder'
 - assertVisible: 'Notifications are blocked. Enable them in system settings before saving a reminder.'
 - scrollUntilVisible:
