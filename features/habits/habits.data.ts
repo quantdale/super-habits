@@ -16,18 +16,29 @@ import {
   replaceLinkedActionRulesForSourceEntity,
 } from '@/core/linked-actions/linkedActions.data';
 import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
+import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
+import { requestHabitDataRefresh } from '@/core/notifications/habitDataSignals';
+import {
+  claimNotificationActionInTransaction,
+  setNotificationActionLinkedRequiredInTransaction,
+} from '@/features/habits/notificationActions.data';
 import {
   ALL_HABIT_WEEKDAYS,
   buildInitialHabitRule,
   createHabitRule,
   getHabitRuleForDate,
   getHabitTargetForDate,
+  isHabitScheduledOn,
   parseHabitRuleHistory,
   serializeHabitRuleHistory,
   upsertHabitRule,
   type HabitRule,
   type HabitWeekday,
 } from '@/features/habits/habits.domain';
+import {
+  formatHabitReminderTime,
+  parseHabitReminderTime,
+} from '@/features/habits/habitReminders.domain';
 
 const CATEGORY_ORDER =
   "CASE category WHEN 'anytime' THEN 0 WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 WHEN 'evening' THEN 3 ELSE 4 END";
@@ -61,17 +72,26 @@ export async function addHabit(
   icon: HabitIcon = DEFAULT_HABIT_ICON,
   color: string = DEFAULT_HABIT_COLOR,
   weekdays: readonly HabitWeekday[] = ALL_HABIT_WEEKDAYS,
+  reminderTime: string | null = null,
 ): Promise<string> {
+  const parsedReminderTime = reminderTime === null ? null : parseHabitReminderTime(reminderTime);
+  if (reminderTime !== null && !parsedReminderTime) {
+    throw new Error('Reminder time must use HH:MM local time.');
+  }
+  const canonicalReminderTime = parsedReminderTime
+    ? formatHabitReminderTime(parsedReminderTime)
+    : null;
   const id = createId('habit');
   const now = nowIso();
   const ruleHistory = buildInitialHabitRule(timestampToLocalDateKey(now), targetPerDay, weekdays);
   const db = await getDatabase();
   await db.runAsync(
-    'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, created_at, updated_at, deleted_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL)',
+    'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
     [
       id,
       name,
       targetPerDay,
+      canonicalReminderTime,
       category,
       icon,
       color,
@@ -81,6 +101,7 @@ export async function addHabit(
     ],
   );
   syncEngine.enqueue({ entity: 'habits', id, updatedAt: now, operation: 'create' });
+  requestHabitReminderReconciliation();
   return id;
 }
 
@@ -135,6 +156,7 @@ export async function incrementHabit(
        updated_at = excluded.updated_at`,
     [createId('hcmp'), habitId, dateKey, now, now],
   );
+  requestHabitReminderReconciliation();
 
   const row = await db.getFirstAsync<{ id: string; count: number }>(
     'SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
@@ -182,6 +204,193 @@ export async function incrementHabit(
   };
 }
 
+export type NotificationHabitCompletionResult = {
+  status: 'applied' | 'duplicate' | 'noop';
+  count: number;
+  linkedActions: LinkedActionsDispatchResult;
+};
+
+/**
+ * Apply one notification completion with a durable claim and the same
+ * threshold/Linked Actions semantics as a normal user increment. The marker
+ * and completion row share one SQLite transaction; Linked Actions run after
+ * commit with the marker's stable event ID so a replay can safely finish a
+ * crash between the two durable boundaries.
+ */
+let notificationCompletionQueue: Promise<void> = Promise.resolve();
+
+export function completeHabitFromNotification(input: {
+  habitId: string;
+  dateKey: string;
+  actionKey: string;
+  occurrenceId: string;
+  now?: Date;
+}): Promise<NotificationHabitCompletionResult> {
+  const result = notificationCompletionQueue.then(() => runCompleteHabitFromNotification(input));
+  notificationCompletionQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+async function runCompleteHabitFromNotification(input: {
+  habitId: string;
+  dateKey: string;
+  actionKey: string;
+  occurrenceId: string;
+  now?: Date;
+}): Promise<NotificationHabitCompletionResult> {
+  const db = await getDatabase();
+  const now = input.now ?? new Date();
+  const processedAt = now.toISOString();
+  let claim: Awaited<ReturnType<typeof claimNotificationActionInTransaction>> = {
+    claimed: false,
+    linkedEventId: '',
+    linkedActionRequired: false,
+  };
+  let habitName: string | null = null;
+  let completionId: string | null = null;
+  let shouldDispatchLinkedActions = false;
+  let mutationApplied = false;
+  let nextCount = 0;
+
+  await db.withTransactionAsync(async () => {
+    claim = await claimNotificationActionInTransaction(db, {
+      actionKey: input.actionKey,
+      kind: 'habit-reminder',
+      actionName: 'mark_complete',
+      occurrenceId: input.occurrenceId,
+      processedAt,
+    });
+
+    const habit = await db.getFirstAsync<{
+      id: string;
+      name: string;
+      target_per_day: number;
+      created_at: string;
+      rule_history: string | null;
+    }>(
+      `SELECT id, name, target_per_day, created_at, rule_history
+       FROM habits
+       WHERE id = ?
+         AND deleted_at IS NULL`,
+      [input.habitId],
+    );
+    habitName = habit?.name ?? null;
+
+    const existingCompletion = await db.getFirstAsync<{ id: string; count: number }>(
+      `SELECT id, count
+       FROM habit_completions
+       WHERE habit_id = ?
+         AND date_key = ?`,
+      [input.habitId, input.dateKey],
+    );
+    nextCount = existingCompletion?.count ?? 0;
+    completionId = existingCompletion?.id ?? null;
+
+    if (!claim.claimed) {
+      shouldDispatchLinkedActions = claim.linkedActionRequired && habit !== null;
+      return;
+    }
+
+    const todayKey = toDateKey(now);
+    if (!habit || input.dateKey !== todayKey) {
+      await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
+      return;
+    }
+
+    const creationDateKey = safeTimestampToLocalDateKey(habit.created_at);
+    const history = parseHabitRuleHistory(habit.rule_history);
+    const targetPerDay = getHabitTargetForDate(
+      history,
+      input.dateKey,
+      habit.target_per_day,
+      creationDateKey,
+    );
+    if (
+      !isHabitScheduledOn(history, input.dateKey, habit.target_per_day, creationDateKey) ||
+      nextCount >= targetPerDay
+    ) {
+      await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
+      return;
+    }
+
+    const updatedAt = processedAt;
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES (?, ?, ?, 1, ?, ?)
+       ON CONFLICT(habit_id, date_key) DO UPDATE SET
+         count = count + 1,
+         updated_at = excluded.updated_at`,
+      [createId('hcmp'), input.habitId, input.dateKey, updatedAt, updatedAt],
+    );
+    const updatedCompletion = await db.getFirstAsync<{ id: string; count: number }>(
+      `SELECT id, count
+       FROM habit_completions
+       WHERE habit_id = ?
+         AND date_key = ?`,
+      [input.habitId, input.dateKey],
+    );
+    nextCount = updatedCompletion?.count ?? nextCount + 1;
+    completionId = updatedCompletion?.id ?? completionId;
+    mutationApplied = true;
+    shouldDispatchLinkedActions = nextCount >= targetPerDay;
+    await setNotificationActionLinkedRequiredInTransaction(
+      db,
+      input.actionKey,
+      shouldDispatchLinkedActions,
+    );
+  });
+
+  const status: NotificationHabitCompletionResult['status'] = claim.claimed
+    ? mutationApplied
+      ? 'applied'
+      : 'noop'
+    : 'duplicate';
+  if (claim.claimed) requestHabitDataRefresh();
+  if (claim.claimed && habitName) requestHabitReminderReconciliation();
+
+  if (!shouldDispatchLinkedActions || !habitName || !claim.linkedEventId) {
+    return {
+      status,
+      count: nextCount,
+      linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
+    };
+  }
+
+  const processResult = await linkedActionsEngine.processSourceAction({
+    eventId: claim.linkedEventId,
+    occurredAt: processedAt,
+    feature: 'habits',
+    entityType: 'habit',
+    entityId: input.habitId,
+    triggerType: 'habit.completed_for_day',
+    label: habitName,
+    sourceDateKey: input.dateKey,
+    sourceRecordId: completionId,
+    origin: {
+      originKind: 'user',
+      originRuleId: null,
+      originEventId: null,
+    },
+    payload: {
+      source: 'habit-reminder',
+      actionKey: input.actionKey,
+      currentCount: nextCount,
+    },
+  });
+
+  return {
+    status,
+    count: nextCount,
+    linkedActions: {
+      matchedRuleCount: processResult.matchedRuleCount,
+      notices: processResult.notices,
+    },
+  };
+}
+
 export async function decrementHabit(habitId: string, dateKey = toDateKey()): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
@@ -198,6 +407,7 @@ export async function decrementHabit(habitId: string, dateKey = toDateKey()): Pr
     'DELETE FROM habit_completions WHERE habit_id = ? AND date_key = ? AND count = 0',
     [habitId, dateKey],
   );
+  requestHabitReminderReconciliation();
 }
 
 export async function getHabitCountByDate(habitId: string, dateKey = toDateKey()): Promise<number> {
@@ -270,16 +480,18 @@ export async function updateHabit(
     color?: string;
     weekdays?: readonly HabitWeekday[];
     effectiveFromDate?: string;
+    reminderTime?: string | null;
   },
 ): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
   const existing = await db.getFirstAsync<{
     target_per_day: number;
+    reminder_time: string | null;
     created_at: string;
     rule_history: string | null;
   }>(
-    `SELECT target_per_day, created_at, rule_history
+    `SELECT target_per_day, reminder_time, created_at, rule_history
      FROM habits
      WHERE id = ?
        AND deleted_at IS NULL`,
@@ -306,12 +518,25 @@ export async function updateHabit(
     updates.targetPerDay,
   );
   const nextHistory = upsertHabitRule(normalizedHistory, nextRule);
+  // An omitted reminder field means “leave the current setting unchanged” for
+  // existing callers; null is the explicit disable value used by the editor.
+  const nextReminderTime =
+    updates.reminderTime === undefined ? existing.reminder_time : updates.reminderTime;
+  const parsedReminderTime =
+    nextReminderTime === null ? null : parseHabitReminderTime(nextReminderTime);
+  if (nextReminderTime !== null && !parsedReminderTime) {
+    throw new Error('Reminder time must use HH:MM local time.');
+  }
+  const canonicalReminderTime = parsedReminderTime
+    ? formatHabitReminderTime(parsedReminderTime)
+    : null;
 
   await db.runAsync(
-    'UPDATE habits SET name = ?, target_per_day = ?, category = ?, icon = ?, color = ?, rule_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    'UPDATE habits SET name = ?, target_per_day = ?, reminder_time = ?, category = ?, icon = ?, color = ?, rule_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
     [
       updates.name,
       updates.targetPerDay,
+      canonicalReminderTime,
       updates.category,
       updates.icon ?? DEFAULT_HABIT_ICON,
       updates.color ?? DEFAULT_HABIT_COLOR,
@@ -321,6 +546,7 @@ export async function updateHabit(
     ],
   );
   syncEngine.enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'update' });
+  requestHabitReminderReconciliation();
 }
 
 export async function listHabitLinkedActionRules(
@@ -361,6 +587,7 @@ export async function deleteHabit(habitId: string): Promise<void> {
     deletedAt: now,
   });
   syncEngine.enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'delete' });
+  requestHabitReminderReconciliation();
 }
 
 async function getLinkedActionHabitTarget(habitId: string) {
@@ -417,6 +644,8 @@ export async function incrementHabitFromLinkedAction(input: {
       [createId('hcmp'), input.habitId, input.dateKey, input.amount, now, now],
     );
   }
+
+  requestHabitReminderReconciliation();
 
   return {
     status: 'applied',
@@ -484,6 +713,8 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
       [createId('hcmp'), input.habitId, input.dateKey, desiredCount, now, now],
     );
   }
+
+  requestHabitReminderReconciliation();
 
   return {
     status: 'applied',

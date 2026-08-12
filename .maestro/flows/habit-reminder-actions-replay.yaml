@@ -1,0 +1,72 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - lifecycle
+  - notifications
+  - habit-reminder-replay
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native replay action'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native replay action: 0 of 1 today.*'
+    timeout: 5000
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Inject Mark complete response'
+    direction: DOWN
+- tapOn: 'Inject Mark complete response'
+- scrollUntilVisible:
+    element: 'Cancel'
+    direction: DOWN
+- tapOn: 'Cancel'
+- tapOn: 'Exit habit edit mode'
+- extendedWaitUntil:
+    visible: 'Native replay action: 1 of 1 today.*'
+    timeout: 5000
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- assertVisible: 'Native replay action: 1 of 1 today.*'
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Inject Mark complete response'
+    direction: DOWN
+- tapOn: 'Inject Mark complete response'
+- scrollUntilVisible:
+    element: 'Cancel'
+    direction: DOWN
+- tapOn: 'Cancel'
+- tapOn: 'Exit habit edit mode'
+- scrollUntilVisible:
+    element: 'Native replay action: 1 of 1 today.*'
+    direction: UP
+- assertVisible: 'Native replay action: 1 of 1 today.*'

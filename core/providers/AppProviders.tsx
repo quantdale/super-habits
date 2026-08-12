@@ -19,6 +19,7 @@ import { ensureAnonymousSession, isRemoteEnabled } from '@/lib/supabase';
 import { ThemeProvider, useAppTheme } from '@/core/providers/ThemeProvider';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
+import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
 
 type AppBootstrapState = {
   authBootstrapReady: boolean;
@@ -186,6 +187,7 @@ export function AppProviders({ children }: PropsWithChildren) {
             <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
               <BootstrapGate dbError={dbError}>
                 {children}
+                <HabitReminderHost />
                 <RestorePrompt
                   preview={restorePreview}
                   visible={showRestorePrompt}

@@ -20,17 +20,24 @@ sleeps or raw absolute-coordinate taps. The Calories footer uses an indexed
 semantic selector with a relative point only to keep the matched control above
 the Android API-36 navigation-bar boundary.
 
-| Flow                              | Tags                                               | Proof                                                                                    |
-| --------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `native-smoke.yaml`               | `native`, `smoke`                                  | Native launch, all six sections, Settings open/close                                     |
-| `todo-persistence.yaml`           | `native`, `persistence`, `todos`                   | Create a todo, terminate, relaunch, verify it remains                                    |
-| `habit-persistence.yaml`          | `native`, `persistence`, `habits`                  | Create/increment a habit, terminate, relaunch, verify count                              |
-| `habit-schedule-persistence.yaml` | `native`, `persistence`, `habits`, `habit-v2`      | Create an M/W/F habit, terminate, relaunch, verify the schedule remains                  |
-| `calories-persistence.yaml`       | `native`, `persistence`, `calories`                | Create a calorie entry and verify it after relaunch                                      |
-| `workout-persistence.yaml`        | `native`, `persistence`, `workout`                 | Create a routine/exercise and verify the routine after relaunch                          |
-| `settings-persistence.yaml`       | `native`, `persistence`, `settings`                | Change theme mode and verify it after relaunch                                           |
-| `pomodoro-lifecycle.yaml`         | `native`, `lifecycle`, `pomodoro`                  | Start, background, foreground, and reset a running timer                                 |
-| `pomodoro-notification-path.yaml` | `native`, `lifecycle`, `notifications`, `pomodoro` | Grant notification permission, start native timer scheduling path, background/foreground |
+| Flow                                    | Tags                                                              | Proof                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `native-smoke.yaml`                     | `native`, `smoke`                                                 | Native launch, all six sections, Settings open/close                                     |
+| `todo-persistence.yaml`                 | `native`, `persistence`, `todos`                                  | Create a todo, terminate, relaunch, verify it remains                                    |
+| `habit-persistence.yaml`                | `native`, `persistence`, `habits`                                 | Create/increment a habit, terminate, relaunch, verify count                              |
+| `habit-schedule-persistence.yaml`       | `native`, `persistence`, `habits`, `habit-v2`                     | Create an M/W/F habit, terminate, relaunch, verify the schedule remains                  |
+| `habit-reminder-persistence.yaml`       | `native`, `persistence`, `notifications`, `habits`, `habit-v2`    | Create an M/W/F reminder, terminate, relaunch, verify schedule/time/configuration        |
+| `habit-reminder-disable.yaml`           | `native`, `persistence`, `notifications`, `habits`                | Disable a reminder and verify it stays off after relaunch                                |
+| `habit-reminder-permission-denied.yaml` | `native`, `persistence`, `notifications`, `habits`                | Denied permission is visible and does not enable a reminder                              |
+| `habit-reminder-isolation.yaml`         | `native`, `persistence`, `notifications`, `habits`, `pomodoro`    | Two reminders remain independent; delete one; Pomodoro lifecycle still works             |
+| `habit-reminder-delivery.yaml`          | `native`, `lifecycle`, `notifications`, `habit-reminder-delivery` | Test-build-only near-term schedule, background, and process termination                  |
+| `habit-reminder-actions.yaml`           | `native`, `lifecycle`, `notifications`, `habit-reminder-actions`  | Exact-habit tap, Mark complete, Snooze, and configured-time preservation                 |
+| `habit-reminder-actions-replay.yaml`    | `native`, `lifecycle`, `notifications`, `habit-reminder-replay`   | Mark complete replay after kill/relaunch remains exactly once                            |
+| `calories-persistence.yaml`             | `native`, `persistence`, `calories`                               | Create a calorie entry and verify it after relaunch                                      |
+| `workout-persistence.yaml`              | `native`, `persistence`, `workout`                                | Create a routine/exercise and verify the routine after relaunch                          |
+| `settings-persistence.yaml`             | `native`, `persistence`, `settings`                               | Change theme mode and verify it after relaunch                                           |
+| `pomodoro-lifecycle.yaml`               | `native`, `lifecycle`, `pomodoro`                                 | Start, background, foreground, and reset a running timer                                 |
+| `pomodoro-notification-path.yaml`       | `native`, `lifecycle`, `notifications`, `pomodoro`                | Grant notification permission, start native timer scheduling path, background/foreground |
 
 Run the workspace directly when Maestro is installed:
 
@@ -47,6 +54,8 @@ npm run qa:native:android
 npm run qa:native:lifecycle
 npm run qa:native:ios
 node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml
+# Requires an e2e-test/native build with EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true.
+node scripts/qa-native-delivery.mjs
 ```
 
 The local runner does not build or install an app. Install the `e2e-test`
@@ -90,7 +99,8 @@ Native launch/navigation, SQLite-backed Todo, scheduled and daily Habit,
 Calories, Workout, and
 Settings persistence across process termination, Pomodoro background/foreground
 state, notification permission setup, and the native notification scheduling
-path.
+path. Habit reminder persistence/permission/isolation flows are part of the
+current-source validation for this change.
 
 ### Cloud-only or not run locally
 
@@ -104,10 +114,73 @@ local pass.
 The scheduled flow proves schedule persistence but does not mutate the Android
 system clock to prove a date-specific off-day card; deterministic off-day
 semantics remain covered by domain, timezone, and web clock lanes. The
-notification-path flow does not prove system notification-tray delivery.
-Long-duration/background timer completion after process death, focused native
-`Alert.alert` confirmation coverage, deterministic Android system offline /
-reconnect toggling, and platform-specific performance remain unproven.
+notification-path flow does not prove delivery by itself. The separate
+test-build-only delivery flow now proves a short-horizon Android local
+notification: after a 20-second one-shot trigger and app process termination,
+`adb shell dumpsys notification` observed the expected package, title, body,
+deterministic test identity, and `habit-reminders` channel. Report:
+`simulation-output/native/habit-reminder-delivery-2026-08-12T090401052Z.json`
+(`VERIFIED`). A visual notification-shade interaction was not automated, so
+that presentation layer remains unasserted. The 14-day production window has
+not been accelerated on-device; long-horizon recurrence, long-running
+background timer completion after process death, focused native `Alert.alert`
+confirmation coverage, deterministic Android system offline / reconnect
+toggling, and platform-specific performance remain unproven.
+
+### Nitro reminder validation evidence (2026-08-12)
+
+The current-source Android release APK was assembled for the API-36 x86_64
+emulator after a workstation-only, ignored `-lc++_shared` correction in
+dependency CMake inputs. No such generated dependency edit is part of the
+product change. The installed APK contains the test-only delivery hook and
+passed these sequential lanes:
+
+- `npm run qa:native:targeted` — 10/10 persistence flows, including reminder
+  persistence, disablement, denied permission, schedule-aware configuration,
+  multi-habit isolation, and Pomodoro isolation. Report:
+  `simulation-output/native/native-android-persistence-2026-08-12T094838933Z.json`.
+- `npm run qa:native:lifecycle` — 3/3 flows, including the reminder delivery
+  path and both Pomodoro lifecycle/notification paths. Report:
+  `simulation-output/native/native-android-lifecycle-2026-08-12T095008203Z.json`.
+- `node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml`
+  — the direct smoke reproduction passed all section and Settings assertions.
+  Report:
+  `simulation-output/native/native-android-all-2026-08-12T095324942Z.json`.
+- `node scripts/qa-native-delivery.mjs` — `VERIFIED`; Android's notification
+  manager observed the test notification after app termination. Report:
+  `simulation-output/native/habit-reminder-delivery-2026-08-12T090401052Z.json`.
+
+One preceding aggregate smoke attempt failed with a Maestro device-server
+heartbeat-file lock, and a later aggregate attempt transiently missed the
+reverse-swipe `Start focus` assertion; the unchanged flow passed when replayed
+directly. These are retained as `FLAKY_TEST` harness evidence, not suppressed
+or weakened product assertions. `npm run qa:native:ios` remains an expected
+`ENVIRONMENT` block on Windows because Xcode `xcrun/simctl` is unavailable.
+
+### Habit Reminders V2 action evidence (2026-08-12)
+
+The rebuilt current-source Android APK passed these same-path response probes
+on `Nitro_API_36`:
+
+- `habit-reminder-actions.yaml` passed exact ID-based body-tap routing into
+  the existing Habit edit interaction, one canonical target-one completion
+  with the mounted card refreshed to `1 of 1`, and Snooze scheduling while the
+  configured reminder remained `18:00`.
+- `habit-reminder-actions-replay.yaml` passed Mark complete, process kill,
+  relaunch, and replay of the same response through the production response
+  bridge; the card remained `1 of 1`.
+- `node scripts/qa-native-delivery.mjs` remained `VERIFIED`: Android's
+  notification manager observed the real scheduled reminder after the app was
+  backgrounded and terminated.
+
+The action flows use a test-only response injection that enters the same
+central dispatcher used by the Expo notification listener and cold-start
+recovery. This is intentional: Maestro's visual notification-shade action
+selection is not stable on this emulator. Category registration and actual
+Android posting are still exercised by the installed APK; the shade rendering
+and manual action-button selection remain unasserted. The real SQLite suite
+separately proves target-greater-than-one, concurrent/restart replay, Linked
+Actions, duplicate Snooze, deletion/schedule races, and local-midnight guards.
 
 ## Build and cloud path
 
@@ -121,10 +194,11 @@ remain practical. The workflow does not submit or publish an app.
 
 The Pomodoro lifecycle flow verifies the running native UI through a real
 background/foreground transition and the notification-path flow verifies that
-the native permission/scheduling path is entered. These are not claims that a
-notification appeared in the tray/notification center or that a timer completed
-after a process was killed. Those assertions require a stable Android/iOS
-device-lab mechanism and remain capability gaps. The product's documented
+the native permission/scheduling path is entered. The separate delivery probe
+is the only lane that can claim actual Android delivery, and it must retain its
+JSON report. The current probe verifies posting to Android's notification
+manager after process termination; visual shade interaction and iOS tray
+delivery remain unproven on Nitro/Windows. The product's documented
 no-resume-after-process-death behavior is not invented as a requirement here.
 
 Maestro does not replace the web failure-injection lane for system-level offline
