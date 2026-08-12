@@ -25,7 +25,7 @@
 
 ## 4. Validation and documentation
 
-- [ ] 4.1 Run focused typecheck/lint/unit/integration and `qa:affected`; fix
+- [x] 4.1 Run focused typecheck/lint/unit/integration and `qa:affected`; fix
       root causes without weakening assertions.
 - [ ] 4.2 Run OpenSpec validation, web build/E2E, and serialized native
       targeted validation where the UI change is supported.

@@ -78,7 +78,8 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Run the affected QA checkpoint, then continue with the ranked
+- In progress: Profile and correct the current-tree D14 regression after ten
+  quiet, serialized HEAVY repetitions, then continue with the ranked
   accessibility/documentation/performance/dependency/native queue.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
@@ -100,9 +101,10 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `npm run qa:affected` and the OpenSpec/plan validators
-  for the completed Insights slice. Preserve any failure classification, then
-  checkpoint the feature before starting the next ranked queue item.
+- Exact next action: Profile the overview→Todos switch against the clean
+  `aa63cb3` baseline and the campaign diff, identify the smallest root cause
+  of the current 811–945 ms result, add a regression guard if needed, and
+  rerun the focused J8 path before any broad or native QA.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -133,6 +135,8 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Add deterministic Insights domain unit coverage.
 - [x] Add real-SQLite coverage for shared/history loading.
 - [x] Add focused web and accessibility-equivalent tests.
+- [x] Run the affected QA impact check and strict OpenSpec validation for the
+      completed Insights slice.
 - [ ] Complete additional evidence-backed correctness/sync/restore/accessibility
       or UX work from the ranked queue.
 - [ ] Reassess D14/CG-4, CG-5, J8, and any Insights performance impact.
@@ -280,6 +284,25 @@ repository-wide formatting.
   controls now expose names and selected state. Focused Playwright Chromium
   habits suite passed 11/11 on isolated port 8091 after a fresh web build;
   typecheck, focused lint, and diff check pass.
+- 2026-08-12 — `npm run qa:affected` and strict OpenSpec validation — PASS;
+  the clean tree matched the default `qa:fast → qa:full` impact path and all
+  21 current OpenSpec artifacts validated.
+- 2026-08-12 — `E2E_PORT=8091 npm run e2e:full` — PARTIAL / UNRESOLVED
+  PERFORMANCE; the fresh web export and full 170-test Chromium/journeys/
+  simulation matrix produced 148 passed, 17 expected skips, 4 continuity
+  steps not run after the serial failure, and one failure. J8 measured the
+  unchanged HEAVY `overview→todos` switch at 832 ms against the unchanged
+  800 ms D14 ceiling; the retained artifact showed the expected Todos UI with
+  no product error. This is evidence to investigate, not yet a product-bug or
+  host-noise classification.
+- 2026-08-12 — Ten sequential current-tree J8 HEAVY repetitions on isolated
+  port 8091 with no emulator or competing listener — FAIL / PRODUCT_BUG
+  CANDIDATE (PERFORMANCE); all 10 serial journeys failed the first measured
+  `overview→todos` switch at 945, 840, 811, 874, 813, 889, 849, 826, 816,
+  and 822 ms. Min 811 ms, median 833 ms, nearest-rank P90 889 ms, max 945 ms,
+  pass count 0/10. The strict threshold, HEAVY fixture, worker count, and
+  assertion were unchanged. This supersedes the prior host-noise-only
+  hypothesis for the current campaign tree and requires root-cause profiling.
 
 ## Changed Files / Areas
 
