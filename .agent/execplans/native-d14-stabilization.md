@@ -64,8 +64,8 @@ to `main` only if the evidence supports integration.
 
 ## Current Checkpoint
 
-- Current milestone: The current-source Android build and serialized native
-  regression gates are green from commit `b3a5a2e`. The SDK/NDK unified CMake
+- Current milestone: The current-source Android build, serialized native
+  regression gates, and two controlled D14 batches are green. The SDK/NDK unified CMake
   module receives `ANDROID_STL=c++_shared` but omits `libc++_shared` from
   shared-library link rules; an explicit
   `CMAKE_SHARED_LINKER_FLAGS=-lc++_shared` fixes both dependency and app
@@ -73,9 +73,9 @@ to `main` only if the evidence supports integration.
   six minimal patch-package patches.
 - Completed: Git topology recovered; campaign tip `6287fab`, main tip
   `15a1a92`, integration tip `aa63cb3`, and recovery worktrees preserved.
-- In progress: Re-establish D14/CG-4 under isolated conditions, then run the
-  remaining broad web/sync/accessibility/dependency QA and reconcile docs and
-  plans before the final main-consolidation decision.
+- In progress: Run the remaining focused/broad web, sync, accessibility,
+  dependency, and repository QA, then reconcile docs and plans before the final
+  main-consolidation decision.
 - Important modified files: `app.json`,
   `plugins/withAndroidCxxRuntime.js`, six native dependency patches, and this
   ExecPlan. The originating recovery checkout has unrelated dirty edits that
@@ -85,10 +85,10 @@ to `main` only if the evidence supports integration.
   typecheck passed; lint passed with 0 errors/19 warnings; strict OpenSpec
   passed 21/21; impact validation passed 12/12; all versioned plan validation
   passed; Expo Doctor passed 19/19; and `git diff --check` passed.
-- Current failures: No current-source Android flow is failing. The initial
-  9/10 aggregate was a TEST_BUG in the denied-permission flow and the corrected
-  post-commit rerun is green. D14 and the remaining broad QA gates are still
-  open.
+- Current failures: No current-source Android flow or D14 repetition is
+  failing. The initial 9/10 aggregate was a TEST_BUG in the denied-permission
+  flow and the corrected post-commit rerun is green. Remaining open work is
+  broad QA and documentation/repository reconciliation.
 - Previous failure: the no-override build failed at
   `react-native-worklets:buildCMakeRelWithDebInfo[x86_64]` with unresolved
   `std::__ndk1`/`std::bad_alloc`/`__cxa_*`/RTTI/thread symbols. Generated
@@ -113,16 +113,28 @@ scheduled`; a repeated tap remained at one. Snooze produced an app-owned
   existing emulator and serialized Maestro. The shade evidence uses semantic
   System UI hierarchy discovery and coordinate activation only at the OS UI
   boundary.
-- Blockers: None established for Android build or current-source native QA;
-  D14 classification and broad final QA remain open.
+- D14 result: Two independent 10-run controlled batches passed the unchanged
+  `maxSwitch <= 800ms` assertion. Batch A was `759, 747, 758, 773, 735, 735,
+752, 765, 753, 745ms` (min 735, median 752.5, P90 765, max 773, 10/10).
+  Batch B was `743, 763, 755, 767, 751, 744, 733, 770, 756, 746ms` (min
+  733, median 753, P90 767, max 770, 10/10). The same runs kept CG-5 diary
+  search at 372–420ms and the saved-meal picker at 75–84ms, both under 500ms.
+- D14 classification: ENVIRONMENT/HOST-SENSITIVE, not PRODUCT_BUG. The
+  earlier misses were not reproduced after native/build work stopped and one
+  browser worker ran on isolated port 8097; the current product path has a
+  27ms worst-case margin across 20 valid repetitions. No D14 code change was
+  made, and the benchmark fixture, threshold, assertion, and retry policy are
+  unchanged.
+- Blockers: None established for Android build, current-source native QA, or
+  D14. Broad final QA and repository reconciliation remain open.
 - Condition required to unblock: Produce a clean current-source diagnosis and
   either a reproducible portable fix or an evidence-backed exact toolchain
   repair; preserve an explicit blocker if neither is possible.
 - Exact resume action after unblock: stop the task-owned emulator and any
   task-owned dev server, then run the unchanged D14/CG-4 benchmark in isolated
   browser conditions; do not overlap it with native or build activity.
-- Exact next action: run the controlled D14 sample and its CG-5/J8/Insights
-  performance checks, recording every valid sample before broad QA.
+- Exact next action: run focused web Insights/accessibility checks and then the
+  required broad static, simulation, web, sync, dependency, and plan gates.
 - Remaining definition of done: current-source Android build/install/native
   evidence; D14 classification and two-batch result or honest partial status;
   focused/broad QA and dependency/OpenSpec/plan/docs reconciliation; final
@@ -146,8 +158,10 @@ scheduled`; a repeated tap remained at one. Snooze produced an app-owned
       notification delivery, and direct notification-shade action evidence.
 - [x] Re-prove Habit Progress Insights and Habit Reminder Interactions parity
       with a semantic native flow and exact-source system UI evidence.
-- [ ] Re-establish D14/CG-4, profile/fix only if evidence supports it, and
-      re-run CG-5/J8/Insights performance.
+- [x] Re-establish D14/CG-4 in two independent controlled 10-run batches;
+      classify the old misses as environment/host-sensitive and recheck CG-5
+      and J8 in the same unchanged HEAVY runs.
+- [ ] Run focused Habit Insights performance/accessibility checks.
 - [ ] Run dependency, lint/type, accessibility, sync/restore, simulation, web,
       and final QA matrices.
 - [ ] Reconcile OpenSpec, known gaps, native/build docs, and all ExecPlans.
@@ -324,7 +338,23 @@ habit.` in Android's notification manager after app termination. Report
   all six section navigations and Settings open/close on the installed APK.
   Report `simulation-output/native/native-android-all-2026-08-12T220059910Z.json`
   records `gitSha=b3a5a2e`.
-- 2026-08-13 — D14/CG-4 — NOT RUN for this stabilization branch.
+- 2026-08-13 — D14/CG-4 Batch A — PASS; after stopping the task-owned Android
+  emulator and confirming no task-owned server/build process remained, the
+  unchanged HEAVY J8 journey ran serially on isolated E2E port 8097 for 10
+  valid repetitions. Max-switch samples were
+  `759,747,758,773,735,735,752,765,753,745ms`; min 735, median 752.5, P90
+  765, max 773, pass 10/10. CG-5 diary search was 372–392ms and picker
+  search 75–84ms; all seven J8 steps passed in every repetition.
+- 2026-08-13 — D14/CG-4 Batch B — PASS; an independent serial 10-repetition
+  run under the same unchanged fixture/threshold/assertions produced
+  `743,763,755,767,751,744,733,770,756,746ms`; min 733, median 753, P90
+  767, max 770, pass 10/10. CG-5 diary search was 373–420ms and picker
+  search 75–82ms; all seven J8 steps passed in every repetition.
+- 2026-08-13 — D14 classification — ENVIRONMENT/HOST-SENSITIVE; the old
+  misses were not reproducible once native/build activity stopped and the
+  benchmark ran with one browser worker on port 8097. The current path has a
+  27ms worst-case margin across 20 valid repetitions. No product performance
+  code or benchmark contract was changed.
 
 ## Changed Files / Areas
 
