@@ -16,11 +16,11 @@
 
 ## 3. Accessible product surface
 
-- [ ] 3.1 Add the per-habit Progress entry point and modal/detail component with
+- [x] 3.1 Add the per-habit Progress entry point and modal/detail component with
       loading, empty, error, metric, trend, and target-vs-actual states.
-- [ ] 3.2 Add semantic labels/selected state to habit icon and color selectors
+- [x] 3.2 Add semantic labels/selected state to habit icon and color selectors
       and ensure all insight visualizations have textual equivalents.
-- [ ] 3.3 Add focused Playwright coverage for opening exact-habit progress and
+- [x] 3.3 Add focused Playwright coverage for opening exact-habit progress and
       reading the accessible metrics/history.
 
 ## 4. Validation and documentation

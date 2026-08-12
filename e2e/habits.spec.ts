@@ -56,6 +56,22 @@ test.describe('Habits', () => {
     await expect(page.getByText('Morning run').first()).toBeVisible();
   });
 
+  test('opens accessible progress insights for the exact habit', async ({ page }) => {
+    await openAddHabitModal(page);
+    await page.getByLabel('Habit name').fill('Read progress');
+    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Read progress', { exact: true }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'View progress for Read progress' }).click();
+    await expect(page.getByText('Read progress progress', { exact: true })).toBeVisible();
+    await expect(page.getByText('Scheduled completion rate', { exact: true })).toBeVisible();
+    await expect(page.getByText('Recent target vs actual', { exact: true })).toBeVisible();
+    await expect(page.getByLabel(/Current streak: 0 scheduled occurrences/i)).toBeVisible();
+    await expect(
+      page.getByLabel(/Last 7 days scheduled completion rate: 0 percent, 0 of 1/i),
+    ).toBeVisible();
+  });
+
   test('increments habit completion', async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByLabel('Habit name').fill('Meditate');

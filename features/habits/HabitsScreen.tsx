@@ -61,6 +61,7 @@ import {
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { HabitCircle } from '@/features/habits/HabitCircle';
 import { HabitsOverviewGrid } from '@/features/habits/HabitsOverviewGrid';
+import { HabitProgressInsightsModal } from '@/features/habits/HabitProgressInsightsModal';
 import {
   DEFAULT_HABIT_COLOR,
   DEFAULT_HABIT_ICON,
@@ -138,6 +139,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [insightsHabit, setInsightsHabit] = useState<Habit | null>(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('1');
   const [category, setCategory] = useState<HabitCategory>('anytime');
@@ -810,6 +812,23 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                                 </Text>
                               </View>
                             ) : null}
+                            <Pressable
+                              onPress={() => setInsightsHabit(habit)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`View progress for ${habit.name}`}
+                              className="mt-1 min-h-[36px] w-[84px] items-center justify-center rounded-full border px-2 py-1"
+                              style={{
+                                borderColor: SECTION_COLORS.habits,
+                                backgroundColor: tokens.surfaceElevated,
+                              }}
+                            >
+                              <Text
+                                className="text-[10px] font-semibold"
+                                style={{ color: sectionAccents.habits.text }}
+                              >
+                                Progress
+                              </Text>
+                            </Pressable>
                           </View>
                         );
                       })}
@@ -1117,6 +1136,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                   setHabitError(null);
                   setIcon(iconName);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${iconName.replace('-', ' ')} icon`}
+                accessibilityState={{ selected: icon === iconName }}
                 className="items-center justify-center rounded-lg p-2"
                 style={{
                   width: 44,
@@ -1143,6 +1165,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                   setHabitError(null);
                   setColor(c);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Select habit color ${c}`}
+                accessibilityState={{ selected: color === c }}
                 className="rounded-full"
                 style={{
                   width: 36,
@@ -1200,6 +1225,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           </View>
         </Card>
       </Modal>
+      {insightsHabit ? (
+        <HabitProgressInsightsModal
+          visible
+          habit={insightsHabit}
+          onClose={() => setInsightsHabit(null)}
+        />
+      ) : null}
       {confirmationDialog}
     </Screen>
   );

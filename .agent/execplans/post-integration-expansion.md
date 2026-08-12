@@ -67,9 +67,9 @@ leave a tested campaign branch with an honest final handoff.
 
 ## Current Checkpoint
 
-- Current milestone: Fresh baseline is green, the audit is ranked, the first
-  integrity fix is checkpointed, and Insights domain plus shared completion
-  loading are implemented and tested.
+- Current milestone: Fresh baseline is green, the audit is ranked, and the
+  complete Insights domain/data/UI slice is implemented with focused
+  real-SQLite and web evidence.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -78,12 +78,14 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Build the accessible per-habit progress detail surface and its
-  focused web coverage.
+- In progress: Run the affected QA checkpoint, then continue with the ranked
+  accessibility/documentation/performance/dependency/native queue.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
-  `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`, and
-  `features/habits/HabitsScreen.tsx` contain the current Insights loading
-  milestone; `00c60cd` remains the committed habit-delete fix.
+  `features/habits/HabitProgressInsightsModal.tsx`,
+  `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
+  `features/habits/HabitsScreen.tsx`, and the focused habit E2E/integration
+  tests contain the current Insights slice; `00c60cd` remains the committed
+  habit-delete fix.
 - Last successful validation: `npm ci` installed 1137 packages; typecheck,
   `qa:fast`, `npm test` (727 tests/68 files), `qa:integration` (67 tests/10
   files), OpenSpec (20/20), impact validation (12/12), all versioned plan
@@ -98,10 +100,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Implement task 3.1 of
-  `add-habit-progress-insights`: add the per-habit Progress entry point and
-  accessible modal/detail component with loading, empty, error, metric, trend,
-  and target-vs-actual states.
+- Exact next action: Run `npm run qa:affected` and the OpenSpec/plan validators
+  for the completed Insights slice. Preserve any failure classification, then
+  checkpoint the feature before starting the next ranked queue item.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -128,10 +129,10 @@ leave a tested campaign branch with an honest final handoff.
       window/trend calculation.
 - [x] Implement Insights data loading with historical semantics and bounded
       in-memory list derivation.
-- [ ] Implement Insights UI with historical semantics and bounded loading.
+- [x] Implement Insights UI with historical semantics and bounded loading.
 - [x] Add deterministic Insights domain unit coverage.
 - [x] Add real-SQLite coverage for shared/history loading.
-- [ ] Add focused web and accessibility-equivalent tests.
+- [x] Add focused web and accessibility-equivalent tests.
 - [ ] Complete additional evidence-backed correctness/sync/restore/accessibility
       or UX work from the ranked queue.
 - [ ] Reassess D14/CG-4, CG-5, J8, and any Insights performance impact.
@@ -273,6 +274,12 @@ repository-wide formatting.
   target-two completion is preserved, and opened history uses one query.
   Typecheck, focused unit/integration tests, focused lint, and diff check pass;
   the pre-existing pending-habit focus effect remains one lint warning.
+- 2026-08-12 — Insights UI task 3 — PASS; active habits expose an exact-habit
+  Progress control and a modal with accessible streak/rate/trend/history text,
+  nullable empty-rate messaging, and target-vs-actual rows. Icon/color editor
+  controls now expose names and selected state. Focused Playwright Chromium
+  habits suite passed 11/11 on isolated port 8091 after a fresh web build;
+  typecheck, focused lint, and diff check pass.
 
 ## Changed Files / Areas
 
@@ -289,6 +296,9 @@ repository-wide formatting.
 - `tests/habitInsights.domain.test.ts` — deterministic domain matrix.
 - `tests/integration/habitInsights.test.ts` — real-SQLite shared/history query
   and deleted-habit coverage.
+- `features/habits/HabitProgressInsightsModal.tsx` — accessible local progress
+  detail surface.
+- `e2e/habits.spec.ts` — exact-habit progress accessibility-equivalent journey.
 
 ## Recovery / Resume Instructions
 
