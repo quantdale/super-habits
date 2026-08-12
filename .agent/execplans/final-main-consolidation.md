@@ -1,7 +1,7 @@
 # ExecPlan: Final main consolidation
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -46,37 +46,38 @@ normally when the remote permits it.
 ## Current Checkpoint
 
 - Current milestone: The complete stabilization descendant has been merged
-  normally into local `main` at `36a73dc9942d5e8ad3a7af0a8f5bd862e6679b48`.
-  Main's full web, simulation, and sync gates are green; exact-SHA Android
-  validation and remote synchronization remain.
+  normally into local `main`; the final main QA checkpoint is
+  `62710d8dfa38794a3aedc774a3bea1593ee89f62`. All local product gates and
+  exact-source Android gates are green at that checkpoint.
 - Completed: Local/remote main state, all local branch refs, worktrees, graph,
-  and pre-merge ancestry coverage have been inspected.
-- In progress: Build/install an APK from the exact current `main` SHA, run the
-  serialized main-native matrix, close this plan with final ancestry/security
-  evidence, and push `main` normally if `origin/main` remains unchanged.
-- Important modified files: this ExecPlan only before the merge; the main
-  merge is expected to bring the validated stabilization history and its
-  intentional documentation/OpenSpec changes.
+  pre-merge ancestry coverage, normal merge, main static/web/sync/performance
+  QA, exact-source Android build/install/native matrix, notification-shade
+  actions, documentation, and OpenSpec/ExecPlan reconciliation.
+- In progress: None in this plan. A final closure commit records this state;
+  the post-closure APK rebuild and normal remote push are transport/verification
+  steps and must not change product content.
+- Important modified files: the final consolidation ExecPlan is the only
+  consolidation-specific source change; the merge brought the validated
+  stabilization history and its intentional documentation/OpenSpec changes.
 - Last successful validation: On `main`, 740 Vitest tests, 68 integration
   tests, five-zone timezone QA, 153/170 full E2E aggregate tests, the HEAVY
   D14 row at 753ms, 17/17 deterministic scenarios, 19/19 sync tests, strict
   OpenSpec 21/21, plan validation, impact validation, and Expo Doctor 19/19
-  passed. The stabilization tip's exact-source Android evidence is preserved
-  and the final main APK is still required.
-- Current failures: None established in the validated stabilization tip.
+  passed. Exact main-source Android validation also passed: smoke 1/1,
+  targeted 10/10, lifecycle 5/5, Insights semantic flow, delivery, and real
+  notification-shade Mark Complete/Snooze evidence.
+- Current failures: None established in the validated stabilization tip or
+  consolidated main.
 - Relevant quarantines: iOS/Xcode remains unavailable on Windows; full web
   aggregate has 17 documented environment/opt-in skips; framework-transitive
   npm advisories remain deferred without a compatible fix.
-- Blockers: None for local consolidation at this checkpoint; remote push may
-  be blocked by branch protection or authentication and must be reported
-  precisely rather than bypassed.
-- Exact next action: from clean generated state, build the Android test APK
-  from main SHA `36a73dc9942d5e8ad3a7af0a8f5bd862e6679b48`, install it on the
-  existing `Nitro_API_36`/`emulator-5554`, and run serialized smoke,
-  persistence, lifecycle/action, and Insights flows.
-- Remaining definition of done: final main QA, ancestry/content proof,
-  documentation/plan reconciliation, clean main audit, and remote equality or
-  an honest permission blocker.
+- Blockers: None established. Remote push may be blocked by branch protection
+  or authentication and must be reported precisely rather than bypassed.
+- Exact next action: None — consolidation is complete; perform only the final
+  exact-SHA rebuild/installation and normal `origin/main` equality check.
+- Remaining definition of done: No remaining work in this plan; final main QA,
+  ancestry/content proof, documentation reconciliation, clean-main audit, and
+  remote synchronization are complete or honestly classified.
 
 ## Progress
 
@@ -88,10 +89,10 @@ normally when the remote permits it.
 - [x] Prove every completed branch tip is an ancestor of final `main`.
 - [x] Run final static, unit/integration, web, simulation, sync, performance,
       and dependency validation on `main`.
-- [ ] Build/install from exact final main SHA and run the serialized main-native
-      matrix.
-- [ ] Reconcile this plan/docs, audit side branches/worktrees, and push/verify
-      `origin/main` when permitted.
+- [x] Build/install from exact main SHA and run the serialized main-native
+      matrix, including current notification-shade action evidence.
+- [x] Reconcile this plan/docs, audit side branches/worktrees, and prepare
+      normal `origin/main` synchronization.
 
 ## Surprises & Discoveries
 
@@ -136,6 +137,19 @@ normally when the remote permits it.
   82ms.
 - 2026-08-13 — Main sync/restore — PASS; `e2e:sync` passed 19/19 against the
   dummy-Supabase `dist-sync` build.
+- 2026-08-13 — Main exact-source Android — PASS; clean Expo prebuild and
+  release build succeeded with the portable libc++ linker configuration,
+  installed package `com.dale16.superhabits` on `Nitro_API_36`/
+  `emulator-5554`, smoke passed 1/1, targeted persistence 10/10, lifecycle
+  5/5, Insights semantic flow passed, delivery was verified after process
+  kill, and System UI Mark Complete produced exactly one completion while
+  Snooze scheduled one app-owned Expo notification alarm approximately 14m50s
+  ahead. The pre-closure APK SHA-256 was
+  `B8C538F370D3FC85E12F0B61B3B4F02E135F072E314F4D75A026CD860035C6EE`.
+- 2026-08-13 — Consolidation closure — PASS; all identified completed branch
+  tips are ancestors of main, no merge conflicts occurred, no relevant
+  unmerged branch or stranded committed product work remains, and the final
+  plan/documentation state is reconciled.
 
 ## Changed Files / Areas
 
@@ -157,4 +171,5 @@ normally when the remote permits it.
 
 ## Outcomes & Retrospective
 
-Pending final main merge and validation.
+Main consolidation complete. The final exact-SHA rebuild after this closure
+commit and normal remote equality check are recorded in the handoff report.
