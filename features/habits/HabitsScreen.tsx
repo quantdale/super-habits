@@ -33,9 +33,8 @@ import {
   addHabit,
   decrementHabit,
   deleteHabit,
+  getAllHabitCompletions,
   getAllHabitCompletionsForRange,
-  getCompletionHistory,
-  getHabitCountByDate,
   incrementHabit,
   listHabitLinkedActionRules,
   listHabits,
@@ -165,19 +164,34 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     const list = await listHabits();
     setHabits(list);
     setHabitsLoaded(true);
-    const counts = await Promise.all(list.map((h) => getHabitCountByDate(h.id)));
-    setCompletionMap(Object.fromEntries(list.map((h, i) => [h.id, counts[i]])));
+    const todayKey = toDateKey();
+    const allHabitCompletions = await getAllHabitCompletions();
+    const completionsByHabit = new Map<string, typeof allHabitCompletions>();
+    const todayCounts = new Map<string, number>();
+    for (const completion of allHabitCompletions) {
+      const habitRows = completionsByHabit.get(completion.habit_id) ?? [];
+      habitRows.push(completion);
+      completionsByHabit.set(completion.habit_id, habitRows);
+      if (completion.date_key === todayKey) {
+        todayCounts.set(completion.habit_id, completion.count);
+      }
+    }
+    setCompletionMap(
+      Object.fromEntries(list.map((habit) => [habit.id, todayCounts.get(habit.id) ?? 0])),
+    );
 
     const streaks: Record<string, number> = {};
     for (const habit of list) {
-      const completions = await getCompletionHistory(habit.id);
+      const completions = completionsByHabit.get(habit.id) ?? [];
       const dayCompletions = buildDayCompletions(
         completions,
         habit.target_per_day,
         undefined,
         habit.rule_history,
+        undefined,
+        todayKey,
       );
-      streaks[habit.id] = calculateCurrentStreak(dayCompletions);
+      streaks[habit.id] = calculateCurrentStreak(dayCompletions, todayKey);
     }
     setStreakMap(streaks);
 

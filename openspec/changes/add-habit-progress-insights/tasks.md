@@ -8,10 +8,10 @@
 
 ## 2. Query-efficient data loading
 
-- [ ] 2.1 Add one ordered all-habit completion read for the active Habits list
+- [x] 2.1 Add one ordered all-habit completion read for the active Habits list
       and refactor today counts/current streak derivation to use in-memory
       indexes without changing results.
-- [ ] 2.2 Add real-SQLite coverage for the history query and batched list result,
+- [x] 2.2 Add real-SQLite coverage for the history query and batched list result,
       including target >1 and soft-deleted habit exclusion.
 
 ## 3. Accessible product surface

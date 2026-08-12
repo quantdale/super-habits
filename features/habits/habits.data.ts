@@ -440,6 +440,18 @@ export async function getAllHabitCompletionsForRange(
   );
 }
 
+/** Read all completion rows for active habits in one ordered query. */
+export async function getAllHabitCompletions(): Promise<HabitCompletionRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<HabitCompletionRow>(
+    `SELECT completions.habit_id, completions.date_key, completions.count
+     FROM habit_completions AS completions
+     INNER JOIN habits ON habits.id = completions.habit_id
+     WHERE habits.deleted_at IS NULL
+     ORDER BY completions.habit_id ASC, completions.date_key ASC`,
+  );
+}
+
 export async function getCompletionHistory(
   habitId: string,
   days?: number,

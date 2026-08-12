@@ -68,8 +68,8 @@ leave a tested campaign branch with an honest final handoff.
 ## Current Checkpoint
 
 - Current milestone: Fresh baseline is green, the audit is ranked, the first
-  integrity fix is checkpointed, and the Insights domain contract is now
-  implemented and unit-tested.
+  integrity fix is checkpointed, and Insights domain plus shared completion
+  loading are implemented and tested.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -78,12 +78,12 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Add the shared completion read, refactor the Habits list to
-  remove avoidable N+1 history queries, and then build the accessible detail
-  surface.
-- Important modified files: `features/habits/habitInsights.domain.ts` and
-  `tests/habitInsights.domain.test.ts` are the current domain milestone;
-  `00c60cd` remains the committed habit-delete fix.
+- In progress: Build the accessible per-habit progress detail surface and its
+  focused web coverage.
+- Important modified files: `features/habits/habitInsights.domain.ts`,
+  `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`, and
+  `features/habits/HabitsScreen.tsx` contain the current Insights loading
+  milestone; `00c60cd` remains the committed habit-delete fix.
 - Last successful validation: `npm ci` installed 1137 packages; typecheck,
   `qa:fast`, `npm test` (727 tests/68 files), `qa:integration` (67 tests/10
   files), OpenSpec (20/20), impact validation (12/12), all versioned plan
@@ -98,10 +98,10 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Implement task 2.1 of
-  `add-habit-progress-insights`: add one ordered all-habit completion read and
-  refactor `HabitsScreen.refresh()` to derive today counts/current streaks from
-  one in-memory index without changing the existing heatmap query.
+- Exact next action: Implement task 3.1 of
+  `add-habit-progress-insights`: add the per-habit Progress entry point and
+  accessible modal/detail component with loading, empty, error, metric, trend,
+  and target-vs-actual states.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -126,9 +126,12 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Propose and validate `add-habit-progress-insights` OpenSpec.
 - [x] Implement Insights domain with historical semantics and bounded in-memory
       window/trend calculation.
-- [ ] Implement Insights data/UI with historical semantics and bounded loading.
+- [x] Implement Insights data loading with historical semantics and bounded
+      in-memory list derivation.
+- [ ] Implement Insights UI with historical semantics and bounded loading.
 - [x] Add deterministic Insights domain unit coverage.
-- [ ] Add real-SQLite, focused web, and accessibility-equivalent tests.
+- [x] Add real-SQLite coverage for shared/history loading.
+- [ ] Add focused web and accessibility-equivalent tests.
 - [ ] Complete additional evidence-backed correctness/sync/restore/accessibility
       or UX work from the ranked queue.
 - [ ] Reassess D14/CG-4, CG-5, J8, and any Insights performance impact.
@@ -264,6 +267,12 @@ repository-wide formatting.
   and deletion boundaries, current-day grace, off-day neutrality, empty rates,
   trend evidence, >30 streaks, and leap/year boundaries. Typecheck, focused
   lint, and `git diff --check` pass.
+- 2026-08-12 — Insights data task 2 — PASS; one ordered active-habit
+  completion read replaced the Habits list’s per-habit full-history and
+  today-count reads. Real SQLite coverage proves deleted habits are excluded,
+  target-two completion is preserved, and opened history uses one query.
+  Typecheck, focused unit/integration tests, focused lint, and diff check pass;
+  the pre-existing pending-habit focus effect remains one lint warning.
 
 ## Changed Files / Areas
 
@@ -278,6 +287,8 @@ repository-wide formatting.
 - `features/habits/habitInsights.domain.ts` — canonical metric/window/trend
   calculator.
 - `tests/habitInsights.domain.test.ts` — deterministic domain matrix.
+- `tests/integration/habitInsights.test.ts` — real-SQLite shared/history query
+  and deleted-habit coverage.
 
 ## Recovery / Resume Instructions
 
