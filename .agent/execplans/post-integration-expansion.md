@@ -71,7 +71,7 @@ leave a tested campaign branch with an honest final handoff.
   complete Insights domain/data/UI slice is implemented, D14 has been
   compared against the preserved integrated control, serialized Android
   persistence/lifecycle evidence is recorded, and a task accessibility bug is
-  fixed with focused web proof.
+  fixed with focused web proof and checkpointed as `78ae6ea`.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -138,9 +138,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the task accessibility checkpoint, then run the
-  final affected/static/web regression matrix and reconcile its results before
-  the final repository audit.
+- Exact next action: Run the final affected/static/web regression matrix from
+  clean commit `78ae6ea`, preserve exact results and classifications, then
+  reconcile them before the final repository audit.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -450,6 +450,9 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   Show completed, and Repeat daily, and replaced brittle E2E selectors. The
   focused Chromium Todos suite passed 8/8; typecheck, focused ESLint,
   Prettier, build:web, and diff-check passed.
+- 2026-08-13 — `78ae6ea a11y: make todo completion controls actionable` —
+  PASS; the accessibility source, focused regression, and durable checkpoint
+  were committed together and the worktree is clean.
 
 ## Changed Files / Areas
 
