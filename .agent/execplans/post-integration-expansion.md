@@ -71,7 +71,8 @@ leave a tested campaign branch with an honest final handoff.
   complete Insights domain/data/UI slice is implemented, D14 has been
   compared against the preserved integrated control, serialized Android
   persistence/lifecycle evidence is recorded, and a task accessibility bug is
-  fixed with focused web proof and checkpointed as `78ae6ea`.
+  fixed with focused web proof and checkpointed as `78ae6ea`; current-source
+  sync, P0, and Chromium feature gates are green.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -139,9 +140,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run the final affected/static/web regression matrix from
-  clean commit `78ae6ea`, preserve exact results and classifications, then
-  reconcile them before the final repository audit.
+- Exact next action: Run the complete journey project from the current export,
+  preserve the D14 result and any downstream skips, then finish dependency,
+  timezone/simulation, and final audit reconciliation.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -465,6 +466,18 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - 2026-08-13 — `npm test -- --reporter=dot` — PASS; 740 tests across 70 files
   passed, including 672 unit and 68 real-SQLite integration tests. The only
   stderr was the existing unsupported-legacy-linked-action diagnostic.
+- 2026-08-13 — `npm run build:sync` and dummy-endpoint inspection — PASS;
+  rebuilt `dist-sync` from the final source with the non-routable
+  `https://dummy.supabase.co` and no real credentials.
+- 2026-08-13 — `npm run e2e:sync` — PASS; all 19/19 sync/restore boundary
+  journeys passed on one worker.
+- 2026-08-13 — `E2E_PORT=8091 npm run e2e:journeys:p0` — PASS; all 16/16
+  prioritized journeys passed, including focus continuity and midnight
+  freshness/write coverage.
+- 2026-08-13 — `E2E_PORT=8091 npx playwright test --project=chromium` —
+  PASS; 88 tests passed and 7 contractually skipped internal-mode cases out
+  of 95 collected, including the new Insights and semantic task-control
+  coverage.
 
 ## Changed Files / Areas
 
