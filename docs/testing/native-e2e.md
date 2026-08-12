@@ -173,6 +173,22 @@ on `Nitro_API_36`:
   notification manager observed the real scheduled reminder after the app was
   backgrounded and terminated.
 
+### Current-source notification shade proof (2026-08-13)
+
+The current-source APK was rebuilt and installed after the CMake/libc++ fix.
+For a fresh delivered reminder, Android System UI hierarchy inspection exposed
+semantic `Mark complete` and `Snooze` actions. Activating `Mark complete` cold-
+started the app, routed the exact habit, and produced one completion; repeating
+the same response left the count at one. Activating `Snooze` on a second fresh
+delivery produced one replacement alarm approximately 15 minutes ahead in
+`dumpsys alarm`. Coordinate activation was used only after semantic discovery
+at the System UI boundary; no app-content selector was coordinate-only.
+
+The current-source Android Insights flow also passed: an exact habit opened its
+Progress modal, exposed current/longest streak, scheduled completion rate,
+recent target-vs-actual history and semantic labels, then closed and reopened
+successfully. The flow is `.maestro/flows/habit-progress-insights.yaml`.
+
 ### Current-source Android CMake stabilization evidence (2026-08-13)
 
 The clean current-source build initially failed in `react-native-worklets` and
@@ -200,12 +216,12 @@ and then runs the standalone assemble command.
 
 The action flows use a test-only response injection that enters the same
 central dispatcher used by the Expo notification listener and cold-start
-recovery. This is intentional: Maestro's visual notification-shade action
-selection is not stable on this emulator. Category registration and actual
-Android posting are still exercised by the installed APK; the shade rendering
-and manual action-button selection remain unasserted. The real SQLite suite
-separately proves target-greater-than-one, concurrent/restart replay, Linked
-Actions, duplicate Snooze, deletion/schedule races, and local-midnight guards.
+recovery. Category registration and actual Android posting are exercised by
+the installed APK. The separate current-source shade proof above additionally
+used Android System UI semantic discovery to activate both real actions. The
+real SQLite suite separately proves target-greater-than-one,
+concurrent/restart replay, Linked Actions, duplicate Snooze,
+deletion/schedule races, and local-midnight guards.
 
 ## Build and cloud path
 

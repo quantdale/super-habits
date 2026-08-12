@@ -78,12 +78,13 @@ Untestable with this repo and this harness, regardless of application behaviour.
 
 **Reason:** Nitro's Windows Android lane now reaches the installed SuperHabits
 `e2e-test` equivalent and has proven native smoke, SQLite-backed persistence,
-Pomodoro lifecycle, the notification scheduling path, and short-horizon local
-notification posting after app process termination. The remaining capability
-gaps are visual notification-shade interaction, long-horizon recurrence,
-long-running background execution, focused `Alert.alert` confirmations, system
-offline toggling, and platform-specific performance. iOS remains dependent on
-EAS/macOS because Windows has no Xcode `xcrun/simctl`.
+Pomodoro lifecycle, the notification scheduling path, short-horizon local
+notification posting after app process termination, and direct Android
+notification-shade action selection on the current-source APK. The remaining
+capability gaps are long-horizon recurrence, long-running background
+execution, focused `Alert.alert` confirmations, system offline toggling, and
+platform-specific performance. iOS remains dependent on EAS/macOS because
+Windows has no Xcode `xcrun/simctl`.
 
 **Closing path:** keep `npm run qa:native:android`, the targeted persistence
 lane, lifecycle lane, and the test-only delivery probe as the local Android
@@ -117,6 +118,15 @@ visual notification shade and direct manual selection of the two action
 buttons remain unasserted on Nitro because emulator automation is unreliable;
 the installed Expo category and Android notification-manager posting are
 verified. iOS actionable-notification execution remains cloud/macOS-only.
+
+**Superseding current-source evidence (2026-08-13):** a fresh delivery on the
+same current-source APK was inspected through the Android System UI hierarchy.
+The semantic `Mark complete` action was activated after cold start and routed
+to the exact habit; replaying it left one completion. A second fresh delivery
+was activated through the semantic `Snooze` action and `dumpsys alarm` showed
+one replacement notification approximately 15 minutes ahead. This closes the
+Android shade-action capability for the tested path; the dated 2026-08-12
+statement above remains historical evidence from before that proof.
 
 ### 2. Real Supabase round-trips
 

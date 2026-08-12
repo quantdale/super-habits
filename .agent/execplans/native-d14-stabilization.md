@@ -1,7 +1,7 @@
 # ExecPlan: Current-source Android and D14 stabilization
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -73,22 +73,25 @@ to `main` only if the evidence supports integration.
   six minimal patch-package patches.
 - Completed: Git topology recovered; campaign tip `6287fab`, main tip
   `15a1a92`, integration tip `aa63cb3`, and recovery worktrees preserved.
-- In progress: Run the remaining focused/broad web, sync, accessibility,
-  dependency, and repository QA, then reconcile docs and plans before the final
-  main-consolidation decision.
+- Completed: Focused/broad web, sync, accessibility, dependency, simulation,
+  and repository QA passed; docs, OpenSpec, and plans are reconciled before
+  the separate final main-consolidation decision.
+- In progress: None — stabilization implementation and evidence work is
+  complete; final main consolidation is the next task.
 - Important modified files: `app.json`,
-  `plugins/withAndroidCxxRuntime.js`, six native dependency patches, and this
-  ExecPlan. The originating recovery checkout has unrelated dirty edits that
-  remain untouched.
+  `plugins/withAndroidCxxRuntime.js`, six native dependency patches, native
+  Maestro flows, native/build and known-gap docs, canonical/archive OpenSpec
+  artifacts, and this ExecPlan. The originating recovery checkout has
+  unrelated dirty edits that remain untouched.
 - Last successful validation: `npm test` passed 740 tests/70 files; integration
   passed 68 tests/11 files; timezone QA passed 42 tests in each of five zones;
   typecheck passed; lint passed with 0 errors/19 warnings; strict OpenSpec
   passed 21/21; impact validation passed 12/12; all versioned plan validation
   passed; Expo Doctor passed 19/19; and `git diff --check` passed.
-- Current failures: No current-source Android flow or D14 repetition is
-  failing. The initial 9/10 aggregate was a TEST_BUG in the denied-permission
-  flow and the corrected post-commit rerun is green. Remaining open work is
-  broad QA and documentation/repository reconciliation.
+- Current failures: None in the stabilization scope. The initial 9/10
+  aggregate was a TEST_BUG in the denied-permission flow and the corrected
+  current-source rerun is green. iOS remains an expected Windows environment
+  limitation, and framework-transitive audit advisories remain deferred.
 - Previous failure: the no-override build failed at
   `react-native-worklets:buildCMakeRelWithDebInfo[x86_64]` with unresolved
   `std::__ndk1`/`std::bad_alloc`/`__cxa_*`/RTTI/thread symbols. Generated
@@ -97,7 +100,7 @@ to `main` only if the evidence supports integration.
   selected by the dependency default. CMake 3.30.5 and 3.31.6 alone
   reproduced the omission. A generated-app test with the explicit linker flag
   passed, and a clean prebuild now emits that flag in `android/app/build.gradle`.
-  D14 current-source samples are not yet collected.
+- D14 current-source samples are recorded below from two independent batches.
 - Native persistence result: the initial 9/10 aggregate run passed every flow
   except `habit-reminder-permission-denied`. Its preserved screenshot showed
   the daily-schedule form already scrolled past the Reminder section; changing
@@ -125,20 +128,20 @@ scheduled`; a repeated tap remained at one. Snooze produced an app-owned
   27ms worst-case margin across 20 valid repetitions. No D14 code change was
   made, and the benchmark fixture, threshold, assertion, and retry policy are
   unchanged.
-- Blockers: None established for Android build, current-source native QA, or
-  D14. Broad final QA and repository reconciliation remain open.
-- Condition required to unblock: Produce a clean current-source diagnosis and
-  either a reproducible portable fix or an evidence-backed exact toolchain
-  repair; preserve an explicit blocker if neither is possible.
-- Exact resume action after unblock: stop the task-owned emulator and any
-  task-owned dev server, then run the unchanged D14/CG-4 benchmark in isolated
-  browser conditions; do not overlap it with native or build activity.
-- Exact next action: run focused web Insights/accessibility checks and then the
-  required broad static, simulation, web, sync, dependency, and plan gates.
-- Remaining definition of done: current-source Android build/install/native
-  evidence; D14 classification and two-batch result or honest partial status;
-  focused/broad QA and dependency/OpenSpec/plan/docs reconciliation; final
-  diff/security audit; justified merge decision.
+- Blockers: None established for Android build, current-source native QA, D14,
+  broad QA, or repository reconciliation. iOS remains outside this Windows
+  workstation's capability.
+- Condition required to unblock: Not applicable — no stabilization blocker
+  remains.
+- Exact resume action after unblock: None — use the final consolidation plan
+  for the next task.
+- Exact next action: None — stabilization is complete; proceed to the separate
+  final-main-consolidation plan and merge decision.
+- Remaining definition of done: No remaining work in this stabilization plan.
+  Final main
+  consolidation must independently validate the selected descendant on
+  `main`, prove ancestry/content coverage, run main QA, and synchronize
+  `origin/main` when permitted.
 
 ## Progress
 
@@ -161,11 +164,12 @@ scheduled`; a repeated tap remained at one. Snooze produced an app-owned
 - [x] Re-establish D14/CG-4 in two independent controlled 10-run batches;
       classify the old misses as environment/host-sensitive and recheck CG-5
       and J8 in the same unchanged HEAVY runs.
-- [ ] Run focused Habit Insights performance/accessibility checks.
-- [ ] Run dependency, lint/type, accessibility, sync/restore, simulation, web,
+- [x] Run focused Habit Insights performance/accessibility checks.
+- [x] Run dependency, lint/type, accessibility, sync/restore, simulation, web,
       and final QA matrices.
-- [ ] Reconcile OpenSpec, known gaps, native/build docs, and all ExecPlans.
-- [ ] Audit the cumulative diff and decide whether to merge to `main`.
+- [x] Reconcile OpenSpec, known gaps, native/build docs, and all ExecPlans.
+- [x] Audit the cumulative diff and hand the validated descendant to the
+      separate final-main-consolidation task.
 
 ## Surprises & Discoveries
 
@@ -355,6 +359,30 @@ habit.` in Android's notification manager after app termination. Report
   benchmark ran with one browser worker on port 8097. The current path has a
   27ms worst-case margin across 20 valid repetitions. No product performance
   code or benchmark contract was changed.
+- 2026-08-13 — focused web Insights/accessibility — PASS; `e2e/habits.spec.ts`
+  passed 11/11, including exact-habit Insights accessibility, M/W/F off-day
+  neutrality, schedule edits, reminder persistence, and historical target
+  edits. Full Vitest coverage includes current-day grace, creation boundary,
+  target >1, zero eligible windows, and timezone-safe domain cases.
+- 2026-08-13 — deterministic simulation — PASS; all 17 scenarios passed in
+  345.8 seconds on isolated E2E port 8097.
+- 2026-08-13 — P0 journeys — PASS; 16/16 steps passed.
+- 2026-08-13 — full E2E aggregate — PASS; 153 passed and 17 documented
+  environment/opt-in skips across 170 tests; the HEAVY J8 row passed with
+  maxSwitch 745ms in this run.
+- 2026-08-13 — sync/restore boundary — PASS; `npm run e2e:sync` passed 19/19
+  against the dummy-Supabase `dist-sync` build.
+- 2026-08-13 — dependency health — PASS/PARTIAL; Expo Doctor 19/19. `npm
+audit` remains at 16 framework-transitive advisories (6 moderate, 10 high);
+  available automatic fixes require Expo 53 or React Native 0.72 major
+  downgrades and were deferred.
+- 2026-08-13 — OpenSpec archival — PASS; `add-habit-progress-insights` was
+  archived as `2026-08-13-add-habit-progress-insights` and its canonical
+  `openspec/specs/habit-progress-insights/spec.md` was created.
+- 2026-08-13 — documentation and plan reconciliation — PASS; native shade,
+  Android build, Insights parity, D14 classification, and remaining platform
+  gaps now reflect current evidence; strict OpenSpec and all plan validators
+  pass.
 
 ## Changed Files / Areas
 
@@ -367,6 +395,11 @@ habit.` in Android's notification manager after app termination. Report
   form scroll direction for the denied-notification persistence case.
 - `.maestro/flows/habit-progress-insights.yaml` — current-source semantic
   native Insights parity flow.
+- `docs/testing/known-gaps.md` — current Android shade and remaining-capability
+  classification.
+- `openspec/specs/habit-progress-insights/` and
+  `openspec/changes/archive/2026-08-13-add-habit-progress-insights/` —
+  canonical spec and completed change archive.
 - Future changes will be limited to evidence-backed Android/build, performance,
   test, accessibility, documentation, or safe dependency areas and listed here
   as they occur.
@@ -388,13 +421,18 @@ habit.` in Android's notification manager after app termination. Report
 
 ## Outcomes & Retrospective
 
-- Stabilization remains ACTIVE because D14/CG-4 and broad final QA are not yet
-  complete. The current-source Android CMake/libc++ blocker is resolved with a
-  portable prebuild/plugin-plus-patch configuration, and exact-source
-  build/install/smoke/persistence/lifecycle/notification/action/Insights
-  evidence is green from `b3a5a2e`.
+- The current-source Android build is reproducible from clean Expo-generated
+  state with NDK `27.1.12297006` and CMake `3.22.1`; the portable fix avoids
+  machine-specific paths and does not commit generated Android output.
+- Native current-source evidence is green for smoke, 10/10 persistence, 5/5
+  lifecycle/action flows, real notification delivery, direct Android shade
+  Mark Complete/Snooze proof, and Insights open/metrics/history/close/reopen.
+- D14/CG-4 is closed under controlled conditions with two independent 10/10
+  batches and unchanged contract/fixture/assertions. The honest classification
+  is host-sensitive rather than a product regression.
 - The only native failure discovered was a test-flow scroll-direction bug in
   the denied-permission case; it was corrected without weakening the product
-  assertion and the committed aggregate rerun is `10/10`.
-- Follow-up: stop task-owned Android activity, run isolated D14/CG-4 and
-  related performance checks, then complete broad QA and the merge decision.
+  assertion and the committed aggregate rerun is 10/10.
+- Habit Progress Insights is complete, its canonical spec is created, and its
+  change is archived. The stabilization handoff is ready for final main
+  consolidation; no unrelated feature work was started.

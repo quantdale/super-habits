@@ -29,9 +29,10 @@
       root causes without weakening assertions.
 - [x] 4.2 Run OpenSpec validation, web build/E2E, and serialized native
       targeted validation where the UI change is supported. Web build and
-      current headless coverage pass; serialized Android persistence/lifecycle
-      lanes pass on the installed integration APK. The current-source Android
-      build is an explicitly documented CMake/libc++ environment blocker, so
-      no unsupported native Insights UI claim is made.
+      current headless coverage pass; the current-source Android build,
+      serialized persistence/lifecycle lanes, and the exact-habit Insights
+      modal flow (metrics, history, close/reopen, semantic labels) pass on the
+      current-source APK. The Android CMake/libc++ linker omission is repaired
+      portably through the Expo plugin and dependency patches.
 - [x] 4.3 Update the campaign ExecPlan with evidence, mark these tasks
       complete, and create a coherent checkpoint commit.
