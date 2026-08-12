@@ -351,6 +351,14 @@ repository-wide formatting.
   errors/19 existing warnings), full Vitest (740/740), Expo Doctor (19/19),
   and `npm run build:web` all passed. Worktree hook setup still reports the
   known ENOTDIR warning because this is a linked worktree.
+- 2026-08-12 — `E2E_PORT=8091 npm run qa:simulation -- --all --mode
+deterministic` — PASS; the validator checked all 17 scenarios and the
+  deterministic runner completed all 17/17, including J8, in 375.6 seconds.
+  The previous historical >300-second observation is therefore classified as
+  an insufficient command budget, not an infinite-loop or scenario-loss bug.
+- 2026-08-12 — `npm run qa:timezones` — PASS; the 42-test date/reminder
+  matrix passed in Asia/Manila, UTC, America/New_York, Pacific/Honolulu, and
+  Pacific/Kiritimati. No timezone or local-date regression was observed.
 
 ## Changed Files / Areas
 
