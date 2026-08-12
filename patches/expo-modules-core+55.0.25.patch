@@ -1,0 +1,12 @@
+diff --git a/node_modules/expo-modules-core/android/build.gradle b/node_modules/expo-modules-core/android/build.gradle
+index aa170fa..cb60dc2 100644
+--- a/node_modules/expo-modules-core/android/build.gradle
++++ b/node_modules/expo-modules-core/android/build.gradle
+@@ -106,6 +106,7 @@ android {
+       cmake {
+         def cppArguments = [
+           "-DANDROID_STL=c++_shared",
++          "-DCMAKE_SHARED_LINKER_FLAGS=-lc++_shared",
+           "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+           "-DREACT_NATIVE_DIR=${expoModuleExtension.reactNativeDir}",
+           "-DREACT_NATIVE_TARGET_VERSION=${expoModuleExtension.reactNativeVersion.minor}",

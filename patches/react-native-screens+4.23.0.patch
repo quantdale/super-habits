@@ -1,0 +1,12 @@
+diff --git a/node_modules/react-native-screens/android/build.gradle b/node_modules/react-native-screens/android/build.gradle
+index 23aecd3..2e48d03 100644
+--- a/node_modules/react-native-screens/android/build.gradle
++++ b/node_modules/react-native-screens/android/build.gradle
+@@ -138,6 +138,7 @@ android {
+         externalNativeBuild {
+             cmake {
+                 arguments "-DANDROID_STL=c++_shared",
++                        "-DCMAKE_SHARED_LINKER_FLAGS=-lc++_shared",
+                         "-DRNS_NEW_ARCH_ENABLED=${IS_NEW_ARCHITECTURE_ENABLED}",
+                         "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+             }

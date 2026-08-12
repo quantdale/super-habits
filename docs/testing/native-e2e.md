@@ -75,10 +75,10 @@ The Windows Nitro workstation has a working local Android lane:
   the EAS profile; the EAS local-build command itself remains a macOS/Linux
   capability.
 - Build details: the generated Expo Android project was assembled for
-  `x86_64` with CMake 3.30.5. The successful local build also needed a C++
-  shared-runtime linker correction in generated/dependency inputs; those
-  workstation-only changes were not committed. Recheck this toolchain detail
-  before treating a clean-machine rebuild as portable.
+  `x86_64` with the installed Android SDK/NDK toolchain. The historical build
+  needed a C++ shared-runtime linker correction in generated/dependency inputs;
+  the 2026-08-13 stabilization made that correction reproducible through the
+  committed Expo prebuild plugin and patch-package patches described below.
 - The first Codex shell could not resolve Maestro because the long-running
   process retained a stale PATH even though the official launcher existed in
   the persisted Windows user PATH. `scripts/qa-native.mjs` now probes that
@@ -172,6 +172,31 @@ on `Nitro_API_36`:
 - `node scripts/qa-native-delivery.mjs` remained `VERIFIED`: Android's
   notification manager observed the real scheduled reminder after the app was
   backgrounded and terminated.
+
+### Current-source Android CMake stabilization evidence (2026-08-13)
+
+The clean current-source build initially failed in `react-native-worklets` and
+then in generated application codegen targets with unresolved libc++ symbols
+(`std::__ndk1`, `operator new/delete`, `std::bad_alloc`, `__cxa_*`, RTTI, and
+thread symbols). The installed CMake Android toolchain accepted
+`ANDROID_STL=c++_shared` but omitted `libc++_shared` from the shared-library
+link rules; changing CMake versions alone did not change that behavior.
+
+The portable correction is now applied during every install/prebuild:
+
+- `plugins/withAndroidCxxRuntime.js` adds
+  `-DCMAKE_SHARED_LINKER_FLAGS=-lc++_shared` to the generated application
+  `defaultConfig.externalNativeBuild` arguments.
+- Patch-package patches add the same explicit linker input to the six native
+  dependency CMake configurations that build in this app.
+
+After `npm ci`, clean Expo prebuild, and x86_64 release builds from generated
+native state, two independent builds passed on Nitro with NDK
+`27.1.12297006` and the default installed CMake `3.22.1`. The Gradle/CMake
+clean task itself can fail when asked to clean and assemble in one invocation
+because it removes generated codegen directories before native reconfiguration;
+the validated procedure regenerates Android with Expo, verifies no APK exists,
+and then runs the standalone assemble command.
 
 The action flows use a test-only response injection that enters the same
 central dispatcher used by the Expo notification listener and cold-start
