@@ -28,11 +28,12 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
   `C:\Users\Michael Roy\Documents\super-habits-headless`.
 - Integration branch/worktree: `integration/reminder-actions-headless` at
   `C:\Users\Michael Roy\Documents\super-habits-integrated`.
-- The original feature worktree retains unrelated dependency/configuration
-  edits in `package.json`, `package-lock.json`, `eslint.config.mjs`, patch
-  files, and `.agent/execplans/install-configure-dependencies.md`; these are
-  preserved outside this branch until their ownership and compatibility are
-  deliberately reassessed.
+- The original feature worktree still retains its separate dependency/
+  configuration edits. After inspection, the integration branch deliberately
+  incorporated the SDK-55-compatible subset as `12be240`, covering
+  `package.json`, `package-lock.json`, ESLint configuration, and versioned
+  patch filenames; the unrelated dependency ExecPlan remains outside this
+  branch.
 - Runtime schema truth is `core/db/client.ts` bootstrap plus append-only
   migrations. `schema.sql` is reference-only. Migration 13 is the durable
   processed-notification-action store.
@@ -69,22 +70,31 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 
 ## Current Checkpoint
 
-- Current milestone: Source preservation complete; isolated integration
-  worktree created; semantic merge is next.
+- Current milestone: Web/headless journeys and the dummy sync boundary are
+  green; the required ten-repetition controlled D14/J8 sample is next.
 - Completed: Read repository startup/architecture/QA/ExecPlan instructions;
   located the actual Reminder worktree and OpenSpec history; verified the
   headless branch/worktree and common ancestor; staged only task-owned Reminder
   V2 plus its schedule-aware prerequisite; committed feature tip `2d8223e`;
   created `integration/reminder-actions-headless` from that tip.
-- In progress: Merge `parallel/headless-hardening` into the integration branch.
-- Important modified files: None in the integration worktree yet. The source
-  worktree's preserved unrelated dependency edits are outside this plan's
-  current branch.
-- Last successful validation: Git topology inventory and OpenSpec status show
-  both source changes complete; staged feature commit passed its repository
-  pre-commit formatting/lint tasks.
-- Current failures: None recorded for the clean integration tip; broad QA has
-  not yet run on the integrated tree.
+- In progress: Collect at least ten serial canonical HEAVY D14 repetitions on
+  the quiet host, then inspect current native/emulator readiness.
+- Important modified files: `package.json`, `package-lock.json`,
+  `eslint.config.mjs`, versioned `patches/`, and the earlier merged
+  `core/sync/syncPersistence.ts`, the todos/calories/
+  workout soft-delete data layers, `e2e/helpers/journey.ts`, their regression
+  tests, the merged headless ExecPlan/guidance files, and the Reminder V2 areas
+  from feature tip `2d8223e`.
+- Last successful validation: `npm ci` passed with the SDK-aligned lockfile;
+  Expo Doctor 19/19 and `expo install --check` passed; typecheck, lint (0
+  errors/19 warnings), `npm test` (727/68), and aligned `build:web` passed;
+  focused Habits E2E passed 10/10; broad Chromium passed 87/94 with 7
+  expected internal-mode skips on isolated port 8091; `build:sync` passed and
+  the isolated dummy-boundary sync journey passed 19/19.
+- Current failures: Runtime audit reports 19 vulnerabilities (1 low, 6
+  moderate, 12 high), including transitive Metro/image-size, Babel, js-yaml,
+  brace-expansion, and uuid findings; forced repair proposes an Expo 53
+  downgrade and is not authorized. No product test failure is recorded.
 - Relevant quarantines: Native iOS is expected to be Windows/macOS-limited;
   visual Android notification-shade and direct OS cold-start action selection
   are explicit proof attempts, not assumed passes; D14/CG-4 must be measured
@@ -92,9 +102,10 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: From `C:\Users\Michael Roy\Documents\super-habits-integrated`,
-  run `git merge --no-ff parallel/headless-hardening`, inspect every conflict
-  semantically, then record the merge result and resolution rationale here.
+- Exact next action: Run ten serial repetitions of the canonical HEAVY J8
+  journey on the fresh regular `dist` build, extract each `maxSwitch` timing,
+  and calculate min/median/P90/max/pass count against the unchanged 800 ms
+  threshold. Do not run native or broad QA concurrently.
 - Remaining definition of done: A committed semantic merge; valid append-only
   migration sequence; focused Reminder/headless regressions green; required
   static/OpenSpec/impact/integration/timezone/simulation/web/sync/build gates
@@ -112,10 +123,21 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
       unrelated dependency/configuration edits.
 - [x] Create integration branch/worktree from the Reminder V2 tip.
 - [x] Create this durable Plan-Version 2 integration/continuation plan.
-- [ ] Merge `parallel/headless-hardening` semantically and commit the merge.
-- [ ] Verify migration ordering and focused Reminder/headless invariants.
-- [ ] Run static, integration, OpenSpec, impact, timezone, simulation, web,
-      sync, and build QA appropriate to the merged diff.
+- [x] Merge `parallel/headless-hardening` semantically and commit merge
+      `b4f7372`.
+- [x] Verify the merged headless changes through unit and real-SQLite tests.
+- [x] Verify migration ordering and focused Reminder/headless invariants.
+- [x] Reconcile safe SDK 55 dependency/patch drift and re-run the required
+      clean install, diagnostics, typecheck, lint, unit suite, and web build.
+- [x] Run isolated focused and broad Chromium E2E on port 8091.
+- [x] Run isolated P0 and full journey E2E on port 8091.
+- [x] Run dummy-Supabase sync build and boundary journeys; `build:sync` and
+      `e2e:sync` passed (19/19).
+- [ ] Collect ten controlled HEAVY D14 repetitions and calculate min/median/
+      P90/max/pass count.
+- [x] Run static, integration, OpenSpec, impact, timezone, simulation, web,
+      sync, and build QA appropriate to the merged diff; all recorded gates
+      are green except the documented dependency audit findings.
 - [ ] Re-establish D14/CG-4 under controlled conditions and resolve or classify.
 - [ ] Audit dependency/Expo/lint/format health without unsafe upgrades or
       broad formatting churn.
@@ -151,6 +173,10 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 - 2026-08-12 — Start the integration branch at `2d8223e` and merge
   `parallel/headless-hardening` with `--no-ff` so both histories remain visible
   and conflicts can be reviewed by intent.
+- 2026-08-12 — The merge produced no textual conflicts. Review the actual
+  headless diff rather than treating that as proof of correctness; the
+  non-overlapping fixes remain intact and the merged commit is
+  `b4f7372`.
 - 2026-08-12 — Keep `main` unchanged until the final evidence review.
 
 ## Validation Ledger
@@ -165,8 +191,77 @@ add-schedule-aware-habit-reminders` — PASS; planning complete, 28/28 tasks
   done.
 - 2026-08-12 — `git diff --cached --check` and feature commit hook — PASS;
   Reminder source commit `2d8223e` created with staged-file formatting/lint.
-- 2026-08-12 — Integrated-tree gates — NOT RUN; exact next action is the
-  semantic merge.
+- 2026-08-12 — `git merge --no-ff parallel/headless-hardening` — PASS; merge
+  commit `b4f7372`, no textual conflicts, headless changes reviewed in sync,
+  data, journey, and regression-test areas.
+- 2026-08-12 — Integrated-tree gates — initially NOT RUN; the subsequent
+  post-reconciliation matrix is recorded below.
+- 2026-08-12 — `npm ci` — PASS; 1111 packages installed, baseline patches
+  applied; 24 audit advisories remain and `simple-git-hooks` cannot create
+  hooks through a worktree `.git` file.
+- 2026-08-12 — `npm run typecheck` — PASS; no TypeScript errors.
+- 2026-08-12 — `npm run lint` — PASS; 0 errors and 19 warnings within the
+  25-warning budget; warnings preserved for later safe triage.
+- 2026-08-12 — `npm test` — PASS; 727 tests across 68 files.
+- 2026-08-12 — `npm run qa:integration` — PASS; 67 real-SQLite tests across
+  10 integration files, including headless soft-delete/sync and Reminder V2
+  action/restart coverage.
+- 2026-08-12 — `npm run openspec:validate` — PASS; 20/20 items valid.
+- 2026-08-12 — `npm run qa:impact:validate` — PASS; 12 impact rules valid.
+- 2026-08-12 — `npm run agent:plan:validate:all` — PASS; all versioned plans
+  valid.
+- 2026-08-12 — `npx expo-doctor` — FAIL/DEPENDENCY_DRIFT; Expo Doctor 18/19,
+  with SDK 55-compatible package drift and the existing watcher option warning;
+  no unsafe repair applied.
+- 2026-08-12 — Migration audit (`core/db/client.ts`, `schema.sql`, migration
+  tests) — PASS; append-only blocks 2–13, no duplicate number, migration 13
+  table/index, schema version 13, and real-SQLite latest-schema assertions are
+  consistent. `schema.sql` remains an explicitly reference-only through-v12
+  snapshot.
+- 2026-08-12 — Focused unit reminder/headless set — PASS; 63 tests across six
+  files.
+- 2026-08-12 — Focused real-SQLite set — PASS; 32 tests across four files.
+- 2026-08-12 — Baseline `npm run build:web` — PASS; static export completed.
+- 2026-08-12 — `npm run qa:timezones` — PASS; Asia/Manila, UTC,
+  America/New_York, Pacific/Honolulu, and Pacific/Kiritimati each passed 42
+  checks.
+- 2026-08-12 — `npm run qa:simulation` — PASS; rebuilt web export, simulation
+  model validation (17 scenarios) and deterministic P0 smoke passed.
+- 2026-08-12 — SDK reconciliation (`package.json`, lockfile, ESLint config,
+  versioned patches) — PASS; applied only SDK-55-compatible versions, added
+  documented direct/runtime dependencies, and did not run forced audit repair.
+- 2026-08-12 — post-reconciliation `npm ci` — PASS; 1137 packages installed,
+  both versioned patches applied; 21 npm install-time audit findings reported.
+- 2026-08-12 — `npx expo-doctor` — PASS; 19/19 checks.
+- 2026-08-12 — `npx expo install --check` — PASS; dependencies up to date.
+- 2026-08-12 — `npm audit --omit=dev` — FAIL/KNOWN DEPENDENCY AUDIT; 19
+  transitive/platform/build findings remain; `--force` would downgrade Expo
+  to 53, so no mutation was applied.
+- 2026-08-12 — post-reconciliation `npm run typecheck` — PASS.
+- 2026-08-12 — post-reconciliation `npm run lint` — PASS; 0 errors/19
+  warnings.
+- 2026-08-12 — post-reconciliation `npm test` — PASS; 727 tests across 68
+  files.
+- 2026-08-12 — post-reconciliation `npm run build:web` — PASS; static export
+  completed with the aligned packages and gradient runtime peer.
+- 2026-08-12 — `E2E_PORT=8091 npx playwright test --project=chromium
+e2e/habits.spec.ts` — PASS; 10/10 focused Habit tests.
+- 2026-08-12 — `E2E_PORT=8091 npx playwright test --project=chromium` — PASS;
+  87 passed, 7 expected internal-mode skips, 0 failed (94 total) in 8.1
+  minutes.
+- 2026-08-12 — `E2E_PORT=8091 npx playwright test --project=journeys --grep
+'@p0'` — PASS; 16/16 P0 journeys in 1.1 minutes.
+- 2026-08-12 — `E2E_PORT=8091 npx playwright test --project=journeys` — PASS;
+  62 passed, 10 expected remote-boundary skips, 0 failed (72 total) in 3.6
+  minutes. Canonical HEAVY J8 timing: coldOverview 727ms, maxSwitch 736ms
+  (overview→todos 736ms; all six switches within 800ms), diarySearch 395ms,
+  pickerSearch 80ms.
+- 2026-08-12 — `npm run build:sync` — PASS; isolated `dist-sync` export
+  completed with the dummy Supabase boundary configuration and no real remote
+  credentials.
+- 2026-08-12 — `npm run e2e:sync` — PASS; 19/19 journeys-sync checks passed
+  against the dummy boundary, including malformed/503/timeout/partial-sync,
+  restore, offline outbox, and reconnect behavior.
 
 ## Changed Files / Areas
 
@@ -181,9 +276,9 @@ add-schedule-aware-habit-reminders` — PASS; planning complete, 28/28 tasks
 - `openspec/changes/add-habit-reminder-actions/` and
   `openspec/changes/add-schedule-aware-habit-reminders/` — normative artifacts
   and completed implementation plans.
-- `parallel/headless-hardening` source areas — to be reviewed after merge for
-  sync metadata validation, soft-delete guards, test fixture handling, lint,
-  and current repository guidance.
+- `parallel/headless-hardening` source areas — merged and reviewed for sync
+  metadata validation, soft-delete guards, test fixture handling, lint, and
+  current repository guidance; broad QA remains.
 
 ## Recovery / Resume Instructions
 
@@ -203,7 +298,9 @@ add-schedule-aware-habit-reminders` — PASS; planning complete, 28/28 tasks
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Source preservation and isolated integration setup are complete;
-  merge, stabilization, QA, and continuation remain.
+- Summary: Source preservation, durable planning, the semantic two-parent
+  integration merge, SDK-55-compatible dependency alignment, web/headless
+  journeys, and the dummy sync boundary are complete; controlled performance,
+  native proof, and continuation remain.
 - Follow-up: Complete the remaining definition-of-done conditions before
   considering a merge to `main`.
