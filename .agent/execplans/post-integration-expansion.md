@@ -67,9 +67,9 @@ leave a tested campaign branch with an honest final handoff.
 
 ## Current Checkpoint
 
-- Current milestone: Fresh baseline is green for static, unit, integration,
-  OpenSpec, impact, plan, and Expo diagnostics; source-driven audit/ranking is
-  now complete and the first integrity fix is checkpointed.
+- Current milestone: Fresh baseline is green, the audit is ranked, the first
+  integrity fix is checkpointed, and the validated Insights OpenSpec is ready
+  for implementation.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -78,8 +78,8 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Propose the focused Insights OpenSpec, then implement it against
-  the existing Habit Engine V2 domain semantics.
+- In progress: Apply the Insights OpenSpec domain/data/UI tasks against the
+  existing Habit Engine V2 domain semantics.
 - Important modified files: `features/habits/habits.data.ts` and
   `tests/integration/softDelete.test.ts` were changed and committed in
   `00c60cd`; the campaign plan remains the only uncommitted area between
@@ -98,11 +98,10 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Audit the current source and tests across Habits,
-  Overview, Todos, Calories, Workout, Pomodoro, Settings, command/linked
-  actions, sync/restore, navigation/lifecycle, accessibility, simulation,
-  scripts, and migration documentation; record a ranked queue with concrete
-  evidence before creating the Insights OpenSpec.
+- Exact next action: Implement task 1.1 of
+  `add-habit-progress-insights`: add the pure calculator/types and focused
+  window/trend helpers, then write its deterministic unit matrix before
+  touching the screen.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -124,7 +123,7 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Perform source-driven whole-repository audit and rank actionable queue.
 - [x] Resolve the highest-confidence higher-severity correctness finding:
       repeated habit soft delete.
-- [ ] Propose and validate `add-habit-progress-insights` OpenSpec.
+- [x] Propose and validate `add-habit-progress-insights` OpenSpec.
 - [ ] Implement Insights domain/data/UI with historical semantics and bounded
       loading.
 - [ ] Add unit, real-SQLite, focused web, and accessibility-equivalent tests.
@@ -255,6 +254,9 @@ repository-wide formatting.
 - 2026-08-12 — `00c60cd fix: make habit soft delete idempotent` — PASS;
   targeted Vitest (15 tests/2 files), typecheck, and ESLint passed before the
   checkpoint.
+- 2026-08-12 — `add-habit-progress-insights` OpenSpec — PASS; proposal,
+  delta spec, design, and tasks created and `openspec validate ... --strict`
+  passed. Apply instructions report 10 pending tasks.
 
 ## Changed Files / Areas
 
@@ -264,6 +266,8 @@ repository-wide formatting.
   committed as `00c60cd`.
 - `tests/integration/softDelete.test.ts` — real-SQLite repeat-delete
   regression coverage, committed as `00c60cd`.
+- `openspec/changes/add-habit-progress-insights/` — validated product contract,
+  design, and apply task list.
 
 ## Recovery / Resume Instructions
 
@@ -283,7 +287,7 @@ repository-wide formatting.
 
 - Status: Active.
 - Summary: Campaign branch and durable state created; baseline is green, the
-  audit is ranked, and the first correctness defect is fixed. Insights is the
-  next implementation milestone.
-- Follow-up: Create/validate the Insights OpenSpec, implement it with focused
-  domain/data/UI tests, then continue through the remaining ranked queue.
+  audit is ranked, the first correctness defect is fixed, and the Insights
+  contract is validated. Implementation is the next milestone.
+- Follow-up: Complete the OpenSpec tasks with focused domain/data/UI tests,
+  then continue through the remaining ranked queue.

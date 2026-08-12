@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-12
+goal: Help users understand habit consistency, streaks, and target-vs-actual
+  history without duplicating Habit Engine semantics
