@@ -115,13 +115,13 @@ leave a tested campaign branch with an honest final handoff.
   `features/todos/TodoItem.tsx`, `features/todos/TodosScreen.tsx`,
   `e2e/todos.spec.ts`, and the journey comment in
   `e2e/journeys/a-tuesday.spec.ts`.
-- Last successful validation: after the task fix, Prettier, `git diff --check`,
-  typecheck, focused ESLint, `npm run build:web`, and
-  `npx playwright test e2e/todos.spec.ts --project=chromium` (8/8) pass. The
-  broader baseline remains `npm ci` with 1138 packages; typecheck, `qa:fast`,
-  `npm test` (740 tests/70 files), `qa:integration` (68 tests/11 files),
-  OpenSpec (21/21), impact validation (12/12), all versioned plan validation,
-  and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
+- Last successful validation: after the task fix, `qa:fast` passed typecheck,
+  lint (0 errors/19 warnings), and 672 unit tests/59 files; `qa:integration`
+  passed 68 real-SQLite tests/11 files; strict OpenSpec passed 21/21, impact
+  validation passed 12/12, and all versioned plan validation passed. The
+  focused Chromium task suite remains 8/8, and the rebuilt web export passes.
+  The broader baseline uses `npm ci` with 1138 packages and Expo Doctor
+  19/19.
 - Current failures: the post-repair `npm audit` reports 16 advisories (6
   moderate, 10 high), all remaining through transitive Expo/Metro/image-size,
   config, and uuid edges; the force-fix path still proposes Expo 53 or React
@@ -453,6 +453,14 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - 2026-08-13 — `78ae6ea a11y: make todo completion controls actionable` —
   PASS; the accessibility source, focused regression, and durable checkpoint
   were committed together and the worktree is clean.
+- 2026-08-13 — `npm run qa:fast` — PASS; typecheck, lint (0 errors/19
+  warnings), and 672 unit tests across 59 files passed.
+- 2026-08-13 — `npm run qa:integration` — PASS; 68 real-SQLite tests across
+  11 integration files passed, including migrations, soft-delete guards,
+  schedule history, Insights loading, restore safety, linked actions, and
+  Reminder V2 actions.
+- 2026-08-13 — strict OpenSpec, impact-map, and all-plan validation — PASS;
+  21/21 OpenSpec items, 12/12 impact rules, and all versioned plans passed.
 
 ## Changed Files / Areas
 
