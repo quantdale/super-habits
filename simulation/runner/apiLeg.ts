@@ -257,6 +257,23 @@ export async function execCreateHabit(page: Page, args: Record<string, unknown>)
   const effectiveFromDate = await pageDateKey(page);
   const id = makeId('habit');
   const target = Number(args.targetPerDay ?? 1);
+  const reminderTime = args.reminderTime === undefined ? null : args.reminderTime;
+  if (
+    reminderTime !== null &&
+    (typeof reminderTime !== 'string' || !/^\d{2}:\d{2}$/.test(reminderTime))
+  ) {
+    throw new Error(
+      `apiLeg createHabit reminderTime must be canonical HH:MM or null (got ${JSON.stringify(reminderTime)})`,
+    );
+  }
+  if (
+    typeof reminderTime === 'string' &&
+    (Number(reminderTime.slice(0, 2)) > 23 || Number(reminderTime.slice(3, 5)) > 59)
+  ) {
+    throw new Error(
+      `apiLeg createHabit reminderTime must be canonical HH:MM or null (got ${JSON.stringify(reminderTime)})`,
+    );
+  }
   const weekdays = [
     ...new Set(
       (Array.isArray(args.weekdays) ? args.weekdays : [1, 2, 3, 4, 5, 6, 7])
@@ -288,7 +305,7 @@ export async function execCreateHabit(page: Page, args: Record<string, unknown>)
         esc(id),
         esc(String(args.name)),
         esc(target),
-        'NULL',
+        reminderTime === null ? 'NULL' : esc(reminderTime),
         esc('anytime'),
         esc('check-circle'),
         esc('#6366f1'),
@@ -299,7 +316,7 @@ export async function execCreateHabit(page: Page, args: Record<string, unknown>)
       ],
     ),
   );
-  return `createHabit(${JSON.stringify(args.name)}, target=${String(target)}, weekdays=${weekdays.join(',')})`;
+  return `createHabit(${JSON.stringify(args.name)}, target=${String(target)}, weekdays=${weekdays.join(',')}, reminder=${reminderTime ?? 'off'})`;
 }
 
 /** Handler for `tickHabit`: SELECT→INSERT/UPDATE on habit_completions (today). */

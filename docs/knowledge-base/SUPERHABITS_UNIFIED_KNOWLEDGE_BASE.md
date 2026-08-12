@@ -61,7 +61,7 @@
 
 **SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **12**. Next migration: `if (version < 13)`. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **13**. Next migration: `if (version < 14)`. Migration 13 adds durable `processed_notification_actions` state. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
 **Sync / backup:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
@@ -75,7 +75,7 @@
 
 **UI:** NativeWind + `core/ui` primitives; top tab rail of plain `Pressable` items inside `app/index.tsx`.
 
-**Quality (May 5, 2026):** `npm run typecheck` passes; `npm test` passes with **427** tests; `npm run build:web` passes; `npx playwright test --list` reports **90** tests in **14** spec files. CI runs quality (`typecheck` + `test`) then E2E.
+**Quality (2026-08-12 campaign baseline):** `npm run typecheck` passes; the current Vitest inventory is **740** tests across **70** files; the Chromium Playwright inventory is **95** tests across **14** spec files (189 across all configured projects). `npm run build:web` passes. CI runs quality (`typecheck` + `test`) then E2E; live performance/native verdicts remain in the campaign ExecPlan rather than being implied by this inventory.
 
 ### Cross-cutting concerns
 
@@ -97,15 +97,15 @@
 
 ### Repository identity
 
-| Attribute               | Value                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Name                    | `superhabits` (npm package, private)                                                                                                        |
-| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay       |
-| Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                              |
-| Schema version (stored) | **12** (`app_meta.db_schema_version`)                                                                                                       |
-| Next migration          | `13` (new `if (version < 13)` block in `runMigrations`)                                                                                     |
-| Unit tests              | **427** passing (Vitest)                                                                                                                    |
-| E2E tests               | **90** Playwright tests in **14** spec files (Chromium); **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js` |
+| Attribute               | Value                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Name                    | `superhabits` (npm package, private)                                                                                                  |
+| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay |
+| Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                        |
+| Schema version (stored) | **13** (`app_meta.db_schema_version`)                                                                                                 |
+| Next migration          | `14` (new `if (version < 14)` block in `runMigrations`)                                                                               |
+| Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                |
+| E2E tests               | **95** Chromium tests in **14** spec files; **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js`        |
 
 ### Top-level directory map
 
@@ -510,7 +510,7 @@ There are no distinct URL routes. The app is a single page: all six sections are
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **12**. Next migration: `if (version < 13)` in `runMigrations()`.
+Current `app_meta.db_schema_version`: **13**. Next migration: `if (version < 14)` in `runMigrations()`.
 
 ### Bootstrap DDL (verbatim)
 

@@ -78,7 +78,7 @@ Key product facts:
 
 ## Technology Stack
 
-- **Runtime:** Expo SDK `^55.0.8`, React Native `0.83.4`, React `19.2.0`
+- **Runtime:** Expo SDK `~55.0.28`, React Native `0.83.10`, React `19.2.0`
 - **Language:** TypeScript `~5.9.2` (strict mode)
 - **Routing:** Expo Router `^55.0.7` (file-based routing in `app/`)
 - **Styling:** NativeWind `^4.2.3` + Tailwind CSS `^3.4.19`
@@ -133,8 +133,8 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **12** (`app_meta.db_schema_version`). Next migration: add a new `if (version < 13) { ... }` block.
-- `core/db/schema.sql` is **stale** (a v4-era snapshot missing 7 of 15 tables) and **reference-only** — it is never executed at runtime. Derive the real schema from the bootstrap DDL + migration blocks in `core/db/client.ts`.
+- Current stored schema version: **13** (`app_meta.db_schema_version`), including durable processed-notification-action state. Next migration: add a new `if (version < 14) { ... }` block.
+- `core/db/schema.sql` is **stale** (a v4-era snapshot missing runtime tables, including migration-13 notification-action state) and **reference-only** — it is never executed at runtime. Derive the real schema from the bootstrap DDL + migration blocks in `core/db/client.ts`.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 
 ### Sync
@@ -208,7 +208,7 @@ Violating these can cause silent data corruption or break the app on cold start.
 4. **IDs via `createId(prefix)` from `lib/id.ts`.** Format: `{prefix}_{timestamp_ms}_{8_random_chars}`. Never use `Math.random()`, `crypto.randomUUID()`, or `Date.now()` alone.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
 6. **Migrations are append-only.** Never edit existing migration blocks. Add a new `if (version < N+1) { ... }` block in `runMigrations()` in `core/db/client.ts`.
-7. **`schema.sql` is a stale v4-era snapshot** (missing 7 of 15 tables) and reference-only, not runtime authority — the runtime truth is the bootstrap DDL + migration blocks in `core/db/client.ts`.
+7. **`schema.sql` is a stale v4-era snapshot** (missing runtime tables, including migration-13 notification-action state) and reference-only, not runtime authority — the runtime truth is the bootstrap DDL + migration blocks in `core/db/client.ts`.
 8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`). Neither table is synced.
 
 ## Feature Module Pattern
@@ -290,8 +290,8 @@ Current verified baselines:
 
 - `npm run typecheck`: 0 errors
 - `npm run lint`: 0 errors (warnings allowed)
-- `npm test`: **633 tests passing** across **57 test files** (589 unit + 44 integration under the `tests/integration/` Vitest project)
-- `npx playwright test --list`: **181 tests** across **19 spec files** — the `chromium` project (14 `e2e/*.spec.ts`), the `journeys` project (12 `e2e/journeys/*.spec.ts`), the `simulation` project (`simulation/runner/specs/`), and the `journeys-sync` project (`e2e/journeys` `grep /@sync/` — the 19 remote-boundary steps, opt-in via `npm run e2e:sync` against the dummy-Supabase `dist-sync/` build on :8082; main/nightly only)
+- `npm test`: **740 tests passing** across **70 test files** (672 unit + 68 integration under the `tests/integration/` Vitest project)
+- `npx playwright test --list`: **189 tests** across **19 spec files** — the `chromium` project (95 tests in 14 `e2e/*.spec.ts` files), the `journeys` project, the `simulation` project (`simulation/runner/specs/`), and the `journeys-sync` project (`e2e/journeys` `grep /@sync/` — the 19 remote-boundary steps, opt-in via `npm run e2e:sync` against the dummy-Supabase `dist-sync/` build on :8082; main/nightly only)
 - `npm run e2e:sync`: **18 passed / 1 skipped** (J3, J4, J5 @sync steps; the skip is J5's CG-2 quarantine) — 0 failed
 
 > The simulation platform (`simulation/`) adds scenario/runner/repro layers on top of the journey suite — see `simulation/README.md` and `docs/testing/known-gaps.md`.

@@ -1,0 +1,12 @@
+diff --git a/node_modules/expo-sqlite/android/build.gradle b/node_modules/expo-sqlite/android/build.gradle
+index fee6bd1..a157995 100644
+--- a/node_modules/expo-sqlite/android/build.gradle
++++ b/node_modules/expo-sqlite/android/build.gradle
+@@ -61,6 +61,7 @@ android {
+       cmake {
+         abiFilters (*reactNativeArchitectures())
+         arguments "-DANDROID_STL=c++_shared",
++          "-DCMAKE_SHARED_LINKER_FLAGS=-lc++_shared",
+           "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+           "-DSQLITE3_SRC_DIR=${toPlatformIndependentPath(SQLITE3_SRC_DIR)}",
+           "-DSQLITE_BUILDFLAGS=${getSQLiteBuildFlags()}",

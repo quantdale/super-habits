@@ -16,6 +16,9 @@
     },
     "e2e-test": {
       "withoutCredentials": true,
+      "env": {
+        "EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST": "true"
+      },
       "ios": {
         "simulator": true
       },

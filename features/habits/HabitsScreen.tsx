@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinkedActionsEditorSection } from '@/core/linked-actions/LinkedActionsEditorSection';
 import { buildLinkedActionEditorRowsFromRules } from '@/core/linked-actions/linkedActionsEditor.adapter';
 import { HABIT_LINKED_ACTIONS_EDITOR_CONFIG } from '@/core/linked-actions/linkedActionsEditor.config';
@@ -24,6 +25,7 @@ import { Button } from '@/core/ui/Button';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppNavigation } from '@/core/providers/NavigationProvider';
 import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
 import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
 import type { Habit, HabitCategory, HabitIcon } from './types';
@@ -31,9 +33,8 @@ import {
   addHabit,
   decrementHabit,
   deleteHabit,
+  getAllHabitCompletions,
   getAllHabitCompletionsForRange,
-  getCompletionHistory,
-  getHabitCountByDate,
   incrementHabit,
   listHabitLinkedActionRules,
   listHabits,
@@ -60,6 +61,7 @@ import {
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { HabitCircle } from '@/features/habits/HabitCircle';
 import { HabitsOverviewGrid } from '@/features/habits/HabitsOverviewGrid';
+import { HabitProgressInsightsModal } from '@/features/habits/HabitProgressInsightsModal';
 import {
   DEFAULT_HABIT_COLOR,
   DEFAULT_HABIT_ICON,
@@ -71,6 +73,23 @@ import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateHabit } from '@/lib/validation';
 import { ValidationError } from '@/core/ui/ValidationError';
+import {
+  formatHabitReminderTime,
+  parseHabitReminderTime,
+  getHabitReminderIdentifier,
+  HABIT_REMINDER_DATA_KIND,
+  HABIT_REMINDER_DATA_VERSION,
+  HABIT_REMINDER_MARK_COMPLETE_ACTION,
+  HABIT_REMINDER_SNOOZE_ACTION,
+} from '@/features/habits/habitReminders.domain';
+import { injectNotificationResponseForTesting } from '@/core/notifications/notificationResponseBridge';
+import { setHabitDataRefreshHandler } from '@/core/notifications/habitDataSignals';
+import {
+  getNotificationPermissionState,
+  requestHabitReminderPermission,
+  scheduleTestHabitReminderNotification,
+  type NotificationPermissionState,
+} from '@/lib/notifications';
 
 const TIME_GROUPS = [
   { key: 'anytime' as const, label: 'Anytime', icon: '🔄' },
@@ -81,6 +100,7 @@ const TIME_GROUPS = [
 
 const COLOR = SECTION_COLORS.habits;
 const HABIT_LINKED_ACTION_SOURCE_KEY = 'habit-linked-actions-source';
+const HABIT_REMINDER_E2E_TEST = process.env.EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST === 'true';
 const SCHEDULE_OPTIONS: { value: HabitSchedulePreset; label: string; weekdays: HabitWeekday[] }[] =
   [
     { value: 'every_day', label: 'Every day', weekdays: [...ALL_HABIT_WEEKDAYS] },
@@ -96,6 +116,7 @@ const WEEKDAY_OPTIONS: { value: HabitWeekday; label: string; fullLabel: string }
   { value: 6, label: 'S', fullLabel: 'Saturday' },
   { value: 7, label: 'S', fullLabel: 'Sunday' },
 ];
+const DEFAULT_HABIT_REMINDER_TIME = '18:00';
 
 function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
   if (a.length !== b.length) return false;
@@ -107,15 +128,18 @@ function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
 
 export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const { consumePendingHabitFocus } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitsLoaded, setHabitsLoaded] = useState(false);
   const [completionMap, setCompletionMap] = useState<Record<string, number>>({});
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [insightsHabit, setInsightsHabit] = useState<Habit | null>(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('1');
   const [category, setCategory] = useState<HabitCategory>('anytime');
@@ -123,6 +147,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [color, setColor] = useState(DEFAULT_HABIT_COLOR);
   const [schedulePreset, setSchedulePreset] = useState<HabitSchedulePreset>('every_day');
   const [weekdays, setWeekdays] = useState<HabitWeekday[]>([...ALL_HABIT_WEEKDAYS]);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_HABIT_REMINDER_TIME);
+  const [showReminderTimePicker, setShowReminderTimePicker] = useState(false);
+  const [reminderPermission, setReminderPermission] =
+    useState<NotificationPermissionState>('not_determined');
+  const [reminderPermissionBusy, setReminderPermissionBusy] = useState(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
   const [habitHeatmapDays, setHabitHeatmapDays] = useState<HeatmapDay[]>([]);
   const [consistencyPct, setConsistencyPct] = useState(0);
   const [overallStreak, setOverallStreak] = useState(0);
@@ -134,19 +165,35 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const refresh = useCallback(async () => {
     const list = await listHabits();
     setHabits(list);
-    const counts = await Promise.all(list.map((h) => getHabitCountByDate(h.id)));
-    setCompletionMap(Object.fromEntries(list.map((h, i) => [h.id, counts[i]])));
+    setHabitsLoaded(true);
+    const todayKey = toDateKey();
+    const allHabitCompletions = await getAllHabitCompletions();
+    const completionsByHabit = new Map<string, typeof allHabitCompletions>();
+    const todayCounts = new Map<string, number>();
+    for (const completion of allHabitCompletions) {
+      const habitRows = completionsByHabit.get(completion.habit_id) ?? [];
+      habitRows.push(completion);
+      completionsByHabit.set(completion.habit_id, habitRows);
+      if (completion.date_key === todayKey) {
+        todayCounts.set(completion.habit_id, completion.count);
+      }
+    }
+    setCompletionMap(
+      Object.fromEntries(list.map((habit) => [habit.id, todayCounts.get(habit.id) ?? 0])),
+    );
 
     const streaks: Record<string, number> = {};
     for (const habit of list) {
-      const completions = await getCompletionHistory(habit.id);
+      const completions = completionsByHabit.get(habit.id) ?? [];
       const dayCompletions = buildDayCompletions(
         completions,
         habit.target_per_day,
         undefined,
         habit.rule_history,
+        undefined,
+        todayKey,
       );
-      streaks[habit.id] = calculateCurrentStreak(dayCompletions);
+      streaks[habit.id] = calculateCurrentStreak(dayCompletions, todayKey);
     }
     setStreakMap(streaks);
 
@@ -181,6 +228,17 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
+  useEffect(() => {
+    setHabitDataRefreshHandler(() => void refresh());
+    return () => setHabitDataRefreshHandler(null);
+  }, [isActive, refresh]);
+
+  const refreshReminderPermission = useCallback(async () => {
+    const state = await getNotificationPermissionState();
+    setReminderPermission(state);
+    return state;
+  }, []);
+
   const openAddModal = (presetCategory?: HabitCategory) => {
     setEditingHabit(null);
     setName('');
@@ -190,40 +248,173 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setColor(DEFAULT_HABIT_COLOR);
     setSchedulePreset('every_day');
     setWeekdays([...ALL_HABIT_WEEKDAYS]);
+    setReminderEnabled(false);
+    setReminderTime(DEFAULT_HABIT_REMINDER_TIME);
+    setShowReminderTimePicker(false);
+    setReminderPermission('not_determined');
+    setReminderError(null);
     setHabitError(null);
     setLinkedActionRows([]);
     setLinkedActionsError(null);
     setLinkedActionsLoading(false);
     setModalVisible(true);
+    void refreshReminderPermission();
   };
 
-  const openEditModal = async (habit: Habit) => {
-    setHabitError(null);
-    setLinkedActionsError(null);
-    setLinkedActionRows([]);
-    setLinkedActionsLoading(true);
-    setEditingHabit(habit);
-    setName(habit.name);
-    setTarget(String(habit.target_per_day));
-    setCategory(habit.category ?? 'anytime');
-    setIcon(HABIT_ICONS.includes(habit.icon) ? habit.icon : DEFAULT_HABIT_ICON);
-    setColor(HABIT_COLORS.includes(habit.color) ? habit.color : DEFAULT_HABIT_COLOR);
-    const currentRule = getHabitRuleForDate(habit.rule_history, toDateKey(), habit.target_per_day);
-    const currentWeekdays = currentRule?.weekdays ?? [...ALL_HABIT_WEEKDAYS];
-    setWeekdays(currentWeekdays);
-    setSchedulePreset(getHabitSchedulePreset(currentWeekdays));
-    setModalVisible(true);
-
-    try {
-      const rules = await listHabitLinkedActionRules(habit.id);
-      setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
-    } catch (error) {
-      setLinkedActionsError(
-        error instanceof Error ? error.message : 'Could not load linked actions for this habit.',
+  const openEditModal = useCallback(
+    async (habit: Habit) => {
+      setHabitError(null);
+      setLinkedActionsError(null);
+      setLinkedActionRows([]);
+      setLinkedActionsLoading(true);
+      setEditingHabit(habit);
+      setName(habit.name);
+      setTarget(String(habit.target_per_day));
+      setCategory(habit.category ?? 'anytime');
+      setIcon(HABIT_ICONS.includes(habit.icon) ? habit.icon : DEFAULT_HABIT_ICON);
+      setColor(HABIT_COLORS.includes(habit.color) ? habit.color : DEFAULT_HABIT_COLOR);
+      const existingReminder = parseHabitReminderTime(habit.reminder_time);
+      setReminderEnabled(existingReminder !== null);
+      setReminderTime(
+        existingReminder ? formatHabitReminderTime(existingReminder) : DEFAULT_HABIT_REMINDER_TIME,
       );
-    } finally {
-      setLinkedActionsLoading(false);
+      setShowReminderTimePicker(false);
+      setReminderPermission('not_determined');
+      setReminderError(null);
+      const currentRule = getHabitRuleForDate(
+        habit.rule_history,
+        toDateKey(),
+        habit.target_per_day,
+      );
+      const currentWeekdays = currentRule?.weekdays ?? [...ALL_HABIT_WEEKDAYS];
+      setWeekdays(currentWeekdays);
+      setSchedulePreset(getHabitSchedulePreset(currentWeekdays));
+      setModalVisible(true);
+      void refreshReminderPermission();
+
+      try {
+        const rules = await listHabitLinkedActionRules(habit.id);
+        setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
+      } catch (error) {
+        setLinkedActionsError(
+          error instanceof Error ? error.message : 'Could not load linked actions for this habit.',
+        );
+      } finally {
+        setLinkedActionsLoading(false);
+      }
+    },
+    [refreshReminderPermission],
+  );
+
+  useEffect(() => {
+    if (!isActive || !habitsLoaded) return;
+    const pendingHabitId = consumePendingHabitFocus();
+    if (!pendingHabitId) return;
+    const habit = habits.find((candidate) => candidate.id === pendingHabitId);
+    if (habit) void openEditModal(habit);
+  }, [consumePendingHabitFocus, habits, habitsLoaded, isActive, openEditModal]);
+
+  const handleReminderToggle = async () => {
+    if (reminderEnabled) {
+      setReminderEnabled(false);
+      setReminderError(null);
+      return;
     }
+    if (Platform.OS === 'web') {
+      setReminderPermission('unsupported');
+      setReminderError('Native habit reminders are available on Android and iOS only.');
+      return;
+    }
+
+    setReminderPermissionBusy(true);
+    setReminderError(null);
+    try {
+      let state = await getNotificationPermissionState();
+      if (state === 'not_determined') {
+        state = await requestHabitReminderPermission();
+      }
+      setReminderPermission(state);
+      if (state !== 'granted') {
+        setReminderEnabled(false);
+        setReminderError(
+          state === 'denied'
+            ? 'Notifications are blocked. Enable them in system settings before saving a reminder.'
+            : 'Notifications are unavailable on this device.',
+        );
+        return;
+      }
+      setReminderEnabled(true);
+    } finally {
+      setReminderPermissionBusy(false);
+    }
+  };
+
+  const ensureReminderPermissionForSave = async (): Promise<boolean> => {
+    if (!reminderEnabled) return true;
+    if (Platform.OS === 'web') {
+      setReminderPermission('unsupported');
+      setReminderError('Native habit reminders are available on Android and iOS only.');
+      return false;
+    }
+
+    let state = reminderPermission;
+    if (state !== 'granted') {
+      state = await getNotificationPermissionState();
+      if (state === 'not_determined') state = await requestHabitReminderPermission();
+      setReminderPermission(state);
+    }
+    if (state !== 'granted') {
+      setReminderError(
+        state === 'denied'
+          ? 'Notifications are blocked. Disable this reminder or enable notifications in system settings.'
+          : 'Notifications are unavailable on this device.',
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const scheduleTestReminder = async () => {
+    if (!editingHabit) return;
+    const identifier = await scheduleTestHabitReminderNotification({
+      habitId: editingHabit.id,
+      title: editingHabit.name,
+      dateKey: toDateKey(),
+      occurrenceId: getHabitReminderIdentifier(editingHabit.id, toDateKey()),
+    });
+    setReminderError(
+      identifier
+        ? 'Test notification scheduled for about 20 seconds.'
+        : 'The test notification is available only in the native E2E build.',
+    );
+  };
+
+  const injectTestReminderResponse = (actionIdentifier: string) => {
+    if (!editingHabit) return;
+    const dateKey = toDateKey();
+    injectNotificationResponseForTesting({
+      actionIdentifier,
+      notification: {
+        date: Date.now(),
+        request: {
+          identifier: getHabitReminderIdentifier(editingHabit.id, dateKey),
+          content: {
+            title: editingHabit.name,
+            body: 'Time to complete your habit.',
+            data: {
+              kind: HABIT_REMINDER_DATA_KIND,
+              version: HABIT_REMINDER_DATA_VERSION,
+              habitId: editingHabit.id,
+              dateKey,
+              occurrenceId: getHabitReminderIdentifier(editingHabit.id, dateKey),
+            },
+            sound: 'default',
+          },
+          trigger: null,
+        },
+      },
+    } as never);
+    setReminderError(`Injected ${actionIdentifier} response.`);
   };
 
   const onSubmit = async () => {
@@ -237,7 +428,14 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
       setHabitError('Choose at least one day for this habit.');
       return;
     }
+    const parsedReminder = reminderEnabled ? parseHabitReminderTime(reminderTime) : null;
+    if (reminderEnabled && !parsedReminder) {
+      setReminderError('Enter a reminder time in HH:MM format.');
+      return;
+    }
+    if (!(await ensureReminderPermissionForSave())) return;
     setHabitError(null);
+    setReminderError(null);
     setLinkedActionsError(null);
 
     let linkedActionRules;
@@ -260,10 +458,19 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         icon,
         color,
         weekdays,
+        reminderTime: parsedReminder ? formatHabitReminderTime(parsedReminder) : null,
       });
       await saveHabitLinkedActionRules(editingHabit.id, linkedActionRules);
     } else {
-      const habitId = await addHabit(name.trim(), targetNum, category, icon, color, weekdays);
+      const habitId = await addHabit(
+        name.trim(),
+        targetNum,
+        category,
+        icon,
+        color,
+        weekdays,
+        parsedReminder ? formatHabitReminderTime(parsedReminder) : null,
+      );
       await saveHabitLinkedActionRules(habitId, linkedActionRules);
     }
     setEditingHabit(null);
@@ -274,6 +481,11 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setColor(DEFAULT_HABIT_COLOR);
     setSchedulePreset('every_day');
     setWeekdays([...ALL_HABIT_WEEKDAYS]);
+    setReminderEnabled(false);
+    setReminderTime(DEFAULT_HABIT_REMINDER_TIME);
+    setShowReminderTimePicker(false);
+    setReminderPermission('not_determined');
+    setReminderError(null);
     setHabitError(null);
     setLinkedActionRows([]);
     setLinkedActionsError(null);
@@ -330,6 +542,11 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setLinkedActionsLoading(false);
     setSchedulePreset('every_day');
     setWeekdays([...ALL_HABIT_WEEKDAYS]);
+    setReminderEnabled(false);
+    setReminderTime(DEFAULT_HABIT_REMINDER_TIME);
+    setShowReminderTimePicker(false);
+    setReminderPermission('not_determined');
+    setReminderError(null);
   }, []);
 
   const linkedActionSource: LinkedActionEditorSourceOption = {
@@ -575,6 +792,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                             >
                               {formatHabitSchedule(currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS)}
                             </Text>
+                            {parseHabitReminderTime(habit.reminder_time) ? (
+                              <Text
+                                className="mt-0.5 w-[84px] text-center text-[10px] leading-4"
+                                style={{ color: sectionAccents.habits.text }}
+                                accessibilityLabel={`Reminder ${formatHabitReminderTime(parseHabitReminderTime(habit.reminder_time)!)}`}
+                              >
+                                🔔{' '}
+                                {formatHabitReminderTime(
+                                  parseHabitReminderTime(habit.reminder_time)!,
+                                )}
+                              </Text>
+                            ) : null}
                             {streak > 0 ? (
                               <View className="mt-1 flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1">
                                 <Text style={{ fontSize: 10 }}>{streak > 2 ? '🔥' : '⚡'}</Text>
@@ -583,6 +812,23 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                                 </Text>
                               </View>
                             ) : null}
+                            <Pressable
+                              onPress={() => setInsightsHabit(habit)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`View progress for ${habit.name}`}
+                              className="mt-1 min-h-[36px] w-[84px] items-center justify-center rounded-full border px-2 py-1"
+                              style={{
+                                borderColor: SECTION_COLORS.habits,
+                                backgroundColor: tokens.surfaceElevated,
+                              }}
+                            >
+                              <Text
+                                className="text-[10px] font-semibold"
+                                style={{ color: sectionAccents.habits.text }}
+                              >
+                                Progress
+                              </Text>
+                            </Pressable>
                           </View>
                         );
                       })}
@@ -718,6 +964,149 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               })}
             </View>
           ) : null}
+          <View className="mb-3 mt-1 rounded-2xl border p-3" style={{ borderColor: tokens.border }}>
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+                  Reminder
+                </Text>
+                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                  {Platform.OS === 'web'
+                    ? 'Native reminders are available on Android and iOS only.'
+                    : reminderPermission === 'denied'
+                      ? 'Notifications are blocked in system settings.'
+                      : reminderEnabled
+                        ? 'One reminder on each scheduled day.'
+                        : 'Off'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => void handleReminderToggle()}
+                disabled={reminderPermissionBusy || Platform.OS === 'web'}
+                accessibilityRole="switch"
+                accessibilityLabel="Enable habit reminder"
+                accessibilityState={{ checked: reminderEnabled, disabled: Platform.OS === 'web' }}
+                className="h-8 w-14 justify-center rounded-full px-1"
+                style={{
+                  backgroundColor: reminderEnabled ? COLOR : tokens.border,
+                  opacity: reminderPermissionBusy || Platform.OS === 'web' ? 0.55 : 1,
+                }}
+              >
+                <View
+                  className="h-6 w-6 rounded-full"
+                  style={{
+                    alignSelf: reminderEnabled ? 'flex-end' : 'flex-start',
+                    backgroundColor: tokens.surface,
+                  }}
+                />
+              </Pressable>
+            </View>
+            {reminderEnabled ? (
+              <>
+                {Platform.OS === 'web' ? (
+                  <TextField
+                    label="Reminder time (HH:MM)"
+                    value={reminderTime}
+                    onChangeText={(value) => {
+                      setReminderError(null);
+                      setReminderTime(value);
+                    }}
+                    placeholder="18:00"
+                    accessibilityLabel="Reminder time"
+                  />
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => setShowReminderTimePicker(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reminder time"
+                      className="mt-3 flex-row items-center justify-between rounded-xl border px-4 py-3"
+                      style={{
+                        borderColor: tokens.border,
+                        backgroundColor: tokens.surfaceElevated,
+                      }}
+                    >
+                      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                        Time
+                      </Text>
+                      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                        {reminderTime}
+                      </Text>
+                    </Pressable>
+                    {showReminderTimePicker ? (
+                      <DateTimePicker
+                        value={(() => {
+                          const parsed = parseHabitReminderTime(reminderTime) ?? {
+                            hour: 18,
+                            minute: 0,
+                          };
+                          const date = new Date();
+                          date.setHours(parsed.hour, parsed.minute, 0, 0);
+                          return date;
+                        })()}
+                        mode="time"
+                        display="default"
+                        is24Hour
+                        onChange={(event, selectedDate) => {
+                          setShowReminderTimePicker(false);
+                          if (event.type === 'set' && selectedDate) {
+                            setReminderError(null);
+                            setReminderTime(
+                              formatHabitReminderTime({
+                                hour: selectedDate.getHours(),
+                                minute: selectedDate.getMinutes(),
+                              }),
+                            );
+                          }
+                        }}
+                      />
+                    ) : null}
+                    {HABIT_REMINDER_E2E_TEST && editingHabit ? (
+                      <View className="gap-2">
+                        <Button
+                          label="Schedule test notification"
+                          variant="ghost"
+                          onPress={() => void scheduleTestReminder()}
+                        />
+                        <Button
+                          label="Inject habit reminder tap"
+                          variant="ghost"
+                          onPress={() =>
+                            injectTestReminderResponse('expo.modules.notifications.actions.DEFAULT')
+                          }
+                        />
+                        <Button
+                          label="Inject Mark complete response"
+                          variant="ghost"
+                          onPress={() =>
+                            injectTestReminderResponse(HABIT_REMINDER_MARK_COMPLETE_ACTION)
+                          }
+                        />
+                        <Button
+                          label="Inject Snooze response"
+                          variant="ghost"
+                          onPress={() => injectTestReminderResponse(HABIT_REMINDER_SNOOZE_ACTION)}
+                        />
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </>
+            ) : null}
+            {reminderPermission === 'denied' || reminderPermission === 'unsupported' ? (
+              <Text
+                className="mt-1 text-xs"
+                style={{ color: tokens.dangerText }}
+                accessibilityRole="alert"
+                accessibilityLabel="Notification permission error"
+              >
+                {reminderError ??
+                  (reminderPermission === 'denied'
+                    ? 'Allow notifications in system settings to enable reminders.'
+                    : 'Native reminders are unavailable on this platform.')}
+              </Text>
+            ) : null}
+          </View>
           <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
             Category
           </Text>
@@ -747,6 +1136,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                   setHabitError(null);
                   setIcon(iconName);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${iconName.replace('-', ' ')} icon`}
+                accessibilityState={{ selected: icon === iconName }}
                 className="items-center justify-center rounded-lg p-2"
                 style={{
                   width: 44,
@@ -773,6 +1165,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                   setHabitError(null);
                   setColor(c);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Select habit color ${c}`}
+                accessibilityState={{ selected: color === c }}
                 className="rounded-full"
                 style={{
                   width: 36,
@@ -830,6 +1225,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           </View>
         </Card>
       </Modal>
+      {insightsHabit ? (
+        <HabitProgressInsightsModal
+          visible
+          habit={insightsHabit}
+          onClose={() => setInsightsHabit(null)}
+        />
+      ) : null}
       {confirmationDialog}
     </Screen>
   );

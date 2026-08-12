@@ -1,7 +1,7 @@
 # ExecPlan: Habit Engine V2 — Weekly Scheduling and Historical Semantics
 
 Plan-Version: 2
-Status: BLOCKED
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -31,22 +31,27 @@ Deliver weekly scheduled habits with historically correct streak, consistency, t
 
 ## Current Checkpoint
 
-- Current milestone: Product implementation, Nitro workstation provisioning, and the local web/SQLite/simulation/timezone/Android lanes are complete. The only Habit Engine V2 product-acceptance item remains authorized Supabase schema deployment and a remote Habit V2 round trip.
+- Current milestone: Habit Engine V2 implementation and all requested local, native, sync, restore, and authorized remote acceptance evidence are complete.
 - Completed: Startup docs, skills, feature/data/DB/sync/restore/linked-action/Overview/heatmap/tests/journeys/known-gap/OpenSpec audit completed. Starting Git status/branch/log and active plan inventory captured. Existing day-rollover and linked-action dirty changes inspected. Current daily habit semantics and remote schema limitation verified. OpenSpec proposal, capability spec, design, and task list created. v12 migration/types/reference schemas, effective-dated domain algorithms, unbounded streak reads, persistence/edit behavior, restore compatibility, Overview rest-day state, schedule-diverse simulation fixtures, linked-action off-day coverage, and two fake-clock Playwright schedule journeys implemented.
 - Completed this continuation: Diagnosed the persisted-vs-inherited Maestro PATH discrepancy, made the native runner portable on Windows, built/installed a fresh current-source x86_64 Android release APK, executed scheduled and daily Habit persistence, and created/static-validated the additive remote migration. No reminder work is in scope.
 - Completed this continuation's live Nitro audit: Node 22.23.2/npm 10.9.8, JDK 17.0.20, Android SDK/API 36 x86_64 with `Nitro_API_36`, Python 3.13.15, Visual Studio 2022 Build Tools, and Maestro 2.8.0 are present; user-level Android/Maestro/Deno PATH entries and both Android SDK variables are persisted. `npm ci` passed with repository patches/hooks; Playwright Chromium 147.0.7727.15 launches headlessly; Deno 2.9.5 was installed and both Edge Function checks pass; pinned EAS 18.5.0, Supabase 2.113.0, Vercel 58.9.2, and one-off `tsx` 4.23.12 probes pass. Docker/Podman, local EAS, and GitHub CLI are not installed. `npm run doctor` reports only existing Expo SDK patch/config-version drift; no blind dependency upgrade was made.
 - Completed this continuation's web/local readiness proof: `npm ci`, `npm test` (62 files/661 tests), `npm run qa:fast`, `npm run qa:integration` (51), `npm run qa:timezones` (five zones), `npm run build:web`, infrastructure Chromium (10/10), P0 journeys (16/16), deterministic P0 simulation, `npm run build:sync`, and `npm run e2e:sync` (19/19) passed. `npm run web -- --port 8091` returned HTTP 200 after bundling. A broad `npm run e2e` rerun exposed one existing heavy-journey D14 performance failure (`overview→todos` 993ms > 800ms); the focused rerun timed out while mounting the same heavy fixture, so this remains preserved as host/performance `ENVIRONMENT` evidence rather than a Habit V2 semantic failure.
 - Completed this continuation's fresh native proof: CMake 3.30.5, Gradle 9.0.0, MSVC `cl.exe`, WHPX, and the API-36 x86_64 emulator all validate; a current-source release APK built after the documented workstation-only `libc++_shared` dependency-input correction, installed, and launched. Native smoke passed; persistence passed 6/6 including the M/W/F schedule flow; lifecycle passed 2/2. Windows iOS preflight remains the documented `ENVIRONMENT`/cloud-only boundary.
-- In progress: Remote gate only. It remains blocked pending authenticated Supabase identity, explicit target/environment confirmation, migration history/schema inspection, and a safe dry-run.
+- Completed this continuation's remote preflight: the linked Supabase project is `superhabits` / `kruubbynsmxzxfdunaal`; `npx --no-install supabase projects list --output json` reports it as the linked `ACTIVE_HEALTHY` project; `npx --no-install supabase migration list --linked` reports local `20260810130000` and remote `20260810130000`; no link, push, repair, or migration reapplication was performed. Read-only linked SQL confirms `public.habits.rule_history` exists as `text NOT NULL DEFAULT '[]'`, all four synced tables have RLS enabled, and each has the expected own-user `ALL` policy.
+- Completed this continuation's remote round trip: a management-path upsert/read returned the full Habit V2 row and ordered `rule_history`; the real anon PostgREST path signed in, confirmed a foreign probe was hidden by RLS, upserted/read an owned full row, and deleted it through the owner policy; direct verification found no remaining probe rows.
+- Completed this continuation's focused regressions: unit sync/restore/adapter tests passed 25/25; real-SQLite Habit V2 and restore tests passed 13/13, including rule-history readback and legacy fallback.
+- In progress: None — all requested implementation and verification work is complete.
+- Completed this continuation's sync-boundary regression: a fresh dummy-Supabase export and `npm run e2e:sync` passed 19/19 remote-boundary journey tests.
+- Completed this continuation's final validation: migration parity, remote probe cleanup, OpenSpec validation, QA impact-map validation, and `git diff --check` all passed.
 - Important modified files: pre-existing dirty files listed above; new change artifacts under this directory plus the habit engine files and focused tests listed in Changed Files / Areas.
 - Last validation: In this continuation, `npm test`, `npm run qa:integration`, `npm run qa:timezones`, `npm run e2e:sync`, and the fresh native lanes listed above passed. The historical 2026-08-10 full `npm run e2e` green run remains recorded, but the current broad rerun is not claimed as green because of the preserved D14 performance failure.
 - Current failures: The current broad `npm run e2e` run has one heavy P2 D14 latency failure (`overview→todos` 993ms > 800ms), and its focused rerun timed out before the same section-switch assertion. Classify as `ENVIRONMENT`/host-performance instability pending a later dedicated performance investigation; do not weaken the threshold or attribute it to the Habit V2 data contract. The earlier focused Habits `TEST_BUG` remains fixed and its final 9-test file passes.
 - Relevant quarantines: Preserve existing known gaps and performance contracts; do not claim them closed without evidence. The earlier Maestro-missing reports remain historical ENVIRONMENT evidence; current native execution is green. Native off-day date semantics remain covered by domain/web/timezone lanes because deterministic Android clock mutation is not safely supported.
-- Blockers: Remote schema deployment and round-trip access remain unverified. The repository-supported Supabase CLI is `2.113.0`; `npx supabase projects list` reports no access token, `npx supabase login` refuses the automatic browser flow in this non-TTY session, `npx supabase migration list --linked` reports no linked project, and `npx supabase db push --linked --dry-run` stops before any remote inspection because no project is linked. No Supabase public configuration or linked metadata exists, and Docker/Podman is unavailable for a local Supabase fallback. The deployment workflow contains only an authoring-time clue (`kruubbynsmxzxfdunaal`, named `superhabits`), which does not by itself establish the intended environment or authorize mutation.
-- Condition required to unblock: Authenticate with the official Supabase CLI and explicitly confirm that the workflow ref `kruubbynsmxzxfdunaal` is the intended guarded development/staging or disposable target (or provide the correct project ref and environment), then inspect migration status before applying only this migration and run the dedicated Habit V2 round trip.
-- Exact resume action after unblock: From an interactive user terminal, complete `npx --no-install supabase login` (or set the user-owned `SUPABASE_ACCESS_TOKEN` without exposing it), then run `npx --no-install supabase projects list`; confirm the intended project/environment before `supabase link`. Continue with `npx supabase migration list --linked`, read-only schema/RLS inspection, `npx supabase db push --linked --dry-run`, and only then the additive migration and isolated round trip.
-- Exact next action: No independent local setup remains. The next action is the user-owned interactive Supabase authentication and explicit project/environment confirmation. Do not run `supabase link` or `supabase db push` against an unidentified project.
-- Remaining definition of done: Authorized remote schema application and remote `rule_history` upsert/read/restore evidence; then rerun the affected QA set and mark this plan COMPLETED.
+- Blockers: None for the requested remote verification. The existing broad D14 host-performance failure and Windows iOS environment boundary remain preserved, unrelated to this remote gate.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: None — task complete.
+- Remaining definition of done: None. Authorized remote schema/RLS verification, Habit V2 upsert/read/restore-compatible evidence, cleanup, sync regression, and final structural validation are complete.
 
 ## Progress
 
@@ -63,7 +68,7 @@ Deliver weekly scheduled habits with historically correct streak, consistency, t
 - [x] Add web journeys, simulation diversity, and Android Maestro persistence flow.
 - [x] Run affected and broad QA; classify failures and preserve artifacts.
 - [x] Complete the native-gated OpenSpec/ExecPlan handoff once Maestro is available; current Android smoke, lifecycle, targeted persistence, and Habit V2 schedule persistence evidence are green.
-- [ ] Complete the remote-gated OpenSpec/ExecPlan handoff after authorized additive migration deployment and a remote Habit V2 round trip.
+- [x] Complete the remote-gated OpenSpec/ExecPlan handoff after authorized additive migration deployment and a remote Habit V2 round trip. Migration parity was already exact; no reapplication or history repair was performed.
 
 ## Surprises & Discoveries
 
@@ -159,6 +164,14 @@ Deliver weekly scheduled habits with historically correct streak, consistency, t
 - 2026-08-12 — Remote Supabase gate — BLOCKED / CREDENTIAL_REQUIRED + SPEC_AMBIGUITY — all five relevant environment variables are absent; `npx --no-install supabase projects list` reports no access token; official `npx --no-install supabase login` refuses automatic login in the non-TTY agent session; linked migration list reports no project; linked dry-run stops with no project ref. No link, schema inspection, migration repair, push, remote test row, or cleanup was attempted.
 - 2026-08-12 — `npm run qa:affected` + focused `npx vitest run tests/agent-execplan.test.ts` — PASS — the only current tracked change is this ExecPlan; the documentation/agent gate resolved to `qa:fast`, and the focused test passed 9/9.
 - 2026-08-12 — Final `npm run agent:resume -- --plan ...`, plan validation, OpenSpec validation, impact-map validation, all-plan validation, and `git diff --check` — PASS — checkpoint reconciled, 18 OpenSpec items and 12 impact rules valid, all versioned plans valid, and no whitespace errors. Plan intentionally remains `BLOCKED` for the remote gate.
+- 2026-08-12 — Authorized remote preflight — PASS — linked project is `superhabits` / `kruubbynsmxzxfdunaal`, status `ACTIVE_HEALTHY`; `npx --no-install supabase migration list --linked` reports local `20260810130000` = remote `20260810130000`. No link, push, migration reapplication, or history repair was performed.
+- 2026-08-12 — Read-only remote schema/RLS verification — PASS — `public.habits.rule_history` is `text NOT NULL DEFAULT '[]'`; `habits`, `todos`, `calorie_entries`, and `workout_routines` all have RLS enabled and own-user `ALL` policies using `auth.uid() = user_id`. Remote grants were inspected without changing them.
+- 2026-08-12 — Remote Habit V2 round trip — PASS — management-path upsert/read returned the full row and ordered M/W/F→Tue/Thu rule history; real anon PostgREST upsert/read returned the same history, hid a foreign-user probe under RLS, and deleted the owned probe through the owner boundary.
+- 2026-08-12 — Remote cleanup — PASS — direct linked query found zero rows for both unique probe IDs after cleanup.
+- 2026-08-12 — `npm run test:unit -- core/sync/__tests__/supabase.adapter.test.ts tests/sync.engine.test.ts tests/restore.helpers.test.ts` — PASS — 3 files, 25 tests; full-row sync serialization, failed-push retention, restore fallback, and helper contracts remain green.
+- 2026-08-12 — `npm run test:integration -- tests/integration/habitScheduling.test.ts tests/integration/restore.test.ts` — PASS — 2 files, 13 tests; real SQLite Habit V2 persistence, rule-history readback, restore-compatible import, and legacy fallback remain green.
+- 2026-08-12 — `npm run build:sync` + `npm run e2e:sync` — PASS — fresh dummy-Supabase export and 19/19 sync/restore boundary journeys passed.
+- 2026-08-12 — Final migration/plan validation — PASS — migration parity rechecked, cleanup rechecked, `npm run openspec:validate` 18/18, `npm run qa:impact:validate` 12/12, and `git diff --check` passed.
 
 ## Changed Files / Areas
 
@@ -182,8 +195,8 @@ Deliver weekly scheduled habits with historically correct streak, consistency, t
 
 ## Outcomes & Retrospective
 
-- Status: Blocked — native-gated completion is proven; authorized remote schema deployment and round-trip evidence are externally blocked.
-- Summary: Weekly schedules, effective-dated history, schedule-aware metrics, migration, persistence, UI, restore/sync reference behavior, Linked Actions compatibility, deterministic simulation, web journeys, and performance contracts are implemented and validated.
-- Proof: prior web/local evidence remains above; this continuation adds fresh Android API 36 evidence (smoke, lifecycle 2/2, targeted persistence 6/6, and scheduled M/W/F persistence), plus the repository migration and static/disposable-path audit.
-- Remaining risks: The intended live Supabase project and its actual RLS/schema state remain unverifiable here. The current broad `npm run e2e` preserved one heavy P2 D14 host-performance failure and a focused rerun timed out; no threshold or assertion was weakened. The Habit V2-focused web, sync, integration, simulation, and native lanes remain green.
-- Follow-up: Provide the authorized target, inspect migration status, apply only the additive migration, and prove remote upsert/read/restore. Keep reminders deferred until this remote gate closes.
+- Status: Completed — Habit Engine V2 implementation and requested acceptance evidence are proven.
+- Summary: Weekly schedules, effective-dated history, schedule-aware metrics, migration, persistence, UI, restore/sync behavior, Linked Actions compatibility, deterministic simulation, web journeys, Android persistence, and the authorized live Supabase schema/RLS and Habit V2 round trip are complete.
+- Proof: Remote migration parity was exact before verification; live schema exposed `rule_history`, RLS isolated users, both management and anon REST upserts/readbacks preserved ordered history, restore-compatible local tests passed, sync/restore boundary journeys passed 19/19, and probe cleanup was confirmed empty.
+- Remaining risks: The prior broad `npm run e2e` preserved one heavy P2 D14 host-performance failure and a focused rerun timed out; no threshold or assertion was weakened. Windows cannot run the documented iOS lane. Neither affects the completed remote Habit V2 acceptance scope.
+- Follow-up: Archive the completed OpenSpec change when desired. No migration repair or reapplication is required.

@@ -59,6 +59,51 @@ describe('real SQLite habit scheduling persistence', () => {
     await db.closeAsync();
   });
 
+  it('persists, updates, disables, reloads, and soft-deletes reminder configuration', async () => {
+    const db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+
+    const id = await habits.addHabit(
+      'Gym',
+      1,
+      'anytime',
+      'fitness-center',
+      '#10b981',
+      [1, 3, 5],
+      '18:00',
+    );
+    expect((await habits.listHabits())[0]?.reminder_time).toBe('18:00');
+
+    await habits.updateHabit(id, {
+      name: 'Gym',
+      targetPerDay: 1,
+      category: 'anytime',
+      weekdays: [1, 2, 3, 4, 5],
+      reminderTime: '07:00',
+    });
+    expect((await habits.listHabits())[0]?.reminder_time).toBe('07:00');
+
+    await habits.updateHabit(id, {
+      name: 'Gym',
+      targetPerDay: 1,
+      category: 'anytime',
+      weekdays: [1, 2, 3, 4, 5],
+      reminderTime: null,
+    });
+    expect((await habits.listHabits())[0]?.reminder_time).toBeNull();
+
+    await habits.deleteHabit(id);
+    expect(await habits.listHabits()).toHaveLength(0);
+    const deleted = await db.getFirstAsync<{
+      reminder_time: string | null;
+      deleted_at: string | null;
+    }>('SELECT reminder_time, deleted_at FROM habits WHERE id = ?', [id]);
+    expect(deleted).toMatchObject({ reminder_time: null });
+    expect(deleted?.deleted_at).toEqual(expect.any(String));
+
+    await db.closeAsync();
+  });
+
   it('keeps completion rows compatible while scheduled metrics ignore off-days', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');

@@ -94,10 +94,8 @@ async function createHabitViaUi(page: Page, name: string): Promise<void> {
 
 /**
  * Toggle a todo's completion by firing a REAL pointer press sequence on the
- * checkbox column of its row. (The existing `clickTodoCheckboxForTitle` helper
- * dispatches a bare DOM `.click()`, which does not fire RNGH RectButton's
- * onPress on web — the row stays unchecked. This helper mirrors the proven
- * `clickSwipeDeleteAction` pointer-down/up/click sequence.)
+ * semantic checkbox column of its row. This deliberately exercises the same
+ * browser interaction path as a user press rather than mutating the DOM.
  */
 async function toggleTodoCompletion(page: Page, title: string): Promise<void> {
   const textNode = page.getByText(title, { exact: true }).first();

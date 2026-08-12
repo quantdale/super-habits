@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { memo } from 'react';
-import { RectButton } from 'react-native-gesture-handler';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
@@ -48,18 +47,26 @@ export const TodoItem = memo(function TodoItem({
             onLongPress={onLongPress}
             delayLongPress={180}
             hitSlop={6}
-            accessibilityLabel="Drag to reorder"
+            accessibilityLabel={`Reorder ${todo.title}`}
             className="pt-0.5"
           >
             <MaterialIcons name="drag-indicator" size={18} color={tokens.iconMuted} />
           </Pressable>
-          <RectButton onPress={onToggle} hitSlop={6} style={{ backgroundColor: 'transparent' }}>
+          <Pressable
+            onPress={onToggle}
+            hitSlop={6}
+            accessibilityRole="checkbox"
+            accessibilityLabel={`${done ? 'Mark incomplete' : 'Mark complete'}: ${todo.title}`}
+            accessibilityState={{ checked: done }}
+            aria-checked={done}
+            style={{ backgroundColor: 'transparent' }}
+          >
             <MaterialIcons
               name={done ? 'check-box' : 'check-box-outline-blank'}
               size={18}
               color={done ? tokens.iconMuted : tokens.text}
             />
-          </RectButton>
+          </Pressable>
           <View className="min-w-0 flex-1 gap-1">
             <Text
               numberOfLines={2}
@@ -95,17 +102,25 @@ export const TodoItem = memo(function TodoItem({
             onLongPress={onLongPress}
             delayLongPress={180}
             hitSlop={8}
-            accessibilityLabel="Drag to reorder"
+            accessibilityLabel={`Reorder ${todo.title}`}
           >
             <MaterialIcons name="drag-indicator" size={18} color={tokens.iconMuted} />
           </Pressable>
-          <RectButton onPress={onToggle} hitSlop={8} style={{ backgroundColor: 'transparent' }}>
+          <Pressable
+            onPress={onToggle}
+            hitSlop={8}
+            accessibilityRole="checkbox"
+            accessibilityLabel={`${done ? 'Mark incomplete' : 'Mark complete'}: ${todo.title}`}
+            accessibilityState={{ checked: done }}
+            aria-checked={done}
+            style={{ backgroundColor: 'transparent' }}
+          >
             <MaterialIcons
               name={done ? 'check-box' : 'check-box-outline-blank'}
               size={20}
               color={done ? tokens.iconMuted : tokens.text}
             />
-          </RectButton>
+          </Pressable>
           <Text
             numberOfLines={1}
             style={{ flex: 1, fontSize: 14, color: done ? tokens.textMuted : tokens.text }}
@@ -146,13 +161,17 @@ export const TodoItem = memo(function TodoItem({
           delayLongPress={180}
           hitSlop={8}
           className="pt-0.5"
-          accessibilityLabel="Drag to reorder"
+          accessibilityLabel={`Reorder ${todo.title}`}
         >
           <MaterialIcons name="drag-indicator" size={22} color={tokens.iconMuted} />
         </Pressable>
-        <RectButton
+        <Pressable
           onPress={onToggle}
           hitSlop={8}
+          accessibilityRole="checkbox"
+          accessibilityLabel={`${done ? 'Mark incomplete' : 'Mark complete'}: ${todo.title}`}
+          accessibilityState={{ checked: done }}
+          aria-checked={done}
           style={{ paddingTop: 2, backgroundColor: 'transparent' }}
         >
           <MaterialIcons
@@ -160,7 +179,7 @@ export const TodoItem = memo(function TodoItem({
             size={24}
             color={done ? tokens.iconMuted : tokens.text}
           />
-        </RectButton>
+        </Pressable>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View className="flex-row flex-wrap items-center gap-2">
             <Text

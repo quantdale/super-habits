@@ -50,16 +50,16 @@ async function expectQueueCounts(page: Page, pending: number, completed: number)
 
 /**
  * Toggle (complete/uncomplete) the todo row whose title matches. The row's
- * layout is [drag handle, checkbox button, content]; the checkbox is the only
- * role=button sibling of the title text. The title may be wrapped in nested
+ * layout is [drag handle, checkbox, content]; the checkbox is the semantic
+ * control sibling of the title text. The title may be wrapped in nested
  * text/content Views, so climb to the nearest ancestor that contains a
- * role=button (the row) rather than assuming a fixed nesting depth.
+ * role=checkbox (the row) rather than assuming a fixed nesting depth.
  */
 async function toggleTodo(page: Page, title: string): Promise<void> {
   const row = page
     .getByText(title, { exact: true })
-    .locator('xpath=ancestor::*[.//*[@role="button"]][1]');
-  await row.getByRole('button').first().click({ force: true });
+    .locator('xpath=ancestor::*[.//*[@role="checkbox"]][1]');
+  await row.getByRole('checkbox').click({ force: true });
 }
 
 /** Reveal the Completed section if it is currently hidden. Waits for the toggle

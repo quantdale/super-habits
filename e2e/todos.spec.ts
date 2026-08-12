@@ -31,7 +31,16 @@ test.describe('Todos', () => {
     await openNewTodoModal(page);
     await page.getByPlaceholder(/Add a task/i).fill('Read a book');
     await submitTodoModal(page);
-    await page.getByText('Read a book').click();
+    const completionControl = page.getByRole('checkbox', { name: 'Mark complete: Read a book' });
+    await expect(completionControl).toBeVisible();
+    await expect(completionControl).toHaveAttribute('aria-checked', 'false');
+    await completionControl.click();
+    const showCompleted = page.getByRole('button', { name: 'Show completed tasks' });
+    await expect(showCompleted).toBeVisible();
+    await showCompleted.click();
+    await expect(
+      page.getByRole('checkbox', { name: 'Mark incomplete: Read a book' }),
+    ).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('Read a book')).toBeVisible();
   });
 
@@ -94,7 +103,9 @@ test.describe('Todos', () => {
     await page.getByText('Complete target task', { exact: true }).click({ force: true });
     await submitTodoModal(page);
 
-    await page.getByRole('button', { name: '' }).nth(1).click({ force: true });
+    await page
+      .getByRole('checkbox', { name: 'Mark complete: Linked source task' })
+      .click({ force: true });
     await expect(page.getByText(/Linked Actions updated/i)).toBeVisible();
     await expect(
       page.getByText('No pending tasks', { exact: true }).filter({ visible: true }).last(),

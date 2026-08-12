@@ -389,6 +389,26 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       }
     });
   }
+  if (version < 13) {
+    await applyMigration(db, 13, async () => {
+      await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS processed_notification_actions (
+        action_key              TEXT PRIMARY KEY NOT NULL,
+        kind                    TEXT NOT NULL,
+        action_name             TEXT NOT NULL,
+        occurrence_id           TEXT NOT NULL,
+        linked_event_id         TEXT NOT NULL,
+        linked_action_required  INTEGER NOT NULL DEFAULT 0,
+        processed_at            TEXT NOT NULL
+      );
+    `);
+
+      await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_processed_notification_actions_processed_at
+      ON processed_notification_actions (processed_at);
+    `);
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

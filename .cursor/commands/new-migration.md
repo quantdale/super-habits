@@ -11,7 +11,7 @@ Migration request: {{change}}
 
 Rules:
 - Migrations are append-only: never edit an existing `if (version < N)` block, and never modify the bootstrap DDL.
-- Current stored schema version: 11. New migration: append a new `if (version < 12) { ... }` block at the end of `runMigrations()` in `core/db/client.ts` (there are no numbered migration files).
+- Current stored schema version: 13. New migration: append a new `if (version < 14) { ... }` block at the end of `runMigrations()` in `core/db/client.ts` (there are no numbered migration files).
 - Read core/db/client.ts completely before writing anything.
 - schema.sql is reference only — do not update it. `core/db/migrations/` holds only a Supabase reference SQL, not runtime migration files.
 - After migration, update TypeScript types in core/db/types.ts.

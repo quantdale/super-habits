@@ -76,7 +76,7 @@ calls a *.data.ts function must be a descendant of AppProviders.
 - Run: npm test
 - Current suite covers domain logic plus command parser/config, data-layer contracts, restore flows, linked actions, and selected provider/DB behavior
 - Every new domain function needs a test
-- Baseline: `npx vitest list` shows the current inventory (630 tests as of the last full pass); the gate is **0 failures** on `npm test` — never maintain a magic total count
+- Baseline: `npx vitest list` shows the current inventory; the gate is **0 failures** on `npm test` — never maintain a magic total count
 
 ## Metro / build config
 - metro.config.js: WASM support, COOP/COEP headers — **COEP** is `require-corp` (aligned with `app.json` for `crossOriginIsolated` on web)

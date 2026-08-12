@@ -1,0 +1,41 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - lifecycle
+  - notifications
+  - habit-reminder-delivery
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native delivery habit'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native delivery habit'
+    timeout: 5000
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Schedule test notification'
+    direction: DOWN
+- tapOn: 'Schedule test notification'
+- pressKey: HOME
+- killApp

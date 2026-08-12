@@ -56,6 +56,22 @@ test.describe('Habits', () => {
     await expect(page.getByText('Morning run').first()).toBeVisible();
   });
 
+  test('opens accessible progress insights for the exact habit', async ({ page }) => {
+    await openAddHabitModal(page);
+    await page.getByLabel('Habit name').fill('Read progress');
+    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Read progress', { exact: true }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'View progress for Read progress' }).click();
+    await expect(page.getByText('Read progress progress', { exact: true })).toBeVisible();
+    await expect(page.getByText('Scheduled completion rate', { exact: true })).toBeVisible();
+    await expect(page.getByText('Recent target vs actual', { exact: true })).toBeVisible();
+    await expect(page.getByLabel(/Current streak: 0 scheduled occurrences/i)).toBeVisible();
+    await expect(
+      page.getByLabel(/Last 7 days scheduled completion rate: 0 percent, 0 of 1/i),
+    ).toBeVisible();
+  });
+
   test('increments habit completion', async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByLabel('Habit name').fill('Meditate');
@@ -160,6 +176,34 @@ test.describe('Scheduled habits', () => {
     await page.waitForLoadState('load');
     await goToTab(page, 'habits');
     await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
+  });
+
+  test('reminder configuration persists and remains schedule-aware after reload', async ({
+    page,
+  }) => {
+    await openAddHabitModal(page);
+    await page.getByLabel('Habit name').fill('Gym reminder');
+    await page.getByText('Custom', { exact: true }).click();
+    for (const weekday of ['Tuesday', 'Thursday', 'Saturday', 'Sunday']) {
+      await page.getByRole('checkbox', { name: `${weekday} scheduled` }).click();
+    }
+    // Web explicitly exposes native reminder support as unavailable. The
+    // persisted configuration remains null rather than pretending to work.
+    await expect(
+      page.getByText(/Native reminders are available on Android and iOS only/i),
+    ).toBeVisible();
+    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    await expect(page.getByText('Gym reminder', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Mon / Wed / Fri', { exact: true })).toBeVisible();
+
+    await page.reload();
+    await page.waitForLoadState('load');
+    await goToTab(page, 'habits');
+    await expect(page.getByText('Gym reminder', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Mon / Wed / Fri', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/Native reminders are available on Android and iOS only/i),
+    ).not.toBeVisible();
   });
 
   test('target edits keep a prior completed date complete', async ({ page }) => {

@@ -204,9 +204,8 @@ defineJourney({
         await page.getByPlaceholder(/Add a task/i).fill('Draft reply');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Draft reply').first()).toBeVisible();
-        // The completion toggle is the checkbox RectButton left of the title
-        // (row child [1]; the title text itself has no onPress — the existing
-        // todos spec only clicks the text and never verifies completion).
+        // The completion toggle is the semantic checkbox left of the title
+        // (row child [1]; the title text itself has no onPress).
         await page
           .getByText('Draft reply')
           .first()

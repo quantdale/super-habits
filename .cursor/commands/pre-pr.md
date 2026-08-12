@@ -26,7 +26,7 @@ Run the following commands in the terminal and capture output:
    If errors: stop here — list every error (file + line) and do not proceed.
 
 2. `npm test`
-Expected: **630** tests passing (compare against `npx vitest list`) — 0 failing is the gate
+Expected: all tests listed by `npx vitest list` passing (0 failing is the gate)
    If failing: stop here — list failing test names and do not proceed.
 
 Report result:
@@ -161,7 +161,7 @@ Produce this table:
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | Typecheck | 0 errors | ? | PASS/FAIL |
-| Tests | 630 passing (vs `npx vitest list`) | ? | PASS/FAIL |
+| Tests | inventory passing (vs `npx vitest list`) | ? | PASS/FAIL |
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |

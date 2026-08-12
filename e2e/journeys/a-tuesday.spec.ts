@@ -304,7 +304,7 @@ defineJourney({
         await switchTab(page, 'todos');
         // Complete the seeded pending todo 'Task 5' (sort 4: near the top of
         // the list and NOT in Overview's top-3, so its title is unique here).
-        // Its checkbox (RectButton) is the sibling before the title's wrapping
+        // Its checkbox is the sibling before the title's wrapping
         // View in the content row.
         await page
           .getByText('Task 5', { exact: true })

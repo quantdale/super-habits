@@ -14,7 +14,7 @@ describe('android notification channel (COR-007)', () => {
   it('creates the channel even when permission is already granted', async () => {
     vi.resetModules();
     const setNotificationChannelAsync = vi.fn().mockResolvedValue(undefined);
-    const getPermissionsAsync = vi.fn().mockResolvedValue({ status: 'granted' });
+    const getPermissionsAsync = vi.fn().mockResolvedValue({ granted: true });
     const requestPermissionsAsync = vi.fn();
 
     vi.doMock('react-native', () => ({
@@ -45,6 +45,51 @@ describe('android notification channel (COR-007)', () => {
         importance: 5,
       });
       expect(requestPermissionsAsync).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('react-native');
+      vi.doUnmock('expo-notifications');
+      vi.resetModules();
+    }
+  });
+});
+
+describe('habit reminder notification category', () => {
+  it('registers one stable category with foregrounding Mark complete and Snooze actions', async () => {
+    vi.resetModules();
+    const setNotificationCategoryAsync = vi.fn().mockResolvedValue(undefined);
+    const setNotificationChannelAsync = vi.fn().mockResolvedValue(undefined);
+
+    vi.doMock('react-native', () => ({
+      Platform: {
+        OS: 'android',
+        select: (obj: Record<string, unknown>) => obj['android'] ?? obj['default'],
+      },
+    }));
+    vi.doMock('expo-notifications', () => ({
+      setNotificationHandler: vi.fn(),
+      setNotificationCategoryAsync,
+      setNotificationChannelAsync,
+      AndroidImportance: { DEFAULT: 3, HIGH: 5 },
+      PermissionStatus: { GRANTED: 'granted' },
+      SchedulableTriggerInputTypes: { DATE: 'date' },
+    }));
+
+    try {
+      const mod = await import('../lib/notifications');
+      await mod.ensureHabitReminderChannel();
+
+      expect(setNotificationCategoryAsync).toHaveBeenCalledWith('habitReminder', [
+        expect.objectContaining({
+          identifier: 'habit_reminder_mark_complete',
+          buttonTitle: 'Mark complete',
+          options: { opensAppToForeground: true },
+        }),
+        expect.objectContaining({
+          identifier: 'habit_reminder_snooze',
+          buttonTitle: 'Snooze',
+          options: { opensAppToForeground: true },
+        }),
+      ]);
     } finally {
       vi.doUnmock('react-native');
       vi.doUnmock('expo-notifications');
