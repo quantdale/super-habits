@@ -67,9 +67,9 @@ leave a tested campaign branch with an honest final handoff.
 
 ## Current Checkpoint
 
-- Current milestone: Fresh baseline is green, the audit is ranked, and the
-  complete Insights domain/data/UI slice is implemented with focused
-  real-SQLite and web evidence.
+- Current milestone: Fresh baseline is green, the audit is ranked, the
+  complete Insights domain/data/UI slice is implemented, and D14 has been
+  compared against the preserved integrated control.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -78,9 +78,10 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Profile and correct the current-tree D14 regression after ten
-  quiet, serialized HEAVY repetitions, then continue with the ranked
-  accessibility/documentation/performance/dependency/native queue.
+- In progress: Continue the ranked dependency/security, simulation,
+  accessibility, and serialized-native queue after classifying D14 as
+  host-sensitive on the current Nitro host; keep the strict performance
+  contract and fixture unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -88,23 +89,25 @@ leave a tested campaign branch with an honest final handoff.
   tests contain the current Insights slice; `00c60cd` remains the committed
   habit-delete fix.
 - Last successful validation: `npm ci` installed 1137 packages; typecheck,
-  `qa:fast`, `npm test` (727 tests/68 files), `qa:integration` (67 tests/10
-  files), OpenSpec (20/20), impact validation (12/12), all versioned plan
+  `qa:fast`, `npm test` (740 tests/70 files), `qa:integration` (68 tests/11
+  files), OpenSpec (21/21), impact validation (12/12), all versioned plan
   validation, and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
 - Current failures: `npm audit` reports 21 advisories (1 low, 7 moderate,
   13 high), mainly transitive build/tooling packages; safe fixes and the
-  framework-breaking Expo 53 path still need classification. Inherited D14 is
-  not conclusively closed; native direct OS notification selection is partial.
+  framework-breaking Expo 53 path still need classification. D14 remains
+  below its threshold on this host for most repetitions but fails in the
+  preserved baseline too; it is classified ENVIRONMENT/HOST-SENSITIVE, not
+  hidden or fixed by changing the contract. Native direct OS notification
+  selection remains partial.
 - Relevant quarantines: iOS native execution is unavailable on Windows;
   Android is one-emulator/one-Maestro-lane and must remain serialized;
   remote Supabase mutation is out of scope.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Profile the overview→Todos switch against the clean
-  `aa63cb3` baseline and the campaign diff, identify the smallest root cause
-  of the current 811–945 ms result, add a regression guard if needed, and
-  rerun the focused J8 path before any broad or native QA.
+- Exact next action: Run current `npm audit --omit=dev` and `npx expo-doctor`,
+  classify each advisory against the Expo-55-compatible dependency graph, and
+  apply only safe non-framework-breaking fixes before simulation/native work.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -139,7 +142,10 @@ leave a tested campaign branch with an honest final handoff.
       completed Insights slice.
 - [ ] Complete additional evidence-backed correctness/sync/restore/accessibility
       or UX work from the ranked queue.
-- [ ] Reassess D14/CG-4, CG-5, J8, and any Insights performance impact.
+- [x] Reassess D14/CG-4 and the current Insights performance impact against
+      the preserved integrated baseline; classify the current host variance.
+- [ ] Complete a current-tree full J8 pass for fresh CG-5 evidence when the
+      host is idle; do not alter D14/CG-5 thresholds or fixtures.
 - [ ] Audit test runtime/simulation, security/dependencies, types/lint,
       cross-platform scripts, and current documentation.
 - [ ] Run broad headless QA and serialized Android lanes; classify all gaps.
@@ -294,15 +300,42 @@ repository-wide formatting.
   unchanged HEAVY `overview→todos` switch at 832 ms against the unchanged
   800 ms D14 ceiling; the retained artifact showed the expected Todos UI with
   no product error. This is evidence to investigate, not yet a product-bug or
-  host-noise classification.
+  host-noise classification; comparison with the preserved control is
+  required before assigning product causality.
 - 2026-08-12 — Ten sequential current-tree J8 HEAVY repetitions on isolated
-  port 8091 with no emulator or competing listener — FAIL / PRODUCT_BUG
-  CANDIDATE (PERFORMANCE); all 10 serial journeys failed the first measured
+  port 8091 with no emulator or competing listener — ENVIRONMENT /
+  HOST-SENSITIVE; all 10 serial journeys failed the first measured
   `overview→todos` switch at 945, 840, 811, 874, 813, 889, 849, 826, 816,
   and 822 ms. Min 811 ms, median 833 ms, nearest-rank P90 889 ms, max 945 ms,
   pass count 0/10. The strict threshold, HEAVY fixture, worker count, and
-  assertion were unchanged. This supersedes the prior host-noise-only
-  hypothesis for the current campaign tree and requires root-cause profiling.
+  assertion were unchanged. The preserved control fails under the same host
+  conditions, so this does not support an Insights-caused regression. The
+  strict contract remains unchanged and the campaign records the variance
+  rather than weakening the assertion.
+- 2026-08-12 — Ten sequential preserved-`aa63cb3` control J8 HEAVY
+  repetitions on isolated port 8092 with a fresh control export and no
+  emulator or competing listener — CONTROL COMPARISON / ENVIRONMENT; nine
+  runs failed the first `overview→todos` measurement at 970, 922, 853, 808,
+  1126, 883, 886, 811, and 825 ms, while one complete run passed with
+  maxSwitch 797 ms. Across the observed first-switch/failing values: min
+  797 ms, median 868 ms, nearest-rank P90 970 ms, max 1126 ms, pass count
+  1/10. The control fails under the same host conditions, while the campaign
+  tree's observed values are lower in median and maximum; this does not
+  support an Insights-caused regression. The D14 contract remains strict and
+  unresolved on this host, classified ENVIRONMENT/HOST-SENSITIVE rather than
+  fixed by threshold or fixture changes.
+- 2026-08-12 — `npm test -- --reporter=dot` — PASS; 740 tests across 70 test
+  files (672 unit and 68 integration), including the new Insights and habit
+  soft-delete coverage.
+- 2026-08-12 — `npx playwright test --list` — PASS; 189 tests across 19
+  configured project/spec groups, including 95 Chromium tests across 14
+  feature specs. The current broad execution result remains separately
+  recorded as partial because of the host-sensitive J8 threshold miss.
+- 2026-08-12 — Active operational guidance refresh — PASS; current schema
+  version 13 / next migration 14 and migration-13 notification-action state
+  are now recorded in AGENTS, project maps, working rules, database skills,
+  migration command guidance, and the unified knowledge base. Historical audit
+  reports and dated ExecPlans were intentionally left unchanged.
 
 ## Changed Files / Areas
 
