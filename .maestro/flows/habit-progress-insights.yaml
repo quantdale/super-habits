@@ -1,0 +1,49 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - habits
+  - habit-progress-insights
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native insights habit'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native insights habit: 0 of 1 today.*'
+    timeout: 5000
+- tapOn: 'Native insights habit: 0 of 1 today.*'
+- extendedWaitUntil:
+    visible: 'Native insights habit: 1 of 1 today.*'
+    timeout: 5000
+- tapOn: 'View progress for Native insights habit'
+- extendedWaitUntil:
+    visible: 'Native insights habit progress'
+    timeout: 5000
+- extendedWaitUntil:
+    visible: 'Current streak: 1 scheduled occurrence.*'
+    timeout: 5000
+- assertVisible: 'Longest streak: 1 scheduled occurrence.*'
+- assertVisible: 'Scheduled completion rate'
+- assertVisible: 'Recent target vs actual'
+- assertVisible: 'Target met'
+- tapOn: 'Close'
+- assertNotVisible: 'Native insights habit progress'
+- tapOn: 'View progress for Native insights habit'
+- extendedWaitUntil:
+    visible: 'Native insights habit progress'
+    timeout: 5000
+- assertVisible: 'Current streak: 1 scheduled occurrence.*'
+- tapOn: 'Close'

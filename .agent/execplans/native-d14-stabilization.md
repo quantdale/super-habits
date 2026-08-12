@@ -64,8 +64,8 @@ to `main` only if the evidence supports integration.
 
 ## Current Checkpoint
 
-- Current milestone: The native root cause is established and a portable
-  candidate fix is installed in the source tree. The SDK/NDK unified CMake
+- Current milestone: The current-source Android build and serialized native
+  regression gates are green from commit `b3a5a2e`. The SDK/NDK unified CMake
   module receives `ANDROID_STL=c++_shared` but omits `libc++_shared` from
   shared-library link rules; an explicit
   `CMAKE_SHARED_LINKER_FLAGS=-lc++_shared` fixes both dependency and app
@@ -73,10 +73,9 @@ to `main` only if the evidence supports integration.
   six minimal patch-package patches.
 - Completed: Git topology recovered; campaign tip `6287fab`, main tip
   `15a1a92`, integration tip `aa63cb3`, and recovery worktrees preserved.
-- In progress: Rebuild the test APK after a native-flow test fix, then continue
-  the serialized current-source lifecycle, reminder-action, delivery, and
-  Insights lanes; the clean build gate, install, smoke, and persistence lanes
-  are now evidenced.
+- In progress: Re-establish D14/CG-4 under isolated conditions, then run the
+  remaining broad web/sync/accessibility/dependency QA and reconcile docs and
+  plans before the final main-consolidation decision.
 - Important modified files: `app.json`,
   `plugins/withAndroidCxxRuntime.js`, six native dependency patches, and this
   ExecPlan. The originating recovery checkout has unrelated dirty edits that
@@ -86,10 +85,10 @@ to `main` only if the evidence supports integration.
   typecheck passed; lint passed with 0 errors/19 warnings; strict OpenSpec
   passed 21/21; impact validation passed 12/12; all versioned plan validation
   passed; Expo Doctor passed 19/19; and `git diff --check` passed.
-- Current failures: The first current-source persistence aggregate was 9/10;
-  its only failure was the now-corrected `habit-reminder-permission-denied`
-  Maestro scroll-direction test bug. Final source-SHA-matched persistence,
-  lifecycle/action/delivery/Insights, D14, and broad QA evidence remain open.
+- Current failures: No current-source Android flow is failing. The initial
+  9/10 aggregate was a TEST_BUG in the denied-permission flow and the corrected
+  post-commit rerun is green. D14 and the remaining broad QA gates are still
+  open.
 - Previous failure: the no-override build failed at
   `react-native-worklets:buildCMakeRelWithDebInfo[x86_64]` with unresolved
   `std::__ndk1`/`std::bad_alloc`/`__cxa_*`/RTTI/thread symbols. Generated
@@ -101,26 +100,29 @@ to `main` only if the evidence supports integration.
   D14 current-source samples are not yet collected.
 - Native persistence result: the initial 9/10 aggregate run passed every flow
   except `habit-reminder-permission-denied`. Its preserved screenshot showed
-  the daily-schedule form already scrolled past the Reminder section; the flow
-  used the wrong scroll direction for that default form. Changing only that
-  Maestro step from `DOWN` to `UP` made the isolated flow pass, including the
-  blocked-notifications assertion and no-reminder-after-save assertion. Treat
-  the initial result as a TEST_BUG, not a product failure, and rerun the
-  committed flow against an APK built from the post-fix source SHA.
+  the daily-schedule form already scrolled past the Reminder section; changing
+  only that Maestro step from `DOWN` to `UP` made the isolated flow pass. The
+  committed post-fix APK rerun is `10/10`.
+- Native current-source result: smoke, persistence (`10/10`), lifecycle/action
+  (`5/5`), real notification-manager delivery, current-source Insights
+  open/metrics/history/close/reopen, and direct System UI shade actions passed
+  from `b3a5a2e`. Mark Complete routed to the named habit and produced `1 of 1
+scheduled`; a repeated tap remained at one. Snooze produced an app-owned
+  Expo alarm at `+14m54.893s`.
 - Relevant quarantines: Windows cannot run iOS/Xcode lanes; Android uses one
-  existing emulator and serialized Maestro; visual notification-shade control
-  may remain an explicit capability gap if the system UI is nondeterministic.
-- Blockers: None established. The Android linker issue is fixed portably;
-  current native lifecycle/action/delivery/Insights evidence and D14 remain
-  open.
+  existing emulator and serialized Maestro. The shade evidence uses semantic
+  System UI hierarchy discovery and coordinate activation only at the OS UI
+  boundary.
+- Blockers: None established for Android build or current-source native QA;
+  D14 classification and broad final QA remain open.
 - Condition required to unblock: Produce a clean current-source diagnosis and
   either a reproducible portable fix or an evidence-backed exact toolchain
   repair; preserve an explicit blocker if neither is possible.
-- Exact resume action after unblock: Install the APK recorded below, verify the
-  package and source hash, then continue with the first unchecked native lane.
-- Exact next action: commit the corrected permission-denied Maestro flow and
-  checkpoint, rebuild/install the test APK from that new SHA, then run the
-  serialized lifecycle/reminder-action lanes.
+- Exact resume action after unblock: stop the task-owned emulator and any
+  task-owned dev server, then run the unchanged D14/CG-4 benchmark in isolated
+  browser conditions; do not overlap it with native or build activity.
+- Exact next action: run the controlled D14 sample and its CG-5/J8/Insights
+  performance checks, recording every valid sample before broad QA.
 - Remaining definition of done: current-source Android build/install/native
   evidence; D14 classification and two-batch result or honest partial status;
   focused/broad QA and dependency/OpenSpec/plan/docs reconciliation; final
@@ -138,13 +140,12 @@ to `main` only if the evidence supports integration.
 - [x] Repair compatible Android toolchain or portable repository configuration.
 - [x] Build twice from clean generated state and produce/install the exact
       current APK; production APK SHA and source SHA were recorded.
-- [x] Run the current-source smoke and persistence lanes; smoke passed and
-      persistence passed 9/10 initially plus the corrected permission-denied
-      flow in isolation.
-- [ ] Rerun the corrected persistence flow from the post-fix source SHA, then
-      run serialized current-source lifecycle,
-      reminders, reminder actions, delivery, and Insights flows.
-- [ ] Re-prove Habit Progress Insights and Habit Reminder Interactions parity.
+- [x] Run the current-source smoke and persistence lanes; the exact post-fix
+      APK passed smoke and persistence `10/10`.
+- [x] Run serialized current-source lifecycle, reminder actions/replay,
+      notification delivery, and direct notification-shade action evidence.
+- [x] Re-prove Habit Progress Insights and Habit Reminder Interactions parity
+      with a semantic native flow and exact-source system UI evidence.
 - [ ] Re-establish D14/CG-4, profile/fix only if evidence supports it, and
       re-run CG-5/J8/Insights performance.
 - [ ] Run dependency, lint/type, accessibility, sync/restore, simulation, web,
@@ -279,8 +280,50 @@ to `main` only if the evidence supports integration.
   because its daily-schedule form search used the wrong scroll direction. The
   preserved screenshot and hierarchy show the form at the bottom with the
   Reminder section above the visible viewport. After changing that one test
-  step to `direction: UP`, the isolated flow passed end to end. A final
-  post-commit rerun is required for source-SHA identity.
+  step to `direction: UP`, the isolated flow passed end to end.
+- 2026-08-13 — post-fix current-source APK — PASS; source SHA `b3a5a2e`,
+  test-build APK SHA-256
+  `CDA600F1A1386AD8268342271CFF850B98FBF74F605B57F581027FEF77F91A61`,
+  package `com.dale16.superhabits`, version `1.0.0`, versionCode `1`,
+  x86_64/API 36, installed on `emulator-5554` after clean prebuild. This
+  build includes `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true` for the native
+  action controls.
+- 2026-08-13 — post-fix current-source persistence — PASS; `npm run
+qa:native:targeted` completed `10/10` flows in 7m43s. Report
+  `simulation-output/native/native-android-persistence-2026-08-12T214333706Z.json`
+  records `gitSha=b3a5a2e`.
+- 2026-08-13 — post-fix current-source lifecycle — PASS; `npm run
+qa:native:lifecycle` completed `5/5` flows in 3m35s, including reminder
+  action routing, replay, delivery, and Pomodoro isolation. Report
+  `simulation-output/native/native-android-lifecycle-2026-08-12T214730799Z.json`
+  records `gitSha=b3a5a2e`.
+- 2026-08-13 — current-source real notification delivery — PASS; the real
+  scheduling flow posted `Native delivery habit` / `Time to complete your
+habit.` in Android's notification manager after app termination. Report
+  `simulation-output/native/habit-reminder-delivery-2026-08-12T215759038Z.json`.
+- 2026-08-13 — current-source Android shade Mark Complete — PASS; System UI
+  hierarchy exposed semantic buttons `Mark complete` at `[147,841][512,967]`
+  and `Snooze` at `[523,841][726,967]`. A fresh delivered notification action
+  cold-started `MainActivity`, routed to `Native delivery habit`, and after
+  closing the focused editor the list showed `1 of 1 scheduled`. Repeating
+  the same action left the count at one, consistent with exactly-once
+  notification-action handling.
+- 2026-08-13 — current-source Android shade Snooze — PASS; a fresh delivered
+  notification's semantic `Snooze` action resumed the app and
+  `adb shell dumpsys alarm` showed an app-owned
+  `expo.modules.notifications.NOTIFICATION_EVENT` alarm with requester
+  `+14m54s893ms`, matching the fixed 15-minute replacement.
+- 2026-08-13 — current-source Habit Progress Insights — PASS; new semantic
+  flow `.maestro/flows/habit-progress-insights.yaml` created a habit, recorded
+  one completion, opened the progress modal, asserted current/longest streak,
+  scheduled completion rate, recent target-vs-actual history and `Target met`,
+  then closed and reopened the modal. Report
+  `simulation-output/native/native-android-all-2026-08-12T220002956Z.json`
+  records `gitSha=b3a5a2e`.
+- 2026-08-13 — current-source exact smoke rerun — PASS; the smoke flow passed
+  all six section navigations and Settings open/close on the installed APK.
+  Report `simulation-output/native/native-android-all-2026-08-12T220059910Z.json`
+  records `gitSha=b3a5a2e`.
 - 2026-08-13 — D14/CG-4 — NOT RUN for this stabilization branch.
 
 ## Changed Files / Areas
@@ -292,6 +335,8 @@ to `main` only if the evidence supports integration.
   linking fix and evidence.
 - `.maestro/flows/habit-reminder-permission-denied.yaml` — corrected daily
   form scroll direction for the denied-notification persistence case.
+- `.maestro/flows/habit-progress-insights.yaml` — current-source semantic
+  native Insights parity flow.
 - Future changes will be limited to evidence-backed Android/build, performance,
   test, accessibility, documentation, or safe dependency areas and listed here
   as they occur.
@@ -313,14 +358,13 @@ to `main` only if the evidence supports integration.
 
 ## Outcomes & Retrospective
 
-- Stabilization is still ACTIVE. The current-source CMake/libc++ blocker is
-  resolved with a portable prebuild/plugin-plus-patch configuration, and clean
-  build/install/smoke evidence exists. Native persistence is substantively
-  green after correcting one test-flow direction, but the final source-SHA
-  matched rerun and the remaining native, performance, and broad QA gates are
-  still required.
-
-- Status: Active.
-- Summary: Stabilization work has not yet been executed.
-- Follow-up: Populate this section with exact current-source evidence and the
-  justified merge or remaining-blocker decision at task completion.
+- Stabilization remains ACTIVE because D14/CG-4 and broad final QA are not yet
+  complete. The current-source Android CMake/libc++ blocker is resolved with a
+  portable prebuild/plugin-plus-patch configuration, and exact-source
+  build/install/smoke/persistence/lifecycle/notification/action/Insights
+  evidence is green from `b3a5a2e`.
+- The only native failure discovered was a test-flow scroll-direction bug in
+  the denied-permission case; it was corrected without weakening the product
+  assertion and the committed aggregate rerun is `10/10`.
+- Follow-up: stop task-owned Android activity, run isolated D14/CG-4 and
+  related performance checks, then complete broad QA and the merge decision.
