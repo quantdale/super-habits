@@ -78,10 +78,10 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Continue the ranked dependency/security, simulation,
-  accessibility, and serialized-native queue after classifying D14 as
-  host-sensitive on the current Nitro host; keep the strict performance
-  contract and fixture unchanged.
+- In progress: Complete the post-dependency headless proof (dummy sync build,
+  sync E2E, and focused journey gates), then perform the serialized Android
+  preflight and one supported reminder OS-interaction attempt. Keep the D14
+  threshold, HEAVY fixture, and assertion unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -106,9 +106,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run current `npm audit --omit=dev` and `npx expo-doctor`,
-  classify each advisory against the Expo-55-compatible dependency graph, and
-  apply only safe non-framework-breaking fixes before simulation/native work.
+- Exact next action: Run `npm run build:sync` and `npm run e2e:sync` on the
+  current dependency graph, record the exact result, and then run the focused
+  current journey gates before native preflight.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -359,6 +359,9 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - 2026-08-12 — `npm run qa:timezones` — PASS; the 42-test date/reminder
   matrix passed in Asia/Manila, UTC, America/New_York, Pacific/Honolulu, and
   Pacific/Kiritimati. No timezone or local-date regression was observed.
+- 2026-08-12 — `npm run qa:affected` after compaction recovery — PASS;
+  clean-tree impact resolution selected the default `qa:fast → qa:full` path;
+  no implementation changes were present to trigger a narrower rule.
 
 ## Changed Files / Areas
 
@@ -396,8 +399,9 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Campaign branch and durable state created; baseline is green, the
-  audit is ranked, the first correctness defect is fixed, and the Insights
-  domain is implemented and covered. Data/UI integration is next.
-- Follow-up: Complete the OpenSpec tasks with focused data/UI tests, then
-  continue through the remaining ranked queue.
+- Summary: Campaign branch and durable state are clean at `7fe8857`; baseline,
+  dependency classification, Insights implementation, deterministic
+  simulation, timezone matrix, and D14 control comparison are recorded.
+- Follow-up: Prove the current sync boundary and focused journeys, classify
+  native availability and reminder OS gaps, then finish the remaining queue
+  and final regression matrix.
