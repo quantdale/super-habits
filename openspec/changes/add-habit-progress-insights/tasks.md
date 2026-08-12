@@ -1,8 +1,8 @@
 ## 1. Domain contract
 
-- [ ] 1.1 Add the pure insight types/calculator and shared window/trend helpers
+- [x] 1.1 Add the pure insight types/calculator and shared window/trend helpers
       using the existing Habit Engine V2 rule and streak functions.
-- [ ] 1.2 Add deterministic Vitest coverage for schedules, historical targets,
+- [x] 1.2 Add deterministic Vitest coverage for schedules, historical targets,
       creation/deletion boundaries, current-day grace, long streaks, rates,
       trend evidence, off-day rows, and local date boundaries.
 

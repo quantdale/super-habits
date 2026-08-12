@@ -68,8 +68,8 @@ leave a tested campaign branch with an honest final handoff.
 ## Current Checkpoint
 
 - Current milestone: Fresh baseline is green, the audit is ranked, the first
-  integrity fix is checkpointed, and the validated Insights OpenSpec is ready
-  for implementation.
+  integrity fix is checkpointed, and the Insights domain contract is now
+  implemented and unit-tested.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -78,12 +78,12 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Apply the Insights OpenSpec domain/data/UI tasks against the
-  existing Habit Engine V2 domain semantics.
-- Important modified files: `features/habits/habits.data.ts` and
-  `tests/integration/softDelete.test.ts` were changed and committed in
-  `00c60cd`; the campaign plan remains the only uncommitted area between
-  checkpoints.
+- In progress: Add the shared completion read, refactor the Habits list to
+  remove avoidable N+1 history queries, and then build the accessible detail
+  surface.
+- Important modified files: `features/habits/habitInsights.domain.ts` and
+  `tests/habitInsights.domain.test.ts` are the current domain milestone;
+  `00c60cd` remains the committed habit-delete fix.
 - Last successful validation: `npm ci` installed 1137 packages; typecheck,
   `qa:fast`, `npm test` (727 tests/68 files), `qa:integration` (67 tests/10
   files), OpenSpec (20/20), impact validation (12/12), all versioned plan
@@ -98,10 +98,10 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Implement task 1.1 of
-  `add-habit-progress-insights`: add the pure calculator/types and focused
-  window/trend helpers, then write its deterministic unit matrix before
-  touching the screen.
+- Exact next action: Implement task 2.1 of
+  `add-habit-progress-insights`: add one ordered all-habit completion read and
+  refactor `HabitsScreen.refresh()` to derive today counts/current streaks from
+  one in-memory index without changing the existing heatmap query.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -124,9 +124,11 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Resolve the highest-confidence higher-severity correctness finding:
       repeated habit soft delete.
 - [x] Propose and validate `add-habit-progress-insights` OpenSpec.
-- [ ] Implement Insights domain/data/UI with historical semantics and bounded
-      loading.
-- [ ] Add unit, real-SQLite, focused web, and accessibility-equivalent tests.
+- [x] Implement Insights domain with historical semantics and bounded in-memory
+      window/trend calculation.
+- [ ] Implement Insights data/UI with historical semantics and bounded loading.
+- [x] Add deterministic Insights domain unit coverage.
+- [ ] Add real-SQLite, focused web, and accessibility-equivalent tests.
 - [ ] Complete additional evidence-backed correctness/sync/restore/accessibility
       or UX work from the ranked queue.
 - [ ] Reassess D14/CG-4, CG-5, J8, and any Insights performance impact.
@@ -257,6 +259,11 @@ repository-wide formatting.
 - 2026-08-12 — `add-habit-progress-insights` OpenSpec — PASS; proposal,
   delta spec, design, and tasks created and `openspec validate ... --strict`
   passed. Apply instructions report 10 pending tasks.
+- 2026-08-12 — Insights domain task 1 — PASS; 12 deterministic Vitest cases
+  cover daily/M-W/F/weekdays/weekends, target and schedule history, creation
+  and deletion boundaries, current-day grace, off-day neutrality, empty rates,
+  trend evidence, >30 streaks, and leap/year boundaries. Typecheck, focused
+  lint, and `git diff --check` pass.
 
 ## Changed Files / Areas
 
@@ -268,6 +275,9 @@ repository-wide formatting.
   regression coverage, committed as `00c60cd`.
 - `openspec/changes/add-habit-progress-insights/` — validated product contract,
   design, and apply task list.
+- `features/habits/habitInsights.domain.ts` — canonical metric/window/trend
+  calculator.
+- `tests/habitInsights.domain.test.ts` — deterministic domain matrix.
 
 ## Recovery / Resume Instructions
 
@@ -288,6 +298,6 @@ repository-wide formatting.
 - Status: Active.
 - Summary: Campaign branch and durable state created; baseline is green, the
   audit is ranked, the first correctness defect is fixed, and the Insights
-  contract is validated. Implementation is the next milestone.
-- Follow-up: Complete the OpenSpec tasks with focused domain/data/UI tests,
-  then continue through the remaining ranked queue.
+  domain is implemented and covered. Data/UI integration is next.
+- Follow-up: Complete the OpenSpec tasks with focused data/UI tests, then
+  continue through the remaining ranked queue.
