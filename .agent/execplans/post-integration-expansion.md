@@ -78,10 +78,10 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Complete the post-dependency headless proof (dummy sync build,
-  sync E2E, and focused journey gates), then perform the serialized Android
-  preflight and one supported reminder OS-interaction attempt. Keep the D14
-  threshold, HEAVY fixture, and assertion unchanged.
+- In progress: Complete the post-dependency focused journey gates, then
+  perform the serialized Android preflight and one supported reminder
+  OS-interaction attempt. Keep the D14 threshold, HEAVY fixture, and assertion
+  unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -106,9 +106,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `npm run build:sync` and `npm run e2e:sync` on the
-  current dependency graph, record the exact result, and then run the focused
-  current journey gates before native preflight.
+- Exact next action: Run the current P0 journey gate on isolated port 8091,
+  record its result, and then run the remaining current journeys before native
+  preflight.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -362,6 +362,13 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - 2026-08-12 — `npm run qa:affected` after compaction recovery — PASS;
   clean-tree impact resolution selected the default `qa:fast → qa:full` path;
   no implementation changes were present to trigger a narrower rule.
+- 2026-08-12 — `npm run build:sync` — PASS; rebuilt `dist-sync/` from a
+  clean output directory and verified the non-routable dummy Supabase URL was
+  baked into the export, with no real credentials used.
+- 2026-08-12 — `npm run e2e:sync` — PASS; all 19/19 tagged journeys passed on
+  one worker, covering malformed/503/timeout/partial sync failures, backoff,
+  restore lifecycle and safety, offline outbox persistence/deduplication, and
+  reconnect delivery.
 
 ## Changed Files / Areas
 
