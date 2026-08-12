@@ -68,8 +68,9 @@ leave a tested campaign branch with an honest final handoff.
 ## Current Checkpoint
 
 - Current milestone: Fresh baseline is green, the audit is ranked, the
-  complete Insights domain/data/UI slice is implemented, and D14 has been
-  compared against the preserved integrated control.
+  complete Insights domain/data/UI slice is implemented, D14 has been
+  compared against the preserved integrated control, and serialized Android
+  persistence/lifecycle evidence is recorded.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -78,18 +79,23 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Complete the serialized lifecycle/reminder action lane on the
-  installed integration APK, then make one supported OS notification shade /
-  cold-start attempt. The current-source local Android build is separately
-  classified as a CMake/libc++ toolchain blocker; do not hide it as a product
-  pass. Keep the D14 threshold, HEAVY fixture, and assertion unchanged.
+- Completed: `npm run qa:native:targeted` passed 10/10 persistence flows and
+  `npm run qa:native:lifecycle` passed 5/5 flows on the installed integration
+  APK, including Reminder V2 actions/replay/delivery and Pomodoro lifecycle.
+  The APK is older than this campaign tip, so this is strong native behavior
+  evidence but not current-source Insights UI evidence.
+- In progress: Make one supported OS notification shade / cold-start attempt
+  against the real Android notification surface. The current-source local
+  Android build is separately classified as a CMake/libc++ toolchain blocker;
+  do not hide it as a product pass. Keep the D14 threshold, HEAVY fixture, and
+  assertion unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
   `features/habits/HabitsScreen.tsx`, and the focused habit E2E/integration
   tests contain the current Insights slice; `00c60cd` remains the committed
   habit-delete fix.
-- Last successful validation: `npm ci` installed 1137 packages; typecheck,
+- Last successful validation: `npm ci` installed 1138 packages; typecheck,
   `qa:fast`, `npm test` (740 tests/70 files), `qa:integration` (68 tests/11
   files), OpenSpec (21/21), impact validation (12/12), all versioned plan
   validation, and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
@@ -107,9 +113,12 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `npm run qa:native:lifecycle` serially on
-  `emulator-5554`, preserve its report, and classify any failure with the
-  existing native taxonomy before the OS-level attempt.
+- Exact next action: Inspect the existing test-notification path, schedule one
+  real habit notification on `emulator-5554`, expand the Android notification
+  shade through supported system automation, and attempt semantic Mark
+  Complete/Snooze selection plus one cold-start tap. Preserve evidence and
+  classify any nondeterministic or unavailable OS surface as an explicit known
+  gap; do not fake a tray-action pass.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -138,6 +147,8 @@ leave a tested campaign branch with an honest final handoff.
       in-memory list derivation.
 - [x] Implement Insights UI with historical semantics and bounded loading.
 - [x] Add deterministic Insights domain unit coverage.
+- [x] Run serialized Android persistence and lifecycle lanes; record the
+      10/10 and 5/5 evidence and the installed-APK/current-source distinction.
 - [x] Add real-SQLite coverage for shared/history loading.
 - [x] Add focused web and accessibility-equivalent tests.
 - [x] Run the affected QA impact check and strict OpenSpec validation for the
