@@ -69,15 +69,21 @@ leave a tested campaign branch with an honest final handoff.
 
 - Current milestone: Fresh baseline is green for static, unit, integration,
   OpenSpec, impact, plan, and Expo diagnostics; source-driven audit/ranking is
-  next.
+  now complete and the first integrity fix is checkpointed.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
   OpenSpec, and ExecPlan instructions; created this campaign branch.
-- In progress: Inspect the major product/data/sync/accessibility/tooling areas,
-  classify inherited gaps, and build the ranked audit queue before product
-  implementation.
-- Important modified files: none yet on this branch beyond this ExecPlan.
+- Completed: Inspected the major product/data/sync/accessibility/tooling areas,
+  classified inherited gaps, and ranked the queue below. Fixed and committed
+  the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
+  regression assertion.
+- In progress: Propose the focused Insights OpenSpec, then implement it against
+  the existing Habit Engine V2 domain semantics.
+- Important modified files: `features/habits/habits.data.ts` and
+  `tests/integration/softDelete.test.ts` were changed and committed in
+  `00c60cd`; the campaign plan remains the only uncommitted area between
+  checkpoints.
 - Last successful validation: `npm ci` installed 1137 packages; typecheck,
   `qa:fast`, `npm test` (727 tests/68 files), `qa:integration` (67 tests/10
   files), OpenSpec (20/20), impact validation (12/12), all versioned plan
@@ -115,8 +121,9 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Establish and record the fresh baseline matrix; static/unit/integration
       gates pass, with 19 lint warnings and 21 audit advisories classified as
       follow-up work.
-- [ ] Perform source-driven whole-repository audit and rank actionable queue.
-- [ ] Resolve any higher-severity correctness/security blocker found by audit.
+- [x] Perform source-driven whole-repository audit and rank actionable queue.
+- [x] Resolve the highest-confidence higher-severity correctness finding:
+      repeated habit soft delete.
 - [ ] Propose and validate `add-habit-progress-insights` OpenSpec.
 - [ ] Implement Insights domain/data/UI with historical semantics and bounded
       loading.
@@ -132,21 +139,65 @@ leave a tested campaign branch with an honest final handoff.
 
 ## Audit Queue
 
-Populate after the baseline and source inspection. Rank findings with:
+Ranked after the baseline and source inspection with:
 
 `Severity × user impact × likelihood × fix confidence × regression-testability ÷ implementation risk`.
 
-Initial hypotheses to verify, not assume:
+1. **P1 data integrity — repeated habit soft delete (resolved).**
+   `features/habits/habits.data.ts` previously rewrote an existing tombstone
+   and re-enqueued/cleaned up downstream state on every repeat call, while
+   Todos, Calories, and Workout already guarded `deleted_at IS NULL`. The
+   fix is `00c60cd`; the integration test proves the second delete preserves
+   the first tombstone and does not repeat the mutation path.
+2. **P1 product value/correctness — schedule-aware Habit Progress Insights.**
+   Existing `habits.domain.ts` already owns effective-dated schedule/target,
+   streak, and neutral off-day semantics, while `HabitsScreen` has no useful
+   per-habit historical detail surface. This is the next selected workstream:
+   expose bounded, accessible metrics without creating a second calculation
+   model.
+3. **P2 performance — HabitsScreen completion loading is N+1.**
+   `refresh()` calls `getHabitCountByDate` once per active habit and
+   `getCompletionHistory` once per habit, in addition to the shared heatmap
+   query. Insights will use one bounded/history query for the opened habit;
+   the list path should also gain a batched completion read if the measured
+   impact remains material after implementation.
+4. **P2 accessibility — habit editor icon/color controls lack semantic names
+   and selected state.** Existing `IconButton` supports both, but the
+   habit-specific Pressables in `HabitsScreen` do not expose equivalent
+   semantics. Fix alongside the Insights entry/modal so the core habit flow
+   is usable by assistive technology.
+5. **P2 performance evidence — D14/CG-4 needs a quiet-host repeat.** The
+   inherited 10-run sample was 8/10 (748 min, 761 median, 866 P90, 1202 max)
+   with `emulator-5554` running; the emulator was stopped and the controlled
+   repeat was interrupted. Re-measure after product work in an isolated
+   single-worker environment; do not alter the threshold or fixture.
+6. **P2 dependency/security — current `npm audit` reports 21 transitive or
+   build/tooling advisories.** A forced repair proposes an Expo 53 downgrade,
+   so it is not acceptable. Inspect the normal dry-run and runtime omission
+   view; apply only SDK-compatible safe patches, otherwise document the exact
+   deferred chains.
+7. **P2 sync/restore — local hardening is green, but remote round-trip and
+   user-scoped Supabase/RLS validation are external capability gaps.** Current
+   metadata validation, partial failure retention, and empty-device restore
+   safety have focused tests and pass. Do not mutate remote Supabase; add
+   local adversarial coverage only where a concrete gap appears.
+8. **P3 test/runtime — current simulation and full web matrix need fresh
+   campaign evidence.** Run the current lanes after implementation and profile
+   only if a real slow or leaking scenario reproduces; do not remove scenarios
+   or add retry-based speedups.
+9. **P3 documentation — operational guidance still names schema v12 and old
+   point-in-time test counts in canonical maps/skills.** Refresh current
+   canonical docs after implementation, while preserving historical OpenSpec
+   reports as historical evidence.
+10. **P3 native capability — Android reminder shade/direct cold-start action
+    selection remains unasserted and iOS is unavailable on Windows.** Attempt
+    one serialized current-environment proof after headless stabilization;
+    retain a precise `EXPECTED_KNOWN_GAP`/`ENVIRONMENT` classification if the
+    OS interaction is not deterministic.
 
-1. D14/CG-4 host-sensitive performance state and missing quiet-host repeat.
-2. Habit Progress Insights V1 as the highest-value user capability if no P0/P1
-   correctness/security issue appears.
-3. Restore/sync fail-closed behavior for malformed or partial remote payloads.
-4. Habit schedule/target-history edge cases not covered by current tests.
-5. Core workflow accessibility semantics and icon-only controls.
-6. Safe lint/type/JSON-validation issues with concrete defect potential.
-7. Simulation/test-runtime or cross-platform script reliability gaps.
-8. Documentation drift about current schema, test inventory, and native status.
+Deferred unless new evidence elevates them: broad UI redesign, full pull-based
+multi-device sync, remote schema changes, Expo/RN major upgrades, and cosmetic
+repository-wide formatting.
 
 ## Surprises & Discoveries
 
@@ -176,7 +227,8 @@ Initial hypotheses to verify, not assume:
 - 2026-08-12 — Required instruction/skill reads — PASS; repository maps,
   ExecPlan protocol, QA conventions, feature/RN/data invariants, and OpenSpec
   proposal workflow read before implementation.
-- 2026-08-12 — Fresh campaign baseline — NOT RUN; exact next action.
+- 2026-08-12 — Fresh campaign baseline — PASS/CLASSIFIED; exact commands and
+  results are recorded below.
 - 2026-08-12 — `npm ci` — PASS; 1137 packages installed and both SDK-55
   patches applied. Worktree hook creation reports ENOTDIR because `.git` is a
   worktree file; no product failure.
@@ -194,11 +246,24 @@ Initial hypotheses to verify, not assume:
 - 2026-08-12 — `npx expo-doctor` — PASS; 19/19 checks.
 - 2026-08-12 — `npm audit` — FAIL/KNOWN DEPENDENCY AUDIT; 21 advisories,
   with forced repair proposing an Expo 53 downgrade; no unsafe repair run.
+- 2026-08-12 — Source-driven audit — PASS/CLASSIFIED; found the unguarded
+  repeat habit tombstone, confirmed existing Todos/Calories/Workout guards,
+  identified the HabitsScreen N+1 completion load, habit editor semantic gaps,
+  inherited D14/native evidence gaps, dependency advisories, and canonical
+  documentation drift. No higher-severity blocker than the fixed habit
+  mutation was found.
+- 2026-08-12 — `00c60cd fix: make habit soft delete idempotent` — PASS;
+  targeted Vitest (15 tests/2 files), typecheck, and ESLint passed before the
+  checkpoint.
 
 ## Changed Files / Areas
 
 - `.agent/execplans/post-integration-expansion.md` — durable campaign state,
   queue, evidence, and recovery instructions.
+- `features/habits/habits.data.ts` — idempotent habit tombstone mutation,
+  committed as `00c60cd`.
+- `tests/integration/softDelete.test.ts` — real-SQLite repeat-delete
+  regression coverage, committed as `00c60cd`.
 
 ## Recovery / Resume Instructions
 
@@ -217,7 +282,8 @@ Initial hypotheses to verify, not assume:
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Campaign branch and durable state created; baseline, audit,
-  implementation, and final validation remain.
-- Follow-up: Complete the ranked queue and update this section before any
-  final merge recommendation.
+- Summary: Campaign branch and durable state created; baseline is green, the
+  audit is ranked, and the first correctness defect is fixed. Insights is the
+  next implementation milestone.
+- Follow-up: Create/validate the Insights OpenSpec, implement it with focused
+  domain/data/UI tests, then continue through the remaining ranked queue.
