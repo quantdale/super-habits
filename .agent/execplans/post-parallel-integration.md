@@ -1,7 +1,7 @@
 # ExecPlan: Post-parallel integration and autonomous continuation
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -70,54 +70,55 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 
 ## Current Checkpoint
 
-- Current milestone: Web/headless journeys and the dummy sync boundary are
-  green; the ten-repetition D14/J8 sample is complete but CG-4 remains
-  unresolved because two isolated runs exceeded the unchanged 800 ms ceiling.
+- Current milestone: Integration and continuation are complete on the
+  preserved integration history plus the campaign branch. Web/headless,
+  sync/restore, timezone, simulation, dependency, and serialized Android
+  evidence are recorded; D14 remains an explicit host-sensitive exception.
 - Completed: Read repository startup/architecture/QA/ExecPlan instructions;
   located the actual Reminder worktree and OpenSpec history; verified the
   headless branch/worktree and common ancestor; staged only task-owned Reminder
   V2 plus its schedule-aware prerequisite; committed feature tip `2d8223e`;
   created `integration/reminder-actions-headless` from that tip.
-- In progress: Inspect the D14 measurement path and preserved failure trace to
-  distinguish host-sensitive scheduling from an integrated-tree regression;
-  then repeat the sample after removing the identified emulator/Gradle host
-  load and inspect current native/emulator readiness.
+- In progress: None — the remaining D14, dependency-audit, iOS, and
+  current-source Android toolchain items are external or explicitly deferred
+  follow-ups, not unrecorded integration work.
 - Important modified files: `package.json`, `package-lock.json`,
   `eslint.config.mjs`, versioned `patches/`, and the earlier merged
   `core/sync/syncPersistence.ts`, the todos/calories/
   workout soft-delete data layers, `e2e/helpers/journey.ts`, their regression
   tests, the merged headless ExecPlan/guidance files, and the Reminder V2 areas
   from feature tip `2d8223e`.
-- Last successful validation: `npm ci` passed with the SDK-aligned lockfile;
-  Expo Doctor 19/19 and `expo install --check` passed; typecheck, lint (0
-  errors/19 warnings), `npm test` (727/68), and aligned `build:web` passed;
-  focused Habits E2E passed 10/10; broad Chromium passed 87/94 with 7
-  expected internal-mode skips on isolated port 8091; `build:sync` passed and
-  the isolated dummy-boundary sync journey passed 19/19.
-- Current failures: Runtime audit reports 19 vulnerabilities (1 low, 6
-  moderate, 12 high), including transitive Metro/image-size, Babel, js-yaml,
-  brace-expansion, and uuid findings; forced repair proposes an Expo 53
-  downgrade and is not authorized. D14 has two isolated over-threshold
-  repetitions (1202 ms and 866 ms) amid eight passes, so it is not yet closed.
-- Relevant quarantines: Native iOS is expected to be Windows/macOS-limited;
-  visual Android notification-shade and direct OS cold-start action selection
-  are explicit proof attempts, not assumed passes; D14/CG-4 must be measured
-  under controlled conditions.
+- Last successful validation: The campaign’s final `npm ci` passed with the
+  SDK-aligned lockfile; Expo Doctor 19/19 and `expo install --check` passed;
+  final typecheck, lint (0 errors/19 warnings), `npm test` (740/70), rebuilt
+  web and sync exports, Chromium feature coverage, and the isolated
+  dummy-boundary sync journey passed (19/19). The final deterministic
+  simulation is 17/17 and the timezone matrix is 42/42 in each of five zones.
+  Serialized Android persistence and lifecycle lanes passed 10/10 and 5/5 on
+  the installed integration APK.
+- Current failures: Final audit reports 16 vulnerabilities (6 moderate, 10
+  high), including transitive Expo/Metro/image-size, config, and uuid edges;
+  forced repair proposes framework-breaking Expo 53 or React Native 0.72
+  paths and was not run. Controlled D14 remains host-sensitive at 3/10
+  passes (minimum 765 ms, median 830.5 ms, P90 916 ms, maximum 965 ms) with
+  the unchanged 800 ms contract; the preserved control also missed it.
+  Current-source Android build is blocked by the local CMake/libc++ toolchain.
+- Relevant quarantines: Native iOS is unavailable on Windows; Android remains
+  one-emulator/one-Maestro-lane and current-source native UI claims are
+  limited by the toolchain; remote Supabase mutation remains out of scope.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Stop the identified idle Nitro emulator and Gradle test
-  daemon, verify no listener/test process remains, then repeat ten serial J8
-  HEAVY runs on port 8091 with the unchanged threshold and fixture. Do not run
-  native or broad QA concurrently.
-- Remaining definition of done: A committed semantic merge; valid append-only
-  migration sequence; focused Reminder/headless regressions green; required
-  static/OpenSpec/impact/integration/timezone/simulation/web/sync/build gates
-  run and classified; D14/CG-4 reliably green or root-caused/classified;
-  dependency and Expo health understood; serialized Android lanes and focused
-  actionable-reminder proof attempted; at least one additional high-value
-  continuation task completed when safe; final plan validation and handoff
-  evidence recorded.
+- Exact next action: None — integration and the safe continuation work are
+  complete; use `post-integration-expansion.md` for the current handoff
+  evidence.
+- Remaining definition of done: No remaining work in the safe in-scope
+  integration campaign; semantic merge preserved both histories; migration
+  ordering is valid; Reminder/headless regressions and required static,
+  OpenSpec, impact, integration, timezone, simulation, web, sync, build, and
+  serialized Android gates were run and classified; D14/CG-4 is classified;
+  dependency and Expo health are understood; continuation work is complete;
+  final plan validation and handoff evidence are recorded.
 
 ## Progress
 
@@ -143,17 +144,17 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 - [x] Run static, integration, OpenSpec, impact, timezone, simulation, web,
       sync, and build QA appropriate to the merged diff; all recorded gates
       are green except the documented dependency audit findings.
-- [ ] Re-establish D14/CG-4 under controlled conditions and resolve or classify;
+- [x] Re-establish D14/CG-4 under controlled conditions and resolve or classify;
       current evidence is intermittent (seven consecutive 748–779 ms passes,
       then isolated 1202 ms and 866 ms misses), not a reliable pass or a
       reproducible over-threshold regression.
-- [ ] Audit dependency/Expo/lint/format health without unsafe upgrades or
+- [x] Audit dependency/Expo/lint/format health without unsafe upgrades or
       broad formatting churn.
-- [ ] Serialize Android native lanes and attempt remaining actionable-reminder
+- [x] Serialize Android native lanes and attempt remaining actionable-reminder
       system proofs; preserve environment/known-gap evidence.
-- [ ] Audit the stabilized current tree and complete the highest-value safe
+- [x] Audit the stabilized current tree and complete the highest-value safe
       continuation work.
-- [ ] Inspect final diff/history, validate the plan, and decide whether the
+- [x] Inspect final diff/history, validate the plan, and decide whether the
       branch is READY TO MERGE to `main`.
 
 ## Surprises & Discoveries
@@ -319,10 +320,14 @@ e2e/habits.spec.ts` — PASS; 10/10 focused Habit tests.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
+- Status: Completed.
 - Summary: Source preservation, durable planning, the semantic two-parent
   integration merge, SDK-55-compatible dependency alignment, web/headless
-  journeys, and the dummy sync boundary are complete; controlled performance,
-  native proof, and continuation remain.
-- Follow-up: Complete the remaining definition-of-done conditions before
-  considering a merge to `main`.
+  journeys, dummy sync boundary, controlled performance classification,
+  serialized native proof, and high-value continuation work are complete. The
+  campaign branch contains the current implementation and remains separate
+  from `main`.
+- Follow-up: Revisit D14 on a controlled low-contention host and repair the
+  current-source Android CMake/libc++ environment when external toolchain
+  support is available; no threshold, fixture, or framework-breaking
+  dependency change was used to close the plan.

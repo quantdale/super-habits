@@ -26,12 +26,12 @@ leave a tested campaign branch with an honest final handoff.
 - Prior integration commits include Reminder V2 (`2d8223e`), the semantic
   headless merge (`b4f7372`), SDK-55-compatible dependency alignment
   (`12be240`), and integration checkpoints (`6b54bbd`, `58a261d`, `aa63cb3`).
-- The inherited integration plan is still ACTIVE. Its first ten-run D14
-  sample recorded 8/10 passes (748 ms minimum, 761 ms median, 866 ms P90,
-  1202 ms maximum) while the Nitro emulator was running; the emulator was
-  subsequently stopped, but the quiet-host repeat was interrupted when this
-  campaign began. Native reminder-shade/cold-start proof also remains to be
-  recovered from actual current evidence.
+- The inherited integration plan has now been reconciled to COMPLETED. Its
+  first ten-run D14 sample recorded 8/10 passes (748 ms minimum, 761 ms
+  median, 866 ms P90, 1202 ms maximum) while the Nitro emulator was running;
+  the campaign added a controlled 3/10 host-sensitive repeat and completed
+  the serialized native reminder-shade/cold-start proof on the installed
+  integration APK.
 - Runtime schema/migration truth must come from `core/db/client.ts` and
   migration tests, not stale `schema.sql` or older guidance that still names
   v12. Migrations are append-only.
@@ -134,6 +134,9 @@ leave a tested campaign branch with an honest final handoff.
 - `e2e/helpers/gestures.ts`, `e2e/journeys/fat-fingers.spec.ts`, and
   `e2e/journeys/the-commute.spec.ts` — stale completion-control comments
   aligned with the semantic checkbox implementation.
+- `.agent/execplans/post-parallel-integration.md` — reconciled the inherited
+  integration plan to completed status with the campaign’s final evidence and
+  deferred external follow-ups.
 - Last successful validation: after the task fix, `qa:fast` passed typecheck,
   lint (0 errors/19 warnings), and 672 unit tests/59 files; `qa:integration`
   passed 68 real-SQLite tests/11 files; strict OpenSpec passed 21/21, impact
