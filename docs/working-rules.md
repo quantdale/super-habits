@@ -82,8 +82,8 @@ If this file conflicts with current code, trust the code and document the confli
 - Create IDs only with `createId(prefix)` from `lib/id.ts`.
 - Create day keys only with `toDateKey()` from `lib/time.ts`.
 - `toDateKey()` currently uses local calendar dates, not UTC.
-- Runtime schema version is `11`.
-- The next schema change belongs in a new `if (version < 12)` block in `core/db/client.ts`.
+- Runtime schema version is `12`.
+- The next schema change belongs in a new `if (version < 13)` block in `core/db/client.ts`.
 - Migrations are append-only. Never edit prior migration blocks.
 - `core/db/schema.sql` is reference-only and currently stale.
 
@@ -118,7 +118,7 @@ If this file conflicts with current code, trust the code and document the confli
 
 - Validation baseline (point-in-time; re-verify with `npx vitest list` / `npx playwright test --list` instead of trusting the numbers below):
   - `npm run typecheck` passes (0 errors).
-  - `npm test` passes with `630` tests across `56` test files (586 unit + 44 integration).
+  - `npm test` passes with `664` tests across `63` test files (613 unit + 51 integration).
   - `npm run build:web` passes.
   - `npx playwright test --list` reports `181` tests across `19` spec files in 4 projects (chromium 90, journeys 69, simulation 3, journeys-sync 19).
 

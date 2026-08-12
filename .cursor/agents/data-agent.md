@@ -51,7 +51,7 @@ NON-NEGOTIABLES
 - schema.sql is reference only — never execute it
 - UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed exception to soft-delete — non-synced entity, no `syncEngine.enqueue()`. See `features/habits/habits.data.ts` ~63–66 for the explanatory comment.
 - All SELECT queries include WHERE deleted_at IS NULL
-- 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` (630 tests as of the last full pass) — never maintain a magic total count
+- 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` — never maintain a magic total count
 
 E2E TESTS
 E2E uses the **static** web bundle (`dist/`) served by `node scripts/serve-e2e.js` (see `playwright.config.ts` `webServer`). Run `npm run build:web` before `npm run e2e` when data-layer changes affect the web build. **Keep `workers: 1` locally** — OPFS SQLite does not tolerate parallel Playwright workers on the same origin.

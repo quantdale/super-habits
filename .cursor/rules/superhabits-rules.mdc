@@ -54,7 +54,7 @@ Current product-shell facts to preserve:
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always append a new `if (version < N) { ... }`
    block in `runMigrations()` in `core/db/client.ts` — there are no numbered migration
-   files. Current stored version: 11; the next block is `if (version < 12)`.
+   files. Current stored version: 12; the next block is `if (version < 13)`.
    schema.sql is a reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions
@@ -98,7 +98,7 @@ Do not wire these up without an explicit decision to do so.
 - Every new \*.domain.ts function must have a Vitest unit test
 - Test files live in tests/ directory
 - Run: npm test
-- Baseline: `npx vitest list` shows the current inventory (630 tests as of the last full pass); the gate is **0 failures** on `npm test` — never maintain a magic total count in this file
+- Baseline: `npx vitest list` shows the current inventory; the gate is **0 failures** on `npm test` — never maintain a magic total count in this file
 - Data/DB, restore, linked-actions, and provider-model tests already exist. Component rendering tests are still limited — document that gap honestly instead of describing the suite as domain-only.
 
 ## E2E Tests (Playwright)

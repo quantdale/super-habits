@@ -74,7 +74,7 @@ toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **loca
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 12) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 13) { ... }` today — bump to N+1 when version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/
