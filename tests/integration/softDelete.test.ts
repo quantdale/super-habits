@@ -26,23 +26,35 @@ import { freshDatabase } from './helpers/db';
 /** Intercepts every prepared statement so DELETE usage can be asserted. */
 function installDeleteTracer(db: TestDatabase): {
   deletes: string[];
+  updates: string[];
   assertNoHardDeleteOn(table: string): void;
+  assertGuardedSoftDelete(table: string): void;
 } {
   const deletes: string[] = [];
+  const updates: string[] = [];
   // The local declaration only covers the adapter's surface; the raw handle
   // is the real better-sqlite3 Database, whose `prepare` we can wrap.
   const raw = db.raw as unknown as { prepare: (sql: string) => unknown };
   const originalPrepare = raw.prepare.bind(raw);
   raw.prepare = (sql: string) => {
     if (/^\s*DELETE\s/i.test(sql)) deletes.push(sql);
+    if (/^\s*UPDATE\s+\w+\s+SET\s+deleted_at\b/i.test(sql)) updates.push(sql);
     return originalPrepare(sql);
   };
   return {
     deletes,
+    updates,
     assertNoHardDeleteOn(table: string) {
       expect(
         deletes.some((sql) => new RegExp(`DELETE\\s+FROM\\s+${table}\\b`, 'i').test(sql)),
       ).toBe(false);
+    },
+    assertGuardedSoftDelete(table: string) {
+      const tableUpdates = updates.filter((sql) =>
+        new RegExp(`UPDATE\\s+${table}\\s+SET\\s+deleted_at\\b`, 'i').test(sql),
+      );
+      expect(tableUpdates.length).toBeGreaterThan(0);
+      expect(tableUpdates.every((sql) => /WHERE[\s\S]*deleted_at IS NULL/i.test(sql))).toBe(true);
     },
   };
 }
@@ -104,6 +116,7 @@ describe('todos soft delete', () => {
     expect(tombstone?.deleted_at).not.toBeNull();
     expect((await todos.listTodos()).map((t) => t.id)).toEqual([keepId]);
     tracer.assertNoHardDeleteOn('todos');
+    tracer.assertGuardedSoftDelete('todos');
 
     // Recoverable: clearing the tombstone brings the row straight back.
     await revive(db, 'todos', doomedId);
@@ -200,6 +213,7 @@ describe('calories soft delete', () => {
     );
     expect(tombstone?.deleted_at).not.toBeNull();
     tracer.assertNoHardDeleteOn('calorie_entries');
+    tracer.assertGuardedSoftDelete('calorie_entries');
 
     await revive(db, 'calorie_entries', doomed.id);
     expect((await calories.listCalorieEntries('2026-07-01')).map((e) => e.food_name)).toContain(
@@ -229,6 +243,7 @@ describe('workout soft delete', () => {
     expect((await workout.listRoutines()).map((r) => r.name)).toEqual(['Keep routine']);
     expect(await workout.getRoutineWithExercises(doomedRoutine.id)).toBeNull();
     tracer.assertNoHardDeleteOn('workout_routines');
+    tracer.assertGuardedSoftDelete('workout_routines');
 
     // deleteRoutine does NOT cascade: the nested exercises keep their rows and
     // are not tombstoned (the app leaves routine content alone; only the
@@ -261,6 +276,7 @@ describe('workout soft delete', () => {
 
   it('deleteExercise tombstones that exercise and its sets', async () => {
     const db = await freshDatabase();
+    const tracer = installDeleteTracer(db);
     const workout = await import('@/features/workout/workout.data');
 
     await workout.addRoutine('R', 'desc');
@@ -282,6 +298,8 @@ describe('workout soft delete', () => {
     );
     expect(setRow?.deleted_at).not.toBeNull();
     expect(await workout.listSets(exId)).toHaveLength(0);
+    tracer.assertGuardedSoftDelete('routine_exercises');
+    tracer.assertGuardedSoftDelete('routine_exercise_sets');
 
     await db.closeAsync();
   });

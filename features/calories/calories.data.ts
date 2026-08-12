@@ -265,11 +265,10 @@ export async function deleteSavedMeal(id: string): Promise<void> {
 export async function deleteCalorieEntry(id: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync('UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?', [
-    now,
-    now,
-    id,
-  ]);
+  await db.runAsync(
+    'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    [now, now, id],
+  );
   syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'delete' });
 }
 
