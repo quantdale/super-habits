@@ -2,6 +2,7 @@ import expoConfig from 'eslint-config-expo/flat.js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 // React Native UI ecosystem — banned from pure (data/domain) layers.
@@ -29,6 +30,21 @@ const reactUiImportGroups = [
     message: 'Pure layers must not import @react-native-community packages.',
   },
 ];
+
+const expoConfigWithProjectReactHooks = expoConfig.map((config) => {
+  if (!config.plugins?.['react-hooks']) {
+    return config;
+  }
+
+  return {
+    ...config,
+    plugins: {
+      ...config.plugins,
+      // Keep the project’s React Hooks 7 rules while using the SDK 55 preset.
+      'react-hooks': reactHooks,
+    },
+  };
+});
 
 export default [
   // Global ignores
@@ -58,7 +74,7 @@ export default [
   },
 
   // Expo preset (core + TypeScript + React + Expo rules)
-  ...expoConfig,
+  ...expoConfigWithProjectReactHooks,
 
   // TypeScript recommended type-checked rules
   ...tseslint.configs['flat/recommended-type-checked'],
