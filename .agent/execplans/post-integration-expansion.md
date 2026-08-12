@@ -84,11 +84,20 @@ leave a tested campaign branch with an honest final handoff.
   APK, including Reminder V2 actions/replay/delivery and Pomodoro lifecycle.
   The APK is older than this campaign tip, so this is strong native behavior
   evidence but not current-source Insights UI evidence.
-- In progress: Make one supported OS notification shade / cold-start attempt
-  against the real Android notification surface. The current-source local
-  Android build is separately classified as a CMake/libc++ toolchain blocker;
-  do not hide it as a product pass. Keep the D14 threshold, HEAVY fixture, and
-  assertion unchanged.
+- Completed: The focused Android-system attempt delivered a real habit
+  notification after the app was killed. The expanded System UI hierarchy
+  exposed `Mark complete` and `Snooze`; a device-specific, non-gating tap on
+  `Mark complete` cold-started `MainActivity`, routed to the exact habit, and
+  the list subsequently reported `1 of 1 today`. A second real delivery and
+  `Snooze` tap resumed the app and created an Expo notification alarm about
+  14m55s ahead, matching the fixed 15-minute replacement. This closes the
+  direct Android shade/cold-start reminder evidence on the installed
+  integration APK without changing production code or test thresholds.
+- In progress: Finish the campaign’s final static/web regression and audit
+  checkpoint. The current-source local Android build is separately classified
+  as a CMake/libc++ toolchain blocker; do not claim current-tree Insights
+  native UI coverage from the older installed APK. Keep the D14 threshold,
+  HEAVY fixture, and assertion unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -106,19 +115,18 @@ leave a tested campaign branch with an honest final handoff.
   below its threshold on this host for most repetitions but fails in the
   preserved baseline too; it is classified ENVIRONMENT/HOST-SENSITIVE, not
   hidden or fixed by changing the contract. Native direct OS notification
-  selection remains partial.
+  selection is now proven on Android’s real notification shade for the
+  installed integration APK; current-source Insights native UI remains
+  unavailable because the local Expo/RN CMake toolchain cannot produce an APK.
 - Relevant quarantines: iOS native execution is unavailable on Windows;
   Android is one-emulator/one-Maestro-lane and must remain serialized;
   remote Supabase mutation is out of scope.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Inspect the existing test-notification path, schedule one
-  real habit notification on `emulator-5554`, expand the Android notification
-  shade through supported system automation, and attempt semantic Mark
-  Complete/Snooze selection plus one cold-start tap. Preserve evidence and
-  classify any nondeterministic or unavailable OS surface as an explicit known
-  gap; do not fake a tray-action pass.
+- Exact next action: Run the final affected/static/web regression matrix after
+  this native checkpoint, then inspect the remaining accessibility/correctness
+  queue for one more evidence-backed fix before the final audit.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -149,6 +157,9 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Add deterministic Insights domain unit coverage.
 - [x] Run serialized Android persistence and lifecycle lanes; record the
       10/10 and 5/5 evidence and the installed-APK/current-source distinction.
+- [x] Attempt real Android notification-shade Mark Complete and Snooze actions;
+      record cold-start routing, exactly-once count evidence, and the 15-minute
+      replacement alarm without making the device-specific tap a gate.
 - [x] Add real-SQLite coverage for shared/history loading.
 - [x] Add focused web and accessibility-equivalent tests.
 - [x] Run the affected QA impact check and strict OpenSpec validation for the
