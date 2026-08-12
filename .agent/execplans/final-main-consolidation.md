@@ -45,20 +45,24 @@ normally when the remote permits it.
 
 ## Current Checkpoint
 
-- Current milestone: Branch inventory is complete; the stabilization tip is a
-  single complete descendant of all five identified completed workstreams.
+- Current milestone: The complete stabilization descendant has been merged
+  normally into local `main` at `36a73dc9942d5e8ad3a7af0a8f5bd862e6679b48`.
+  Main's full web, simulation, and sync gates are green; exact-SHA Android
+  validation and remote synchronization remain.
 - Completed: Local/remote main state, all local branch refs, worktrees, graph,
   and pre-merge ancestry coverage have been inspected.
-- In progress: Create this durable consolidation plan, merge the complete
-  descendant into `main`, then run and record final main QA.
+- In progress: Build/install an APK from the exact current `main` SHA, run the
+  serialized main-native matrix, close this plan with final ancestry/security
+  evidence, and push `main` normally if `origin/main` remains unchanged.
 - Important modified files: this ExecPlan only before the merge; the main
   merge is expected to bring the validated stabilization history and its
   intentional documentation/OpenSpec changes.
-- Last successful validation: stabilization tip was clean; current-source
-  Android build/native matrix, D14 batches, 740 Vitest tests, 68 integration
-  tests, five-zone timezone QA, 153/170 full E2E aggregate tests, 17/17
-  deterministic scenarios, 19/19 sync tests, strict OpenSpec, plan validation,
-  impact validation, and Expo Doctor 19/19 passed there.
+- Last successful validation: On `main`, 740 Vitest tests, 68 integration
+  tests, five-zone timezone QA, 153/170 full E2E aggregate tests, the HEAVY
+  D14 row at 753ms, 17/17 deterministic scenarios, 19/19 sync tests, strict
+  OpenSpec 21/21, plan validation, impact validation, and Expo Doctor 19/19
+  passed. The stabilization tip's exact-source Android evidence is preserved
+  and the final main APK is still required.
 - Current failures: None established in the validated stabilization tip.
 - Relevant quarantines: iOS/Xcode remains unavailable on Windows; full web
   aggregate has 17 documented environment/opt-in skips; framework-transitive
@@ -66,9 +70,10 @@ normally when the remote permits it.
 - Blockers: None for local consolidation at this checkpoint; remote push may
   be blocked by branch protection or authentication and must be reported
   precisely rather than bypassed.
-- Exact next action: commit this ACTIVE plan, merge
-  `stabilization/native-d14-closure` into this clean consolidation worktree,
-  then update the plan with the merge SHA and final main QA evidence.
+- Exact next action: from clean generated state, build the Android test APK
+  from main SHA `36a73dc9942d5e8ad3a7af0a8f5bd862e6679b48`, install it on the
+  existing `Nitro_API_36`/`emulator-5554`, and run serialized smoke,
+  persistence, lifecycle/action, and Insights flows.
 - Remaining definition of done: final main QA, ancestry/content proof,
   documentation/plan reconciliation, clean main audit, and remote equality or
   an honest permission blocker.
@@ -78,11 +83,13 @@ normally when the remote permits it.
 - [x] Recover and inventory all relevant branches, remotes, and worktrees.
 - [x] Identify `stabilization/native-d14-closure` as the complete descendant.
 - [x] Prove the five identified completed workstream tips are ancestors of it.
-- [ ] Create the consolidation plan checkpoint commit.
-- [ ] Merge the complete descendant into local `main` semantically.
-- [ ] Prove every completed branch tip is an ancestor of final `main`.
-- [ ] Run final static, unit/integration, web, simulation, sync, performance,
-      dependency, and native validation on `main`.
+- [x] Create the consolidation plan checkpoint commit.
+- [x] Merge the complete descendant into local `main` semantically.
+- [x] Prove every completed branch tip is an ancestor of final `main`.
+- [x] Run final static, unit/integration, web, simulation, sync, performance,
+      and dependency validation on `main`.
+- [ ] Build/install from exact final main SHA and run the serialized main-native
+      matrix.
 - [ ] Reconcile this plan/docs, audit side branches/worktrees, and push/verify
       `origin/main` when permitted.
 
@@ -114,6 +121,21 @@ normally when the remote permits it.
   ancestors of `7e61aec`.
 - 2026-08-13 — Pre-merge stabilization evidence — PASS; see
   `.agent/execplans/native-d14-stabilization.md` and its committed ledger.
+- 2026-08-13 — Normal local main merge — PASS; consolidation branch merged
+  without conflicts into `main` as `36a73dc9942d5e8ad3a7af0a8f5bd862e6679b48`.
+- 2026-08-13 — Main static/unit/integration — PASS; typecheck passed, lint
+  passed with 0 errors/19 warnings, Vitest passed 740/740 across 70 files,
+  integration passed 68/68, timezone QA passed 42/42 in each of five zones,
+  and QA fast passed 672/672 unit tests.
+- 2026-08-13 — Main repository validation — PASS; strict OpenSpec 21/21,
+  impact map 12/12, all plan validators, Expo Doctor 19/19, and diff check
+  passed.
+- 2026-08-13 — Main web aggregate — PASS; full `e2e:full` passed 153/170
+  with 17 documented skips, including exact-habit Insights and schedule
+  coverage; HEAVY J8 measured maxSwitch 753ms, diary search 382ms, and picker
+  82ms.
+- 2026-08-13 — Main sync/restore — PASS; `e2e:sync` passed 19/19 against the
+  dummy-Supabase `dist-sync` build.
 
 ## Changed Files / Areas
 
