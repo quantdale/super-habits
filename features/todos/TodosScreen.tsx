@@ -435,6 +435,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 {hasCompleted ? (
                   <Pressable
                     onPress={() => setShowCompleted((v) => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
+                    accessibilityState={{ expanded: showCompleted }}
+                    aria-expanded={showCompleted}
                     className="rounded-full border px-3 py-2.5"
                     style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
                   >
@@ -559,6 +563,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   setTodoError(null);
                   setIsRecurring((v) => !v);
                 }}
+                accessibilityRole="checkbox"
+                accessibilityLabel="Repeat task daily"
+                accessibilityState={{ checked: isRecurring }}
+                aria-checked={isRecurring}
                 className="mb-3 flex-row items-center gap-2 py-2"
               >
                 <View

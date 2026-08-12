@@ -69,8 +69,9 @@ leave a tested campaign branch with an honest final handoff.
 
 - Current milestone: Fresh baseline is green, the audit is ranked, the
   complete Insights domain/data/UI slice is implemented, D14 has been
-  compared against the preserved integrated control, and serialized Android
-  persistence/lifecycle evidence is recorded.
+  compared against the preserved integrated control, serialized Android
+  persistence/lifecycle evidence is recorded, and a task accessibility bug is
+  fixed with focused web proof.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -93,6 +94,13 @@ leave a tested campaign branch with an honest final handoff.
   14m55s ahead, matching the fixed 15-minute replacement. This closes the
   direct Android shade/cold-start reminder evidence on the installed
   integration APK without changing production code or test thresholds.
+- Completed: A focused task accessibility audit found that the web
+  `RectButton` completion control exposed a checkbox role but did not respond
+  to activation. The three layout variants now use React Native `Pressable`
+  with task-specific labels and explicit checked state; Show completed and
+  Repeat daily controls also expose semantic state. The weak title/glyph E2E
+  selectors were replaced with named controls, and the focused Todos suite
+  passes 8/8.
 - In progress: Finish the campaign’s final static/web regression and audit
   checkpoint. The current-source local Android build is separately classified
   as a CMake/libc++ toolchain blocker; do not claim current-tree Insights
@@ -103,11 +111,17 @@ leave a tested campaign branch with an honest final handoff.
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
   `features/habits/HabitsScreen.tsx`, and the focused habit E2E/integration
   tests contain the current Insights slice; `00c60cd` remains the committed
-  habit-delete fix.
-- Last successful validation: `npm ci` installed 1138 packages; typecheck,
-  `qa:fast`, `npm test` (740 tests/70 files), `qa:integration` (68 tests/11
-  files), OpenSpec (21/21), impact validation (12/12), all versioned plan
-  validation, and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
+  habit-delete fix. The current task accessibility checkpoint covers
+  `features/todos/TodoItem.tsx`, `features/todos/TodosScreen.tsx`,
+  `e2e/todos.spec.ts`, and the journey comment in
+  `e2e/journeys/a-tuesday.spec.ts`.
+- Last successful validation: after the task fix, Prettier, `git diff --check`,
+  typecheck, focused ESLint, `npm run build:web`, and
+  `npx playwright test e2e/todos.spec.ts --project=chromium` (8/8) pass. The
+  broader baseline remains `npm ci` with 1138 packages; typecheck, `qa:fast`,
+  `npm test` (740 tests/70 files), `qa:integration` (68 tests/11 files),
+  OpenSpec (21/21), impact validation (12/12), all versioned plan validation,
+  and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
 - Current failures: the post-repair `npm audit` reports 16 advisories (6
   moderate, 10 high), all remaining through transitive Expo/Metro/image-size,
   config, and uuid edges; the force-fix path still proposes Expo 53 or React
@@ -124,9 +138,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run the final affected/static/web regression matrix after
-  this native checkpoint, then inspect the remaining accessibility/correctness
-  queue for one more evidence-backed fix before the final audit.
+- Exact next action: Commit the task accessibility checkpoint, then run the
+  final affected/static/web regression matrix and reconcile its results before
+  the final repository audit.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -164,8 +178,9 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Add focused web and accessibility-equivalent tests.
 - [x] Run the affected QA impact check and strict OpenSpec validation for the
       completed Insights slice.
-- [ ] Complete additional evidence-backed correctness/sync/restore/accessibility
-      or UX work from the ranked queue.
+- [x] Complete additional evidence-backed correctness/sync/restore/accessibility
+      or UX work from the ranked queue; the Todo completion semantics and
+      related toggle labels/states are now covered by a focused web regression.
 - [x] Reassess D14/CG-4 and the current Insights performance impact against
       the preserved integrated baseline; classify the current host variance.
 - [x] Capture current-tree J8 evidence: the canonical journey reproduced the
@@ -424,6 +439,17 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   integration APK; all 10/10 persistence flows passed, including habit,
   schedule, reminder persistence/disable/isolation/permission, settings,
   todo, calories, and workout coverage.
+- 2026-08-13 — Focused Todo accessibility E2E — PRODUCT_BUG reproduced; the
+  initial semantic `RectButton` controls exposed `role=checkbox` and
+  `aria-checked` but a web click did not complete the Todo, so the test could
+  not observe the resulting state. This failure was preserved as root-cause
+  evidence rather than weakening the selector or assertion.
+- 2026-08-13 — Todo accessibility checkpoint — PASS; replaced the three web
+  completion controls with `Pressable`, retained the visual/icon behavior,
+  added task-specific reorder labels and explicit state aliases for completion,
+  Show completed, and Repeat daily, and replaced brittle E2E selectors. The
+  focused Chromium Todos suite passed 8/8; typecheck, focused ESLint,
+  Prettier, build:web, and diff-check passed.
 
 ## Changed Files / Areas
 
@@ -443,6 +469,11 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - `features/habits/HabitProgressInsightsModal.tsx` — accessible local progress
   detail surface.
 - `e2e/habits.spec.ts` — exact-habit progress accessibility-equivalent journey.
+- `features/todos/TodoItem.tsx` — actionable semantic completion control in
+  grid/list/content layouts.
+- `features/todos/TodosScreen.tsx` — expanded/checked state for Todo toggles.
+- `e2e/todos.spec.ts` and `e2e/journeys/a-tuesday.spec.ts` — semantic Todo
+  completion coverage and selector documentation.
 
 ## Recovery / Resume Instructions
 
@@ -461,9 +492,10 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Campaign branch and durable state are clean at `7fe8857`; baseline,
-  dependency classification, Insights implementation, deterministic
-  simulation, timezone matrix, and D14 control comparison are recorded.
-- Follow-up: Prove the current sync boundary and focused journeys, classify
-  native availability and reminder OS gaps, then finish the remaining queue
-  and final regression matrix.
+- Summary: Campaign branch has completed the baseline, dependency
+  classification, Insights implementation, deterministic simulation, timezone
+  matrix, D14 control comparison, serialized native evidence, real Android
+  notification-shade proof, and a focused Todo accessibility fix. The final
+  static/web matrix and repository audit remain.
+- Follow-up: Run the final matrix, preserve any classifications, validate the
+  plan, and leave the branch clean without mutating main.
