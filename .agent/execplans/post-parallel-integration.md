@@ -71,14 +71,17 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 ## Current Checkpoint
 
 - Current milestone: Web/headless journeys and the dummy sync boundary are
-  green; the required ten-repetition controlled D14/J8 sample is next.
+  green; the ten-repetition D14/J8 sample is complete but CG-4 remains
+  unresolved because two isolated runs exceeded the unchanged 800 ms ceiling.
 - Completed: Read repository startup/architecture/QA/ExecPlan instructions;
   located the actual Reminder worktree and OpenSpec history; verified the
   headless branch/worktree and common ancestor; staged only task-owned Reminder
   V2 plus its schedule-aware prerequisite; committed feature tip `2d8223e`;
   created `integration/reminder-actions-headless` from that tip.
-- In progress: Collect at least ten serial canonical HEAVY D14 repetitions on
-  the quiet host, then inspect current native/emulator readiness.
+- In progress: Inspect the D14 measurement path and preserved failure trace to
+  distinguish host-sensitive scheduling from an integrated-tree regression;
+  then repeat the sample after removing the identified emulator/Gradle host
+  load and inspect current native/emulator readiness.
 - Important modified files: `package.json`, `package-lock.json`,
   `eslint.config.mjs`, versioned `patches/`, and the earlier merged
   `core/sync/syncPersistence.ts`, the todos/calories/
@@ -94,7 +97,8 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 - Current failures: Runtime audit reports 19 vulnerabilities (1 low, 6
   moderate, 12 high), including transitive Metro/image-size, Babel, js-yaml,
   brace-expansion, and uuid findings; forced repair proposes an Expo 53
-  downgrade and is not authorized. No product test failure is recorded.
+  downgrade and is not authorized. D14 has two isolated over-threshold
+  repetitions (1202 ms and 866 ms) amid eight passes, so it is not yet closed.
 - Relevant quarantines: Native iOS is expected to be Windows/macOS-limited;
   visual Android notification-shade and direct OS cold-start action selection
   are explicit proof attempts, not assumed passes; D14/CG-4 must be measured
@@ -102,10 +106,10 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run ten serial repetitions of the canonical HEAVY J8
-  journey on the fresh regular `dist` build, extract each `maxSwitch` timing,
-  and calculate min/median/P90/max/pass count against the unchanged 800 ms
-  threshold. Do not run native or broad QA concurrently.
+- Exact next action: Stop the identified idle Nitro emulator and Gradle test
+  daemon, verify no listener/test process remains, then repeat ten serial J8
+  HEAVY runs on port 8091 with the unchanged threshold and fixture. Do not run
+  native or broad QA concurrently.
 - Remaining definition of done: A committed semantic merge; valid append-only
   migration sequence; focused Reminder/headless regressions green; required
   static/OpenSpec/impact/integration/timezone/simulation/web/sync/build gates
@@ -133,12 +137,16 @@ actions`). It contains the completed `add-schedule-aware-habit-reminders`
 - [x] Run isolated P0 and full journey E2E on port 8091.
 - [x] Run dummy-Supabase sync build and boundary journeys; `build:sync` and
       `e2e:sync` passed (19/19).
-- [ ] Collect ten controlled HEAVY D14 repetitions and calculate min/median/
-      P90/max/pass count.
+- [x] Collect ten controlled HEAVY D14 repetitions and calculate
+      min/median/P90/max/pass count; 8/10 passed, min 748 ms, median 761 ms,
+      P90 866 ms, max 1202 ms.
 - [x] Run static, integration, OpenSpec, impact, timezone, simulation, web,
       sync, and build QA appropriate to the merged diff; all recorded gates
       are green except the documented dependency audit findings.
-- [ ] Re-establish D14/CG-4 under controlled conditions and resolve or classify.
+- [ ] Re-establish D14/CG-4 under controlled conditions and resolve or classify;
+      current evidence is intermittent (seven consecutive 748–779 ms passes,
+      then isolated 1202 ms and 866 ms misses), not a reliable pass or a
+      reproducible over-threshold regression.
 - [ ] Audit dependency/Expo/lint/format health without unsafe upgrades or
       broad formatting churn.
 - [ ] Serialize Android native lanes and attempt remaining actionable-reminder
@@ -262,6 +270,20 @@ e2e/habits.spec.ts` — PASS; 10/10 focused Habit tests.
 - 2026-08-12 — `npm run e2e:sync` — PASS; 19/19 journeys-sync checks passed
   against the dummy boundary, including malformed/503/timeout/partial-sync,
   restore, offline outbox, and reconnect behavior.
+- 2026-08-12 — Ten serial canonical HEAVY J8 repetitions on fresh `dist` at
+  isolated port 8091 — INTERMITTENT/UNRESOLVED; max-switch values were
+  771, 779, 753, 764, 755, 748, 758, 1202, 755, and 866 ms. Min 748 ms,
+  median 761 ms, nearest-rank P90 866 ms, max 1202 ms, pass count 8/10.
+  Runs 1–7 were consecutive passes; run 8 failed at `overview→todos` 1202 ms
+  with a retained screenshot/trace, run 9 passed, and run 10 failed at
+  `overview→todos` 866 ms. The threshold and HEAVY fixture were unchanged.
+- 2026-08-12 — D14 artifact inspection — SUPPORTS HOST-SENSITIVE HYPOTHESIS;
+  the retained screenshot shows the expected rendered Todos screen with no
+  product error, and `measureSwitch` uses wall-clock time around a browser
+  click plus a DOM-wide opacity poll. The known Nitro emulator was still
+  running during this first sample; its QEMU process consumed about 1.3 CPU
+  seconds during a five-second idle observation, so that sample is retained
+  but not treated as a genuinely quiet-host baseline.
 
 ## Changed Files / Areas
 
