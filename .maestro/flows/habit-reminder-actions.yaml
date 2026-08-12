@@ -1,0 +1,75 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - lifecycle
+  - notifications
+  - habit-reminder-actions
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native Gym action'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native Gym action: 0 of 1 today.*'
+    timeout: 5000
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Inject habit reminder tap'
+    direction: DOWN
+- tapOn: 'Inject habit reminder tap'
+- assertVisible: 'Edit Habit'
+- scrollUntilVisible:
+    element: 'Cancel'
+    direction: DOWN
+- tapOn: 'Cancel'
+- tapOn: 'Exit habit edit mode'
+- scrollUntilVisible:
+    element: 'Native Gym action: 0 of 1 today.*'
+    direction: UP
+- assertVisible: 'Native Gym action: 0 of 1 today.*'
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Inject Mark complete response'
+    direction: DOWN
+- tapOn: 'Inject Mark complete response'
+- scrollUntilVisible:
+    element: 'Cancel'
+    direction: DOWN
+- tapOn: 'Cancel'
+- tapOn: 'Exit habit edit mode'
+- extendedWaitUntil:
+    visible: 'Native Gym action: 1 of 1 today.*'
+    timeout: 5000
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Inject Snooze response'
+    direction: DOWN
+- tapOn: 'Inject Snooze response'
+- scrollUntilVisible:
+    element: 'Cancel'
+    direction: DOWN
+- tapOn: 'Cancel'
+- tapOn: 'Exit habit edit mode'
+- assertVisible: 'Reminder 18:00'

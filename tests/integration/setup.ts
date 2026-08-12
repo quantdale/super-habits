@@ -40,11 +40,16 @@ vi.mock('expo-notifications', () => ({
   getPermissionsAsync: vi.fn().mockResolvedValue({ status: 'denied' }),
   requestPermissionsAsync: vi.fn().mockResolvedValue({ status: 'denied' }),
   setNotificationChannelAsync: vi.fn(),
+  setNotificationCategoryAsync: vi.fn().mockResolvedValue(undefined),
   scheduleNotificationAsync: vi.fn().mockResolvedValue('notif-id'),
   cancelScheduledNotificationAsync: vi.fn().mockResolvedValue(undefined),
-  AndroidImportance: { HIGH: 5 },
+  getAllScheduledNotificationsAsync: vi.fn().mockResolvedValue([]),
+  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  getLastNotificationResponse: vi.fn().mockReturnValue(null),
+  clearLastNotificationResponse: vi.fn(),
+  AndroidImportance: { DEFAULT: 5, HIGH: 6 },
   PermissionStatus: { GRANTED: 'granted' },
-  SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval' },
+  SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
 }));
 
 /** Avoid loading @react-native-async-storage via real `lib/supabase` when tests import sync.engine. */

@@ -1,0 +1,78 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - notifications
+  - habits
+  - pomodoro
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native Gym reminder'
+- hideKeyboard
+- tapOn: 'Custom'
+- tapOn: 'Tuesday scheduled'
+- tapOn: 'Thursday scheduled'
+- tapOn: 'Saturday scheduled'
+- tapOn: 'Sunday scheduled'
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native Gym reminder'
+    timeout: 5000
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native Read reminder'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native Read reminder'
+    timeout: 5000
+- assertVisible: 'Native Gym reminder'
+- assertVisible: 'Reminder 18:00'
+- tapOn: 'Enter habit edit mode'
+- scrollUntilVisible:
+    element: 'Delete'
+    direction: DOWN
+- tapOn: 'Delete'
+- tapOn: 'Delete habit'
+- extendedWaitUntil:
+    visible: 'Native Gym reminder'
+    timeout: 5000
+- assertNotVisible: 'Native Read reminder'
+- tapOn: 'Exit habit edit mode'
+- assertVisible: 'Reminder 18:00'
+- swipe:
+    direction: LEFT
+- tapOn: 'Start focus'
+- assertVisible: 'Pause'
+- pressKey: HOME
+- launchApp:
+    stopApp: false
+- assertVisible: 'Pause'
+- tapOn: 'Reset'
+- assertVisible: 'Start focus'

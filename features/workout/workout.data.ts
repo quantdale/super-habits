@@ -142,11 +142,10 @@ export async function listWorkoutLogsForRange(
 export async function deleteRoutine(routineId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync('UPDATE workout_routines SET deleted_at = ?, updated_at = ? WHERE id = ?', [
-    now,
-    now,
-    routineId,
-  ]);
+  await db.runAsync(
+    'UPDATE workout_routines SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    [now, now, routineId],
+  );
   await deleteLinkedActionRulesForTargetEntity({
     feature: 'workout',
     entityType: 'workout_routine',
@@ -200,12 +199,12 @@ export async function deleteExercise(id: string): Promise<void> {
   );
   await db.runAsync(
     `UPDATE routine_exercises
-     SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+     SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
     [now, now, id],
   );
   await db.runAsync(
     `UPDATE routine_exercise_sets
-     SET deleted_at = ?, updated_at = ? WHERE exercise_id = ?`,
+     SET deleted_at = ?, updated_at = ? WHERE exercise_id = ? AND deleted_at IS NULL`,
     [now, now, id],
   );
   if (row?.routine_id) await markWorkoutRoutineUpdated(db, row.routine_id, now);
@@ -324,7 +323,7 @@ export async function deleteSet(id: string): Promise<void> {
   );
   await db.runAsync(
     `UPDATE routine_exercise_sets
-     SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+     SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
     [now, now, id],
   );
   if (setRow?.routine_id) await markWorkoutRoutineUpdated(db, setRow.routine_id, now);

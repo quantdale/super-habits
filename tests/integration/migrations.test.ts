@@ -61,7 +61,7 @@ vi.mock('@/core/db/appMeta', async (importOriginal) => {
   };
 });
 
-/** All tables the app creates (bootstrap DDL + migrations 2–12). */
+/** All tables the app creates (bootstrap DDL + migrations 2–13). */
 const EXPECTED_TABLES = [
   'todos',
   'habits',
@@ -78,6 +78,7 @@ const EXPECTED_TABLES = [
   'linked_action_rules',
   'linked_action_events',
   'linked_action_executions',
+  'processed_notification_actions',
 ];
 
 /** Named indexes the app creates (migrations 8, 10, 11). */
@@ -90,6 +91,7 @@ const EXPECTED_NAMED_INDEXES = [
   'idx_linked_action_executions_source_rule',
   'idx_linked_action_executions_chain_guard',
   'idx_linked_action_executions_chain',
+  'idx_processed_notification_actions_processed_at',
 ];
 
 type OpenDbOptions = {
@@ -114,14 +116,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 12', async () => {
+  it('bootstraps from zero and reaches stored schema version 13', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('12');
+    expect(row?.value).toBe('13');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -157,18 +159,18 @@ describe('tests/integration/migrations', () => {
     await db.closeAsync();
   });
 
-  it('re-running migrations on an existing v12 database is a no-op', async () => {
+  it('re-running migrations on an existing v13 database is a no-op', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-integration-'));
     const file = path.join(dir, 'superhabits.db');
 
     try {
-      // Session 1: a fresh empty file gets bootstrapped + migrated to v12.
+      // Session 1: a fresh empty file gets bootstrapped + migrated to v13.
       const session1 = await openDb({ filename: file });
       const v1 = await session1.getFirstAsync<{ value: string }>(
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('12');
+      expect(v1?.value).toBe('13');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -179,7 +181,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('12');
+      expect(v2?.value).toBe('13');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",

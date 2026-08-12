@@ -285,7 +285,7 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
         id: 'habit_imported',
         name: 'Hydrate',
         target_per_day: 8,
-        reminder_time: null,
+        reminder_time: '07:30',
         category: 'anytime',
         icon: 'check-circle',
         color: '#64748b',
@@ -318,6 +318,7 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
     const calories = await import('@/features/calories/calories.data');
     expect((await habits.listHabits()).map((h) => h.name)).toEqual(['Hydrate']);
     const importedHabit = (await habits.listHabits())[0];
+    expect(importedHabit?.reminder_time).toBe('07:30');
     expect(
       getHabitRuleForDate(
         parseHabitRuleHistory(importedHabit?.rule_history),

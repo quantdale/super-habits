@@ -1,0 +1,59 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - notifications
+  - habits
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native disable reminder'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native disable reminder'
+    timeout: 5000
+- assertVisible: 'Reminder 18:00'
+- tapOn: 'Enter habit edit mode'
+- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Save changes'
+    direction: DOWN
+- tapOn: 'Save changes'
+- extendedWaitUntil:
+    visible: 'Native disable reminder'
+    timeout: 5000
+- assertNotVisible: 'Reminder 18:00'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- assertVisible: 'Native disable reminder'
+- assertNotVisible: 'Reminder 18:00'

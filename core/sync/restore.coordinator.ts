@@ -2,6 +2,7 @@ import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { applyRemoteCalorieEntries } from '@/features/calories/calories.data';
 import { applyRemoteHabits } from '@/features/habits/habits.data';
+import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { applyRemoteTodos } from '@/features/todos/todos.data';
 import { isRemoteEnabled, supabase } from '@/lib/supabase';
 import { nowIso } from '@/lib/time';
@@ -410,6 +411,8 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
       preview: await getRestorePreview(),
     };
   }
+
+  requestHabitReminderReconciliation();
 
   return {
     status: 'restored',

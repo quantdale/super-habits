@@ -147,7 +147,7 @@ describe('calories.data', () => {
     await deleteCalorieEntry('cal_9');
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ?',
+      'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
       ['2026-04-06T10:00:00.000Z', '2026-04-06T10:00:00.000Z', 'cal_9'],
     );
     expect(syncEngine.enqueue).toHaveBeenCalledWith({

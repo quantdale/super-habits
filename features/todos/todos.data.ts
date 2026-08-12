@@ -405,7 +405,10 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
 export async function removeTodo(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await db.runAsync('UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+  await db.runAsync(
+    'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    [now, now, id],
+  );
   await saveTodoLinkedActionRules(id, []);
   await deleteLinkedActionRulesForTargetEntity({
     feature: 'todos',

@@ -11,7 +11,7 @@ E2E tests (Playwright) — in one pass. Reports results for both.
 
 Run: `npm test`
 
-Expected: **630** tests passing (compare against `npx vitest list`) — 0 failing is the gate
+Expected: all tests listed by `npx vitest list` passing — 0 failing is the gate
 
 Report:
 
@@ -72,7 +72,7 @@ Report:
 
 | Suite            | Tests | Passed | Failed | Skipped |
 | ---------------- | ----- | ------ | ------ | ------- |
-| Unit (Vitest)    | 630   | ?      | ?      | 0       |
+| Unit (Vitest)    | inventory | ?      | ?      | 0       |
 | E2E (Playwright) | 181   | ?      | ?      | ?       |
 | **Total**        | ?     | ?      | ?      | ?       |
 

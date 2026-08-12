@@ -10,6 +10,8 @@ export type AppSection = 'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout
 type NavigationContextValue = {
   activeSection: AppSection;
   setActiveSection: (section: AppSection) => void;
+  openHabit: (habitId: string) => void;
+  consumePendingHabitFocus: () => string | null;
   isSettingsOpen: boolean;
   openSettings: () => void;
   closeSettings: () => void;
@@ -20,15 +22,31 @@ const NavigationContext = createContext<NavigationContextValue | null>(null);
 export function NavigationProvider({ children }: PropsWithChildren) {
   const [activeSection, setActiveSection] = useState<AppSection>('overview');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [pendingHabitFocusId, setPendingHabitFocusId] = useState<string | null>(null);
 
   const openSettings = useCallback(() => setIsSettingsOpen(true), []);
   const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
+  const openHabit = useCallback((habitId: string) => {
+    setPendingHabitFocusId(habitId);
+    setActiveSection('habits');
+    setIsSettingsOpen(false);
+  }, []);
+  const consumePendingHabitFocus = useCallback(() => {
+    let pending = pendingHabitFocusId;
+    setPendingHabitFocusId((current) => {
+      pending = current;
+      return null;
+    });
+    return pending;
+  }, [pendingHabitFocusId]);
 
   return (
     <NavigationContext.Provider
       value={{
         activeSection,
         setActiveSection,
+        openHabit,
+        consumePendingHabitFocus,
         isSettingsOpen,
         openSettings,
         closeSettings,

@@ -78,18 +78,21 @@ Untestable with this repo and this harness, regardless of application behaviour.
 
 **Reason:** Nitro's Windows Android lane now reaches the installed SuperHabits
 `e2e-test` equivalent and has proven native smoke, SQLite-backed persistence,
-Pomodoro lifecycle, and the notification scheduling path. The remaining
-capability gaps are notification-tray delivery, long-running background
+Pomodoro lifecycle, the notification scheduling path, short-horizon local
+notification posting after app process termination, and direct Android
+notification-shade action selection on the current-source APK. The remaining
+capability gaps are long-horizon recurrence, long-running background
 execution, focused `Alert.alert` confirmations, system offline toggling, and
 platform-specific performance. iOS remains dependent on EAS/macOS because
 Windows has no Xcode `xcrun/simctl`.
 
 **Closing path:** keep `npm run qa:native:android`, the targeted persistence
-lane, and lifecycle lane as the local Android gates. Run the
-`.eas/workflows/native-e2e.yml` jobs for iOS/cross-platform coverage. Add
-stable notification-shade and system-network assertions only after selecting
-a supported device-lab mechanism. (Supplemented by the manual exploratory
-missions in `docs/testing/exploratory-missions.md` — M1, M2.)
+lane, lifecycle lane, and the test-only delivery probe as the local Android
+gates. Run the `.eas/workflows/native-e2e.yml` jobs for iOS/cross-platform
+coverage. Add stable visual notification-shade and system-network assertions
+only after selecting a supported device-lab mechanism. (Supplemented by the
+manual exploratory missions in `docs/testing/exploratory-missions.md` — M1,
+M2.)
 
 **Habit Engine V2 note (2026-08-10):** the official Maestro 2.8.0 launcher was
 found in the persisted Windows user install path after the Codex process's
@@ -98,6 +101,32 @@ launcher, and the current-source Android build passed the scheduled M/W/F
 habit persistence flow plus the 6/6 targeted persistence lane. Deterministic
 Android clock mutation for native off-day semantics remains intentionally
 unproven; domain, timezone, and web fake-clock coverage own that contract.
+
+**Habit Reminders V1 note (2026-08-12):** the current-source Android APK's
+test-only 20-second delivery probe observed the expected habit reminder in
+Android's notification manager after app process termination. This closes the
+previous Android posting/delivery gap at the notification-manager boundary;
+the visual shade, long-horizon recurrence, and iOS boundaries remain open.
+
+**Habit Reminders V2 note (2026-08-12):** the current-source Android APK
+passed exact-habit routing, Mark complete, Snooze, and replay-after-kill
+through the production response dispatcher using the same-path test seam.
+SQLite/integration coverage proves durable action claims, canonical +1
+completion, Linked Action replay safety, deterministic single-snooze
+replacement, and local-midnight/stale/schedule/deletion no-op behavior. The
+visual notification shade and direct manual selection of the two action
+buttons remain unasserted on Nitro because emulator automation is unreliable;
+the installed Expo category and Android notification-manager posting are
+verified. iOS actionable-notification execution remains cloud/macOS-only.
+
+**Superseding current-source evidence (2026-08-13):** a fresh delivery on the
+same current-source APK was inspected through the Android System UI hierarchy.
+The semantic `Mark complete` action was activated after cold start and routed
+to the exact habit; replaying it left one completion. A second fresh delivery
+was activated through the semantic `Snooze` action and `dumpsys alarm` showed
+one replacement notification approximately 15 minutes ahead. This closes the
+Android shade-action capability for the tested path; the dated 2026-08-12
+statement above remains historical evidence from before that proof.
 
 ### 2. Real Supabase round-trips
 

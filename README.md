@@ -178,10 +178,11 @@ If unset, the app runs local-only and remote backup/restore operations stay unav
 - Unit tests: `npm test`
 - E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes; Playwright serves static `dist/` through `node scripts/serve-e2e.js`)
 
-Current local baseline on May 5, 2026:
+Current local baseline on August 12, 2026 (re-verify with the inventory
+commands when the suite changes):
 
-- `npm test`: `427` Vitest tests across `41` test files
-- `npx playwright test --list`: `90` Playwright tests across `14` spec files
+- `npm test`: `664` Vitest tests across `63` test files (`613` unit + `51` integration)
+- `npx playwright test --list`: `181` Playwright tests across `19` spec files
 
 ## Additional Documentation
 

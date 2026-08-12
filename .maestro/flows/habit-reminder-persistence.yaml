@@ -1,0 +1,55 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - notifications
+  - habits
+  - habit-v2
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native reminder M-W-F'
+- hideKeyboard
+- tapOn: 'Custom'
+- tapOn: 'Tuesday scheduled'
+- tapOn: 'Thursday scheduled'
+- tapOn: 'Saturday scheduled'
+- tapOn: 'Sunday scheduled'
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: DOWN
+- tapOn: 'Enable habit reminder'
+- assertVisible: 'Reminder time'
+- assertVisible: '18:00'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native reminder M-W-F'
+    timeout: 5000
+- assertVisible: 'Mon / Wed / Fri'
+- assertVisible: 'Reminder 18:00'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- assertVisible: 'Native reminder M-W-F'
+- assertVisible: 'Mon / Wed / Fri'
+- assertVisible: 'Reminder 18:00'

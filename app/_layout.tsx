@@ -1,10 +1,11 @@
 import '@/global.css';
+import { useCallback, useEffect, useRef } from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, Text, View } from 'react-native';
-import { AppProviders } from '@/core/providers/AppProviders';
-import { NavigationProvider } from '@/core/providers/NavigationProvider';
+import { Platform, Pressable, Text, View } from 'react-native';
+import { AppProviders, useAppBootstrapState } from '@/core/providers/AppProviders';
+import { NavigationProvider, useAppNavigation } from '@/core/providers/NavigationProvider';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
 import {
@@ -12,6 +13,17 @@ import {
   GlobalCommandCenterHost,
 } from '@/features/command/CommandCenterProvider';
 import { AskConversationProvider } from '@/features/command/AskConversationContext';
+import * as Notifications from 'expo-notifications';
+import {
+  dispatchNotificationResponse,
+  getNotificationResponseFingerprint,
+} from '@/core/notifications/notificationResponseDispatcher';
+import { setNotificationResponseHandler } from '@/core/notifications/notificationResponseBridge';
+import {
+  completeHabitReminderAction,
+  snoozeHabitReminderAction,
+} from '@/features/habits/habitReminderActions';
+import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
 
 /**
  * Route-level error boundary so a render-time exception shows recovery UI
@@ -85,6 +97,71 @@ function ThemedRoot() {
       <Stack screenOptions={{ headerShown: false }} />
       <GlobalCommandCenterHost />
       <InAppNoticeBanner />
+      <HabitReminderResponseHost />
     </>
   );
+}
+
+function HabitReminderResponseHost() {
+  const { authBootstrapReady } = useAppBootstrapState();
+  const { openHabit } = useAppNavigation();
+  const { showNotice } = useInAppNotices();
+  const handledFingerprints = useRef<string[]>([]);
+  const responseQueue = useRef(Promise.resolve());
+
+  const handleResponse = useCallback(
+    (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const fingerprint = getNotificationResponseFingerprint(response);
+      if (handledFingerprints.current.includes(fingerprint)) return;
+      handledFingerprints.current.push(fingerprint);
+      if (handledFingerprints.current.length > 64) handledFingerprints.current.shift();
+
+      const task = responseQueue.current.then(async () => {
+        try {
+          await dispatchNotificationResponse(response, {
+            openHabit,
+            markComplete: async (input) => {
+              const result = await completeHabitReminderAction(input);
+              for (const notice of result.linkedActions.notices) showNotice(notice);
+              openHabit(input.habitId);
+            },
+            snooze: async (input) => {
+              await snoozeHabitReminderAction(input);
+              openHabit(input.habitId);
+            },
+          });
+        } catch (error) {
+          console.error('[notifications] response dispatch failed', error);
+        } finally {
+          try {
+            Notifications.clearLastNotificationResponse();
+          } catch {
+            // The response may already have been cleared by the native runtime.
+          }
+        }
+      });
+      responseQueue.current = task.catch(() => undefined);
+    },
+    [openHabit, showNotice],
+  );
+
+  useEffect(() => {
+    if (!authBootstrapReady || Platform.OS === 'web') return undefined;
+    setNotificationResponseHandler(handleResponse);
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleResponse(response);
+    });
+    try {
+      handleResponse(Notifications.getLastNotificationResponse());
+    } catch (error) {
+      console.warn('[notifications] last response unavailable', error);
+    }
+    return () => {
+      subscription.remove();
+      setNotificationResponseHandler(null);
+    };
+  }, [authBootstrapReady, handleResponse]);
+
+  return null;
 }

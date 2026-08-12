@@ -590,7 +590,6 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       workoutDays,
       workoutStreak,
       setActiveSection,
-      openSettings,
       tokens.border,
       tokens.surface,
       tokens.text,

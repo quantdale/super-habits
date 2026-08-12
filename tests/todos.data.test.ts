@@ -337,6 +337,11 @@ describe('features/todos/todos.data', () => {
 
     await removeTodo('todo_1');
 
+    expect(db.runAsync).toHaveBeenCalledWith(
+      'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+      ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 'todo_1'],
+    );
+
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith({
       feature: 'todos',
       entityType: 'todo',

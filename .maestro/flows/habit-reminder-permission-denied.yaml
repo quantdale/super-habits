@@ -1,0 +1,35 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - notifications
+  - habits
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: deny
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 10000
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
+- tapOn: 'Add anytime habit'
+- tapOn: 'Habit name'
+- inputText: 'Native denied reminder'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Enable habit reminder'
+    direction: UP
+- tapOn: 'Enable habit reminder'
+- assertVisible: 'Notifications are blocked. Enable them in system settings before saving a reminder.'
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Native denied reminder'
+    timeout: 5000
+- assertNotVisible: 'Reminder 18:00'

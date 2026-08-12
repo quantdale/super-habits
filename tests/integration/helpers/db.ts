@@ -184,8 +184,17 @@ export function resetTestModules(): void {
  * Data-layer modules must be dynamically imported AFTER calling this (see
  * the header comment); `freshDatabase` itself does not import them.
  */
-export async function freshDatabase(): Promise<TestDatabase> {
+export async function freshDatabase(filename?: string): Promise<TestDatabase> {
   resetTestModules();
+  if (filename) {
+    vi.doMock('expo-sqlite', () => ({
+      openDatabaseAsync: vi.fn(() => createTestDatabase(filename)),
+    }));
+  } else {
+    vi.doMock('expo-sqlite', () => ({
+      openDatabaseAsync: vi.fn(() => createTestDatabase()),
+    }));
+  }
   const { getDatabase } = await import('@/core/db/client');
   return (await getDatabase()) as unknown as TestDatabase;
 }

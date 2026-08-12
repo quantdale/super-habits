@@ -216,7 +216,7 @@ function buildDateKeysBetween(startDateKey: string, endDateKey: string): string[
 
 function firstHistoryDate(
   rules: HabitRule[],
-  completions: HabitCompletion[],
+  completions: Pick<HabitCompletion, 'date_key' | 'count'>[],
   fallbackEffectiveFromDate?: string,
 ): string {
   return (
@@ -248,7 +248,7 @@ export function calculateHabitProgress(count: number, targetPerDay: number): num
 
 /** Build the requested local-date history, resolving each date's rule. */
 export function buildDayCompletions(
-  completions: HabitCompletion[],
+  completions: Pick<HabitCompletion, 'date_key' | 'count'>[],
   targetPerDay: number,
   days?: number,
   history?: HabitRuleHistoryInput,

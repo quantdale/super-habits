@@ -2,7 +2,13 @@ import { spawnSync } from 'node:child_process';
 
 const zones = ['Asia/Manila', 'UTC', 'America/New_York', 'Pacific/Honolulu', 'Pacific/Kiritimati'];
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const testArgs = ['test', '--', 'tests/time.test.ts', 'tests/integration/dateKeys.test.ts'];
+const testArgs = [
+  'test',
+  '--',
+  'tests/time.test.ts',
+  'tests/integration/dateKeys.test.ts',
+  'tests/habitReminders.domain.test.ts',
+];
 
 for (const timezone of zones) {
   console.log(`\n[timezone] ${timezone}`);
