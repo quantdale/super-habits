@@ -78,10 +78,11 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Rebuild/install the current campaign source on the one
-  established Android target after the stale-installed-APK smoke failure,
-  then rerun native lanes serially and attempt reminder OS interaction.
-  Keep the D14 threshold, HEAVY fixture, and assertion unchanged.
+- In progress: Complete the serialized lifecycle/reminder action lane on the
+  installed integration APK, then make one supported OS notification shade /
+  cold-start attempt. The current-source local Android build is separately
+  classified as a CMake/libc++ toolchain blocker; do not hide it as a product
+  pass. Keep the D14 threshold, HEAVY fixture, and assertion unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -106,9 +107,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `npx expo run:android --device emulator-5554` to
-  install the current campaign tree, verify the installed package timestamp,
-  and rerun the smoke flow before classifying the prior failure.
+- Exact next action: Run `npm run qa:native:lifecycle` serially on
+  `emulator-5554`, preserve its report, and classify any failure with the
+  existing native taxonomy before the OS-level attempt.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -389,6 +390,18 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   absent while Workout was selected). The installed APK reported an earlier
   update timestamp than the campaign tip, so current-tree build parity must be
   established before assigning PRODUCT_BUG or TEST_BUG.
+- 2026-08-12 — `npx expo run:android --device Nitro_API_36 --no-bundler
+--no-install` — ENVIRONMENT / NATIVE TOOLCHAIN BLOCKER; Expo prebuild
+  generated only ignored native output, then Gradle/CMake failed before APK
+  installation with unresolved C++ runtime symbols in
+  `react-native-worklets` and `react-native-screens` under the local
+  Expo-55/RN-0.83/NDK-27.1 setup. A narrow temporary CMake argument test and
+  the available CMake 3.30.5 did not resolve the broader module-wide failure;
+  no dependency or product patch was committed.
+- 2026-08-12 — `npm run qa:native:targeted` — PASS on the installed
+  integration APK; all 10/10 persistence flows passed, including habit,
+  schedule, reminder persistence/disable/isolation/permission, settings,
+  todo, calories, and workout coverage.
 
 ## Changed Files / Areas
 
