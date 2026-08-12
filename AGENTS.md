@@ -290,7 +290,7 @@ Current verified baselines:
 
 - `npm run typecheck`: 0 errors
 - `npm run lint`: 0 errors (warnings allowed)
-- `npm test`: **633 tests passing** across **57 test files** (589 unit + 44 integration under the `tests/integration/` Vitest project)
+- `npm test`: **664 tests passing** across **63 test files** (613 unit + 51 integration under the `tests/integration/` Vitest project)
 - `npx playwright test --list`: **181 tests** across **19 spec files** — the `chromium` project (14 `e2e/*.spec.ts`), the `journeys` project (12 `e2e/journeys/*.spec.ts`), the `simulation` project (`simulation/runner/specs/`), and the `journeys-sync` project (`e2e/journeys` `grep /@sync/` — the 19 remote-boundary steps, opt-in via `npm run e2e:sync` against the dummy-Supabase `dist-sync/` build on :8082; main/nightly only)
 - `npm run e2e:sync`: **18 passed / 1 skipped** (J3, J4, J5 @sync steps; the skip is J5's CG-2 quarantine) — 0 failed
 

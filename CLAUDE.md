@@ -65,7 +65,7 @@ Any component calling a `*.data.ts` function must be a descendant of `AppProvide
 3. **DB singleton** — `getDatabase()` in `core/db/client.ts` is the only entrypoint; every data function starts with `const db = await getDatabase()`. Never open a second connection.
 4. **IDs via `createId(prefix)`** from `lib/id.ts` (`{prefix}_{ms}_{rand8}`). Never `Math.random()`, `crypto.randomUUID()`, or bare `Date.now()`. Prefixes: `todo`, `habit`, `hcmp`, `cal`, `smeal`, `wrk`, `ex`, `eset`, `wsex`, `pom`, `rec`, `guest`.
 5. **Date keys via `toDateKey()`** from `lib/time.ts` — local-calendar `YYYY-MM-DD` since migration 5 (`app_meta.date_key_cutover`; old UTC rows are not backfilled).
-6. **Migrations are append-only** — never edit an existing block. Current stored schema version is **11**; add a new `if (version < 12) { ... }` block in `runMigrations()` in `core/db/client.ts`. `core/db/schema.sql` is a stale v4-era snapshot (missing 7 of 15 tables) and reference-only — never executed at runtime; the runtime truth is `core/db/client.ts`.
+6. **Migrations are append-only** — never edit an existing block. Current stored schema version is **12**; add a new `if (version < 13) { ... }` block in `runMigrations()` in `core/db/client.ts`. `core/db/schema.sql` is a stale v4-era snapshot (missing 7 of 15 tables) and reference-only — never executed at runtime; the runtime truth is `core/db/client.ts`.
 7. **Hard-delete exceptions** — `habit_completions`: SELECT existing `(habit_id, date_key)` → INSERT (`hcmp`) or UPDATE count; hard `DELETE` allowed only when decrementing from 1 to 0. `saved_meals` also hard-deletes by design (`deleteSavedMeal` in `features/calories/calories.data.ts`). Neither is synced.
 
 ## Conventions

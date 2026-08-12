@@ -58,17 +58,17 @@ validated as COMPLETED.
 
 ## Current Checkpoint
 
-- Current milestone: two independent correctness fixes implemented and focused QA-green; preparing coherent commits.
-- Completed: repository isolation/recovery and baseline audit; hardened persisted sync metadata against malformed/wrong-shaped local JSON; added three focused persistence regressions; guarded repeat soft-delete updates in todos, calories, and workout parent/nested rows; strengthened real-SQLite soft-delete SQL assertions.
-- In progress: commit the completed correctness groups, then audit remaining lint warnings, documentation drift, and D14/headless behavior.
-- Important modified files: `.agent/execplans/parallel-headless-hardening.md`; `core/sync/syncPersistence.ts`; `tests/syncPersistence.test.ts`; `features/todos/todos.data.ts`; `features/calories/calories.data.ts`; `features/workout/workout.data.ts`; related tests in `tests/todos.data.test.ts`, `tests/calories.data.test.ts`, and `tests/integration/softDelete.test.ts`.
+- Current milestone: three independent improvement groups implemented; focused QA is green, D14 has been characterized, and broad headless validation is next.
+- Completed: repository isolation/recovery and baseline audit; hardened persisted sync metadata against malformed/wrong-shaped local JSON; added three focused persistence regressions; guarded repeat soft-delete updates in todos, calories, and workout parent/nested rows; strengthened real-SQLite soft-delete SQL assertions; removed two behavior-preserving lint warnings; refreshed stale operational schema/test baselines.
+- In progress: run the full safe headless matrix, classify any failures, then finalize commits and merge-overlap evidence.
+- Important modified files: `.agent/execplans/parallel-headless-hardening.md`; `core/sync/syncPersistence.ts`; `tests/syncPersistence.test.ts`; `features/todos/todos.data.ts`; `features/calories/calories.data.ts`; `features/workout/workout.data.ts`; related tests in `tests/todos.data.test.ts`, `tests/calories.data.test.ts`, and `tests/integration/softDelete.test.ts`; `e2e/helpers/journey.ts`; `features/overview/OverviewScreen.tsx`; operational docs under `README.md`, `AGENTS.md`, `.cursor/`, `CLAUDE.md`, `.github/`, and `docs/working-rules.md`.
 - Last successful validation: focused sync persistence tests 3/3; todos/calories unit tests 21/21; soft-delete integration 7/7; typecheck PASS; focused ESLint PASS.
-- Current failures: `npm audit` exits 1 with 24 advisories (1 low, 7 moderate, 16 high), predominantly transitive tooling/build dependencies; automatic remediation proposes framework/Metro 0.87 and Expo upgrades, so no dependency mutation is selected yet.
+- Current failures: `npm audit` exits 1 with 24 advisories (1 low, 7 moderate, 16 high), predominantly transitive tooling/build dependencies; automatic remediation proposes framework/Metro 0.87 and Expo upgrades, so no dependency mutation is selected yet. One fresh J8 D14 run missed the unchanged `overview→todos` ceiling at 839ms, but two sequential reruns passed at 751ms and 770ms; the miss is classified as host-sensitive `FLAKY_TEST`/environment noise, with thresholds and assertions unchanged. A parallel repeat was invalidated by shared Playwright artifact corruption/timeout and is excluded from classification.
 - Relevant quarantines: CG-1 through CG-6 are documented as closed on `origin/main`; external native/remote capability gaps remain documented.
 - Blockers: None for audit or headless work. Native and remote lanes are intentionally out of scope.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: harden `core/sync/syncPersistence.ts` against malformed persisted JSON, add focused regression tests, and run its unit/affected QA.
+- Exact next action: run the safe broad headless matrix sequentially, starting with the full Vitest suite and timezone/simulation gates, then run the full non-sync Playwright projects on a dedicated port.
 - Remaining definition of done: multiple meaningful independent improvements where evidence supports them; regressions and affected QA; dependency/security classification; D14 status; coherent commits; final broad safe headless matrix; clean worktree; final merge-conflict handoff; plan COMPLETED and validated.
 
 ## Progress
@@ -82,6 +82,7 @@ validated as COMPLETED.
 - [x] Audit and prioritize independent opportunities, including D14 and security/lint/type findings.
 - [x] Implement first coherent low-conflict fix and focused regression.
 - [x] Implement additional independent improvements with checkpoints.
+- [x] Complete low-risk lint cleanup and operational documentation drift audit.
 - [ ] Run affected and broad safe headless validation; classify failures.
 - [ ] Commit coherent logical groups and assess overlap.
 - [ ] Complete and validate this plan.
@@ -135,6 +136,13 @@ validated as COMPLETED.
 - 2026-08-12 — `npm run qa:impact:validate` — PASS; 12 impact-map rules valid.
 - 2026-08-12 — `npm audit` — FAIL by advisory contract; 24 advisories classified, no automatic fix applied.
 - 2026-08-12 — `npm run agent:resume -- --plan .agent/execplans/parallel-headless-hardening.md` — PASS; checkpoint and impact reconciled.
+- 2026-08-12 — `npm run build:web` — PASS; fresh static export completed with existing Expo notifications web warning.
+- 2026-08-12 — `E2E_PORT=8217 npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts` — FAIL / PRODUCT_BUG candidate; steps 1–2 passed, step 3 measured `overview→todos` at 839ms against unchanged 800ms D14 ceiling; artifact retained under `.cursor/playwright-output/e2e-failures/`.
+- 2026-08-12 — parallel D14 repeats on ports 8218/8219 — INVALID / ENVIRONMENT; shared Playwright artifact paths corrupted one trace and the other timed out. Do not use for product classification; rerun sequentially with isolated artifacts or one port.
+- 2026-08-12 — sequential D14 rerun on port 8220 — PASS; all 7 steps passed, J8 reported coldOverview 748ms, maxSwitch 751ms, diarySearch 370ms, pickerSearch 89ms.
+- 2026-08-12 — sequential D14 rerun on port 8221 — PASS; all 7 steps passed, J8 reported coldOverview 782ms, maxSwitch 770ms, diarySearch 366ms, pickerSearch 85ms. D14 remains below its unchanged 800ms ceiling on valid sequential reruns.
+- 2026-08-12 — focused lint after warning cleanup — PASS; changed journey helper and overview screen have 0 warnings/errors.
+- 2026-08-12 — full `npm run lint` — PASS; 0 errors, warnings reduced from 20 to 18. Remaining warnings are legitimate provider Fast Refresh, async state-effect, and simulation CLI concerns; no blanket suppressions added.
 
 ## Changed Files / Areas
 
@@ -143,8 +151,11 @@ validated as COMPLETED.
 - `features/todos/todos.data.ts`, `features/calories/calories.data.ts`,
   `features/workout/workout.data.ts` and relevant tests — idempotent soft-delete
   guards and real-SQLite SQL assertions.
-- Future implementation files will be listed here as they are selected and
-  validated; protected reminder files remain excluded.
+- `e2e/helpers/journey.ts` and `features/overview/OverviewScreen.tsx` — two
+  low-risk lint warning fixes.
+- `README.md`, `AGENTS.md`, `CLAUDE.md`, `.cursor/`, `.github/`, and
+  `docs/working-rules.md` — current schema/migration and test-inventory
+  guidance; stale historical audit/archive documents intentionally unchanged.
 
 ## Recovery / Resume Instructions
 
@@ -164,6 +175,6 @@ validated as COMPLETED.
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Campaign setup complete; implementation and final evidence pending.
+- Summary: Three independent improvement groups are implemented; final headless evidence and completion handoff remain.
 - Follow-up: Record all deferred high-conflict/native/remote findings and provide
   a manual merge order recommendation in the final handoff.

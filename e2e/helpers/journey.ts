@@ -135,7 +135,7 @@ export function defineJourney(declaration: JourneyDeclaration): JourneyDeclarati
       // Step titles carry the journey persona (see the header note on
       // attribution); tags must stay appended at the very end for CI greps.
       stepResults.push({ index: i, name: step.name, status: 'not-run' });
-      test(`${persona} — ${i + 1}. ${step.name}${tagSuffix}`, async ({}, testInfo) => {
+      test(`${persona} — ${i + 1}. ${step.name}${tagSuffix}`, async (_fixtures, testInfo) => {
         if (step.quarantine) {
           test.fixme(true, step.quarantine);
         }
