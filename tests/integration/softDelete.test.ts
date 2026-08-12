@@ -135,6 +135,16 @@ describe('habits soft delete', () => {
     const doomedId = await habits.addHabit('Doomed', 3);
     await habits.addHabit('Keep', 3);
     await habits.deleteHabit(doomedId);
+    const firstDelete = await db.getFirstAsync<{ deleted_at: string; updated_at: string }>(
+      'SELECT deleted_at, updated_at FROM habits WHERE id = ?',
+      [doomedId],
+    );
+    await habits.deleteHabit(doomedId);
+    const repeatedDelete = await db.getFirstAsync<{ deleted_at: string; updated_at: string }>(
+      'SELECT deleted_at, updated_at FROM habits WHERE id = ?',
+      [doomedId],
+    );
+    expect(repeatedDelete).toEqual(firstDelete);
 
     expect((await habits.listHabits()).map((h) => h.name)).toEqual(['Keep']);
 
@@ -155,6 +165,7 @@ describe('habits soft delete', () => {
     );
     expect(tombstone?.deleted_at).not.toBeNull();
     tracer.assertNoHardDeleteOn('habits');
+    tracer.assertGuardedSoftDelete('habits');
 
     await revive(db, 'habits', doomedId);
     expect((await habits.listHabits()).map((h) => h.id)).toContain(doomedId);

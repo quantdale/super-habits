@@ -574,11 +574,13 @@ export async function saveHabitLinkedActionRules(
 export async function deleteHabit(habitId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync('UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ?', [
-    now,
-    now,
-    habitId,
-  ]);
+  const result = await db.runAsync(
+    'UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    [now, now, habitId],
+  );
+  // A repeated delete is an idempotent no-op. Avoid rewriting the tombstone,
+  // enqueueing another backup mutation, or re-running linked-action cleanup.
+  if (result.changes === 0) return;
   await saveHabitLinkedActionRules(habitId, []);
   await deleteLinkedActionRulesForTargetEntity({
     feature: 'habits',
