@@ -120,6 +120,7 @@ leave a tested campaign branch with an honest final handoff.
   passed 68 real-SQLite tests/11 files; strict OpenSpec passed 21/21, impact
   validation passed 12/12, and all versioned plan validation passed. The
   focused Chromium task suite remains 8/8, and the rebuilt web export passes.
+  The complete Vitest run also passes 740 tests across 70 files.
   The broader baseline uses `npm ci` with 1138 packages and Expo Doctor
   19/19.
 - Current failures: the post-repair `npm audit` reports 16 advisories (6
@@ -461,6 +462,9 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   Reminder V2 actions.
 - 2026-08-13 — strict OpenSpec, impact-map, and all-plan validation — PASS;
   21/21 OpenSpec items, 12/12 impact rules, and all versioned plans passed.
+- 2026-08-13 — `npm test -- --reporter=dot` — PASS; 740 tests across 70 files
+  passed, including 672 unit and 68 real-SQLite integration tests. The only
+  stderr was the existing unsupported-legacy-linked-action diagnostic.
 
 ## Changed Files / Areas
 
