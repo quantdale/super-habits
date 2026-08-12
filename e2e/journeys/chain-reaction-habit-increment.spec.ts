@@ -27,8 +27,8 @@ function executionsSql(): string {
 async function toggleTodo(page: Page, title: string): Promise<void> {
   const row = page
     .getByText(title, { exact: true })
-    .locator('xpath=ancestor::*[.//*[@role="button"]][1]');
-  await row.getByRole('button').first().click({ force: true });
+    .locator('xpath=ancestor::*[.//*[@role="checkbox"]][1]');
+  await row.getByRole('checkbox').click({ force: true });
 }
 
 async function ensureCompletedShown(page: Page): Promise<void> {

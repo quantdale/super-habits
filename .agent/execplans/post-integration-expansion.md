@@ -72,7 +72,8 @@ leave a tested campaign branch with an honest final handoff.
   compared against the preserved integrated control, serialized Android
   persistence/lifecycle evidence is recorded, and a task accessibility bug is
   fixed with focused web proof and checkpointed as `78ae6ea`; current-source
-  sync, P0, and Chromium feature gates are green.
+  sync, P0, and Chromium feature gates are green. Journey helpers were then
+  updated to follow the new checkbox semantics after two selector regressions.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
@@ -102,6 +103,10 @@ leave a tested campaign branch with an honest final handoff.
   Repeat daily controls also expose semantic state. The weak title/glyph E2E
   selectors were replaced with named controls, and the focused Todos suite
   passes 8/8.
+- Completed: The final journey run exposed two `TEST_BUG` failures in linked
+  action helpers: their old first-`role=button` assumption clicked Edit after
+  completion became a semantic checkbox. Both helpers now locate the nearest
+  checkbox-bearing row and the focused linked-action journey set passes 7/7.
 - In progress: Finish the campaign’s final static/web regression and audit
   checkpoint. The current-source local Android build is separately classified
   as a CMake/libc++ toolchain blocker; do not claim current-tree Insights
@@ -140,9 +145,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run the complete journey project from the current export,
-  preserve the D14 result and any downstream skips, then finish dependency,
-  timezone/simulation, and final audit reconciliation.
+- Exact next action: Run the non-HEAVY journey set after the helper fix, then
+  rerun current-source timezone/simulation gates and finish dependency and
+  final audit reconciliation.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -478,6 +483,15 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   PASS; 88 tests passed and 7 contractually skipped internal-mode cases out
   of 95 collected, including the new Insights and semantic task-control
   coverage.
+- 2026-08-13 — `E2E_PORT=8091 npm run e2e:journeys` — PARTIAL with two
+  `TEST_BUG` selector failures and one known performance failure; before the
+  helper fix, 52 steps passed, 10 expected skips, and 7 later steps did not
+  run. The two linked-action failures clicked the Edit action because the
+  semantic checkbox no longer occupied the old first-button position. The
+  HEAVY D14 switch measured 990 ms against the unchanged 800 ms ceiling.
+- 2026-08-13 — focused linked-action journey rerun after selector fix — PASS;
+  7/7 steps passed across habit-increment and todo-chain scenarios, including
+  exactly-once execution and deleted-target guards.
 
 ## Changed Files / Areas
 
@@ -502,6 +516,9 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
 - `features/todos/TodosScreen.tsx` — expanded/checked state for Todo toggles.
 - `e2e/todos.spec.ts` and `e2e/journeys/a-tuesday.spec.ts` — semantic Todo
   completion coverage and selector documentation.
+- `e2e/journeys/chain-reaction.spec.ts` and
+  `e2e/journeys/chain-reaction-habit-increment.spec.ts` — linked-action
+  journey helpers aligned with semantic checkbox controls.
 
 ## Recovery / Resume Instructions
 
