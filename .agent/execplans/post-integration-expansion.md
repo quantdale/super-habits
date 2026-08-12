@@ -78,10 +78,10 @@ leave a tested campaign branch with an honest final handoff.
   classified inherited gaps, and ranked the queue below. Fixed and committed
   the habit repeat-soft-delete defect in `00c60cd` with a real-SQLite
   regression assertion.
-- In progress: Perform the serialized Android preflight and one supported
-  reminder OS-interaction attempt, then complete the final static/headless
-  regression and documentation audit. Keep the D14 threshold, HEAVY fixture,
-  and assertion unchanged.
+- In progress: Rebuild/install the current campaign source on the one
+  established Android target after the stale-installed-APK smoke failure,
+  then rerun native lanes serially and attempt reminder OS interaction.
+  Keep the D14 threshold, HEAVY fixture, and assertion unchanged.
 - Important modified files: `features/habits/habitInsights.domain.ts`,
   `features/habits/HabitProgressInsightsModal.tsx`,
   `features/habits/habits.data.ts`, `features/habits/habits.domain.ts`,
@@ -106,10 +106,9 @@ leave a tested campaign branch with an honest final handoff.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Inspect the native runner and current Android/AVD
-  availability, then run the applicable Android lanes serially or record the
-  precise ENVIRONMENT result before attempting reminder shade/cold-start
-  interaction.
+- Exact next action: Run `npx expo run:android --device emulator-5554` to
+  install the current campaign tree, verify the installed package timestamp,
+  and rerun the smoke flow before classifying the prior failure.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -383,6 +382,13 @@ deterministic` — PASS; the validator checked all 17 scenarios and the
   the unchanged diary search measured 273 ms and the saved-meal picker 106 ms,
   both below the unchanged 500 ms ceiling. The diagnostic was deleted after
   measurement and is not part of the committed suite.
+- 2026-08-12 — serialized Android preflight — PASS/ENVIRONMENT READY; the
+  preserved `Nitro_API_36` AVD booted as `emulator-5554` on API 36/x86_64 and
+  the existing `com.dale16.superhabits` APK was installed. The first smoke
+  lane failed at the existing return-swipe assertion (`Start focus` remained
+  absent while Workout was selected). The installed APK reported an earlier
+  update timestamp than the campaign tip, so current-tree build parity must be
+  established before assigning PRODUCT_BUG or TEST_BUG.
 
 ## Changed Files / Areas
 
