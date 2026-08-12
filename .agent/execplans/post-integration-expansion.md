@@ -92,9 +92,10 @@ leave a tested campaign branch with an honest final handoff.
   `qa:fast`, `npm test` (740 tests/70 files), `qa:integration` (68 tests/11
   files), OpenSpec (21/21), impact validation (12/12), all versioned plan
   validation, and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
-- Current failures: `npm audit` reports 21 advisories (1 low, 7 moderate,
-  13 high), mainly transitive build/tooling packages; safe fixes and the
-  framework-breaking Expo 53 path still need classification. D14 remains
+- Current failures: the post-repair `npm audit` reports 16 advisories (6
+  moderate, 10 high), all remaining through transitive Expo/Metro/image-size,
+  config, and uuid edges; the force-fix path still proposes Expo 53 or React
+  Native 0.72 and is deferred. D14 remains
   below its threshold on this host for most repetitions but fails in the
   preserved baseline too; it is classified ENVIRONMENT/HOST-SENSITIVE, not
   hidden or fixed by changing the contract. Native direct OS notification
@@ -336,6 +337,20 @@ repository-wide formatting.
   are now recorded in AGENTS, project maps, working rules, database skills,
   migration command guidance, and the unified knowledge base. Historical audit
   reports and dated ExecPlans were intentionally left unchanged.
+- 2026-08-12 — Current dependency audit — CLASSIFIED; `npm audit --omit=dev`
+  initially reported 19 runtime advisories and full `npm audit` reported 21.
+  The non-force compatible repair updated Babel/brace-expansion/js-yaml and
+  reduced runtime findings to 16; scoped overrides also aligned
+  `patch-package -> tmp` to 0.2.7 and `minimatch@3.1.5 -> brace-expansion`
+  to 1.1.18, reducing the full audit to 16 (6 moderate, 10 high). Expo 55
+  (`~55.0.28`) and React Native 0.83.10 were preserved. Remaining image-size,
+  Metro, Expo config, uuid, and CLI findings require a framework-breaking
+  downgrade according to npm and are documented as deferred.
+- 2026-08-12 — Dependency checkpoint validation — PASS; `npm ci` installed
+  1138 packages and reapplied both repository patches; typecheck, lint (0
+  errors/19 existing warnings), full Vitest (740/740), Expo Doctor (19/19),
+  and `npm run build:web` all passed. Worktree hook setup still reports the
+  known ENOTDIR warning because this is a linked worktree.
 
 ## Changed Files / Areas
 
