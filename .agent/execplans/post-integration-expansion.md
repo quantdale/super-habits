@@ -67,32 +67,36 @@ leave a tested campaign branch with an honest final handoff.
 
 ## Current Checkpoint
 
-- Current milestone: Campaign worktree created from the clean integrated tip;
-  baseline and source-driven audit are next.
+- Current milestone: Fresh baseline is green for static, unit, integration,
+  OpenSpec, impact, plan, and Expo diagnostics; source-driven audit/ranking is
+  next.
 - Completed: Recovered branches/worktrees/logs/remotes; verified integrated
   tip `aa63cb3`; confirmed `main` is unchanged and recovery worktrees remain;
   read repository startup, architecture, QA, feature, RN, database/sync,
   OpenSpec, and ExecPlan instructions; created this campaign branch.
-- In progress: Run the fresh baseline, classify inherited D14/native/dependency
-  gaps, and build the ranked audit queue before product implementation.
+- In progress: Inspect the major product/data/sync/accessibility/tooling areas,
+  classify inherited gaps, and build the ranked audit queue before product
+  implementation.
 - Important modified files: none yet on this branch beyond this ExecPlan.
-- Last successful validation: inherited integrated evidence includes SDK 55
-  `expo-doctor` 19/19, typecheck, lint (0 errors/19 warnings), 727 Vitest
-  tests, web/headless journeys, `build:sync`, and 19/19 dummy-boundary sync
-  checks; all claims must be rechecked against this campaign tree.
-- Current failures: inherited D14 is not conclusively closed; runtime audit
-  findings were previously 19 transitive/platform findings; native direct OS
-  notification selection was partial. Fresh baseline not yet run.
+- Last successful validation: `npm ci` installed 1137 packages; typecheck,
+  `qa:fast`, `npm test` (727 tests/68 files), `qa:integration` (67 tests/10
+  files), OpenSpec (20/20), impact validation (12/12), all versioned plan
+  validation, and Expo Doctor (19/19) pass. Lint has 0 errors/19 warnings.
+- Current failures: `npm audit` reports 21 advisories (1 low, 7 moderate,
+  13 high), mainly transitive build/tooling packages; safe fixes and the
+  framework-breaking Expo 53 path still need classification. Inherited D14 is
+  not conclusively closed; native direct OS notification selection is partial.
 - Relevant quarantines: iOS native execution is unavailable on Windows;
   Android is one-emulator/one-Maestro-lane and must remain serialized;
   remote Supabase mutation is out of scope.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `npm ci`, then the baseline static/diagnostic matrix
-  (`typecheck`, `lint`, `npm test`, `qa:fast`, `qa:integration`, OpenSpec,
-  impact, plan validation, `git diff --check`, `expo-doctor`, and `npm audit`),
-  preserving exact results before changing product code.
+- Exact next action: Audit the current source and tests across Habits,
+  Overview, Todos, Calories, Workout, Pomodoro, Settings, command/linked
+  actions, sync/restore, navigation/lifecycle, accessibility, simulation,
+  scripts, and migration documentation; record a ranked queue with concrete
+  evidence before creating the Insights OpenSpec.
 - Remaining definition of done: Baseline classified; prioritized queue
   addressed through multiple meaningful commits; Insights OpenSpec and
   implementation complete or safely deferred with evidence; relevant
@@ -108,7 +112,9 @@ leave a tested campaign branch with an honest final handoff.
 - [x] Create campaign branch/worktree from the validated integrated tip.
 - [x] Read required repository, architecture, QA, feature, RN, data, OpenSpec,
       and ExecPlan instructions.
-- [ ] Establish and record the fresh baseline matrix.
+- [x] Establish and record the fresh baseline matrix; static/unit/integration
+      gates pass, with 19 lint warnings and 21 audit advisories classified as
+      follow-up work.
 - [ ] Perform source-driven whole-repository audit and rank actionable queue.
 - [ ] Resolve any higher-severity correctness/security blocker found by audit.
 - [ ] Propose and validate `add-habit-progress-insights` OpenSpec.
@@ -171,6 +177,23 @@ Initial hypotheses to verify, not assume:
   ExecPlan protocol, QA conventions, feature/RN/data invariants, and OpenSpec
   proposal workflow read before implementation.
 - 2026-08-12 — Fresh campaign baseline — NOT RUN; exact next action.
+- 2026-08-12 — `npm ci` — PASS; 1137 packages installed and both SDK-55
+  patches applied. Worktree hook creation reports ENOTDIR because `.git` is a
+  worktree file; no product failure.
+- 2026-08-12 — `npm run typecheck` — PASS; no TypeScript errors.
+- 2026-08-12 — `npm run lint` — PASS; 0 errors and 19 warnings within the
+  configured 25-warning budget.
+- 2026-08-12 — `npm test` — PASS; 727 tests across 68 files.
+- 2026-08-12 — `npm run qa:fast` — PASS; typecheck, lint, and 660 unit tests.
+- 2026-08-12 — `npm run qa:integration` — PASS; 67 real-SQLite tests across
+  10 integration files.
+- 2026-08-12 — `npm run openspec:validate` — PASS; 20/20 artifacts valid.
+- 2026-08-12 — `npm run qa:impact:validate` — PASS; 12 impact rules valid.
+- 2026-08-12 — `npm run agent:plan:validate:all` — PASS; all versioned plans
+  structurally valid, including both active plans.
+- 2026-08-12 — `npx expo-doctor` — PASS; 19/19 checks.
+- 2026-08-12 — `npm audit` — FAIL/KNOWN DEPENDENCY AUDIT; 21 advisories,
+  with forced repair proposing an Expo 53 downgrade; no unsafe repair run.
 
 ## Changed Files / Areas
 
