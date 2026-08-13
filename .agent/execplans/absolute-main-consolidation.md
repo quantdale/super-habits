@@ -66,8 +66,9 @@ do not discard or hide unknown state.
 - Current milestone: six-directory/Git-topology inventory and dirty-state
   preservation complete; final-main migration/schema consistency and all web,
   sync, simulation, static, unit, integration, timezone, and repository gates
-  are complete. Native validation is in progress after correcting two real
-  Android shell defects and two stale Maestro selectors.
+  are complete. Native validation and final-source web validation are complete;
+  final six-directory re-audit, ancestry proof, plan closure, and remote sync
+  remain.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -86,8 +87,9 @@ do not discard or hide unknown state.
 - Completed: append-only migration audit, focused migration tests, clean
   install, Expo Doctor, strict OpenSpec/impact/plan validation, timezone QA,
   web/sync exports, full web/sync/P0/simulation lanes, and final static/unit/
-  integration gates. Main source commit for the reconciliation is `7f1cfe1`.
-- In progress: native build/installation and serialized Android QA. The first
+  integration gates. The schema reconciliation commit is `7f1cfe1`; the
+  current navigation/native-QA commit is `aa076b9`.
+- Completed: native build/installation and serialized Android QA. The first
   final-main full E2E run and isolated replays
   failed the unchanged HEAVY D14 switch ceiling on the same
   `overview→todos` measurement (1052 ms, 1090 ms, 1083 ms, and 810–964 ms on
@@ -95,21 +97,20 @@ do not discard or hide unknown state.
   and an inactive-container `display:none` experiment were each tested; the
   first two did not establish a pass and the last worsened the transition to
   2487 ms, so all experiments were reverted. The strict D14 contract remains
-  unchanged and the retained artifacts support a host-sensitive classification.
+  unchanged; the final current-source run passed it at 625 ms.
 - Important modified files: `core/db/schema.sql`,
   `tests/integration/migrations.test.ts`, and the small current-schema doc
   updates in `docs/PROJECT_STRUCTURE_MAP.md`, `docs/master-context.md`,
   `docs/working-rules.md`, and `openspec/config.yaml`; the original dirty
   files are preserved in recovery commit `3191541`.
 - Last successful validation: `npm test` passed 741/741 across 70 files;
-  `qa:fast` passed typecheck, lint (0 errors/19 warnings), and 672/672 unit
-  tests; integration passed 69/69; each of five timezone zones passed 42/42;
-  strict OpenSpec passed 21/21; impact validation passed 12/12; all plan
-  validators passed; Expo Doctor passed 19/19; P0 journeys passed 16/16;
+  final `qa:fast` passed typecheck, lint (0 errors/19 warnings), and 672/672
+  unit tests; integration passed 69/69; each of five timezone zones passed
+  42/42; strict OpenSpec passed 21/21; impact validation passed 12/12; all
+  plan validators passed; Expo Doctor passed 19/19; P0 journeys passed 16/16;
   sync passed 19/19; deterministic simulation passed validation plus 24/24
-  smoke steps. The full aggregate web run passed 148/170 with 17 documented
-  skips, 4 continuity steps not run after the strict D14 miss, and no other
-  functional failures.
+  smoke steps. The final full web run passed 153/170 with 17 documented
+  skips and a passing D14/J8 contract.
 - Completed: current working-tree Android release build installed on the
   single `Nitro_API_36` target; smoke passed 1/1 and the corrected persistence
   lane passed 10/10. Native persistence covers Calories immediate/relaunch
@@ -121,37 +122,65 @@ do not discard or hide unknown state.
   now asserts unique screen content rather than always-visible tab labels. The
   Calories persistence flow now scrolls to the actual submit button and Diary
   control using semantic state-based actions.
-- Current failures: the first preservation commit attempt could not run the
+- Completed: committed source `aa076b9f033911edf3917d84e97d6d8727005c90`
+  passed the final web fast gate (typecheck, lint, 672/672 unit tests),
+  integration (69/69), timezone matrix (42/42 in each of Asia/Manila, UTC,
+  America/New_York, Pacific/Honolulu, and Pacific/Kiritimati), and the full
+  web E2E run (153 passed, 17 documented skips). The final D14/J8 journey
+  measured `maxSwitch=625ms`, diary search `351ms`, and saved-meal picker
+  search `77ms`.
+- Completed: a release APK was rebuilt and installed from the exact source
+  commit above with `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; the explicit
+  embed bundle contained all E2E-only reminder labels. APK SHA-256 is
+  `D3712DFC242577BC4BEC7773F808AEE21778389AB8F152E88D917C04943085F4`,
+  package `com.dale16.superhabits`, version `1.0.0`, versionCode `1`.
+- Completed: that exact APK passed native smoke 1/1, lifecycle 5/5, the
+  notification-manager delivery probe (`VERIFIED`), and the Habit Progress
+  Insights flow. The persistence aggregate passed 9/10; the sole failure was
+  an initial Overview startup assertion in `habit-persistence` after the
+  preceding serial flows. The preserved direct replay of that same flow passed
+  end-to-end on the same APK, so it is classified `FLAKY_TEST`/emulator startup
+  rather than a product failure; the other 9 persistence flows passed.
+- Completed: dummy-backend sync build and boundary E2E passed 19/19, covering
+  broken backend responses, outbox/reconnect, restore, tombstone emptiness,
+  and local-only restore behavior.
+- In progress: final six-directory re-audit, completed-branch ancestry proof,
+  normal `origin/main` synchronization, final plan validation, and exact-main
+  APK identity refresh after the closing plan commit.
+- Current failures: no product or web integration failures remain. The final
+  native persistence aggregate has one preserved startup-only
+  `FLAKY_TEST`/emulator result in `habit-persistence`; its immediate direct
+  replay passed end-to-end on the same APK. iOS is an `ENVIRONMENT` block on
+  Windows, and `npm audit --omit=dev` remains a known dependency-advisory
+  partial described in the ledger.
+- Current limitations: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
   direct Prettier check passed and the exact snapshot was committed with
-  `--no-verify` solely for that environment reason. Final consolidation proof
-  and fresh final-main QA are not yet run in this session. Native/iOS,
-  Docker/Supabase, and dependency advisory limitations must be classified
-  from current command output. Final-main web E2E currently has a reproducible
-  host-sensitive D14 performance miss in this session; retain it as PARTIAL
-  rather than claiming a pass. Prior committed stabilization evidence records
-  two independent 10/10 batches under the same unchanged contract, with
-  max-switch maxima of 773 ms and 770 ms.
+  `--no-verify` solely for that environment reason. iOS/Xcode remains an
+  expected Windows environment boundary; Docker/Supabase remote mutation was
+  not needed because the dummy boundary lane passed. The earlier pre-fix D14
+  miss was superseded by
+  the final current-source run passing at 625 ms; retain the earlier artifacts
+  as historical evidence, not as the final result. The native persistence
+  aggregate has one preserved startup flake with a passing direct replay.
 - The first current-build lifecycle run classified the three reminder action/
   delivery failures as build-configuration evidence: the installed APK was
   built without `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, so the test-only
   controls were compiled out. Pomodoro lifecycle and notification-path flows
   passed. An explicit same-process `expo export:embed` with the flag proved
-  the expected E2E controls are present in the bundle; the final APK must be
+  the expected E2E controls are present in the bundle; the final APK was then
   rebuilt with that environment variable set for both prebuild and Gradle.
 - Relevant quarantines: none newly established; preserve documented native,
   remote, and performance gaps until independently checked.
 - Blockers: none established.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit the current `app/index.tsx` and validated Maestro
-  selector fixes, then regenerate the ignored Android project and run Expo
-  embed plus Gradle in one process with
-  `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; verify the generated bundle
-  contains the E2E-only labels, build/install the release APK on the single
-  `Nitro_API_36` target, and rerun serialized lifecycle reminder actions,
-  delivery, replay, and Insights flows before final-source rebuild evidence.
+- Exact next action: record the final QA ledger in this plan, run strict
+  repository/spec validation, re-audit all six physical paths and every
+  completed branch, fetch/check `origin/main`, push local `main` normally,
+  then mark this plan COMPLETED, validate all plans, and perform the final
+  exact-main APK identity check without deleting recovery refs/worktrees.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -174,7 +203,7 @@ do not discard or hide unknown state.
 - [x] Run final static, unit/integration/timezone, web, sync, simulation,
       performance, dependency, and repository gates; classify unavailable
       lanes.
-- [ ] Build/install the exact final-main Android APK and run serialized native
+- [x] Build/install the exact final-main Android APK and run serialized native
       QA with the E2E reminder flag verified in the embedded bundle; classify
       iOS/Xcode availability.
 - [ ] Re-audit six paths/branches, validate the plan, and synchronize origin.
@@ -224,6 +253,14 @@ do not discard or hide unknown state.
   the E2E public flag into Metro. An explicit `expo export:embed` with the flag
   set in the same process contains the test-only reminder labels, so this is a
   reproducible build invocation issue rather than missing product controls.
+- The first full post-fix web run passed the strict D14/J8 contract at
+  `maxSwitch=625ms`; the earlier 8097 run's 1017ms result is retained as a
+  pre-fix/host-sensitive historical artifact and does not describe the final
+  source.
+- The final native persistence aggregate had one startup-only failure after
+  nine preceding flows; an immediate direct replay passed all steps on the same
+  APK, while the other nine aggregate flows passed. No app or test change was
+  made to hide or retry it.
 
 ## Decision Log
 
@@ -280,13 +317,11 @@ do not discard or hide unknown state.
 - 2026-08-13 — Final static/integration/timezone — PASS; `qa:fast` passed
   typecheck, lint with 0 errors/19 warnings, and 672/672 unit tests;
   integration passed 69/69; all five timezone zones passed 42/42.
-- 2026-08-13 — Web aggregate — PARTIAL / ENVIRONMENT-HOST-SENSITIVE; fresh
-  `E2E_PORT=8097 npm run e2e:full` passed 148/170, skipped 17 documented
-  cases, stopped four serial continuity steps after the strict D14 failure,
-  and recorded only `overview→todos` at 1037 ms against the unchanged 800 ms
-  ceiling. Controlled replay artifacts are retained under
-  `.cursor/playwright-output/e2e-failures/`; prior stabilization evidence has
-  two independent 10/10 batches under the same contract.
+- 2026-08-13 — Web aggregate — PASS; final `E2E_PORT=8098 npm run e2e:full`
+  passed 153/170 with 17 documented skips. D14/J8 passed with max switch
+  625 ms, diary search 351 ms, and picker search 77 ms. The earlier 8097
+  host-sensitive miss and its artifacts remain preserved as historical
+  evidence; no threshold or retry was changed.
 - 2026-08-13 — Sync boundary — PASS; `npm run build:sync` followed by
   `npm run e2e:sync` passed 19/19 against the dummy Supabase build.
 - 2026-08-13 — P0 journeys — PASS; `npm run qa:journeys` rebuilt `dist/` and
@@ -300,20 +335,41 @@ do not discard or hide unknown state.
   framework/tooling advisories (6 moderate, 10 high), with automatic force
   remediation requiring a breaking Expo/React Native downgrade; no forced
   dependency mutation was made.
-- 2026-08-13 — Native preflight — PASS/PENDING; JDK 17.0.20, Gradle 9.0.0,
-  Maestro 2.8.0, adb, and one booted `Nitro_API_36` target are available;
-  build/install and serialized native lanes are the next action. iOS remains
-  an expected Windows/Xcode environment boundary.
+- 2026-08-13 — Native preflight — PASS/CLASSIFIED; JDK 17.0.20, Gradle 9.0.0,
+  Maestro 2.8.0, adb, and one booted `Nitro_API_36` target are available. iOS
+  is an expected Windows/Xcode environment boundary.
 - 2026-08-13 — Current working-tree Android smoke — PASS; corrected unique
   screen-content assertions passed 1/1 on `Nitro_API_36`.
 - 2026-08-13 — Current working-tree Android persistence — PASS; corrected
-  Calories flow plus the full `qa:native:targeted` lane passed 10/10 in 8m27s.
+  Calories flow plus the full `qa:native:targeted` lane passed 10/10 in 8m27s
+  before the final exact-source rebuild.
 - 2026-08-13 — Current working-tree Android lifecycle — PARTIAL/BUILD-CONFIG;
   Pomodoro lifecycle and notification-path passed 2/2, while reminder action,
   replay, and delivery flows could not find E2E-only controls in the APK. The
   installed bundle lacked the public E2E flag; explicit same-process embed
-  verification now confirms the flag-bearing bundle path and requires a
-  rebuild before retry.
+  verification then confirmed the flag-bearing bundle path; the final-source
+  lifecycle rerun passed 5/5.
+- 2026-08-13 — Final-source web fast — PASS; typecheck, lint with 0 errors/19
+  warnings, and 672/672 unit tests.
+- 2026-08-13 — Final-source integration/timezone — PASS; integration 69/69 and
+  all five timezone runs 42/42.
+- 2026-08-13 — Final-source full web E2E — PASS; 153/170 passed, 17 documented
+  skips, D14/J8 `maxSwitch=625ms`, diary search 351ms, picker search 77ms.
+- 2026-08-13 — Final-source sync boundary — PASS; dummy `dist-sync` build and
+  19/19 sync journey tests.
+- 2026-08-13 — Final-source native smoke — PASS; 1/1 on `Nitro_API_36`.
+- 2026-08-13 — Final-source native lifecycle — PASS; 5/5 on `Nitro_API_36`.
+- 2026-08-13 — Final-source Android notification delivery — PASS; Android
+  notification manager observed the expected package/title/body after process
+  termination (`habit-reminder-delivery-2026-08-13T085242563Z.json`).
+- 2026-08-13 — Final-source Habit Progress Insights — PASS; progress metrics,
+  history, close, and reopen assertions passed.
+- 2026-08-13 — Final-source native persistence — PARTIAL/FLAKY_TEST; 9/10
+  aggregate flows passed, with only the first Overview startup assertion in
+  `habit-persistence` failing; direct replay then passed the complete flow.
+- 2026-08-13 — iOS native preflight — BLOCKED/ENVIRONMENT; Windows has no
+  Xcode `xcrun/simctl`; the EAS native-e2e path remains the executable iOS
+  route and was not claimed as a local pass.
 
 ## Changed Files / Areas
 
@@ -331,6 +387,8 @@ do not discard or hide unknown state.
 - `.maestro/flows/native-smoke.yaml`,
   `.maestro/flows/calories-persistence.yaml` — unique section assertions and
   corrected semantic Calories scroll/actions.
+- `simulation-output/native/` — ignored native reports and preserved failure
+  artifacts; no generated output is tracked.
 - Original dirty checkout dependency/configuration files — exact state
   preserved in recovery commit `3191541`; no regression was merged into main.
 
