@@ -50,16 +50,16 @@ plan committed on `main`.
 ## Current Checkpoint
 
 - Current milestone: Full branch audit, local recovery preservation,
-  documentation/main validation, and the pre-deletion main push are complete;
-  remote cleanup remains.
+  documentation/main validation, pre-deletion main push, and deletion batch 1
+  are complete; 24 non-main remote heads remain.
 - Completed: fetched/pruned; confirmed clean starting worktree; confirmed
   local `main == origin/main`; enumerated 32 non-main remote heads; computed a
   merge-base, ancestor result, unique-commit count, and three-dot diff summary
   for every candidate; inspected the unique product/recovery commits and
   current-main counterparts; scanned historical refs for secret-like paths and
   content.
-- In progress: delete the audited remote refs in controlled batches and verify
-  GitHub after each batch.
+- In progress: continue deleting the audited remote refs in controlled batches
+  and verify GitHub after each batch.
 - Important modified files: `.agent/execplans/remote-branch-cleanup.md` is
   committed on `main`; no product files changed.
 - Last successful validation: `qa:affected` selected `qa:fast`; `qa:fast`
@@ -71,9 +71,9 @@ plan committed on `main`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: delete the first controlled batch of audited non-main
-  refs, run `git fetch --prune origin` and `git ls-remote --heads origin`, and
-  reconcile the result against the audit table before the next batch.
+- Exact next action: commit this batch-1 checkpoint on `main`, push it, then
+  delete batch 2 (`fix/*`, the security-sensitive dark-mode snapshot, and the
+  two obsolete WIP refs) with tip-SHA checks and post-batch live inventory.
 - Remaining definition of done: all branches classified; any valuable work
   integrated and validated; local archive refs created when warranted; cleanup
   plan committed to `main`; `main == origin/main`; all non-main remote heads
@@ -95,8 +95,8 @@ plan committed on `main`.
 - [x] Commit the completed audit plan on `main`.
 - [x] Validate the documentation-only main change.
 - [x] Synchronize `origin/main` before deletion.
-- [ ] Delete audited remote refs in controlled batches and verify each batch.
-- [ ] Delete safe remote branches in audited batches and verify after each.
+- [x] Delete and verify audited remote batch 1.
+- [ ] Delete and verify the remaining audited remote batches.
 - [ ] Prune tracking refs, verify GitHub and local final state, and validate this
       completed plan.
 
@@ -254,6 +254,20 @@ the permitted classifications:
   refs were also not archived because their unique content targets removed
   architecture and has no recovery value beyond the preserved main history.
 
+## Remote Deletion Ledger
+
+- Batch 1 — 2026-08-13 — deleted and verified eight audited refs:
+  `backup/predator/chore/design-dna-polish-audit` (`09cd033`),
+  `backup/predator/chore/extensive-codebase-maintenance` (`0b10f29`),
+  `backup/predator/codex/fix-linkedactions-testss` (`96af1e1`),
+  `backup/predator/codex/fix-sync-push-retries` (`0808cb9`),
+  `backup/predator/feat/design-dna-primitives` (`44b7b07`),
+  `backup/predator/feat/design-dna-secondary-screens` (`75b345b`),
+  `backup/predator/feat/linked-actions-policy-wip` (`eb7d6d5`), and
+  `backup/predator/feat/todo-linked-action-first-path` (`65ec266`).
+  `git fetch --prune origin` and `git ls-remote --heads origin` then showed
+  `main` plus 24 remaining non-main heads; no `main` ref was targeted.
+
 ## Security Review
 
 - Historical refs will be searched for credential/token/private-key patterns
@@ -290,6 +304,9 @@ the permitted classifications:
 - 2026-08-13 — `git fetch origin`, `git push origin main`, `git fetch origin`,
   and SHA comparison — PASS; pushed `main` as `f1c3452fc5621822c5c3fe02b9cea45392658295`
   and local `main == origin/main` before any branch deletion.
+- 2026-08-13 — deletion batch 1 — PASS; eight explicit audited refs deleted,
+  fetch/prune completed, and live remote inventory showed 24 non-main heads
+  plus `main`.
 
 ## Changed Files / Areas
 
