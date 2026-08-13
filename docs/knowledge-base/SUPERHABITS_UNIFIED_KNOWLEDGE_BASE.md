@@ -97,15 +97,15 @@
 
 ### Repository identity
 
-| Attribute               | Value                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Name                    | `superhabits` (npm package, private)                                                                                                  |
-| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay |
-| Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                        |
-| Schema version (stored) | **14** (`app_meta.db_schema_version`)                                                                                                 |
-| Next migration          | `15` (new `if (version < 15)` block in `runMigrations`)                                                                               |
-| Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                |
-| E2E tests               | **95** Chromium tests in **14** spec files; **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js`        |
+| Attribute               | Value                                                                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name                    | `superhabits` (npm package, private)                                                                                                                |
+| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay               |
+| Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                                      |
+| Schema version (stored) | **14** (`app_meta.db_schema_version`)                                                                                                               |
+| Next migration          | `15` (new `if (version < 15)` block in `runMigrations`)                                                                                             |
+| Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                              |
+| E2E tests               | **95** Chromium tests in **14** spec files; **`workers: 1` locally and in CI** (shared OPFS origin); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
@@ -1896,27 +1896,27 @@ Covers `SyncEngine.flush`: records enqueued while a push is blocked are flushed 
 
 **Static bundle:** Playwright does **not** run `expo export`. Run `npm run build:web` before E2E when source changes. `webServer.command` is `node scripts/serve-e2e.js`, which serves `dist/` on port **8081** with `Cross-Origin-Embedder-Policy: require-corp` (and COOP) so `crossOriginIsolated` / OPFS SQLite work. Metro is **not** used for E2E.
 
-| Setting             | Value                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------ |
-| `testDir`           | `"./e2e"`                                                                                        |
-| `fullyParallel`     | `false`                                                                                          |
-| `workers`           | `1` locally (**do not** raise — shared OPFS SQLite lock). CI may use `workers: 2` in config.     |
-| `retries`           | `process.env.CI ? 2 : 0`                                                                         |
-| `timeout`           | `60_000`                                                                                         |
-| `expect.timeout`    | `5_000`                                                                                          |
-| `forbidOnly`        | `!!process.env.CI`                                                                               |
-| `reporter`          | HTML → `.cursor/playwright-output/e2e-report/`, `open: "never"` + `list`                         |
-| `use.baseURL`       | `"http://localhost:8081"`                                                                        |
-| `headless`          | `true`                                                                                           |
-| `screenshot`        | `"only-on-failure"`                                                                              |
-| `video`             | `"off"`                                                                                          |
-| `trace`             | `"on-first-retry"`                                                                               |
-| `navigationTimeout` | `20_000`                                                                                         |
-| `outputDir`         | `.cursor/playwright-output/e2e-failures`                                                         |
-| `projects`          | Chromium Desktop Chrome                                                                          |
-| `globalSetup`       | `"./e2e/global.setup.ts"`                                                                        |
-| `globalTeardown`    | `"./e2e/global.teardown.ts"`                                                                     |
-| `webServer`         | `command: "node scripts/serve-e2e.js"`, `url: http://localhost:8081`, `reuseExistingServer: !CI` |
+| Setting             | Value                                                                                              |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| `testDir`           | `"./e2e"`                                                                                          |
+| `fullyParallel`     | `false`                                                                                            |
+| `workers`           | `1` for local and CI runs (**do not raise** — all standard projects share the OPFS SQLite origin). |
+| `retries`           | `process.env.CI ? 2 : 0`                                                                           |
+| `timeout`           | `60_000`                                                                                           |
+| `expect.timeout`    | `5_000`                                                                                            |
+| `forbidOnly`        | `!!process.env.CI`                                                                                 |
+| `reporter`          | HTML → `.cursor/playwright-output/e2e-report/`, `open: "never"` + `list`                           |
+| `use.baseURL`       | `"http://localhost:8081"`                                                                          |
+| `headless`          | `true`                                                                                             |
+| `screenshot`        | `"only-on-failure"`                                                                                |
+| `video`             | `"off"`                                                                                            |
+| `trace`             | `"on-first-retry"`                                                                                 |
+| `navigationTimeout` | `20_000`                                                                                           |
+| `outputDir`         | `.cursor/playwright-output/e2e-failures`                                                           |
+| `projects`          | Chromium Desktop Chrome                                                                            |
+| `globalSetup`       | `"./e2e/global.setup.ts"`                                                                          |
+| `globalTeardown`    | `"./e2e/global.teardown.ts"`                                                                       |
+| `webServer`         | `command: "node scripts/serve-e2e.js"`, `url: http://localhost:8081`, `reuseExistingServer: !CI`   |
 
 #### `e2e/global.setup.ts`
 
@@ -2354,7 +2354,7 @@ Tag phase completions: `git tag phaseN-complete`
 | PWA / web            | COOP/COEP require-corp, service worker v3, OPFS SQLite; **Vercel** static deploy via root `vercel.json`                                                                                                                                                                                                                                                                                                                   |
 | Command shell        | Experimental command center for single `create_todo` / `create_habit` drafts only; the entry is a global overlay launcher (`GlobalCommandCenterHost`), no `/command` page route; parse -> review -> confirm flow; default parser mode `mock`, optional `remote_with_fallback`, local parser remains fallback/guardrail; internal remote rollout is gated by build config plus a device-local toggle; not a chat assistant |
 | Unit tests           | **427** passing (Vitest)                                                                                                                                                                                                                                                                                                                                                                                                  |
-| E2E                  | **90** Playwright tests in **14** spec files (Chromium); local `workers: 1`; static `dist/` + `serve-e2e`                                                                                                                                                                                                                                                                                                                 |
+| E2E                  | **90** Playwright tests in **14** spec files (Chromium); `workers: 1` locally and in CI; static `dist/` + `serve-e2e`                                                                                                                                                                                                                                                                                                     |
 | Schema version       | **11**                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Linked Actions       | Shipped scope: schema tables + engine/effects + in-app notice banner + habit editor integration + habits/todos source entrypoints with a limited supported-path matrix                                                                                                                                                                                                                                                    |
 | Cloud sync / restore | Push backup via `SupabaseSyncAdapter` + **anonymous auth** (`ensureAnonymousSession`); `remoteMode` **enabled** by default; adapter **pull** not implemented; restore v1 separately supports empty-device import for todos, habits, and calorie entries only                                                                                                                                                              |

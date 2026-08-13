@@ -15,11 +15,13 @@ export default defineConfig({
   // Tests within the same file run serially by default (fullyParallel: false).
   fullyParallel: false,
 
-  // OPFS + expo-sqlite hold one lock per origin; parallel workers against the
-  // app origin can cause flaky navigation/reload (see config comments).
-  // Keep fullyParallel false so tests within a file stay serial (clearDatabase()
-  // in beforeEach must not race).
-  workers: process.env.CI ? 2 : 1,
+  // Every standard project shares the same localhost origin and therefore the
+  // same OPFS SQLite database. A per-project `workers: 1` setting is not
+  // sufficient: Playwright can still run different projects concurrently and
+  // one project's reset can erase another project's in-flight write. Keep the
+  // whole invocation serial so clearDatabase(), reloads, and continuity
+  // journeys cannot race across projects.
+  workers: 1,
 
   // Retry on CI only — locally you want to see failures immediately
   retries: process.env.CI ? 2 : 0,

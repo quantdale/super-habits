@@ -16,7 +16,9 @@ regressions for concurrency/fault/restart cases, and a normal push to
 
 - Repository: `C:\Users\Michael Roy\Documents\super-habits`.
 - Authoritative branch/worktree at startup: local `main`, one worktree,
-  `HEAD=origin/main=45fecf619671ee38c7ecd62d1ac5582b830460fa`.
+  `HEAD=origin/main=45fecf619671ee38c7ecd62d1ac5582b830460fa`; after the
+  campaign wave, the validated pushed tip is
+  `4daf1c4d6d022f5fe73075513e87f98794d1edc8`.
 - Local SQLite is the source of truth. Runtime schema authority is bootstrap
   DDL plus append-only migrations in `core/db/client.ts`; current version is
   14 after the durable outbox migration.
@@ -63,11 +65,12 @@ regressions for concurrency/fault/restart cases, and a normal push to
 ## Current Checkpoint
 
 - Current milestone: P0 through P3 repository-side hardening and the P4
-  settings/lint/rollover work are implemented; focused, full Vitest, full
-  Chromium, full journey, and full deterministic simulation evidence is green.
-  Native cloud flow coverage is expanded and local execution is classified as
-  environment-blocked. Remaining work is final repository QA, commit/push, and
-  post-push CI.
+  settings/lint/rollover work are implemented. The first pushed CI run proved
+  the quality job green but exposed an unsafe Playwright project-parallelism
+  configuration: three unrelated E2E/simulation failures occurred while the
+  standard projects shared one OPFS origin. The global worker count is now
+  serial, and the CI-shaped 16-test reproduction passes. Remaining work is
+  final full QA, commit/push of this CI fix, and post-push CI inspection.
 - Completed: exact Git topology capture; current dependency engine inspection;
   mandatory architecture/workflow/QA/OpenSpec context reads; applicable
   database, feature, and Expo skills read; `npm ci` from the committed lockfile
@@ -112,20 +115,24 @@ regressions for concurrency/fault/restart cases, and a normal push to
   documented skips), and all 17 deterministic simulation scenarios pass;
   typecheck and lint pass. `npm ci` installed 1,138 packages under Node
   `v22.23.2`; npm reports 16 framework-owned advisories (6 moderate, 10 high).
-- Current failures: no current product failure in focused, integration, full
-  Vitest, E2E, or deterministic simulation gates. `npm audit` and
-  `npm audit --omit=dev` report 16 Expo/Metro transitive advisories whose only
-  available fix is an incompatible Expo 53/RN downgrade. Live Supabase
-  verification is credential-dependent. Native execution is an explicit
-  environment blocker; lint has 0 errors and 0 warnings.
+- Current failures: the first pushed run `31740558470` had quality `success`
+  but E2E `failure`: the logs show schedule reload, linked-action habit
+  identity, and simulation self-test failures; the run used `workers: 2` at
+  the top level while all projects shared localhost OPFS. A serial CI-shaped
+  rerun passes all 16 affected tests, so this is classified as a
+  `FLAKY_TEST`/test-topology defect and fixed in the pending config change.
+  `npm audit` and `npm audit --omit=dev` report 16 Expo/Metro transitive
+  advisories whose only available fix is an incompatible Expo 53/RN downgrade.
+  Live Supabase verification is credential-dependent. Native execution is an
+  explicit environment blocker; lint has 0 errors and 0 warnings.
 - Relevant quarantines: inherited documented web/native/dependency gaps remain
   untouched until impact is re-evaluated.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: update the final QA/OpenSpec/plan ledgers, fetch and
-  reconcile `origin/main`, run diff checks, commit coherent changes, push, and
-  inspect GitHub Actions.
+- Exact next action: run the final affected/full web and repository gates for
+  the global-worker fix, validate this plan, fetch/reconcile `origin/main`,
+  commit and push the fix, then inspect the new GitHub Actions run.
 - Remaining definition of done: all A–N findings resolved/disproven or
   explicitly classified external after repository-side work; regression and
   fault-injection coverage added; final QA/plan/OpenSpec validation complete;
@@ -189,9 +196,9 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - [x] Run focused, integration, full, web, simulation, timezone, native, and
       repository validation according to impact; native execution is explicitly
       classified as environment-blocked.
-- [ ] Commit coherent changes and push validated `main` to `origin/main`.
-- [ ] Inspect post-push GitHub CI and resolve repository-caused failures.
-- [ ] Complete Outcomes & Retrospective and validate all ExecPlans.
+- [x] Commit coherent changes and push the first validated campaign wave to `origin/main`; a follow-up worker-topology fix remains to commit/push.
+- [x] Inspect the first post-push GitHub CI and resolve its repository-caused shared-OPFS project-parallelism failure locally.
+- [ ] Push the worker-topology fix, inspect its post-push GitHub CI, then complete Outcomes & Retrospective and validate all ExecPlans.
 
 ## Surprises & Discoveries
 
@@ -218,6 +225,14 @@ regressions for concurrency/fault/restart cases, and a normal push to
   schema and only a dashboard-era remote baseline. Additive repository-managed
   migrations now define the sync tables and private AI quota RPC; live remote
   policy/type comparison remains credential-dependent.
+- 2026-08-14 — GitHub run `31740558470` quality passed under Node `22.23.2`,
+  but its main E2E job used two top-level workers across projects that all
+  reset/read the same localhost OPFS database. The run failed three unrelated
+  tests (habit schedule reload, fresh linked-action identity, and simulation
+  report schema); the downloaded report/logs provide the exact assertions.
+  Per-project worker limits did not protect the shared origin. The safe fix is
+  a global `workers: 1` for every standard invocation, with a serial
+  CI-shaped rerun passing all 16 targeted tests.
 
 ## Decision Log
 
@@ -350,6 +365,15 @@ regressions for concurrency/fault/restart cases, and a normal push to
   oracle made all 12 J1 steps deterministic.
 - 2026-08-14 — `npm run qa:simulation -- --all --mode deterministic` — PASS —
   all 17 scenarios passed after the runner correction.
+- 2026-08-14 — GitHub Actions REST/app inspection for run `31740558470` —
+  QUALITY PASS / E2E FAIL — quality completed successfully under Node
+  `22.23.2`; the E2E report/logs identified three cross-project shared-OPFS
+  failures and a secondary missing `dist-sync/` artifact after the failed
+  lane. The artifact was downloaded and inspected; the job was not dismissed
+  as an opaque infrastructure failure.
+- 2026-08-14 — CI-shaped serial Playwright rerun after `workers: 1` change —
+  PASS — Chromium habits (11), linked-action journey (3), and simulation
+  self-test (2), 16/16 passed in one worker.
 
 ## Changed Files / Areas
 
