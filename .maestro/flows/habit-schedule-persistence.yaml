@@ -26,7 +26,6 @@ tags:
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
-    centerElement: true
 - tapOn: 'Create habit'
 - extendedWaitUntil:
     visible: 'Native M-W-F habit'

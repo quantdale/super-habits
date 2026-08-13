@@ -1,7 +1,7 @@
 # ExecPlan: Absolute main consolidation audit
 
 Plan-Version: 2
-Status: COMPLETED
+Status: ACTIVE
 
 ## Purpose / User Outcome
 
@@ -68,11 +68,11 @@ do not discard or hide unknown state.
 - Current milestone: all six physical checkouts have been audited twice;
   completed work is reconciled into `main`; migration/schema, static, unit,
   integration, timezone, web, sync, simulation, performance, and Android
-  native gates are complete. The Calories native selector race was corrected
-  semantically. The exact-final aggregate briefly hit an emulator ANR, then
-  passed 10/10 after reboot; lifecycle is 5/5, delivery is verified, and
-  Insights passes. This final documentation-only triage record is the
-  authoritative closing state for the plan.
+  native gates are complete except for a reproducible Maestro interaction
+  issue in the aggregate `habit-schedule-persistence` flow. The button is
+  reachable and the flow passes in isolation; the remaining fix removes only
+  `centerElement: true` from that scroll action. Lifecycle is 5/5, delivery is
+  verified, Insights passes, and the other nine persistence flows pass.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -153,18 +153,19 @@ do not discard or hide unknown state.
 - Completed: dummy-backend sync build and boundary E2E passed 19/19, covering
   broken backend responses, outbox/reconnect, restore, tombstone emptiness,
   and local-only restore behavior.
-- In progress: none.
-- Current failures: no product, database, web, sync, simulation, or Android
-  native product failures remain. One post-closure exact-`1746d2f` aggregate
-  initially finished `8/10`: `habit-reminder-disable` and
-  `habit-reminder-isolation` lost the app after an Android ANR; logcat records
-  the emulator graphics compositor and system UI consuming roughly 90--99%
-  CPU before Android force-finished the app. Both flows passed isolated
-  replays, and the complete aggregate passed 10/10 after reboot. This is
-  classified `ENVIRONMENT`/`FLAKY_TEST`, not a product failure. Maestro
-  heartbeat-file lock messages remain a test-environment observation. iOS is
-  an `ENVIRONMENT` block on Windows, and `npm audit --omit=dev` remains a
-  known dependency-advisory partial.
+- In progress: commit and validate the semantic Maestro flow correction,
+  rebuild the final-main APK from the resulting SHA, rerun the focused and
+  aggregate native persistence proof, then re-push and re-prove final refs.
+- Current failures: the first exact-`1746d2f` aggregate finished `8/10`
+  after an Android ANR in two reminder flows; isolated replay and rebooted
+  aggregate passed, classified `ENVIRONMENT`/`FLAKY_TEST`. The next two
+  rebooted exact-`0fe8028` aggregates finished `9/10`: only
+  `habit-schedule-persistence` failed at `scrollUntilVisible(centerElement:
+true)` even though its button was visible at the content boundary; isolated
+  replay passed. This is classified `TEST_BUG`/FLAKY_TEST, not a product
+  failure. Maestro heartbeat-file lock messages remain a test-environment
+  observation. iOS is an `ENVIRONMENT` block on Windows, and
+  `npm audit --omit=dev` remains a known dependency-advisory partial.
 - Current limitations: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -190,8 +191,10 @@ do not discard or hide unknown state.
 - Blockers: none established for the requested Windows/Android scope.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: none; preserve recovery refs/worktrees and do not perform
-  cleanup without a separate explicit request.
+- Exact next action: validate the no-centering schedule-flow correction,
+  commit it with this plan checkpoint, rebuild/install from the new final
+  `main` SHA, rerun focused plus aggregate native QA, then close and push the
+  plan only after the aggregate is clean.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -438,6 +441,17 @@ do not discard or hide unknown state.
   the embedded bundle, APK SHA-256 was
   `F8A2DEEF43C8FEDA9223EDDA00EF02B410A82A39BEEF349F431E47DAE52543C6`, and
   final smoke passed 1/1 on `Nitro_API_36`.
+- 2026-08-13 — Exact-`0fe8028` targeted persistence — PARTIAL/TEST_BUG+
+  FLAKY_TEST; 9/10 flows passed twice after separate reboots, with only
+  `habit-schedule-persistence` failing at the `Create habit` scroll action.
+  The failure screenshot shows the unique button at the bottom content
+  boundary; the same flow passed in an isolated replay. Reports:
+  `simulation-output/native/native-android-persistence-2026-08-13T114704962Z.json`
+  and `simulation-output/native/native-android-persistence-2026-08-13T120248228Z.json`.
+- 2026-08-13 — Habit schedule flow correction — IN PROGRESS; preserve the
+  `scrollUntilVisible` assertion and unique selector but remove only
+  `centerElement: true`, which was the unstable content-boundary behavior.
+  The corrected flow passed in an isolated replay on the installed final APK.
 - 2026-08-13 — iOS native preflight — BLOCKED/ENVIRONMENT; Windows has no
   Xcode `xcrun/simctl`; the EAS native-e2e path remains the executable iOS
   route and was not claimed as a local pass.
