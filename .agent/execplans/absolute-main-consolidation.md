@@ -389,6 +389,43 @@ do not discard or hide unknown state.
   corrected semantic Calories scroll/actions.
 - `simulation-output/native/` — ignored native reports and preserved failure
   artifacts; no generated output is tracked.
+
+## Final Physical Checkout Audit
+
+All six paths were inspected individually after the final QA commits. They
+are linked worktrees of the same repository common directory
+`C:/Users/Michael Roy/Documents/super-habits/.git`; none is an independent
+clone.
+
+| Directory                    | Branch                                       | HEAD                                       | Git relationship                             | Dirty? | Unique completed work absent from main? | Action                                                           |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------ | -------------------------------------------- | ------ | --------------------------------------- | ---------------------------------------------------------------- |
+| `super-habits`               | `recovery/preserved-install-config-20260813` | `3191541b445bddb58edcc1930fae6682092390ad` | linked worktree; recovery snapshot           | No     | No                                      | Preserve exact superseded dependency/config state; do not delete |
+| `super-habits-consolidation` | `main`                                       | `513651f1f70113e7e0c46737b834f187bfd234c4` | linked worktree; authoritative               | No     | No                                      | Authoritative development state                                  |
+| `super-habits-expansion`     | `campaign/post-integration-expansion`        | `6287fabfc3a436ab276d9ce94d2ec875b500ef50` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
+| `super-habits-headless`      | `parallel/headless-hardening`                | `bd468566666b20a4436f721882f1e64e43c401cb` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
+| `super-habits-integrated`    | `integration/reminder-actions-headless`      | `aa63cb33b6986edb6028cc947d1f53db27d5be5f` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
+| `super-habits-stabilization` | `stabilization/native-d14-closure`           | `7e61aec5a1ab4985a862e4085ddf7f4a7464811c` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
+
+The original checkout's dirty dependency/configuration state was preserved in
+the recovery commit before consolidation. Its blank ignored `.env.local` is
+machine configuration with no secrets; all other ignored candidates observed
+in the six paths are generated build/cache/test directories (`node_modules`,
+`android`, `ios`, `dist`, `dist-sync`, `.expo`, Playwright output, or native
+reports). No ignored product source was found.
+
+## Final Branch Proof
+
+The required completed branches all have zero `main..<branch>` commits, zero
+`git cherry main <branch>` additions, and pass `merge-base --is-ancestor`
+against local `main`. Before the final push they also remain ancestors of the
+existing `origin/main` because their tips predate the remote's current main.
+The only local branch reported by `git branch --no-merged main` is
+`recovery/preserved-install-config-20260813`; it contains one deliberately
+preserved recovery commit, not intended completed product work. Remote
+`origin/backup/predator/*` refs are retained recovery/WIP snapshots and were
+not deleted or merged; their completed content is already represented in
+main, and their old unique snapshots are superseded or recovery-only.
+
 - Original dirty checkout dependency/configuration files — exact state
   preserved in recovery commit `3191541`; no regression was merged into main.
 
