@@ -26,6 +26,9 @@ jobs:
         - .maestro/flows/native-smoke.yaml
         - .maestro/flows/todo-persistence.yaml
         - .maestro/flows/habit-persistence.yaml
+        - .maestro/flows/habit-progress-insights.yaml
+        - .maestro/flows/habit-reminder-actions.yaml
+        - .maestro/flows/habit-reminder-actions-replay.yaml
         - .maestro/flows/calories-persistence.yaml
         - .maestro/flows/workout-persistence.yaml
         - .maestro/flows/settings-persistence.yaml
@@ -48,6 +51,9 @@ jobs:
         - .maestro/flows/native-smoke.yaml
         - .maestro/flows/todo-persistence.yaml
         - .maestro/flows/habit-persistence.yaml
+        - .maestro/flows/habit-progress-insights.yaml
+        - .maestro/flows/habit-reminder-actions.yaml
+        - .maestro/flows/habit-reminder-actions-replay.yaml
         - .maestro/flows/calories-persistence.yaml
         - .maestro/flows/workout-persistence.yaml
         - .maestro/flows/settings-persistence.yaml

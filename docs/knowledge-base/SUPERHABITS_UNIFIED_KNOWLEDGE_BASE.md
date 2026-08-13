@@ -61,9 +61,9 @@
 
 **SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **13**. Next migration: `if (version < 14)`. Migration 13 adds durable `processed_notification_actions` state. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **14**. Next migration: `if (version < 15)`. Migration 13 adds durable `processed_notification_actions` state and migration 14 adds the durable `sync_outbox` table. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
-**Sync / backup:** `syncEngine.enqueue` after writes on todos, habits, calorie_entries, workout_routines. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub). `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior (no flush listeners; the in-memory queue can grow). If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
+**Sync / backup:** synced writes commit their local mutation and a durable `sync_outbox` row in one SQLite transaction, then publish to the in-memory queue. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub), and revision matching prevents an old push from deleting a newer pending mutation. `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior; durable pending outbox rows remain available for a later flush. If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
 **Restore v1:** startup and Settings use `core/sync/restore.coordinator.ts` to preview backup status and allow a conservative restore only on an **empty device** for synced tables. Restore imports **todos**, **habits**, and **calorie_entries**. Habit completion history, saved meals, and workout restore remain out of scope in this phase.
 
@@ -79,17 +79,17 @@
 
 ### Cross-cutting concerns
 
-| Concern    | Where                                                       | Behavior                                                                                                                                         |
-| ---------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Navigation | `app/_layout.tsx`, `app/index.tsx`                          | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay                                           |
-| Database   | `core/db/client.ts`                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                                 |
-| Types      | `core/db/types.ts`                                          | Entity TypeScript shapes                                                                                                                         |
-| IDs & time | `lib/id.ts`, `lib/time.ts`                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                               |
-| Sync       | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts` | In-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                                                   |
-| Bootstrap  | `core/providers/AppProviders.tsx`                           | DB init, SW register, **`ensureAnonymousSession()`**, `syncEngine.hydrate()`, restore preview; second effect registers sync flush when remote on |
-| PWA        | `registerServiceWorker.ts`, `public/sw.js`                  | Workbox registration; cache-first GET handler                                                                                                    |
-| Web deploy | Root **`vercel.json`**                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html`           |
-| Styling    | `tailwind.config.js`, `global.css`                          | Section palette + brand scale; NativeWind                                                                                                        |
+| Concern    | Where                                                                                       | Behavior                                                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Navigation | `app/_layout.tsx`, `app/index.tsx`                                                          | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay                                           |
+| Database   | `core/db/client.ts`                                                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                                 |
+| Types      | `core/db/types.ts`                                                                          | Entity TypeScript shapes                                                                                                                         |
+| IDs & time | `lib/id.ts`, `lib/time.ts`                                                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                               |
+| Sync       | `core/sync/sync.engine.ts`, `core/sync/syncPersistence.ts`, `core/sync/supabase.adapter.ts` | Durable SQLite `sync_outbox` plus in-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                 |
+| Bootstrap  | `core/providers/AppProviders.tsx`                                                           | DB init, SW register, **`ensureAnonymousSession()`**, `syncEngine.hydrate()`, restore preview; second effect registers sync flush when remote on |
+| PWA        | `registerServiceWorker.ts`, `public/sw.js`                                                  | Workbox registration; cache-first GET handler                                                                                                    |
+| Web deploy | Root **`vercel.json`**                                                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html`           |
+| Styling    | `tailwind.config.js`, `global.css`                                                          | Section palette + brand scale; NativeWind                                                                                                        |
 
 ---
 
@@ -102,8 +102,8 @@
 | Name                    | `superhabits` (npm package, private)                                                                                                  |
 | Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                        |
-| Schema version (stored) | **13** (`app_meta.db_schema_version`)                                                                                                 |
-| Next migration          | `14` (new `if (version < 14)` block in `runMigrations`)                                                                               |
+| Schema version (stored) | **14** (`app_meta.db_schema_version`)                                                                                                 |
+| Next migration          | `15` (new `if (version < 15)` block in `runMigrations`)                                                                               |
 | Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                |
 | E2E tests               | **95** Chromium tests in **14** spec files; **local `workers: 1`** (OPFS lock); static `dist/` via `node scripts/serve-e2e.js`        |
 
@@ -510,7 +510,8 @@ There are no distinct URL routes. The app is a single page: all six sections are
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **13**. Next migration: `if (version < 14)` in `runMigrations()`.
+Current `app_meta.db_schema_version`: **14**. The durable SQLite sync outbox
+was added in migration 14; future schema work must append migration 15.
 
 ### Bootstrap DDL (verbatim)
 
@@ -2063,10 +2064,11 @@ Tests:
 
 | Job       | Steps                                                                                                                              |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `quality` | `actions/checkout@v4` → `actions/setup-node@v4` (Node 20, cache npm) → `npm ci` → `npm run typecheck` → `npm test`                 |
+| `quality` | `actions/checkout@v4` → `actions/setup-node@v4` (Node 22.23.2, npm cache) → `npm ci` → `npm run typecheck` → `npm test`            |
 | `e2e`     | needs `quality`; `npm run build:web` → `npm run e2e` (Playwright starts `node scripts/serve-e2e.js`); uploads HTML report artifact |
 
-**CI Node:** 20. **Devcontainer Node:** 22 (intentional mismatch).
+**CI and development Node:** 22.23.2 (selected by `.nvmrc`; package engines
+require Node 22.22.1–22.x).
 
 ---
 
@@ -2208,7 +2210,8 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 | Out of scope    | Screens, `app/`, `core/ui/`                                                                                           |
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
 | Workflow        | Read → plan → approval → implement → typecheck + test → report                                                        |
-| Schema          | Current version **11**, next migration `version < 12`                                                                 |
+
+         | Schema          | Current version **14**, next migration `version < 15`                                                                 |
 
 #### `feature-agent.md`
 
@@ -2273,18 +2276,18 @@ Tag phase completions: `git tag phaseN-complete`
 
 ### Architectural invariants
 
-| Rule                                     | Why                       | Example violation                                |
-| ---------------------------------------- | ------------------------- | ------------------------------------------------ |
-| Soft delete on main entities             | Recovery / sync           | `DELETE FROM todos WHERE id = ?`                 |
-| `syncEngine.enqueue` after synced writes | Future multi-device       | Insert habit without enqueue                     |
-| Single DB singleton before access        | WAL / OPFS stability      | Second `openDatabaseAsync`                       |
-| IDs via `createId(prefix)`               | Traceable entity type     | `uuid()` or `Date.now()` alone                   |
-| Date keys via `toDateKey()`              | Consistent local calendar | Manual `toISOString().slice(0, 10)` for new rows |
-| Migrations append-only                   | Deterministic upgrades    | Editing `if (version < 5)` block                 |
-| `habit_completions` uniqueness           | One row per habit/day     | Duplicate INSERT without SELECT                  |
-| OPFS E2E single worker                   | SQLite lock               | Raising `workers` above `1` locally              |
-| Hard rejection validation                | Data integrity            | Silent clamping instead of error message         |
-| Tests never weakened                     | Code quality              | Changing assertion to force pass                 |
+| Rule                                                                       | Why                       | Example violation                                |
+| -------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------ |
+| Soft delete on main entities                                               | Recovery / sync           | `DELETE FROM todos WHERE id = ?`                 |
+| durable `sync_outbox` intent plus `syncEngine.enqueue` after synced writes | Future multi-device       | Insert habit without durable outbox intent       |
+| Single DB singleton before access                                          | WAL / OPFS stability      | Second `openDatabaseAsync`                       |
+| IDs via `createId(prefix)`                                                 | Traceable entity type     | `uuid()` or `Date.now()` alone                   |
+| Date keys via `toDateKey()`                                                | Consistent local calendar | Manual `toISOString().slice(0, 10)` for new rows |
+| Migrations append-only                                                     | Deterministic upgrades    | Editing `if (version < 5)` block                 |
+| `habit_completions` uniqueness                                             | One row per habit/day     | Duplicate INSERT without SELECT                  |
+| OPFS E2E single worker                                                     | SQLite lock               | Raising `workers` above `1` locally              |
+| Hard rejection validation                                                  | Data integrity            | Silent clamping instead of error message         |
+| Tests never weakened                                                       | Code quality              | Changing assertion to force pass                 |
 
 ### Sync invariants
 

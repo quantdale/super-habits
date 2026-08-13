@@ -133,13 +133,13 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **13** (`app_meta.db_schema_version`), including durable processed-notification-action state. Next migration: add a new `if (version < 14) { ... }` block.
-- `core/db/schema.sql` is **stale** (a v4-era snapshot missing runtime tables, including migration-13 notification-action state) and **reference-only** — it is never executed at runtime. Derive the real schema from the bootstrap DDL + migration blocks in `core/db/client.ts`.
+- Current stored schema version: **14** (`app_meta.db_schema_version`), including durable processed-notification-action state and the SQLite sync outbox. Next migration: add a new `if (version < 15) { ... }` block.
+- `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v14 outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 
 ### Sync
 
-- `syncEngine` (`core/sync/sync.engine.ts`) is an in-memory queue of `SyncRecord` objects.
+- `syncEngine` (`core/sync/sync.engine.ts`) publishes a durable SQLite `sync_outbox` row into an in-memory `SyncRecord` queue; the durable table is authoritative across restart.
 - Feature data-layer writes call `syncEngine.enqueue({ entity, id, updatedAt, operation })` after mutating synced entities.
 - The exported `syncEngine` uses `SupabaseSyncAdapter` (`core/sync/supabase.adapter.ts`), which groups records by entity, reads local rows, and upserts them to Supabase (`onConflict: "id"`).
 - `NoopSyncAdapter` is the constructor default for tests.
@@ -208,7 +208,7 @@ Violating these can cause silent data corruption or break the app on cold start.
 4. **IDs via `createId(prefix)` from `lib/id.ts`.** Format: `{prefix}_{timestamp_ms}_{8_random_chars}`. Never use `Math.random()`, `crypto.randomUUID()`, or `Date.now()` alone.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
 6. **Migrations are append-only.** Never edit existing migration blocks. Add a new `if (version < N+1) { ... }` block in `runMigrations()` in `core/db/client.ts`.
-7. **`schema.sql` is a stale v4-era snapshot** (missing runtime tables, including migration-13 notification-action state) and reference-only, not runtime authority — the runtime truth is the bootstrap DDL + migration blocks in `core/db/client.ts`.
+7. **`schema.sql` is a reference-only partial snapshot** (not runtime authority) — the runtime truth is the bootstrap DDL + append-only migration blocks in `core/db/client.ts`; the snapshot records the current v14 outbox addition but may omit runtime-only details.
 8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`). Neither table is synced.
 
 ## Feature Module Pattern

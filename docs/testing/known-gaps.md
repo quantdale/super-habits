@@ -220,11 +220,11 @@ The user-simulation platform (`simulation/`) layers a model + multiple runners o
 
 **Closing path:** non-gating by design (D7); missions are time-boxed and their anomaly reports require repro evidence (trace + persisted state) to be actionable. The triage rule converts every anomaly into either a filed defect change, a new deterministic scenario in the library, or a documented non-issue — never a note that evaporates. Chronic non-finding missions are retired, not kept as ceremony. CI wiring (runtime + credentials) is an open question recorded in `simulation/ai/RUNBOOK.md` (task 7.5); v1 runs the lane locally/on-demand.
 
-### P3 — Manually maintained reference schema
+### P3 — Live Supabase schema verification
 
-**Reason:** `simulation/backend/schema.sql` is a hand-written **reference copy** of the Supabase dashboard configuration (the four synced tables + RLS + the `parse-ai-command` edge function). It is not the runtime authority — the real dashboard is — so it can drift silently with any dashboard change, and a drifting schema tests the stale copy instead of the real one while still proving the out-of-repo schema problem (audit SEC-003).
+**Reason:** the repository now owns an additive Supabase migration series and a static contract validator, but this workstation does not have verified read access to the intended production project's information schema and RLS policies. A live project can still have historical dashboard drift until it is inspected.
 
-**Closing path:** any dashboard-vs-`schema.sql` discrepancy found by the disposable-backend lane is filed as a finding (procedure in `simulation/backend/DRIFT.md`); the real close is the follow-up change that moves the Supabase schema into version control. Until then the file is header-commented as a manual copy and is kept compatible with a future local `supabase start` stack.
+**Closing path:** run `npm run supabase:schema:validate` for repository-side checks, then perform a read-only authenticated comparison of the linked project against `supabase/migrations/` and file any exact discrepancy. The disposable fixture is now a compatibility payload, not the authority. The live comparison remains `CREDENTIAL_REQUIRED` until project access is available.
 
 ### P4 — No persistent staging environment
 

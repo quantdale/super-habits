@@ -18,10 +18,10 @@ Read this before writing any code that touches the database or data layer.
 
 ## Schema version
 
-- Current stored version: **13** (`app_meta.db_schema_version`)
-- Next migration number: **14** (add `if (version < 14) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Current stored version: **14** (`app_meta.db_schema_version`)
+- Next migration number: **15** (add `if (version < 15) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations are append-only `if (version < N)` blocks inside `runMigrations()` in `core/db/client.ts` — there are no numbered migration files. `core/db/migrations/` holds only a Supabase reference SQL (`001_initial_supabase.sql`), never runtime code.
-- schema.sql is a REFERENCE ONLY — not executed at runtime
+- schema.sql is a partial REFERENCE ONLY snapshot — not executed at runtime; bootstrap DDL plus migrations are authoritative
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
 
 ## Entity types (core/db/types.ts)
@@ -55,7 +55,7 @@ Entities that DO sync: todos, habits, calorie_entries, workout_routines (enqueue
 Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions, saved_meals, workout_session_exercises, routine_exercises, routine_exercise_sets
 (This is intentional — local-only data or nested workout structure handled by routine bumps.)
 
-The exported **`syncEngine`** uses **`SupabaseSyncAdapter`** (push upsert to Supabase when the client is configured). **`NoopSyncAdapter`** remains the `SyncEngine` constructor default for tests. **`enqueue()` always runs** — it fills the in-memory queue; never skip it on writes.
+The exported **`syncEngine`** uses **`SupabaseSyncAdapter`** (push upsert to Supabase when the client is configured). **`NoopSyncAdapter`** remains the `SyncEngine` constructor default for tests. Synced writes persist a `sync_outbox` row transactionally before publishing to the in-memory queue; **`enqueue()` always runs** — never skip it on writes.
 
 ## ID generation
 
@@ -82,7 +82,7 @@ cutover used UTC calendar dates; no automatic backfill.
 ## Adding a new table
 
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 12) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 15) { ... }` today — bump to N+1 when version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/

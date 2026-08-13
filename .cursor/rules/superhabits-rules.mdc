@@ -12,7 +12,7 @@ Stack: React Native 0.83.10, Expo 55 (`~55.0.28`), TypeScript 5.9, expo-router, 
 (expo-sqlite WAL mode), NativeWind 4, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
-Current stored schema version: **13** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 14) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
+Current stored schema version: **14** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 15) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 Current product-shell facts to preserve:
 - The command center is a **global overlay** only; `/command` is not a route anymore.
@@ -54,8 +54,8 @@ Current product-shell facts to preserve:
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always append a new `if (version < N) { ... }`
    block in `runMigrations()` in `core/db/client.ts` — there are no numbered migration
-   files. Current stored version: 13; the next block is `if (version < 14)`.
-   schema.sql is a reference doc only — it is NOT executed at runtime.
+   files. Current stored version: 14; the next block is `if (version < 15)`.
+   schema.sql is a partial reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions
    The data layer (habits.data.ts) avoids duplicate rows by:
@@ -168,7 +168,7 @@ Three jobs (see `.github/workflows/ci.yml`; lane matrix enforced by `validateMat
   flush listeners are not registered and the in-memory queue can grow — intentional local-only tradeoff.
   The exported `syncEngine` uses **`SupabaseSyncAdapter`** (push upsert); if Supabase env vars are unset,
   `supabase` is `null` and pushes no-op without throwing. Document as tradeoff, not a silent bug fix.
-- schema.sql is out of date (reference only, not authoritative)
+- schema.sql is a partial reference snapshot (reference only, not authoritative)
 
 Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true; **`ensureAnonymousSession()`** runs on bootstrap when Supabase is configured. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
 
