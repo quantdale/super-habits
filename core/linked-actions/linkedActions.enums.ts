@@ -65,6 +65,7 @@ export type LinkedActionEffectType = ValueOfConstArrays<
 
 export const LINKED_ACTION_EXECUTION_STATUSES = [
   'planned',
+  'running',
   'applied',
   'skipped',
   'duplicate',

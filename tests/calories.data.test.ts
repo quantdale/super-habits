@@ -20,6 +20,8 @@ vi.mock('@/core/db/client', () => ({
 vi.mock('@/core/sync/sync.engine', () => ({
   syncEngine: {
     enqueue: vi.fn(),
+    prepare: vi.fn((record: Record<string, unknown>) => ({ ...record, revision: 1 })),
+    enqueuePrepared: vi.fn(),
   },
 }));
 
@@ -44,6 +46,7 @@ describe('calories.data', () => {
     vi.mocked(getDatabase).mockResolvedValue(db as never);
     vi.mocked(nowIso).mockReturnValue('2026-04-06T10:00:00.000Z');
     vi.mocked(toDateKey).mockReturnValue('2026-04-06');
+    db.runAsync.mockResolvedValue({ changes: 1 });
   });
 
   it('addCalorieEntry inserts the entry, saves the meal, and enqueues create', async () => {
@@ -77,28 +80,28 @@ describe('calories.data', () => {
         '2026-04-06T10:00:00.000Z',
       ],
     );
-    expect(db.runAsync).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('INSERT INTO saved_meals'),
-      [
-        'smeal_1',
-        'Chicken breast',
-        220,
-        40,
-        0,
-        5,
-        0,
-        'lunch',
-        '2026-04-06T10:00:00.000Z',
-        '2026-04-06T10:00:00.000Z',
-      ],
+    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO saved_meals'), [
+      'smeal_1',
+      'Chicken breast',
+      220,
+      40,
+      0,
+      5,
+      0,
+      'lunch',
+      '2026-04-06T10:00:00.000Z',
+      '2026-04-06T10:00:00.000Z',
+    ]);
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'calorie_entries',
+        id: 'cal_1',
+        updatedAt: '2026-04-06T10:00:00.000Z',
+        operation: 'create',
+        revision: 1,
+      },
+      { durablyPersisted: true },
     );
-    expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: 'calorie_entries',
-      id: 'cal_1',
-      updatedAt: '2026-04-06T10:00:00.000Z',
-      operation: 'create',
-    });
   });
 
   it('updateCalorieEntry recalculates calories, updates saved meals, and enqueues update', async () => {
@@ -119,28 +122,28 @@ describe('calories.data', () => {
       expect.stringContaining('UPDATE calorie_entries SET'),
       ['Protein oats', 360, 30, 40, 10, 5, 'breakfast', '2026-04-06T10:00:00.000Z', 'cal_1'],
     );
-    expect(db.runAsync).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('INSERT INTO saved_meals'),
-      [
-        'smeal_2',
-        'Protein oats',
-        360,
-        30,
-        40,
-        10,
-        5,
-        'breakfast',
-        '2026-04-06T10:00:00.000Z',
-        '2026-04-06T10:00:00.000Z',
-      ],
+    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO saved_meals'), [
+      'smeal_2',
+      'Protein oats',
+      360,
+      30,
+      40,
+      10,
+      5,
+      'breakfast',
+      '2026-04-06T10:00:00.000Z',
+      '2026-04-06T10:00:00.000Z',
+    ]);
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'calorie_entries',
+        id: 'cal_1',
+        updatedAt: '2026-04-06T10:00:00.000Z',
+        operation: 'update',
+        revision: 1,
+      },
+      { durablyPersisted: true },
     );
-    expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: 'calorie_entries',
-      id: 'cal_1',
-      updatedAt: '2026-04-06T10:00:00.000Z',
-      operation: 'update',
-    });
   });
 
   it('deleteCalorieEntry soft-deletes the row and enqueues delete', async () => {
@@ -150,12 +153,16 @@ describe('calories.data', () => {
       'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
       ['2026-04-06T10:00:00.000Z', '2026-04-06T10:00:00.000Z', 'cal_9'],
     );
-    expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: 'calorie_entries',
-      id: 'cal_9',
-      updatedAt: '2026-04-06T10:00:00.000Z',
-      operation: 'delete',
-    });
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'calorie_entries',
+        id: 'cal_9',
+        updatedAt: '2026-04-06T10:00:00.000Z',
+        operation: 'delete',
+        revision: 1,
+      },
+      { durablyPersisted: true },
+    );
   });
 
   it('upsertSavedMeal issues a single atomic case-insensitive upsert', async () => {

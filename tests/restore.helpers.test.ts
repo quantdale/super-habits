@@ -61,6 +61,7 @@ vi.mock('@/lib/id', () => ({
 }));
 
 vi.mock('@/features/calories/calories.domain', () => ({
+  DEFAULT_CALORIE_GOAL: { calories: 2000, protein: 150, carbs: 200, fats: 70, fiber: 25 },
   kcalFromMacros: vi.fn(() => 0),
 }));
 

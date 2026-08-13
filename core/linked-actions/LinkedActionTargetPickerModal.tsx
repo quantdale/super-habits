@@ -21,7 +21,7 @@ import {
   type SectionAccent,
   type SectionKey,
 } from '@/constants/sectionColors';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 type CandidateState = {
   status: 'idle' | 'loading' | 'ready' | 'error';

@@ -37,7 +37,7 @@ import type { TestDatabase } from '../helpers/db';
  * - After seeding, `clock.now()` is the seed's last day (2026-07-01 local
  *   noon) unless a later seeder advanced it.
  * - Seeds deliberately go through the real data layers, so synced writes
- *   enqueue into the real sync engine and land in `app_meta.sync_outbox`,
+ *   enqueue into the real sync engine and land in the durable `sync_outbox` table,
  *   and linked-action habits/todos emit source events — both are part of a
  *   realistic corpus, not noise to be cheated around in tests.
  */

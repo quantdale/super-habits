@@ -25,6 +25,7 @@ export type LinkedActionEffectPlan = {
   effectFingerprint: string;
   plannedProducedEntityType: LinkedActionEffectProducedEntityType | null;
   plannedProducedEntityId: string | null;
+  executionId?: string;
   noticePreview: LinkedActionsNoticePayload | null;
 };
 
@@ -34,6 +35,8 @@ export type LinkedActionEffectAdapterResult = {
   targetLabel?: string | null;
   producedEntityType?: LinkedActionEffectProducedEntityType | null;
   producedEntityId?: string | null;
+  /** True when the adapter committed the execution receipt in its own transaction. */
+  executionFinalized?: boolean;
 };
 
 export type LinkedActionExecutionRecord = {

@@ -92,8 +92,16 @@ async function hasColumn(
   table: string,
   column: string,
 ): Promise<boolean> {
+  assertSafeSqlIdentifier(table);
+  assertSafeSqlIdentifier(column);
   const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
   return columns.some((c) => c.name === column);
+}
+
+function assertSafeSqlIdentifier(value: string): void {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+    throw new Error(`Unsafe SQLite identifier: ${value}`);
+  }
 }
 
 async function addColumnIfMissing(
@@ -102,6 +110,8 @@ async function addColumnIfMissing(
   column: string,
   definition: string,
 ): Promise<void> {
+  assertSafeSqlIdentifier(table);
+  assertSafeSqlIdentifier(column);
   if (await hasColumn(db, table, column)) return;
   await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
@@ -406,7 +416,72 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_processed_notification_actions_processed_at
       ON processed_notification_actions (processed_at);
+      `);
+    });
+  }
+  if (version < 14) {
+    await applyMigration(db, 14, async () => {
+      await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS sync_outbox (
+        entity      TEXT NOT NULL,
+        id          TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        operation   TEXT NOT NULL CHECK (operation IN ('create', 'update', 'delete')),
+        revision    INTEGER NOT NULL,
+        PRIMARY KEY (entity, id)
+      );
     `);
+
+      await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_sync_outbox_revision
+      ON sync_outbox (revision ASC);
+    `);
+
+      // v13 and earlier stored the queue as an app_meta JSON snapshot. Import
+      // valid legacy rows once so an upgrade cannot strand a pending backup
+      // mutation when the new table becomes authoritative.
+      const legacyValue = await getAppMetaText(db, appMetaKeys.syncOutbox);
+      if (legacyValue) {
+        try {
+          const legacyRows: unknown = JSON.parse(legacyValue);
+          if (Array.isArray(legacyRows)) {
+            let revision = 0;
+            for (const row of legacyRows) {
+              if (!row || typeof row !== 'object') continue;
+              const candidate = row as Record<string, unknown>;
+              if (
+                typeof candidate.entity !== 'string' ||
+                typeof candidate.id !== 'string' ||
+                typeof candidate.updatedAt !== 'string' ||
+                !['create', 'update', 'delete'].includes(String(candidate.operation))
+              ) {
+                continue;
+              }
+              revision += 1;
+              await db.runAsync(
+                `INSERT INTO sync_outbox (entity, id, updated_at, operation, revision)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(entity, id) DO UPDATE SET
+                   updated_at = excluded.updated_at,
+                   operation = excluded.operation,
+                   revision = excluded.revision
+                 WHERE excluded.revision > sync_outbox.revision`,
+                [
+                  String(candidate.entity),
+                  String(candidate.id),
+                  String(candidate.updatedAt),
+                  String(candidate.operation),
+                  revision,
+                ],
+              );
+            }
+          }
+        } catch {
+          // Invalid legacy JSON is already treated as an empty queue by the
+          // old persistence reader; the authoritative table remains valid.
+        }
+      }
+      await setAppMetaText(db, appMetaKeys.syncOutbox, '[]');
     });
   }
 }

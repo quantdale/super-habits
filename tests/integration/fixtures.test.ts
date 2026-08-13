@@ -37,7 +37,7 @@ describe('tests/integration/fixtures', () => {
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(version?.value).toBe('13');
+    expect(version?.value).toBe('14');
     await db.closeAsync();
   });
 

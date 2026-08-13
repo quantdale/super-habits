@@ -13,7 +13,7 @@ import {
 } from '@/core/linked-actions/linkedActions.data';
 import { createId } from '@/lib/id';
 import { nowIso, toDateKey } from '@/lib/time';
-import { syncEngine } from '@/core/sync/sync.engine';
+import { runSyncedMutation } from '@/core/sync/syncedMutation';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import { getTomorrowDateKey } from './todos.domain';
 
@@ -84,30 +84,31 @@ export async function addTodo(input: {
   );
   const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
 
-  await db.runAsync(
-    `INSERT INTO todos
-       (id, title, notes, completed, due_date, priority,
-        sort_order, recurrence, recurrence_id,
-        created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-    [
-      id,
-      input.title,
-      input.notes ?? null,
-      dueDate,
-      input.priority ?? 'normal',
-      sortOrder,
-      input.recurrence ?? null,
-      recurrenceId,
-      now,
-      now,
-    ],
-  );
-  syncEngine.enqueue({
-    entity: 'todos',
-    id,
-    updatedAt: now,
-    operation: 'create',
+  await runSyncedMutation({
+    db,
+    record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb) => {
+      await transactionDb.runAsync(
+        `INSERT INTO todos
+           (id, title, notes, completed, due_date, priority,
+            sort_order, recurrence, recurrence_id,
+            created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [
+          id,
+          input.title,
+          input.notes ?? null,
+          dueDate,
+          input.priority ?? 'normal',
+          sortOrder,
+          input.recurrence ?? null,
+          recurrenceId,
+          now,
+          now,
+        ],
+      );
+      return { changed: true, value: undefined };
+    },
   });
 
   return id;
@@ -139,40 +140,39 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
     inputs.map(async (input, index) => {
       const id = createId('todo');
       const now = nowIso();
-      const result = await db.runAsync(
-        `INSERT INTO todos
-           (id, title, notes, completed, due_date, priority,
-            sort_order, recurrence, recurrence_id,
-            created_at, updated_at, deleted_at)
-         SELECT ?, ?, ?, 0, ?, ?, ?, 'daily', ?, ?, ?, NULL
-         WHERE NOT EXISTS (
-           SELECT 1
-           FROM todos
-           WHERE recurrence_id = ?
-             AND due_date = ?
-             AND deleted_at IS NULL
-         )`,
-        [
-          id,
-          input.title,
-          input.notes,
-          input.dueDate,
-          input.priority,
-          firstSortOrder + index,
-          input.recurrenceId,
-          now,
-          now,
-          input.recurrenceId,
-          input.dueDate,
-        ],
-      );
-
-      if (result.changes !== 1) return;
-      syncEngine.enqueue({
-        entity: 'todos',
-        id,
-        updatedAt: now,
-        operation: 'create',
+      await runSyncedMutation({
+        db,
+        record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
+        mutate: async (transactionDb) => {
+          const result = await transactionDb.runAsync(
+            `INSERT INTO todos
+               (id, title, notes, completed, due_date, priority,
+                sort_order, recurrence, recurrence_id,
+                created_at, updated_at, deleted_at)
+             SELECT ?, ?, ?, 0, ?, ?, ?, 'daily', ?, ?, ?, NULL
+             WHERE NOT EXISTS (
+               SELECT 1
+               FROM todos
+               WHERE recurrence_id = ?
+                 AND due_date = ?
+                 AND deleted_at IS NULL
+             )`,
+            [
+              id,
+              input.title,
+              input.notes,
+              input.dueDate,
+              input.priority,
+              firstSortOrder + index,
+              input.recurrenceId,
+              now,
+              now,
+              input.recurrenceId,
+              input.dueDate,
+            ],
+          );
+          return { changed: result.changes === 1, value: undefined };
+        },
       });
     }),
   );
@@ -217,17 +217,18 @@ export async function updateTodoOrder(orderedIds: string[]): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
   for (let i = 0; i < orderedIds.length; i++) {
-    await db.runAsync(
-      `UPDATE todos SET sort_order = ?, updated_at = ?
-       WHERE id = ?
-         AND deleted_at IS NULL`,
-      [i + 1, now, orderedIds[i]],
-    );
-    syncEngine.enqueue({
-      entity: 'todos',
-      id: orderedIds[i],
-      updatedAt: now,
-      operation: 'update',
+    await runSyncedMutation({
+      db,
+      record: { entity: 'todos', id: orderedIds[i], updatedAt: now, operation: 'update' },
+      mutate: async (transactionDb) => {
+        const result = await transactionDb.runAsync(
+          `UPDATE todos SET sort_order = ?, updated_at = ?
+           WHERE id = ?
+             AND deleted_at IS NULL`,
+          [i + 1, now, orderedIds[i]],
+        );
+        return { changed: result.changes === 1, value: undefined };
+      },
     });
   }
 }
@@ -265,17 +266,18 @@ export async function updateTodo(
   }
 
   values.push(id);
-  await db.runAsync(
-    `UPDATE todos SET ${fields.join(', ')}
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    values,
-  );
-  syncEngine.enqueue({
-    entity: 'todos',
-    id,
-    updatedAt: now,
-    operation: 'update',
+  await runSyncedMutation({
+    db,
+    record: { entity: 'todos', id, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const result = await transactionDb.runAsync(
+        `UPDATE todos SET ${fields.join(', ')}
+         WHERE id = ?
+           AND deleted_at IS NULL`,
+        values,
+      );
+      return { changed: result.changes === 1, value: undefined };
+    },
   });
 }
 
@@ -319,31 +321,54 @@ export async function saveTodoLinkedActionRules(
 
 export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
   const db = await getDatabase();
-  const current = await db.getFirstAsync<Todo>(
-    `SELECT *
-     FROM todos
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [todo.id],
-  );
+  const now = nowIso();
+  type ToggleMutation = {
+    current: Todo | null;
+    previous: 0 | 1;
+    next: 0 | 1;
+  };
+  const outcome = await runSyncedMutation<ToggleMutation>({
+    db,
+    record: { entity: 'todos', id: todo.id, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const current = await transactionDb.getFirstAsync<Todo>(
+        `SELECT *
+         FROM todos
+         WHERE id = ?
+           AND deleted_at IS NULL`,
+        [todo.id],
+      );
+      if (!current) {
+        return {
+          changed: false,
+          value: { current: null, previous: 0, next: 0 },
+        };
+      }
+      const previous = current.completed;
+      const next: 0 | 1 = previous === 1 ? 0 : 1;
+      const result = await transactionDb.runAsync(
+        `UPDATE todos SET completed = ?, updated_at = ?
+         WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
+        [next, now, current.id, previous],
+      );
+      if (result.changes !== 1) {
+        return {
+          changed: false,
+          value: { current: null, previous: 0, next: 0 },
+        };
+      }
+      return { changed: true, value: { current, previous, next } };
+    },
+  });
 
-  if (!current) {
+  if (!outcome.changed || !outcome.value.current) {
     return {
       completed: 0,
       linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
     };
   }
 
-  const now = nowIso();
-  const previous = current.completed;
-  const next: 0 | 1 = previous === 1 ? 0 : 1;
-
-  await db.runAsync('UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?', [
-    next,
-    now,
-    current.id,
-  ]);
-  syncEngine.enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });
+  const { current, previous, next } = outcome.value;
 
   if (next === 1 && current.recurrence === 'daily' && current.recurrence_id) {
     const tomorrow = getTomorrowDateKey();
@@ -405,18 +430,34 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
 export async function removeTodo(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await db.runAsync(
-    'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-    [now, now, id],
-  );
-  await saveTodoLinkedActionRules(id, []);
-  await deleteLinkedActionRulesForTargetEntity({
-    feature: 'todos',
-    entityType: 'todo',
-    entityId: id,
-    deletedAt: now,
+  const result = await runSyncedMutation({
+    db,
+    record: { entity: 'todos', id, updatedAt: now, operation: 'delete' },
+    mutate: async (transactionDb) => {
+      const tombstone = await transactionDb.runAsync(
+        'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, id],
+      );
+      if (tombstone.changes === 0) return { changed: false, value: undefined };
+
+      await replaceLinkedActionRulesForSourceEntity({
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: id,
+        rules: [],
+        db: transactionDb,
+      });
+      await deleteLinkedActionRulesForTargetEntity({
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: id,
+        deletedAt: now,
+        db: transactionDb,
+      });
+      return { changed: true, value: undefined };
+    },
   });
-  syncEngine.enqueue({ entity: 'todos', id, updatedAt: now, operation: 'delete' });
+  if (!result.changed) return;
 }
 
 export async function completeTodoFromLinkedAction(
@@ -443,19 +484,29 @@ export async function completeTodoFromLinkedAction(
   }
 
   const now = nowIso();
-  await db.runAsync(
-    `UPDATE todos
-     SET completed = 1, updated_at = ?
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [now, todoId],
-  );
-  syncEngine.enqueue({
-    entity: 'todos',
-    id: todoId,
-    updatedAt: now,
-    operation: 'update',
+  const outcome = await runSyncedMutation({
+    db,
+    record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const result = await transactionDb.runAsync(
+        `UPDATE todos
+         SET completed = 1, updated_at = ?
+         WHERE id = ?
+           AND completed = 0
+           AND deleted_at IS NULL`,
+        [now, todoId],
+      );
+      return { changed: result.changes === 1, value: undefined };
+    },
   });
+
+  if (!outcome.changed) {
+    return {
+      status: 'skipped',
+      reason: 'already_completed',
+      targetLabel: todo.title,
+    };
+  }
 
   return {
     status: 'applied',

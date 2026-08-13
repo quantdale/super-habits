@@ -1,4 +1,5 @@
 import { getDatabase } from '@/core/db/client';
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import { Habit, HabitCategory, HabitCompletion, HabitIcon } from '@/core/db/types';
 import type {
   LinkedActionEffectAdapterResult,
@@ -8,12 +9,13 @@ import type {
 } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
-import { syncEngine } from '@/core/sync/sync.engine';
+import { runSyncedMutation } from '@/core/sync/syncedMutation';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import {
   deleteLinkedActionRulesForTargetEntity,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
+  updateLinkedActionExecutionInTransaction,
 } from '@/core/linked-actions/linkedActions.data';
 import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
@@ -85,22 +87,28 @@ export async function addHabit(
   const now = nowIso();
   const ruleHistory = buildInitialHabitRule(timestampToLocalDateKey(now), targetPerDay, weekdays);
   const db = await getDatabase();
-  await db.runAsync(
-    'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
-    [
-      id,
-      name,
-      targetPerDay,
-      canonicalReminderTime,
-      category,
-      icon,
-      color,
-      serializeHabitRuleHistory(ruleHistory),
-      now,
-      now,
-    ],
-  );
-  syncEngine.enqueue({ entity: 'habits', id, updatedAt: now, operation: 'create' });
+  await runSyncedMutation({
+    db,
+    record: { entity: 'habits', id, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb) => {
+      await transactionDb.runAsync(
+        'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+        [
+          id,
+          name,
+          targetPerDay,
+          canonicalReminderTime,
+          category,
+          icon,
+          color,
+          serializeHabitRuleHistory(ruleHistory),
+          now,
+          now,
+        ],
+      );
+      return { changed: true, value: undefined };
+    },
+  });
   requestHabitReminderReconciliation();
   return id;
 }
@@ -148,20 +156,17 @@ export async function incrementHabit(
   // Atomic upsert instead of read-modify-write: two rapid taps previously
   // either raced the UNIQUE(habit_id, date_key) constraint (crash) or lost
   // an increment.
-  await db.runAsync(
+  const row = await db.getFirstAsync<{ id: string; count: number }>(
     `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
      VALUES (?, ?, ?, 1, ?, ?)
      ON CONFLICT(habit_id, date_key) DO UPDATE SET
        count = count + 1,
-       updated_at = excluded.updated_at`,
+       updated_at = excluded.updated_at
+     RETURNING id, count`,
     [createId('hcmp'), habitId, dateKey, now, now],
   );
   requestHabitReminderReconciliation();
 
-  const row = await db.getFirstAsync<{ id: string; count: number }>(
-    'SELECT id, count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
-    [habitId, dateKey],
-  );
   const nextCount = row?.count ?? 1;
   const previousCount = nextCount - 1;
   const completionId = row?.id ?? null;
@@ -317,20 +322,14 @@ async function runCompleteHabitFromNotification(input: {
     }
 
     const updatedAt = processedAt;
-    await db.runAsync(
+    const updatedCompletion = await db.getFirstAsync<{ id: string; count: number }>(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
        VALUES (?, ?, ?, 1, ?, ?)
        ON CONFLICT(habit_id, date_key) DO UPDATE SET
          count = count + 1,
-         updated_at = excluded.updated_at`,
+         updated_at = excluded.updated_at
+       RETURNING id, count`,
       [createId('hcmp'), input.habitId, input.dateKey, updatedAt, updatedAt],
-    );
-    const updatedCompletion = await db.getFirstAsync<{ id: string; count: number }>(
-      `SELECT id, count
-       FROM habit_completions
-       WHERE habit_id = ?
-         AND date_key = ?`,
-      [input.habitId, input.dateKey],
     );
     nextCount = updatedCompletion?.count ?? nextCount + 1;
     completionId = updatedCompletion?.id ?? completionId;
@@ -543,22 +542,28 @@ export async function updateHabit(
     ? formatHabitReminderTime(parsedReminderTime)
     : null;
 
-  await db.runAsync(
-    'UPDATE habits SET name = ?, target_per_day = ?, reminder_time = ?, category = ?, icon = ?, color = ?, rule_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-    [
-      updates.name,
-      updates.targetPerDay,
-      canonicalReminderTime,
-      updates.category,
-      updates.icon ?? DEFAULT_HABIT_ICON,
-      updates.color ?? DEFAULT_HABIT_COLOR,
-      serializeHabitRuleHistory(nextHistory),
-      now,
-      habitId,
-    ],
-  );
-  syncEngine.enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'update' });
-  requestHabitReminderReconciliation();
+  const result = await runSyncedMutation({
+    db,
+    record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const mutation = await transactionDb.runAsync(
+        'UPDATE habits SET name = ?, target_per_day = ?, reminder_time = ?, category = ?, icon = ?, color = ?, rule_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [
+          updates.name,
+          updates.targetPerDay,
+          canonicalReminderTime,
+          updates.category,
+          updates.icon ?? DEFAULT_HABIT_ICON,
+          updates.color ?? DEFAULT_HABIT_COLOR,
+          serializeHabitRuleHistory(nextHistory),
+          now,
+          habitId,
+        ],
+      );
+      return { changed: mutation.changes === 1, value: undefined };
+    },
+  });
+  if (result.changed) requestHabitReminderReconciliation();
 }
 
 export async function listHabitLinkedActionRules(
@@ -586,154 +591,210 @@ export async function saveHabitLinkedActionRules(
 export async function deleteHabit(habitId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();
-  const result = await db.runAsync(
-    'UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-    [now, now, habitId],
-  );
   // A repeated delete is an idempotent no-op. Avoid rewriting the tombstone,
   // enqueueing another backup mutation, or re-running linked-action cleanup.
-  if (result.changes === 0) return;
-  await saveHabitLinkedActionRules(habitId, []);
-  await deleteLinkedActionRulesForTargetEntity({
-    feature: 'habits',
-    entityType: 'habit',
-    entityId: habitId,
-    deletedAt: now,
-  });
-  syncEngine.enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'delete' });
-  requestHabitReminderReconciliation();
-}
+  const result = await runSyncedMutation({
+    db,
+    record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'delete' },
+    mutate: async (transactionDb) => {
+      const result = await transactionDb.runAsync(
+        'UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, habitId],
+      );
+      if (result.changes === 0) return { changed: false, value: undefined };
 
-async function getLinkedActionHabitTarget(habitId: string) {
-  const db = await getDatabase();
-  const habit = await db.getFirstAsync<
-    Pick<Habit, 'id' | 'name' | 'target_per_day' | 'deleted_at' | 'created_at' | 'rule_history'>
-  >(
-    `SELECT id, name, target_per_day, deleted_at, created_at, rule_history
-     FROM habits
-     WHERE id = ?`,
-    [habitId],
-  );
-  return { db, habit };
+      await replaceLinkedActionRulesForSourceEntity({
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: habitId,
+        rules: [],
+        db: transactionDb,
+      });
+      await deleteLinkedActionRulesForTargetEntity({
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: habitId,
+        deletedAt: now,
+        db: transactionDb,
+      });
+      return { changed: true, value: undefined };
+    },
+  });
+  if (result.changed) requestHabitReminderReconciliation();
 }
 
 export async function incrementHabitFromLinkedAction(input: {
   habitId: string;
   amount: number;
   dateKey: string;
+  executionId?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
-  const { db, habit } = await getLinkedActionHabitTarget(input.habitId);
-  if (!habit || habit.deleted_at !== null) {
-    return { status: 'skipped', reason: 'target_missing' };
-  }
-
-  if (input.amount <= 0) {
-    return {
-      status: 'skipped',
-      reason: 'invalid_amount',
-      targetLabel: habit.name,
-    };
-  }
-
-  const now = nowIso();
-  const existing = await db.getFirstAsync<{ id: string; count: number }>(
-    `SELECT id, count
-     FROM habit_completions
-     WHERE habit_id = ?
-       AND date_key = ?`,
-    [input.habitId, input.dateKey],
-  );
-
-  if (existing) {
-    await db.runAsync(
-      `UPDATE habit_completions
-       SET count = ?, updated_at = ?
+  const db = await getDatabase();
+  const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
+    const habit = await transactionDb.getFirstAsync<Pick<Habit, 'id' | 'name' | 'deleted_at'>>(
+      `SELECT id, name, deleted_at
+       FROM habits
        WHERE id = ?`,
-      [existing.count + input.amount, now, existing.id],
+      [input.habitId],
     );
-  } else {
-    await db.runAsync(
+
+    if (!habit || habit.deleted_at !== null) {
+      if (input.executionId) {
+        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+          status: 'skipped',
+          errorMessage: 'target_missing',
+        });
+      }
+      return {
+        result: {
+          status: 'skipped' as const,
+          reason: 'target_missing',
+          ...(input.executionId ? { executionFinalized: true } : {}),
+        },
+        mutated: false,
+      };
+    }
+
+    if (input.amount <= 0) {
+      if (input.executionId) {
+        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+          status: 'skipped',
+          errorMessage: 'invalid_amount',
+        });
+      }
+      return {
+        result: {
+          status: 'skipped' as const,
+          reason: 'invalid_amount',
+          targetLabel: habit.name,
+          ...(input.executionId ? { executionFinalized: true } : {}),
+        },
+        mutated: false,
+      };
+    }
+
+    await transactionDb.getFirstAsync<{ id: string; count: number }>(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [createId('hcmp'), input.habitId, input.dateKey, input.amount, now, now],
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(habit_id, date_key) DO UPDATE SET
+         count = habit_completions.count + excluded.count,
+         updated_at = excluded.updated_at
+       RETURNING id, count`,
+      [createId('hcmp'), input.habitId, input.dateKey, input.amount, nowIso(), nowIso()],
     );
-  }
 
-  requestHabitReminderReconciliation();
+    if (input.executionId) {
+      await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+        status: 'applied',
+        errorMessage: null,
+      });
+    }
+    return {
+      result: {
+        status: 'applied' as const,
+        targetLabel: habit.name,
+        ...(input.executionId ? { executionFinalized: true } : {}),
+      },
+      mutated: true,
+    };
+  });
 
-  return {
-    status: 'applied',
-    targetLabel: habit.name,
-  };
+  if (outcome.mutated) requestHabitReminderReconciliation();
+  return outcome.result;
 }
 
 export async function ensureHabitDailyTargetFromLinkedAction(input: {
   habitId: string;
   minimumCount: number | 'target_per_day';
   dateKey: string;
+  executionId?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
-  const { db, habit } = await getLinkedActionHabitTarget(input.habitId);
-  if (!habit || habit.deleted_at !== null) {
-    return { status: 'skipped', reason: 'target_missing' };
-  }
-
-  const targetPerDay = getHabitTargetForDate(
-    parseHabitRuleHistory(habit.rule_history),
-    input.dateKey,
-    habit.target_per_day,
-    safeTimestampToLocalDateKey(habit.created_at),
-  );
-
-  const desiredCount = Math.max(
-    0,
-    input.minimumCount === 'target_per_day' ? targetPerDay : input.minimumCount,
-  );
-  if (desiredCount === 0) {
-    return {
-      status: 'skipped',
-      reason: 'already_satisfied',
-      targetLabel: habit.name,
-    };
-  }
-
-  const now = nowIso();
-  const existing = await db.getFirstAsync<{ id: string; count: number }>(
-    `SELECT id, count
-     FROM habit_completions
-     WHERE habit_id = ?
-       AND date_key = ?`,
-    [input.habitId, input.dateKey],
-  );
-
-  if (existing && existing.count >= desiredCount) {
-    return {
-      status: 'skipped',
-      reason: 'already_satisfied',
-      targetLabel: habit.name,
-    };
-  }
-
-  if (existing) {
-    await db.runAsync(
-      `UPDATE habit_completions
-       SET count = ?, updated_at = ?
+  const db = await getDatabase();
+  const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
+    const habit = await transactionDb.getFirstAsync<
+      Pick<Habit, 'id' | 'name' | 'target_per_day' | 'created_at' | 'rule_history' | 'deleted_at'>
+    >(
+      `SELECT id, name, target_per_day, created_at, rule_history, deleted_at
+       FROM habits
        WHERE id = ?`,
-      [desiredCount, now, existing.id],
+      [input.habitId],
     );
-  } else {
-    await db.runAsync(
+    if (!habit || habit.deleted_at !== null) {
+      if (input.executionId) {
+        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+          status: 'skipped',
+          errorMessage: 'target_missing',
+        });
+      }
+      return {
+        result: {
+          status: 'skipped' as const,
+          reason: 'target_missing',
+          ...(input.executionId ? { executionFinalized: true } : {}),
+        },
+        mutated: false,
+      };
+    }
+
+    const targetPerDay = getHabitTargetForDate(
+      parseHabitRuleHistory(habit.rule_history),
+      input.dateKey,
+      habit.target_per_day,
+      safeTimestampToLocalDateKey(habit.created_at),
+    );
+    const desiredCount = Math.max(
+      0,
+      input.minimumCount === 'target_per_day' ? targetPerDay : input.minimumCount,
+    );
+    const existing = await transactionDb.getFirstAsync<{ count: number }>(
+      `SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?`,
+      [input.habitId, input.dateKey],
+    );
+    if (desiredCount === 0 || (existing && existing.count >= desiredCount)) {
+      if (input.executionId) {
+        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+          status: 'skipped',
+          errorMessage: 'already_satisfied',
+        });
+      }
+      return {
+        result: {
+          status: 'skipped' as const,
+          reason: 'already_satisfied',
+          targetLabel: habit.name,
+          ...(input.executionId ? { executionFinalized: true } : {}),
+        },
+        mutated: false,
+      };
+    }
+
+    await transactionDb.getFirstAsync<{ id: string; count: number }>(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [createId('hcmp'), input.habitId, input.dateKey, desiredCount, now, now],
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(habit_id, date_key) DO UPDATE SET
+         count = MAX(habit_completions.count, excluded.count),
+         updated_at = excluded.updated_at
+       RETURNING id, count`,
+      [createId('hcmp'), input.habitId, input.dateKey, desiredCount, nowIso(), nowIso()],
     );
-  }
+    if (input.executionId) {
+      await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+        status: 'applied',
+        errorMessage: null,
+      });
+    }
+    return {
+      result: {
+        status: 'applied' as const,
+        targetLabel: habit.name,
+        ...(input.executionId ? { executionFinalized: true } : {}),
+      },
+      mutated: true,
+    };
+  });
 
-  requestHabitReminderReconciliation();
-
-  return {
-    status: 'applied',
-    targetLabel: habit.name,
-  };
+  if (outcome.mutated) requestHabitReminderReconciliation();
+  return outcome.result;
 }
 
 export async function applyRemoteHabits(

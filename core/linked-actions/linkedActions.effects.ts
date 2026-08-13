@@ -49,6 +49,7 @@ export const linkedActionEffectRegistry: Record<string, LinkedActionEffectExecut
       habitId: targetId,
       amount: effect.amount,
       dateKey: resolveDateKey(plan, effect.dateStrategy),
+      executionId: plan.executionId,
     });
   },
   'habit.ensure_daily_target': async (plan) => {
@@ -61,6 +62,7 @@ export const linkedActionEffectRegistry: Record<string, LinkedActionEffectExecut
       habitId: targetId,
       minimumCount: effect.minimumCount,
       dateKey: resolveDateKey(plan, effect.dateStrategy),
+      executionId: plan.executionId,
     });
   },
   'calorie.log': async (plan) => {

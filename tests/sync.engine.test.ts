@@ -333,4 +333,140 @@ describe('SyncEngine', () => {
 
     expect(pushCount).toBe(1);
   });
+
+  it('serializes legacy snapshot persistence instead of allowing an older save to finish last', async () => {
+    const saves: { records: SyncRecord[]; release: () => void }[] = [];
+    const persistence: SyncPersistence = {
+      async loadOutbox() {
+        return [];
+      },
+      async saveOutbox(records) {
+        await new Promise<void>((resolve) => {
+          saves.push({ records: [...records], release: resolve });
+        });
+      },
+      async loadStatus() {
+        return null;
+      },
+      async saveStatus() {},
+    };
+    const engine = new SyncEngine(undefined, persistence);
+    const first: SyncRecord = {
+      entity: 'todos',
+      id: 'todo_old',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'update',
+    };
+    const second: SyncRecord = {
+      entity: 'todos',
+      id: 'todo_new',
+      updatedAt: '2026-04-06T10:00:01.000Z',
+      operation: 'update',
+    };
+
+    engine.enqueue(first);
+    engine.enqueue(second);
+    await Promise.resolve();
+    expect(saves).toHaveLength(1);
+
+    // The second snapshot is not even started until the first has completed;
+    // a storage adapter cannot commit Q1 after Q2.
+    saves[0].release();
+    await vi.waitFor(() => expect(saves).toHaveLength(2));
+    saves[1].release();
+    await Promise.resolve();
+
+    expect(saves[0].records).toEqual([first]);
+    expect(saves[1].records).toEqual([first, second]);
+  });
+
+  it('does not remove a newer same-entity record when an older push completes', async () => {
+    const durable = new Map<string, { record: SyncRecord; revision: number }>();
+    const persistence: SyncPersistence = {
+      async loadOutbox() {
+        return [];
+      },
+      async saveOutbox() {},
+      async upsertOutbox(record, revision) {
+        const key = `${record.entity}:${record.id}`;
+        const current = durable.get(key);
+        if (!current || revision > current.revision) durable.set(key, { record, revision });
+      },
+      async removeOutbox(records) {
+        for (const record of records) {
+          const key = `${record.entity}:${record.id}`;
+          const current = durable.get(key);
+          if (current?.revision === record.revision) durable.delete(key);
+        }
+      },
+      async loadStatus() {
+        return null;
+      },
+      async saveStatus() {},
+    };
+    let releasePush: (() => void) | undefined;
+    const pushBlocked = new Promise<void>((resolve) => {
+      releasePush = resolve;
+    });
+    const adapter = {
+      push: vi.fn(async (records: SyncRecord[]) => {
+        expect(records).toHaveLength(1);
+        await pushBlocked;
+      }),
+      pull: vi.fn(async () => []),
+    };
+    const engine = new SyncEngine(adapter, persistence);
+    const oldRecord: SyncRecord = {
+      entity: 'todos',
+      id: 'todo_same',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'update',
+    };
+    const newRecord: SyncRecord = {
+      ...oldRecord,
+      updatedAt: '2026-04-06T10:00:01.000Z',
+      operation: 'delete',
+    };
+
+    engine.enqueue(oldRecord);
+    const flushing = engine.flush();
+    engine.enqueue(newRecord);
+    releasePush?.();
+    await flushing;
+
+    expect(durable.get('todos:todo_same')?.record).toEqual(newRecord);
+    expect(engine.getPendingCount()).toBe(1);
+  });
+
+  it('does not let an older transaction completion replace a newer prepared record', async () => {
+    const pushed: SyncRecord[][] = [];
+    const adapter = {
+      push: vi.fn(async (records: SyncRecord[]) => {
+        pushed.push([...records]);
+      }),
+      pull: vi.fn(async () => []),
+    };
+    const engine = new SyncEngine(adapter);
+    const oldRecord: SyncRecord = {
+      entity: 'todos',
+      id: 'todo_out_of_order',
+      updatedAt: '2026-04-06T10:00:00.000Z',
+      operation: 'update',
+    };
+    const newRecord: SyncRecord = {
+      ...oldRecord,
+      updatedAt: '2026-04-06T10:00:01.000Z',
+      operation: 'delete',
+    };
+    const oldPrepared = engine.prepare(oldRecord);
+    const newPrepared = engine.prepare(newRecord);
+
+    // A newer transaction can commit before an older one. The later callback
+    // must not roll the in-memory queue back to the older revision.
+    engine.enqueuePrepared(newPrepared, { durablyPersisted: true });
+    engine.enqueuePrepared(oldPrepared, { durablyPersisted: true });
+    await engine.flush();
+
+    expect(pushed).toEqual([[newRecord]]);
+  });
 });

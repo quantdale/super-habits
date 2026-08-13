@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 
@@ -224,6 +227,230 @@ describe('re-fire suppression', () => {
     );
     expect(executions?.n).toBe(1); // only the first event's run is recorded
 
+    await db.closeAsync();
+  });
+});
+
+describe('crash recovery and exactly-once receipts', () => {
+  it('coalesces concurrent execution creation for one stable source identity', async () => {
+    const db = await freshDatabase();
+    const { sourceTodoId, targetHabitId } = await createTodoHabitIncrementCycle(db);
+    const engineModule = await import('@/core/linked-actions/linkedActions.engine');
+    const source = {
+      eventId: 'levt_concurrent_execution_create',
+      feature: 'todos' as const,
+      entityType: 'todo' as const,
+      entityId: sourceTodoId,
+      triggerType: 'todo.completed' as const,
+      sourceDateKey: '2026-08-14',
+    };
+
+    const [first, second] = await Promise.all([
+      new engineModule.LinkedActionsEngine().processSourceAction(source),
+      new engineModule.LinkedActionsEngine().processSourceAction(source),
+    ]);
+
+    expect([first.effects[0].status, second.effects[0].status].sort()).toEqual([
+      'applied',
+      'duplicate',
+    ]);
+    expect(
+      await db.getFirstAsync<{ count: number }>(
+        'SELECT count FROM habit_completions WHERE habit_id = ?',
+        [targetHabitId],
+      ),
+    ).toEqual({ count: 1 });
+    expect(
+      await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM linked_action_executions',
+      ),
+    ).toEqual({ count: 1 });
+    await db.closeAsync();
+  });
+
+  it('reclaims an execution after a crash between claim and effect, including a persisted restart', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-linked-crash-'));
+    const file = path.join(dir, 'superhabits.db');
+
+    try {
+      const db = await freshDatabase(file);
+      const { sourceTodoId, targetHabitId } = await createTodoHabitIncrementCycle(db);
+      const habits = await import('@/features/habits/habits.data');
+      const effects = await import('@/core/linked-actions/linkedActions.effects');
+      const engineModule = await import('@/core/linked-actions/linkedActions.engine');
+      const crashEngine = new engineModule.LinkedActionsEngine({
+        effectRegistry: {
+          'habit.increment': effects.linkedActionEffectRegistry['habit.increment'],
+        },
+        beforeEffect: () => {
+          throw new engineModule.LinkedActionCrashError('crash before habit mutation');
+        },
+      });
+      const source = {
+        eventId: 'levt_crash_before_effect',
+        feature: 'todos' as const,
+        entityType: 'todo' as const,
+        entityId: sourceTodoId,
+        triggerType: 'todo.completed' as const,
+        sourceDateKey: '2026-08-14',
+      };
+
+      await expect(crashEngine.processSourceAction(source)).rejects.toThrow(
+        'crash before habit mutation',
+      );
+      expect(
+        await db.getFirstAsync<{ status: string }>(
+          'SELECT status FROM linked_action_executions WHERE source_event_id = ?',
+          [source.eventId],
+        ),
+      ).toEqual({ status: 'running' });
+      expect(
+        await db.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM habit_completions WHERE habit_id = ?',
+          [targetHabitId],
+        ),
+      ).toEqual({ count: 0 });
+
+      // A fresh process only reclaims a running claim after its lease is stale.
+      await db.runAsync(
+        `UPDATE linked_action_executions
+         SET updated_at = '2020-01-01T00:00:00.000Z'
+         WHERE source_event_id = ?`,
+        [source.eventId],
+      );
+      await db.closeAsync();
+
+      const restartedDb = await freshDatabase(file);
+      const restartedEngine = (await import('@/core/linked-actions/linkedActions.engine'))
+        .linkedActionsEngine;
+      const replay = await restartedEngine.processSourceAction(source);
+
+      expect(replay.effects[0]).toMatchObject({ status: 'applied' });
+      expect(
+        await restartedDb.getFirstAsync<{ status: string }>(
+          'SELECT status FROM linked_action_executions WHERE source_event_id = ?',
+          [source.eventId],
+        ),
+      ).toEqual({ status: 'applied' });
+      expect(
+        await restartedDb.getFirstAsync<{ count: number }>(
+          'SELECT count FROM habit_completions WHERE habit_id = ?',
+          [targetHabitId],
+        ),
+      ).toEqual({ count: 1 });
+      await restartedDb.closeAsync();
+
+      // Keep the import alive in the first process branch so the test proves
+      // the real adapter path, not a mocked executor.
+      expect(habits.incrementHabitFromLinkedAction).toBeTypeOf('function');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not increment a habit twice when the effect commits before finalization crashes', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-linked-finalize-'));
+    const file = path.join(dir, 'superhabits.db');
+
+    try {
+      const db = await freshDatabase(file);
+      const { sourceTodoId, targetHabitId } = await createTodoHabitIncrementCycle(db);
+      const effects = await import('@/core/linked-actions/linkedActions.effects');
+      const engineModule = await import('@/core/linked-actions/linkedActions.engine');
+      const source = {
+        eventId: 'levt_crash_after_effect',
+        feature: 'todos' as const,
+        entityType: 'todo' as const,
+        entityId: sourceTodoId,
+        triggerType: 'todo.completed' as const,
+        sourceDateKey: '2026-08-14',
+      };
+      const crashEngine = new engineModule.LinkedActionsEngine({
+        effectRegistry: {
+          'habit.increment': effects.linkedActionEffectRegistry['habit.increment'],
+        },
+        afterEffectBeforeFinalize: () => {
+          throw new engineModule.LinkedActionCrashError('crash after habit mutation');
+        },
+      });
+
+      await expect(crashEngine.processSourceAction(source)).rejects.toThrow(
+        'crash after habit mutation',
+      );
+      expect(
+        await db.getFirstAsync<{ status: string; count: number }>(
+          `SELECT e.status, c.count
+           FROM linked_action_executions e
+           INNER JOIN habit_completions c ON c.habit_id = ?
+           WHERE e.source_event_id = ?`,
+          [targetHabitId, source.eventId],
+        ),
+      ).toMatchObject({ status: 'applied', count: 1 });
+      await db.closeAsync();
+
+      const restartedDb = await freshDatabase(file);
+      const restartedEngine = (await import('@/core/linked-actions/linkedActions.engine'))
+        .linkedActionsEngine;
+      const replay = await restartedEngine.processSourceAction(source);
+      expect(replay.effects[0]).toMatchObject({
+        status: 'duplicate',
+        reason: 'source_event_already_executed',
+      });
+      expect(
+        await restartedDb.getFirstAsync<{ count: number }>(
+          'SELECT count FROM habit_completions WHERE habit_id = ?',
+          [targetHabitId],
+        ),
+      ).toEqual({ count: 1 });
+      await restartedDb.closeAsync();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('marks an explicit effect failure retryable and successfully replays it', async () => {
+    const db = await freshDatabase();
+    const { sourceTodoId, targetHabitId } = await createTodoHabitIncrementCycle(db);
+    const engineModule = await import('@/core/linked-actions/linkedActions.engine');
+    const effects = await import('@/core/linked-actions/linkedActions.effects');
+    const source = {
+      eventId: 'levt_retry_failed_effect',
+      feature: 'todos' as const,
+      entityType: 'todo' as const,
+      entityId: sourceTodoId,
+      triggerType: 'todo.completed' as const,
+      sourceDateKey: '2026-08-14',
+    };
+    const failed = new engineModule.LinkedActionsEngine({
+      effectRegistry: {
+        'habit.increment': async () => {
+          throw new Error('temporary effect failure');
+        },
+      },
+    });
+    const first = await failed.processSourceAction(source);
+    expect(first.effects[0]).toMatchObject({ status: 'failed' });
+    expect(
+      await db.getFirstAsync<{ status: string }>(
+        'SELECT status FROM linked_action_executions WHERE source_event_id = ?',
+        [source.eventId],
+      ),
+    ).toEqual({ status: 'failed' });
+
+    const retry = new engineModule.LinkedActionsEngine({
+      effectRegistry: {
+        'habit.increment': effects.linkedActionEffectRegistry['habit.increment'],
+      },
+    });
+    expect((await retry.processSourceAction(source)).effects[0]).toMatchObject({
+      status: 'applied',
+    });
+    expect(
+      await db.getFirstAsync<{ count: number }>(
+        'SELECT count FROM habit_completions WHERE habit_id = ?',
+        [targetHabitId],
+      ),
+    ).toEqual({ count: 1 });
     await db.closeAsync();
   });
 });

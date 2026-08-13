@@ -3,10 +3,10 @@
 -- ============================================================
 -- The authoritative schema is the bootstrapStatements array
 -- in core/db/client.ts, plus the runMigrations() cases.
--- Current stored schema version: 13 (next migration: case 14).
+-- Current stored schema version: 14 (next migration: case 15).
 -- This file is hand-maintained from core/db/client.ts — copy
 -- the bootstrap DDL and every `if (version < N)` block through
--- v13. It is a documentation snapshot, not runtime migration code;
+-- v14. It is a documentation snapshot, not runtime migration code;
 -- do not rely on it for migrations or type generation.
 -- ============================================================
 
@@ -249,3 +249,17 @@ CREATE TABLE IF NOT EXISTS processed_notification_actions (
 
 CREATE INDEX IF NOT EXISTS idx_processed_notification_actions_processed_at
   ON processed_notification_actions (processed_at);
+
+-- Durable sync outbox (runtime migration 14). The app_meta JSON key is a
+-- legacy upgrade source only; this table is authoritative for pending pushes.
+CREATE TABLE IF NOT EXISTS sync_outbox (
+  entity      TEXT NOT NULL,
+  id          TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  operation   TEXT NOT NULL CHECK (operation IN ('create', 'update', 'delete')),
+  revision    INTEGER NOT NULL,
+  PRIMARY KEY (entity, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_outbox_revision
+  ON sync_outbox (revision ASC);

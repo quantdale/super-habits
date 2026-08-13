@@ -47,9 +47,10 @@ describe('features/habits/habits.data', () => {
 
     const result = await incrementHabit('habit_1', '2026-04-14');
 
-    // COR-001: single atomic upsert instead of read-modify-write.
-    expect(db.runAsync).toHaveBeenCalledTimes(1);
-    const [upsertSql, upsertArgs] = db.runAsync.mock.calls[0];
+    // COR-001: the mutation returns its post-write count from the same SQL
+    // statement instead of performing a race-prone follow-up SELECT.
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(2);
+    const [upsertSql, upsertArgs] = db.getFirstAsync.mock.calls[1];
     expect(upsertSql).toContain('INSERT INTO habit_completions');
     expect(upsertSql).toContain('ON CONFLICT(habit_id, date_key) DO UPDATE SET');
     expect(upsertSql).toContain('count = count + 1');
@@ -101,7 +102,7 @@ describe('features/habits/habits.data', () => {
 
     const result = await incrementHabit('habit_1', '2026-04-14');
 
-    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(2);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result).toEqual({
       count: 2,
@@ -130,7 +131,7 @@ describe('features/habits/habits.data', () => {
 
     const result = await incrementHabit('habit_1', '2026-04-14');
 
-    expect(db.runAsync).toHaveBeenCalledTimes(1);
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(2);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result.count).toBe(3);
   });
@@ -175,8 +176,8 @@ describe('features/habits/habits.data', () => {
     // Both calls issue the single ON CONFLICT statement — there is no
     // SELECT-then-INSERT branch left to interleave. (Mock-level proof of the
     // statement shape; the SQL itself was validated against real SQLite.)
-    expect(db.runAsync).toHaveBeenCalledTimes(2);
-    for (const [sql] of db.runAsync.mock.calls) {
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(4);
+    for (const [sql] of [db.getFirstAsync.mock.calls[1], db.getFirstAsync.mock.calls[3]]) {
       expect(sql).toContain('ON CONFLICT(habit_id, date_key) DO UPDATE SET');
     }
     expect(first.count).toBe(1);
@@ -249,11 +250,17 @@ describe('features/habits/habits.data', () => {
       targetLabel: 'Hydrate',
     });
 
-    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('UPDATE habit_completions'), [
-      3,
-      expect.any(String),
-      'hcmp_1',
-    ]);
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO habit_completions'),
+      [
+        expect.stringMatching(/^hcmp_/),
+        'habit_1',
+        '2026-04-14',
+        1,
+        expect.any(String),
+        expect.any(String),
+      ],
+    );
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
@@ -283,7 +290,7 @@ describe('features/habits/habits.data', () => {
       targetLabel: 'Hydrate',
     });
 
-    expect(db.runAsync).toHaveBeenCalledWith(
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO habit_completions'),
       [
         expect.stringMatching(/^hcmp_/),

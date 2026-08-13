@@ -236,7 +236,7 @@ describe('calories soft delete', () => {
 });
 
 describe('workout soft delete', () => {
-  it('deleted routines and exercises vanish from reads, keep their tombstones, and revive', async () => {
+  it('deleted routines and configuration children keep tombstones while history survives', async () => {
     const db = await freshDatabase();
     const tracer = installDeleteTracer(db);
     const workout = await import('@/features/workout/workout.data');
@@ -256,23 +256,24 @@ describe('workout soft delete', () => {
     tracer.assertNoHardDeleteOn('workout_routines');
     tracer.assertGuardedSoftDelete('workout_routines');
 
-    // deleteRoutine does NOT cascade: the nested exercises keep their rows and
-    // are not tombstoned (the app leaves routine content alone; only the
-    // parent is hidden, and only a direct deleteExercise tombstones an
-    // exercise — see the next test). Nothing is hard-deleted anywhere.
+    // Configuration children are tombstoned with the parent so stale UI calls
+    // cannot leave active child configuration beneath a deleted routine.
     const exerciseRows = await db.getAllAsync<{ id: string; deleted_at: string | null }>(
       'SELECT id, deleted_at FROM routine_exercises WHERE routine_id = ?',
       [doomedRoutine.id],
     );
     expect(exerciseRows).toHaveLength(2);
     for (const row of exerciseRows) {
-      expect(row.deleted_at).toBeNull();
+      expect(row.deleted_at).not.toBeNull();
     }
     tracer.assertNoHardDeleteOn('routine_exercises');
     tracer.assertNoHardDeleteOn('routine_exercise_sets');
+    tracer.assertGuardedSoftDelete('routine_exercises');
+    tracer.assertGuardedSoftDelete('routine_exercise_sets');
 
-    // Reviving the routine restores it with its exercises intact — the whole
-    // delete was cursory at the row level, so a restore can bring it back.
+    // Reviving only the parent does not resurrect deleted configuration
+    // children; an explicit child restore policy can be added later without
+    // weakening the active-parent invariant.
     // Both routines share the same created_at millisecond, so listRoutines'
     // ORDER BY created_at DESC tie-break order is nondeterministic — assert
     // the revived set, not its display order.
@@ -280,7 +281,7 @@ describe('workout soft delete', () => {
     const revivedRoutineNames = (await workout.listRoutines()).map((r) => r.name);
     expect([...revivedRoutineNames].sort()).toEqual(['Doomed routine', 'Keep routine']);
     const revived = await workout.getRoutineWithExercises(doomedRoutine.id);
-    expect(revived?.exercises.map((e) => e.name)).toEqual(['Push-ups', 'Squats']);
+    expect(revived?.exercises).toEqual([]);
 
     await db.closeAsync();
   });

@@ -1,4 +1,5 @@
 import { getDatabase } from '@/core/db/client';
+import type * as SQLite from 'expo-sqlite';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
 import {
@@ -224,8 +225,9 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
   entityType: LinkedActionSourceEntityType;
   entityId: string;
   rules: SaveLinkedActionRuleForSourceInput[];
+  db?: Awaited<ReturnType<typeof getDatabase>>;
 }): Promise<void> {
-  const db = await getDatabase();
+  const db = input.db ?? (await getDatabase());
   const existingRows = await db.getAllAsync<LinkedActionRuleRow>(
     `SELECT *
      FROM linked_action_rules
@@ -345,8 +347,9 @@ export async function deleteLinkedActionRulesForTargetEntity(input: {
   entityType: LinkedActionTargetEntityType;
   entityId: string;
   deletedAt?: string;
+  db?: Awaited<ReturnType<typeof getDatabase>>;
 }): Promise<void> {
-  const db = await getDatabase();
+  const db = input.db ?? (await getDatabase());
   const now = input.deletedAt ?? nowIso();
   await db.runAsync(
     `UPDATE linked_action_rules
@@ -397,7 +400,8 @@ export async function createLinkedActionEvent(
        occurred_at,
        payload,
        created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
     [
       row.id,
       row.chain_id,
@@ -419,7 +423,14 @@ export async function createLinkedActionEvent(
       row.created_at,
     ],
   );
-  return event;
+  const persisted = await db.getFirstAsync<LinkedActionEventRow>(
+    `SELECT * FROM linked_action_events WHERE id = ?`,
+    [event.eventId],
+  );
+  if (!persisted) {
+    throw new Error(`Linked action event ${event.eventId} was not persisted.`);
+  }
+  return normalizeLinkedActionEventRow(persisted);
 }
 
 export async function getLinkedActionExecutionByRuleAndSourceEvent(
@@ -467,7 +478,7 @@ export async function getAppliedHabitDayCalorieExecution(
        ON ev.id = e.source_event_id
      WHERE e.rule_id = ?
        AND e.effect_type = 'calorie.log'
-       AND e.status = 'applied'
+       AND e.status IN ('planned', 'running', 'applied', 'skipped', 'failed')
        AND ev.source_feature = 'habits'
        AND ev.source_entity_type = 'habit'
        AND ev.source_entity_id = ?
@@ -496,7 +507,7 @@ export async function getAppliedHabitIncrementExecution(
        ON ev.id = e.source_event_id
      WHERE e.rule_id = ?
        AND e.effect_type = 'habit.increment'
-       AND e.status = 'applied'
+       AND e.status IN ('planned', 'running', 'applied', 'skipped', 'failed')
        AND ev.source_feature = ?
        AND ev.source_entity_type = ?
        AND ev.source_entity_id = ?
@@ -558,7 +569,8 @@ export async function createLinkedActionExecution(
        error_message,
        created_at,
        updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
     [
       row.id,
       row.rule_id,
@@ -580,7 +592,27 @@ export async function createLinkedActionExecution(
       row.updated_at,
     ],
   );
-  return record;
+  const persisted =
+    (await db.getFirstAsync<LinkedActionExecutionRow>(
+      `SELECT * FROM linked_action_executions WHERE id = ?`,
+      [record.id],
+    )) ??
+    (await db.getFirstAsync<LinkedActionExecutionRow>(
+      `SELECT *
+       FROM linked_action_executions
+       WHERE rule_id = ? AND source_event_id = ?`,
+      [record.ruleId, record.sourceEventId],
+    )) ??
+    (await db.getFirstAsync<LinkedActionExecutionRow>(
+      `SELECT *
+       FROM linked_action_executions
+       WHERE chain_id = ? AND rule_id = ? AND effect_fingerprint = ?`,
+      [record.chainId, record.ruleId, record.effectFingerprint],
+    ));
+  if (!persisted) {
+    throw new Error(`Linked action execution ${record.id} was not persisted.`);
+  }
+  return normalizeLinkedActionExecutionRow(persisted);
 }
 
 export async function updateLinkedActionExecution(
@@ -593,6 +625,32 @@ export async function updateLinkedActionExecution(
   >,
 ): Promise<void> {
   const db = await getDatabase();
+  await updateLinkedActionExecutionInDatabase(db, id, updates);
+}
+
+export async function updateLinkedActionExecutionInTransaction(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  updates: Partial<
+    Pick<
+      LinkedActionExecutionRecord,
+      'status' | 'producedEntityType' | 'producedEntityId' | 'noticePayload' | 'errorMessage'
+    >
+  >,
+): Promise<void> {
+  await updateLinkedActionExecutionInDatabase(db, id, updates);
+}
+
+async function updateLinkedActionExecutionInDatabase(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  updates: Partial<
+    Pick<
+      LinkedActionExecutionRecord,
+      'status' | 'producedEntityType' | 'producedEntityId' | 'noticePayload' | 'errorMessage'
+    >
+  >,
+): Promise<void> {
   const fields: string[] = ['updated_at = ?'];
   const values: (string | null)[] = [nowIso()];
 
@@ -618,10 +676,32 @@ export async function updateLinkedActionExecution(
   }
 
   values.push(id);
-  await db.runAsync(
+  const result = await db.runAsync(
     `UPDATE linked_action_executions
      SET ${fields.join(', ')}
      WHERE id = ?`,
     values,
   );
+  if (result.changes !== 1) {
+    throw new Error(`Linked action execution ${id} was not found while finalizing.`);
+  }
+}
+
+/** Claim a planned/failed execution, or reclaim a stale interrupted runner. */
+export async function claimLinkedActionExecution(
+  id: string,
+  staleBefore: string,
+): Promise<boolean> {
+  const db = await getDatabase();
+  const result = await db.runAsync(
+    `UPDATE linked_action_executions
+     SET status = 'running', updated_at = ?, error_message = NULL
+     WHERE id = ?
+       AND (
+         status IN ('planned', 'failed')
+         OR (status = 'running' AND updated_at <= ?)
+       )`,
+    [nowIso(), id, staleBefore],
+  );
+  return result.changes === 1;
 }

@@ -4,8 +4,12 @@ import { CalorieEntry, SavedMeal } from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { nowIso, toDateKey } from '@/lib/time';
-import { syncEngine } from '@/core/sync/sync.engine';
-import { kcalFromMacros } from '@/features/calories/calories.domain';
+import { runSyncedMutation } from '@/core/sync/syncedMutation';
+import {
+  DEFAULT_CALORIE_GOAL,
+  kcalFromMacros,
+  normalizeCalorieGoal,
+} from '@/features/calories/calories.domain';
 import type { CalorieGoal, DailySummary } from '@/features/calories/types';
 
 export type { CalorieGoal, DailySummary } from '@/features/calories/types';
@@ -49,21 +53,21 @@ export async function countCalorieEntriesByRange(
   return row?.count ?? 0;
 }
 
-export const DEFAULT_GOAL: CalorieGoal = {
-  calories: 2000,
-  protein: 150,
-  carbs: 200,
-  fats: 65,
-};
+export const DEFAULT_GOAL: CalorieGoal = DEFAULT_CALORIE_GOAL;
 
 export async function getCalorieGoal(): Promise<CalorieGoal> {
   const db = await getDatabase();
-  return getAppMetaJsonOrDefault<CalorieGoal>(db, appMetaKeys.calorieGoal, DEFAULT_GOAL);
+  return getAppMetaJsonOrDefault<CalorieGoal>(
+    db,
+    appMetaKeys.calorieGoal,
+    DEFAULT_GOAL,
+    normalizeCalorieGoal,
+  );
 }
 
 export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.calorieGoal, goal);
+  await setAppMetaJson(db, appMetaKeys.calorieGoal, normalizeCalorieGoal(goal));
 }
 
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {
@@ -99,32 +103,45 @@ export async function addCalorieEntry(input: {
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
   const db = await getDatabase();
-  await db.runAsync(
-    'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
-    [
-      id,
-      input.foodName,
-      input.calories,
-      input.protein ?? 0,
-      input.carbs ?? 0,
-      input.fats ?? 0,
-      input.fiber ?? 0,
-      input.mealType,
-      consumedOn,
-      now,
-      now,
-    ],
-  );
-  syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'create' });
-  await upsertSavedMeal({
-    foodName: input.foodName,
-    calories: input.calories,
-    protein: input.protein ?? 0,
-    carbs: input.carbs ?? 0,
-    fats: input.fats ?? 0,
-    fiber: input.fiber ?? 0,
-    mealType: input.mealType,
+  await runSyncedMutation({
+    db,
+    record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb) => {
+      await transactionDb.runAsync(
+        'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+        [
+          id,
+          input.foodName,
+          input.calories,
+          input.protein ?? 0,
+          input.carbs ?? 0,
+          input.fats ?? 0,
+          input.fiber ?? 0,
+          input.mealType,
+          consumedOn,
+          now,
+          now,
+        ],
+      );
+      return { changed: true, value: undefined };
+    },
   });
+  try {
+    await upsertSavedMeal({
+      foodName: input.foodName,
+      calories: input.calories,
+      protein: input.protein ?? 0,
+      carbs: input.carbs ?? 0,
+      fats: input.fats ?? 0,
+      fiber: input.fiber ?? 0,
+      mealType: input.mealType,
+    });
+  } catch (error) {
+    // The calorie ledger is authoritative. Saved meals are a local convenience
+    // index; a cache failure must not turn a committed ledger write into a
+    // reported failure that encourages a duplicate retry.
+    console.error('[calories] saved-meal maintenance failed after add', error);
+  }
 }
 
 export async function updateCalorieEntry(
@@ -137,12 +154,16 @@ export async function updateCalorieEntry(
     fiber: number;
     mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   },
-): Promise<void> {
+): Promise<'updated' | 'not_found'> {
   const db = await getDatabase();
   const now = nowIso();
   const calories = kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
-  await db.runAsync(
-    `UPDATE calorie_entries SET
+  const result = await runSyncedMutation<'updated' | 'not_found'>({
+    db,
+    record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const update = await transactionDb.runAsync(
+        `UPDATE calorie_entries SET
        food_name = ?,
        calories = ?,
        protein = ?,
@@ -153,28 +174,39 @@ export async function updateCalorieEntry(
        updated_at = ?
      WHERE id = ?
        AND deleted_at IS NULL`,
-    [
-      updates.foodName,
-      calories,
-      updates.protein,
-      updates.carbs,
-      updates.fats,
-      updates.fiber,
-      updates.mealType,
-      now,
-      id,
-    ],
-  );
-  syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'update' });
-  await upsertSavedMeal({
-    foodName: updates.foodName,
-    calories,
-    protein: updates.protein,
-    carbs: updates.carbs,
-    fats: updates.fats,
-    fiber: updates.fiber,
-    mealType: updates.mealType,
+        [
+          updates.foodName,
+          calories,
+          updates.protein,
+          updates.carbs,
+          updates.fats,
+          updates.fiber,
+          updates.mealType,
+          now,
+          id,
+        ],
+      );
+      return {
+        changed: update.changes === 1,
+        value: update.changes === 1 ? 'updated' : 'not_found',
+      };
+    },
   });
+  if (!result.changed) return result.value;
+  try {
+    await upsertSavedMeal({
+      foodName: updates.foodName,
+      calories,
+      protein: updates.protein,
+      carbs: updates.carbs,
+      fats: updates.fats,
+      fiber: updates.fiber,
+      mealType: updates.mealType,
+    });
+  } catch (error) {
+    console.error('[calories] saved-meal maintenance failed after update', error);
+  }
+  return result.value;
 }
 
 export async function upsertSavedMeal(input: {
@@ -262,14 +294,24 @@ export async function deleteSavedMeal(id: string): Promise<void> {
   await db.runAsync(`DELETE FROM saved_meals WHERE id = ?`, [id]);
 }
 
-export async function deleteCalorieEntry(id: string): Promise<void> {
+export async function deleteCalorieEntry(id: string): Promise<'deleted' | 'not_found'> {
   const now = nowIso();
   const db = await getDatabase();
-  await db.runAsync(
-    'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-    [now, now, id],
-  );
-  syncEngine.enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'delete' });
+  const result = await runSyncedMutation<'deleted' | 'not_found'>({
+    db,
+    record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'delete' },
+    mutate: async (transactionDb) => {
+      const deleted = await transactionDb.runAsync(
+        'UPDATE calorie_entries SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, id],
+      );
+      return {
+        changed: deleted.changes === 1,
+        value: deleted.changes === 1 ? 'deleted' : 'not_found',
+      };
+    },
+  });
+  return result.value;
 }
 
 export async function addCalorieEntryFromLinkedAction(input: {
@@ -285,13 +327,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
   const existing = await db.getFirstAsync<Pick<CalorieEntry, 'id' | 'food_name'>>(
-    `SELECT id, food_name
-     FROM calorie_entries
-     WHERE id = ?
-       AND deleted_at IS NULL`,
+    `SELECT id, food_name FROM calorie_entries WHERE id = ? AND deleted_at IS NULL`,
     [input.id],
   );
-
   if (existing) {
     return {
       status: 'applied',
@@ -302,8 +340,17 @@ export async function addCalorieEntryFromLinkedAction(input: {
   }
 
   const now = nowIso();
-  await db.runAsync(
-    `INSERT INTO calorie_entries (
+  const outcome = await runSyncedMutation({
+    db,
+    record: { entity: 'calorie_entries', id: input.id, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb) => {
+      const concurrent = await transactionDb.getFirstAsync<Pick<CalorieEntry, 'id' | 'food_name'>>(
+        `SELECT id, food_name FROM calorie_entries WHERE id = ? AND deleted_at IS NULL`,
+        [input.id],
+      );
+      if (concurrent) return { changed: false, value: concurrent };
+      await transactionDb.runAsync(
+        `INSERT INTO calorie_entries (
        id,
        food_name,
        calories,
@@ -317,35 +364,44 @@ export async function addCalorieEntryFromLinkedAction(input: {
        updated_at,
        deleted_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-    [
-      input.id,
-      input.foodName,
-      input.calories,
-      input.protein,
-      input.carbs,
-      input.fats,
-      input.fiber,
-      input.mealType,
-      input.consumedOn,
-      now,
-      now,
-    ],
-  );
-  syncEngine.enqueue({
-    entity: 'calorie_entries',
-    id: input.id,
-    updatedAt: now,
-    operation: 'create',
+        [
+          input.id,
+          input.foodName,
+          input.calories,
+          input.protein,
+          input.carbs,
+          input.fats,
+          input.fiber,
+          input.mealType,
+          input.consumedOn,
+          now,
+          now,
+        ],
+      );
+      return { changed: true, value: { id: input.id, food_name: input.foodName } };
+    },
   });
-  await upsertSavedMeal({
-    foodName: input.foodName,
-    calories: input.calories,
-    protein: input.protein,
-    carbs: input.carbs,
-    fats: input.fats,
-    fiber: input.fiber,
-    mealType: input.mealType,
-  });
+  if (!outcome.changed) {
+    return {
+      status: 'applied',
+      targetLabel: outcome.value.food_name,
+      producedEntityType: 'calorie_log',
+      producedEntityId: outcome.value.id,
+    };
+  }
+  try {
+    await upsertSavedMeal({
+      foodName: input.foodName,
+      calories: input.calories,
+      protein: input.protein,
+      carbs: input.carbs,
+      fats: input.fats,
+      fiber: input.fiber,
+      mealType: input.mealType,
+    });
+  } catch (error) {
+    console.error('[calories] saved-meal maintenance failed after linked add', error);
+  }
 
   return {
     status: 'applied',

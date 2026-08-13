@@ -8,6 +8,7 @@ import type {
 const dataMocks = vi.hoisted(() => ({
   createLinkedActionEvent: vi.fn(),
   createLinkedActionExecution: vi.fn(),
+  claimLinkedActionExecution: vi.fn(),
   getAppliedHabitIncrementExecution: vi.fn(),
   getAppliedHabitDayCalorieExecution: vi.fn(),
   getLinkedActionEvent: vi.fn(),
@@ -63,6 +64,7 @@ describe('core/linked-actions/linkedActions.engine', () => {
     dataMocks.getLinkedActionExecutionByRuleAndSourceEvent.mockResolvedValue(null);
     dataMocks.getLinkedActionExecutionByChainFingerprint.mockResolvedValue(null);
     dataMocks.updateLinkedActionExecution.mockResolvedValue(undefined);
+    dataMocks.claimLinkedActionExecution.mockResolvedValue(true);
     dataMocks.listMatchingLinkedActionRules.mockResolvedValue([]);
     dataMocks.createLinkedActionEvent.mockImplementation(async (event) => event);
     dataMocks.createLinkedActionExecution.mockImplementation(async (execution) => ({

@@ -29,6 +29,8 @@ const linkedActionDataMocks = vi.hoisted(() => ({
 const { syncEngine } = vi.hoisted(() => ({
   syncEngine: {
     enqueue: vi.fn(),
+    prepare: vi.fn((record: Record<string, unknown>) => ({ ...record, revision: 1 })),
+    enqueuePrepared: vi.fn(),
   },
 }));
 
@@ -107,15 +109,15 @@ describe('features/todos/todos.data', () => {
         updated_at: '2026-04-16T09:00:00.000Z',
         deleted_at: null,
       }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 
     const result = await toggleTodo({ id: 'todo_1' } as never);
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE todos SET completed = ?, updated_at = ? WHERE id = ?',
-      [1, '2026-04-16T10:00:00.000Z', 'todo_1'],
+      expect.stringContaining('UPDATE todos SET completed = ?, updated_at = ?'),
+      [1, '2026-04-16T10:00:00.000Z', 'todo_1', 0],
     );
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -144,7 +146,7 @@ describe('features/todos/todos.data', () => {
         updated_at: '2026-04-16T09:00:00.000Z',
         deleted_at: null,
       }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 
@@ -211,7 +213,7 @@ describe('features/todos/todos.data', () => {
       expect.stringContaining('WHERE NOT EXISTS'),
       expect.arrayContaining(['rec_1', '2026-04-17']),
     );
-    expect(syncEngine.enqueue).not.toHaveBeenCalled();
+    expect(syncEngine.enqueuePrepared).not.toHaveBeenCalled();
   });
 
   it('inserts and enqueues one recurring instance when the series/day is missing', async () => {
@@ -229,18 +231,21 @@ describe('features/todos/todos.data', () => {
       dueDate: '2026-04-17',
     });
 
-    expect(db.runAsync).toHaveBeenCalledTimes(1);
     expect(db.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO todos'),
       expect.arrayContaining(['rec_1', '2026-04-17']),
     );
-    expect(syncEngine.enqueue).toHaveBeenCalledTimes(1);
-    expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: 'todos',
-      id: expect.stringMatching(/^todo_/),
-      updatedAt: expect.any(String),
-      operation: 'create',
-    });
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(1);
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'todos',
+        id: expect.stringMatching(/^todo_/),
+        updatedAt: expect.any(String),
+        operation: 'create',
+        revision: 1,
+      },
+      { durablyPersisted: true },
+    );
   });
 
   it('rejects saving non-empty source rules for recurring todos based on persisted row', async () => {
@@ -331,7 +336,7 @@ describe('features/todos/todos.data', () => {
         recurrence: null,
         deleted_at: null,
       }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 
@@ -342,18 +347,22 @@ describe('features/todos/todos.data', () => {
       ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 'todo_1'],
     );
 
-    expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith({
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: 'todo_1',
-      rules: [],
-    });
-    expect(linkedActionDataMocks.deleteLinkedActionRulesForTargetEntity).toHaveBeenCalledWith({
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: 'todo_1',
-      deletedAt: '2026-04-16T10:00:00.000Z',
-    });
+    expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
+        rules: [],
+      }),
+    );
+    expect(linkedActionDataMocks.deleteLinkedActionRulesForTargetEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: 'todo_1',
+        deletedAt: '2026-04-16T10:00:00.000Z',
+      }),
+    );
   });
 
   it('returns safe no-op notice metadata when engine reports self-target skip', async () => {
@@ -372,7 +381,7 @@ describe('features/todos/todos.data', () => {
         updated_at: '2026-04-16T09:00:00.000Z',
         deleted_at: null,
       }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
     linkedActionsEngine.processSourceAction.mockResolvedValue({
@@ -438,7 +447,7 @@ describe('features/todos/todos.data', () => {
         completed: 0,
         deleted_at: '2026-04-16T09:00:00.000Z',
       }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 
@@ -452,7 +461,7 @@ describe('features/todos/todos.data', () => {
     });
 
     expect(db.runAsync).not.toHaveBeenCalled();
-    expect(syncEngine.enqueue).not.toHaveBeenCalled();
+    expect(syncEngine.enqueuePrepared).not.toHaveBeenCalled();
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 
@@ -464,7 +473,7 @@ describe('features/todos/todos.data', () => {
         completed: 0,
         deleted_at: null,
       }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 
@@ -474,15 +483,19 @@ describe('features/todos/todos.data', () => {
     });
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('SET completed = 1, updated_at = ?'),
+      expect.stringContaining('completed = 1, updated_at = ?'),
       [expect.any(String), 'todo_2'],
     );
-    expect(syncEngine.enqueue).toHaveBeenCalledWith({
-      entity: 'todos',
-      id: 'todo_2',
-      updatedAt: expect.any(String),
-      operation: 'update',
-    });
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'todos',
+        id: 'todo_2',
+        updatedAt: expect.any(String),
+        operation: 'update',
+        revision: 1,
+      },
+      { durablyPersisted: true },
+    );
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
 

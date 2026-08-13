@@ -111,9 +111,9 @@ class SqliteTestDatabase implements TestDatabase {
   /**
    * Better-sqlite3 does not support async transaction functions (it throws
    * "Transaction function cannot return a promise"), so transactions are
-   * driven with explicit BEGIN/COMMIT/ROLLBACK. The app never nests
-   * `withTransactionAsync` calls (verified: only `core/db/client.ts`
-   * migrations and `core/sync/restore.coordinator.ts` use it).
+   * driven with explicit BEGIN/COMMIT/ROLLBACK. The production transaction
+   * helper serializes callers per database connection, matching SQLite's
+   * single-writer behavior without allowing nested BEGIN statements.
    */
   async withTransactionAsync(task: () => Promise<void>): Promise<void> {
     this.raw.exec('BEGIN');

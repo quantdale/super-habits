@@ -145,8 +145,8 @@ describe('features/workout/workout.data', () => {
 
   it('addSet returns a real id for valid timing', async () => {
     const db = {
-      getFirstAsync: vi.fn().mockResolvedValueOnce({ routine_id: 'routine_1' }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
+      getFirstAsync: vi.fn().mockResolvedValue({ routine_id: 'routine_1' }),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
     getDatabase.mockResolvedValue(db);
 

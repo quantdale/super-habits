@@ -1,4 +1,4 @@
-import type { AppSection } from '@/core/providers/NavigationProvider';
+import type { AppSection } from '@/core/providers/navigationContext';
 import type {
   LinkedActionFeature,
   LinkedActionTargetEntityType,
