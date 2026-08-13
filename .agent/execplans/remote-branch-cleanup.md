@@ -50,8 +50,8 @@ plan committed on `main`.
 ## Current Checkpoint
 
 - Current milestone: Full branch audit, local recovery preservation,
-  documentation/main validation, pre-deletion main push, and deletion batch 1
-  are complete; 24 non-main remote heads remain.
+  documentation/main validation, pre-deletion main push, and deletion batches 1
+  and 2 are complete; 15 non-main remote heads remain.
 - Completed: fetched/pruned; confirmed clean starting worktree; confirmed
   local `main == origin/main`; enumerated 32 non-main remote heads; computed a
   merge-base, ancestor result, unique-commit count, and three-dot diff summary
@@ -71,9 +71,9 @@ plan committed on `main`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit this batch-1 checkpoint on `main`, push it, then
-  delete batch 2 (`fix/*`, the security-sensitive dark-mode snapshot, and the
-  two obsolete WIP refs) with tip-SHA checks and post-batch live inventory.
+- Exact next action: commit this batch-2 checkpoint on `main`, push it, then
+  delete batch 3: the eight locally archived reflog snapshots, with tip-SHA
+  checks and post-batch live inventory.
 - Remaining definition of done: all branches classified; any valuable work
   integrated and validated; local archive refs created when warranted; cleanup
   plan committed to `main`; `main == origin/main`; all non-main remote heads
@@ -96,6 +96,7 @@ plan committed on `main`.
 - [x] Validate the documentation-only main change.
 - [x] Synchronize `origin/main` before deletion.
 - [x] Delete and verify audited remote batch 1.
+- [x] Delete and verify audited remote batch 2.
 - [ ] Delete and verify the remaining audited remote batches.
 - [ ] Prune tracking refs, verify GitHub and local final state, and validate this
       completed plan.
@@ -267,6 +268,18 @@ the permitted classifications:
   `backup/predator/feat/todo-linked-action-first-path` (`65ec266`).
   `git fetch --prune origin` and `git ls-remote --heads origin` then showed
   `main` plus 24 remaining non-main heads; no `main` ref was targeted.
+- Batch 2 — 2026-08-13 — deleted and verified nine audited refs:
+  `backup/predator/fix/date-boundary-consistency`,
+  `backup/predator/fix/design-dna-post-merge-consolidation`,
+  `backup/predator/fix/linked-actions-contract-alignment-safe`,
+  `backup/predator/fix/linked-actions-rule-lifecycle`,
+  `backup/predator/fix/sync-fail-closed`,
+  `backup/predator/fix/web-delete-flows`,
+  `backup/predator/reflog/dark-mode-documentation`,
+  `backup/predator/reflog/wip-habits`, and
+  `backup/predator/reflog/wip-main-package-directory`.
+  `git fetch --prune origin` and `git ls-remote --heads origin` then showed
+  `main` plus 15 remaining non-main heads; no `main` ref was targeted.
 
 ## Security Review
 
@@ -302,10 +315,14 @@ the permitted classifications:
 - 2026-08-13 — `npm run qa:impact:validate` — PASS; 12 rules valid.
 - 2026-08-13 — `git diff --check` and plan validator — PASS.
 - 2026-08-13 — `git fetch origin`, `git push origin main`, `git fetch origin`,
-  and SHA comparison — PASS; pushed `main` as `f1c3452fc5621822c5c3fe02b9cea45392658295`
-  and local `main == origin/main` before any branch deletion.
+  and SHA comparison — PASS; pushed the validated audit checkpoint as
+  `057970d63549d7c37862db4c7d669bf7d45c2700` and local `main == origin/main`
+  before batch 2.
 - 2026-08-13 — deletion batch 1 — PASS; eight explicit audited refs deleted,
   fetch/prune completed, and live remote inventory showed 24 non-main heads
+  plus `main`.
+- 2026-08-13 — deletion batch 2 — PASS; nine explicit audited refs deleted,
+  fetch/prune completed, and live remote inventory showed 15 non-main heads
   plus `main`.
 
 ## Changed Files / Areas
