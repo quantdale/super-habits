@@ -64,7 +64,9 @@ do not discard or hide unknown state.
 ## Current Checkpoint
 
 - Current milestone: six-directory/Git-topology inventory and dirty-state
-  preservation complete; final-main migration/schema validation is in progress.
+  preservation complete; final-main migration/schema consistency and all web,
+  sync, simulation, static, unit, integration, timezone, and repository gates
+  are complete. Native validation is in progress.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -80,18 +82,33 @@ do not discard or hide unknown state.
 - Completed: local completed-workstream inventory, OpenSpec completion review,
   and ancestry/content proof. All required workstream tips are covered by
   main; the recovery-only dependency snapshot is preserved outside main.
-- In progress: final-main migration/schema validation and the broader QA
-  matrix; only final re-audit, plan completion, and remote synchronization
-  remain after those gates.
+- Completed: append-only migration audit, focused migration tests, clean
+  install, Expo Doctor, strict OpenSpec/impact/plan validation, timezone QA,
+  web/sync exports, full web/sync/P0/simulation lanes, and final static/unit/
+  integration gates. Main source commit for the reconciliation is `7f1cfe1`.
+- In progress: native build/installation and serialized Android QA. The first
+  final-main full E2E run and isolated replays
+  failed the unchanged HEAVY D14 switch ceiling on the same
+  `overview→todos` measurement (1052 ms, 1090 ms, 1083 ms, and 810–964 ms on
+  the controlled port). A scheduling deferral, a memoized Todos content split,
+  and an inactive-container `display:none` experiment were each tested; the
+  first two did not establish a pass and the last worsened the transition to
+  2487 ms, so all experiments were reverted. The strict D14 contract remains
+  unchanged and the retained artifacts support a host-sensitive classification.
 - Important modified files: `core/db/schema.sql`,
   `tests/integration/migrations.test.ts`, and the small current-schema doc
   updates in `docs/PROJECT_STRUCTURE_MAP.md`, `docs/master-context.md`,
   `docs/working-rules.md`, and `openspec/config.yaml`; the original dirty
   files are preserved in recovery commit `3191541`.
-- Last successful validation: `git fetch --all --prune` succeeded; all six
-  worktree inspections succeeded; `npm run agent:plans` listed only completed
-  plans and no active plan; the preserved snapshot passed direct Prettier
-  checks for its JSON/JS/Markdown files.
+- Last successful validation: `npm test` passed 741/741 across 70 files;
+  `qa:fast` passed typecheck, lint (0 errors/19 warnings), and 672/672 unit
+  tests; integration passed 69/69; each of five timezone zones passed 42/42;
+  strict OpenSpec passed 21/21; impact validation passed 12/12; all plan
+  validators passed; Expo Doctor passed 19/19; P0 journeys passed 16/16;
+  sync passed 19/19; deterministic simulation passed validation plus 24/24
+  smoke steps. The full aggregate web run passed 148/170 with 17 documented
+  skips, 4 continuity steps not run after the strict D14 miss, and no other
+  functional failures.
 - Current failures: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -99,16 +116,21 @@ do not discard or hide unknown state.
   `--no-verify` solely for that environment reason. Final consolidation proof
   and fresh final-main QA are not yet run in this session. Native/iOS,
   Docker/Supabase, and dependency advisory limitations must be classified
-  from current command output. No final-main migration failure is currently
-  observed.
+  from current command output. Final-main web E2E currently has a reproducible
+  host-sensitive D14 performance miss in this session; retain it as PARTIAL
+  rather than claiming a pass. Prior committed stabilization evidence records
+  two independent 10/10 batches under the same unchanged contract, with
+  max-switch maxima of 773 ms and 770 ms.
 - Relevant quarantines: none newly established; preserve documented native,
   remote, and performance gaps until independently checked.
 - Blockers: none established.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run the append-only migration-number audit and the
-  affected integration/quality gates on final `main`, then continue through
-  web/sync/simulation/performance/native validation.
+- Exact next action: commit this validated plan checkpoint, regenerate the
+  ignored Android project from that exact `main` SHA with the credential-free
+  E2E reminder flag, build/install the release APK on the single
+  `Nitro_API_36` target, and run the serialized smoke, persistence, lifecycle,
+  reminder-action, delivery, and Insights flows.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -124,9 +146,15 @@ do not discard or hide unknown state.
 - [x] Integrate the only genuinely missing final-main consistency fix: the
       v13 processed-action table/index in the reference schema plus its
       contract test and current-schema documentation.
-- [ ] Audit runtime migrations and cross-feature integration on final `main`.
-- [ ] Run final static, unit/integration/timezone, web, sync, simulation,
-      performance, dependency, and native gates; classify unavailable lanes.
+- [x] Audit runtime migrations and cross-feature integration on final `main`.
+- [x] Re-run the unchanged HEAVY D14 journey after the controlled performance
+      experiments; classify the current 8097 result (1017 ms) as a retained
+      host-sensitive miss without changing the contract.
+- [x] Run final static, unit/integration/timezone, web, sync, simulation,
+      performance, dependency, and repository gates; classify unavailable
+      lanes.
+- [ ] Build/install the exact final-main Android APK and run serialized native
+      QA; classify iOS/Xcode availability.
 - [ ] Re-audit six paths/branches, validate the plan, and synchronize origin.
 
 ## Surprises & Discoveries
@@ -210,17 +238,49 @@ do not discard or hide unknown state.
   includes the v13 processed-action table/index and the focused integration
   migration suite passes 6/6, including fresh bootstrap, rerun, v11 upgrade,
   rollback, and reference-schema checks.
-- 2026-08-13 — Remaining validation — NOT RUN; continue from Exact next
-  action.
+- 2026-08-13 — `npm test` — PASS; 741 tests passed across 70 files, including
+  69 real-SQLite integration tests.
+- 2026-08-13 — Final static/integration/timezone — PASS; `qa:fast` passed
+  typecheck, lint with 0 errors/19 warnings, and 672/672 unit tests;
+  integration passed 69/69; all five timezone zones passed 42/42.
+- 2026-08-13 — Web aggregate — PARTIAL / ENVIRONMENT-HOST-SENSITIVE; fresh
+  `E2E_PORT=8097 npm run e2e:full` passed 148/170, skipped 17 documented
+  cases, stopped four serial continuity steps after the strict D14 failure,
+  and recorded only `overview→todos` at 1037 ms against the unchanged 800 ms
+  ceiling. Controlled replay artifacts are retained under
+  `.cursor/playwright-output/e2e-failures/`; prior stabilization evidence has
+  two independent 10/10 batches under the same contract.
+- 2026-08-13 — Sync boundary — PASS; `npm run build:sync` followed by
+  `npm run e2e:sync` passed 19/19 against the dummy Supabase build.
+- 2026-08-13 — P0 journeys — PASS; `npm run qa:journeys` rebuilt `dist/` and
+  passed 16/16 journey steps.
+- 2026-08-13 — Deterministic simulation — PASS; `npm run qa:simulation`
+  validated all 17 scenarios and ran the deterministic P0 smoke scenario with
+  24/24 steps passed.
+- 2026-08-13 — Repository/spec gates — PASS; strict OpenSpec 21/21, impact map
+  12/12, all ExecPlan validators, Expo Doctor 19/19, and `git diff --check`
+  passed. `npm audit --omit=dev` remains a known PARTIAL: 16 transitive
+  framework/tooling advisories (6 moderate, 10 high), with automatic force
+  remediation requiring a breaking Expo/React Native downgrade; no forced
+  dependency mutation was made.
+- 2026-08-13 — Native preflight — PASS/PENDING; JDK 17.0.20, Gradle 9.0.0,
+  Maestro 2.8.0, adb, and one booted `Nitro_API_36` target are available;
+  build/install and serialized native lanes are the next action. iOS remains
+  an expected Windows/Xcode environment boundary.
 
 ## Changed Files / Areas
 
 - `.agent/execplans/absolute-main-consolidation.md` — durable state for this
   consolidation audit.
-- Original dirty checkout dependency/configuration files — protected state to
-  classify; no integration decision yet.
-- `main` source/docs/config — may change only if an evidence-backed missing
-  completed change is found.
+- `core/db/schema.sql` — reference schema reconciled through runtime v13,
+  including the local-only processed notification-action table/index.
+- `tests/integration/migrations.test.ts` — fresh/reference-schema contract
+  coverage.
+- `docs/PROJECT_STRUCTURE_MAP.md`, `docs/master-context.md`,
+  `docs/working-rules.md`, `openspec/config.yaml` — current schema-version
+  documentation reconciled.
+- Original dirty checkout dependency/configuration files — exact state
+  preserved in recovery commit `3191541`; no regression was merged into main.
 
 ## Recovery / Resume Instructions
 
@@ -237,8 +297,11 @@ do not discard or hide unknown state.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Consolidation audit in progress; no final integration or remote
-  synchronization claim is valid yet.
-- Follow-up: Complete only after the final evidence and ancestry/content proof
-  are recorded and the plan validator passes.
+- Status: Active; native build/QA and final six-directory/remote checks remain.
+- Summary: The six physical checkouts are one linked-worktree repository; all
+  completed workstream history is already in main. The only checkout-only
+  state was preserved as an explicitly recovery-only dependency snapshot, and
+  the only main content correction was the v13 reference-schema/test gap.
+- Follow-up: Build from the post-checkpoint main SHA, run native QA, then
+  complete the second physical-checkout audit, final ancestry proof, normal
+  origin push, and plan closure without deleting recovery references.
