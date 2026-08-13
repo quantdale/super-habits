@@ -1,7 +1,7 @@
 # ExecPlan: Absolute main consolidation audit
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -20,8 +20,9 @@ do not discard or hide unknown state.
 - Initial inspection shows all six are linked worktrees sharing
   `C:\Users\Michael Roy\Documents\super-habits\.git`; `main` was checked out
   in `super-habits-consolidation` at `d23c56e`, equal to `origin/main` after
-  fetch. The final normal push advanced both refs through the consolidation
-  commits to `220adf3` before this closing plan commit. The original
+  fetch. Normal pushes advanced the integrated history through `220adf3` and
+  `ba9de0f`; the final selector correction is local commit `f4604aa` pending
+  this closing plan and final synchronization. The original
   `super-habits` directory is on
   `codex/add-schedule-aware-habit-reminders` at `2d8223e` with dirty
   dependency/configuration files and an untracked completed dependency plan.
@@ -29,10 +30,9 @@ do not discard or hide unknown state.
   expansion, stabilization, and prior-main-consolidation histories. They are
   evidence to verify, not authority over Git or fresh QA.
 - Runtime DB authority is `core/db/client.ts` bootstrap plus append-only
-  migrations. The repository currently documents schema version 12, while
-  the completed reminder history must be checked directly for migration 13
-  and processed notification-action persistence. `schema.sql` is reference
-  only.
+  migrations. The final runtime and reference schema are aligned through
+  migration 13, including local-only processed notification-action
+  persistence. `schema.sql` remains reference only.
 - Main product invariants include SQLite singleton access, soft deletes,
   immediate sync enqueue for synced entities, `createId`, `toDateKey`, and
   append-only migrations. No force push or destructive cleanup is allowed.
@@ -65,12 +65,14 @@ do not discard or hide unknown state.
 
 ## Current Checkpoint
 
-- Current milestone: six-directory/Git-topology inventory and dirty-state
-  preservation complete; final-main migration/schema consistency, all web,
-  sync, simulation, static, unit, integration, timezone, repository, and native
-  gates are complete. A final exact-main native persistence run exposed a
-  selector race in the Calories flow; the semantic selector fix is now in
-  progress before reopening final native proof and closing the plan.
+- Current milestone: all six physical checkouts have been audited twice;
+  completed work is reconciled into `main`; migration/schema, static, unit,
+  integration, timezone, web, sync, simulation, performance, and Android
+  native gates are complete. The Calories native selector race was corrected
+  semantically; the rebuilt exact-main Android aggregate passes 10/10, the
+  lifecycle lane passes 5/5, delivery is verified, and Insights passes. The
+  closing documentation commit and its normal remote synchronization are the
+  final authoritative state transition for this plan.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -90,7 +92,8 @@ do not discard or hide unknown state.
   install, Expo Doctor, strict OpenSpec/impact/plan validation, timezone QA,
   web/sync exports, full web/sync/P0/simulation lanes, and final static/unit/
   integration gates. The schema reconciliation commit is `7f1cfe1`; the
-  current navigation/native-QA commit is `aa076b9`.
+  navigation/native-QA commit is `aa076b9`; the semantic Calories selector
+  correction is `f4604aa`.
 - Completed: native build/installation and serialized Android QA. The first
   final-main full E2E run and isolated replays
   failed the unchanged HEAVY D14 switch ceiling on the same
@@ -113,11 +116,11 @@ do not discard or hide unknown state.
   sync passed 19/19; deterministic simulation passed validation plus 24/24
   smoke steps. The final full web run passed 153/170 with 17 documented
   skips and a passing D14/J8 contract.
-- Completed: current working-tree Android release build installed on the
-  single `Nitro_API_36` target; smoke passed 1/1 and the corrected persistence
-  lane passed 10/10. Native persistence covers Calories immediate/relaunch
-  verification, habit schedule/reminder configuration, disablement, denied
-  permission, isolation, Settings, Todo, and Workout.
+- Completed: the selector-corrected exact-main Android release build is
+  installed on the single `Nitro_API_36` target; the corrected persistence
+  lane passed 10/10 in 8m50s. Native persistence covers Calories
+  immediate/relaunch verification, habit schedule/reminder configuration,
+  disablement, denied permission, isolation, Settings, Todo, and Workout.
 - Completed: current-source investigation found and fixed an Android API-36
   edge-to-edge layout issue in `app/index.tsx` (safe-area top inset), a lazy
   section mount race, and a swipe navigation shared-value race. The smoke flow
@@ -131,31 +134,28 @@ do not discard or hide unknown state.
   web E2E run (153 passed, 17 documented skips). The final D14/J8 journey
   measured `maxSwitch=625ms`, diary search `351ms`, and saved-meal picker
   search `77ms`.
-- Completed: a release APK was rebuilt and installed from the final-main
-  source commit `220adf30f66f5dff5d3adaf6f9cf1533f4f85623` with
-  `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; the explicit embed bundle
+- Completed: the selector-corrected release APK was rebuilt and installed
+  from local `main` commit `f4604aabbc090e46a997886f7785f29491da4fbd`
+  with `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; the explicit embed bundle
   contained all E2E-only reminder labels. APK SHA-256 is
-  `C228F151AB7F012C134B778E6969E25DAF013E2E0837E98B2B4EEC1BE7939776`,
+  `0F146CD82BCA1E5E9D63DF156CA0E624B978217BE3995EC407290B1EF57FBCC2`,
   package `com.dale16.superhabits`, version `1.0.0`, versionCode `1`.
-- Completed: that exact APK passed native smoke 1/1, lifecycle 5/5, the
-  notification-manager delivery probe (`VERIFIED`), and the Habit Progress
-  Insights flow. A deliberate final exact-APK confirmation then passed the
-  complete persistence aggregate 10/10 in 9m04s, including the previously
-  observed startup-sensitive `habit-persistence` flow.
+- Completed: that exact APK passed the full native persistence aggregate
+  10/10 in 8m50s, lifecycle 5/5 in 4m17s, the notification-manager delivery
+  probe (`VERIFIED`), and the Habit Progress Insights flow. The delivery
+  report observed the expected package/title/body after process termination.
 - Completed: dummy-backend sync build and boundary E2E passed 19/19, covering
   broken backend responses, outbox/reconnect, restore, tombstone emptiness,
   and local-only restore behavior.
-- In progress: correct the Calories native selector, rebuild from the new
-  final-main SHA, rerun the affected native persistence proof plus the
-  reminder/lifecycle/Insights lanes, then update ancestry/remote proof and
-  close this plan.
-- Current failures: exact-main native persistence aggregate was `9/10`; only
-  `calories-persistence` failed because the text selector chose the header
-  `Add entry` match at `(531,250)` instead of the submit button. Immediate
-  isolated replay on the same APK passed. Maestro also logged heartbeat-file
-  lock errors. This is classified `TEST_BUG`/`FLAKY_TEST`, not a product or
-  database failure. iOS is an `ENVIRONMENT` block on Windows, and
-  `npm audit --omit=dev` remains a known dependency-advisory partial.
+- In progress: none.
+- Current failures: no product, database, web, sync, simulation, or Android
+  native product failures remain. The prior `9/10` exact-main persistence run
+  was classified `TEST_BUG`/`FLAKY_TEST`: `calories-persistence` selected the
+  card header instead of the submit button when scroll position differed, and
+  the semantic `below: Meal` selector fixed it. Maestro heartbeat-file lock
+  messages remain a test-environment observation. iOS is an `ENVIRONMENT`
+  block on Windows, and `npm audit --omit=dev` remains a known dependency-
+  advisory partial.
 - Current limitations: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -166,7 +166,8 @@ do not discard or hide unknown state.
   miss was superseded by
   the final current-source run passing at 625 ms; retain the earlier artifacts
   as historical evidence, not as the final result. The native persistence
-  earlier startup-sensitive run was followed by a clean 10/10 confirmation.
+  selector failure was followed by a clean 10/10 confirmation on the
+  corrected exact-main APK.
 - The first current-build lifecycle run classified the three reminder action/
   delivery failures as build-configuration evidence: the installed APK was
   built without `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, so the test-only
@@ -176,12 +177,11 @@ do not discard or hide unknown state.
   rebuilt with that environment variable set for both prebuild and Gradle.
 - Relevant quarantines: none newly established; preserve documented native,
   remote, and performance gaps until independently checked.
-- Blockers: none established.
+- Blockers: none established for the requested Windows/Android scope.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run the corrected Calories flow and affected native
-  lanes on the rebuilt exact-main APK, then update this plan to COMPLETED only
-  after all final proofs pass and the new main is pushed normally.
+- Exact next action: none; preserve recovery refs/worktrees and do not perform
+  cleanup without a separate explicit request.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -207,7 +207,7 @@ do not discard or hide unknown state.
 - [x] Build/install the exact final-main Android APK and run serialized native
       QA with the E2E reminder flag verified in the embedded bundle; classify
       iOS/Xcode availability.
-- [ ] Re-audit six paths/branches, validate the plan, and synchronize origin
+- [x] Re-audit six paths/branches, validate the plan, and synchronize origin
       after the final native selector correction.
 
 ## Surprises & Discoveries
@@ -267,7 +267,8 @@ do not discard or hide unknown state.
   immediate diary assertion because the `Add entry` text selector selected the
   card header rather than the form button when the scroll offset differed.
   An isolated replay passed and the corrected selector now anchors the button
-  below the `Meal` label.
+  below the `Meal` label; the complete corrected aggregate passed 10/10 on
+  the rebuilt `f4604aa` APK.
 
 ## Decision Log
 
@@ -386,6 +387,24 @@ do not discard or hide unknown state.
 - 2026-08-13 — Calories selector correction — PASS; the flow now selects
   `Add entry` below the `Meal` label, and the corrected immediate/relaunch
   flow passed on the installed exact-`ba9de0f` APK on `Nitro_API_36`.
+- 2026-08-13 — Exact-`f4604aa` native persistence aggregate — PASS; the
+  selector-corrected full `qa:native:targeted` lane passed 10/10 in 8m50s on
+  `Nitro_API_36`, report
+  `simulation-output/native/native-android-persistence-2026-08-13T103114561Z.json`.
+- 2026-08-13 — Exact-`f4604aa` native smoke — PASS; the final Android smoke
+  lane passed 1/1 on `Nitro_API_36`, report
+  `simulation-output/native/native-android-smoke-2026-08-13T104545363Z.json`.
+- 2026-08-13 — Exact-`f4604aa` native lifecycle — PASS; all 5/5 lifecycle,
+  reminder-action, replay, notification-path, and Pomodoro-isolation steps
+  passed in 4m17s on `Nitro_API_36`, report
+  `simulation-output/native/native-android-lifecycle-2026-08-13T103554341Z.json`.
+- 2026-08-13 — Exact-`f4604aa` notification delivery — PASS/VERIFIED; the
+  delivery flow observed the expected Android notification manager record
+  after process termination, reports
+  `native-android-all-2026-08-13T103658351Z.json` and
+  `habit-reminder-delivery-2026-08-13T103715694Z.json`.
+- 2026-08-13 — Exact-`f4604aa` Habit Progress Insights — PASS; metrics,
+  history, close, and reopen assertions passed on `Nitro_API_36`.
 - 2026-08-13 — iOS native preflight — BLOCKED/ENVIRONMENT; Windows has no
   Xcode `xcrun/simctl`; the EAS native-e2e path remains the executable iOS
   route and was not claimed as a local pass.
@@ -393,6 +412,12 @@ do not discard or hide unknown state.
   directories are clean linked worktrees, no completed work is absent from
   main, the recovery branch is the only intentionally non-ancestor local
   branch, and all completed branches are ancestors of main.
+- 2026-08-13 — Closing physical/ref re-audit — PASS; every named directory
+  was inspected individually after the selector correction. The five
+  historical worktrees are clean with no untracked source; the authoritative
+  checkout contains only this intentional plan edit before its closing commit;
+  the recovery snapshot is the only non-ancestor local branch and has no
+  completed product work absent from main.
 - 2026-08-13 — Normal origin synchronization — PASS; after comparing both
   directions and finding no independent remote commits, `git push origin main`
   advanced `origin/main` from `d23c56e` to `220adf3` without force options.
@@ -474,10 +499,11 @@ main, and their old unique snapshots are superseded or recovery-only.
   and local `main` equals synchronized `origin/main` after a normal push.
 - Summary: The six physical checkouts are one linked-worktree repository; all
   completed workstream history is in main. The only checkout-only state was
-  preserved as an explicitly recovery-only dependency snapshot, and the only
-  main content correction was the v13 reference-schema/test gap. Final
-  Android validation used the exact final-main source identity and the
-  single `Nitro_API_36` target.
+  preserved as an explicitly recovery-only dependency snapshot, and the main
+  content corrections were the v13 reference-schema/test gap plus the
+  selector-safe native Calories test interaction. Final Android validation
+  used the exact final-main source identity and the single `Nitro_API_36`
+  target.
 - Follow-up: Preserve recovery refs/worktrees and the documented Windows iOS
   environment boundary; no cleanup or force operation is authorized by this
   consolidation task.
