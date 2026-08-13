@@ -608,11 +608,12 @@ async function outboxRecords(
   page: Page,
 ): Promise<{ entity: string; id: string; updatedAt: string; operation: string }[]> {
   await ensureDbContext(page);
-  const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'sync_outbox'");
-  const raw = rows[0]?.value;
-  if (typeof raw !== 'string' || raw.trim() === '') return [];
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed) ? parsed : [];
+  return (await queryRows(
+    page,
+    `SELECT entity, id, updated_at AS updatedAt, operation
+     FROM sync_outbox
+     ORDER BY revision ASC`,
+  )) as { entity: string; id: string; updatedAt: string; operation: string }[];
 }
 
 /**

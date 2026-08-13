@@ -260,6 +260,7 @@ export function sqlLiteral(v: unknown): string {
  */
 const KNOWN_TABLE_ORDER = [
   'app_meta',
+  'sync_outbox',
   'habits',
   'todos',
   'calorie_entries',

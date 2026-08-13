@@ -19,12 +19,12 @@ import { clickCaloriesAddEntry, fillCaloriesMacros } from '../helpers/forms';
  * Offline-first sync/outbox behaviour:
  *   online, create data → go offline → create/edit/delete across todos,
  *   habits and calories → outbox grows and dedupes per (entity, id) →
- *   full reload → app_meta.sync_outbox survived (hydrate restored it) →
+ *   full reload → durable sync_outbox survived (hydrate restored it) →
  *   reconnect → each record pushed exactly once.
  *
  * What runs against the standard `dist/` build (no EXPO_PUBLIC_SUPABASE_*):
- * the whole offline half. `syncEngine.enqueue()` persists the outbox to
- * `app_meta.sync_outbox` (SqliteSyncPersistence) on every enqueue, so the
+ * the whole offline half. `syncEngine.enqueue()` persists the outbox to the
+ * durable `sync_outbox` table (SqliteSyncPersistence) on every enqueue, so the
  * outbox grows and survives a reload even though the Supabase adapter is a
  * no-op here. Going offline (context.setOffline) does NOT trigger a flush
  * (NetInfo only flushes on reconnect) and a reload in headless Chromium does
@@ -246,7 +246,7 @@ defineJourney({
       },
     },
     {
-      name: 'offline: outbox grew to one record per (entity, id) and persisted to app_meta',
+      name: 'offline: outbox grew to one record per (entity, id) and persisted durably',
       run: async ({ page }) => {
         // Chromium's offline emulation blocks a new document navigation even
         // when the navigation's resources are fulfilled by Playwright routes.
@@ -288,7 +288,7 @@ defineJourney({
       },
     },
     {
-      name: 'full reload: app_meta.sync_outbox survived (hydrate restored it)',
+      name: 'full reload: durable sync_outbox survived (hydrate restored it)',
       run: async ({ page }) => {
         // Page is on the DB harness (no app mounted): going online here is safe
         // — the NetInfo reconnect flush lives in AppProviders on the app page
@@ -400,10 +400,11 @@ defineJourney({
         await expect(async () => {
           const rows = await queryRows(
             page,
-            "SELECT value FROM app_meta WHERE key = 'sync_outbox'",
+            `SELECT entity, id, updated_at AS updatedAt, operation
+             FROM sync_outbox
+             ORDER BY revision ASC`,
           );
-          const raw = rows[0]?.value;
-          return typeof raw !== 'string' || raw.trim() === '' || raw === '[]';
+          return rows.length === 0;
         }).toPass({ timeout: 15_000 });
 
         for (const exp of expected) {

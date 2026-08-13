@@ -37,7 +37,7 @@ export async function expectRows(
   }
 }
 
-/** Shape of a record in `app_meta.sync_outbox`. */
+/** Shape of a durable `sync_outbox` record. */
 export interface OutboxRecord {
   entity: string;
   id: string;
@@ -46,20 +46,20 @@ export interface OutboxRecord {
 }
 
 /**
- * Assert the sync outbox contents (app_meta.sync_outbox JSON). Accepts either
+ * Assert the sync outbox contents (SQLite `sync_outbox` rows). Accepts either
  * the exact expected array (subset-agnostic deep equality) or a matcher.
  */
 export async function expectOutbox(
   page: Page,
   expected: OutboxRecord[] | ((outbox: OutboxRecord[]) => void),
 ): Promise<void> {
-  const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'sync_outbox'");
-  let outbox: OutboxRecord[] = [];
-  const raw = rows[0]?.value;
-  if (typeof raw === 'string' && raw.trim() !== '') {
-    const parsed = JSON.parse(raw) as OutboxRecord[];
-    outbox = Array.isArray(parsed) ? parsed : [];
-  }
+  const rows = await queryRows(
+    page,
+    `SELECT entity, id, updated_at AS updatedAt, operation
+     FROM sync_outbox
+     ORDER BY revision ASC`,
+  );
+  const outbox = rows as unknown as OutboxRecord[];
   if (typeof expected === 'function') {
     expected(outbox);
   } else {

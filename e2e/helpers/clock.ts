@@ -72,7 +72,14 @@ export async function advanceToNextDay(
   const nowMs: number = await page.evaluate(() => Date.now());
   const target = buildLocalMidnight(days, new Date(nowMs));
   target.setMilliseconds(target.getMilliseconds() + afterMidnightMs);
+  // `setSystemTime()` intentionally does not execute pending timers. The
+  // foreground/visibility contract must still re-evaluate after a suspended
+  // or manually changed system clock, so exercise that safety path explicitly.
+  // The rollover provider's boundary timer is covered by its deterministic
+  // unit tests; running a full day of browser animation timers here would make
+  // the E2E harness needlessly expensive.
   await page.clock.setSystemTime(target);
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   return target;
 }
 

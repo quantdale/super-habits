@@ -31,7 +31,7 @@ import { setOffline, SYNCABLE_ENTITIES } from '../helpers/failure';
  * through injected responses.
  *
  * All data is created through the real UI write path so records enter the sync
- * outbox (`app_meta.sync_outbox`); raw SQL inserts bypass the engine and are
+ * outbox (`sync_outbox`); raw SQL inserts bypass the engine and are
  * deliberately not used to seed pending work.
  */
 

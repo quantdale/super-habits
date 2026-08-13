@@ -217,13 +217,12 @@ async function evaluateRowsOracle(
 
 async function evaluateOutboxOracle(page: Page): Promise<EvaluatedOracle> {
   try {
-    const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'sync_outbox'");
-    const raw = rows[0]?.value;
-    let outbox: unknown[] = [];
-    if (typeof raw === 'string' && raw.trim() !== '') {
-      const parsed = JSON.parse(raw) as unknown[];
-      outbox = Array.isArray(parsed) ? parsed : [];
-    }
+    const outbox = await queryRows(
+      page,
+      `SELECT entity, id, updated_at AS updatedAt, operation
+       FROM sync_outbox
+       ORDER BY revision ASC`,
+    );
     return { kind: 'outbox', result: 'passed', detail: `${outbox.length} record(s)` };
   } catch (err) {
     return { kind: 'outbox', result: 'failed', detail: (err as Error).message };

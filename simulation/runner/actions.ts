@@ -16,11 +16,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { openNewTodoModal, submitTodoModal, TAB_LABELS } from '../../e2e/helpers/navigation';
-import {
-  fillCaloriesMacros,
-  clickCaloriesAddEntry,
-  fillRoutineName,
-} from '../../e2e/helpers/forms';
+import { fillCaloriesMacros, fillRoutineName } from '../../e2e/helpers/forms';
 import { switchSection } from '../../e2e/helpers/oracles';
 import { advanceToNextDay } from '../../e2e/helpers/clock';
 import {
@@ -309,12 +305,25 @@ export async function actionLogCalories(
   // declare a multiple of 4 for exact row-oracles.
   const cal = Math.max(0, Math.round(Number(step.calories) || 0));
   const carbs = Math.round(cal / 4);
+  await page.locator('#cal-entry-food').waitFor({ state: 'visible', timeout: 15_000 });
   await fillCaloriesMacros(page, step.food, String(0), String(carbs), String(0), String(0));
+  await expect
+    .poll(() => page.locator('#cal-entry-food').inputValue(), { timeout: 5_000 })
+    .toBe(step.food);
   if (step.mealType) {
     const label = step.mealType[0].toUpperCase() + step.mealType.slice(1);
-    await page.getByText(label, { exact: true }).click();
+    await page
+      .locator('div[style*="pointer-events: auto"]')
+      .getByRole('button', { name: label, exact: true })
+      .click({ force: true });
   }
-  await clickCaloriesAddEntry(page);
+  await page
+    .locator('div[style*="pointer-events: auto"]')
+    .getByRole('button', { name: 'Add entry', exact: true })
+    .click({ force: true });
+  await expect(activeScopedText(page, `${step.food} - ${cal} kcal`)).toBeVisible({
+    timeout: 15_000,
+  });
   return `logCalories food=${JSON.stringify(step.food)} kcal=${cal}`;
 }
 
