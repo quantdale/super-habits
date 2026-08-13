@@ -51,7 +51,7 @@ plan committed on `main`.
 
 - Current milestone: Full branch audit, local recovery preservation,
   documentation/main validation, pre-deletion main push, and deletion batches 1
-  and 2 are complete; 15 non-main remote heads remain.
+  through 3 are complete; seven non-main remote heads remain.
 - Completed: fetched/pruned; confirmed clean starting worktree; confirmed
   local `main == origin/main`; enumerated 32 non-main remote heads; computed a
   merge-base, ancestor result, unique-commit count, and three-dot diff summary
@@ -71,9 +71,9 @@ plan committed on `main`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: delete batch 3, the eight locally archived reflog
-  snapshots, with tip-SHA checks and post-batch live inventory; then record and
-  push the checkpoint before the final seven-ref deletion batch.
+- Exact next action: commit this batch-3 checkpoint on `main`, push it, verify
+  local `main == origin/main`, then delete the final seven audited refs with
+  exact tip-SHA checks and a post-batch live inventory.
 - Remaining definition of done: all branches classified; any valuable work
   integrated and validated; local archive refs created when warranted; cleanup
   plan committed to `main`; `main == origin/main`; all non-main remote heads
@@ -97,7 +97,8 @@ plan committed on `main`.
 - [x] Synchronize `origin/main` before deletion.
 - [x] Delete and verify audited remote batch 1.
 - [x] Delete and verify audited remote batch 2.
-- [ ] Delete and verify the remaining audited remote batches.
+- [x] Delete and verify audited remote batch 3.
+- [ ] Delete and verify the final audited remote batch.
 - [ ] Prune tracking refs, verify GitHub and local final state, and validate this
       completed plan.
 
@@ -280,6 +281,22 @@ the permitted classifications:
   `backup/predator/reflog/wip-main-package-directory`.
   `git fetch --prune origin` and `git ls-remote --heads origin` then showed
   `main` plus 15 remaining non-main heads; no `main` ref was targeted.
+- Batch 3 — 2026-08-13 — deleted and verified eight locally archived
+  recovery refs:
+  `backup/predator/reflog/codex-worktree-stash` (`b8d251c`),
+  `backup/predator/reflog/e2e-selector-fix` (`e825fad`),
+  `backup/predator/reflog/linked-actions-calorie-duplicate` (`7036b62`),
+  `backup/predator/reflog/linked-actions-habit-merge` (`553e2c7`),
+  `backup/predator/reflog/linked-actions-merge` (`2c5c30d`),
+  `backup/predator/reflog/linked-actions-policy` (`9d71458`),
+  `backup/predator/reflog/linked-actions-tests` (`d34f38b`), and
+  `backup/predator/reflog/linked-actions-todo` (`6613bb2`). Each live tip was
+  checked against the recorded SHA before deletion. The first ref was deleted
+  with `git push --no-thin origin --delete`; GitHub returned HTTP 500 for the
+  remaining receive-pack deletions, so the same authenticated GitHub ref API
+  operation was used as a narrowly scoped fallback. `git fetch --prune origin`
+  and `git ls-remote --heads origin` then showed `main` plus seven remaining
+  non-main heads; no `main` ref was targeted.
 
 ## Security Review
 
@@ -324,6 +341,10 @@ the permitted classifications:
 - 2026-08-13 — deletion batch 2 — PASS; nine explicit audited refs deleted,
   fetch/prune completed, and live remote inventory showed 15 non-main heads
   plus `main`.
+- 2026-08-13 — deletion batch 3 — PASS; eight explicit audited refs deleted
+  after live tip checks, fetch/prune completed, and live remote inventory
+  showed seven non-main heads plus `main`. GitHub API fallback was used only
+  after receive-pack deletion returned HTTP 500; `main` was not targeted.
 
 ## Changed Files / Areas
 
