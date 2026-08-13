@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
-import { expectRows, switchSection } from '../helpers/oracles';
+import { ACTIVE_SECTION_SELECTOR, expectRows, switchSection } from '../helpers/oracles';
 import { resetAll } from '../helpers/reset';
 import { returnToApp } from '../helpers/dbHarness';
 import { openNewTodoModal, submitTodoModal } from '../helpers/navigation';
@@ -25,10 +25,35 @@ function executionsSql(): string {
 }
 
 async function toggleTodo(page: Page, title: string): Promise<void> {
-  const row = page
-    .getByText(title, { exact: true })
-    .locator('xpath=ancestor::*[.//*[@role="checkbox"]][1]');
-  await row.getByRole('checkbox').click({ force: true });
+  const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const checkbox = page
+    .locator(ACTIVE_SECTION_SELECTOR)
+    .getByRole('checkbox', { name: new RegExp(`^Mark (?:in)?complete: ${escapedTitle}$`) });
+  const before = await checkbox.getAttribute('aria-checked');
+  await checkbox.click({ force: true });
+  const expected = before === 'true' ? 'false' : 'true';
+  await expect
+    .poll(
+      async () => {
+        const current = await page
+          .locator(ACTIVE_SECTION_SELECTOR)
+          .locator('[role="checkbox"]')
+          .evaluateAll(
+            (elements, target) =>
+              elements
+                .find((element) =>
+                  (element.getAttribute('aria-label') ?? '').endsWith(`: ${target}`),
+                )
+                ?.getAttribute('aria-checked') ?? null,
+            title,
+          );
+        // Completing a pending todo moves it into the collapsed completed
+        // section, so its checkbox can disappear when the refresh commits.
+        return current === expected || (expected === 'true' && current === null);
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
 }
 
 async function ensureCompletedShown(page: Page): Promise<void> {

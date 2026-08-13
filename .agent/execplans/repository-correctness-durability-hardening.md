@@ -17,8 +17,8 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - Repository: `C:\Users\Michael Roy\Documents\super-habits`.
 - Authoritative branch/worktree at startup: local `main`, one worktree,
   `HEAD=origin/main=45fecf619671ee38c7ecd62d1ac5582b830460fa`; after the
-  campaign wave, the validated pushed tip is
-  `4daf1c4d6d022f5fe73075513e87f98794d1edc8`.
+  campaign wave and CI-driven follow-ups, the latest validated pushed tip is
+  `cbf08b513ab64f781ffc1ae29c46dece14eef8e8`.
 - Local SQLite is the source of truth. Runtime schema authority is bootstrap
   DDL plus append-only migrations in `core/db/client.ts`; current version is
   14 after the durable outbox migration.
@@ -65,14 +65,15 @@ regressions for concurrency/fault/restart cases, and a normal push to
 ## Current Checkpoint
 
 - Current milestone: P0 through P3 repository-side hardening and the P4
-  settings/lint/rollover work are implemented. The first pushed CI run exposed
-  unsafe Playwright project-parallelism over one OPFS origin; the serial worker
-  fix removed the linked-action and simulation failures in the second run.
-  That second run then isolated one real test synchronization defect: the
-  habit schedule assertion could match the edit modal instead of the committed
-  habit card. The assertion is now scoped to the active card and the focused
-  case passes five repeated runs. Remaining work is the final commit/push and
-  post-fix GitHub CI inspection, followed by completion validation.
+  settings/lint/rollover work are implemented. CI-driven follow-ups have now
+  corrected shared-OPFS project parallelism, the habit schedule assertion, and
+  the remaining navigation/action synchronization defects. The active-section
+  selector now matches the shell's top-level container, section switching waits
+  for the requested heading, and linked-action journey toggles wait for the
+  live checkbox state or committed removal from the collapsed completed list.
+  Focused linked-action journeys and simulation lane validation pass. Remaining
+  work is the final commit/push, post-fix GitHub CI inspection, and completion
+  validation.
 - Completed: exact Git topology capture; current dependency engine inspection;
   mandatory architecture/workflow/QA/OpenSpec context reads; applicable
   database, feature, and Expo skills read; `npm ci` from the committed lockfile
@@ -103,8 +104,9 @@ regressions for concurrency/fault/restart cases, and a normal push to
   stale linked-effect parameter list, a missing test mock export, and the
   now-intended workout child-tombstone expectation. The corrected full suite
   passes 780 tests across 78 files.
-- In progress: record the second CI failure and selector correction, commit the
-  regression fix, push, and inspect the final post-fix GitHub CI.
+- In progress: record the third CI failure and deterministic selector/action
+  correction, commit the regression fix, push, and inspect the final post-fix
+  GitHub CI.
 - Important modified files: package/CI runtime contract; `core/db/client.ts`,
   `core/db/transactions.ts`, `core/sync/sync.engine.ts`,
   `core/sync/syncPersistence.ts`, `core/sync/syncedMutation.ts`, linked-action
@@ -125,7 +127,15 @@ regressions for concurrency/fault/restart cases, and a normal push to
   assertion: the pre-reload check matched a modal label, not the rendered card,
   so it could reload before the save/refresh boundary was observable. The test
   now exits edit mode and scopes both checks to the habit card; the focused case
-  passes five repetitions and the full habits spec passes 11/11. `npm audit`
+  passes five repetitions and the full habits spec passes 11/11. The third run
+  `31747362847` then exposed two deterministic harness synchronization defects:
+  the habit-linked journey clicked a task twice before the first refresh had
+  committed, and simulation `4.4` could query a habit ring before section
+  navigation settled. The fixes use the exact active shell container, wait for
+  the requested section heading, target the checkbox's semantic label, and poll
+  the live DOM after each toggle. The focused habit-linked journey, generic
+  chain-reaction journey, and full `4.4` scenario/seeded/repro lane now pass.
+  `npm audit`
   and `npm audit --omit=dev` report 16 Expo/Metro transitive
   advisories whose only available fix is an incompatible Expo 53/RN downgrade.
   Live Supabase verification is credential-dependent. Native execution is an
@@ -135,10 +145,10 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run the affected web/repository gates for the selector
-  correction, update OpenSpec task/checkpoint evidence, fetch/reconcile
-  `origin/main`, commit and push the final regression fix, then inspect the new
-  GitHub Actions run.
+- Exact next action: run repeated focused simulation/E2E checks and the affected
+  repository gates for the selector/action correction, update OpenSpec
+  task/checkpoint evidence, fetch/reconcile `origin/main`, commit and push the
+  final regression fix, then inspect the new GitHub Actions run.
 - Remaining definition of done: all A–N findings resolved/disproven or
   explicitly classified external after repository-side work; regression and
   fault-injection coverage added; final QA/plan/OpenSpec validation complete;
@@ -248,6 +258,15 @@ regressions for concurrency/fault/restart cases, and a normal push to
   Scoping the assertion to the active habit card and leaving edit mode makes the
   test wait on the actual refreshed row; five repeated focused runs and the
   complete habits spec pass locally.
+- 2026-08-14 — GitHub run `31747362847` confirmed the habit-card correction and
+  exposed the last two deterministic interaction races: a journey toggle could
+  issue a second click before the first todo refresh had committed, and the
+  simulation ring action could run against a still-mounted inactive section.
+  The shell's inline style has a top-level active-container signature; using it
+  rather than any nested pointer-events View, waiting for the requested section
+  heading, and polling the live checkbox/ring state removes both ambiguities.
+  The focused linked-action journeys pass, and the complete `4.4` scenario,
+  seeded, and repro lane passes locally.
 
 ## Decision Log
 
@@ -398,6 +417,18 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - 2026-08-14 — focused habit persistence regression — PASS — the schedule
   reload case passed 5/5 repetitions; the complete `e2e/habits.spec.ts` passed
   11/11 tests using the static web build.
+- 2026-08-14 — GitHub Actions inspection for run `31747362847` — QUALITY PASS /
+  E2E FAIL — 151 tests passed and 17 documented skips; the remaining failures
+  were the habit-linked replay step and simulation self-test `4.4`. The
+  downloaded simulation report showed the first `tickHabit` action ran before
+  the active Habits section/ring was settled; the journey screenshot showed the
+  todo mutation had committed while the dynamic checkbox locator still read a
+  stale false node. These were classified as TEST_BUG synchronization defects,
+  not product data failures.
+- 2026-08-14 — focused post-CI correction — PASS — the habit-increment linked
+  action journey passed 3/3 steps, the generic chain-reaction journey passed
+  4/4 steps, and simulation self-test `4.4` passed all scenario/seeded/repro
+  reports after active-section and live-state synchronization fixes.
 
 ## Changed Files / Areas
 
@@ -416,12 +447,14 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - Supabase contract/security — `supabase/migrations/`, `supabase/README.md`,
   `supabase/config.toml`, both AI functions, shared security helper, static
   validator, AI security tests, and disposable schema/drift documentation.
-- E2E/simulation durability — `e2e/helpers/clock.ts`, `e2e/helpers/oracles.ts`,
-  the commute/bad-backend/three-month journey specs, and
-  `simulation/runner/actions.ts` now exercise the SQLite outbox and clock
-  rollover contract through scoped, state-verified controls. The habit reload
-  regression in `e2e/habits.spec.ts` now scopes schedule assertions to the
-  committed card instead of an editor label.
+- E2E/simulation durability — `e2e/helpers/clock.ts`,
+  `e2e/helpers/oracles.ts`, the commute/bad-backend/three-month and
+  chain-reaction journey specs, and `simulation/runner/actions.ts` now exercise
+  the SQLite outbox and clock rollover contract through scoped, state-verified
+  controls. The habit reload regression in `e2e/habits.spec.ts` scopes schedule
+  assertions to the committed card instead of an editor label; the latest
+  navigation/action correction shares the exact active-container selector and
+  waits for committed live control state.
 - Native workflow and runtime/UI hardening — `.eas/workflows/native-e2e.yml`,
   provider context modules, settings normalizers, and the boundary-driven day
   rollover scheduler.

@@ -17,7 +17,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { openNewTodoModal, submitTodoModal, TAB_LABELS } from '../../e2e/helpers/navigation';
 import { fillCaloriesMacros, fillRoutineName } from '../../e2e/helpers/forms';
-import { switchSection } from '../../e2e/helpers/oracles';
+import { ACTIVE_SECTION_SELECTOR, switchSection } from '../../e2e/helpers/oracles';
 import { advanceToNextDay } from '../../e2e/helpers/clock';
 import {
   setOffline,
@@ -58,10 +58,7 @@ async function returnToAppSafe(page: Page): Promise<void> {
  * by the active container's inline style instead.
  */
 export function activeScopedText(page: Page, text: string): ReturnType<Page['getByText']> {
-  return page
-    .locator('div[style*="pointer-events: auto"]')
-    .getByText(text, { exact: true })
-    .first();
+  return page.locator(ACTIVE_SECTION_SELECTOR).getByText(text, { exact: true }).first();
 }
 
 /* ------------------------------------------------------------------ */
@@ -280,15 +277,18 @@ export async function actionTickHabit(
 ): Promise<string> {
   await ensureApp(page);
   await switchSection(page, 'habits');
-  const ring = page.getByRole('button', {
-    name: new RegExp(`^${escRegExp(step.name)}: \\d+ of \\d+ today`),
-  });
-  await ring.click({ force: true });
+  const ring = page
+    .locator(ACTIVE_SECTION_SELECTOR)
+    .getByRole('button', {
+      name: new RegExp(`^${escRegExp(step.name)}: \\d+ of \\d+ today`),
+    })
+    .first();
+  await expect(ring).toBeVisible({ timeout: 15_000 });
   const times = step.times ?? 1;
-  if (times > 1) {
-    for (let i = 1; i < times; i++) {
-      await ring.click({ force: true });
-    }
+  for (let i = 0; i < times; i++) {
+    const before = await ring.getAttribute('aria-label');
+    await ring.click({ force: true });
+    await expect.poll(() => ring.getAttribute('aria-label'), { timeout: 15_000 }).not.toBe(before);
   }
   return `tickHabit name=${JSON.stringify(step.name)} x${times}`;
 }

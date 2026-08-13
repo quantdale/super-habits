@@ -7,6 +7,21 @@ import {
 } from './dbHarness';
 import { TAB_LABELS } from './navigation';
 
+const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
+  overview: 'Overview',
+  todos: 'Todos',
+  habits: 'Habits',
+  pomodoro: 'Pomodoro',
+  workout: 'Workout',
+  calories: 'Calories',
+};
+
+/** The single-page shell keeps every section mounted; this matches the
+ * section container itself rather than nested Views that inherit pointer
+ * interaction styles. */
+export const ACTIVE_SECTION_SELECTOR =
+  'div[style*="position: absolute"][style*="pointer-events: auto"][style*="z-index: 1"]';
+
 /**
  * Oracles: assertions that go beyond what the UI shows.
  *
@@ -122,5 +137,17 @@ export async function expectAcrossSurfaces(
  * reload would destroy in-memory state (e.g. a running Pomodoro).
  */
 export async function switchSection(page: Page, tab: keyof typeof TAB_LABELS): Promise<void> {
-  await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+  const tabButton = page.getByRole('button', { name: TAB_LABELS[tab], exact: true });
+  await tabButton.click();
+  // The six screens remain mounted behind the active one. Wait for the
+  // navigation state itself before a caller queries a screen-specific control;
+  // otherwise a forced click can land on a still-mounted inactive screen.
+  const activeSection = page
+    .locator(ACTIVE_SECTION_SELECTOR)
+    .filter({ hasText: SECTION_HEADINGS[tab] })
+    .first();
+  await expect(activeSection).toBeVisible();
+  await expect(
+    activeSection.getByText(SECTION_HEADINGS[tab], { exact: true }).first(),
+  ).toBeVisible();
 }
