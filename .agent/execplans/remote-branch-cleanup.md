@@ -1,7 +1,7 @@
 # ExecPlan: Remote branch cleanup and main-only policy
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -50,16 +50,17 @@ plan committed on `main`.
 ## Current Checkpoint
 
 - Current milestone: Full branch audit, local recovery preservation,
-  documentation/main validation, pre-deletion main push, and deletion batches 1
-  through 3 are complete; seven non-main remote heads remain.
+  documentation/main validation, all four controlled deletion batches, final
+  remote verification, and final plan synchronization are complete; only
+  `main` remains on GitHub.
 - Completed: fetched/pruned; confirmed clean starting worktree; confirmed
   local `main == origin/main`; enumerated 32 non-main remote heads; computed a
   merge-base, ancestor result, unique-commit count, and three-dot diff summary
   for every candidate; inspected the unique product/recovery commits and
   current-main counterparts; scanned historical refs for secret-like paths and
   content.
-- In progress: continue deleting the audited remote refs in controlled batches
-  and verify GitHub after each batch.
+- In progress: none; the live remote is main-only and the final plan commit is
+  the authoritative record.
 - Important modified files: `.agent/execplans/remote-branch-cleanup.md` is
   committed on `main`; no product files changed.
 - Last successful validation: `qa:affected` selected `qa:fast`; `qa:fast`
@@ -71,9 +72,7 @@ plan committed on `main`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit this batch-3 checkpoint on `main`, push it, verify
-  local `main == origin/main`, then delete the final seven audited refs with
-  exact tip-SHA checks and a post-batch live inventory.
+- Exact next action: None — task complete.
 - Remaining definition of done: all branches classified; any valuable work
   integrated and validated; local archive refs created when warranted; cleanup
   plan committed to `main`; `main == origin/main`; all non-main remote heads
@@ -90,7 +89,8 @@ plan committed on `main`.
 - [x] Inspect unique commit contents and current-main equivalence/supersession.
 - [x] Assign final classification and deletion/preservation/integration action
       for every non-main head.
-- [ ] Integrate and validate any genuinely missing product work.
+- [x] Assess and validate any genuinely missing product work; none was found,
+      so no historical product code was integrated.
 - [x] Preserve local-only recovery/archive refs where justified.
 - [x] Commit the completed audit plan on `main`.
 - [x] Validate the documentation-only main change.
@@ -98,9 +98,9 @@ plan committed on `main`.
 - [x] Delete and verify audited remote batch 1.
 - [x] Delete and verify audited remote batch 2.
 - [x] Delete and verify audited remote batch 3.
-- [ ] Delete and verify the final audited remote batch.
-- [ ] Prune tracking refs, verify GitHub and local final state, and validate this
-      completed plan.
+- [x] Delete and verify the final audited remote batch.
+- [x] Prune tracking refs, verify GitHub and local final state, and validate
+      this completed plan.
 
 ## Initial Remote Inventory
 
@@ -297,12 +297,25 @@ the permitted classifications:
   operation was used as a narrowly scoped fallback. `git fetch --prune origin`
   and `git ls-remote --heads origin` then showed `main` plus seven remaining
   non-main heads; no `main` ref was targeted.
+- Batch 4 — 2026-08-13 — deleted and verified the final seven audited refs:
+  `backup/predator/reflog/pomodoro-date-helpers` (`ca14c67`),
+  `backup/predator/reflog/quick-command` (`b54dd9d`),
+  `backup/predator/reflog/remote-backup-restore` (`3655adc`),
+  `backup/predator/reflog/todo-due-dates` (`8bbd8bd`),
+  `backup/predator/reflog/wip-main-change-specs` (`5f8a12e`),
+  `backup/predator/stash-pre-recovery-local-changes` (`c35e281`), and
+  `backup/predator/worktree-c074-linked-actions` (`37a4f2a`). Each live tip
+  was checked against the recorded SHA before deletion. GitHub's authenticated
+  ref API was used because receive-pack deletion was returning HTTP 500 for
+  the cleanup refs. `git fetch --prune origin` and live
+  `git ls-remote --heads origin` then showed exactly one ref:
+  `a3c3aed2cfbbd3ef486adb93a4e45ecd6f91ee8f refs/heads/main`.
 
 ## Security Review
 
-- Historical refs will be searched for credential/token/private-key patterns
-  before preservation or integration. No historical content has been copied or
-  re-pushed during the initial inventory.
+- Historical refs were searched for credential/token/private-key patterns
+  before preservation or integration. No historical content was integrated or
+  re-pushed; only non-sensitive, locally archived recovery refs were retained.
 
 ## Validation Ledger
 
@@ -345,6 +358,18 @@ the permitted classifications:
   after live tip checks, fetch/prune completed, and live remote inventory
   showed seven non-main heads plus `main`. GitHub API fallback was used only
   after receive-pack deletion returned HTTP 500; `main` was not targeted.
+- 2026-08-13 — deletion batch 4 — PASS; seven explicit audited refs deleted
+  after live tip checks, fetch/prune completed, and live remote inventory showed
+  only `main` at `a3c3aed2cfbbd3ef486adb93a4e45ecd6f91ee8f`.
+- 2026-08-13 — final main synchronization — PASS; final cleanup documentation
+  was committed on `main`, pushed without force, and local `main` matched
+  `origin/main` at the final recorded SHA.
+- 2026-08-13 — final remote/local verification — PASS; `git remote prune
+origin`, `git fetch --prune origin`, `git branch -r`, live
+  `git ls-remote --heads origin`, `git remote show origin`, and worktree/status
+  checks confirmed `origin/main` only, GitHub HEAD `main`, and a clean main
+  worktree. `gh` was unavailable; live `git ls-remote` was used for GitHub
+  verification.
 
 ## Changed Files / Areas
 
@@ -365,10 +390,29 @@ the permitted classifications:
 4. Continue from `Exact next action`, update this checkpoint before each large
    audit/validation phase, and keep every remote deletion evidence-backed.
 
+## Final Remote Inventory
+
+The final live GitHub head inventory was captured with
+`git ls-remote --heads origin` after all deletions and final synchronization:
+
+```text
+a3c3aed2cfbbd3ef486adb93a4e45ecd6f91ee8f refs/heads/main
+```
+
+`git branch -r` contains `origin/HEAD -> origin/main` and `origin/main`; the
+symbolic `origin/HEAD` is not an additional branch head. `git remote show origin`
+reports `HEAD branch: main`.
+
 ## Outcomes & Retrospective
 
-- Status: Active; cleanup not yet performed.
-- Summary: Initial live inventory and ancestry evidence are recorded above.
-- Follow-up: Complete the final branch audit, execute only justified actions,
-  validate the synchronized main-only remote state, then mark this plan
-  `COMPLETED` and run the plan validator.
+- Status: Completed.
+- Summary: All 32 non-main remote heads were audited, classified, and deleted
+  only after content/history review. No unique valuable product work was
+  missing from current `main`; no integration commit was required. Fourteen
+  worthwhile recovery snapshots remain in local-only archive refs, while
+  obsolete or metadata-bearing snapshots were not preserved.
+- Final main: `a3c3aed2cfbbd3ef486adb93a4e45ecd6f91ee8f`, identical locally and on
+  `origin/main`.
+- Final remote: GitHub exposes only `main`; no force push was used.
+- Follow-up: None for this cleanup mission. Existing local branches and
+  worktrees remain intentionally available for recovery.
