@@ -35,24 +35,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
-      # Cache node_modules keyed on the lockfile hash plus the patch-package
-      # patch files: postinstall re-applies patches, so a patches/ change must
-      # bust the cache even when the lockfile is unchanged.
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json', 'patches/*') }}
-          restore-keys: |
-            node-modules-${{ runner.os }}-
-
-      # Only run npm ci (+ patch-package postinstall) on cache miss.
+      # setup-node caches npm's download cache. npm ci always reconstructs
+      # node_modules for this exact Node/lockfile/postinstall environment.
       - name: Install dependencies
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Typecheck
@@ -107,12 +95,12 @@ jobs:
         env:
           TZ: Asia/Manila
 
-      # Advisory for now: 1 critical + 2 high advisories live in the production
-      # dependency chain (expo -> @expo/cli: shell-quote, tmp, ws) and fixing
-      # them requires a coordinated expo-* bump (`npx expo install --fix`) —
-      # `npm audit fix` alone produces a lockfile without expo-modules-core and
-      # breaks typecheck (confirmed while attempting this — see DEP-001 notes).
-      # Flip continue-on-error to false once that bump lands.
+      # Advisory for now: the 2026-08-14 audit reports 16 framework-owned
+      # advisories in the Expo/Metro toolchain (10 high, 6 moderate), chiefly
+      # Metro's image-size parser and Expo config's uuid dependency. The
+      # available automated fix requires an incompatible Expo/React Native
+      # downgrade, so this remains report-only until the Expo 55 line provides
+      # a compatible coordinated fix.
       - name: Audit runtime dependencies (advisory)
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
@@ -135,20 +123,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json', 'patches/*') }}
-          restore-keys: |
-            node-modules-${{ runner.os }}-
-
       - name: Install dependencies
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Get Playwright version
@@ -283,20 +261,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: node-modules-cache
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json', 'patches/*') }}
-          restore-keys: |
-            node-modules-${{ runner.os }}-
-
       - name: Install dependencies
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Get Playwright version

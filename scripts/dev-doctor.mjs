@@ -76,10 +76,17 @@ console.log('SuperHabits development doctor (read-only)');
 console.log(`Platform: ${process.platform} ${process.arch}`);
 
 const nodeVersion = process.versions.node.split('.').map(Number);
-if (nodeVersion[0] >= 20) {
-  report('PASS', 'Node.js', `v${process.versions.node} (20+ supported)`);
+const supportedNode =
+  nodeVersion[0] === 22 && (nodeVersion[1] > 22 || (nodeVersion[1] === 22 && nodeVersion[2] >= 1));
+if (supportedNode) {
+  report('PASS', 'Node.js', `v${process.versions.node} (22.22.1–22.x supported)`);
 } else {
-  report('MISSING', 'Node.js', `v${process.versions.node}; Node.js 20+ is required`, true);
+  report(
+    'MISSING',
+    'Node.js',
+    `v${process.versions.node}; Node.js 22.22.1–22.x is required (see .nvmrc)`,
+    true,
+  );
 }
 checkCommand('npm', 'npm', ['--version'], { required: true });
 checkCommand('Git', 'git', ['--version'], { required: true });

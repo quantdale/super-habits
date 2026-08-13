@@ -65,7 +65,8 @@ Current adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pul
 
 ### Prerequisites
 
-- Node.js 20+ recommended
+- Node.js 22.22.1–22.x required (the checked-in `.nvmrc` selects the CI/dev
+  baseline)
 - npm
 
 ### Install

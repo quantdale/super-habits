@@ -9,8 +9,8 @@ machine caches, emulator images, credentials, or Codex conversation state.
 ### Required for web development and repository QA
 
 - Git.
-- Node.js 20 or newer. Node.js 22 LTS is the recommended baseline and matches
-  the checked-in devcontainer image (`javascript-node:1-22-bookworm`).
+- Node.js 22.22.1 through 22.x. The checked-in `.nvmrc` selects the exact
+  CI/dev baseline and matches the `javascript-node:1-22-bookworm` image.
 - npm compatible with the selected Node.js release.
 - A Chromium installation managed by Playwright.
 
