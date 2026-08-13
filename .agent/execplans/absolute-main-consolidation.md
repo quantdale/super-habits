@@ -20,9 +20,9 @@ do not discard or hide unknown state.
 - Initial inspection shows all six are linked worktrees sharing
   `C:\Users\Michael Roy\Documents\super-habits\.git`; `main` was checked out
   in `super-habits-consolidation` at `d23c56e`, equal to `origin/main` after
-  fetch. Normal pushes advanced the integrated history through `220adf3` and
-  `ba9de0f`; the final selector correction is local commit `f4604aa` pending
-  this closing plan and final synchronization. The original
+  fetch. Normal pushes advanced the integrated history through `220adf3`,
+  `ba9de0f`, `f4604aa`, and the documentation closure `1746d2f`; this final
+  triage record is documentation-only. The original
   `super-habits` directory is on
   `codex/add-schedule-aware-habit-reminders` at `2d8223e` with dirty
   dependency/configuration files and an untracked completed dependency plan.
@@ -69,10 +69,10 @@ do not discard or hide unknown state.
   completed work is reconciled into `main`; migration/schema, static, unit,
   integration, timezone, web, sync, simulation, performance, and Android
   native gates are complete. The Calories native selector race was corrected
-  semantically; the rebuilt exact-main Android aggregate passes 10/10, the
-  lifecycle lane passes 5/5, delivery is verified, and Insights passes. The
-  closing documentation commit and its normal remote synchronization are the
-  final authoritative state transition for this plan.
+  semantically. The exact-final aggregate briefly hit an emulator ANR, then
+  passed 10/10 after reboot; lifecycle is 5/5, delivery is verified, and
+  Insights passes. This final documentation-only triage record is the
+  authoritative closing state for the plan.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -118,7 +118,8 @@ do not discard or hide unknown state.
   skips and a passing D14/J8 contract.
 - Completed: the selector-corrected exact-main Android release build is
   installed on the single `Nitro_API_36` target; the corrected persistence
-  lane passed 10/10 in 8m50s. Native persistence covers Calories
+  lane passed 10/10 in 8m50s, and the final clean-target rerun passed 10/10
+  in 11m21s after reboot. Native persistence covers Calories
   immediate/relaunch verification, habit schedule/reminder configuration,
   disablement, denied permission, isolation, Settings, Todo, and Workout.
 - Completed: current-source investigation found and fixed an Android API-36
@@ -144,18 +145,26 @@ do not discard or hide unknown state.
   10/10 in 8m50s, lifecycle 5/5 in 4m17s, the notification-manager delivery
   probe (`VERIFIED`), and the Habit Progress Insights flow. The delivery
   report observed the expected package/title/body after process termination.
+- Completed: the final closure commit `1746d2f8a8bfb2cbbc90aa2e8b0b4e7d0c39bb91`
+  was rebuilt with the E2E reminder flag; its APK SHA-256 is
+  `F8A2DEEF43C8FEDA9223EDDA00EF02B410A82A39BEEF349F431E47DAE52543C6`.
+  The embedded bundle contained all three reminder E2E controls, and the
+  installed APK passed final smoke 1/1 on `Nitro_API_36`.
 - Completed: dummy-backend sync build and boundary E2E passed 19/19, covering
   broken backend responses, outbox/reconnect, restore, tombstone emptiness,
   and local-only restore behavior.
 - In progress: none.
 - Current failures: no product, database, web, sync, simulation, or Android
-  native product failures remain. The prior `9/10` exact-main persistence run
-  was classified `TEST_BUG`/`FLAKY_TEST`: `calories-persistence` selected the
-  card header instead of the submit button when scroll position differed, and
-  the semantic `below: Meal` selector fixed it. Maestro heartbeat-file lock
-  messages remain a test-environment observation. iOS is an `ENVIRONMENT`
-  block on Windows, and `npm audit --omit=dev` remains a known dependency-
-  advisory partial.
+  native product failures remain. One post-closure exact-`1746d2f` aggregate
+  initially finished `8/10`: `habit-reminder-disable` and
+  `habit-reminder-isolation` lost the app after an Android ANR; logcat records
+  the emulator graphics compositor and system UI consuming roughly 90--99%
+  CPU before Android force-finished the app. Both flows passed isolated
+  replays, and the complete aggregate passed 10/10 after reboot. This is
+  classified `ENVIRONMENT`/`FLAKY_TEST`, not a product failure. Maestro
+  heartbeat-file lock messages remain a test-environment observation. iOS is
+  an `ENVIRONMENT` block on Windows, and `npm audit --omit=dev` remains a
+  known dependency-advisory partial.
 - Current limitations: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -167,7 +176,8 @@ do not discard or hide unknown state.
   the final current-source run passing at 625 ms; retain the earlier artifacts
   as historical evidence, not as the final result. The native persistence
   selector failure was followed by a clean 10/10 confirmation on the
-  corrected exact-main APK.
+  corrected exact-main APK; a post-reboot clean-target aggregate then passed
+  10/10.
 - The first current-build lifecycle run classified the three reminder action/
   delivery failures as build-configuration evidence: the installed APK was
   built without `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, so the test-only
@@ -269,6 +279,13 @@ do not discard or hide unknown state.
   An isolated replay passed and the corrected selector now anchors the button
   below the `Meal` label; the complete corrected aggregate passed 10/10 on
   the rebuilt `f4604aa` APK.
+- The first literal final-closure aggregate on `1746d2f` recorded two flow
+  failures after an Android ANR: the failure screenshots showed the launcher
+  and task-switcher rather than the app, while logcat recorded input timeout,
+  force-finish, and approximately 90--99% combined emulator graphics/system
+  CPU. Individual replays passed, and a reboot of the same `Nitro_API_36`
+  target followed by the complete aggregate passed 10/10; no app or flow
+  change was needed.
 
 ## Decision Log
 
@@ -299,8 +316,9 @@ do not discard or hide unknown state.
 - 2026-08-13 — Six-directory topology inventory — PASS; all six paths exist,
   are Git worktrees, share the same common dir, and their branches/HEADs were
   captured.
-- 2026-08-13 — `git fetch --all --prune` — PASS; `origin/main` remains
-  `d23c56e`.
+- 2026-08-13 — Initial `git fetch --all --prune` — PASS; the initial
+  `origin/main` was `d23c56e`; later normal pushes and the final equality
+  check are recorded below.
 - 2026-08-13 — `npm run agent:plans` (dirty checkout and main) — PASS;
   existing discovered plans are completed; this plan is the only new active
   plan.
@@ -405,6 +423,21 @@ do not discard or hide unknown state.
   `habit-reminder-delivery-2026-08-13T103715694Z.json`.
 - 2026-08-13 — Exact-`f4604aa` Habit Progress Insights — PASS; metrics,
   history, close, and reopen assertions passed on `Nitro_API_36`.
+- 2026-08-13 — Exact-`1746d2f` targeted persistence — PARTIAL/ENVIRONMENT;
+  the aggregate ended `8/10` because `habit-reminder-disable` and
+  `habit-reminder-isolation` encountered an Android ANR. The failure artifact
+  is `simulation-output/native/native-android-persistence-2026-08-13T110825207Z.json`;
+  logcat records the launcher/task-switcher visible after force-finish and
+  extreme emulator graphics/system CPU. Individual replays of both flows
+  passed on the same APK.
+- 2026-08-13 — Rebooted `Nitro_API_36` exact-`1746d2f` persistence rerun —
+  PASS; all 10/10 persistence flows passed in 11m21s, including both flows
+  affected by the prior emulator ANR. Report:
+  `simulation-output/native/native-android-persistence-2026-08-13T112630955Z.json`.
+- 2026-08-13 — Exact-`1746d2f` final APK — PASS; E2E controls were present in
+  the embedded bundle, APK SHA-256 was
+  `F8A2DEEF43C8FEDA9223EDDA00EF02B410A82A39BEEF349F431E47DAE52543C6`, and
+  final smoke passed 1/1 on `Nitro_API_36`.
 - 2026-08-13 — iOS native preflight — BLOCKED/ENVIRONMENT; Windows has no
   Xcode `xcrun/simctl`; the EAS native-e2e path remains the executable iOS
   route and was not claimed as a local pass.
@@ -419,8 +452,9 @@ do not discard or hide unknown state.
   the recovery snapshot is the only non-ancestor local branch and has no
   completed product work absent from main.
 - 2026-08-13 — Normal origin synchronization — PASS; after comparing both
-  directions and finding no independent remote commits, `git push origin main`
-  advanced `origin/main` from `d23c56e` to `220adf3` without force options.
+  directions and finding no independent remote commits, normal pushes
+  advanced `origin/main` through the final closure history without force
+  options; the post-push local and remote SHAs are equal.
 
 ## Changed Files / Areas
 
@@ -448,14 +482,19 @@ are linked worktrees of the same repository common directory
 `C:/Users/Michael Roy/Documents/super-habits/.git`; none is an independent
 clone.
 
-| Directory                    | Branch                                       | HEAD                                       | Git relationship                             | Dirty? | Unique completed work absent from main? | Action                                                           |
-| ---------------------------- | -------------------------------------------- | ------------------------------------------ | -------------------------------------------- | ------ | --------------------------------------- | ---------------------------------------------------------------- |
-| `super-habits`               | `recovery/preserved-install-config-20260813` | `3191541b445bddb58edcc1930fae6682092390ad` | linked worktree; recovery snapshot           | No     | No                                      | Preserve exact superseded dependency/config state; do not delete |
-| `super-habits-consolidation` | `main`                                       | `220adf30f66f5dff5d3adaf6f9cf1533f4f85623` | linked worktree; authoritative               | No     | No                                      | Authoritative development state                                  |
-| `super-habits-expansion`     | `campaign/post-integration-expansion`        | `6287fabfc3a436ab276d9ce94d2ec875b500ef50` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
-| `super-habits-headless`      | `parallel/headless-hardening`                | `bd468566666b20a4436f721882f1e64e43c401cb` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
-| `super-habits-integrated`    | `integration/reminder-actions-headless`      | `aa63cb33b6986edb6028cc947d1f53db27d5be5f` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
-| `super-habits-stabilization` | `stabilization/native-d14-closure`           | `7e61aec5a1ab4985a862e4085ddf7f4a7464811c` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
+| Directory                    | Branch                                       | HEAD                                       | Git relationship                                        | Dirty? | Unique completed work absent from main? | Action                                                           |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- | ------ | --------------------------------------- | ---------------------------------------------------------------- |
+| `super-habits`               | `recovery/preserved-install-config-20260813` | `3191541b445bddb58edcc1930fae6682092390ad` | linked worktree; recovery snapshot                      | No     | No                                      | Preserve exact superseded dependency/config state; do not delete |
+| `super-habits-consolidation` | `main`                                       | `1746d2f8a8bfb2cbbc90aa2e8b0b4e7d0c39bb91` | linked worktree; authoritative at final runtime closure | No     | No                                      | Authoritative development state; later plan record is docs-only  |
+| `super-habits-expansion`     | `campaign/post-integration-expansion`        | `6287fabfc3a436ab276d9ce94d2ec875b500ef50` | linked worktree; completed historical branch            | No     | No                                      | Preserve recovery branch                                         |
+| `super-habits-headless`      | `parallel/headless-hardening`                | `bd468566666b20a4436f721882f1e64e43c401cb` | linked worktree; completed historical branch            | No     | No                                      | Preserve recovery branch                                         |
+| `super-habits-integrated`    | `integration/reminder-actions-headless`      | `aa63cb33b6986edb6028cc947d1f53db27d5be5f` | linked worktree; completed historical branch            | No     | No                                      | Preserve recovery branch                                         |
+| `super-habits-stabilization` | `stabilization/native-d14-closure`           | `7e61aec5a1ab4985a862e4085ddf7f4a7464811c` | linked worktree; completed historical branch            | No     | No                                      | Preserve recovery branch                                         |
+
+The table's authoritative runtime row is captured at `1746d2f` before this
+final documentation-only triage record; the final report records the resulting
+post-triage `main`/`origin/main` SHA. No product or native source changed in
+the triage record.
 
 The original checkout's dirty dependency/configuration state was preserved in
 the recovery commit before consolidation. Its blank ignored `.env.local` is
