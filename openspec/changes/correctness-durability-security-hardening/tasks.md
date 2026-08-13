@@ -39,5 +39,5 @@
 
 - [x] 6.1 Complete the static trust-boundary and dependency audit, classify advisories and external blockers, and update stale QA/known-gap docs.
 - [x] 6.2 Run focused, integration, full Vitest, typecheck, lint, theme, OpenSpec, ExecPlan, impact, timezone, web build, E2E, simulation, sync/restore, and practical native gates.
-- [ ] 6.3 Commit coherent changes, validate every commit, fetch/reconcile `origin/main`, push normal `main`, inspect GitHub CI, and fix repository-caused failures.
-- [ ] 6.4 Record final finding evidence, residual risk, exact QA ledger, outcomes, and ExecPlan completion status.
+- [x] 6.3 Commit coherent changes, validate every commit, fetch/reconcile `origin/main`, push normal `main`, inspect GitHub CI, and fix repository-caused failures.
+- [x] 6.4 Record final finding evidence, residual risk, exact QA ledger, outcomes, and ExecPlan completion status.

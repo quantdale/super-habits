@@ -1,7 +1,7 @@
 # ExecPlan: Repository correctness, durability, CI, security, and hardening campaign
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -104,9 +104,10 @@ regressions for concurrency/fault/restart cases, and a normal push to
   stale linked-effect parameter list, a missing test mock export, and the
   now-intended workout child-tombstone expectation. The corrected full suite
   passes 780 tests across 78 files.
-- In progress: record the third CI failure and deterministic selector/action
-  correction, commit the regression fix, push, and inspect the final post-fix
-  GitHub CI.
+- Completed: recorded the third CI failure and deterministic selector/action
+  correction, committed it as `2eaccc4208779a411ee351ccdc561bf663234bf1`,
+  pushed it to `origin/main`, and inspected GitHub run `31751809643`.
+- In progress: None; the implementation and verification campaign is complete.
 - Important modified files: package/CI runtime contract; `core/db/client.ts`,
   `core/db/transactions.ts`, `core/sync/sync.engine.ts`,
   `core/sync/syncPersistence.ts`, `core/sync/syncedMutation.ts`, linked-action
@@ -139,20 +140,21 @@ regressions for concurrency/fault/restart cases, and a normal push to
   and `npm audit --omit=dev` report 16 Expo/Metro transitive
   advisories whose only available fix is an incompatible Expo 53/RN downgrade.
   Live Supabase verification is credential-dependent. Native execution is an
-  explicit environment blocker; lint has 0 errors and 0 warnings.
+  explicit environment blocker; lint has 0 errors and 0 warnings. The final
+  pushed GitHub run `31751809643` is green for quality, full E2E, all 17
+  deterministic scenarios, the dummy `dist-sync` build, and remote-boundary
+  journeys.
 - Relevant quarantines: inherited documented web/native/dependency gaps remain
   untouched until impact is re-evaluated.
 - Blockers: None.
 - Condition required to unblock: None.
-- Exact resume action after unblock: None.
-- Exact next action: run repeated focused simulation/E2E checks and the affected
-  repository gates for the selector/action correction, update OpenSpec
-  task/checkpoint evidence, fetch/reconcile `origin/main`, commit and push the
-  final regression fix, then inspect the new GitHub Actions run.
-- Remaining definition of done: all A–N findings resolved/disproven or
-  explicitly classified external after repository-side work; regression and
-  fault-injection coverage added; final QA/plan/OpenSpec validation complete;
-  coherent commits pushed to `origin/main`; GitHub CI inspected.
+- Exact resume action after unblock: None; no blocker remains.
+- Exact next action: None; the campaign is complete and the final pushed CI
+  evidence has been recorded.
+- Remaining definition of done: Complete; all A–N findings are resolved,
+  disproven, or explicitly classified as external; regression and
+  fault-injection coverage is present; final QA, plan, OpenSpec, push, and
+  GitHub CI validation are complete.
 
 ## Audit Finding Matrix
 
@@ -215,7 +217,7 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - [x] Commit coherent changes and push the first validated campaign wave to `origin/main`; a follow-up worker-topology fix remains to commit/push.
 - [x] Inspect the first post-push GitHub CI and resolve its repository-caused shared-OPFS project-parallelism failure locally.
 - [x] Push the worker-topology fix and inspect the second post-push GitHub CI; linked-action and simulation failures are resolved, with one habit selector synchronization defect remaining.
-- [ ] Push the scoped habit persistence regression fix, inspect final GitHub CI, then complete Outcomes & Retrospective and validate all ExecPlans.
+- [x] Push the scoped habit persistence regression fix, inspect final GitHub CI, then complete Outcomes & Retrospective and validate all ExecPlans.
 
 ## Surprises & Discoveries
 
@@ -429,6 +431,14 @@ regressions for concurrency/fault/restart cases, and a normal push to
   action journey passed 3/3 steps, the generic chain-reaction journey passed
   4/4 steps, and simulation self-test `4.4` passed all scenario/seeded/repro
   reports after active-section and live-state synchronization fixes.
+- 2026-08-14 — final push and GitHub CI — PASS — commit
+  `2eaccc4208779a411ee351ccdc561bf663234bf1` reached `origin/main`; run
+  `31751809643` completed successfully. Quality, full E2E, deterministic
+  scenarios, `dist-sync`, and remote-boundary journeys all passed.
+- 2026-08-14 — `npm run format:check` — FAIL/CLASSIFIED — 87 pre-existing
+  repository files in mirrored agent/OpenSpec/docs/workflow areas differ from
+  the repository's current Prettier output; the two files changed in this
+  closure pass `npx prettier --check`. No broad formatting churn was introduced.
 
 ## Changed Files / Areas
 
@@ -477,11 +487,30 @@ regressions for concurrency/fault/restart cases, and a normal push to
 
 ## Outcomes & Retrospective
 
-- Status: Active; implementation is in progress.
-- Summary: P0 and the core local durability/data-integrity waves are now
-  implemented with real SQLite recovery/concurrency/fault evidence. The
-  remaining campaign is primarily Supabase/AI contract/security, native cloud
-  coverage, settings validation, lint architecture, rollover efficiency, and
-  final full/post-push QA.
-- Remaining work: Resolve or classify every A–N finding, preserve all durable
-  evidence, push the completed validated work, and record final readiness.
+- Status: Completed.
+- Summary: The campaign established a Node 22.23.2 repository contract and
+  hermetic CI install, durable SQLite outbox ordering, atomic synced
+  tombstones, crash-recoverable linked actions, exactly-once receipts for
+  non-idempotent effects, atomic habit threshold transitions, calorie and
+  workout integrity boundaries, repository-owned Supabase/AI security
+  contracts, runtime settings normalization, zero-warning lint, and boundary-
+  scheduled day rollover behavior.
+- Evidence: real SQLite integration tests cover concurrency, process restart,
+  fault injection, replay, stale IDs, partial failure, outbox ordering, and
+  parent/child integrity. Local full gates passed, including 780 Vitest tests,
+  timezone validation, web build, full E2E, all 17 deterministic scenarios, and
+  three repeated simulation schema runs. GitHub run `31751809643` then passed
+  quality, full E2E, the full deterministic library, dummy `dist-sync`, and
+  remote-boundary journeys.
+- Disposition: All A–N findings are resolved or explicitly classified. Live
+  Supabase policy comparison and native device/cloud execution remain external
+  verification items because credentials/devices were unavailable; repository-
+  side contracts and workflow coverage are complete. Sixteen framework-owned
+  transitive audit advisories remain deferred because the available forced fix
+  would downgrade the Expo/React Native stack.
+- Retrospective: The most important discoveries were that the sync outbox had
+  to share the local SQLite commit boundary, and that the E2E projects needed a
+  global single worker because per-project limits did not isolate one OPFS
+  origin. CI feedback also exposed selector synchronization assumptions that
+  local focused runs did not initially exercise; downloading artifacts and
+  reproducing each assertion led to durable state-aware test helpers.
