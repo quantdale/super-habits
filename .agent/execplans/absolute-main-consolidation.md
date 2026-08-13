@@ -1,7 +1,7 @@
 # ExecPlan: Absolute main consolidation audit
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -18,9 +18,11 @@ do not discard or hide unknown state.
   `super-habits-headless`, `super-habits-integrated`, and
   `super-habits-stabilization`.
 - Initial inspection shows all six are linked worktrees sharing
-  `C:\Users\Michael Roy\Documents\super-habits\.git`; `main` is checked out
+  `C:\Users\Michael Roy\Documents\super-habits\.git`; `main` was checked out
   in `super-habits-consolidation` at `d23c56e`, equal to `origin/main` after
-  fetch. The original `super-habits` directory is on
+  fetch. The final normal push advanced both refs through the consolidation
+  commits to `220adf3` before this closing plan commit. The original
+  `super-habits` directory is on
   `codex/add-schedule-aware-habit-reminders` at `2d8223e` with dirty
   dependency/configuration files and an untracked completed dependency plan.
 - Existing completed ExecPlans identify the reminder, headless, integration,
@@ -64,11 +66,10 @@ do not discard or hide unknown state.
 ## Current Checkpoint
 
 - Current milestone: six-directory/Git-topology inventory and dirty-state
-  preservation complete; final-main migration/schema consistency and all web,
-  sync, simulation, static, unit, integration, timezone, and repository gates
-  are complete. Native validation and final-source web validation are complete;
-  final six-directory re-audit, ancestry proof, plan closure, and remote sync
-  remain.
+  preservation complete; final-main migration/schema consistency, all web,
+  sync, simulation, static, unit, integration, timezone, repository, and native
+  gates are complete. The six-directory re-audit, ancestry proof, normal remote
+  sync, and plan closure are complete.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -129,30 +130,25 @@ do not discard or hide unknown state.
   web E2E run (153 passed, 17 documented skips). The final D14/J8 journey
   measured `maxSwitch=625ms`, diary search `351ms`, and saved-meal picker
   search `77ms`.
-- Completed: a release APK was rebuilt and installed from the exact source
-  commit above with `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; the explicit
-  embed bundle contained all E2E-only reminder labels. APK SHA-256 is
-  `D3712DFC242577BC4BEC7773F808AEE21778389AB8F152E88D917C04943085F4`,
+- Completed: a release APK was rebuilt and installed from the final-main
+  source commit `220adf30f66f5dff5d3adaf6f9cf1533f4f85623` with
+  `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; the explicit embed bundle
+  contained all E2E-only reminder labels. APK SHA-256 is
+  `C228F151AB7F012C134B778E6969E25DAF013E2E0837E98B2B4EEC1BE7939776`,
   package `com.dale16.superhabits`, version `1.0.0`, versionCode `1`.
 - Completed: that exact APK passed native smoke 1/1, lifecycle 5/5, the
   notification-manager delivery probe (`VERIFIED`), and the Habit Progress
-  Insights flow. The persistence aggregate passed 9/10; the sole failure was
-  an initial Overview startup assertion in `habit-persistence` after the
-  preceding serial flows. The preserved direct replay of that same flow passed
-  end-to-end on the same APK, so it is classified `FLAKY_TEST`/emulator startup
-  rather than a product failure; the other 9 persistence flows passed.
+  Insights flow. A deliberate final exact-APK confirmation then passed the
+  complete persistence aggregate 10/10 in 9m04s, including the previously
+  observed startup-sensitive `habit-persistence` flow.
 - Completed: dummy-backend sync build and boundary E2E passed 19/19, covering
   broken backend responses, outbox/reconnect, restore, tombstone emptiness,
   and local-only restore behavior.
-- In progress: final six-directory re-audit, completed-branch ancestry proof,
-  normal `origin/main` synchronization, final plan validation, and exact-main
-  APK identity refresh after the closing plan commit.
-- Current failures: no product or web integration failures remain. The final
-  native persistence aggregate has one preserved startup-only
-  `FLAKY_TEST`/emulator result in `habit-persistence`; its immediate direct
-  replay passed end-to-end on the same APK. iOS is an `ENVIRONMENT` block on
-  Windows, and `npm audit --omit=dev` remains a known dependency-advisory
-  partial described in the ledger.
+- In progress: none; all required consolidation, validation, audit, and sync
+  actions are complete.
+- Current failures: no product, web, sync, or native Android failures remain.
+  iOS is an `ENVIRONMENT` block on Windows, and `npm audit --omit=dev` remains
+  a known dependency-advisory partial described in the ledger.
 - Current limitations: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -163,7 +159,7 @@ do not discard or hide unknown state.
   miss was superseded by
   the final current-source run passing at 625 ms; retain the earlier artifacts
   as historical evidence, not as the final result. The native persistence
-  aggregate has one preserved startup flake with a passing direct replay.
+  earlier startup-sensitive run was followed by a clean 10/10 confirmation.
 - The first current-build lifecycle run classified the three reminder action/
   delivery failures as build-configuration evidence: the installed APK was
   built without `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, so the test-only
@@ -176,11 +172,8 @@ do not discard or hide unknown state.
 - Blockers: none established.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: record the final QA ledger in this plan, run strict
-  repository/spec validation, re-audit all six physical paths and every
-  completed branch, fetch/check `origin/main`, push local `main` normally,
-  then mark this plan COMPLETED, validate all plans, and perform the final
-  exact-main APK identity check without deleting recovery refs/worktrees.
+- Exact next action: none; retain recovery refs/worktrees and hand off the
+  synchronized `main` state.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -206,7 +199,7 @@ do not discard or hide unknown state.
 - [x] Build/install the exact final-main Android APK and run serialized native
       QA with the E2E reminder flag verified in the embedded bundle; classify
       iOS/Xcode availability.
-- [ ] Re-audit six paths/branches, validate the plan, and synchronize origin.
+- [x] Re-audit six paths/branches, validate the plan, and synchronize origin.
 
 ## Surprises & Discoveries
 
@@ -367,9 +360,19 @@ do not discard or hide unknown state.
 - 2026-08-13 — Final-source native persistence — PARTIAL/FLAKY_TEST; 9/10
   aggregate flows passed, with only the first Overview startup assertion in
   `habit-persistence` failing; direct replay then passed the complete flow.
+- 2026-08-13 — Final exact-APK native persistence confirmation — PASS; the
+  complete `qa:native:targeted` aggregate passed 10/10 in 9m04s on the APK
+  built from the final-main identity `220adf3`.
 - 2026-08-13 — iOS native preflight — BLOCKED/ENVIRONMENT; Windows has no
   Xcode `xcrun/simctl`; the EAS native-e2e path remains the executable iOS
   route and was not claimed as a local pass.
+- 2026-08-13 — Final physical re-audit and ancestry proof — PASS; all six
+  directories are clean linked worktrees, no completed work is absent from
+  main, the recovery branch is the only intentionally non-ancestor local
+  branch, and all completed branches are ancestors of main.
+- 2026-08-13 — Normal origin synchronization — PASS; after comparing both
+  directions and finding no independent remote commits, `git push origin main`
+  advanced `origin/main` from `d23c56e` to `220adf3` without force options.
 
 ## Changed Files / Areas
 
@@ -400,7 +403,7 @@ clone.
 | Directory                    | Branch                                       | HEAD                                       | Git relationship                             | Dirty? | Unique completed work absent from main? | Action                                                           |
 | ---------------------------- | -------------------------------------------- | ------------------------------------------ | -------------------------------------------- | ------ | --------------------------------------- | ---------------------------------------------------------------- |
 | `super-habits`               | `recovery/preserved-install-config-20260813` | `3191541b445bddb58edcc1930fae6682092390ad` | linked worktree; recovery snapshot           | No     | No                                      | Preserve exact superseded dependency/config state; do not delete |
-| `super-habits-consolidation` | `main`                                       | `513651f1f70113e7e0c46737b834f187bfd234c4` | linked worktree; authoritative               | No     | No                                      | Authoritative development state                                  |
+| `super-habits-consolidation` | `main`                                       | `220adf30f66f5dff5d3adaf6f9cf1533f4f85623` | linked worktree; authoritative               | No     | No                                      | Authoritative development state                                  |
 | `super-habits-expansion`     | `campaign/post-integration-expansion`        | `6287fabfc3a436ab276d9ce94d2ec875b500ef50` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
 | `super-habits-headless`      | `parallel/headless-hardening`                | `bd468566666b20a4436f721882f1e64e43c401cb` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
 | `super-habits-integrated`    | `integration/reminder-actions-headless`      | `aa63cb33b6986edb6028cc947d1f53db27d5be5f` | linked worktree; completed historical branch | No     | No                                      | Preserve recovery branch                                         |
@@ -417,9 +420,8 @@ reports). No ignored product source was found.
 
 The required completed branches all have zero `main..<branch>` commits, zero
 `git cherry main <branch>` additions, and pass `merge-base --is-ancestor`
-against local `main`. Before the final push they also remain ancestors of the
-existing `origin/main` because their tips predate the remote's current main.
-The only local branch reported by `git branch --no-merged main` is
+against both local `main` and the synchronized `origin/main`. The only local
+branch reported by `git branch --no-merged main` is
 `recovery/preserved-install-config-20260813`; it contains one deliberately
 preserved recovery commit, not intended completed product work. Remote
 `origin/backup/predator/*` refs are retained recovery/WIP snapshots and were
@@ -444,11 +446,15 @@ main, and their old unique snapshots are superseded or recovery-only.
 
 ## Outcomes & Retrospective
 
-- Status: Active; native build/QA and final six-directory/remote checks remain.
+- Status: Completed; all six physical checkouts were audited twice, all
+  completed work is in main, final validation passed on the permitted lanes,
+  and local `main` equals synchronized `origin/main` after a normal push.
 - Summary: The six physical checkouts are one linked-worktree repository; all
-  completed workstream history is already in main. The only checkout-only
-  state was preserved as an explicitly recovery-only dependency snapshot, and
-  the only main content correction was the v13 reference-schema/test gap.
-- Follow-up: Build from the post-checkpoint main SHA, run native QA, then
-  complete the second physical-checkout audit, final ancestry proof, normal
-  origin push, and plan closure without deleting recovery references.
+  completed workstream history is in main. The only checkout-only state was
+  preserved as an explicitly recovery-only dependency snapshot, and the only
+  main content correction was the v13 reference-schema/test gap. Final
+  Android validation used the exact final-main source identity and the
+  single `Nitro_API_36` target.
+- Follow-up: Preserve recovery refs/worktrees and the documented Windows iOS
+  environment boundary; no cleanup or force operation is authorized by this
+  consolidation task.
