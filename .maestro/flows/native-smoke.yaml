@@ -8,40 +8,40 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 10000
-- assertVisible: 'Overview'
+- assertVisible: 'A compact snapshot of focus, habits, calories, todos, and workouts.'
 - swipe:
     direction: LEFT
-- assertVisible: 'Todos'
+- assertVisible: "Today's queue"
 - swipe:
     direction: LEFT
-- assertVisible: 'Habits'
+- assertVisible: 'Track daily consistency.'
 - swipe:
     direction: LEFT
-- assertVisible: 'Start focus'
+- assertVisible: 'Pomodoro'
 - swipe:
     direction: LEFT
-- assertVisible: 'Workout'
+- assertVisible: 'Create simple routines and mark completions.'
 - swipe:
     direction: LEFT
-- assertVisible: 'Calories'
+- assertVisible: 'Switch between manual entry and a diary grouped by meal.'
 - swipe:
     direction: RIGHT
-- assertVisible: 'Workout'
+- assertVisible: 'Create simple routines and mark completions.'
 - swipe:
     direction: RIGHT
-- assertVisible: 'Start focus'
+- assertVisible: 'Pomodoro'
 - swipe:
     direction: RIGHT
-- assertVisible: 'Habits'
+- assertVisible: 'Track daily consistency.'
 - swipe:
     direction: RIGHT
-- assertVisible: 'Todos'
+- assertVisible: "Today's queue"
 - swipe:
     direction: RIGHT
-- assertVisible: 'Overview'
+- assertVisible: 'A compact snapshot of focus, habits, calories, todos, and workouts.'
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Close settings'
     timeout: 5000
 - tapOn: 'Close settings'
-- assertVisible: 'Overview'
+- assertVisible: 'A compact snapshot of focus, habits, calories, todos, and workouts.'

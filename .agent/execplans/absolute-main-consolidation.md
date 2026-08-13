@@ -66,7 +66,8 @@ do not discard or hide unknown state.
 - Current milestone: six-directory/Git-topology inventory and dirty-state
   preservation complete; final-main migration/schema consistency and all web,
   sync, simulation, static, unit, integration, timezone, and repository gates
-  are complete. Native validation is in progress.
+  are complete. Native validation is in progress after correcting two real
+  Android shell defects and two stale Maestro selectors.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -109,6 +110,17 @@ do not discard or hide unknown state.
   smoke steps. The full aggregate web run passed 148/170 with 17 documented
   skips, 4 continuity steps not run after the strict D14 miss, and no other
   functional failures.
+- Completed: current working-tree Android release build installed on the
+  single `Nitro_API_36` target; smoke passed 1/1 and the corrected persistence
+  lane passed 10/10. Native persistence covers Calories immediate/relaunch
+  verification, habit schedule/reminder configuration, disablement, denied
+  permission, isolation, Settings, Todo, and Workout.
+- Completed: current-source investigation found and fixed an Android API-36
+  edge-to-edge layout issue in `app/index.tsx` (safe-area top inset), a lazy
+  section mount race, and a swipe navigation shared-value race. The smoke flow
+  now asserts unique screen content rather than always-visible tab labels. The
+  Calories persistence flow now scrolls to the actual submit button and Diary
+  control using semantic state-based actions.
 - Current failures: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -121,16 +133,25 @@ do not discard or hide unknown state.
   rather than claiming a pass. Prior committed stabilization evidence records
   two independent 10/10 batches under the same unchanged contract, with
   max-switch maxima of 773 ms and 770 ms.
+- The first current-build lifecycle run classified the three reminder action/
+  delivery failures as build-configuration evidence: the installed APK was
+  built without `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, so the test-only
+  controls were compiled out. Pomodoro lifecycle and notification-path flows
+  passed. An explicit same-process `expo export:embed` with the flag proved
+  the expected E2E controls are present in the bundle; the final APK must be
+  rebuilt with that environment variable set for both prebuild and Gradle.
 - Relevant quarantines: none newly established; preserve documented native,
   remote, and performance gaps until independently checked.
 - Blockers: none established.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit this validated plan checkpoint, regenerate the
-  ignored Android project from that exact `main` SHA with the credential-free
-  E2E reminder flag, build/install the release APK on the single
-  `Nitro_API_36` target, and run the serialized smoke, persistence, lifecycle,
-  reminder-action, delivery, and Insights flows.
+- Exact next action: commit the current `app/index.tsx` and validated Maestro
+  selector fixes, then regenerate the ignored Android project and run Expo
+  embed plus Gradle in one process with
+  `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`; verify the generated bundle
+  contains the E2E-only labels, build/install the release APK on the single
+  `Nitro_API_36` target, and rerun serialized lifecycle reminder actions,
+  delivery, replay, and Insights flows before final-source rebuild evidence.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -154,7 +175,8 @@ do not discard or hide unknown state.
       performance, dependency, and repository gates; classify unavailable
       lanes.
 - [ ] Build/install the exact final-main Android APK and run serialized native
-      QA; classify iOS/Xcode availability.
+      QA with the E2E reminder flag verified in the embedded bundle; classify
+      iOS/Xcode availability.
 - [ ] Re-audit six paths/branches, validate the plan, and synchronize origin.
 
 ## Surprises & Discoveries
@@ -187,6 +209,21 @@ do not discard or hide unknown state.
   hardening tasks). Several older planning changes retain complete task
   checklists but one missing optional design artifact; they are not active
   implementation branches, and strict validation remains a required gate.
+- Android API-36 edge-to-edge places the status bar over the app content unless
+  the root shell consumes the top safe-area inset; this was observable as
+  inaccessible initial tabs on the first current-source smoke attempt.
+- Native tab assertions using labels such as `Workout` and `Calories` were
+  ambiguous because those labels remain in the tab rail while another section
+  is active. The corrected flow asserts each section's unique subtitle/content,
+  preserving the navigation contract rather than weakening it.
+- The Calories flow had two stale assumptions: it searched in the wrong scroll
+  direction for the submit button and then left the Diary control off-screen.
+  Both were corrected with semantic scroll actions; the flow now passes
+  immediate and post-relaunch persistence checks.
+- The first current APK was assembled from a Gradle process that did not carry
+  the E2E public flag into Metro. An explicit `expo export:embed` with the flag
+  set in the same process contains the test-only reminder labels, so this is a
+  reproducible build invocation issue rather than missing product controls.
 
 ## Decision Log
 
@@ -267,6 +304,16 @@ do not discard or hide unknown state.
   Maestro 2.8.0, adb, and one booted `Nitro_API_36` target are available;
   build/install and serialized native lanes are the next action. iOS remains
   an expected Windows/Xcode environment boundary.
+- 2026-08-13 — Current working-tree Android smoke — PASS; corrected unique
+  screen-content assertions passed 1/1 on `Nitro_API_36`.
+- 2026-08-13 — Current working-tree Android persistence — PASS; corrected
+  Calories flow plus the full `qa:native:targeted` lane passed 10/10 in 8m27s.
+- 2026-08-13 — Current working-tree Android lifecycle — PARTIAL/BUILD-CONFIG;
+  Pomodoro lifecycle and notification-path passed 2/2, while reminder action,
+  replay, and delivery flows could not find E2E-only controls in the APK. The
+  installed bundle lacked the public E2E flag; explicit same-process embed
+  verification now confirms the flag-bearing bundle path and requires a
+  rebuild before retry.
 
 ## Changed Files / Areas
 
@@ -279,6 +326,11 @@ do not discard or hide unknown state.
 - `docs/PROJECT_STRUCTURE_MAP.md`, `docs/master-context.md`,
   `docs/working-rules.md`, `openspec/config.yaml` — current schema-version
   documentation reconciled.
+- `app/index.tsx` — Android safe-area shell padding, active-section mounting,
+  and atomic swipe index/state navigation corrections.
+- `.maestro/flows/native-smoke.yaml`,
+  `.maestro/flows/calories-persistence.yaml` — unique section assertions and
+  corrected semantic Calories scroll/actions.
 - Original dirty checkout dependency/configuration files — exact state
   preserved in recovery commit `3191541`; no regression was merged into main.
 

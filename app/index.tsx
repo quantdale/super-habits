@@ -3,6 +3,7 @@ import { Pressable, Text, View, useWindowDimensions, type ViewProps } from 'reac
 import { MaterialIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/ThemeProvider';
 import { type AppSection, useAppNavigation } from '@/core/providers/NavigationProvider';
@@ -146,6 +147,7 @@ export default function Index() {
   const { tokens, resolvedTheme, sectionAccents } = useAppTheme();
   const { activeSection, setActiveSection, isSettingsOpen, closeSettings } = useAppNavigation();
   const { width: screenWidth } = useWindowDimensions();
+  const { top: safeAreaTop } = useSafeAreaInsets();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
 
   const [mountedSections, setMountedSections] = useState<Record<AppSection, boolean>>(() => {
@@ -188,9 +190,10 @@ export default function Index() {
   const navigateToIndex = useCallback(
     (index: number) => {
       if (index < 0 || index >= NAV_TAB_COUNT) return;
+      tabIndex.value = index;
       setActiveSection(NAV_ITEMS[index].name);
     },
-    [setActiveSection],
+    [setActiveSection, tabIndex],
   );
 
   const pan = useMemo(
@@ -224,7 +227,10 @@ export default function Index() {
   );
 
   return (
-    <View className="flex-1 flex-col" style={{ backgroundColor: tokens.background }}>
+    <View
+      className="flex-1 flex-col"
+      style={{ backgroundColor: tokens.background, paddingTop: safeAreaTop }}
+    >
       <View
         style={{
           flexDirection: 'row',
@@ -267,8 +273,8 @@ export default function Index() {
         <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
           {NAV_ITEMS.map((item) => {
             const ScreenComponent = SECTION_SCREENS[item.name];
-            const isMounted = mountedSections[item.name];
             const isActive = activeSection === item.name;
+            const isMounted = mountedSections[item.name] || isActive;
             return (
               <SectionContainer key={item.name} isActive={isActive}>
                 {isMounted ? <ScreenComponent isActive={isActive} /> : null}

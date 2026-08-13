@@ -28,15 +28,16 @@ tags:
 - tapOn: 'Calories entry fat'
 - inputText: '10'
 - hideKeyboard
-- scrollUntilVisible:
-    element:
-      text: 'Add entry'
-      index: 1
-    direction: DOWN
+- swipe:
+    direction: UP
 - tapOn:
     text: 'Add entry'
-    index: 1
+    index: 0
     point: '50%,10%'
+- scrollUntilVisible:
+    element:
+      text: 'Diary'
+    direction: UP
 - tapOn: 'Diary'
 - extendedWaitUntil:
     visible: 'Native breakfast'
