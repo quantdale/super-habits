@@ -65,12 +65,14 @@ regressions for concurrency/fault/restart cases, and a normal push to
 ## Current Checkpoint
 
 - Current milestone: P0 through P3 repository-side hardening and the P4
-  settings/lint/rollover work are implemented. The first pushed CI run proved
-  the quality job green but exposed an unsafe Playwright project-parallelism
-  configuration: three unrelated E2E/simulation failures occurred while the
-  standard projects shared one OPFS origin. The global worker count is now
-  serial, and the CI-shaped 16-test reproduction passes. Remaining work is
-  final full QA, commit/push of this CI fix, and post-push CI inspection.
+  settings/lint/rollover work are implemented. The first pushed CI run exposed
+  unsafe Playwright project-parallelism over one OPFS origin; the serial worker
+  fix removed the linked-action and simulation failures in the second run.
+  That second run then isolated one real test synchronization defect: the
+  habit schedule assertion could match the edit modal instead of the committed
+  habit card. The assertion is now scoped to the active card and the focused
+  case passes five repeated runs. Remaining work is the final commit/push and
+  post-fix GitHub CI inspection, followed by completion validation.
 - Completed: exact Git topology capture; current dependency engine inspection;
   mandatory architecture/workflow/QA/OpenSpec context reads; applicable
   database, feature, and Expo skills read; `npm ci` from the committed lockfile
@@ -101,8 +103,8 @@ regressions for concurrency/fault/restart cases, and a normal push to
   stale linked-effect parameter list, a missing test mock export, and the
   now-intended workout child-tombstone expectation. The corrected full suite
   passes 780 tests across 78 files.
-- In progress: record final QA evidence, commit coherent changes, push, and
-  inspect post-push CI.
+- In progress: record the second CI failure and selector correction, commit the
+  regression fix, push, and inspect the final post-fix GitHub CI.
 - Important modified files: package/CI runtime contract; `core/db/client.ts`,
   `core/db/transactions.ts`, `core/sync/sync.engine.ts`,
   `core/sync/syncPersistence.ts`, `core/sync/syncedMutation.ts`, linked-action
@@ -116,12 +118,15 @@ regressions for concurrency/fault/restart cases, and a normal push to
   typecheck and lint pass. `npm ci` installed 1,138 packages under Node
   `v22.23.2`; npm reports 16 framework-owned advisories (6 moderate, 10 high).
 - Current failures: the first pushed run `31740558470` had quality `success`
-  but E2E `failure`: the logs show schedule reload, linked-action habit
-  identity, and simulation self-test failures; the run used `workers: 2` at
-  the top level while all projects shared localhost OPFS. A serial CI-shaped
-  rerun passes all 16 affected tests, so this is classified as a
-  `FLAKY_TEST`/test-topology defect and fixed in the pending config change.
-  `npm audit` and `npm audit --omit=dev` report 16 Expo/Metro transitive
+  but E2E `failure` because the top-level `workers: 2` ran projects sharing
+  localhost OPFS concurrently. The serial fix was pushed in `0cc417e` and the
+  second run `31744190344` proved that the linked-action and simulation
+  failures were gone. Its only remaining failure was the habit schedule reload
+  assertion: the pre-reload check matched a modal label, not the rendered card,
+  so it could reload before the save/refresh boundary was observable. The test
+  now exits edit mode and scopes both checks to the habit card; the focused case
+  passes five repetitions and the full habits spec passes 11/11. `npm audit`
+  and `npm audit --omit=dev` report 16 Expo/Metro transitive
   advisories whose only available fix is an incompatible Expo 53/RN downgrade.
   Live Supabase verification is credential-dependent. Native execution is an
   explicit environment blocker; lint has 0 errors and 0 warnings.
@@ -130,9 +135,10 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run the final affected/full web and repository gates for
-  the global-worker fix, validate this plan, fetch/reconcile `origin/main`,
-  commit and push the fix, then inspect the new GitHub Actions run.
+- Exact next action: run the affected web/repository gates for the selector
+  correction, update OpenSpec task/checkpoint evidence, fetch/reconcile
+  `origin/main`, commit and push the final regression fix, then inspect the new
+  GitHub Actions run.
 - Remaining definition of done: all A–N findings resolved/disproven or
   explicitly classified external after repository-side work; regression and
   fault-injection coverage added; final QA/plan/OpenSpec validation complete;
@@ -198,7 +204,8 @@ regressions for concurrency/fault/restart cases, and a normal push to
       classified as environment-blocked.
 - [x] Commit coherent changes and push the first validated campaign wave to `origin/main`; a follow-up worker-topology fix remains to commit/push.
 - [x] Inspect the first post-push GitHub CI and resolve its repository-caused shared-OPFS project-parallelism failure locally.
-- [ ] Push the worker-topology fix, inspect its post-push GitHub CI, then complete Outcomes & Retrospective and validate all ExecPlans.
+- [x] Push the worker-topology fix and inspect the second post-push GitHub CI; linked-action and simulation failures are resolved, with one habit selector synchronization defect remaining.
+- [ ] Push the scoped habit persistence regression fix, inspect final GitHub CI, then complete Outcomes & Retrospective and validate all ExecPlans.
 
 ## Surprises & Discoveries
 
@@ -233,6 +240,14 @@ regressions for concurrency/fault/restart cases, and a normal push to
   Per-project worker limits did not protect the shared origin. The safe fix is
   a global `workers: 1` for every standard invocation, with a serial
   CI-shaped rerun passing all 16 targeted tests.
+- 2026-08-14 — GitHub run `31744190344` confirmed the global worker fix: the
+  quality job passed and all prior linked-action/simulation failures disappeared.
+  The sole E2E failure was the habit schedule reload assertion. Its downloaded
+  snapshot showed the app in habit edit mode with no schedule text after reload;
+  the earlier assertion had been satisfied by the editor's `Weekdays` option.
+  Scoping the assertion to the active habit card and leaving edit mode makes the
+  test wait on the actual refreshed row; five repeated focused runs and the
+  complete habits spec pass locally.
 
 ## Decision Log
 
@@ -374,6 +389,15 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - 2026-08-14 — CI-shaped serial Playwright rerun after `workers: 1` change —
   PASS — Chromium habits (11), linked-action journey (3), and simulation
   self-test (2), 16/16 passed in one worker.
+- 2026-08-14 — GitHub Actions inspection for run `31744190344` — QUALITY PASS /
+  E2E FAIL — Node `22.23.2` and serial execution were correct; one habit
+  schedule assertion remained. The downloaded snapshot showed that the
+  pre-reload global text match could be satisfied by the editor, while the
+  post-reload screen was still in edit mode and had no schedule label. The
+  correction scopes the check to the active habit card and exits edit mode.
+- 2026-08-14 — focused habit persistence regression — PASS — the schedule
+  reload case passed 5/5 repetitions; the complete `e2e/habits.spec.ts` passed
+  11/11 tests using the static web build.
 
 ## Changed Files / Areas
 
@@ -395,7 +419,9 @@ regressions for concurrency/fault/restart cases, and a normal push to
 - E2E/simulation durability — `e2e/helpers/clock.ts`, `e2e/helpers/oracles.ts`,
   the commute/bad-backend/three-month journey specs, and
   `simulation/runner/actions.ts` now exercise the SQLite outbox and clock
-  rollover contract through scoped, state-verified controls.
+  rollover contract through scoped, state-verified controls. The habit reload
+  regression in `e2e/habits.spec.ts` now scopes schedule assertions to the
+  committed card instead of an editor label.
 - Native workflow and runtime/UI hardening — `.eas/workflows/native-e2e.yml`,
   provider context modules, settings normalizers, and the boundary-driven day
   rollover scheduler.

@@ -170,12 +170,19 @@ test.describe('Scheduled habits', () => {
       .click({ force: true });
     await page.getByText('Weekdays', { exact: true }).click();
     await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
-    await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
+    await page.getByLabel('Exit habit edit mode').click();
+    const habitCard = page.getByText('Study weekdays', { exact: true }).locator('..');
+    await expect(habitCard.getByText('Weekdays', { exact: true })).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'habits');
-    await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByText('Study weekdays', { exact: true })
+        .locator('..')
+        .getByText('Weekdays', { exact: true }),
+    ).toBeVisible();
   });
 
   test('reminder configuration persists and remains schedule-aware after reload', async ({
