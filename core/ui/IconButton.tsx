@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 function withAlpha(color: string, opacity: number) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) {

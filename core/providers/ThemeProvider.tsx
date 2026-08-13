@@ -1,29 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance } from 'react-native';
-import {
-  createContext,
-  type PropsWithChildren,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { getSectionAccents, type SectionAccent, type SectionKey } from '@/constants/sectionColors';
+import { type PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
+import { getSectionAccents } from '@/constants/sectionColors';
 import {
   DEFAULT_DARK_THEME_ID,
   DEFAULT_LIGHT_THEME_ID,
   THEME_REGISTRY,
   getTheme,
   isThemeId,
-  type ThemeDefinition,
   type ThemeId,
-  type ThemeTokens,
 } from '@/core/theme';
+import { ThemeContext, type ResolvedTheme, type ThemeMode } from '@/core/providers/themeContext';
 
-export type { ThemeTokens };
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type ResolvedTheme = 'light' | 'dark';
+export type { ResolvedTheme, ThemeMode } from '@/core/providers/themeContext';
 type SystemTheme = 'light' | 'dark' | 'unspecified' | null;
 
 const THEME_MODE_STORAGE_KEY = 'superhabits.theme.mode';
@@ -61,19 +50,6 @@ function resolveTheme(mode: ThemeMode, system: SystemTheme): ResolvedTheme {
 function kebabToCamelCssVar(key: string): string {
   return `--sh-${key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
 }
-
-type ThemeContextValue = {
-  mode: ThemeMode;
-  resolvedTheme: ResolvedTheme;
-  themeId: ThemeId;
-  theme: ThemeDefinition;
-  tokens: ThemeTokens;
-  sectionAccents: Record<SectionKey, SectionAccent>;
-  setMode: (nextMode: ThemeMode) => void;
-  setTheme: (id: ThemeId) => void;
-};
-
-const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const [mode, setModeState] = useState<ThemeMode>('system');
@@ -159,12 +135,4 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
-}
-
-export function useAppTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useAppTheme must be used within ThemeProvider');
-  }
-  return context;
 }

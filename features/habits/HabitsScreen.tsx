@@ -24,10 +24,10 @@ import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { Button } from '@/core/ui/Button';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
-import { useAppNavigation } from '@/core/providers/NavigationProvider';
-import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
-import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { useAppNavigation } from '@/core/providers/navigationContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
+import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import type { Habit, HabitCategory, HabitIcon } from './types';
 import {
   addHabit,
@@ -311,7 +311,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     const pendingHabitId = consumePendingHabitFocus();
     if (!pendingHabitId) return;
     const habit = habits.find((candidate) => candidate.id === pendingHabitId);
-    if (habit) void openEditModal(habit);
+    if (!habit) return;
+
+    // Pending focus is an external navigation response. Schedule the modal
+    // state transition after the effect callback so React does not cascade a
+    // synchronous render while it is reconciling the mounted screen.
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) void openEditModal(habit);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [consumePendingHabitFocus, habits, habitsLoaded, isActive, openEditModal]);
 
   const handleReminderToggle = async () => {

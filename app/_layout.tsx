@@ -4,9 +4,11 @@ import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { AppProviders, useAppBootstrapState } from '@/core/providers/AppProviders';
-import { NavigationProvider, useAppNavigation } from '@/core/providers/NavigationProvider';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { AppProviders } from '@/core/providers/AppProviders';
+import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
+import { NavigationProvider } from '@/core/providers/NavigationProvider';
+import { useAppNavigation } from '@/core/providers/navigationContext';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
 import {
   CommandCenterProvider,
@@ -23,7 +25,7 @@ import {
   completeHabitReminderAction,
   snoozeHabitReminderAction,
 } from '@/features/habits/habitReminderActions';
-import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
+import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 
 /**
  * Route-level error boundary so a render-time exception shows recovery UI

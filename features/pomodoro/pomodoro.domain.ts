@@ -20,6 +20,38 @@ export const DEFAULT_SETTINGS: PomodoroSettings = {
   sessionsBeforeLongBreak: 4,
 };
 
+function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+    ? value
+    : fallback;
+}
+
+/** Normalize persisted settings so malformed app_meta JSON cannot poison timer state. */
+export function normalizePomodoroSettings(value: unknown): PomodoroSettings {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return {
+    focusMinutes: boundedInteger(candidate.focusMinutes, DEFAULT_SETTINGS.focusMinutes, 1, 120),
+    shortBreakMinutes: boundedInteger(
+      candidate.shortBreakMinutes,
+      DEFAULT_SETTINGS.shortBreakMinutes,
+      1,
+      60,
+    ),
+    longBreakMinutes: boundedInteger(
+      candidate.longBreakMinutes,
+      DEFAULT_SETTINGS.longBreakMinutes,
+      1,
+      120,
+    ),
+    sessionsBeforeLongBreak: boundedInteger(
+      candidate.sessionsBeforeLongBreak,
+      DEFAULT_SETTINGS.sessionsBeforeLongBreak,
+      2,
+      10,
+    ),
+  };
+}
+
 export function applySettingsToTimerState(
   nextSettings: PomodoroSettings,
   state: {

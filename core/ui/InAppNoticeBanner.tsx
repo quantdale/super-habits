@@ -1,8 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAppNavigation } from '@/core/providers/NavigationProvider';
+import { useAppNavigation } from '@/core/providers/navigationContext';
 import { Pressable, SafeAreaView, Text, View } from 'react-native';
-import { useInAppNotices } from '@/core/providers/InAppNoticeProvider';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 function formatContextLabel(label?: string, fallbackFeature?: string) {
   return label?.trim() || fallbackFeature || 'item';

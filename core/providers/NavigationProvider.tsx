@@ -1,36 +1,35 @@
-import { createContext, useCallback, useContext, useState, type PropsWithChildren } from 'react';
+import { useCallback, useState, type PropsWithChildren } from 'react';
+import { NavigationContext, type AppSection } from '@/core/providers/navigationContext';
 
-/**
- * The six primary app sections. These double as command-center launch contexts
- * and linked-action navigation targets. "pomodoro" is the canonical feature
- * name even though the user-facing section label is "Focus".
- */
-export type AppSection = 'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories';
-
-type NavigationContextValue = {
-  activeSection: AppSection;
-  setActiveSection: (section: AppSection) => void;
-  openHabit: (habitId: string) => void;
-  consumePendingHabitFocus: () => string | null;
-  isSettingsOpen: boolean;
-  openSettings: () => void;
-  closeSettings: () => void;
-};
-
-const NavigationContext = createContext<NavigationContextValue | null>(null);
+export type { AppSection } from '@/core/providers/navigationContext';
 
 export function NavigationProvider({ children }: PropsWithChildren) {
-  const [activeSection, setActiveSection] = useState<AppSection>('overview');
+  const [activeSection, setActiveSectionState] = useState<AppSection>('overview');
+  const [mountedSections, setMountedSections] = useState<Record<AppSection, boolean>>({
+    overview: true,
+    todos: false,
+    habits: false,
+    pomodoro: false,
+    workout: false,
+    calories: false,
+  });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [pendingHabitFocusId, setPendingHabitFocusId] = useState<string | null>(null);
 
   const openSettings = useCallback(() => setIsSettingsOpen(true), []);
   const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
-  const openHabit = useCallback((habitId: string) => {
-    setPendingHabitFocusId(habitId);
-    setActiveSection('habits');
-    setIsSettingsOpen(false);
+  const setActiveSection = useCallback((section: AppSection) => {
+    setMountedSections((current) => (current[section] ? current : { ...current, [section]: true }));
+    setActiveSectionState(section);
   }, []);
+  const openHabit = useCallback(
+    (habitId: string) => {
+      setPendingHabitFocusId(habitId);
+      setActiveSection('habits');
+      setIsSettingsOpen(false);
+    },
+    [setActiveSection],
+  );
   const consumePendingHabitFocus = useCallback(() => {
     let pending = pendingHabitFocusId;
     setPendingHabitFocusId((current) => {
@@ -44,6 +43,7 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     <NavigationContext.Provider
       value={{
         activeSection,
+        mountedSections,
         setActiveSection,
         openHabit,
         consumePendingHabitFocus,
@@ -55,12 +55,4 @@ export function NavigationProvider({ children }: PropsWithChildren) {
       {children}
     </NavigationContext.Provider>
   );
-}
-
-export function useAppNavigation(): NavigationContextValue {
-  const context = useContext(NavigationContext);
-  if (!context) {
-    throw new Error('useAppNavigation must be used within a NavigationProvider');
-  }
-  return context;
 }

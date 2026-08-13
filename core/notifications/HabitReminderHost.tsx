@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
-import { useAppBootstrapState } from '@/core/providers/AppProviders';
-import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
+import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import {
   reconcileHabitReminders,

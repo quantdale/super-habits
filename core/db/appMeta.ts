@@ -71,10 +71,13 @@ export async function getAppMetaJsonOrDefault<T>(
   db: SQLite.SQLiteDatabase,
   metaKey: AppMetaJsonKey,
   fallback: T,
+  normalize?: (value: unknown) => T | null,
 ): Promise<T> {
   try {
-    const value = await getAppMetaJson<T>(db, metaKey);
-    return value ?? fallback;
+    const value = await getAppMetaJson<unknown>(db, metaKey);
+    if (value === null) return fallback;
+    if (!normalize) return value as T;
+    return normalize(value) ?? fallback;
   } catch {
     return fallback;
   }

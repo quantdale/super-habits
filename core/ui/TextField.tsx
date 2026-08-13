@@ -1,5 +1,5 @@
 import { Platform, Text, TextInput, View } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 type TextFieldProps = {
   label: string;

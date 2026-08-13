@@ -6,6 +6,7 @@ import { createId } from '@/lib/id';
 import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
 import {
   DEFAULT_SETTINGS,
+  normalizePomodoroSettings,
   type PomodoroMode,
   type PomodoroSettings,
 } from '@/features/pomodoro/pomodoro.domain';
@@ -63,12 +64,13 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
     db,
     appMetaKeys.pomodoroSettings,
     DEFAULT_SETTINGS,
+    normalizePomodoroSettings,
   );
 }
 
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.pomodoroSettings, settings);
+  await setAppMetaJson(db, appMetaKeys.pomodoroSettings, normalizePomodoroSettings(settings));
 }
 
 export async function logPomodoroSession(

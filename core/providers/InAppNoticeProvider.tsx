@@ -1,11 +1,4 @@
-import {
-  createContext,
-  type PropsWithChildren,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
+import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import {
   createInAppNoticeState,
   dismissInAppNotice,
@@ -13,16 +6,8 @@ import {
   getCurrentInAppNotice,
   type InAppNoticeState,
 } from '@/core/notifications/inAppNotices.store';
+import { InAppNoticeContext } from '@/core/providers/inAppNoticeContext';
 import type { AppNotice } from '@/core/notifications/inAppNotices.types';
-
-type InAppNoticeContextValue = {
-  currentNotice: AppNotice | null;
-  notices: AppNotice[];
-  showNotice: (notice: AppNotice) => void;
-  dismissNotice: (noticeId: string) => void;
-};
-
-const InAppNoticeContext = createContext<InAppNoticeContextValue | null>(null);
 
 export function InAppNoticeProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<InAppNoticeState>(() => createInAppNoticeState());
@@ -46,12 +31,4 @@ export function InAppNoticeProvider({ children }: PropsWithChildren) {
   );
 
   return <InAppNoticeContext.Provider value={value}>{children}</InAppNoticeContext.Provider>;
-}
-
-export function useInAppNotices() {
-  const context = useContext(InAppNoticeContext);
-  if (!context) {
-    throw new Error('useInAppNotices must be used within InAppNoticeProvider');
-  }
-  return context;
 }

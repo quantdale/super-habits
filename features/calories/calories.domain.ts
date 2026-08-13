@@ -1,7 +1,31 @@
-import type { DailySummary, SavedMeal } from './types';
+import type { CalorieGoal, DailySummary, SavedMeal } from './types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { buildDateRange, buildDateRangeOldestFirst } from '@/lib/time';
+
+export const DEFAULT_CALORIE_GOAL: CalorieGoal = {
+  calories: 2000,
+  protein: 150,
+  carbs: 200,
+  fats: 65,
+};
+
+function boundedGoalNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : fallback;
+}
+
+/** Normalize persisted goals so malformed app_meta JSON cannot create NaN UI math. */
+export function normalizeCalorieGoal(value: unknown): CalorieGoal {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return {
+    calories: boundedGoalNumber(candidate.calories, DEFAULT_CALORIE_GOAL.calories, 500, 6000),
+    protein: boundedGoalNumber(candidate.protein, DEFAULT_CALORIE_GOAL.protein, 0, 999),
+    carbs: boundedGoalNumber(candidate.carbs, DEFAULT_CALORIE_GOAL.carbs, 0, 999),
+    fats: boundedGoalNumber(candidate.fats, DEFAULT_CALORIE_GOAL.fats, 0, 999),
+  };
+}
 
 /**
  * (protein × 4) + ((carbs − fiber) × 4) + (fiber × 2) + (fat × 9)

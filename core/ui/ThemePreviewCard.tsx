@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import type { ThemeDefinition } from '@/core/theme';
 
 type ThemePreviewCardProps = {

@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
+import { type PropsWithChildren, useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Modal, Platform, Text, View } from 'react-native';
@@ -16,22 +16,12 @@ import type { RestorePreview } from '@/core/sync/restore.types';
 import { InAppNoticeProvider } from '@/core/providers/InAppNoticeProvider';
 import { DayRolloverProvider } from '@/core/providers/DayRolloverProvider';
 import { ensureAnonymousSession, isRemoteEnabled } from '@/lib/supabase';
-import { ThemeProvider, useAppTheme } from '@/core/providers/ThemeProvider';
+import { ThemeProvider } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { AppBootstrapStateContext } from '@/core/providers/appBootstrapContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
-
-type AppBootstrapState = {
-  authBootstrapReady: boolean;
-};
-
-const AppBootstrapStateContext = createContext<AppBootstrapState>({
-  authBootstrapReady: false,
-});
-
-export function useAppBootstrapState(): AppBootstrapState {
-  return useContext(AppBootstrapStateContext);
-}
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);

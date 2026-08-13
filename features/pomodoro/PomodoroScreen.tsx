@@ -7,10 +7,10 @@ import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { PillChip } from '@/core/ui/PillChip';
 import { ScreenSection } from '@/core/ui/ScreenSection';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
-import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
-import { useCommandLauncherSuppressed } from '@/features/command/CommandCenterProvider';
+import { useCommandLauncherSuppressed } from '@/features/command/commandCenterContext';
 import {
   listPomodoroSessionsForDateRange,
   logPomodoroSession,

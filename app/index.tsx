@@ -1,12 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { Pressable, Text, View, useWindowDimensions, type ViewProps } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
-import { type AppSection, useAppNavigation } from '@/core/providers/NavigationProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { Modal } from '@/core/ui/Modal';
 import { OverviewScreen } from '@/features/overview/OverviewScreen';
 import { TodosScreen } from '@/features/todos/TodosScreen';
@@ -145,30 +145,11 @@ function SectionContainer({
 
 export default function Index() {
   const { tokens, resolvedTheme, sectionAccents } = useAppTheme();
-  const { activeSection, setActiveSection, isSettingsOpen, closeSettings } = useAppNavigation();
+  const { activeSection, mountedSections, setActiveSection, isSettingsOpen, closeSettings } =
+    useAppNavigation();
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop } = useSafeAreaInsets();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
-
-  const [mountedSections, setMountedSections] = useState<Record<AppSection, boolean>>(() => {
-    const initial: Record<AppSection, boolean> = {
-      overview: false,
-      todos: false,
-      habits: false,
-      pomodoro: false,
-      workout: false,
-      calories: false,
-    };
-    initial.overview = true;
-    return initial;
-  });
-
-  useEffect(() => {
-    setMountedSections((current) => {
-      if (current[activeSection]) return current;
-      return { ...current, [activeSection]: true };
-    });
-  }, [activeSection]);
 
   const currentIndex = useMemo(
     () => NAV_ITEMS.findIndex((item) => item.name === activeSection),

@@ -1,4 +1,4 @@
-import type { AppSection } from '@/core/providers/NavigationProvider';
+import type { AppSection } from '@/core/providers/navigationContext';
 
 export type InAppNoticeContext = {
   feature: string;

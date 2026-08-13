@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 /** Align with `Card` (rounded-2xl, border, shadow). */
 const CARD_RADIUS = 16;

@@ -1,21 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { AppState, Platform } from 'react-native';
 import { toDateKey } from '@/lib/time';
+import { didLocalDayRollOver, getMillisecondsUntilNextLocalMidnight } from './dayRollover';
+import { DayRolloverContext } from './dayRolloverContext';
 
-const DayRolloverContext = createContext(0);
-
-/** Return true only when the local calendar day has changed. */
-export function didLocalDayRollOver(previousDayKey: string, currentDayKey: string): boolean {
-  return previousDayKey !== currentDayKey;
-}
+const MAX_TIMER_DELAY_MS = 2_147_000_000;
 
 export function DayRolloverProvider({ children }: PropsWithChildren) {
   const lastDayKeyRef = useRef(toDateKey());
@@ -30,13 +19,27 @@ export function DayRolloverProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    // One app-wide check is deliberately shared by all mounted sections. The
-    // short interval also lets deterministic browser-clock journeys observe a
-    // setSystemTime() day jump without requiring a reload or a user gesture.
-    const intervalId = setInterval(checkDay, 1_000);
+    // One app-wide timer is shared by all mounted sections. It wakes at the
+    // next local midnight; foreground/visibility events handle sleep, clock,
+    // and timezone changes without a permanent high-frequency poll.
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const scheduleNextCheck = () => {
+      if (timerId !== undefined) clearTimeout(timerId);
+      const delay = Math.min(getMillisecondsUntilNextLocalMidnight(), MAX_TIMER_DELAY_MS);
+      timerId = setTimeout(() => {
+        checkDay();
+        scheduleNextCheck();
+      }, delay);
+    };
+    const checkAndReschedule = () => {
+      checkDay();
+      scheduleNextCheck();
+    };
+
+    scheduleNextCheck();
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') checkDay();
+      if (document.visibilityState === 'visible') checkAndReschedule();
     };
     let removeVisibilityListener: (() => void) | undefined;
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -46,19 +49,15 @@ export function DayRolloverProvider({ children }: PropsWithChildren) {
     }
 
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') checkDay();
+      if (nextState === 'active') checkAndReschedule();
     });
 
     return () => {
-      clearInterval(intervalId);
+      if (timerId !== undefined) clearTimeout(timerId);
       removeVisibilityListener?.();
       appStateSubscription.remove();
     };
   }, [checkDay]);
 
   return <DayRolloverContext.Provider value={generation}>{children}</DayRolloverContext.Provider>;
-}
-
-export function useDayRolloverGeneration(): number {
-  return useContext(DayRolloverContext);
 }

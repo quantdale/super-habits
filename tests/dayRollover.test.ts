@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { didLocalDayRollOver } from '@/core/providers/DayRolloverProvider';
+import {
+  didLocalDayRollOver,
+  getMillisecondsUntilNextLocalMidnight,
+  getNextLocalMidnight,
+} from '@/core/providers/dayRollover';
 
 describe('day rollover detection', () => {
   it('detects a local calendar-day boundary', () => {
@@ -21,5 +25,19 @@ describe('day rollover detection', () => {
     }
     expect(generation).toBe(2);
     expect(lastDay).toBe('2026-08-05');
+  });
+
+  it('schedules the next local midnight without a one-second polling interval', () => {
+    const now = new Date(2026, 7, 14, 23, 59, 30, 0);
+    const next = getNextLocalMidnight(now);
+    expect(next.getHours()).toBe(0);
+    expect(next.getDate()).toBe(15);
+    expect(getMillisecondsUntilNextLocalMidnight(now)).toBe(30_000);
+  });
+
+  it('handles a check exactly at midnight by scheduling the following boundary', () => {
+    const now = new Date(2026, 7, 15, 0, 0, 0, 0);
+    expect(getNextLocalMidnight(now).getDate()).toBe(16);
+    expect(getMillisecondsUntilNextLocalMidnight(now)).toBe(24 * 60 * 60 * 1000);
   });
 });

@@ -1,6 +1,6 @@
 import { PropsWithChildren } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;

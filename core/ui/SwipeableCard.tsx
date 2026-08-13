@@ -1,7 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 import { type StyleProp, View, type ViewStyle } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from './Card';
 import { SwipeRightActions } from './SwipeRightActions';
 
