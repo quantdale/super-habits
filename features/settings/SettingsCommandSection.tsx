@@ -1,5 +1,5 @@
 import { Pressable, Text } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';

@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { memo, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import type { TodoPriority } from './types';
 
 function withAlpha(color: string, opacity: number) {

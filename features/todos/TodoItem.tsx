@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { memo } from 'react';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import { DueDateBadge } from './DueDateBadge';
 import { PriorityBadge } from './PriorityBadge';

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';

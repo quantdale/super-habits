@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text } from 'react-native';
-import { useAppBootstrapState } from '@/core/providers/AppProviders';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.coordinator';
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { syncEngine } from '@/core/sync/sync.engine';
@@ -19,7 +19,7 @@ import {
   getAiCommandInternalRolloutPreference,
   setAiCommandInternalRolloutPreference,
 } from '@/features/command/commandInternalRollout';
-import { useCommandCenter } from '@/features/command/CommandCenterProvider';
+import { useCommandCenter } from '@/features/command/commandCenterContext';
 import { getPomodoroSettings, savePomodoroSettings } from '@/features/pomodoro/pomodoro.data';
 import { DEFAULT_SETTINGS, type PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
 import { validateCalorieGoal, validatePomodoroSettings } from '@/lib/validation';
@@ -156,17 +156,22 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
 
   useEffect(() => {
     if (!visible) return;
-    void maybeLoadRestorePreviewForSettings({
-      authBootstrapReady,
-      loadRestorePreview,
-      onAuthBootstrapping: () => {
-        setRestoreLoading(true);
-        setRestoreError(null);
-      },
+    // These are asynchronous external-data loads. Starting them in a
+    // microtask keeps the effect from synchronously cascading state updates
+    // while the settings modal is being committed.
+    void Promise.resolve().then(() => {
+      void maybeLoadRestorePreviewForSettings({
+        authBootstrapReady,
+        loadRestorePreview,
+        onAuthBootstrapping: () => {
+          setRestoreLoading(true);
+          setRestoreError(null);
+        },
+      });
+      void loadCommandRolloutPreference();
+      void loadPomodoroDefaults();
+      void loadCalorieDefaults();
     });
-    void loadCommandRolloutPreference();
-    void loadPomodoroDefaults();
-    void loadCalorieDefaults();
   }, [
     visible,
     authBootstrapReady,

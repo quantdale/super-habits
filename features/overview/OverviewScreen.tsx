@@ -3,7 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { POMODORO_SECTION_KEY, SECTION_COLORS, type SectionKey } from '@/constants/sectionColors';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
@@ -50,8 +50,8 @@ import {
   computeWorkoutStreakFromHeatmapDays,
 } from '@/features/workout/workout.domain';
 import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
-import { useAppNavigation } from '@/core/providers/NavigationProvider';
-import { useDayRolloverGeneration } from '@/core/providers/DayRolloverProvider';
+import { useAppNavigation } from '@/core/providers/navigationContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 
 type ViewMode = 'grid' | 'column' | 'list';
 type OverviewCardKey = 'pomodoro' | 'habits' | 'calories' | 'todos' | 'workout';

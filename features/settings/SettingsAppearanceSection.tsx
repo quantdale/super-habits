@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
-import type { ResolvedTheme, ThemeMode } from '@/core/providers/ThemeProvider';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import type { ResolvedTheme, ThemeMode } from '@/core/providers/themeContext';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { DARK_THEME_IDS, LIGHT_THEME_IDS, THEME_REGISTRY, type ThemeId } from '@/core/theme';
 import { Card } from '@/core/ui/Card';
 import { PillChip } from '@/core/ui/PillChip';
