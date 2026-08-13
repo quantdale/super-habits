@@ -49,28 +49,30 @@ plan committed on `main`.
 
 ## Current Checkpoint
 
-- Current milestone: Full branch audit and local recovery preservation complete;
-  remote cleanup and main synchronization remain.
+- Current milestone: Full branch audit, local recovery preservation, and
+  documentation/main validation are complete; remote cleanup remains.
 - Completed: fetched/pruned; confirmed clean starting worktree; confirmed
   local `main == origin/main`; enumerated 32 non-main remote heads; computed a
   merge-base, ancestor result, unique-commit count, and three-dot diff summary
   for every candidate; inspected the unique product/recovery commits and
   current-main counterparts; scanned historical refs for secret-like paths and
   content.
-- In progress: commit the audit plan on `main`, validate/push `main`, then
+- In progress: commit the validated checkpoint, push/synchronize `main`, then
   delete the audited remote refs in controlled batches and verify GitHub.
-- Important modified files: this plan only, currently being added in the main
-  worktree; no product files changed.
-- Last successful validation: `git fetch --all --prune`; all initial Git state
-  commands completed; working tree was clean.
+- Important modified files: `.agent/execplans/remote-branch-cleanup.md` is
+  committed on `main`; no product files changed.
+- Last successful validation: `qa:affected` selected `qa:fast`; `qa:fast`
+  passed typecheck/lint/unit (0 errors, 19 existing lint warnings, 672 unit
+  tests); `npm test` passed 741 tests in 70 files; strict OpenSpec validation
+  passed 21/21; QA impact validation and ExecPlan validation passed.
 - Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run the repository plan validator and a clean-main diff
-  check, commit this completed audit plan on `main`, push/synchronize
-  `origin/main`, then begin the first controlled remote-deletion batch.
+- Exact next action: commit the validated plan checkpoint on `main`, run
+  `git fetch origin` and `git push origin main`, verify local `main` equals
+  `origin/main`, then delete the first audited remote batch.
 - Remaining definition of done: all branches classified; any valuable work
   integrated and validated; local archive refs created when warranted; cleanup
   plan committed to `main`; `main == origin/main`; all non-main remote heads
@@ -89,7 +91,9 @@ plan committed on `main`.
       for every non-main head.
 - [ ] Integrate and validate any genuinely missing product work.
 - [x] Preserve local-only recovery/archive refs where justified.
-- [ ] Commit the completed audit plan on `main` and synchronize `origin/main`.
+- [x] Commit the completed audit plan on `main`.
+- [x] Validate the documentation-only main change.
+- [ ] Synchronize `origin/main` before deletion.
 - [ ] Delete safe remote branches in audited batches and verify after each.
 - [ ] Prune tracking refs, verify GitHub and local final state, and validate this
       completed plan.
@@ -272,6 +276,15 @@ the permitted classifications:
 - 2026-08-13 — local archive preservation — PASS; 14 local-only
   `refs/archive/remote-branch-cleanup/*` refs created and verified at the
   reviewed source tips; none was pushed.
+- 2026-08-13 — `npm run qa:affected` — PASS; documentation rule selected
+  `qa:fast` and `tests/agent-execplan.test.ts`.
+- 2026-08-13 — `npm run qa:fast` — PASS; typecheck and lint passed (19 existing
+  warnings, 0 errors) and 672 unit tests passed.
+- 2026-08-13 — `npm test` — PASS; 741 tests passed across 70 unit/integration
+  files.
+- 2026-08-13 — `npm run openspec:validate -- --strict` — PASS; 21/21 items.
+- 2026-08-13 — `npm run qa:impact:validate` — PASS; 12 rules valid.
+- 2026-08-13 — `git diff --check` and plan validator — PASS.
 
 ## Changed Files / Areas
 
