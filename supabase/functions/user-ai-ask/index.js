@@ -1,5 +1,10 @@
 // @ts-nocheck
 import { normalizeAskRequestBody } from "./normalize.js";
+import {
+  authenticateSupabaseUser,
+  consumeAiQuota,
+  readBoundedJson,
+} from "../_shared/aiSecurity.js";
 
 // DeepSeek v4 Flash via OpenCodeGo gateway (OpenAI-compatible API).
 // The original Bedrock/SigV4 design (tasks 4.2-4.8) was pivoted to this
@@ -33,9 +38,13 @@ const CORS_HEADERS = {
 };
 
 function jsonResponse(status, body) {
+  const headers = { ...CORS_HEADERS };
+  if (status === 429 && Number.isInteger(body?.retryAfterSeconds)) {
+    headers["Retry-After"] = String(body.retryAfterSeconds);
+  }
   return new Response(JSON.stringify(body), {
     status,
-    headers: CORS_HEADERS,
+    headers,
   });
 }
 
@@ -249,8 +258,20 @@ Deno.serve(async (request) => {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
   let requestBody;
+  const auth = await authenticateSupabaseUser(request);
+  if (!auth.ok) {
+    logAskEvent({
+      requestId,
+      questionLength: null,
+      latencyMs: Date.now() - startedAt,
+      outcome: "authentication_rejected",
+      httpStatus: auth.status,
+    });
+    return jsonResponse(auth.status, auth.body);
+  }
+
   try {
-    requestBody = normalizeAskRequestBody(await request.json());
+    requestBody = normalizeAskRequestBody(await readBoundedJson(request));
   } catch (error) {
     const responseBody = {
       error: error instanceof Error ? error.message : "Invalid request body.",
@@ -263,6 +284,22 @@ Deno.serve(async (request) => {
       httpStatus: 400,
     });
     return jsonResponse(400, responseBody);
+  }
+
+  const quota = await consumeAiQuota(
+    auth.userId,
+    requestBody.stage === "classify" ? "ask_classify" : "ask_phrase",
+  );
+  if (!quota.ok) {
+    logAskEvent({
+      requestId,
+      questionLength: requestBody.question.length,
+      stage: requestBody.stage,
+      latencyMs: Date.now() - startedAt,
+      outcome: "quota_rejected",
+      httpStatus: quota.status,
+    });
+    return jsonResponse(quota.status, quota.body);
   }
 
   // 2. Dispatch to classify or phrase stage.

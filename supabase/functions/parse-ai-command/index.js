@@ -5,6 +5,11 @@ import {
   normalizeModelResponse,
   toNonEmptyString,
 } from "./normalize.js";
+import {
+  authenticateSupabaseUser,
+  consumeAiQuota,
+  readBoundedJson,
+} from "../_shared/aiSecurity.js";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -262,8 +267,20 @@ Deno.serve(async (request) => {
   let requestBody;
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
+  const auth = await authenticateSupabaseUser(request);
+  if (!auth.ok) {
+    logParseEvent({
+      requestId,
+      rawTextLength: null,
+      latencyMs: Date.now() - startedAt,
+      outcome: "authentication_rejected",
+      httpStatus: auth.status,
+    });
+    return jsonResponse(auth.status, auth.body);
+  }
+
   try {
-    requestBody = normalizeRequestBody(await request.json());
+    requestBody = normalizeRequestBody(await readBoundedJson(request));
   } catch (error) {
     const responseBody = {
       error: error instanceof Error ? error.message : "Invalid request body.",
@@ -277,6 +294,18 @@ Deno.serve(async (request) => {
       httpStatus: 400,
     });
     return jsonResponse(400, responseBody);
+  }
+
+  const quota = await consumeAiQuota(auth.userId, "command_parse");
+  if (!quota.ok) {
+    logParseEvent({
+      requestId,
+      rawTextLength: requestBody.rawText.length,
+      latencyMs: Date.now() - startedAt,
+      outcome: "quota_rejected",
+      httpStatus: quota.status,
+    });
+    return jsonResponse(quota.status, quota.body);
   }
 
   try {
@@ -294,7 +323,7 @@ Deno.serve(async (request) => {
     return jsonResponse(200, normalized);
   } catch (error) {
     const responseBody = {
-      error: error instanceof Error ? error.message : "Unable to parse command.",
+      error: "Command parsing is temporarily unavailable.",
     };
     logParseEvent({
       requestId,

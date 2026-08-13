@@ -1,19 +1,18 @@
 # Reference-Schema Drift Procedure — Disposable-Backend Lane
 
-Applies to `simulation/backend/schema.sql`, the MANUALLY MAINTAINED COPY of
-the Supabase dashboard configuration for the four synced tables
-(`todos`, `habits`, `calorie_entries`, `workout_routines`) plus their RLS.
+Applies to `simulation/backend/schema.sql`, the disposable-lane compatibility
+fixture for the repository-managed Supabase migration contract. It covers the
+four synced tables (`todos`, `habits`, `calorie_entries`,
+`workout_routines`) plus their RLS.
 
 ## Why this file exists
 
 The full remote schema and RLS were historically maintained **only in the
-Supabase dashboard**, not in this repo (audit SEC-003). `schema.sql` remains a
-checked-in reference copy so the disposable-backend lane can provision
-throwaway projects — and so that a divergence between the dashboard and the
-repo is _visible_ instead of silent. Habit Engine V2 now also has an additive,
-repository-managed migration at
-`supabase/migrations/20260810130000_add_habits_rule_history.sql`; the intended
-remote project has not been verified from this workstation.
+Supabase dashboard**, not in this repo (audit SEC-003). The repository now owns
+an additive migration series under `supabase/migrations`; this file remains a
+standalone SQL payload so the guarded disposable-backend lane can provision a
+throwaway project. The intended remote project has not been verified from this
+workstation.
 The drift procedure below makes that divergence a finding, never a quiet edit.
 
 ## Current snapshot
@@ -23,8 +22,9 @@ The drift procedure below makes that divergence a finding, never a quiet edit.
   JSON rule array containing local ISO-weekday schedules and historical daily
   targets. The live Supabase dashboard must receive this additive column before
   production backup pushes can report success.
-- Column source of truth: `core/db/client.ts` (`bootstrapStatements` +
-  `runMigrations`) and the entity types in `core/db/types.ts`. The sync
+- Column source of truth for the remote: `supabase/migrations/` and the
+  checked-in validator (`npm run supabase:schema:validate`). Local shape comes
+  from `core/db/client.ts` (`bootstrapStatements` + `runMigrations`) and the entity types in `core/db/types.ts`. The sync
   adapter (`core/sync/supabase.adapter.ts`) selects the full local row
   (`SELECT *`) and upserts keyed on `id`, so every local column must exist
   remotely with a compatible type.
@@ -67,21 +67,12 @@ The Habit Engine V2 migration is intentionally narrow: it adds only the
 Applying it to the intended project remains a separate deployment gate because
 the target project and credentials must be identified first.
 
-The remaining infrastructure follow-up is to move the complete Supabase
-schema **into version control** so the dashboard is derived from (and
-reconciled against) a committed definition instead of the reverse.
+The remaining verification step is a read-only comparison of the linked
+project's `information_schema` and RLS policies against the migration contract.
+That requires credentials and is not performed by the static validator.
 
-Recommended shape: Supabase-managed migrations (a `supabase/migrations/*.sql`
-convention applied by `supabase db push` in CI against a staging project, or a
-local `supabase start` stack) — `schema.sql` is already written as plain
-Postgres SQL so it can be staged into that convention with minimal change. The
-follow-up change owns: migration scaffolding, a "dashboard drift detector"
-(compare the live remote `information_schema` against the committed schema and
-fail/label on mismatch), and retiring this manual-copy header once the remote
-is provably derived from the repo.
-
-Closes audit SEC-003; see the capability-gap register
-(`docs/testing/known-gaps.md`, "manually maintained reference schema").
+The repository-side portion of audit SEC-003 is closed; see the capability-gap
+register (`docs/testing/known-gaps.md`) for the external verification status.
 
 ## How schema.sql is applied
 

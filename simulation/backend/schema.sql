@@ -1,20 +1,21 @@
 -- ============================================================================
--- REFERENCE SCHEMA — DISPOSABLE-BACKEND LANE (task 8.1)
+-- COMPATIBILITY SCHEMA — DISPOSABLE-BACKEND LANE
 -- ============================================================================
--- MANUALLY MAINTAINED COPY of the Supabase dashboard configuration for the
--- four synced tables: todos, habits, calorie_entries, workout_routines.
+-- Compatibility fixture for the repository-managed Supabase contract in
+-- supabase/migrations/20260814140000_sync_schema_baseline.sql. The four
+-- synced tables are intentionally kept here as a standalone SQL payload for
+-- the guarded disposable-backend provisioning lane.
 --
--- The remote schema and RLS live ONLY in the Supabase dashboard, not in this
--- repo (audit SEC-003). This file is the repo-side reference copy used to
--- provision the disposable project. It is applied ONLY to throwaway projects
--- behind the guard (simulation/backend/guard.ts); it is never a runtime
--- authority the app reads. The authoritative local shape is
+-- It is applied ONLY to throwaway projects behind the guard
+-- (simulation/backend/guard.ts); it is never a runtime authority the app
+-- reads. The repository-managed remote authority is the ordered migration
+-- series under supabase/migrations; the authoritative local shape is
 -- core/db/client.ts (bootstrapStatements + runMigrations) and the entity
 -- types in core/db/types.ts.
 --
--- DRIFT PROCEDURE: see simulation/backend/DRIFT.md. Any discrepancy between
--- the dashboard tables and this file is filed as a finding (parent protocol),
--- never silently absorbed here.
+-- DRIFT PROCEDURE: see simulation/backend/DRIFT.md. Any live-project
+-- discrepancy from the migration contract is filed as a finding; it is never
+-- silently absorbed here.
 --
 -- COMPATIBILITY (future local lane): written as plain Postgres/Supabase SQL
 -- so it can also be applied to a local `supabase start` stack or via the

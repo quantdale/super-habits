@@ -1,7 +1,7 @@
 /**
  * Disposable-backend provisioning (design D8, task 8.2).
  *
- * Creates-or-reuses a throwaway Supabase project, applies the reference schema
+ * Creates-or-reuses a throwaway Supabase project, applies the compatibility schema
  * (simulation/backend/schema.sql), optionally deploys the `parse-ai-command`
  * edge function, emits a short-lived env file for the `dist-live/` build, and
  * tears the project down at the end of the run.
@@ -67,6 +67,10 @@ const EMITTED_ENV_KEYS = [
 /** Abort with a clear, greppable message. Never swallow the reason. */
 function failFast(message: string): never {
   throw new Error(`ABORT[disposable-backend]: ${message}`);
+}
+
+function writeLine(message: string): void {
+  process.stdout.write(`${message}\n`);
 }
 
 /** Run an async function and exit non-zero with a clear message on failure. */
@@ -295,7 +299,7 @@ async function createProject(opts: {
 async function teardownProject(ref: string): Promise<void> {
   try {
     await supabase(['projects', 'delete', ref, '--yes']);
-    console.log(`[disposable-backend] project ${ref} deleted.`);
+    writeLine(`[disposable-backend] project ${ref} deleted.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(
@@ -345,7 +349,7 @@ async function emitLiveEnv(info: ProjectInfo, marker: string): Promise<void> {
   await writeFile(LIVE_ENV_FILE, `${lines.join('\n')}\n`, 'utf8');
   await writeFile(MARKER_FILE, `${marker}\n`, 'utf8');
 
-  console.log(`[disposable-backend] env emitted to ${LIVE_ENV_FILE}`);
+  writeLine(`[disposable-backend] env emitted to ${LIVE_ENV_FILE}`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -427,13 +431,13 @@ async function run(argv: string[]): Promise<number> {
       });
     }
     await emitLiveEnv(info, marker);
-    console.log(
+    writeLine(
       `[disposable-backend] ready: ref=${info.ref} name=${info.name} marker=${marker}\n` +
         `  next: build dist-live via build-dist-live.sh, then run the round-trip scenario set.`,
     );
   } finally {
     if (noTeardown) {
-      console.log(`[disposable-backend] --no-teardown: leaving project ${info.ref} in place.`);
+      writeLine(`[disposable-backend] --no-teardown: leaving project ${info.ref} in place.`);
     } else {
       await teardownProject(info.ref);
     }
@@ -488,7 +492,7 @@ async function check(): Promise<number> {
   });
 
   if (result.ok) {
-    console.log(`[disposable-backend] guard PASSED for ${targetHost}`);
+    writeLine(`[disposable-backend] guard PASSED for ${targetHost}`);
     return 0;
   }
   console.error(result.message);
@@ -512,7 +516,7 @@ export async function main(argv: string[]): Promise<number> {
     case 'help':
     case '--help':
     case '-h':
-      console.log(
+      writeLine(
         [
           'usage: provision.ts <command> [options]',
           '',
