@@ -85,7 +85,8 @@ If this file conflicts with current code, trust the code and document the confli
 - Runtime schema version is `13`.
 - The next schema change belongs in a new `if (version < 14)` block in `core/db/client.ts`.
 - Migrations are append-only. Never edit prior migration blocks.
-- `core/db/schema.sql` is reference-only and currently stale.
+- `core/db/schema.sql` is reference-only but is maintained through the current
+  runtime schema version; runtime migration code remains authoritative.
 
 ## Feature Workflow
 

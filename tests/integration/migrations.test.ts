@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { TestDatabase } from './helpers/db';
+import { createTestDatabase, type TestDatabase } from './helpers/db';
 import { timestampToLocalDateKey } from '@/lib/time';
 
 /**
@@ -157,6 +157,44 @@ describe('tests/integration/migrations', () => {
     const habitColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(habits)');
     expect(habitColumns.map((column) => column.name)).toContain('rule_history');
     await db.closeAsync();
+  });
+
+  it('keeps the reference schema snapshot aligned through migration 13', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-reference-schema-'));
+    const file = path.join(dir, 'schema.db');
+    const reference = createTestDatabase(file);
+
+    try {
+      reference.raw.exec(readFileSync(path.join(process.cwd(), 'core/db/schema.sql'), 'utf8'));
+
+      const tables = reference.raw
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all() as { name: string }[];
+      expect(tables.map((table) => table.name)).toEqual(expect.arrayContaining(EXPECTED_TABLES));
+
+      const indexes = reference.raw
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+        .all() as { name: string }[];
+      expect(indexes.map((index) => index.name)).toEqual(
+        expect.arrayContaining(EXPECTED_NAMED_INDEXES),
+      );
+
+      const processedColumns = reference.raw
+        .prepare('PRAGMA table_info(processed_notification_actions)')
+        .all() as { name: string }[];
+      expect(processedColumns.map((column) => column.name)).toEqual([
+        'action_key',
+        'kind',
+        'action_name',
+        'occurrence_id',
+        'linked_event_id',
+        'linked_action_required',
+        'processed_at',
+      ]);
+    } finally {
+      await reference.closeAsync();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('re-running migrations on an existing v13 database is a no-op', async () => {

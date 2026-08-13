@@ -6,8 +6,8 @@
 -- Current stored schema version: 13 (next migration: case 14).
 -- This file is hand-maintained from core/db/client.ts — copy
 -- the bootstrap DDL and every `if (version < N)` block through
--- v12. It may lag behind the live schema. Do not rely on it
--- for migrations or type generation.
+-- v13. It is a documentation snapshot, not runtime migration code;
+-- do not rely on it for migrations or type generation.
 -- ============================================================
 
 PRAGMA journal_mode = WAL;
@@ -236,3 +236,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_linked_action_executions_chain_guard
 
 CREATE INDEX IF NOT EXISTS idx_linked_action_executions_chain
   ON linked_action_executions (chain_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS processed_notification_actions (
+  action_key              TEXT PRIMARY KEY NOT NULL,
+  kind                    TEXT NOT NULL,
+  action_name             TEXT NOT NULL,
+  occurrence_id           TEXT NOT NULL,
+  linked_event_id         TEXT NOT NULL,
+  linked_action_required  INTEGER NOT NULL DEFAULT 0,
+  processed_at            TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_processed_notification_actions_processed_at
+  ON processed_notification_actions (processed_at);

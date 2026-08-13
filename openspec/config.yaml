@@ -7,7 +7,7 @@ context: |
   SuperHabits is an offline-first productivity app: a PWA (Expo SDK 55, React Native 0.83, React 19, TypeScript strict, NativeWind/Tailwind, Expo Router) with a local SQLite source of truth (expo-sqlite; SQLite WASM + OPFS on web) and optional Supabase backup via anonymous auth.
   Six feature sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) render from a single root screen behind NavigationContext.activeSection; Settings is a modal overlay and the Command Center a global overlay — no routed tab/settings/command URLs.
   Layering: {feature}.data.ts owns SQLite reads/writes + sync enqueue; {feature}.domain.ts is pure logic (no DB, no React); screens are presentation-only and must not import the DB.
-  Non-negotiable invariants: soft delete only on synced entities; syncEngine.enqueue after every applicable write; getDatabase() singleton in core/db/client.ts; createId(prefix) for IDs; toDateKey() for local-calendar date keys; migrations append-only (current schema version 11).
+  Non-negotiable invariants: soft delete only on synced entities; syncEngine.enqueue after every applicable write; getDatabase() singleton in core/db/client.ts; createId(prefix) for IDs; toDateKey() for local-calendar date keys; migrations append-only (current schema version 13).
   Testing: Vitest unit tests plus a real-SQLite integration project (tests/integration/, better-sqlite3), and Playwright E2E against the static web export in dist/ (chromium specs, persona journeys in e2e/journeys/, and the user-simulation platform in simulation/).
 
 # Per-artifact rules (optional)

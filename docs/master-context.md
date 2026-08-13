@@ -388,7 +388,9 @@ Companion docs in this folder:
 
 ### Confirmed from code vs docs
 
-- `core/db/schema.sql` is a stale reference snapshot; runtime code is currently schema version `13` and the next append-only slot is `if (version < 14)`.
+- `core/db/schema.sql` is a hand-maintained reference snapshot of the runtime
+  bootstrap DDL plus migrations through schema version `13`; the next
+  append-only slot is `if (version < 14)`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 
