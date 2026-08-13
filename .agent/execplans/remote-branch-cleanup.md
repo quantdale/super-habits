@@ -71,9 +71,9 @@ plan committed on `main`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit this batch-2 checkpoint on `main`, push it, then
-  delete batch 3: the eight locally archived reflog snapshots, with tip-SHA
-  checks and post-batch live inventory.
+- Exact next action: delete batch 3, the eight locally archived reflog
+  snapshots, with tip-SHA checks and post-batch live inventory; then record and
+  push the checkpoint before the final seven-ref deletion batch.
 - Remaining definition of done: all branches classified; any valuable work
   integrated and validated; local archive refs created when warranted; cleanup
   plan committed to `main`; `main == origin/main`; all non-main remote heads
