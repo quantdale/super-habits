@@ -32,7 +32,7 @@ tags:
     direction: UP
 - tapOn:
     text: 'Add entry'
-    index: 0
+    below: 'Meal'
     point: '50%,10%'
 - scrollUntilVisible:
     element:

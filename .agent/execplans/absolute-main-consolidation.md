@@ -1,7 +1,7 @@
 # ExecPlan: Absolute main consolidation audit
 
 Plan-Version: 2
-Status: COMPLETED
+Status: ACTIVE
 
 ## Purpose / User Outcome
 
@@ -68,8 +68,9 @@ do not discard or hide unknown state.
 - Current milestone: six-directory/Git-topology inventory and dirty-state
   preservation complete; final-main migration/schema consistency, all web,
   sync, simulation, static, unit, integration, timezone, repository, and native
-  gates are complete. The six-directory re-audit, ancestry proof, normal remote
-  sync, and plan closure are complete.
+  gates are complete. A final exact-main native persistence run exposed a
+  selector race in the Calories flow; the semantic selector fix is now in
+  progress before reopening final native proof and closing the plan.
 - Completed: read startup/workflow/architecture/QA guidance; verified all six
   requested paths exist; confirmed they are linked worktrees of one repository;
   fetched/pruned origin; inspected the original dirty checkout; ran
@@ -144,11 +145,17 @@ do not discard or hide unknown state.
 - Completed: dummy-backend sync build and boundary E2E passed 19/19, covering
   broken backend responses, outbox/reconnect, restore, tombstone emptiness,
   and local-only restore behavior.
-- In progress: none; all required consolidation, validation, audit, and sync
-  actions are complete.
-- Current failures: no product, web, sync, or native Android failures remain.
-  iOS is an `ENVIRONMENT` block on Windows, and `npm audit --omit=dev` remains
-  a known dependency-advisory partial described in the ledger.
+- In progress: correct the Calories native selector, rebuild from the new
+  final-main SHA, rerun the affected native persistence proof plus the
+  reminder/lifecycle/Insights lanes, then update ancestry/remote proof and
+  close this plan.
+- Current failures: exact-main native persistence aggregate was `9/10`; only
+  `calories-persistence` failed because the text selector chose the header
+  `Add entry` match at `(531,250)` instead of the submit button. Immediate
+  isolated replay on the same APK passed. Maestro also logged heartbeat-file
+  lock errors. This is classified `TEST_BUG`/`FLAKY_TEST`, not a product or
+  database failure. iOS is an `ENVIRONMENT` block on Windows, and
+  `npm audit --omit=dev` remains a known dependency-advisory partial.
 - Current limitations: the first preservation commit attempt could not run the
   linked-worktree pre-commit hook because the original checkout's incomplete
   `node_modules` had no usable `.bin/prettier`/Expo dependency resolution; a
@@ -172,8 +179,9 @@ do not discard or hide unknown state.
 - Blockers: none established.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: none; retain recovery refs/worktrees and hand off the
-  synchronized `main` state.
+- Exact next action: run the corrected Calories flow and affected native
+  lanes on the rebuilt exact-main APK, then update this plan to COMPLETED only
+  after all final proofs pass and the new main is pushed normally.
 - Remaining definition of done: all six physical paths audited twice; no
   intended completed work remains only in a checkout/branch; final main is
   validated and clean; ancestry/content proof is recorded; plan validation
@@ -199,7 +207,8 @@ do not discard or hide unknown state.
 - [x] Build/install the exact final-main Android APK and run serialized native
       QA with the E2E reminder flag verified in the embedded bundle; classify
       iOS/Xcode availability.
-- [x] Re-audit six paths/branches, validate the plan, and synchronize origin.
+- [ ] Re-audit six paths/branches, validate the plan, and synchronize origin
+      after the final native selector correction.
 
 ## Surprises & Discoveries
 
@@ -254,6 +263,11 @@ do not discard or hide unknown state.
   nine preceding flows; an immediate direct replay passed all steps on the same
   APK, while the other nine aggregate flows passed. No app or test change was
   made to hide or retry it.
+- The exact-main native persistence rerun later failed only at the Calories
+  immediate diary assertion because the `Add entry` text selector selected the
+  card header rather than the form button when the scroll offset differed.
+  An isolated replay passed and the corrected selector now anchors the button
+  below the `Meal` label.
 
 ## Decision Log
 
@@ -363,6 +377,15 @@ do not discard or hide unknown state.
 - 2026-08-13 — Final exact-APK native persistence confirmation — PASS; the
   complete `qa:native:targeted` aggregate passed 10/10 in 9m04s on the APK
   built from the final-main identity `220adf3`.
+- 2026-08-13 — Exact-`ba9de0f` native persistence aggregate —
+  PARTIAL/TEST_BUG+FLAKY_TEST; 9/10 flows passed. `calories-persistence`
+  selected the `Add entry` card header at `(531,250)` instead of the submit
+  button when scroll position differed; the same APK and flow passed in an
+  isolated replay. The artifact also records repeated Maestro heartbeat-file
+  lock errors.
+- 2026-08-13 — Calories selector correction — PASS; the flow now selects
+  `Add entry` below the `Meal` label, and the corrected immediate/relaunch
+  flow passed on the installed exact-`ba9de0f` APK on `Nitro_API_36`.
 - 2026-08-13 — iOS native preflight — BLOCKED/ENVIRONMENT; Windows has no
   Xcode `xcrun/simctl`; the EAS native-e2e path remains the executable iOS
   route and was not claimed as a local pass.
