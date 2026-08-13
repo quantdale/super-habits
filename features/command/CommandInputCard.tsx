@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { TextField } from '@/core/ui/TextField';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 
 export function CommandInputCard({
   value,

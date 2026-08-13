@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { CommandSection } from './CommandSection';
 
 export function CommandParseResultCard({

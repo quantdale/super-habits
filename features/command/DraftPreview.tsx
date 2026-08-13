@@ -4,8 +4,8 @@ import { Card } from '@/core/ui/Card';
 import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
-import { type AppSection } from '@/core/providers/NavigationProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { type AppSection } from '@/core/providers/navigationContext';
 import {
   PreviewInfoRow,
   PreviewMissingField,

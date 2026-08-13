@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { PillChip } from '@/core/ui/PillChip';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import type { CommandMode } from './commandModePreference';
 
 const COMMAND_MODE_OPTIONS: { value: CommandMode; label: string }[] = [

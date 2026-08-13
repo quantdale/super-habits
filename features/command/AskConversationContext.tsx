@@ -1,20 +1,6 @@
-import {
-  createContext,
-  type PropsWithChildren,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
+import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
+import { AskConversationContext } from './askConversationContextValue';
 import type { AskConversationTurn } from './ask.types';
-
-type AskConversationContextValue = {
-  turns: AskConversationTurn[];
-  addTurn: (turn: AskConversationTurn) => void;
-  clearHistory: () => void;
-};
-
-const AskConversationContext = createContext<AskConversationContextValue | null>(null);
 
 /**
  * In-memory only, scoped to the app process — not the command center modal.
@@ -37,12 +23,4 @@ export function AskConversationProvider({ children }: PropsWithChildren) {
   return (
     <AskConversationContext.Provider value={value}>{children}</AskConversationContext.Provider>
   );
-}
-
-export function useAskConversation() {
-  const context = useContext(AskConversationContext);
-  if (!context) {
-    throw new Error('useAskConversation must be used within AskConversationProvider');
-  }
-  return context;
 }

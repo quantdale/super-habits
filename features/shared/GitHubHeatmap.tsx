@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { InteractionManager, View, Text, type ViewStyle } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { HorizontalScrollArea } from '@/core/ui/HorizontalScrollArea';
 import type { HeatmapDay } from './activityTypes';
+import { buildHeatmapWeekColumns, monthLabelsForHeatmapWeeks } from './githubHeatmap.domain';
 
 type Props = {
   days: HeatmapDay[];
@@ -44,72 +45,6 @@ function getColorForValue(value: number, color: string, emptyColor: string): str
   return color;
 }
 
-function parseLocalDate(dateKey: string): Date {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
-}
-
-/**
- * Week columns (Mon–Sun rows). Leading slots before the window are null.
- */
-function buildCalendarGrid(days: HeatmapDay[]): (HeatmapDay | null)[][] {
-  if (days.length === 0) return [];
-
-  const firstDate = parseLocalDate(days[0].dateKey);
-  const firstDow = (firstDate.getDay() + 6) % 7;
-
-  const padded: (HeatmapDay | null)[] = [
-    ...new Array<HeatmapDay | null>(firstDow).fill(null),
-    ...days,
-  ];
-
-  const weeks: (HeatmapDay | null)[][] = [];
-  for (let i = 0; i < padded.length; i += 7) {
-    const week = padded.slice(i, i + 7);
-    while (week.length < 7) week.push(null);
-    weeks.push(week);
-  }
-  return weeks;
-}
-
-/**
- * Build the visible calendar columns while honoring the explicit `weeks`
- * contract. A date window can need one leading partial column for alignment;
- * keep the most recent columns when that padding would exceed the requested
- * width.
- */
-export function buildHeatmapWeekColumns(
-  days: HeatmapDay[],
-  weeks: number = DEFAULT_WEEKS,
-): (HeatmapDay | null)[][] {
-  const maxDays = weeks * 7;
-  const trimmedDays = days.length > maxDays ? days.slice(-maxDays) : days;
-  const calendarGrid = buildCalendarGrid(trimmedDays);
-  return calendarGrid.length > weeks ? calendarGrid.slice(-weeks) : calendarGrid;
-}
-
-function firstDayInWeek(week: (HeatmapDay | null)[]): HeatmapDay | null {
-  for (const d of week) {
-    if (d) return d;
-  }
-  return null;
-}
-
-function monthLabelsForWeeks(weeksGrid: (HeatmapDay | null)[][]): string[] {
-  let prevKey: string | null = null;
-  return weeksGrid.map((week) => {
-    const first = firstDayInWeek(week);
-    if (!first) return '';
-    const dt = parseLocalDate(first.dateKey);
-    const key = `${dt.getFullYear()}-${dt.getMonth()}`;
-    if (key !== prevKey) {
-      prevKey = key;
-      return dt.toLocaleDateString('en', { month: 'short' });
-    }
-    return '';
-  });
-}
-
 function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props) {
   const { tokens } = useAppTheme();
   const [isReady, setIsReady] = useState(false);
@@ -133,7 +68,7 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
   }, []);
 
   const weekColumns = useMemo(() => buildHeatmapWeekColumns(days, weeks), [days, weeks]);
-  const monthLabels = useMemo(() => monthLabelsForWeeks(weekColumns), [weekColumns]);
+  const monthLabels = useMemo(() => monthLabelsForHeatmapWeeks(weekColumns), [weekColumns]);
 
   const footer = label ? (
     <Text

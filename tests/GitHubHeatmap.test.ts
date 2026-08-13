@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHeatmapWeekColumns } from '@/features/shared/GitHubHeatmap';
+import { buildHeatmapWeekColumns } from '@/features/shared/githubHeatmap.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 
 function dateKey(date: Date): string {

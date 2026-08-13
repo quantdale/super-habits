@@ -1,16 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { type AppSection, useAppNavigation } from '@/core/providers/NavigationProvider';
-import {
-  createContext,
-  type PropsWithChildren,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
+import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
 import {
@@ -18,17 +10,7 @@ import {
   getCommandCenterContextCopy,
 } from './commandCenterConfig';
 import { CommandScreen } from './CommandScreen';
-
-type CommandCenterContextValue = {
-  isOpen: boolean;
-  launchContext: CommandCenterLaunchContext | null;
-  launcherSuppressed: boolean;
-  openCommandCenter: (context: CommandCenterLaunchContext) => void;
-  closeCommandCenter: () => void;
-  setLauncherSuppressed: (key: string, suppressed: boolean) => void;
-};
-
-const CommandCenterContext = createContext<CommandCenterContextValue | null>(null);
+import { CommandCenterContext, useCommandCenter } from './commandCenterContext';
 
 export function CommandCenterProvider({ children }: PropsWithChildren) {
   const [isOpen, setIsOpen] = useState(false);
@@ -79,25 +61,6 @@ export function CommandCenterProvider({ children }: PropsWithChildren) {
   );
 
   return <CommandCenterContext.Provider value={value}>{children}</CommandCenterContext.Provider>;
-}
-
-export function useCommandCenter() {
-  const context = useContext(CommandCenterContext);
-  if (!context) {
-    throw new Error('useCommandCenter must be used within CommandCenterProvider');
-  }
-  return context;
-}
-
-export function useCommandLauncherSuppressed(key: string, suppressed: boolean) {
-  const { setLauncherSuppressed } = useCommandCenter();
-
-  useEffect(() => {
-    setLauncherSuppressed(key, suppressed);
-    return () => {
-      setLauncherSuppressed(key, false);
-    };
-  }, [key, setLauncherSuppressed, suppressed]);
 }
 
 function FloatingCommandLauncher({

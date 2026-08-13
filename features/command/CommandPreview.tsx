@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import { Card } from '@/core/ui/Card';
-import { useAppTheme } from '@/core/providers/ThemeProvider';
+import { useAppTheme } from '@/core/providers/themeContext';
 import {
   type CommandCenterLaunchContext,
   getCommandCenterContextCopy,
