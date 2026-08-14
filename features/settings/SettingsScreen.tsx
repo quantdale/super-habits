@@ -46,7 +46,16 @@ type SettingsScreenProps = {
 
 export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps) {
   const { mode, resolvedTheme, themeId, setMode, setTheme, tokens } = useAppTheme();
-  const { authBootstrapReady } = useAppBootstrapState();
+  const {
+    authBootstrapReady,
+    accountState,
+    protectAccount,
+    verifyAccountProtection,
+    resendAccountProtection,
+    requestAccountRecovery,
+    verifyAccountRecovery,
+    resendAccountRecovery,
+  } = useAppBootstrapState();
   const { openCommandCenter } = useCommandCenter();
   const commandConfig = useMemo(() => getAiCommandParseConfig(), []);
   const commandInternalRolloutAvailable = useMemo(
@@ -175,6 +184,9 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
   }, [
     visible,
     authBootstrapReady,
+    accountState.status,
+    accountState.canRecoverExisting,
+    accountState.canRecoverOwner,
     loadCalorieDefaults,
     loadCommandRolloutPreference,
     loadPomodoroDefaults,
@@ -336,6 +348,13 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         restoreRunning={restoreRunning}
         restoreError={restoreError}
         onRestore={handleRestore}
+        accountState={accountState}
+        onProtectAccount={protectAccount}
+        onVerifyAccountProtection={verifyAccountProtection}
+        onResendAccountProtection={resendAccountProtection}
+        onRequestAccountRecovery={requestAccountRecovery}
+        onVerifyAccountRecovery={verifyAccountRecovery}
+        onResendAccountRecovery={resendAccountRecovery}
       />
 
       <SettingsCommandSection

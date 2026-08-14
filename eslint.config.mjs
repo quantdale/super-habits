@@ -181,6 +181,7 @@ export default [
             {
               group: ['@/core/**'],
               caseSensitive: true,
+              allowTypeImports: true,
               message:
                 'Domain layers must not import core/ (DB, sync, providers, UI); keep domain files pure.',
             },
@@ -245,6 +246,7 @@ export default [
     files: ['**/*.ts', '**/*.tsx'],
     ignores: [
       'core/db/**',
+      'core/auth/**',
       'core/sync/**',
       'core/providers/AppProviders.tsx',
       'core/linked-actions/linkedActions.data.ts',

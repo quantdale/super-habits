@@ -96,7 +96,7 @@ export default defineConfig({
       expect: { timeout: 10_000 },
       workers: 1,
       fullyParallel: false,
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], serviceWorkers: 'block' },
     },
     {
       name: 'simulation',
@@ -143,7 +143,7 @@ export default defineConfig({
       expect: { timeout: 10_000 },
       workers: 1,
       fullyParallel: false,
-      use: { ...devices['Desktop Chrome'], baseURL: e2eBaseUrl },
+      use: { ...devices['Desktop Chrome'], baseURL: e2eBaseUrl, serviceWorkers: 'block' },
     },
   ],
 

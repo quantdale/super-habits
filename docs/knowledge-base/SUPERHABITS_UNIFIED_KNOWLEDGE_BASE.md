@@ -65,7 +65,9 @@
 
 **Sync / backup:** synced writes commit their local mutation and a durable `sync_outbox` row in one SQLite transaction, then publish to the in-memory queue. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub), and revision matching prevents an old push from deleting a newer pending mutation. `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior; durable pending outbox rows remain available for a later flush. If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
-**Restore v1:** startup and Settings use `core/sync/restore.coordinator.ts` to preview backup status and allow a conservative restore only on an **empty device** for synced tables. Restore imports **todos**, **habits**, and **calorie_entries**. Habit completion history, saved meals, and workout restore remain out of scope in this phase.
+**Restore v1:** startup and Settings use `core/sync/restore.coordinator.ts` to preview backup status and allow a conservative restore only on an **empty device** for synced tables. Restore imports **todos**, **habits**, and **calorie_entries**. Habit completion history, saved meals, and workout restore remain out of scope in this phase. A recovered protected account must pass the same owner and empty-device gates before this flow runs.
+
+**Recoverable Account V1:** `core/auth/accountCoordinator.ts` and `core/auth/account.data.ts` maintain the local-only dataset binding `app_meta.account.owner_user_id` plus typed inspection of all user-owned tables and durable outbox owners. An empty/unbound install may create an anonymous Auth session; a bound or populated dataset that loses Auth enters recovery-required state and never creates a replacement anonymous owner. A verified different UID enters owner-mismatch state. Settings can protect the current anonymous UUID with email-change OTP, requiring the verified result to retain that UUID, or recover an existing protected account with email OTP and `shouldCreateUser: false` on an empty device. Account merge, populated-device switching, transfer, and deletion remain unsupported.
 
 **Linked Actions:** schema tables and contracts are live (`linked_action_rules`, `linked_action_events`, `linked_action_executions`), centralized execution lives in `core/linked-actions/*`, shipped source entrypoints exist for `habit.completed_for_day` and non-recurring `todo.completed`, and the current habit editor flow exposes supported rule paths instead of a placeholder preview.
 
@@ -75,21 +77,21 @@
 
 **UI:** NativeWind + `core/ui` primitives; top tab rail of plain `Pressable` items inside `app/index.tsx`.
 
-**Quality (2026-08-12 campaign baseline):** `npm run typecheck` passes; the current Vitest inventory is **740** tests across **70** files; the Chromium Playwright inventory is **95** tests across **14** spec files (189 across all configured projects). `npm run build:web` passes. CI runs quality (`typecheck` + `test`) then E2E; live performance/native verdicts remain in the campaign ExecPlan rather than being implied by this inventory.
+**Quality:** `npm run typecheck`, `npm run lint`, unit/integration tests, static web export, Playwright, and simulation inventories are point-in-time and must be re-queried with `npx vitest list` and `npx playwright test --list`. CI runs quality (`typecheck` + `lint` + `test`) then the configured E2E/simulation lanes; live performance/native verdicts remain in their evidence plans rather than being implied by an inventory count.
 
 ### Cross-cutting concerns
 
-| Concern    | Where                                                                                       | Behavior                                                                                                                                         |
-| ---------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Navigation | `app/_layout.tsx`, `app/index.tsx`                                                          | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay                                           |
-| Database   | `core/db/client.ts`                                                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                                 |
-| Types      | `core/db/types.ts`                                                                          | Entity TypeScript shapes                                                                                                                         |
-| IDs & time | `lib/id.ts`, `lib/time.ts`                                                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                               |
-| Sync       | `core/sync/sync.engine.ts`, `core/sync/syncPersistence.ts`, `core/sync/supabase.adapter.ts` | Durable SQLite `sync_outbox` plus in-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                 |
-| Bootstrap  | `core/providers/AppProviders.tsx`                                                           | DB init, SW register, **`ensureAnonymousSession()`**, `syncEngine.hydrate()`, restore preview; second effect registers sync flush when remote on |
-| PWA        | `registerServiceWorker.ts`, `public/sw.js`                                                  | Workbox registration; cache-first GET handler                                                                                                    |
-| Web deploy | Root **`vercel.json`**                                                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html`           |
-| Styling    | `tailwind.config.js`, `global.css`                                                          | Section palette + brand scale; NativeWind                                                                                                        |
+| Concern    | Where                                                                                       | Behavior                                                                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation | `app/_layout.tsx`, `app/index.tsx`                                                          | Single-page shell; sections behind `NavigationContext.activeSection`; settings modal + command overlay                                                                                             |
+| Database   | `core/db/client.ts`                                                                         | Bootstrap DDL + migrations; `getDatabase` / `initializeDatabase`                                                                                                                                   |
+| Types      | `core/db/types.ts`                                                                          | Entity TypeScript shapes                                                                                                                                                                           |
+| IDs & time | `lib/id.ts`, `lib/time.ts`                                                                  | `createId`, `nowIso`, `toDateKey` (local calendar)                                                                                                                                                 |
+| Sync       | `core/sync/sync.engine.ts`, `core/sync/syncPersistence.ts`, `core/sync/supabase.adapter.ts` | Durable SQLite `sync_outbox` plus in-memory queue; `flush` → `SupabaseSyncAdapter.push` (upsert) when configured                                                                                   |
+| Bootstrap  | `core/providers/AppProviders.tsx`                                                           | DB init, SW register, **account coordinator** ownership inspection/safe anonymous bootstrap, `syncEngine.hydrate()`, account refresh, restore preview; sync flush requires verified owner equality |
+| PWA        | `registerServiceWorker.ts`, `public/sw.js`                                                  | Workbox registration; cache-first GET handler                                                                                                                                                      |
+| Web deploy | Root **`vercel.json`**                                                                      | `npm run build:web` → `dist/`; **COOP** `same-origin` + **COEP** `require-corp` on `/(.*)`; SPA **`rewrites`** `/(.*)` → `/index.html`                                                             |
+| Styling    | `tailwind.config.js`, `global.css`                                                          | Section palette + brand scale; NativeWind                                                                                                                                                          |
 
 ---
 
@@ -510,8 +512,9 @@ There are no distinct URL routes. The app is a single page: all six sections are
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **14**. The durable SQLite sync outbox
-was added in migration 14; future schema work must append migration 15.
+Current `app_meta.db_schema_version`: **15**. Migration 14 added the durable
+SQLite sync outbox and migration 15 added its enqueue-time owner binding; future
+schema work must append migration 16.
 
 ### Bootstrap DDL (verbatim)
 

@@ -248,7 +248,7 @@ test.describe('Workout — boundary inputs', () => {
 test.describe('Pomodoro — boundary inputs', () => {
   test('setting focus duration to 1 minute works correctly', async ({ page }) => {
     await goToTab(page, 'pomodoro');
-    await page.locator('.text-5xl').click();
+    await page.getByRole('button', { name: 'Edit timer duration' }).click();
     const focusInput = page
       .getByText('Focus (min)', { exact: true })
       .locator('xpath=following::input[1]');

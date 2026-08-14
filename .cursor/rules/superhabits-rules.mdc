@@ -12,13 +12,14 @@ Stack: React Native 0.83.10, Expo 55 (`~55.0.28`), TypeScript 5.9, expo-router, 
 (expo-sqlite WAL mode), NativeWind 4, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
-Current stored schema version: **14** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 15) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
+Current stored schema version: **15** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 16) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 Current product-shell facts to preserve:
 - The command center is a **global overlay** only; `/command` is not a route anymore.
 - Calories supports `Form` and `Diary` modes and remembers the last selected view.
 - Settings is organized into six sections: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
 - Remote backup wording must stay conservative: push backup plus restore v1 preview/import, not full two-way sync.
+- Recoverable Account V1 uses the local-only `app_meta.account.owner_user_id` binding and `core/auth/accountCoordinator.ts`; a lost or mismatched Auth session pauses remote work instead of rebinding data.
 
 ## Non-negotiable invariants — violating these causes silent data corruption
 
@@ -54,7 +55,7 @@ Current product-shell facts to preserve:
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always append a new `if (version < N) { ... }`
    block in `runMigrations()` in `core/db/client.ts` — there are no numbered migration
-   files. Current stored version: 14; the next block is `if (version < 15)`.
+   files. Current stored version: 15; the next block is `if (version < 16)`.
    schema.sql is a partial reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions
@@ -163,14 +164,14 @@ Three jobs (see `.github/workflows/ci.yml`; lane matrix enforced by `validateMat
 
 ## Current known bugs (do not silently fix — coordinate first)
 
-- Sync flush is gated on `isRemoteEnabled()` (`lib/supabase.ts`) — interval / visibility / NetInfo flush
+- Sync flush is gated on `isRemoteEnabled()` plus verified account ownership — interval / visibility / NetInfo flush
   runs when remote is enabled (**default `remoteMode` is `"enabled"`**). If `setRemoteMode("disabled")` is used,
   flush listeners are not registered and the in-memory queue can grow — intentional local-only tradeoff.
   The exported `syncEngine` uses **`SupabaseSyncAdapter`** (push upsert); if Supabase env vars are unset,
-  `supabase` is `null` and pushes no-op without throwing. Document as tradeoff, not a silent bug fix.
+  `supabase` is `null` and pending outbox rows are retained rather than dropped. Document as local-only behavior, not a silent queue loss.
 - schema.sql is a partial reference snapshot (reference only, not authoritative)
 
-Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); `syncEngine.flush()` is wired in `AppProviders` when `isRemoteEnabled()` is true; **`ensureAnonymousSession()`** runs on bootstrap when Supabase is configured. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
+Resolved in repo (do not re-report as open): CaloriesScreen passes user-selected `mealType` to `addCalorieEntry` (meal type picker); account ownership is reconciled in `AppProviders` before sync/restore, and **`ensureAnonymousSession()`** runs only for a safe empty/unbound dataset when Supabase is configured. **toDateKey()** now uses local calendar dates (migration 5 records `date_key_format` / `date_key_cutover` in `app_meta`).
 
 Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.ts` is covered by Vitest; **PomodoroScreen** currently uses inline button labels and does not import it — wire the screen to the domain helper if you want a single source of truth for `Running...` vs `Start focus`.
 

@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current stored version: **14** (`app_meta.db_schema_version`)
-- Next migration number: **15** (add `if (version < 15) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Current stored version: **15** (`app_meta.db_schema_version`)
+- Next migration number: **16** (add `if (version < 16) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations are append-only `if (version < N)` blocks inside `runMigrations()` in `core/db/client.ts` — there are no numbered migration files. `core/db/migrations/` holds only a Supabase reference SQL (`001_initial_supabase.sql`), never runtime code.
 - schema.sql is a partial REFERENCE ONLY snapshot — not executed at runtime; bootstrap DDL plus migrations are authoritative
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
@@ -52,6 +52,8 @@ Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions, s
 
 The exported **`syncEngine`** uses **`SupabaseSyncAdapter`** (push upsert to Supabase when the client is configured). **`NoopSyncAdapter`** remains the `SyncEngine` constructor default for tests. **`enqueue()` always runs** — it fills the in-memory queue; never skip it on writes.
 
+Recoverable Account V1 adds a local-only `app_meta.account.owner_user_id` dataset binding. Before remote flush, the verified Auth UID, local binding, and every durable outbox owner must match. Auth loss or owner mismatch must preserve local writes and their recorded owner while pausing remote work; never rewrite an outbox owner to the current session.
+
 ## ID generation
 File: lib/id.ts
 Function: createId(prefix: string): string
@@ -74,7 +76,7 @@ toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **loca
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 15) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 16) { ... }` today — bump to N+1 when version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/

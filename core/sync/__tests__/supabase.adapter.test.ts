@@ -6,6 +6,7 @@ type AdapterSetupOptions = {
   supabase?: { from: ReturnType<typeof vi.fn> } | null;
   authUserId?: string | null;
   authError?: Error;
+  localOwnerUserId?: string | null;
 };
 
 async function setupAdapter(options: AdapterSetupOptions) {
@@ -13,6 +14,11 @@ async function setupAdapter(options: AdapterSetupOptions) {
 
   const db = {
     getAllAsync: vi.fn(),
+    getFirstAsync: vi
+      .fn()
+      .mockResolvedValue(
+        options.localOwnerUserId === null ? null : { value: options.localOwnerUserId ?? 'user_a' },
+      ),
   };
   const getDatabase = vi.fn().mockResolvedValue(db);
   const upsert = vi.fn().mockResolvedValue({ error: null });
@@ -163,17 +169,23 @@ describe('SupabaseSyncAdapter', () => {
   });
 
   it('fails closed when a pending intent belongs to a different Auth user', async () => {
-    const { adapter, db, from, SyncPushPartialFailureError } = await setupAdapter({
+    const { adapter, db, from } = await setupAdapter({
       authUserId: 'user_b',
     });
     const pending = record('todos', 'todo_1', 'user_a');
     db.getAllAsync.mockResolvedValue([{ id: 'todo_1', title: 'Private' }]);
 
-    await expectPartialFailure(adapter.push([pending]), SyncPushPartialFailureError, {
-      messageContains: 'Sync owner mismatch for todos',
-      failedRecords: [pending],
-    });
+    await expect(adapter.push([pending])).rejects.toThrow('Local dataset owner does not match');
 
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the local owner binding is missing', async () => {
+    const { adapter, from } = await setupAdapter({ localOwnerUserId: null });
+
+    await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow(
+      'Local dataset owner is unavailable',
+    );
     expect(from).not.toHaveBeenCalled();
   });
 

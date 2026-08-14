@@ -1,5 +1,6 @@
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
+import { getLocalDatasetOwner, setLocalDatasetOwner } from '@/core/auth/account.data';
 import { applyRemoteCalorieEntries } from '@/features/calories/calories.data';
 import { applyRemoteHabits } from '@/features/habits/habits.data';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
@@ -36,7 +37,7 @@ type RemoteUpdatedRow = {
 };
 
 function buildBlockedEligibility(
-  reason: 'local_data_present' | 'remote_backup_unavailable' | 'remote_disabled',
+  reason: 'local_data_present' | 'remote_backup_unavailable' | 'remote_disabled' | 'owner_mismatch',
   message: string,
   localCounts: LocalSyncBackedCounts,
 ): RestoreEligibility {
@@ -260,6 +261,7 @@ function buildEligibility(
   localCounts: LocalSyncBackedCounts,
   remoteAvailable: boolean,
   remoteEnabled: boolean,
+  ownerMatches: boolean,
 ): RestoreEligibility {
   const hasAnyLocalSyncRows = SYNC_BACKED_ENTITIES.some((entity) => localCounts[entity] > 0);
 
@@ -267,6 +269,14 @@ function buildEligibility(
     return buildBlockedEligibility(
       'remote_disabled',
       'Remote backup is disabled in local-only mode.',
+      localCounts,
+    );
+  }
+
+  if (!ownerMatches) {
+    return buildBlockedEligibility(
+      'owner_mismatch',
+      'Restore is paused because this device is signed into a different backup account.',
       localCounts,
     );
   }
@@ -338,17 +348,22 @@ async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
 
 async function buildRestorePreview(ownerUserId: string | null): Promise<RestorePreview> {
   const remoteEnabled = isRemoteEnabled();
-  const [db, localCounts, entityStatuses] = await Promise.all([
-    getDatabase(),
+  const dbPromise = getDatabase();
+  const [db, localCounts, localOwner] = await Promise.all([
+    dbPromise,
     getLocalSyncBackedCounts(),
-    remoteEnabled
-      ? getRemoteEntityStatuses(ownerUserId)
-      : Promise.resolve(buildUnavailableEntityStatuses()),
+    dbPromise.then((database) => getLocalDatasetOwner(database)),
   ]);
+
+  const ownerMatches = !localOwner || (ownerUserId !== null && localOwner === ownerUserId);
+  const effectiveOwnerUserId = ownerMatches ? ownerUserId : null;
+  const entityStatuses = remoteEnabled
+    ? await getRemoteEntityStatuses(effectiveOwnerUserId)
+    : buildUnavailableEntityStatuses();
 
   const remoteAvailable =
     remoteEnabled &&
-    ownerUserId !== null &&
+    effectiveOwnerUserId !== null &&
     RESTORE_SCOPED_ENTITIES.some((entity) => {
       const status = entityStatuses[entity];
       return status.remoteState === 'available' && (status.remoteRowCount ?? 0) > 0;
@@ -360,7 +375,7 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
       : await getAppMetaText(db, appMetaKeys.restorePromptDismissedSignature);
   const dismissedForCurrentBackup =
     freshnessSignature !== null && dismissedSignature === freshnessSignature;
-  const eligibility = buildEligibility(localCounts, remoteAvailable, remoteEnabled);
+  const eligibility = buildEligibility(localCounts, remoteAvailable, remoteEnabled, ownerMatches);
 
   return {
     remoteAvailable,
@@ -429,13 +444,18 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     throw new Error('[restore] Authenticated owner changed or is unavailable; restore aborted.');
   }
 
+  const db = await getDatabase();
+  const localOwner = await getLocalDatasetOwner(db);
+  if (localOwner && localOwner !== ownerUserId) {
+    throw new Error('[restore] Local dataset owner changed; restore aborted.');
+  }
+
   const [todos, habits, calorieEntries] = await Promise.all([
     fetchRemoteRows('todos', ownerUserId),
     fetchRemoteRows('habits', ownerUserId),
     fetchRemoteRows('calorie_entries', ownerUserId),
   ]);
 
-  const db = await getDatabase();
   const restoredAt = nowIso();
 
   let localRowsAppeared = false;
@@ -448,12 +468,21 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
       return;
     }
 
+    const transactionOwner = await getLocalDatasetOwner(db);
+    if (transactionOwner && transactionOwner !== ownerUserId) {
+      localRowsAppeared = true;
+      return;
+    }
+
     await applyRemoteTodos(db, todos);
     await applyRemoteHabits(db, habits);
     await applyRemoteCalorieEntries(db, calorieEntries);
 
     await setAppMetaText(db, appMetaKeys.lastRestoreSignature, freshnessSignature);
     await setAppMetaText(db, appMetaKeys.lastRestoreAt, restoredAt);
+    if (!transactionOwner) {
+      await setLocalDatasetOwner(db, ownerUserId);
+    }
   });
 
   if (localRowsAppeared) {

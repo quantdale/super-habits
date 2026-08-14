@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import type { AccountActionResult, AccountState } from '@/core/auth/account.types';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type {
   RemoteBackupEntityStatus,
@@ -8,9 +10,10 @@ import type {
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
 import type { OutboxSummary, SettingsStatusTone } from './settingsShared';
-import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
+import { SettingsRow, SettingsSectionHeading, SettingsStatusPill } from './SettingsSharedUi';
 
 const BACKUP_ACCENT = '#0f766e';
 
@@ -66,6 +69,13 @@ type SettingsBackupSectionProps = {
   restoreRunning: boolean;
   restoreError: string | null;
   onRestore: () => void;
+  accountState: AccountState;
+  onProtectAccount: (email: string) => Promise<AccountActionResult>;
+  onVerifyAccountProtection: (token: string) => Promise<AccountActionResult>;
+  onResendAccountProtection: () => Promise<AccountActionResult>;
+  onRequestAccountRecovery: (email: string) => Promise<AccountActionResult>;
+  onVerifyAccountRecovery: (token: string) => Promise<AccountActionResult>;
+  onResendAccountRecovery: () => Promise<AccountActionResult>;
 };
 
 export function SettingsBackupSection({
@@ -75,6 +85,13 @@ export function SettingsBackupSection({
   restoreRunning,
   restoreError,
   onRestore,
+  accountState,
+  onProtectAccount,
+  onVerifyAccountProtection,
+  onResendAccountProtection,
+  onRequestAccountRecovery,
+  onVerifyAccountRecovery,
+  onResendAccountRecovery,
 }: SettingsBackupSectionProps) {
   const { tokens } = useAppTheme();
 
@@ -119,6 +136,15 @@ export function SettingsBackupSection({
         accentColor={BACKUP_ACCENT}
       />
       <View className="gap-3">
+        <SettingsAccountCard
+          accountState={accountState}
+          onProtectAccount={onProtectAccount}
+          onVerifyAccountProtection={onVerifyAccountProtection}
+          onResendAccountProtection={onResendAccountProtection}
+          onRequestAccountRecovery={onRequestAccountRecovery}
+          onVerifyAccountRecovery={onVerifyAccountRecovery}
+          onResendAccountRecovery={onResendAccountRecovery}
+        />
         <Card accentColor={BACKUP_ACCENT} className="mb-0">
           <SettingsRow
             first
@@ -265,5 +291,256 @@ export function SettingsBackupSection({
         </Card>
       </View>
     </ScreenSection>
+  );
+}
+
+function maskAccountEmail(email: string | null): string | null {
+  if (!email) return null;
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return null;
+  const visible = local.slice(0, 1);
+  return `${visible}${'*'.repeat(Math.max(1, Math.min(local.length - 1, 5)))}@${domain}`;
+}
+
+function accountStatusLabel(accountState: AccountState): string {
+  switch (accountState.status) {
+    case 'not_configured':
+      return 'Unavailable';
+    case 'remote_disabled':
+      return 'Local only';
+    case 'anonymous_ready':
+      return 'Anonymous / unprotected';
+    case 'protection_pending':
+      return 'Verification pending';
+    case 'protected':
+      return 'Protected';
+    case 'sign_in_pending':
+      return 'Sign-in pending';
+    case 'recovery_required':
+    case 'legacy_owner_unknown':
+      return 'Recovery required';
+    case 'owner_mismatch':
+      return 'Account mismatch';
+    case 'account_conflict':
+      return 'Account conflict';
+    case 'remote_unavailable':
+      return 'Remote unavailable';
+    case 'error':
+      return 'Unavailable';
+  }
+}
+
+function accountStatusTone(accountState: AccountState): SettingsStatusTone {
+  if (accountState.status === 'protected') return 'accent';
+  if (accountState.status === 'anonymous_ready') return 'warning';
+  if (
+    accountState.status === 'owner_mismatch' ||
+    accountState.status === 'account_conflict' ||
+    accountState.status === 'recovery_required' ||
+    accountState.status === 'legacy_owner_unknown'
+  ) {
+    return 'danger';
+  }
+  return 'neutral';
+}
+
+function SettingsAccountCard({
+  accountState,
+  onProtectAccount,
+  onVerifyAccountProtection,
+  onResendAccountProtection,
+  onRequestAccountRecovery,
+  onVerifyAccountRecovery,
+  onResendAccountRecovery,
+}: Omit<
+  SettingsBackupSectionProps,
+  | 'outboxSummary'
+  | 'restorePreview'
+  | 'restoreLoading'
+  | 'restoreRunning'
+  | 'restoreError'
+  | 'onRestore'
+>) {
+  const { tokens } = useAppTheme();
+  const [protectEmail, setProtectEmail] = useState('');
+  const [protectCode, setProtectCode] = useState('');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!accountState.resendAvailableAt) return undefined;
+    const intervalId = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(intervalId);
+  }, [accountState.resendAvailableAt]);
+
+  const protectionPending = accountState.status === 'protection_pending';
+  const recoveryPending = accountState.status === 'sign_in_pending';
+  const ownerRecovery = accountState.canRecoverOwner;
+  const canRequestRecovery = accountState.canRecoverExisting || accountState.canRecoverOwner;
+  const resendRemaining = accountState.resendAvailableAt
+    ? Math.max(0, Math.ceil((accountState.resendAvailableAt - now) / 1_000))
+    : 0;
+  const resendDisabled = busy || resendRemaining > 0;
+
+  const runAction = async (action: () => Promise<AccountActionResult>) => {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const result = await action();
+      if (result.ok) setActionMessage(result.message);
+      else setActionError(result.message);
+    } catch {
+      setActionError('We could not complete that account action. Your local data was not changed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card accentColor={BACKUP_ACCENT} className="mb-0">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1">
+          <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+            Backup identity
+          </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            {accountState.message}
+          </Text>
+        </View>
+        <View className="shrink-0">
+          <SettingsStatusPill
+            label={accountStatusLabel(accountState)}
+            tone={accountStatusTone(accountState)}
+            accentColor={BACKUP_ACCENT}
+          />
+        </View>
+      </View>
+
+      {accountState.status === 'protected' && accountState.email ? (
+        <Text className="mt-3 text-sm" style={{ color: tokens.text }}>
+          Email: {maskAccountEmail(accountState.email) ?? 'Protected email'}
+        </Text>
+      ) : null}
+
+      <ValidationError message={actionError} />
+      {actionMessage ? (
+        <Text className="mt-3 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          {actionMessage}
+        </Text>
+      ) : null}
+
+      {accountState.canProtect && !protectionPending ? (
+        <View className="mt-4">
+          <TextField
+            label="Email for backup recovery"
+            value={protectEmail}
+            onChangeText={setProtectEmail}
+            placeholder="you@example.com"
+            keyboardType="default"
+            accessibilityLabel="Email for backup recovery"
+          />
+          <Button
+            label={busy ? 'Sending...' : 'Protect backup with email'}
+            onPress={() => runAction(() => onProtectAccount(protectEmail))}
+            disabled={busy}
+            color={BACKUP_ACCENT}
+          />
+        </View>
+      ) : null}
+
+      {protectionPending ? (
+        <View className="mt-4">
+          <TextField
+            label="Six-digit verification code"
+            value={protectCode}
+            onChangeText={setProtectCode}
+            placeholder="123456"
+            unsignedInteger
+            accessibilityLabel="Backup protection verification code"
+          />
+          <View className="gap-2">
+            <Button
+              label={busy ? 'Verifying...' : 'Verify email'}
+              onPress={() => runAction(() => onVerifyAccountProtection(protectCode))}
+              disabled={busy}
+              color={BACKUP_ACCENT}
+            />
+            <Button
+              label={resendRemaining > 0 ? `Resend code in ${resendRemaining}s` : 'Resend code'}
+              onPress={() => runAction(onResendAccountProtection)}
+              disabled={resendDisabled}
+              variant="ghost"
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {canRequestRecovery && !recoveryPending ? (
+        <View className="mt-5 border-t pt-4" style={{ borderColor: tokens.border }}>
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            {ownerRecovery ? 'Sign back into this device account' : 'Recover existing backup'}
+          </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            {ownerRecovery
+              ? 'Use the email that protects this device’s backup. Local data stays available while remote backup is paused.'
+              : 'On a new or empty device, sign in to an existing protected account. Account merging is not supported.'}
+          </Text>
+          <View className="mt-3">
+            <TextField
+              label="Protected account email"
+              value={recoveryEmail}
+              onChangeText={setRecoveryEmail}
+              placeholder="you@example.com"
+              accessibilityLabel="Protected account email"
+            />
+            <Button
+              label={
+                busy
+                  ? 'Sending...'
+                  : ownerRecovery
+                    ? 'Send sign-in code'
+                    : 'Recover existing backup'
+              }
+              onPress={() => runAction(() => onRequestAccountRecovery(recoveryEmail))}
+              disabled={busy}
+              color={BACKUP_ACCENT}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {recoveryPending ? (
+        <View className="mt-4">
+          <TextField
+            label="Six-digit sign-in code"
+            value={recoveryCode}
+            onChangeText={setRecoveryCode}
+            placeholder="123456"
+            unsignedInteger
+            accessibilityLabel="Account recovery verification code"
+          />
+          <View className="gap-2">
+            <Button
+              label={busy ? 'Signing in...' : 'Sign in and continue'}
+              onPress={() => runAction(() => onVerifyAccountRecovery(recoveryCode))}
+              disabled={busy}
+              color={BACKUP_ACCENT}
+            />
+            <Button
+              label={resendRemaining > 0 ? `Resend code in ${resendRemaining}s` : 'Resend code'}
+              onPress={() => runAction(onResendAccountRecovery)}
+              disabled={resendDisabled}
+              variant="ghost"
+            />
+          </View>
+        </View>
+      ) : null}
+    </Card>
   );
 }

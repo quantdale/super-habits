@@ -31,7 +31,8 @@ export type RestoreEligibility =
     }
   | {
       kind: 'blocked';
-      reason: 'local_data_present' | 'remote_backup_unavailable' | 'remote_disabled';
+      reason:
+        'local_data_present' | 'remote_backup_unavailable' | 'remote_disabled' | 'owner_mismatch';
       message: string;
       localCounts: LocalSyncBackedCounts;
     };

@@ -150,6 +150,19 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
 
   // Auth: keep ensureAnonymousSession quiet (the app catches failures anyway).
   if (path.startsWith('/auth/v1/')) {
+    if (path === '/auth/v1/user' && method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        headers: REMOTE_HEADERS,
+        body: JSON.stringify({
+          id: 'dummy-anon',
+          aud: 'authenticated',
+          role: 'authenticated',
+          email: null,
+          is_anonymous: true,
+        }),
+      });
+    }
     if (method === 'POST') {
       const now = Math.floor(Date.now() / 1000);
       return route.fulfill({
@@ -357,7 +370,9 @@ defineJourney({
         // The one-way door: Settings now reports restore as blocked.
         await returnToApp(page);
         await page.getByRole('button', { name: 'Open settings' }).click();
-        await expect(page.getByText(LOCAL_DATA_PRESENT_MESSAGE)).toBeVisible();
+        const blockedMessage = page.getByText(LOCAL_DATA_PRESENT_MESSAGE);
+        await blockedMessage.scrollIntoViewIfNeeded();
+        await expect(blockedMessage).toBeVisible();
         await expect(page.getByText('Blocked').first()).toBeVisible();
         await expect(page.getByRole('button', { name: 'Restore backup' }).first()).toBeDisabled();
         await page.getByRole('button', { name: 'Close' }).first().click();
@@ -474,7 +489,9 @@ defineJourney({
         // blocked with the local-data-present gate.
         await expect(page.getByText(PROMPT_SUBTITLE)).toHaveCount(0);
         await page.getByRole('button', { name: 'Open settings' }).click();
-        await expect(page.getByText(LOCAL_DATA_PRESENT_MESSAGE)).toBeVisible();
+        const blockedMessage = page.getByText(LOCAL_DATA_PRESENT_MESSAGE);
+        await blockedMessage.scrollIntoViewIfNeeded();
+        await expect(blockedMessage).toBeVisible();
         await expect(page.getByRole('button', { name: 'Restore backup' }).first()).toBeDisabled();
       },
     },

@@ -49,5 +49,33 @@ vi.mock('@/lib/supabase', () => ({
   supabase: null,
   setRemoteMode: vi.fn(),
   isRemoteEnabled: vi.fn(() => true),
+  isSupabaseConfigured: vi.fn(() => false),
   ensureAnonymousSession: vi.fn().mockResolvedValue(undefined),
+  getSupabaseAuthEvidence: vi.fn().mockResolvedValue({
+    sessionUserId: null,
+    verifiedUserId: null,
+    isAnonymous: null,
+    email: null,
+  }),
+  getSupabaseSessionUserId: vi.fn().mockResolvedValue(null),
+  getSupabaseAuthUserId: vi.fn().mockResolvedValue(null),
+  getSupabaseAccessToken: vi.fn().mockResolvedValue(null),
+  requestEmailProtection: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+  verifyEmailChangeOtp: vi
+    .fn()
+    .mockResolvedValue({ data: { session: null, user: null }, error: null }),
+  resendEmailChange: vi.fn().mockResolvedValue({ error: null }),
+  requestExistingAccountRecovery: vi.fn().mockResolvedValue({ error: null }),
+  resendExistingAccountRecovery: vi.fn().mockResolvedValue(undefined),
+  verifyExistingAccountOtp: vi
+    .fn()
+    .mockResolvedValue({ data: { session: null, user: null }, error: null }),
+  classifySupabaseAuthError: vi.fn((error: unknown) =>
+    error instanceof Error && error.message.toLowerCase().includes('exist')
+      ? 'email_conflict'
+      : 'auth',
+  ),
+  signOutSupabase: vi.fn().mockResolvedValue({ error: null }),
+  startSupabaseAutoRefresh: vi.fn(),
+  stopSupabaseAutoRefresh: vi.fn(),
 }));

@@ -172,6 +172,121 @@ export const newDeviceMigrator = definePersona({
   traits: ['restore', 'first-run', 'settings'],
 });
 
+/** Recoverable Account V1 — A: a long-term anonymous user who chooses protection. */
+export const recoverableAnonymousUser = definePersona({
+  id: 'recoverable-anonymous-user',
+  name: 'A — Anonymous Long-Term User',
+  description:
+    'Uses Super Habits anonymously for a long time, accumulates local and backed-up data, then protects the same backup identity with a verified email without changing UUID ownership.',
+  goals: [
+    'keep local-first use frictionless',
+    'protect the existing backup',
+    'continue after verification',
+  ],
+  behavior: {
+    mistakeRate: 0.02,
+    doubleTapRate: 0.01,
+    typoRate: 0.02,
+    abandonmentRate: 0.01,
+    offlineToggleRate: 0.02,
+    tabHideRate: 0.01,
+    featureAffinity: { overview: 2, todos: 3, habits: 3, calories: 2, settings: 2 },
+  },
+  traits: ['account-v1', 'anonymous', 'protection'],
+});
+
+/** Recoverable Account V1 — B: auth storage disappears while the dataset remains. */
+export const lostSessionUser = definePersona({
+  id: 'lost-session-user',
+  name: 'B — Lost Session User',
+  description:
+    'Has a populated owner-bound dataset, loses Auth storage, keeps using the app offline, and later signs back into the original owner so pending outbox work resumes.',
+  goals: [
+    'continue local use during auth loss',
+    'preserve the original outbox owner',
+    'recover the original account',
+  ],
+  behavior: {
+    mistakeRate: 0.04,
+    doubleTapRate: 0.02,
+    typoRate: 0.04,
+    abandonmentRate: 0.03,
+    offlineToggleRate: 0.25,
+    tabHideRate: 0.08,
+    featureAffinity: { todos: 3, habits: 3, calories: 2, settings: 2 },
+  },
+  traits: ['account-v1', 'session-loss', 'offline', 'outbox'],
+});
+
+/** Recoverable Account V1 — C: a different Auth user appears on owner A's device. */
+export const wrongAccountUser = definePersona({
+  id: 'wrong-account-user',
+  name: 'C — Wrong Account User',
+  description:
+    'Presents account B on a device whose local dataset and outbox belong to account A; local features stay usable while remote push, restore, and reassignment remain blocked.',
+  goals: [
+    'avoid cross-account data mixing',
+    'keep local writes readable',
+    'guide the user back to owner A',
+  ],
+  behavior: {
+    mistakeRate: 0.06,
+    doubleTapRate: 0.03,
+    typoRate: 0.05,
+    abandonmentRate: 0.04,
+    offlineToggleRate: 0.08,
+    tabHideRate: 0.04,
+    featureAffinity: { settings: 3, overview: 2, todos: 3, habits: 2 },
+  },
+  traits: ['account-v1', 'owner-mismatch', 'fail-closed'],
+});
+
+/** Recoverable Account V1 — D: an empty phone recovers and restores account A. */
+export const newPhoneRecoverer = definePersona({
+  id: 'new-phone-recoverer',
+  name: 'D — New Phone Recoverer',
+  description:
+    'Starts on an empty device, chooses Recover Existing, verifies the protected account, binds the recovered UUID, and uses the existing empty-device Restore V1 flow.',
+  goals: [
+    'recover an existing protected account',
+    'see only owner-scoped backup',
+    'restore supported entities safely',
+  ],
+  behavior: {
+    mistakeRate: 0.05,
+    doubleTapRate: 0.02,
+    typoRate: 0.06,
+    abandonmentRate: 0.03,
+    offlineToggleRate: 0.02,
+    tabHideRate: 0.01,
+    featureAffinity: { settings: 3, overview: 3, todos: 2, habits: 2 },
+  },
+  traits: ['account-v1', 'new-device', 'recovery', 'restore'],
+});
+
+/** Recoverable Account V1 — E: a typo/unknown email must not create an account. */
+export const unknownEmailRecoverer = definePersona({
+  id: 'unknown-email-recoverer',
+  name: 'E — Unknown Email Recoverer',
+  description:
+    'Uses Recover Existing on an empty device with a mistyped or unknown email and verifies that the no-create request fails safely without binding a new permanent account.',
+  goals: [
+    'retry a recoverable email safely',
+    'avoid accidental account creation',
+    'leave the empty device unchanged',
+  ],
+  behavior: {
+    mistakeRate: 0.12,
+    doubleTapRate: 0.05,
+    typoRate: 0.3,
+    abandonmentRate: 0.06,
+    offlineToggleRate: 0.04,
+    tabHideRate: 0.02,
+    featureAffinity: { settings: 3, overview: 2 },
+  },
+  traits: ['account-v1', 'unknown-email', 'no-create'],
+});
+
 /** The library's canonical `PERSONAS` record (task 6.1), keyed by persona id. */
 export const PERSONAS: Record<string, Persona> = {
   'daily-driver': dailyDriver,
@@ -180,4 +295,9 @@ export const PERSONAS: Record<string, Persona> = {
   'error-prone-user': errorProneUser,
   commuter,
   'new-device-migrator': newDeviceMigrator,
+  'recoverable-anonymous-user': recoverableAnonymousUser,
+  'lost-session-user': lostSessionUser,
+  'wrong-account-user': wrongAccountUser,
+  'new-phone-recoverer': newPhoneRecoverer,
+  'unknown-email-recoverer': unknownEmailRecoverer,
 };

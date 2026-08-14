@@ -1,4 +1,5 @@
 import { getDatabase } from '@/core/db/client';
+import { getLocalDatasetOwner } from '@/core/auth/account.data';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
 import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
 import { getSupabaseAuthUserId, supabase } from '@/lib/supabase';
@@ -54,6 +55,17 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     }
 
     const db = await getDatabase();
+    const localOwnerUserId = await getLocalDatasetOwner(db);
+    if (!localOwnerUserId) {
+      throw new Error(
+        'Local dataset owner is unavailable; keeping the outbox intact until account recovery completes.',
+      );
+    }
+    if (localOwnerUserId !== currentUserId) {
+      throw new Error(
+        'Local dataset owner does not match the verified Supabase user; keeping the outbox intact.',
+      );
+    }
     const byEntity = collectIdsByEntity(records);
     const failedRecords: SyncRecord[] = [];
     const errorMessages: string[] = [];
@@ -73,7 +85,8 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         if (ids.length === 0) continue;
 
         const unownedOrWrongSession = entityRecords.filter(
-          (record) => record.ownerUserId !== currentUserId,
+          (record) =>
+            record.ownerUserId !== currentUserId || record.ownerUserId !== localOwnerUserId,
         );
         if (unownedOrWrongSession.length > 0) {
           throw new Error(

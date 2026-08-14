@@ -79,8 +79,12 @@ async function clearAsyncStorage(page: Page): Promise<void> {
       for (const key of keys) {
         window.localStorage.removeItem(key);
       }
-      // Belt-and-braces: the app may write other superhabits.* keys in the future.
-      const toRemove = Object.keys(window.localStorage).filter((k) => k.startsWith('superhabits.'));
+      // Belt-and-braces: clear app preferences and Supabase's persisted Auth
+      // session so a reset models a genuinely empty/new device rather than
+      // retaining a permanent session in a different browser storage namespace.
+      const toRemove = Object.keys(window.localStorage).filter(
+        (k) => k.startsWith('superhabits.') || k.startsWith('sb-'),
+      );
       for (const key of toRemove) {
         window.localStorage.removeItem(key);
       }

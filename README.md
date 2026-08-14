@@ -2,7 +2,7 @@
 
 SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, six tab surfaces, a six-bucket settings IA, and an experimental command center that now launches as a global overlay. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
-Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes synced entities to Supabase, and restore v1 can import a limited subset back onto an empty device. This is not full two-way sync.
+Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes synced entities to Supabase, and Restore V1 can import a limited subset back onto an empty device. This is not full two-way sync. When remote backup is configured, the local SQLite dataset also keeps a durable owner binding so auth loss cannot silently attach existing data to a new anonymous user.
 
 ## Project Overview
 
@@ -10,7 +10,7 @@ Data is stored locally in SQLite first, then optionally backed up to Supabase. T
 - Web support with static export + service worker + OPFS-backed SQLite runtime
 - Native support through Expo for Android and iOS
 - Feature modules with strict data/domain/UI layering
-- Optional anonymous Supabase backup/restore integration
+- Optional anonymous Supabase backup/restore integration with Recoverable Account V1 email protection and empty-device recovery
 - Global command-center overlay across the six sections (no `/command` route)
 - Calories `Form` / `Diary` modes with remembered last-view preference
 - Settings grouped into Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal
@@ -50,16 +50,23 @@ Current adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pul
 - Saved meals stay local-only.
 - `workout_routines` backup status is shown, but workout restore is intentionally excluded in this phase because nested routine structure is not fully synced.
 
+### Recoverable Account V1
+
+`core/auth/accountCoordinator.ts` coordinates the optional Supabase Auth boundary. A configured empty installation may use an anonymous session, but a populated SQLite dataset is durably associated with one Supabase user UUID in `app_meta.account.owner_user_id`. Losing Auth storage enters recovery-required state instead of creating a new anonymous owner; a different authenticated UUID enters owner-mismatch state. Local reads and writes continue in both states, while remote flush and restore pause.
+
+Settings exposes **Protect backup with email** for an anonymous owner and **Recover existing backup** for an empty device or a bound dataset recovering its original owner. Protection uses the email-change verification flow and requires the post-verification UUID to match the original UUID. Existing-account recovery uses passwordless OTP with account creation disabled, binds only after verification, and then reuses the existing Restore V1 empty-device guard. Account merging, populated-device switching, ownership transfer, and full two-way sync are not supported.
+
 ### Flush and Auth Lifecycle
 
-`AppProviders` wires sync and auth bootstrap:
+`AppProviders` wires sync and the account coordinator:
 
-- Calls `ensureAnonymousSession()` at app startup when Supabase env vars are configured
+- Initializes SQLite, inspects all user-owned tables plus durable outbox owners, and calls `ensureAnonymousSession()` only for an empty/unbound dataset when Supabase env vars are configured
+- Hydrates the durable outbox and restore preview only after account ownership is reconciled
 - Registers `syncEngine.flush()` on:
   - 30-second interval
   - Web `visibilitychange` when page becomes hidden
   - NetInfo connectivity events when connected
-- Gated by `isRemoteEnabled()` (`remoteMode` defaults to `"enabled"`)
+- Gated by `isRemoteEnabled()` and verified account ownership (`remoteMode` defaults to `"enabled"`); every queued owner must match both the local binding and current verified Auth UID
 
 ## Quick Start
 
@@ -179,11 +186,12 @@ If unset, the app runs local-only and remote backup/restore operations stay unav
 - Unit tests: `npm test`
 - E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes; Playwright serves static `dist/` through `node scripts/serve-e2e.js`)
 
-Current local baseline on August 12, 2026 (re-verify with the inventory
-commands when the suite changes):
-
-- `npm test`: `664` Vitest tests across `63` test files (`613` unit + `51` integration)
-- `npx playwright test --list`: `181` Playwright tests across `19` spec files
+Test inventories are intentionally not hard-coded here because they change as
+coverage evolves. Re-verify them with `npx vitest list` and
+`npx playwright test --list`; the gate is zero failures in the applicable unit,
+integration, web, and native lanes. Recoverable Account V1 coverage lives in
+`tests/account.*`, `tests/integration/account*`, and
+`e2e/journeys/recoverable-account-v1.spec.ts`.
 
 ## Additional Documentation
 

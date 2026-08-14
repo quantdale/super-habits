@@ -1,8 +1,10 @@
-import { type PropsWithChildren, useEffect, useState } from 'react';
+import { type PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Modal, Platform, Text, View } from 'react-native';
+import { AppState, Modal, Platform, Text, View } from 'react-native';
 import { initializeDatabase } from '@/core/db/client';
+import { accountCoordinator } from '@/core/auth/accountCoordinator';
+import type { AccountActionResult, AccountState } from '@/core/auth/account.types';
 import { registerServiceWorker } from '@/core/pwa/registerServiceWorker';
 import { syncEngine } from '@/core/sync/sync.engine';
 import {
@@ -15,7 +17,12 @@ import { resolveRestorePromptOutcome } from '@/core/providers/restorePromptFlow'
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { InAppNoticeProvider } from '@/core/providers/InAppNoticeProvider';
 import { DayRolloverProvider } from '@/core/providers/DayRolloverProvider';
-import { ensureAnonymousSession, isRemoteEnabled } from '@/lib/supabase';
+import {
+  isRemoteEnabled,
+  startSupabaseAutoRefresh,
+  stopSupabaseAutoRefresh,
+  supabase,
+} from '@/lib/supabase';
 import { ThemeProvider } from '@/core/providers/ThemeProvider';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { AppBootstrapStateContext } from '@/core/providers/appBootstrapContext';
@@ -27,6 +34,19 @@ import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroComma
 export function AppProviders({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);
   const [authBootstrapReady, setAuthBootstrapReady] = useState(false);
+  const [accountState, setAccountState] = useState<AccountState>({
+    status: 'remote_unavailable',
+    email: null,
+    isAnonymous: null,
+    hasOwnerBinding: false,
+    hasUserData: false,
+    pendingOutboxCount: 0,
+    canProtect: false,
+    canRecoverExisting: false,
+    canRecoverOwner: false,
+    message: 'Account status is loading.',
+    resendAvailableAt: null,
+  });
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [restorePromptBusy, setRestorePromptBusy] = useState(false);
@@ -59,9 +79,19 @@ export function AppProviders({ children }: PropsWithChildren) {
         return;
       }
 
-      await ensureAnonymousSession().catch((e) => {
-        console.error('[auth] ensureAnonymousSession failed', e);
-      });
+      try {
+        const nextAccountState = await accountCoordinator.bootstrap();
+        if (!cancelled) setAccountState(nextAccountState);
+      } catch (e) {
+        console.error('[auth] account bootstrap failed', e);
+        if (!cancelled) {
+          setAccountState((current) => ({
+            ...current,
+            status: 'error',
+            message: 'Account status is temporarily unavailable. Local use remains available.',
+          }));
+        }
+      }
       if (!cancelled) {
         setAuthBootstrapReady(true);
       }
@@ -71,6 +101,13 @@ export function AppProviders({ children }: PropsWithChildren) {
       await syncEngine.hydrate().catch((e) => {
         console.error('[sync] hydrate failed', e);
       });
+
+      try {
+        const nextAccountState = await accountCoordinator.refresh();
+        if (!cancelled) setAccountState(nextAccountState);
+      } catch (e) {
+        console.error('[auth] account refresh failed after sync hydrate', e);
+      }
 
       try {
         const preview = await getRestorePreview();
@@ -90,7 +127,86 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!isRemoteEnabled()) return;
+    if (Platform.OS === 'web') return;
+    void startSupabaseAutoRefresh().catch(() => undefined);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void startSupabaseAutoRefresh().catch(() => undefined);
+      } else {
+        void stopSupabaseAutoRefresh().catch(() => undefined);
+      }
+    });
+    return () => {
+      subscription.remove();
+      void stopSupabaseAutoRefresh().catch(() => undefined);
+    };
+  }, []);
+
+  const refreshAccountState = useCallback(async () => {
+    const nextAccountState = await accountCoordinator.refresh();
+    setAccountState(nextAccountState);
+  }, []);
+
+  const runAccountAction = useCallback(
+    async (action: () => Promise<AccountActionResult>): Promise<AccountActionResult> => {
+      try {
+        const result = await action();
+        await refreshAccountState();
+        return result;
+      } catch {
+        await refreshAccountState().catch(() => undefined);
+        return {
+          ok: false,
+          status: 'error',
+          message: 'We could not complete that account action. Your local data was not changed.',
+        };
+      }
+    },
+    [refreshAccountState],
+  );
+
+  const protectAccount = useCallback(
+    (email: string) => runAccountAction(() => accountCoordinator.protect(email)),
+    [runAccountAction],
+  );
+  const verifyAccountProtection = useCallback(
+    (token: string) => runAccountAction(() => accountCoordinator.verifyProtection(token)),
+    [runAccountAction],
+  );
+  const resendAccountProtection = useCallback(
+    () => runAccountAction(() => accountCoordinator.resendProtection()),
+    [runAccountAction],
+  );
+  const requestAccountRecovery = useCallback(
+    (email: string) => runAccountAction(() => accountCoordinator.requestRecovery(email)),
+    [runAccountAction],
+  );
+  const verifyAccountRecovery = useCallback(
+    (token: string) => runAccountAction(() => accountCoordinator.verifyRecovery(token)),
+    [runAccountAction],
+  );
+  const resendAccountRecovery = useCallback(
+    () => runAccountAction(() => accountCoordinator.resendRecovery()),
+    [runAccountAction],
+  );
+
+  useEffect(() => {
+    if (!authBootstrapReady || !supabase) return;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      // Supabase documents that auth callbacks should not perform additional
+      // auth calls synchronously; reconcile on the next task instead.
+      setTimeout(() => {
+        void refreshAccountState().catch(() => undefined);
+      }, 0);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [authBootstrapReady, refreshAccountState]);
+
+  useEffect(() => {
+    const remoteAccountReady =
+      authBootstrapReady &&
+      ['anonymous_ready', 'protected', 'protection_pending'].includes(accountState.status);
+    if (!isRemoteEnabled() || !remoteAccountReady) return;
 
     const flush = () => {
       void syncEngine.flush().catch((e) => {
@@ -126,7 +242,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       removeVisibilityListener?.();
       unsubscribeNetInfo();
     };
-  }, []);
+  }, [accountState.status, authBootstrapReady]);
 
   const handleDismissRestorePrompt = async () => {
     try {
@@ -176,8 +292,20 @@ export function AppProviders({ children }: PropsWithChildren) {
         <PomodoroCommandBridgeProvider>
           <InAppNoticeProvider>
             <DayRolloverProvider>
-              <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
-                <BootstrapGate dbError={dbError}>
+              <AppBootstrapStateContext.Provider
+                value={{
+                  authBootstrapReady,
+                  accountState,
+                  refreshAccountState,
+                  protectAccount,
+                  verifyAccountProtection,
+                  resendAccountProtection,
+                  requestAccountRecovery,
+                  verifyAccountRecovery,
+                  resendAccountRecovery,
+                }}
+              >
+                <BootstrapGate dbError={dbError} authBootstrapReady={authBootstrapReady}>
                   {children}
                   <HabitReminderHost />
                   <RestorePrompt
@@ -198,10 +326,14 @@ export function AppProviders({ children }: PropsWithChildren) {
   );
 }
 
-function BootstrapGate({ dbError, children }: PropsWithChildren<{ dbError: string | null }>) {
+function BootstrapGate({
+  dbError,
+  authBootstrapReady,
+  children,
+}: PropsWithChildren<{ dbError: string | null; authBootstrapReady: boolean }>) {
   const { tokens } = useAppTheme();
 
-  if (!dbError) return children;
+  if (!dbError && authBootstrapReady) return children;
 
   return (
     <View
@@ -222,9 +354,11 @@ function BootstrapGate({ dbError, children }: PropsWithChildren<{ dbError: strin
           color: tokens.text,
         }}
       >
-        Unable to start
+        {dbError ? 'Unable to start' : 'Preparing local workspace'}
       </Text>
-      <Text style={{ textAlign: 'center', fontSize: 14, color: tokens.textMuted }}>{dbError}</Text>
+      <Text style={{ textAlign: 'center', fontSize: 14, color: tokens.textMuted }}>
+        {dbError ?? 'Checking local backup ownership before remote backup is enabled.'}
+      </Text>
     </View>
   );
 }
