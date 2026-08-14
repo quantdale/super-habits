@@ -1,7 +1,7 @@
 # ExecPlan: Live Supabase production convergence
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -374,8 +374,12 @@ After live convergence, the required headless lanes passed:
 
 ## GitHub CI Ledger
 
-To record the final pushed SHA, quality/e2e results, run ID, and any
-repository-caused fix/reverification cycle.
+Final push run `31774559677` for `95fb1dc4d17bc38ab8baf2d01671d4cc134b536f`
+completed successfully. `quality` job `94687208382` passed; `e2e` job
+`94687464158` passed, including full E2E, deterministic scenarios, and the
+dummy-credential `dist-sync` lane; `nightly` job `94687464674` was skipped as
+expected for a normal push. No repository-caused CI failure or fix cycle was
+required.
 
 ## Rollback / Recovery Notes
 
@@ -425,16 +429,14 @@ repository-caused fix/reverification cycle.
 
 ## Current Checkpoint
 
-- Current milestone: Live Supabase convergence, AI deployment, headless QA, and
-  Android validation complete; repository delivery and GitHub CI inspection are
-  the remaining gates.
+- Current milestone: Live Supabase convergence, AI deployment, headless QA,
+  Android validation, repository delivery, and final GitHub CI are complete.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, repository workflow/rules,
   Supabase skill, relevant data/sync guidance, existing ownership ExecPlans,
   and focused OpenSpec artifacts. Confirmed clean `main`, one worktree,
   `origin/main` at `60d141e...`, and only remote branch `main`.
-- In progress: Reconcile the final worktree, commit on `main`, push, verify
-  remote topology/SHA equality, inspect GitHub Actions for that SHA, then
-  complete this plan.
+- In progress: None — the campaign and all required transport verification are
+  complete.
 - Completed: Deployed and retrieved current Edge Function versions/source;
   completed live no-auth/malformed-auth and quota-boundary checks, with the
   valid-user/provider canary explicitly unclaimed because no safe JWT exists.
@@ -459,13 +461,13 @@ repository-caused fix/reverification cycle.
 - Condition required to unblock: Provide authorized EAS credentials and/or a
   disposable authenticated test session if those optional live lanes are
   required.
-- Exact next action: Reconcile the final worktree, run final validators, commit
-  on `main`, push, verify remote topology/SHA equality, inspect GitHub Actions
-  for that SHA, and mark this plan COMPLETED only after those checks.
-- Remaining definition of done: Live security/data/AI convergence proven or
-  explicitly blocked with evidence; required repository docs/plan updated;
-  final main pushed and equal to origin/main; actual GitHub CI inspected;
-  Android result accurately classified.
+- Exact next action: None — task complete. Preserve the final main-only remote
+  state and the recorded optional external-lane limitations.
+- Remaining definition of done: Complete and validated. Live security/data/AI
+  convergence is proven or explicitly bounded with evidence; repository docs
+  and plan are updated; final main is pushed and equal to origin/main; actual
+  GitHub CI is green for the final transport commit; Android is accurately
+  classified.
 
 ## Progress
 
@@ -479,8 +481,8 @@ repository-caused fix/reverification cycle.
 - [x] Deploy and verify current Edge Functions and safe live AI security.
 - [x] Run live RLS, sync/restore, advisors, and row-preservation proof.
 - [x] Run full headless QA and Android closure attempts.
-- [ ] Update OpenSpec/docs, commit, push main, inspect GitHub CI.
-- [ ] Complete and validate this ExecPlan.
+- [x] Update OpenSpec/docs, commit, push main, inspect GitHub CI.
+- [x] Complete and validate this ExecPlan.
 
 ## Validation Ledger
 
@@ -536,6 +538,10 @@ repository-caused fix/reverification cycle.
   E2E-configured release APKs built and installed; smoke 1/1, persistence 10/10,
   lifecycle 5/5, and Insights passed. EAS cloud is CREDENTIAL_REQUIRED and
   iOS is unavailable on Windows.
+- 2026-08-14 — Final Git transport and GitHub CI — PASS — commit `95fb1dc`
+  pushed normally to `origin/main`; local and remote SHA matched, remote heads
+  contained only `main`, worktree was clean, and GitHub run `31774559677`
+  passed both `quality` and `e2e` with `nightly` skipped.
 
 ## Changed Files / Areas
 
@@ -565,15 +571,15 @@ repository-caused fix/reverification cycle.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
+- Status: Completed.
 - Summary: Production schema/RLS/grants/quota convergence, migration-history
   reconciliation, current AI Edge Function deployment, live transactional
   isolation proof, headless QA, and local Android closure are complete.
 - Evidence: The live ledgers above record pre/post row preservation,
   authenticated A/B and anon policy proof, exact migration/function metadata,
   advisor classification, full QA, and serialized native reports.
-- Remaining work: Commit the intentional migration/docs/ExecPlan changes on
-  `main`, push normally, verify the main-only remote and exact SHA equality,
-  inspect actual GitHub CI, then mark this plan COMPLETED.
+- Remaining work: None for the required campaign. EAS/iOS and valid-user
+  paid-provider HTTP proof remain optional external lanes requiring credentials
+  or an authorized disposable session.
 - Follow-up: EAS/iOS and valid-user paid-provider HTTP proof remain optional
   external lanes requiring credentials or an authorized disposable session.
