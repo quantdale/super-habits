@@ -234,10 +234,25 @@ defineJourney({
         // explicitly, then fill macros. 12/1/8/0 → 124 kcal.
         await page.getByText('Breakfast', { exact: true }).click();
         await fillCaloriesMacros(page, 'Scrambled eggs 🍳', '12', '1', '8', '0');
+        // RN Web fields are controlled inputs. Wait for both the input value and
+        // the derived kcal value before pressing the async submit action; this
+        // keeps the row oracle about persistence rather than input hydration.
+        await expect(page.locator('#cal-entry-food')).toHaveValue('Scrambled eggs 🍳');
+        await expect(
+          page
+            .getByText('Calories (kcal)', { exact: true })
+            .locator('..')
+            .getByText('124', { exact: true }),
+        ).toBeVisible();
         await page
           .getByText('Add entry', { exact: true })
           .last()
           .click({ force: true, timeout: 30_000 });
+
+        // The handler commits the ledger and saved-meal index before refreshing
+        // the mounted screen. Wait for that visible commit before entering the
+        // separate SQLite harness for the row-level assertions below.
+        await expect(page.getByText('Scrambled eggs 🍳 - 124 kcal', { exact: true })).toBeVisible();
 
         const today = await todayKey(page);
         // Row-level: exactly one breakfast entry with the computed kcal.

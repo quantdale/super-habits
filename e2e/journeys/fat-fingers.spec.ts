@@ -167,6 +167,7 @@ async function confirmConfirmationDialog(page: Page, label: string): Promise<voi
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByText(label, { exact: true }).click({ force: true });
+  await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 }
 
 /** Reveal a todo row's swipe actions and click the Edit action for that row. */
@@ -321,6 +322,9 @@ defineJourney({
         await createHabitViaUi(page, 'Neighbour habit');
         await enterHabitEditAndDelete(page, 'Double-tap habit');
         await confirmConfirmationDialog(page, 'Delete habit');
+        await expect(page.getByText('Double-tap habit', { exact: true }).first()).not.toBeVisible({
+          timeout: 15_000,
+        });
 
         // Target is soft-deleted (still one row, deleted_at set — never hard-deleted).
         await expectRows(
@@ -364,6 +368,9 @@ defineJourney({
         await openTodoEditModal(page, 'Stale edit target');
         await page.getByPlaceholder(/Add a task/i).fill('Stale edit saved');
         await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
+        await expect(page.getByText('Stale edit saved', { exact: true }).first()).toBeVisible({
+          timeout: 15_000,
+        });
 
         // Exactly one row with the new title, zero with the old title — the edit
         // updated in place and never created a second row. The completion flag
