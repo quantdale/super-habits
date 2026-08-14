@@ -50,6 +50,23 @@ function buildTodoPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildV2Payload(
+  kind: string,
+  fields: Record<string, unknown>,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    outcome: 'draft',
+    kind,
+    status: 'ready',
+    confidence: 0.9,
+    warnings: [],
+    missingFields: [],
+    fields,
+    ...overrides,
+  };
+}
+
 describe('normalizeModelResponse (parse-ai-command edge function)', () => {
   it("resolves a todo draft with 'today' in the raw text to todayDateKey without throwing", () => {
     const result = normalizeModelResponse(buildTodoPayload(), 'test-model', BASE_INPUT);
@@ -136,6 +153,101 @@ describe('normalizeModelResponse (parse-ai-command edge function)', () => {
     expect(result.fields.name).toBe('Drink water');
     expect(result.fields.targetPerDay).toBe(8);
     expect(result.rawText).toBe('buy milk today');
+  });
+
+  it('normalizes every V2 mutation shape without inventing values', () => {
+    expect(
+      normalizeModelResponse(
+        buildV2Payload('complete_todo', { todoTitle: 'Buy groceries' }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toMatchObject({ kind: 'complete_todo', fields: { todoTitle: 'Buy groceries' } });
+
+    expect(
+      normalizeModelResponse(
+        buildV2Payload('log_habit', { habitName: 'Drink water', dateKey: null }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toMatchObject({ kind: 'log_habit', fields: { habitName: 'Drink water', dateKey: null } });
+
+    expect(
+      normalizeModelResponse(
+        buildV2Payload('log_calorie_entry', {
+          foodName: 'Eggs',
+          calories: 140,
+          protein: 12,
+          carbs: null,
+          fats: null,
+          fiber: null,
+          mealType: 'breakfast',
+          consumedOn: null,
+        }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toMatchObject({ kind: 'log_calorie_entry', fields: { foodName: 'Eggs', calories: 140 } });
+
+    expect(
+      normalizeModelResponse(
+        buildV2Payload('log_workout_routine', { routineName: 'Push Day', completedOn: null }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toMatchObject({ kind: 'log_workout_routine', fields: { routineName: 'Push Day' } });
+
+    expect(
+      normalizeModelResponse(
+        buildV2Payload('start_focus_session', { durationMinutes: 25 }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toMatchObject({ kind: 'start_focus_session', fields: { durationMinutes: 25 } });
+  });
+
+  it('keeps omitted calorie macros null instead of estimating them', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload('log_calorie_entry', {
+        foodName: 'Chicken breast',
+        calories: null,
+        protein: null,
+        carbs: null,
+        fats: null,
+        fiber: null,
+        mealType: null,
+        consumedOn: null,
+      }),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.fields).toEqual({
+      foodName: 'Chicken breast',
+      calories: null,
+      protein: null,
+      carbs: null,
+      fats: null,
+      fiber: null,
+      mealType: null,
+      consumedOn: null,
+    });
+  });
+
+  it.each([
+    ['negative calories', 'log_calorie_entry', { foodName: 'Rice', calories: -1 }],
+    ['oversized calories', 'log_calorie_entry', { foodName: 'Rice', calories: 10_000 }],
+    [
+      'invalid meal type',
+      'log_calorie_entry',
+      { foodName: 'Rice', calories: 200, mealType: 'brunch' },
+    ],
+    ['invalid date', 'log_habit', { habitName: 'Read', dateKey: '2026-13-40' }],
+    ['oversized focus duration', 'start_focus_session', { durationMinutes: 121 }],
+  ])('rejects %s in V2 model output', (_label, kind, fields) => {
+    expect(() =>
+      normalizeModelResponse(buildV2Payload(kind, fields), 'test-model', BASE_INPUT),
+    ).toThrow();
   });
 
   it('passes through an unsupported outcome with the raw text attached', () => {

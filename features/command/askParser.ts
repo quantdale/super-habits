@@ -2,9 +2,15 @@ import { getSupabaseAccessToken, getSupabaseAnonKey, getSupabaseFunctionUrl } fr
 import {
   AskRetrievalError,
   retrieveCalorieSummary,
+  retrieveDailyOverview,
+  retrieveFocusSummary,
+  retrieveHabitProgress,
   retrieveHabitStreak,
   retrievePendingTodos,
+  retrieveWorkoutSummary,
 } from './ask.retrieval';
+import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { isValidCommandDateKey, normalizeReference } from './command.validation';
 import type {
   AiAskParser,
   AskIntent,
@@ -137,11 +143,50 @@ export async function callAskFunction(
   return { ok: true, payload };
 }
 
-function isDateKey(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+function normalizeDateRange(
+  params: Record<string, unknown>,
+  input: Pick<AskParseInput, 'todayDateKey'> | undefined,
+  defaultDays: number,
+) {
+  const startDateKey = params.startDateKey;
+  const endDateKey = params.endDateKey;
+  let normalizedStart = startDateKey;
+  let normalizedEnd = endDateKey;
+  if (normalizedStart == null && normalizedEnd == null && input) {
+    const start = dateKeyToLocalDate(input.todayDateKey);
+    start.setDate(start.getDate() - (defaultDays - 1));
+    normalizedStart = toDateKey(start);
+    normalizedEnd = input.todayDateKey;
+  } else if (normalizedStart == null || normalizedEnd == null) {
+    const onlyDate = normalizedStart ?? normalizedEnd;
+    normalizedStart = onlyDate;
+    normalizedEnd = onlyDate;
+  }
+  if (typeof normalizedStart !== 'string' || typeof normalizedEnd !== 'string') {
+    throw new Error('Classify response must include a bounded date range.');
+  }
+  if (!isValidCommandDateKey(normalizedStart) || !isValidCommandDateKey(normalizedEnd)) {
+    throw new Error('Classify response must include valid date keys.');
+  }
+  const start = dateKeyToLocalDate(normalizedStart);
+  const end = dateKeyToLocalDate(normalizedEnd);
+  const dayCount = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  if (normalizedStart > normalizedEnd || dayCount < 1 || dayCount > 366) {
+    throw new Error('Classify response date range is outside the supported bounds.');
+  }
+  return { startDateKey: normalizedStart, endDateKey: normalizedEnd };
 }
 
-export function normalizeClassifyPayload(payload: unknown): ClassifyResult {
+function normalizeHabitName(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== 'string') throw new Error('Habit references must be strings or null.');
+  return normalizeReference(value);
+}
+
+export function normalizeClassifyPayload(
+  payload: unknown,
+  input?: Pick<AskParseInput, 'todayDateKey'>,
+): ClassifyResult {
   if (!isRecord(payload)) {
     throw new Error('Classify response must be an object.');
   }
@@ -155,44 +200,148 @@ export function normalizeClassifyPayload(payload: unknown): ClassifyResult {
     throw new Error('Classify response outcome is invalid.');
   }
 
-  const intent = payload.intent;
-  if (intent !== 'pending_todos' && intent !== 'calorie_summary' && intent !== 'habit_streak') {
+  const intent = payload.intent as AskIntent;
+  const supported = [
+    'pending_todos',
+    'calorie_summary',
+    'habit_progress',
+    'workout_summary',
+    'focus_summary',
+    'daily_overview',
+    'habit_streak',
+  ];
+  if (typeof payload.intent !== 'string' || !supported.includes(intent)) {
     throw new Error('Classify response intent is invalid.');
   }
 
-  const params = (payload.params ?? {}) as Record<string, unknown>;
-  if (intent === 'calorie_summary') {
-    const { startDateKey, endDateKey } = params;
-    if (!isDateKey(startDateKey) || !isDateKey(endDateKey)) {
-      throw new Error('Classify response calorie_summary params must include valid date keys.');
-    }
-  }
-
-  return {
-    outcome: 'classified',
-    intent,
-    params: params as ClassifyParams[AskIntent],
-  };
-}
-
-async function retrieveFactsForIntent(
-  intent: AskIntent,
-  params: ClassifyParams[AskIntent],
-): Promise<RetrievedFacts> {
+  const params = isRecord(payload.params) ? payload.params : {};
   if (intent === 'pending_todos') {
-    return { intent, facts: await retrievePendingTodos() };
-  }
-
-  if (intent === 'calorie_summary') {
-    const calorieParams = params as ClassifyParams['calorie_summary'];
+    const due = params.due ?? 'all';
+    const priority = params.priority ?? 'all';
+    if (typeof due !== 'string' || !['all', 'today', 'overdue'].includes(due)) {
+      throw new Error('Classify pending_todos due filter is invalid.');
+    }
+    if (typeof priority !== 'string' || !['all', 'urgent', 'normal', 'low'].includes(priority)) {
+      throw new Error('Classify pending_todos priority filter is invalid.');
+    }
     return {
-      intent,
-      facts: await retrieveCalorieSummary(calorieParams.startDateKey, calorieParams.endDateKey),
+      outcome: 'classified',
+      intent: 'pending_todos',
+      params: { due, priority } as ClassifyParams['pending_todos'],
     };
   }
 
-  const habitParams = params as ClassifyParams['habit_streak'];
-  return { intent, facts: await retrieveHabitStreak(habitParams.habitName) };
+  if (intent === 'calorie_summary') {
+    return {
+      outcome: 'classified',
+      intent,
+      params: normalizeDateRange(params, input, 1),
+    };
+  }
+
+  if (intent === 'focus_summary') {
+    return {
+      outcome: 'classified',
+      intent,
+      params: normalizeDateRange(params, input, 7),
+    };
+  }
+
+  if (intent === 'habit_streak') {
+    return {
+      outcome: 'classified',
+      intent,
+      params: { habitName: normalizeHabitName(params.habitName) },
+    };
+  }
+
+  if (intent === 'habit_progress') {
+    return {
+      outcome: 'classified',
+      intent,
+      params: {
+        ...normalizeDateRange(params, input, 30),
+        habitName: normalizeHabitName(params.habitName),
+      },
+    };
+  }
+
+  if (intent === 'workout_summary') {
+    return {
+      outcome: 'classified',
+      intent,
+      params: {
+        ...normalizeDateRange(params, input, 7),
+        routineName: normalizeHabitName(params.routineName),
+      },
+    };
+  }
+
+  const dateKey = params.dateKey ?? input?.todayDateKey;
+  if (typeof dateKey !== 'string') throw new Error('Classify daily_overview dateKey is invalid.');
+  if (!isValidCommandDateKey(dateKey))
+    throw new Error('Classify daily_overview dateKey is invalid.');
+  return { outcome: 'classified', intent, params: { dateKey } };
+}
+
+async function retrieveFactsForIntent(
+  classified: Extract<ClassifyResult, { outcome: 'classified' }>,
+  input: AskParseInput,
+): Promise<RetrievedFacts> {
+  switch (classified.intent) {
+    case 'pending_todos':
+      return {
+        intent: classified.intent,
+        facts: await retrievePendingTodos({
+          ...classified.params,
+          todayDateKey: input.todayDateKey,
+        }),
+      };
+    case 'calorie_summary':
+      return {
+        intent: classified.intent,
+        facts: await retrieveCalorieSummary(
+          classified.params.startDateKey,
+          classified.params.endDateKey,
+        ),
+      };
+    case 'habit_progress':
+      return {
+        intent: classified.intent,
+        facts: await retrieveHabitProgress(
+          classified.params.habitName,
+          classified.params.startDateKey,
+          classified.params.endDateKey,
+        ),
+      };
+    case 'habit_streak':
+      return {
+        intent: classified.intent,
+        facts: await retrieveHabitStreak(classified.params.habitName),
+      };
+    case 'workout_summary':
+      return {
+        intent: classified.intent,
+        facts: await retrieveWorkoutSummary(
+          classified.params.routineName,
+          classified.params.startDateKey,
+          classified.params.endDateKey,
+        ),
+      };
+    case 'focus_summary':
+      return {
+        intent: classified.intent,
+        facts: await retrieveFocusSummary(
+          classified.params.startDateKey,
+          classified.params.endDateKey,
+        ),
+      };
+    case 'daily_overview':
+      return {
+        intent: classified.intent,
+        facts: await retrieveDailyOverview(classified.params.dateKey),
+      };
+  }
 }
 
 function normalizePhrasePayload(payload: unknown): string {
@@ -200,6 +349,40 @@ function normalizePhrasePayload(payload: unknown): string {
     throw new Error('Phrase response must include a non-empty answer string.');
   }
   return payload.answer;
+}
+
+function deterministicAnswer(retrievedFacts: RetrievedFacts): string {
+  switch (retrievedFacts.intent) {
+    case 'pending_todos':
+      return `You have ${retrievedFacts.facts.count} pending Todo${retrievedFacts.facts.count === 1 ? '' : 's'}.${retrievedFacts.facts.titles.length > 0 ? ` ${retrievedFacts.facts.titles.join(', ')}.` : ''}`;
+    case 'calorie_summary': {
+      const facts = retrievedFacts.facts;
+      return `${facts.startDateKey === facts.endDateKey ? facts.startDateKey : `${facts.startDateKey} to ${facts.endDateKey}`}: ${facts.totalCalories} calories, ${facts.totalProtein} g protein, ${facts.totalCarbs} g carbs, ${facts.totalFats} g fats, and ${facts.totalFiber} g fiber across ${facts.entryCount} entries.`;
+    }
+    case 'habit_progress': {
+      const first = retrievedFacts.facts.habits[0];
+      if (!first) return 'No active Habits matched that progress request.';
+      return `${first.habitName}: ${first.currentStreak}-day current streak, ${first.last30Percentage ?? 0}% completion over the recent window, and ${first.currentActual}/${first.currentTarget} today.`;
+    }
+    case 'habit_streak': {
+      if (retrievedFacts.facts.scope === 'single') {
+        return `${retrievedFacts.facts.habitName}: current streak ${retrievedFacts.facts.currentStreak}, longest streak ${retrievedFacts.facts.longestStreak}.`;
+      }
+      return retrievedFacts.facts.habits.length === 0
+        ? 'No active Habits have progress yet.'
+        : retrievedFacts.facts.habits
+            .map((habit) => `${habit.habitName}: ${habit.currentStreak}-day current streak`)
+            .join('; ');
+    }
+    case 'workout_summary':
+      return `${retrievedFacts.facts.sessionCount} workout session${retrievedFacts.facts.sessionCount === 1 ? '' : 's'} from ${retrievedFacts.facts.startDateKey} to ${retrievedFacts.facts.endDateKey}.`;
+    case 'focus_summary':
+      return `${retrievedFacts.facts.totalFocusedMinutes} focused minutes across ${retrievedFacts.facts.completedSessionCount} completed session${retrievedFacts.facts.completedSessionCount === 1 ? '' : 's'}.`;
+    case 'daily_overview': {
+      const facts = retrievedFacts.facts;
+      return `${facts.dateKey}: ${facts.todos.pendingCount} pending Todos, ${facts.habits.completedCount} of ${facts.habits.scheduledCount} scheduled Habits complete, ${facts.calories.totalCalories} calories, ${facts.focus.totalFocusedMinutes} focus minutes, and ${facts.workout.sessionCount} workout sessions.`;
+    }
+  }
 }
 
 export class AskParser implements AiAskParser {
@@ -215,20 +398,17 @@ export class AskParser implements AiAskParser {
       tomorrowDateKey: input.tomorrowDateKey,
     });
 
-    if (!classifyCall.ok) {
-      return classifyCall.result;
-    }
+    if (!classifyCall.ok) return classifyCall.result;
 
     let classifyResult: ClassifyResult;
     try {
-      classifyResult = normalizeClassifyPayload(classifyCall.payload);
+      classifyResult = normalizeClassifyPayload(classifyCall.payload, input);
     } catch (error) {
-      return {
-        outcome: 'unavailable',
-        question: input.question,
-        message: error instanceof Error ? error.message : 'Ask returned an invalid response.',
-        reasonCode: 'response_validation_failed',
-      };
+      return buildUnavailableResult(
+        input.question,
+        error instanceof Error ? error.message : 'Ask returned an invalid response.',
+        'response_validation_failed',
+      );
     }
 
     if (classifyResult.outcome === 'unsupported') {
@@ -242,7 +422,7 @@ export class AskParser implements AiAskParser {
 
     let retrievedFacts: RetrievedFacts;
     try {
-      retrievedFacts = await retrieveFactsForIntent(classifyResult.intent, classifyResult.params);
+      retrievedFacts = await retrieveFactsForIntent(classifyResult, input);
     } catch (error) {
       if (error instanceof AskRetrievalError) {
         return {
@@ -252,7 +432,11 @@ export class AskParser implements AiAskParser {
           reasonCode: error.reasonCode,
         };
       }
-      throw error;
+      return buildUnavailableResult(
+        input.question,
+        'Ask could not read local facts.',
+        'request_failed',
+      );
     }
 
     const phraseCall = await callAskFunction({
@@ -262,18 +446,23 @@ export class AskParser implements AiAskParser {
     });
 
     if (!phraseCall.ok) {
-      return phraseCall.result;
+      return {
+        outcome: 'answer',
+        question: input.question,
+        answer: deterministicAnswer(retrievedFacts),
+        intent: classifyResult.intent,
+      };
     }
 
     try {
       const answer = normalizePhrasePayload(phraseCall.payload);
       return { outcome: 'answer', question: input.question, answer, intent: classifyResult.intent };
-    } catch (error) {
+    } catch {
       return {
-        outcome: 'unavailable',
+        outcome: 'answer',
         question: input.question,
-        message: error instanceof Error ? error.message : 'Ask returned an invalid response.',
-        reasonCode: 'response_validation_failed',
+        answer: deterministicAnswer(retrievedFacts),
+        intent: classifyResult.intent,
       };
     }
   }

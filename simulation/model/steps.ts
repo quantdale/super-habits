@@ -88,6 +88,7 @@ export const MUTATING_STEPS: ReadonlySet<SemanticStepName> = new Set<SemanticSte
   'logCalories',
   'buildRoutine',
   'startPomodoro',
+  'commandConfirm',
   'injectFailure', // tolerated as state-affecting: offline toggling mutates connectivity
   'reloadApp', // tolerated as state-affecting: continuity may be broken by design
   'apiLeg', // setup/teardown/backend writes
@@ -119,6 +120,27 @@ export const SEMANTIC_STEP_CATALOG: Record<SemanticStepName, StepDefinition> = {
     mutating: false,
     parentHelper: null,
     note: 'Runner-owned: parent harness has no openCommand helper; overlay interaction belongs to the runner.',
+  },
+  commandPreview: {
+    kind: 'commandPreview',
+    category: 'entity',
+    description: 'Parse and review a Command Center draft without confirming it.',
+    mutating: false,
+    parentHelper: 'commandObservation.openCommandScreen + parseCommand',
+  },
+  commandConfirm: {
+    kind: 'commandConfirm',
+    category: 'entity',
+    description: 'Confirm one supported Command Center mutation through the normal product path.',
+    mutating: true,
+    parentHelper: 'commandObservation.openCommandScreen + parseCommand + Confirm and save',
+  },
+  askQuestion: {
+    kind: 'askQuestion',
+    category: 'verification',
+    description: 'Submit one bounded read-only question to the Command Center Ask surface.',
+    mutating: false,
+    parentHelper: 'commandObservation.openCommandScreen + AskConversationView',
   },
 
   // ---- entity actions ----

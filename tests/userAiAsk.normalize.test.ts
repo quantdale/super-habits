@@ -90,14 +90,43 @@ describe('supabase/functions/user-ai-ask/normalize', () => {
     const result = normalizeAskRequestBody({
       stage: 'phrase',
       question: 'how many calories have I eaten today?',
-      retrievedFacts: { totalCalories: 1800, entryCount: 3 },
+      retrievedFacts: {
+        intent: 'calorie_summary',
+        facts: { totalCalories: 1800, entryCount: 3 },
+      },
     });
 
     expect(result).toEqual({
       stage: 'phrase',
       question: 'how many calories have I eaten today?',
-      retrievedFacts: { totalCalories: 1800, entryCount: 3 },
+      retrievedFacts: {
+        intent: 'calorie_summary',
+        facts: { totalCalories: 1800, entryCount: 3 },
+      },
     });
+  });
+
+  it('rejects phrase facts without a supported intent envelope', () => {
+    expect(() =>
+      normalizeAskRequestBody({
+        stage: 'phrase',
+        question: 'how am I doing today?',
+        retrievedFacts: { totalCalories: 1800 },
+      }),
+    ).toThrow(/supported intent and a facts object/);
+  });
+
+  it('rejects oversized phrase facts before they reach the provider', () => {
+    expect(() =>
+      normalizeAskRequestBody({
+        stage: 'phrase',
+        question: 'how am I doing today?',
+        retrievedFacts: {
+          intent: 'daily_overview',
+          facts: { titles: 'x'.repeat(24_001) },
+        },
+      }),
+    ).toThrow(/24000 bytes or less/);
   });
 
   it('throws when a phrase-stage request omits retrievedFacts', () => {

@@ -22,6 +22,7 @@ import { AppBootstrapStateContext } from '@/core/providers/appBootstrapContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
+import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroCommandBridge';
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);
@@ -172,24 +173,26 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <InAppNoticeProvider>
-          <DayRolloverProvider>
-            <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
-              <BootstrapGate dbError={dbError}>
-                {children}
-                <HabitReminderHost />
-                <RestorePrompt
-                  preview={restorePreview}
-                  visible={showRestorePrompt}
-                  busy={restorePromptBusy}
-                  errorMessage={restorePromptError}
-                  onDismiss={handleDismissRestorePrompt}
-                  onRestore={handleRestoreFromPrompt}
-                />
-              </BootstrapGate>
-            </AppBootstrapStateContext.Provider>
-          </DayRolloverProvider>
-        </InAppNoticeProvider>
+        <PomodoroCommandBridgeProvider>
+          <InAppNoticeProvider>
+            <DayRolloverProvider>
+              <AppBootstrapStateContext.Provider value={{ authBootstrapReady }}>
+                <BootstrapGate dbError={dbError}>
+                  {children}
+                  <HabitReminderHost />
+                  <RestorePrompt
+                    preview={restorePreview}
+                    visible={showRestorePrompt}
+                    busy={restorePromptBusy}
+                    errorMessage={restorePromptError}
+                    onDismiss={handleDismissRestorePrompt}
+                    onRestore={handleRestoreFromPrompt}
+                  />
+                </BootstrapGate>
+              </AppBootstrapStateContext.Provider>
+            </DayRolloverProvider>
+          </InAppNoticeProvider>
+        </PomodoroCommandBridgeProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

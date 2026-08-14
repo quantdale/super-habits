@@ -280,11 +280,11 @@ const MOCK_EVAL_CASES: CommandEvalCase[] = [
     expectation: { outcomeClass: 'unsupported', effectivePath: 'mock' },
   },
   {
-    label: 'unsupported-complete',
+    label: 'complete-needs-input',
     rawCommand: 'Complete my task',
     expectedModeContext: 'public_mock_default',
     evaluationKind: 'classification',
-    expectation: { outcomeClass: 'unsupported', effectivePath: 'mock' },
+    expectation: { outcomeClass: 'needs_input', effectivePath: 'mock' },
   },
   {
     label: 'unsupported-update',

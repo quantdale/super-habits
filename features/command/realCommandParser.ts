@@ -5,8 +5,22 @@ import {
   isSupabaseConfigured,
 } from '@/lib/supabase';
 import { validateHabit, validateTodo } from '@/lib/validation';
+import {
+  COMMAND_MAX_CALORIES,
+  COMMAND_MAX_FOCUS_MINUTES,
+  COMMAND_MAX_MACRO_GRAMS,
+  isBoundedNonNegativeNumber,
+  isBoundedPositiveInteger,
+  isValidCommandDateKey,
+  validateCommandDraftFields,
+} from './command.validation';
 import type {
   AiCommandParser,
+  DraftLogCalorieEntry,
+  DraftLogHabit,
+  DraftLogWorkoutRoutine,
+  DraftCompleteTodo,
+  DraftStartFocusSession,
   DraftCreateHabit,
   DraftCreateTodo,
   DraftMissingField,
@@ -25,6 +39,11 @@ const SUPPORTED_WARNING_CODES: DraftWarning['code'][] = [
   'ambiguous_date',
   'defaulted_field',
   'partial_parse',
+  'ambiguous_entity',
+  'missing_nutrition',
+  'active_timer_conflict',
+  'already_satisfied',
+  'off_day',
 ];
 const SUPPORTED_WARNING_CODE_SET = new Set<string>(SUPPORTED_WARNING_CODES);
 const SUPPORTED_TODO_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/g;
@@ -120,6 +139,30 @@ function normalizeOptionalString(value: unknown, fieldName: string): string | nu
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalPositiveInteger(
+  value: unknown,
+  fieldName: string,
+  max: number,
+): number | null {
+  if (value == null) return null;
+  if (!isBoundedPositiveInteger(value, max)) {
+    throw new Error(`Model ${fieldName} must be a whole number from 1 to ${max}.`);
+  }
+  return value;
+}
+
+function normalizeOptionalNonNegativeNumber(
+  value: unknown,
+  fieldName: string,
+  max: number,
+): number | null {
+  if (value == null) return null;
+  if (!isBoundedNonNegativeNumber(value, max)) {
+    throw new Error(`Model ${fieldName} must be between 0 and ${max} grams.`);
+  }
+  return value;
 }
 
 function deriveTodoDueDateDirective(
@@ -298,6 +341,168 @@ function normalizeRemoteHabitDraft(
   };
 }
 
+function normalizeEntityReferenceField(value: unknown, fieldName: string): string | null {
+  if (value == null) return null;
+  if (typeof value !== 'string') {
+    throw new Error(`Model ${fieldName} must be a string or null.`);
+  }
+  const trimmed = value.replace(/\s+/g, ' ').trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalCommandDate(value: unknown, fieldName: string): string | null {
+  if (value == null) return null;
+  if (typeof value !== 'string' || !isValidCommandDateKey(value)) {
+    throw new Error(`Model ${fieldName} must be a valid YYYY-MM-DD date or null.`);
+  }
+  return value;
+}
+
+function normalizeCommandStatus(value: unknown): 'ready' | 'needs_input' {
+  if (value !== 'ready' && value !== 'needs_input') {
+    throw new Error('Model draft status must be ready or needs_input.');
+  }
+  return value;
+}
+
+function normalizeRemoteCompleteTodoDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftCompleteTodo {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model complete_todo fields must be an object.');
+  const todoTitle = normalizeEntityReferenceField(fields.todoTitle, 'todoTitle');
+  return {
+    kind: 'complete_todo',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: { todoTitle },
+  };
+}
+
+function normalizeRemoteLogHabitDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftLogHabit {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model log_habit fields must be an object.');
+  const habitName = normalizeEntityReferenceField(fields.habitName, 'habitName');
+  const dateKey = normalizeOptionalCommandDate(fields.dateKey, 'dateKey');
+  return {
+    kind: 'log_habit',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: { habitName, dateKey },
+  };
+}
+
+function normalizeRemoteCalorieDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftLogCalorieEntry {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model log_calorie_entry fields must be an object.');
+  const foodName = normalizeEntityReferenceField(fields.foodName, 'foodName');
+  const macroValues = {
+    protein: normalizeOptionalNonNegativeNumber(fields.protein, 'protein', COMMAND_MAX_MACRO_GRAMS),
+    carbs: normalizeOptionalNonNegativeNumber(fields.carbs, 'carbs', COMMAND_MAX_MACRO_GRAMS),
+    fats: normalizeOptionalNonNegativeNumber(fields.fats, 'fats', COMMAND_MAX_MACRO_GRAMS),
+    fiber: normalizeOptionalNonNegativeNumber(fields.fiber, 'fiber', COMMAND_MAX_MACRO_GRAMS),
+  };
+  const calories = normalizeOptionalPositiveInteger(
+    fields.calories,
+    'calories',
+    COMMAND_MAX_CALORIES,
+  );
+  const mealType = fields.mealType ?? null;
+  if (
+    mealType !== null &&
+    mealType !== 'breakfast' &&
+    mealType !== 'lunch' &&
+    mealType !== 'dinner' &&
+    mealType !== 'snack'
+  ) {
+    throw new Error('Model mealType is invalid.');
+  }
+  const consumedOn = normalizeOptionalCommandDate(fields.consumedOn, 'consumedOn');
+  return {
+    kind: 'log_calorie_entry',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: {
+      foodName,
+      calories,
+      protein: macroValues.protein,
+      carbs: macroValues.carbs,
+      fats: macroValues.fats,
+      fiber: macroValues.fiber,
+      mealType,
+      consumedOn,
+    },
+  };
+}
+
+function normalizeRemoteWorkoutDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftLogWorkoutRoutine {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model log_workout_routine fields must be an object.');
+  return {
+    kind: 'log_workout_routine',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: {
+      routineName: normalizeEntityReferenceField(fields.routineName, 'routineName'),
+      completedOn: normalizeOptionalCommandDate(fields.completedOn, 'completedOn'),
+    },
+  };
+}
+
+function normalizeRemoteFocusDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftStartFocusSession {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model start_focus_session fields must be an object.');
+  const durationMinutes = normalizeOptionalPositiveInteger(
+    fields.durationMinutes,
+    'durationMinutes',
+    COMMAND_MAX_FOCUS_MINUTES,
+  );
+  return {
+    kind: 'start_focus_session',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: { durationMinutes },
+  };
+}
+
 export function normalizeRemoteParseResponse(
   payload: unknown,
   input: ParseCommandInput,
@@ -346,6 +551,27 @@ export function normalizeRemoteParseResponse(
     }
 
     return { outcome: 'draft', draft };
+  }
+
+  const v2Draft =
+    payload.kind === 'complete_todo'
+      ? normalizeRemoteCompleteTodoDraft(payload, input.rawText)
+      : payload.kind === 'log_habit'
+        ? normalizeRemoteLogHabitDraft(payload, input.rawText)
+        : payload.kind === 'log_calorie_entry'
+          ? normalizeRemoteCalorieDraft(payload, input.rawText)
+          : payload.kind === 'log_workout_routine'
+            ? normalizeRemoteWorkoutDraft(payload, input.rawText)
+            : payload.kind === 'start_focus_session'
+              ? normalizeRemoteFocusDraft(payload, input.rawText)
+              : null;
+
+  if (v2Draft) {
+    const validationMessage = validateCommandDraftFields(v2Draft);
+    if (v2Draft.status === 'ready' && validationMessage) {
+      throw new Error(`Model ${v2Draft.kind} draft failed local validation: ${validationMessage}`);
+    }
+    return { outcome: 'draft', draft: v2Draft };
   }
 
   throw new Error('Model parser response kind is invalid.');

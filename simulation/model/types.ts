@@ -156,6 +156,10 @@ export type SemanticStepName =
   | 'switchSection'
   | 'openSettings'
   | 'openCommand'
+  // Command Center V2
+  | 'commandPreview'
+  | 'commandConfirm'
+  | 'askQuestion'
   // entity actions
   | 'createTodo'
   | 'toggleTodo'
@@ -192,6 +196,18 @@ interface StepBase {
   oracles?: Oracle[];
 }
 
+/** A bounded assertion about one Command Center preview row. */
+export interface CommandPreviewCheck {
+  label: string;
+  contains: string;
+}
+
+/** Outcomes the deterministic Command Center parser/review can expose. */
+export type CommandPreviewOutcome = 'ready' | 'needs_input' | 'unsupported';
+
+/** Outcomes the read-only Ask surface can expose. */
+export type AskStepOutcome = 'answer' | 'unsupported' | 'unavailable';
+
 /**
  * A single semantic step. This is a discriminated union keyed on `kind`; the
  * catalog in `steps.ts` records each kind's category, whether it mutates, and
@@ -202,6 +218,24 @@ export type SemanticStep =
   | ({ kind: 'switchSection'; tab: SectionName } & StepBase)
   | ({ kind: 'openSettings'; bucket?: string } & StepBase)
   | ({ kind: 'openCommand' } & StepBase)
+  | ({
+      kind: 'commandPreview';
+      input: string;
+      expectedOutcome: CommandPreviewOutcome;
+      previewRows?: CommandPreviewCheck[];
+    } & StepBase)
+  | ({
+      kind: 'commandConfirm';
+      input: string;
+      previewRows?: CommandPreviewCheck[];
+      successText?: string;
+    } & StepBase)
+  | ({
+      kind: 'askQuestion';
+      question: string;
+      expectedOutcome: AskStepOutcome;
+      contains?: string;
+    } & StepBase)
   // ---- entity actions ----
   | ({
       kind: 'createTodo';

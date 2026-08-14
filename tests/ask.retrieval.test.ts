@@ -3,29 +3,52 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AskRetrievalError,
   retrieveCalorieSummary,
+  retrieveDailyOverview,
+  retrieveFocusSummary,
+  retrieveHabitProgress,
   retrieveHabitStreak,
   retrievePendingTodos,
+  retrieveWorkoutSummary,
 } from '@/features/command/ask.retrieval';
 
 const { getCalorieSummaryByRange, countCalorieEntriesByRange } = vi.hoisted(() => ({
   getCalorieSummaryByRange: vi.fn(),
   countCalorieEntriesByRange: vi.fn(),
 }));
-const { listHabits, getCompletionHistory } = vi.hoisted(() => ({
+const { listHabits, getCompletionHistory, getAllHabitCompletionsForRange } = vi.hoisted(() => ({
   listHabits: vi.fn(),
   getCompletionHistory: vi.fn(),
+  getAllHabitCompletionsForRange: vi.fn(),
 }));
-const { countPendingTodos, listPendingTodos } = vi.hoisted(() => ({
+const { countCompletedTodos, countPendingTodos, listPendingTodos } = vi.hoisted(() => ({
+  countCompletedTodos: vi.fn(),
   countPendingTodos: vi.fn(),
   listPendingTodos: vi.fn(),
+}));
+const { listRoutines, listWorkoutLogsForRange } = vi.hoisted(() => ({
+  listRoutines: vi.fn(),
+  listWorkoutLogsForRange: vi.fn(),
+}));
+const { listPomodoroSessionsForDateRange } = vi.hoisted(() => ({
+  listPomodoroSessionsForDateRange: vi.fn(),
 }));
 
 vi.mock('@/features/calories/calories.data', () => ({
   getCalorieSummaryByRange,
   countCalorieEntriesByRange,
 }));
-vi.mock('@/features/habits/habits.data', () => ({ listHabits, getCompletionHistory }));
-vi.mock('@/features/todos/todos.data', () => ({ countPendingTodos, listPendingTodos }));
+vi.mock('@/features/habits/habits.data', () => ({
+  listHabits,
+  getCompletionHistory,
+  getAllHabitCompletionsForRange,
+}));
+vi.mock('@/features/todos/todos.data', () => ({
+  countCompletedTodos,
+  countPendingTodos,
+  listPendingTodos,
+}));
+vi.mock('@/features/workout/workout.data', () => ({ listRoutines, listWorkoutLogsForRange }));
+vi.mock('@/features/pomodoro/pomodoro.data', () => ({ listPomodoroSessionsForDateRange }));
 
 describe('features/command/ask.retrieval', () => {
   beforeEach(() => {
@@ -44,6 +67,34 @@ describe('features/command/ask.retrieval', () => {
 
       expect(facts).toEqual({ count: 2, titles: ['Call mom', 'Pay rent'] });
       expect(facts).not.toHaveProperty('id');
+    });
+
+    it('applies bounded due and priority filters locally', async () => {
+      countPendingTodos.mockResolvedValue(1);
+      listPendingTodos.mockResolvedValue([
+        {
+          id: 'todo_1',
+          title: 'Submit report',
+          completed: 0,
+          due_date: '2026-04-16',
+          priority: 'urgent',
+        },
+      ]);
+
+      await expect(
+        retrievePendingTodos({ due: 'overdue', priority: 'urgent', todayDateKey: '2026-04-17' }),
+      ).resolves.toEqual({ count: 1, titles: ['Submit report'] });
+      expect(countPendingTodos).toHaveBeenCalledWith({
+        due: 'overdue',
+        priority: 'urgent',
+        todayDateKey: '2026-04-17',
+      });
+      expect(listPendingTodos).toHaveBeenCalledWith({
+        due: 'overdue',
+        priority: 'urgent',
+        todayDateKey: '2026-04-17',
+        limit: 50,
+      });
     });
   });
 
@@ -76,6 +127,10 @@ describe('features/command/ask.retrieval', () => {
       expect(countCalorieEntriesByRange).toHaveBeenCalledWith('2026-04-16', '2026-04-17');
       expect(facts).toEqual({
         totalCalories: 1800,
+        totalProtein: 110,
+        totalCarbs: 160,
+        totalFats: 60,
+        totalFiber: 15,
         entryCount: 3,
         startDateKey: '2026-04-16',
         endDateKey: '2026-04-17',
@@ -126,6 +181,118 @@ describe('features/command/ask.retrieval', () => {
           { habitName: 'Read', currentStreak: 0, longestStreak: 0 },
         ],
       });
+    });
+  });
+
+  describe('retrieveHabitProgress', () => {
+    it('uses the canonical insight domain with one bounded completion range', async () => {
+      listHabits.mockResolvedValue([
+        {
+          id: 'habit_1',
+          name: 'Gym',
+          target_per_day: 1,
+          rule_history: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+          deleted_at: null,
+        },
+      ]);
+      getAllHabitCompletionsForRange.mockResolvedValue([
+        { habit_id: 'habit_1', date_key: '2026-04-17', count: 1 },
+      ]);
+
+      const facts = await retrieveHabitProgress('gym', '2026-04-16', '2026-04-17');
+
+      expect(getAllHabitCompletionsForRange).toHaveBeenCalledWith('2025-04-17', '2026-04-17');
+      expect(facts).toMatchObject({
+        scope: 'single',
+        startDateKey: '2026-04-16',
+        endDateKey: '2026-04-17',
+        habits: [
+          expect.objectContaining({
+            habitName: 'Gym',
+            currentActual: 1,
+          }),
+        ],
+      });
+    });
+  });
+
+  describe('workout and focus summaries', () => {
+    it('returns bounded routine frequency and last session facts', async () => {
+      listRoutines.mockResolvedValue([{ id: 'routine_1', name: 'Push Day', deleted_at: null }]);
+      listWorkoutLogsForRange.mockResolvedValue([
+        { routine_id: 'routine_1', completed_at: '2026-04-17T08:00:00.000Z' },
+        { routine_id: 'routine_1', completed_at: '2026-04-16T08:00:00.000Z' },
+      ]);
+
+      await expect(retrieveWorkoutSummary(null, '2026-04-16', '2026-04-17')).resolves.toEqual({
+        startDateKey: '2026-04-16',
+        endDateKey: '2026-04-17',
+        sessionCount: 2,
+        lastSession: { routineName: 'Push Day', completedAt: '2026-04-17T08:00:00.000Z' },
+        routineFrequency: [{ routineName: 'Push Day', sessionCount: 2 }],
+      });
+    });
+
+    it('returns completed focus session count and total bounded minutes', async () => {
+      listPomodoroSessionsForDateRange.mockResolvedValue([
+        { session_type: 'focus', duration_seconds: 1500 },
+        { session_type: 'short_break', duration_seconds: 300 },
+        { session_type: 'focus', duration_seconds: 2700 },
+      ]);
+
+      await expect(retrieveFocusSummary('2026-04-17', '2026-04-17')).resolves.toEqual({
+        startDateKey: '2026-04-17',
+        endDateKey: '2026-04-17',
+        completedSessionCount: 2,
+        totalFocusedMinutes: 70,
+      });
+    });
+  });
+
+  it('builds a bounded daily overview without exposing raw rows', async () => {
+    countPendingTodos.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    countCompletedTodos.mockResolvedValue(1);
+    listHabits.mockResolvedValue([]);
+    getAllHabitCompletionsForRange.mockResolvedValue([]);
+    getCalorieSummaryByRange.mockResolvedValue([
+      {
+        dateKey: '2026-04-17',
+        totalCalories: 500,
+        totalProtein: 20,
+        totalCarbs: 40,
+        totalFats: 10,
+        totalFiber: 5,
+      },
+    ]);
+    countCalorieEntriesByRange.mockResolvedValue(1);
+    listPomodoroSessionsForDateRange.mockResolvedValue([]);
+    listRoutines.mockResolvedValue([]);
+    listWorkoutLogsForRange.mockResolvedValue([]);
+
+    const facts = await retrieveDailyOverview('2026-04-17');
+
+    expect(countPendingTodos).toHaveBeenCalledWith();
+    expect(countPendingTodos).toHaveBeenCalledWith({
+      due: 'overdue',
+      todayDateKey: '2026-04-17',
+    });
+    expect(countCompletedTodos).toHaveBeenCalledWith();
+
+    expect(facts).toEqual({
+      dateKey: '2026-04-17',
+      todos: { pendingCount: 1, completedCount: 1, overdueCount: 0 },
+      habits: { scheduledCount: 0, completedCount: 0, remainingCount: 0 },
+      calories: {
+        totalCalories: 500,
+        totalProtein: 20,
+        totalCarbs: 40,
+        totalFats: 10,
+        totalFiber: 5,
+        entryCount: 1,
+      },
+      focus: { completedSessionCount: 0, totalFocusedMinutes: 0 },
+      workout: { sessionCount: 0 },
     });
   });
 });

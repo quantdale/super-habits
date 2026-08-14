@@ -412,6 +412,9 @@ describe('semantic step catalog', () => {
       'switchSection',
       'openSettings',
       'openCommand',
+      'commandPreview',
+      'commandConfirm',
+      'askQuestion',
       // entity actions
       'createTodo',
       'toggleTodo',
@@ -453,6 +456,7 @@ describe('semantic step catalog', () => {
       'logCalories',
       'buildRoutine',
       'startPomodoro',
+      'commandConfirm',
       'injectFailure',
       'reloadApp',
       'apiLeg',
@@ -460,7 +464,7 @@ describe('semantic step catalog', () => {
     for (const name of SEMANTIC_STEP_NAMES) {
       expect(isMutatingStep(name)).toBe(mutating.has(name));
     }
-    expect(MUTATING_STEPS.size).toBe(10);
+    expect(MUTATING_STEPS.size).toBe(11);
   });
 
   it('maps every mutating step to the oracle requirement', () => {
@@ -487,6 +491,7 @@ describe('semantic step catalog', () => {
       'seed',
       'reset',
       'journey',
+      'commandObservation',
     ]);
     for (const def of Object.values(SEMANTIC_STEP_CATALOG)) {
       // apiLeg resolves via page.evaluate against the data layer, not a helper file.

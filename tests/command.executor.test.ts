@@ -1,15 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
-import type { DraftCreateHabit, DraftCreateTodo } from '@/features/command/types';
+import type {
+  DraftCompleteTodo,
+  DraftCreateHabit,
+  DraftCreateTodo,
+  DraftLogCalorieEntry,
+  DraftLogHabit,
+  DraftLogWorkoutRoutine,
+  DraftStartFocusSession,
+} from '@/features/command/types';
 
 import { executeDraftAction } from '@/features/command/command.executor';
 
-const { addTodo } = vi.hoisted(() => ({
+const { addTodo, completeTodo, listTodos } = vi.hoisted(() => ({
   addTodo: vi.fn(),
+  completeTodo: vi.fn(),
+  listTodos: vi.fn(),
 }));
 
-const { addHabit } = vi.hoisted(() => ({
+const { addHabit, incrementHabit, listHabits } = vi.hoisted(() => ({
   addHabit: vi.fn(),
+  incrementHabit: vi.fn(),
+  listHabits: vi.fn(),
+}));
+
+const { addCalorieEntry } = vi.hoisted(() => ({
+  addCalorieEntry: vi.fn(),
+}));
+
+const { completeRoutine, listRoutines } = vi.hoisted(() => ({
+  completeRoutine: vi.fn(),
+  listRoutines: vi.fn(),
 }));
 
 const { validateTodo, validateHabit } = vi.hoisted(() => ({
@@ -19,10 +40,23 @@ const { validateTodo, validateHabit } = vi.hoisted(() => ({
 
 vi.mock('@/features/todos/todos.data', () => ({
   addTodo,
+  completeTodo,
+  listTodos,
 }));
 
 vi.mock('@/features/habits/habits.data', () => ({
   addHabit,
+  incrementHabit,
+  listHabits,
+}));
+
+vi.mock('@/features/calories/calories.data', () => ({
+  addCalorieEntry,
+}));
+
+vi.mock('@/features/workout/workout.data', () => ({
+  completeRoutine,
+  listRoutines,
 }));
 
 vi.mock('@/lib/validation', () => ({
@@ -76,7 +110,31 @@ describe('features/command/command.executor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     addTodo.mockResolvedValue('todo_1');
+    completeTodo.mockResolvedValue({
+      completed: 1,
+      linkedActions: { matchedRuleCount: 0, notices: [] },
+    });
+    listTodos.mockResolvedValue([
+      { id: 'todo_1', title: 'Buy groceries', completed: 0, deleted_at: null },
+    ]);
     addHabit.mockResolvedValue('habit_1');
+    incrementHabit.mockResolvedValue({
+      count: 1,
+      linkedActions: { matchedRuleCount: 0, notices: [] },
+    });
+    listHabits.mockResolvedValue([
+      {
+        id: 'habit_1',
+        name: 'Gym',
+        target_per_day: 1,
+        created_at: new Date().toISOString(),
+        rule_history: '[]',
+        deleted_at: null,
+      },
+    ]);
+    addCalorieEntry.mockResolvedValue(undefined);
+    completeRoutine.mockResolvedValue({ status: 'applied', reason: null, routineName: 'Push Day' });
+    listRoutines.mockResolvedValue([{ id: 'routine_1', name: 'Push Day', deleted_at: null }]);
     validateTodo.mockReturnValue(null);
     validateHabit.mockReturnValue(null);
   });
@@ -199,5 +257,141 @@ describe('features/command/command.executor', () => {
       outcome: 'validation_error',
       message: 'Task title is required.',
     });
+  });
+
+  it('completes one Todo through the canonical path and rejects a double confirm', async () => {
+    const draft: DraftCompleteTodo = {
+      kind: 'complete_todo',
+      rawText: 'complete Buy groceries',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: { todoTitle: 'Buy groceries' },
+    };
+    const first = await executeDraftAction(draft, {
+      executionToken: 'cmd_complete_once',
+      resolvedEntityId: 'todo_1',
+    });
+    const duplicate = await executeDraftAction(draft, {
+      executionToken: 'cmd_complete_once',
+      resolvedEntityId: 'todo_1',
+    });
+
+    expect(first).toMatchObject({ outcome: 'success', kind: 'complete_todo' });
+    expect(duplicate).toMatchObject({ outcome: 'duplicate' });
+    expect(completeTodo).toHaveBeenCalledTimes(1);
+  });
+
+  it('executes habit, calorie, and workout V2 actions through canonical functions', async () => {
+    const habitDraft: DraftLogHabit = {
+      kind: 'log_habit',
+      rawText: 'add one to Gym',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: { habitName: 'Gym', dateKey: null },
+    };
+    const calorieDraft: DraftLogCalorieEntry = {
+      kind: 'log_calorie_entry',
+      rawText: 'log eggs 140 calories',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: {
+        foodName: 'eggs',
+        calories: 140,
+        protein: null,
+        carbs: null,
+        fats: null,
+        fiber: null,
+        mealType: 'breakfast',
+        consumedOn: null,
+      },
+    };
+    const workoutDraft: DraftLogWorkoutRoutine = {
+      kind: 'log_workout_routine',
+      rawText: 'log Push Day workout',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: { routineName: 'Push Day', completedOn: null },
+    };
+
+    expect(await executeDraftAction(habitDraft, { resolvedEntityId: 'habit_1' })).toMatchObject({
+      outcome: 'success',
+      kind: 'log_habit',
+    });
+    expect(await executeDraftAction(calorieDraft)).toMatchObject({
+      outcome: 'success',
+      kind: 'log_calorie_entry',
+    });
+    expect(await executeDraftAction(workoutDraft, { resolvedEntityId: 'routine_1' })).toMatchObject(
+      {
+        outcome: 'success',
+        kind: 'log_workout_routine',
+      },
+    );
+    expect(incrementHabit).toHaveBeenCalledWith('habit_1', expect.any(String));
+    expect(addCalorieEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ foodName: 'eggs', calories: 140, protein: undefined }),
+    );
+    expect(completeRoutine).toHaveBeenCalledWith('routine_1');
+  });
+
+  it('does not create a workout log when the routine disappears after review', async () => {
+    completeRoutine.mockResolvedValueOnce({
+      status: 'skipped',
+      reason: 'target_missing',
+      routineName: null,
+    });
+    const draft: DraftLogWorkoutRoutine = {
+      kind: 'log_workout_routine',
+      rawText: 'log Push Day workout',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: { routineName: 'Push Day', completedOn: null },
+    };
+
+    await expect(
+      executeDraftAction(draft, { resolvedEntityId: 'routine_1' }),
+    ).resolves.toMatchObject({ outcome: 'validation_error' });
+  });
+
+  it('protects focus start with the canonical timer callback and conflict result', async () => {
+    const draft: DraftStartFocusSession = {
+      kind: 'start_focus_session',
+      rawText: 'start a 25 minute focus session',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: { durationMinutes: 25 },
+    };
+    const callback = vi.fn().mockResolvedValue({
+      outcome: 'conflict',
+      message: 'A focus session is already running.',
+    });
+
+    const result = await executeDraftAction(draft, { startFocusSession: callback });
+    expect(result).toMatchObject({ outcome: 'conflict' });
+    expect(callback).toHaveBeenCalledWith(25);
   });
 });

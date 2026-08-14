@@ -71,7 +71,7 @@ const MOCK_OBSERVATION_CASES: CommandObservationCase[] = [
   { bucket: 'E', command: 'Drink water tomorrow', expectedOutcome: 'unsupported' },
   { bucket: 'F', command: 'Delete my todo', expectedOutcome: 'unsupported' },
   { bucket: 'F', command: 'Remove my habit', expectedOutcome: 'unsupported' },
-  { bucket: 'F', command: 'Complete my task', expectedOutcome: 'unsupported' },
+  { bucket: 'F', command: 'Complete my task', expectedOutcome: 'needs_input' },
   { bucket: 'F', command: 'Update my habit target', expectedOutcome: 'unsupported' },
   {
     bucket: 'G',

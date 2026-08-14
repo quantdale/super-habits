@@ -9,22 +9,34 @@ const { getSupabaseAccessToken, getSupabaseAnonKey, getSupabaseFunctionUrl } = v
   getSupabaseFunctionUrl: vi.fn(),
 }));
 
-const { retrievePendingTodos, retrieveCalorieSummary, retrieveHabitStreak, AskRetrievalError } =
-  vi.hoisted(() => {
-    class AskRetrievalErrorImpl extends Error {
-      reasonCode: string;
-      constructor(reasonCode: string, message: string) {
-        super(message);
-        this.reasonCode = reasonCode;
-      }
+const {
+  retrievePendingTodos,
+  retrieveCalorieSummary,
+  retrieveHabitProgress,
+  retrieveHabitStreak,
+  retrieveWorkoutSummary,
+  retrieveFocusSummary,
+  retrieveDailyOverview,
+  AskRetrievalError,
+} = vi.hoisted(() => {
+  class AskRetrievalErrorImpl extends Error {
+    reasonCode: string;
+    constructor(reasonCode: string, message: string) {
+      super(message);
+      this.reasonCode = reasonCode;
     }
-    return {
-      retrievePendingTodos: vi.fn(),
-      retrieveCalorieSummary: vi.fn(),
-      retrieveHabitStreak: vi.fn(),
-      AskRetrievalError: AskRetrievalErrorImpl,
-    };
-  });
+  }
+  return {
+    retrievePendingTodos: vi.fn(),
+    retrieveCalorieSummary: vi.fn(),
+    retrieveHabitProgress: vi.fn(),
+    retrieveHabitStreak: vi.fn(),
+    retrieveWorkoutSummary: vi.fn(),
+    retrieveFocusSummary: vi.fn(),
+    retrieveDailyOverview: vi.fn(),
+    AskRetrievalError: AskRetrievalErrorImpl,
+  };
+});
 
 vi.mock('@/lib/supabase', () => ({
   getSupabaseAccessToken,
@@ -35,7 +47,11 @@ vi.mock('@/lib/supabase', () => ({
 vi.mock('@/features/command/ask.retrieval', () => ({
   retrievePendingTodos,
   retrieveCalorieSummary,
+  retrieveHabitProgress,
   retrieveHabitStreak,
+  retrieveWorkoutSummary,
+  retrieveFocusSummary,
+  retrieveDailyOverview,
   AskRetrievalError,
 }));
 
@@ -215,5 +231,147 @@ describe('features/command/askParser', () => {
       message: 'Ask returned malformed JSON.',
       reasonCode: 'malformed_json',
     });
+  });
+
+  it('routes every V2 Ask intent to bounded local retrieval', async () => {
+    const cases = [
+      {
+        intent: 'pending_todos',
+        params: { due: 'all', priority: 'all' },
+        retriever: retrievePendingTodos,
+        facts: { count: 1, titles: ['Submit report'] },
+      },
+      {
+        intent: 'calorie_summary',
+        params: { startDateKey: '2026-04-21', endDateKey: '2026-04-21' },
+        retriever: retrieveCalorieSummary,
+        facts: {
+          totalCalories: 1800,
+          totalProtein: 80,
+          totalCarbs: 200,
+          totalFats: 60,
+          totalFiber: 20,
+          entryCount: 3,
+          startDateKey: '2026-04-21',
+          endDateKey: '2026-04-21',
+        },
+      },
+      {
+        intent: 'habit_progress',
+        params: { habitName: null, startDateKey: '2026-04-15', endDateKey: '2026-04-21' },
+        retriever: retrieveHabitProgress,
+        facts: {
+          scope: 'overall',
+          startDateKey: '2026-04-15',
+          endDateKey: '2026-04-21',
+          habits: [],
+        },
+      },
+      {
+        intent: 'workout_summary',
+        params: { routineName: null, startDateKey: '2026-04-15', endDateKey: '2026-04-21' },
+        retriever: retrieveWorkoutSummary,
+        facts: {
+          startDateKey: '2026-04-15',
+          endDateKey: '2026-04-21',
+          sessionCount: 2,
+          lastSession: null,
+          routineFrequency: [],
+        },
+      },
+      {
+        intent: 'focus_summary',
+        params: { startDateKey: '2026-04-15', endDateKey: '2026-04-21' },
+        retriever: retrieveFocusSummary,
+        facts: {
+          startDateKey: '2026-04-15',
+          endDateKey: '2026-04-21',
+          completedSessionCount: 2,
+          totalFocusedMinutes: 50,
+        },
+      },
+      {
+        intent: 'daily_overview',
+        params: { dateKey: '2026-04-21' },
+        retriever: retrieveDailyOverview,
+        facts: {
+          dateKey: '2026-04-21',
+          todos: { pendingCount: 1, completedCount: 1, overdueCount: 0 },
+          habits: { scheduledCount: 1, completedCount: 1, remainingCount: 0 },
+          calories: {
+            totalCalories: 1800,
+            totalProtein: 80,
+            totalCarbs: 200,
+            totalFats: 60,
+            totalFiber: 20,
+            entryCount: 3,
+          },
+          focus: { completedSessionCount: 2, totalFocusedMinutes: 50 },
+          workout: { sessionCount: 1 },
+        },
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      vi.clearAllMocks();
+      testCase.retriever.mockResolvedValue(testCase.facts);
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, {
+            outcome: 'classified',
+            intent: testCase.intent,
+            params: testCase.params,
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(200, { answer: 'bounded answer' }));
+
+      const result = await new AskParser().ask({
+        ...BASE_INPUT,
+        question: `summary for ${testCase.intent}`,
+      });
+
+      expect(result).toMatchObject({ outcome: 'answer', intent: testCase.intent });
+      expect(testCase.retriever).toHaveBeenCalled();
+    }
+  });
+
+  it('falls back to a deterministic answer when the phrase provider is unavailable', async () => {
+    retrieveHabitProgress.mockResolvedValue({
+      scope: 'single',
+      startDateKey: '2026-04-15',
+      endDateKey: '2026-04-21',
+      habits: [
+        {
+          habitName: 'Gym',
+          currentStreak: 3,
+          longestStreak: 5,
+          scheduledOccurrences: 5,
+          completedOccurrences: 4,
+          currentTarget: 1,
+          currentActual: 1,
+          last7Percentage: 80,
+          last30Percentage: 70,
+          last90Percentage: 70,
+        },
+      ],
+    });
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          outcome: 'classified',
+          intent: 'habit_progress',
+          params: { habitName: 'Gym', startDateKey: '2026-04-15', endDateKey: '2026-04-21' },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(503, { error: 'provider unavailable' }));
+
+    const result = await new AskParser().ask({ ...BASE_INPUT, question: 'how is Gym going?' });
+
+    expect(result).toMatchObject({ outcome: 'answer', intent: 'habit_progress' });
+    if (result.outcome !== 'answer') return;
+    expect(result.answer).toContain('Gym');
+    expect(result.answer).toContain('3-day current streak');
   });
 });

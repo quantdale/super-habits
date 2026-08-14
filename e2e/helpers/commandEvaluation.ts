@@ -149,6 +149,14 @@ async function readInputValue(page: Page, id: string): Promise<string | null> {
   return normalizeText(await locator.inputValue());
 }
 
+async function isInputVisible(page: Page, id: string): Promise<boolean> {
+  return page
+    .locator(`#${id}`)
+    .first()
+    .isVisible()
+    .catch(() => false);
+}
+
 async function readInfoRowValue(page: Page, label: string): Promise<string | null> {
   const row = page
     .getByText(label, { exact: true })
@@ -356,8 +364,10 @@ export async function captureCommandEvaluationResult(
       }
     }
 
-    const intentValue = await readInfoRowValue(page, 'Intent');
-    if (intentValue === 'Create todo') {
+    const intentValue = (await readInfoRowValue(page, 'Intent'))?.toLowerCase();
+    const createTodoEditorVisible = await isInputVisible(page, 'command-edit-todo-title');
+    const createHabitEditorVisible = await isInputVisible(page, 'command-edit-habit-name');
+    if (intentValue === 'create todo' || createTodoEditorVisible) {
       draftKind = 'create_todo';
       title = await readInputValue(page, 'command-edit-todo-title');
       dueDate = await readInputValue(page, 'command-edit-todo-due-date');
@@ -365,7 +375,7 @@ export async function captureCommandEvaluationResult(
       if (!metadataVisible && !title) {
         missingFields.push('title');
       }
-    } else if (intentValue === 'Create habit') {
+    } else if (intentValue === 'create habit' || createHabitEditorVisible) {
       draftKind = 'create_habit';
       name = await readInputValue(page, 'command-edit-habit-name');
       const rawTarget = await readInputValue(page, 'command-edit-habit-target');

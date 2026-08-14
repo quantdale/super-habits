@@ -27,6 +27,16 @@ export type ToggleTodoResult = {
   linkedActions: TodoLinkedActionsDispatchResult;
 };
 
+export type PendingTodoFilters = {
+  due?: 'all' | 'today' | 'overdue';
+  priority?: TodoPriority | 'all';
+  todayDateKey?: string;
+};
+
+export type PendingTodoListOptions = PendingTodoFilters & {
+  limit?: number;
+};
+
 const EMPTY_LINKED_ACTIONS_RESULT: TodoLinkedActionsDispatchResult = {
   matchedRuleCount: 0,
   notices: [],
@@ -41,23 +51,85 @@ export async function listTodos(): Promise<Todo[]> {
   );
 }
 
-export async function listPendingTodos(): Promise<Todo[]> {
+export async function listPendingTodos(input?: number | PendingTodoListOptions): Promise<Todo[]> {
   const db = await getDatabase();
-  return db.getAllAsync<Todo>(
-    `SELECT * FROM todos
+  const options = typeof input === 'number' ? { limit: input } : (input ?? {});
+  const hasFilters =
+    options.due !== undefined ||
+    options.priority !== undefined ||
+    options.todayDateKey !== undefined;
+  const query = `SELECT * FROM todos
      WHERE deleted_at IS NULL
        AND completed = 0
-     ORDER BY sort_order ASC, created_at DESC`,
-  );
+     ORDER BY sort_order ASC, created_at DESC`;
+  if (!hasFilters && options.limit === undefined) {
+    return db.getAllAsync<Todo>(query);
+  }
+
+  const clauses: string[] = ['deleted_at IS NULL', 'completed = 0'];
+  const args: (string | number)[] = [];
+  if (options.priority && options.priority !== 'all') {
+    clauses.push('priority = ?');
+    args.push(options.priority);
+  }
+  if (options.due === 'today') {
+    clauses.push('due_date = ?');
+    args.push(options.todayDateKey ?? toDateKey());
+  } else if (options.due === 'overdue') {
+    clauses.push('due_date IS NOT NULL', 'due_date < ?');
+    args.push(options.todayDateKey ?? toDateKey());
+  }
+  const filteredQuery = `SELECT * FROM todos
+     WHERE ${clauses.join('\n       AND ')}
+     ORDER BY sort_order ASC, created_at DESC`;
+  if (options.limit === undefined) {
+    return db.getAllAsync<Todo>(filteredQuery, args);
+  }
+  return db.getAllAsync<Todo>(`${filteredQuery} LIMIT ?`, [...args, options.limit]);
 }
 
-export async function countPendingTodos(): Promise<number> {
+export async function countPendingTodos(filters?: PendingTodoFilters): Promise<number> {
+  const db = await getDatabase();
+  if (!filters) {
+    const row = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count
+       FROM todos
+       WHERE deleted_at IS NULL
+         AND completed = 0`,
+    );
+    return row?.count ?? 0;
+  }
+
+  const clauses: string[] = ['deleted_at IS NULL', 'completed = 0'];
+  const args: string[] = [];
+  if (filters.priority && filters.priority !== 'all') {
+    clauses.push('priority = ?');
+    args.push(filters.priority);
+  }
+  if (filters.due === 'today') {
+    clauses.push('due_date = ?');
+    args.push(filters.todayDateKey ?? toDateKey());
+  } else if (filters.due === 'overdue') {
+    clauses.push('due_date IS NOT NULL', 'due_date < ?');
+    args.push(filters.todayDateKey ?? toDateKey());
+  }
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count
+     FROM todos
+     WHERE ${clauses.join('\n       AND ')}`,
+    args,
+  );
+  return row?.count ?? 0;
+}
+
+/** Count completed active Todos without loading the full Todo history. */
+export async function countCompletedTodos(): Promise<number> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) AS count
      FROM todos
      WHERE deleted_at IS NULL
-       AND completed = 0`,
+       AND completed = 1`,
   );
   return row?.count ?? 0;
 }
@@ -319,7 +391,10 @@ export async function saveTodoLinkedActionRules(
   });
 }
 
-export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
+async function setTodoCompletion(
+  todoId: string,
+  desiredCompletion: 0 | 1 | 'toggle',
+): Promise<ToggleTodoResult> {
   const db = await getDatabase();
   const now = nowIso();
   type ToggleMutation = {
@@ -329,14 +404,14 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
   };
   const outcome = await runSyncedMutation<ToggleMutation>({
     db,
-    record: { entity: 'todos', id: todo.id, updatedAt: now, operation: 'update' },
+    record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
       const current = await transactionDb.getFirstAsync<Todo>(
         `SELECT *
          FROM todos
          WHERE id = ?
            AND deleted_at IS NULL`,
-        [todo.id],
+        [todoId],
       );
       if (!current) {
         return {
@@ -345,7 +420,11 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
         };
       }
       const previous = current.completed;
-      const next: 0 | 1 = previous === 1 ? 0 : 1;
+      const next: 0 | 1 =
+        desiredCompletion === 'toggle' ? (previous === 1 ? 0 : 1) : desiredCompletion;
+      if (next === previous) {
+        return { changed: false, value: { current, previous, next } };
+      }
       const result = await transactionDb.runAsync(
         `UPDATE todos SET completed = ?, updated_at = ?
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
@@ -361,7 +440,7 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
     },
   });
 
-  if (!outcome.changed || !outcome.value.current) {
+  if (!outcome.value.current) {
     return {
       completed: 0,
       linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
@@ -369,6 +448,15 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
   }
 
   const { current, previous, next } = outcome.value;
+
+  // Idempotent completion is intentionally a safe no-op. This branch is used
+  // by Command Center; it must never toggle a completed Todo back to pending.
+  if (!outcome.changed && desiredCompletion === 1 && previous === 1) {
+    return {
+      completed: 1,
+      linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
+    };
+  }
 
   if (next === 1 && current.recurrence === 'daily' && current.recurrence_id) {
     const tomorrow = getTomorrowDateKey();
@@ -425,6 +513,15 @@ export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
       notices: processResult.notices,
     },
   };
+}
+
+export async function toggleTodo(todo: Todo): Promise<ToggleTodoResult> {
+  return setTodoCompletion(todo.id, 'toggle');
+}
+
+/** Complete a Todo without toggling an already-completed row back to pending. */
+export async function completeTodo(todoId: string): Promise<ToggleTodoResult> {
+  return setTodoCompletion(todoId, 1);
 }
 
 export async function removeTodo(id: string): Promise<void> {

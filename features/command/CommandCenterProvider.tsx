@@ -11,6 +11,7 @@ import {
 } from './commandCenterConfig';
 import { CommandScreen } from './CommandScreen';
 import { CommandCenterContext, useCommandCenter } from './commandCenterContext';
+import { usePomodoroCommandBridge } from '@/features/pomodoro/pomodoroCommandBridgeContext';
 
 export function CommandCenterProvider({ children }: PropsWithChildren) {
   const [isOpen, setIsOpen] = useState(false);
@@ -118,6 +119,7 @@ function FloatingCommandLauncher({
 export function GlobalCommandCenterHost() {
   const { width } = useWindowDimensions();
   const { activeSection, setActiveSection, isSettingsOpen } = useAppNavigation();
+  const { requestFocusSession } = usePomodoroCommandBridge();
   const { isOpen, launchContext, launcherSuppressed, openCommandCenter, closeCommandCenter } =
     useCommandCenter();
 
@@ -131,6 +133,14 @@ export function GlobalCommandCenterHost() {
       setActiveSection(section);
     },
     [closeCommandCenter, setActiveSection],
+  );
+
+  const handleStartFocusSession = useCallback(
+    (durationMinutes: number) => {
+      setActiveSection('pomodoro');
+      return requestFocusSession(durationMinutes);
+    },
+    [requestFocusSession, setActiveSection],
   );
 
   if (!COMMAND_EXPERIMENT_ENABLED) {
@@ -158,6 +168,7 @@ export function GlobalCommandCenterHost() {
             launchContext={launchContext}
             onRequestClose={closeCommandCenter}
             onNavigateToDestination={handleNavigateToDestination}
+            onStartFocusSession={handleStartFocusSession}
           />
         ) : null}
       </Modal>

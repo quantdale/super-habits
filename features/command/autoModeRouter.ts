@@ -4,8 +4,8 @@ import type { AskParseInput, AskResult, ClassifyResult } from './ask.types';
 /**
  * Auto-mode classifier: given a natural-language input, calls the edge
  * function's classify stage to decide whether the user's question routes to
- * the Ask pipeline (pending_todos / calorie_summary / habit_streak) or the
- * Create pipeline (everything else, including unrecognized input that the
+ * the Ask pipeline (pending_todos / calorie_summary / habit_progress /
+ * workout_summary / focus_summary / daily_overview) or the Create pipeline (everything else, including unrecognized input that the
  * classify stage marks unsupported).
  *
  * The edge function's classify result determines the route:
@@ -60,7 +60,7 @@ export async function classifyForAutoMode(input: AskParseInput): Promise<{
 
   let classifyResult: ClassifyResult;
   try {
-    classifyResult = normalizeClassifyPayload(classifyCall.payload);
+    classifyResult = normalizeClassifyPayload(classifyCall.payload, input);
   } catch {
     return {
       route: {

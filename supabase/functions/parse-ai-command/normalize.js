@@ -8,10 +8,18 @@ const SUPPORTED_WARNING_CODES = new Set([
   "ambiguous_date",
   "defaulted_field",
   "partial_parse",
+  "ambiguous_entity",
+  "missing_nutrition",
+  "active_timer_conflict",
+  "already_satisfied",
+  "off_day",
 ]);
 const SUPPORTED_TODO_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/g;
 const TODAY_PATTERN = /\btoday\b/gi;
 const TOMORROW_PATTERN = /\btomorrow\b/gi;
+const MAX_CALORIES = 9999;
+const MAX_MACRO_GRAMS = 999;
+const MAX_FOCUS_MINUTES = 120;
 
 export function isRecord(value) {
   return typeof value === "object" && value !== null;
@@ -251,6 +259,153 @@ function normalizeHabitDraft(payload, parserVersion, rawText) {
   };
 }
 
+function normalizeCommandStatus(value) {
+  if (value !== "ready" && value !== "needs_input") {
+    throw new Error("Command draft status must be ready or needs_input.");
+  }
+  return value;
+}
+
+function normalizeEntityReference(value, fieldName) {
+  if (value == null) return null;
+  if (typeof value !== "string") {
+    throw new Error(`${fieldName} must be a string or null.`);
+  }
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeOptionalCommandDate(value, fieldName) {
+  if (value == null) return null;
+  if (!isValidDateKey(value)) {
+    throw new Error(`${fieldName} must be a valid YYYY-MM-DD date or null.`);
+  }
+  return value;
+}
+
+function normalizeNullablePositiveInteger(value, fieldName, maximum) {
+  if (value == null) return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > maximum) {
+    throw new Error(`${fieldName} must be a whole number from 1 to ${maximum}.`);
+  }
+  return value;
+}
+
+function normalizeNullableNonNegativeNumber(value, fieldName, maximum) {
+  if (value == null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > maximum) {
+    throw new Error(`${fieldName} must be between 0 and ${maximum}.`);
+  }
+  return value;
+}
+
+function normalizeV2Metadata(payload, parserVersion) {
+  return {
+    parserVersion,
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+  };
+}
+
+function normalizeV2Fields(payload, kind) {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) {
+    throw new Error(`${kind} draft fields must be an object.`);
+  }
+  return fields;
+}
+
+function normalizeCompleteTodoDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "complete_todo");
+  return {
+    outcome: "draft",
+    kind: "complete_todo",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      todoTitle: normalizeEntityReference(fields.todoTitle, "todoTitle"),
+    },
+    rawText,
+  };
+}
+
+function normalizeLogHabitDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "log_habit");
+  return {
+    outcome: "draft",
+    kind: "log_habit",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      habitName: normalizeEntityReference(fields.habitName, "habitName"),
+      dateKey: normalizeOptionalCommandDate(fields.dateKey, "dateKey"),
+    },
+    rawText,
+  };
+}
+
+function normalizeLogCalorieDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "log_calorie_entry");
+  const mealType = fields.mealType == null ? null : fields.mealType;
+  if (
+    mealType !== null &&
+    mealType !== "breakfast" &&
+    mealType !== "lunch" &&
+    mealType !== "dinner" &&
+    mealType !== "snack"
+  ) {
+    throw new Error("mealType is invalid.");
+  }
+
+  return {
+    outcome: "draft",
+    kind: "log_calorie_entry",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      foodName: normalizeEntityReference(fields.foodName, "foodName"),
+      calories: normalizeNullablePositiveInteger(fields.calories, "calories", MAX_CALORIES),
+      protein: normalizeNullableNonNegativeNumber(fields.protein, "protein", MAX_MACRO_GRAMS),
+      carbs: normalizeNullableNonNegativeNumber(fields.carbs, "carbs", MAX_MACRO_GRAMS),
+      fats: normalizeNullableNonNegativeNumber(fields.fats, "fats", MAX_MACRO_GRAMS),
+      fiber: normalizeNullableNonNegativeNumber(fields.fiber, "fiber", MAX_MACRO_GRAMS),
+      mealType,
+      consumedOn: normalizeOptionalCommandDate(fields.consumedOn, "consumedOn"),
+    },
+    rawText,
+  };
+}
+
+function normalizeWorkoutDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "log_workout_routine");
+  return {
+    outcome: "draft",
+    kind: "log_workout_routine",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      routineName: normalizeEntityReference(fields.routineName, "routineName"),
+      completedOn: normalizeOptionalCommandDate(fields.completedOn, "completedOn"),
+    },
+    rawText,
+  };
+}
+
+function normalizeFocusDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "start_focus_session");
+  return {
+    outcome: "draft",
+    kind: "start_focus_session",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      durationMinutes: normalizeNullablePositiveInteger(
+        fields.durationMinutes,
+        "durationMinutes",
+        MAX_FOCUS_MINUTES,
+      ),
+    },
+    rawText,
+  };
+}
+
 export function normalizeModelResponse(payload, parserVersion, input) {
   if (!isRecord(payload)) {
     throw new Error("Model output must be an object.");
@@ -279,6 +434,26 @@ export function normalizeModelResponse(payload, parserVersion, input) {
 
   if (payload.kind === "create_habit") {
     return normalizeHabitDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "complete_todo") {
+    return normalizeCompleteTodoDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "log_habit") {
+    return normalizeLogHabitDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "log_calorie_entry") {
+    return normalizeLogCalorieDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "log_workout_routine") {
+    return normalizeWorkoutDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "start_focus_session") {
+    return normalizeFocusDraft(payload, parserVersion, input.rawText);
   }
 
   throw new Error("Model output kind is invalid.");

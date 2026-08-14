@@ -98,13 +98,22 @@ export async function addRoutine(name: string, description: string): Promise<voi
   });
 }
 
-export async function completeRoutine(routineId: string, notes?: string): Promise<void> {
+export type CompleteRoutineResult = {
+  status: 'applied' | 'skipped';
+  reason: string | null;
+  routineName: string | null;
+};
+
+export async function completeRoutine(
+  routineId: string,
+  notes?: string,
+): Promise<CompleteRoutineResult> {
   const db = await getDatabase();
   const logId = createId('wrk');
   const now = nowIso();
 
-  await withSQLiteTransaction(db, async (transactionDb) => {
-    await insertWorkoutLogRecord({
+  return withSQLiteTransaction(db, async (transactionDb) => {
+    return insertWorkoutLogRecord({
       db: transactionDb,
       logId,
       routineId,

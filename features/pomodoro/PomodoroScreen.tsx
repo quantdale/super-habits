@@ -41,6 +41,10 @@ import { FocusSprout } from './FocusSprout';
 import { GardenGrid } from './GardenGrid';
 import { BackgroundWarning } from './BackgroundWarning';
 import { PomodoroSettingsInline } from './PomodoroSettingsInline';
+import {
+  usePomodoroCommandBridge,
+  type PomodoroCommandStartResult,
+} from './pomodoroCommandBridgeContext';
 
 const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
 
@@ -57,6 +61,7 @@ function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
 
 export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const { register: registerCommandTimer } = usePomodoroCommandBridge();
   const dayGeneration = useDayRolloverGeneration();
   const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
@@ -73,6 +78,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [showWarning, setShowWarning] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickTime = useRef<number | null>(null);
+  const startInFlightRef = useRef(false);
 
   const currentModeRef = useRef<PomodoroMode>('focus');
   const completedFocusRef = useRef(0);
@@ -228,24 +234,65 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setShowSettings(false);
   };
 
-  const start = async () => {
-    void cancelScheduledNotification(notificationIdRef.current);
-    notificationIdRef.current = null;
-    const now = new Date();
-    const duration = getModeDuration(currentMode, settings);
-    setStartedAt(now);
-    startedAtRef.current = now;
-    setRemaining(duration);
-    setTotalSeconds(duration);
-    totalSecondsRef.current = duration;
-    const { title, body } = notifyCopy(currentMode);
-    const id = await scheduleTimerEndNotification(duration, title, body);
-    notificationIdRef.current = id;
-    lastTickTime.current = Date.now();
-    setIsRunning(true);
-    setIsPaused(false);
-    setShowSettings(false);
-  };
+  const start = useCallback(
+    async (requestedDurationMinutes?: number): Promise<PomodoroCommandStartResult> => {
+      if (startInFlightRef.current || isRunning || isPaused) {
+        return {
+          outcome: 'conflict',
+          message: 'A focus session is already running or paused.',
+        };
+      }
+
+      startInFlightRef.current = true;
+
+      try {
+        const mode = requestedDurationMinutes === undefined ? currentMode : 'focus';
+        const duration =
+          requestedDurationMinutes === undefined
+            ? getModeDuration(currentMode, settings)
+            : requestedDurationMinutes * 60;
+        if (requestedDurationMinutes !== undefined) {
+          setCurrentMode('focus');
+          currentModeRef.current = 'focus';
+        }
+
+        void cancelScheduledNotification(notificationIdRef.current);
+        notificationIdRef.current = null;
+        const now = new Date();
+        setStartedAt(now);
+        startedAtRef.current = now;
+        setRemaining(duration);
+        setTotalSeconds(duration);
+        totalSecondsRef.current = duration;
+        const { title, body } = notifyCopy(mode);
+        const id = await scheduleTimerEndNotification(duration, title, body);
+        notificationIdRef.current = id;
+        lastTickTime.current = Date.now();
+        setIsRunning(true);
+        setIsPaused(false);
+        setShowSettings(false);
+        return { outcome: 'started' };
+      } finally {
+        startInFlightRef.current = false;
+      }
+    },
+    [currentMode, isPaused, isRunning, settings],
+  );
+
+  const startFocusSession = useCallback(
+    (durationMinutes: number) => start(durationMinutes),
+    [start],
+  );
+
+  useEffect(
+    () =>
+      registerCommandTimer({
+        startFocusSession,
+        isRunning,
+        isPaused,
+      }),
+    [isPaused, isRunning, registerCommandTimer, startFocusSession],
+  );
 
   const pause = () => {
     void cancelScheduledNotification(notificationIdRef.current);
@@ -403,7 +450,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
           <View className="mt-4 gap-3">
             {!isRunning && !isPaused && remaining === totalSeconds ? (
-              <Button label={startLabel} onPress={start} color={COLOR} />
+              <Button label={startLabel} onPress={() => void start()} color={COLOR} />
             ) : null}
 
             {isRunning ? (
@@ -429,7 +476,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {remaining === 0 && !isRunning && !isPaused ? (
-              <Button label={startLabel} onPress={start} color={COLOR} />
+              <Button label={startLabel} onPress={() => void start()} color={COLOR} />
             ) : null}
           </View>
 

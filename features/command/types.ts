@@ -2,14 +2,22 @@ export const COMMAND_EXPERIMENT_ENABLED = true;
 
 /**
  * Ask mode (and Auto mode) — enabled 2026-08-05 after the user-ai-ask edge
- * function was deployed with the DeepSeek v4 Flash backend and all three
- * intents + the phrase stage were verified live against
+ * function was deployed with the DeepSeek v4 Flash backend and the bounded
+ * intent set + phrase stage were verified live against
  * project kruubbynsmxzxfdunaal.
  */
 export const AI_ASK_EXPERIMENT_ENABLED = true;
 
 export type DraftStatus = 'ready' | 'needs_input' | 'unsupported';
 export type DraftParserKind = 'mock_rules' | 'model_proxy' | 'model_proxy_fallback';
+export type DraftKind =
+  | 'create_todo'
+  | 'complete_todo'
+  | 'create_habit'
+  | 'log_habit'
+  | 'log_calorie_entry'
+  | 'log_workout_routine'
+  | 'start_focus_session';
 export type ParsePath = 'mock' | 'remote' | 'remote_with_fallback';
 export type ParseLatencyBucket = 'fast' | 'noticeable' | 'frustrating';
 export type ParseUnsupportedReasonCode = 'unsupported';
@@ -29,7 +37,12 @@ export type DraftWarning = {
     | 'unsupported_recurrence'
     | 'ambiguous_date'
     | 'defaulted_field'
-    | 'partial_parse';
+    | 'partial_parse'
+    | 'ambiguous_entity'
+    | 'missing_nutrition'
+    | 'active_timer_conflict'
+    | 'already_satisfied'
+    | 'off_day';
   message: string;
 };
 
@@ -38,8 +51,8 @@ export type DraftMissingField = {
   message: string;
 };
 
-export type DraftBase = {
-  kind: 'create_todo' | 'create_habit';
+export type DraftBase<K extends DraftKind = DraftKind> = {
+  kind: K;
   rawText: string;
   parserKind: DraftParserKind;
   parserVersion: string;
@@ -47,6 +60,8 @@ export type DraftBase = {
   status: DraftStatus;
   warnings: DraftWarning[];
   missingFields: DraftMissingField[];
+  /** Local-only review token. Remote parsers never provide or control it. */
+  executionToken?: string;
 };
 
 export type DraftCreateTodo = DraftBase & {
@@ -71,7 +86,58 @@ export type DraftCreateHabit = DraftBase & {
   };
 };
 
-export type DraftAiAction = DraftCreateTodo | DraftCreateHabit;
+export type DraftCompleteTodo = DraftBase<'complete_todo'> & {
+  kind: 'complete_todo';
+  fields: {
+    todoTitle: string | null;
+  };
+};
+
+export type DraftLogHabit = DraftBase<'log_habit'> & {
+  kind: 'log_habit';
+  fields: {
+    habitName: string | null;
+    dateKey: string | null;
+  };
+};
+
+export type DraftLogCalorieEntry = DraftBase<'log_calorie_entry'> & {
+  kind: 'log_calorie_entry';
+  fields: {
+    foodName: string | null;
+    calories: number | null;
+    protein: number | null;
+    carbs: number | null;
+    fats: number | null;
+    fiber: number | null;
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null;
+    consumedOn: string | null;
+  };
+};
+
+export type DraftLogWorkoutRoutine = DraftBase<'log_workout_routine'> & {
+  kind: 'log_workout_routine';
+  fields: {
+    routineName: string | null;
+    completedOn: string | null;
+  };
+};
+
+export type DraftStartFocusSession = DraftBase<'start_focus_session'> & {
+  kind: 'start_focus_session';
+  fields: {
+    durationMinutes: number | null;
+  };
+};
+
+export type DraftAiAction =
+  | DraftCreateTodo
+  | DraftCompleteTodo
+  | DraftCreateHabit
+  | DraftLogHabit
+  | DraftLogCalorieEntry
+  | DraftLogWorkoutRoutine
+  | DraftStartFocusSession;
 
 export type ParseCommandInput = {
   rawText: string;
@@ -121,7 +187,11 @@ export type CommandExecutionResult =
   | {
       outcome: 'success';
       kind: DraftAiAction['kind'];
-      entityId: string;
+      entityId: string | null;
+      message: string;
+    }
+  | {
+      outcome: 'duplicate' | 'conflict';
       message: string;
     }
   | {

@@ -133,7 +133,7 @@ function calculateTrend(days: DayCompletion[], todayKey: string): HabitInsightTr
  */
 export function calculateHabitProgressInsights(
   habit: Habit,
-  completions: HabitCompletion[],
+  completions: Pick<HabitCompletion, 'date_key' | 'count'>[],
   todayKey = toDateKey(),
 ): HabitProgressInsights | null {
   if (habit.deleted_at !== null) return null;

@@ -8,6 +8,16 @@
 
 const MAX_QUESTION_LENGTH = 280;
 const MAX_CONVERSATION_TURNS = 20;
+const MAX_RETRIEVED_FACTS_BYTES = 24_000;
+const VALID_FACT_INTENTS = new Set([
+  "pending_todos",
+  "calorie_summary",
+  "habit_progress",
+  "workout_summary",
+  "focus_summary",
+  "daily_overview",
+  "habit_streak",
+]);
 
 export function isRecord(value) {
   return typeof value === "object" && value !== null;
@@ -55,6 +65,26 @@ function normalizeConversationContext(value) {
   });
 }
 
+function validateRetrievedFacts(value) {
+  if (!isRecord(value)) {
+    throw new Error("phrase requests must include a retrievedFacts object.");
+  }
+  if (!VALID_FACT_INTENTS.has(value.intent) || !isRecord(value.facts)) {
+    throw new Error("retrievedFacts must contain one supported intent and a facts object.");
+  }
+
+  let serialized;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new Error("retrievedFacts must be JSON serializable.");
+  }
+  if (typeof serialized !== "string" || serialized.length > MAX_RETRIEVED_FACTS_BYTES) {
+    throw new Error(`retrievedFacts must be ${MAX_RETRIEVED_FACTS_BYTES} bytes or less.`);
+  }
+  return value;
+}
+
 /** Shared request fields for both the classify and phrase stages. */
 export function normalizeAskRequestBody(payload) {
   if (!isRecord(payload)) {
@@ -75,13 +105,10 @@ export function normalizeAskRequestBody(payload) {
   }
 
   if (stage === "phrase") {
-    if (!isRecord(payload.retrievedFacts)) {
-      throw new Error("phrase requests must include a retrievedFacts object.");
-    }
     return {
       stage: "phrase",
       question,
-      retrievedFacts: payload.retrievedFacts,
+      retrievedFacts: validateRetrievedFacts(payload.retrievedFacts),
     };
   }
 

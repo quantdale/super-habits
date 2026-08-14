@@ -86,7 +86,7 @@ export async function expectDraftOutcome(page: Page, status: 'ready' | 'needs_in
     return;
   }
 
-  await expect(page.getByText('Needs input', { exact: true })).toBeVisible();
+  await expect(page.getByText('Needs input', { exact: true }).first()).toBeVisible();
 }
 
 export async function expectUnsupportedOutcome(page: Page) {

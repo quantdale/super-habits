@@ -152,7 +152,7 @@ test.describe('Command shell', () => {
     await openCommandScreen(page);
     await parseCommand(page, 'Add a todo tomorrow');
 
-    await expect(page.getByText('Needs input', { exact: true })).toBeVisible();
+    await expect(page.getByText('Needs input', { exact: true }).first()).toBeVisible();
     await fillById(page, 'command-edit-todo-title', 'call mom');
     await page.getByText('Confirm and save', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('Todo saved.', { exact: true })).toBeVisible();

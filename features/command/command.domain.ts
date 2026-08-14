@@ -9,13 +9,14 @@ import type {
   ParseCommandInput,
   ParseCommandResult,
 } from './types';
+import { parseV2CommandDraft } from './command.v2.domain';
 
 const SAFE_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODO_TIME_PATTERN = /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})\b/i;
 const MULTI_ACTION_PATTERN =
   /\b(?:and|then|also)\b\s+(?:to\s+)?(?:add|create|make|remind|call|pay|send|email|text|buy|book|schedule|do|write|read|finish|complete|submit|review|clean|fix|update)\b|;\s*(?:add|create|make|remind|call|pay|send|email|text|buy|book|schedule|do|write|read|finish|complete|submit|review|clean|fix|update)\b/i;
 const UNSUPPORTED_ROOT_VERB_PATTERN =
-  /^(?:delete|remove|clear|destroy|erase|edit|update|change|rename|complete|finish)\b/i;
+  /^(?:delete|remove|clear|destroy|erase|edit|update|change|rename)\b/i;
 const POLITE_PREFIX_PATTERN = /^(?:please|kindly)\s+/i;
 const QUESTION_PREFIX_PATTERN = /^(?:can|could|would)\s+you\s+/i;
 const TODO_KEYWORD_PATTERN = /\b(?:todo|task)\b/i;
@@ -428,7 +429,7 @@ export function preflightCommandDraft(
     return {
       outcome: 'unsupported',
       rawText,
-      reason: 'This version only supports creating new todos or habits.',
+      reason: 'This command is outside the supported Command Center actions.',
     };
   }
 
@@ -470,6 +471,9 @@ export function parseCommandDraft(input: ParseCommandInput): ParseCommandResult 
     };
   }
 
+  const v2Result = parseV2CommandDraft({ ...input, rawText });
+  if (v2Result) return v2Result;
+
   const lowerText = rawText.toLowerCase();
   const rootCheckText = stripLeadingScaffolding(rawText, [
     POLITE_PREFIX_PATTERN,
@@ -479,7 +483,7 @@ export function parseCommandDraft(input: ParseCommandInput): ParseCommandResult 
     return {
       outcome: 'unsupported',
       rawText,
-      reason: 'This version only supports creating new todos or habits.',
+      reason: 'This command is outside the supported Command Center actions.',
     };
   }
 

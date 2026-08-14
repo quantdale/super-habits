@@ -264,4 +264,92 @@ describe('features/command/realCommandParser normalization', () => {
       ),
     ).toThrow('Use at most one due date');
   });
+
+  it.each([
+    {
+      kind: 'complete_todo',
+      fields: { todoTitle: 'Buy groceries' },
+      expected: { todoTitle: 'Buy groceries' },
+    },
+    {
+      kind: 'log_habit',
+      fields: { habitName: 'Drink water', dateKey: null },
+      expected: { habitName: 'Drink water', dateKey: null },
+    },
+    {
+      kind: 'log_calorie_entry',
+      fields: {
+        foodName: 'Eggs',
+        calories: 140,
+        protein: 12,
+        carbs: null,
+        fats: null,
+        fiber: null,
+        mealType: 'breakfast',
+        consumedOn: null,
+      },
+      expected: { foodName: 'Eggs', calories: 140, protein: 12 },
+    },
+    {
+      kind: 'log_workout_routine',
+      fields: { routineName: 'Push Day', completedOn: null },
+      expected: { routineName: 'Push Day', completedOn: null },
+    },
+    {
+      kind: 'start_focus_session',
+      fields: { durationMinutes: 25 },
+      expected: { durationMinutes: 25 },
+    },
+  ])('normalizes V2 $kind references and fields', ({ kind, fields, expected }) => {
+    const result = normalizeRemoteParseResponse(
+      {
+        outcome: 'draft',
+        kind,
+        status: 'ready',
+        confidence: 0.9,
+        parserVersion: 'v2-test',
+        warnings: [],
+        missingFields: [],
+        fields,
+      },
+      PARSE_INPUT_BASE,
+    );
+
+    expect(result).toMatchObject({
+      outcome: 'draft',
+      draft: {
+        kind,
+        parserKind: 'model_proxy',
+        parserVersion: 'v2-test',
+        fields: expected,
+      },
+    });
+  });
+
+  it.each([
+    ['negative calories', 'log_calorie_entry', { foodName: 'Rice', calories: -1 }],
+    ['invalid macro', 'log_calorie_entry', { foodName: 'Rice', calories: 200, protein: -1 }],
+    [
+      'invalid meal type',
+      'log_calorie_entry',
+      { foodName: 'Rice', calories: 200, mealType: 'brunch' },
+    ],
+    ['invalid date', 'log_habit', { habitName: 'Read', dateKey: '2026-13-40' }],
+    ['oversized focus duration', 'start_focus_session', { durationMinutes: 121 }],
+  ])('rejects %s from a remote V2 response', (_label, kind, fields) => {
+    expect(() =>
+      normalizeRemoteParseResponse(
+        {
+          outcome: 'draft',
+          kind,
+          status: 'ready',
+          confidence: 0.9,
+          warnings: [],
+          missingFields: [],
+          fields,
+        },
+        PARSE_INPUT_BASE,
+      ),
+    ).toThrow();
+  });
 });

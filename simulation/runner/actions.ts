@@ -28,6 +28,13 @@ import {
   clearInjectedFailures,
 } from '../../e2e/helpers/failure';
 import { returnToApp } from '../../e2e/helpers/dbHarness';
+import {
+  expectDraftOutcome,
+  expectPreviewRowContains,
+  expectUnsupportedOutcome,
+  openCommandScreen,
+  parseCommand,
+} from '../../e2e/helpers/commandObservation';
 import type { SectionName, SemanticStep } from '../model/types';
 
 /** Escape a literal string for use inside a RegExp. */
@@ -112,6 +119,86 @@ export async function actionOpenCommand(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('#command-input')).toHaveCount(0);
   return 'openCommand';
+}
+
+async function assertCommandOutcome(
+  page: Page,
+  expectedOutcome: Extract<SemanticStep, { kind: 'commandPreview' }>['expectedOutcome'],
+): Promise<void> {
+  if (expectedOutcome === 'unsupported') {
+    await expectUnsupportedOutcome(page);
+    return;
+  }
+  await expectDraftOutcome(page, expectedOutcome);
+}
+
+async function assertPreviewRows(
+  page: Page,
+  rows: Extract<SemanticStep, { kind: 'commandPreview' }>['previewRows'],
+): Promise<void> {
+  for (const row of rows ?? []) {
+    await expectPreviewRowContains(page, row.label, row.contains);
+  }
+}
+
+/** Parse and inspect a Command Center draft without confirming it. */
+export async function actionCommandPreview(
+  page: Page,
+  step: Extract<SemanticStep, { kind: 'commandPreview' }>,
+): Promise<string> {
+  await openCommandScreen(page);
+  await parseCommand(page, step.input);
+  await assertCommandOutcome(page, step.expectedOutcome);
+  if (step.expectedOutcome !== 'unsupported') {
+    await assertPreviewRows(page, step.previewRows);
+  }
+  return `commandPreview outcome=${step.expectedOutcome} input=${JSON.stringify(step.input)}`;
+}
+
+/** Confirm one Command Center mutation after asserting its local preview. */
+export async function actionCommandConfirm(
+  page: Page,
+  step: Extract<SemanticStep, { kind: 'commandConfirm' }>,
+): Promise<string> {
+  await openCommandScreen(page);
+  await parseCommand(page, step.input);
+  await expectDraftOutcome(page, 'ready');
+  await assertPreviewRows(page, step.previewRows);
+  await page.getByRole('button', { name: 'Confirm and save', exact: true }).click({ force: true });
+  if (step.successText) {
+    await expect(page.getByText(step.successText, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+  return `commandConfirm input=${JSON.stringify(step.input)}`;
+}
+
+/** Submit a read-only Ask question and assert its bounded result state. */
+export async function actionAskQuestion(
+  page: Page,
+  step: Extract<SemanticStep, { kind: 'askQuestion' }>,
+): Promise<string> {
+  await openCommandScreen(page);
+  await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });
+  await page.locator('#ask-input').fill(step.question);
+  await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });
+
+  if (step.expectedOutcome === 'unavailable') {
+    await expect(page.getByText('Ask is temporarily unavailable', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  } else if (step.expectedOutcome === 'unsupported') {
+    await expect(page.getByText('Out of scope for this version', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  } else {
+    if (step.contains) {
+      await expect(page.getByText(step.contains, { exact: false })).toBeVisible({
+        timeout: 15_000,
+      });
+    }
+  }
+  return `askQuestion outcome=${step.expectedOutcome} question=${JSON.stringify(step.question)}`;
 }
 
 /* ------------------------------------------------------------------ */

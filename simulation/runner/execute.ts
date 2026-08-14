@@ -58,8 +58,11 @@ import {
 } from '../observe/report';
 import {
   actionAbandonForm,
+  actionAskQuestion,
   actionAdvanceClockToNextDay,
   actionBuildRoutine,
+  actionCommandConfirm,
+  actionCommandPreview,
   actionCreateHabit,
   actionCreateTodo,
   actionExpectAcrossSurfaces,
@@ -291,6 +294,12 @@ async function dispatchAction(page: Page, step: SemanticStep): Promise<string> {
       return actionOpenSettings(page);
     case 'openCommand':
       return actionOpenCommand(page);
+    case 'commandPreview':
+      return actionCommandPreview(page, step);
+    case 'commandConfirm':
+      return actionCommandConfirm(page, step);
+    case 'askQuestion':
+      return actionAskQuestion(page, step);
     case 'createTodo':
       return actionCreateTodo(page, step);
     case 'toggleTodo':
@@ -906,6 +915,9 @@ export async function replaySteps(
  * | switchSection        | `oracles.switchSection`                                          |
  * | openSettings         | runner-owned (Overview header "Open settings" → Modal "Close")   |
  * | openCommand          | runner-owned (launcher "Open command center" → `#command-input`) |
+ * | commandPreview       | `commandObservation.openCommandScreen` + parse + preview       |
+ * | commandConfirm       | `commandObservation.openCommandScreen` + parse + confirm       |
+ * | askQuestion          | `commandObservation.openCommandScreen` + AskConversationView  |
  * | createTodo           | `navigation.openNewTodoModal` + `navigation.submitTodoModal`     |
  * | toggleTodo           | `gestures.clickTodoCheckboxForTitle`                             |
  * | createHabit          | runner-owned (Habits "Add" tile + "Habit name" form)             |

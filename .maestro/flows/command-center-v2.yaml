@@ -1,0 +1,34 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - command-v2
+  - smoke
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 30000
+- tapOn: 'Open command center'
+- extendedWaitUntil:
+    visible: 'Command center'
+    timeout: 10000
+- tapOn: 'Create'
+- scrollUntilVisible:
+    element: 'Command input'
+    direction: UP
+- extendedWaitUntil:
+    visible: 'Command input'
+    timeout: 10000
+- tapOn: 'Command'
+- inputText: 'Add a todo to native command preview'
+- hideKeyboard
+- tapOn: 'Parse command'
+- extendedWaitUntil:
+    visible: 'Review before saving'
+    timeout: 15000
+- assertVisible: 'Nothing has been saved yet.'
+- scrollUntilVisible:
+    element: 'Confirm and save'
+    direction: DOWN
+- assertVisible: 'Confirm and save'
