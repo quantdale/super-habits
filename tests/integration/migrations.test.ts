@@ -61,7 +61,7 @@ vi.mock('@/core/db/appMeta', async (importOriginal) => {
   };
 });
 
-/** All tables the app creates (bootstrap DDL + migrations 2–14). */
+/** All tables the app creates (bootstrap DDL + migrations 2–15). */
 const EXPECTED_TABLES = [
   'todos',
   'habits',
@@ -82,7 +82,7 @@ const EXPECTED_TABLES = [
   'sync_outbox',
 ];
 
-/** Named indexes the app creates (migrations 8, 10, 11). */
+/** Named indexes the app creates (migrations 8, 10, 11, 15). */
 const EXPECTED_NAMED_INDEXES = [
   'idx_saved_meals_food_name',
   'idx_linked_action_rules_source_lookup',
@@ -118,14 +118,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 14', async () => {
+  it('bootstraps from zero and reaches stored schema version 15', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('14');
+    expect(row?.value).toBe('15');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -161,7 +161,7 @@ describe('tests/integration/migrations', () => {
     await db.closeAsync();
   });
 
-  it('keeps the reference schema snapshot aligned through migration 14', async () => {
+  it('keeps the reference schema snapshot aligned through migration 15', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-reference-schema-'));
     const file = path.join(dir, 'schema.db');
     const reference = createTestDatabase(file);
@@ -193,6 +193,11 @@ describe('tests/integration/migrations', () => {
         'linked_action_required',
         'processed_at',
       ]);
+
+      const outboxColumns = reference.raw.prepare('PRAGMA table_info(sync_outbox)').all() as {
+        name: string;
+      }[];
+      expect(outboxColumns.map((column) => column.name)).toContain('owner_user_id');
     } finally {
       await reference.closeAsync();
       rmSync(dir, { recursive: true, force: true });
@@ -204,13 +209,13 @@ describe('tests/integration/migrations', () => {
     const file = path.join(dir, 'superhabits.db');
 
     try {
-      // Session 1: a fresh empty file gets bootstrapped + migrated to v14.
+      // Session 1: a fresh empty file gets bootstrapped + migrated to v15.
       const session1 = await openDb({ filename: file });
       const v1 = await session1.getFirstAsync<{ value: string }>(
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('14');
+      expect(v1?.value).toBe('15');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -221,7 +226,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('14');
+      expect(v2?.value).toBe('15');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",

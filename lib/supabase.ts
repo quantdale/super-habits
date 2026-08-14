@@ -71,6 +71,51 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
 }
 
 /**
+ * Returns the currently verified Auth user for authorization-sensitive remote
+ * operations. Unlike getSession(), getUser() asks Supabase to validate the
+ * current access token instead of treating cached session metadata as proof.
+ */
+export async function getSupabaseAuthUserId(): Promise<string | null> {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  return user?.id ?? null;
+}
+
+/**
+ * Reads the locally cached session identity for enqueue-time ownership. This
+ * is deliberately separate from getSupabaseAuthUserId(): a local SQLite
+ * mutation must not wait for a network round-trip or fail just because the
+ * remote auth service is temporarily unavailable.
+ */
+export async function getSupabaseSessionUserId(): Promise<string | null> {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw error;
+  }
+
+  return session?.user?.id ?? null;
+}
+
+/**
  * Ensures a Supabase auth session exists, creating an anonymous session when none is present.
  * No-ops when Supabase env is not configured (missing URL or anon key).
  */

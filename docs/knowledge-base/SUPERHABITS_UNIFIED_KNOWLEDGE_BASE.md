@@ -61,7 +61,7 @@
 
 **SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **workout** routines + session logs, and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **14**. Next migration: `if (version < 15)`. Migration 13 adds durable `processed_notification_actions` state and migration 14 adds the durable `sync_outbox` table. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **15**. Next migration: `if (version < 16)`. Migration 13 adds durable `processed_notification_actions` state, migration 14 adds the durable `sync_outbox` table, and migration 15 adds its enqueue-time owner binding. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
 **Sync / backup:** synced writes commit their local mutation and a durable `sync_outbox` row in one SQLite transaction, then publish to the in-memory queue. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub), and revision matching prevents an old push from deleting a newer pending mutation. `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior; durable pending outbox rows remain available for a later flush. If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
@@ -103,7 +103,7 @@
 | Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay               |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                                      |
 | Schema version (stored) | **14** (`app_meta.db_schema_version`)                                                                                                               |
-| Next migration          | `15` (new `if (version < 15)` block in `runMigrations`)                                                                                             |
+| Next migration          | `16` (new `if (version < 16)` block in `runMigrations`)                                                                                             |
 | Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                              |
 | E2E tests               | **95** Chromium tests in **14** spec files; **`workers: 1` locally and in CI** (shared OPFS origin); static `dist/` via `node scripts/serve-e2e.js` |
 
@@ -2211,7 +2211,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
 | Workflow        | Read → plan → approval → implement → typecheck + test → report                                                        |
 
-         | Schema          | Current version **14**, next migration `version < 15`                                                                 |
+         | Schema          | Current version **15**, next migration `version < 16`                                                                 |
 
 #### `feature-agent.md`
 

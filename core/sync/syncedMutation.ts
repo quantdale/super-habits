@@ -2,6 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
 import { syncEngine, type SyncRecord } from '@/core/sync/sync.engine';
+import { getSupabaseSessionUserId } from '@/lib/supabase';
 
 export type SyncedMutationOutcome<T> = {
   value: T;
@@ -17,7 +18,20 @@ export async function runSyncedMutation<T>(input: {
   record: SyncRecord;
   mutate: (transactionDb: SQLite.SQLiteDatabase) => Promise<SyncedMutationOutcome<T>>;
 }): Promise<SyncedMutationOutcome<T>> {
-  const prepared = syncEngine.prepare(input.record);
+  // Session lookup is best-effort at the local boundary. A missing/expired
+  // session must never block a SQLite write; the resulting unowned outbox
+  // intent is quarantined from remote push until it is explicitly resolved.
+  let ownerUserId: string | null = null;
+  try {
+    ownerUserId = await getSupabaseSessionUserId();
+  } catch {
+    ownerUserId = null;
+  }
+
+  const { ownerUserId: _ignoredOwnerUserId, ...recordWithoutOwner } = input.record;
+  const prepared = syncEngine.prepare(
+    ownerUserId ? { ...recordWithoutOwner, ownerUserId } : recordWithoutOwner,
+  );
   const outcome = await withSQLiteTransaction(input.db, async (transactionDb) => {
     const result = await input.mutate(transactionDb);
     if (result.changed) {

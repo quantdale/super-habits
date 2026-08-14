@@ -19,6 +19,7 @@ describe('SQLite sync outbox durability', () => {
           id: 'todo_1',
           updatedAt: '2026-08-14T10:00:00.000Z',
           operation: 'update',
+          ownerUserId: 'user_a',
         },
         2,
       );
@@ -28,6 +29,7 @@ describe('SQLite sync outbox durability', () => {
           id: 'todo_1',
           updatedAt: '2026-08-14T10:01:00.000Z',
           operation: 'delete',
+          ownerUserId: 'user_a',
         },
         3,
       );
@@ -38,6 +40,7 @@ describe('SQLite sync outbox durability', () => {
           id: 'todo_1',
           updatedAt: '2026-08-14T09:59:00.000Z',
           operation: 'update',
+          ownerUserId: 'user_a',
         },
         2,
       );
@@ -48,6 +51,7 @@ describe('SQLite sync outbox durability', () => {
           id: 'todo_1',
           updatedAt: '2026-08-14T10:01:00.000Z',
           operation: 'delete',
+          ownerUserId: 'user_a',
           revision: 3,
         },
       ]);
@@ -74,6 +78,7 @@ describe('SQLite sync outbox durability', () => {
           id: 'todo_1',
           updatedAt: '2026-08-14T10:01:00.000Z',
           operation: 'delete',
+          ownerUserId: 'user_a',
           revision: 3,
         },
       ]);
@@ -81,5 +86,47 @@ describe('SQLite sync outbox durability', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('refuses to rebind a pending intent to another authenticated owner', async () => {
+    const db = await freshDatabase();
+    const persistence = await import('@/core/sync/syncPersistence');
+    const store = new persistence.SqliteSyncPersistence();
+
+    await store.upsertOutbox(
+      {
+        entity: 'todos',
+        id: 'todo_owner_boundary',
+        updatedAt: '2026-08-14T10:00:00.000Z',
+        operation: 'update',
+        ownerUserId: 'user_a',
+      },
+      1,
+    );
+
+    await expect(
+      store.upsertOutbox(
+        {
+          entity: 'todos',
+          id: 'todo_owner_boundary',
+          updatedAt: '2026-08-14T10:01:00.000Z',
+          operation: 'update',
+          ownerUserId: 'user_b',
+        },
+        2,
+      ),
+    ).rejects.toThrow('refusing to rebind a pending intent');
+
+    await expect(store.loadOutbox()).resolves.toEqual([
+      {
+        entity: 'todos',
+        id: 'todo_owner_boundary',
+        updatedAt: '2026-08-14T10:00:00.000Z',
+        operation: 'update',
+        ownerUserId: 'user_a',
+        revision: 1,
+      },
+    ]);
+    await db.closeAsync();
   });
 });

@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-14
+goal: Eliminate cross-user access to synchronized backup entities without
+  weakening offline-first local persistence.

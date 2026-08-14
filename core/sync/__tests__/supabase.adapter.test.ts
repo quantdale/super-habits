@@ -4,6 +4,8 @@ import type { SyncRecord } from '@/core/sync/sync.engine';
 
 type AdapterSetupOptions = {
   supabase?: { from: ReturnType<typeof vi.fn> } | null;
+  authUserId?: string | null;
+  authError?: Error;
 };
 
 async function setupAdapter(options: AdapterSetupOptions) {
@@ -21,7 +23,10 @@ async function setupAdapter(options: AdapterSetupOptions) {
   }));
 
   const supabase = options.supabase === undefined ? { from } : options.supabase;
-  vi.doMock('@/lib/supabase', () => ({ supabase }));
+  const getSupabaseAuthUserId = options.authError
+    ? vi.fn().mockRejectedValue(options.authError)
+    : vi.fn().mockResolvedValue(options.authUserId === undefined ? 'user_a' : options.authUserId);
+  vi.doMock('@/lib/supabase', () => ({ supabase, getSupabaseAuthUserId }));
 
   const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
   // Import from the same freshly-reset module registry as the adapter —
@@ -35,15 +40,17 @@ async function setupAdapter(options: AdapterSetupOptions) {
     getDatabase,
     from,
     upsert,
+    getSupabaseAuthUserId,
   };
 }
 
-function record(entity: string, id: string): SyncRecord {
+function record(entity: string, id: string, ownerUserId: string | null = 'user_a'): SyncRecord {
   return {
     entity,
     id,
     updatedAt: '2026-04-07T12:00:00.000Z',
     operation: 'update',
+    ownerUserId,
   };
 }
 
@@ -126,7 +133,61 @@ describe('SupabaseSyncAdapter', () => {
     await adapter.push([record('todos', 'todo_1')]);
 
     expect(from).toHaveBeenCalledWith('todos');
-    expect(upsert).toHaveBeenCalledWith(rows, { onConflict: 'id' });
+    expect(upsert).toHaveBeenCalledWith(
+      [{ id: 'todo_1', title: 'Ship tests', user_id: 'user_a' }],
+      { onConflict: 'id' },
+    );
+  });
+
+  it('derives the owner from the current Auth user and strips a local owner override', async () => {
+    const { adapter, db, upsert } = await setupAdapter({});
+    db.getAllAsync.mockResolvedValue([{ id: 'todo_1', user_id: 'user_b', title: 'Private' }]);
+
+    await adapter.push([record('todos', 'todo_1')]);
+
+    expect(upsert).toHaveBeenCalledWith([{ id: 'todo_1', title: 'Private', user_id: 'user_a' }], {
+      onConflict: 'id',
+    });
+  });
+
+  it('keeps the durable batch when Auth has no current user', async () => {
+    const { adapter, db, from } = await setupAdapter({ authUserId: null });
+    const pending = record('todos', 'todo_1');
+
+    await expect(adapter.push([pending])).rejects.toThrow(
+      'Supabase auth user is unavailable; keeping the outbox intact',
+    );
+
+    expect(db.getAllAsync).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a pending intent belongs to a different Auth user', async () => {
+    const { adapter, db, from, SyncPushPartialFailureError } = await setupAdapter({
+      authUserId: 'user_b',
+    });
+    const pending = record('todos', 'todo_1', 'user_a');
+    db.getAllAsync.mockResolvedValue([{ id: 'todo_1', title: 'Private' }]);
+
+    await expectPartialFailure(adapter.push([pending]), SyncPushPartialFailureError, {
+      messageContains: 'Sync owner mismatch for todos',
+      failedRecords: [pending],
+    });
+
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('keeps the batch retryable when current Auth verification fails', async () => {
+    const { adapter, db, from } = await setupAdapter({
+      authError: new Error('session refresh failed'),
+    });
+
+    await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow(
+      'Supabase auth is unavailable; keeping the outbox intact: session refresh failed',
+    );
+
+    expect(db.getAllAsync).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
   });
 
   it('reports missing local rows as a failed record for that entity', async () => {
@@ -239,7 +300,9 @@ describe('SupabaseSyncAdapter', () => {
     );
 
     // The healthy entity still pushed even though todos failed.
-    expect(habitsUpsert).toHaveBeenCalledWith([{ id: 'habit_1' }], { onConflict: 'id' });
+    expect(habitsUpsert).toHaveBeenCalledWith([{ id: 'habit_1', user_id: 'user_a' }], {
+      onConflict: 'id',
+    });
   });
 
   it('pull currently returns an empty array', async () => {

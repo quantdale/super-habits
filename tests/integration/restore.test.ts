@@ -54,14 +54,17 @@ function buildSupabaseMock(
     return {
       select: vi.fn((_columns: string, queryOptions?: { head?: boolean }) => {
         if (queryOptions?.head) {
-          return {
+          const headQuery = {
+            eq: vi.fn(() => headQuery),
             is: vi.fn(() =>
               Promise.resolve({ data: null, count: activeRows().length, error: null }),
             ),
           };
+          return headQuery;
         }
 
         const query = {
+          eq: vi.fn(() => query),
           is: vi.fn(() => query),
           order: vi.fn(() => query),
           limit: vi.fn(() => {
@@ -106,6 +109,7 @@ async function load(
   vi.doMock('@/lib/supabase', () => ({
     supabase: supabaseMock.supabase,
     isRemoteEnabled: vi.fn(() => true),
+    getSupabaseAuthUserId: vi.fn().mockResolvedValue('user_a'),
     setRemoteMode: vi.fn(),
     ensureAnonymousSession: vi.fn().mockResolvedValue(undefined),
   }));

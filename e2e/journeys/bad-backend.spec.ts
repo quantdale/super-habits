@@ -4,6 +4,7 @@ import { resetAll } from '../helpers/reset';
 import { ensureAppContext, queryRows } from '../helpers/dbHarness';
 import { expectOutbox, switchSection } from '../helpers/oracles';
 import { setOffline, SYNCABLE_ENTITIES } from '../helpers/failure';
+import { fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
 
 /**
  * J4 — "The backend is having a bad day" (P5, offline-user persona).
@@ -132,10 +133,9 @@ async function assertSettingsSyncPill(
 }
 
 /**
- * Install a Supabase route whose REST behaviour is `restHandler` while the auth
- * endpoints always fail fast (400). The auth 400 is essential: supabase-js
- * treats 5xx as retryable and burns seconds of retries on every app load,
- * which delays `syncEngine.hydrate()` past our first flush trigger.
+ * Install a Supabase route whose REST behaviour is `restHandler` while Auth is
+ * fulfilled by a deterministic signed-in anonymous user. The ownership
+ * boundary requires an authenticated UID before a mock REST push can proceed.
  */
 async function routeSupabase(
   page: Page,
@@ -145,11 +145,7 @@ async function routeSupabase(
   await page.route(SUPABASE_ROUTE, (route) => {
     supabaseRequestsSeen += 1;
     if (route.request().url().includes('/auth/v1/')) {
-      return route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: '{"error":"anonymous sign-in disabled (injected)"}',
-      });
+      return fulfillDummySupabaseAuth(route);
     }
     return restHandler(route, route.request().url());
   });
@@ -160,6 +156,7 @@ async function injectRest503(page: Page): Promise<void> {
   await routeSupabase(page, (route) =>
     route.fulfill({
       status: 503,
+      headers: { 'access-control-allow-origin': '*' },
       contentType: 'application/json',
       body: '{"error":"injected server error"}',
     }),
@@ -169,7 +166,12 @@ async function injectRest503(page: Page): Promise<void> {
 /** Every REST request returns 200 with invalid JSON (parser robustness). */
 async function injectRestMalformed(page: Page): Promise<void> {
   await routeSupabase(page, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '{' }),
+    route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: '{',
+    }),
   );
 }
 
@@ -185,7 +187,12 @@ async function injectRestTimeout(page: Page, ms = 2500): Promise<void> {
 /** Every REST request succeeds (200, empty array) — the "backend recovered" injector. */
 async function injectRestSuccess(page: Page): Promise<void> {
   await routeSupabase(page, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+    route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: '[]',
+    }),
   );
 }
 
@@ -202,11 +209,17 @@ async function injectRestPartial(page: Page, failEntities: readonly string[]): P
     if (hit && fail.has(hit)) {
       return route.fulfill({
         status: 503,
+        headers: { 'access-control-allow-origin': '*' },
         contentType: 'application/json',
         body: '{"error":"injected partial failure"}',
       });
     }
-    return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    return route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: '[]',
+    });
   });
 }
 

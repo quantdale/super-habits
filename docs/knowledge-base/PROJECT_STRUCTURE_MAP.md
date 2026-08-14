@@ -44,8 +44,8 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 - `npm test`: 427 tests in 41 files
 - `npx playwright test --list`: 90 tests in 14 spec files
-- Runtime schema version: 14
-- Next migration slot: `if (version < 15)`
+- Runtime schema version: 15 (migration 15 adds the durable sync-outbox owner binding)
+- Next migration slot: `if (version < 16)`
 
 ---
 

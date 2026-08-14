@@ -4,7 +4,7 @@ import { applyRemoteCalorieEntries } from '@/features/calories/calories.data';
 import { applyRemoteHabits } from '@/features/habits/habits.data';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { applyRemoteTodos } from '@/features/todos/todos.data';
-import { isRemoteEnabled, supabase } from '@/lib/supabase';
+import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { nowIso } from '@/lib/time';
 import type {
   BackupFreshnessSignature,
@@ -23,6 +23,8 @@ const RESTORE_SCOPE_VERSION = 'phase_one_restore_v1';
 const PAGE_SIZE = 1_000;
 const WORKOUT_RESTORE_EXCLUSION_REASON =
   'Workout routines are excluded in this phase because nested routine structure is not synced yet.';
+const REMOTE_AUTH_UNAVAILABLE_MESSAGE =
+  'Remote backup authentication is unavailable for the current account.';
 
 type RemoteMeta = Pick<
   RemoteBackupEntityStatus,
@@ -83,7 +85,9 @@ function buildWarnings(statuses: Record<SyncBackedEntity, RemoteBackupEntityStat
   }
 
   const remoteErrors = getOrderedStatusEntries(statuses).filter(
-    (status) => status.remoteState === 'error' && status.errorMessage,
+    (status) =>
+      (status.remoteState === 'error' || status.remoteState === 'unavailable') &&
+      status.errorMessage,
   );
   if (remoteErrors.length > 0) {
     warnings.push(
@@ -118,7 +122,10 @@ async function getLocalSyncBackedCounts(): Promise<LocalSyncBackedCounts> {
   return Object.fromEntries(entries) as LocalSyncBackedCounts;
 }
 
-async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMeta> {
+async function fetchRemoteEntityMeta(
+  entity: SyncBackedEntity,
+  ownerUserId: string | null,
+): Promise<RemoteMeta> {
   if (!isRemoteEnabled() || !supabase) {
     return {
       remoteState: 'unavailable',
@@ -127,10 +134,19 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
       errorMessage: null,
     };
   }
+  if (!ownerUserId) {
+    return {
+      remoteState: 'unavailable',
+      remoteRowCount: null,
+      latestUpdatedAt: null,
+      errorMessage: REMOTE_AUTH_UNAVAILABLE_MESSAGE,
+    };
+  }
 
   const countResult = await supabase
     .from(entity)
     .select('id', { count: 'exact', head: true })
+    .eq('user_id', ownerUserId)
     .is('deleted_at', null);
   if (countResult.error) {
     return {
@@ -154,6 +170,7 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
   const latestResult = await supabase
     .from(entity)
     .select('updated_at')
+    .eq('user_id', ownerUserId)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .limit(1);
@@ -177,12 +194,16 @@ async function fetchRemoteEntityMeta(entity: SyncBackedEntity): Promise<RemoteMe
   };
 }
 
-async function getRemoteEntityStatuses(): Promise<
-  Record<SyncBackedEntity, RemoteBackupEntityStatus>
-> {
+async function getRemoteEntityStatuses(
+  ownerUserId: string | null,
+): Promise<Record<SyncBackedEntity, RemoteBackupEntityStatus>> {
+  if (!ownerUserId) {
+    return buildUnavailableEntityStatuses(REMOTE_AUTH_UNAVAILABLE_MESSAGE);
+  }
+
   const entries = await Promise.all(
     SYNC_BACKED_ENTITIES.map(async (entity) => {
-      const remoteMeta = await fetchRemoteEntityMeta(entity);
+      const remoteMeta = await fetchRemoteEntityMeta(entity, ownerUserId);
       const isWorkout = entity === 'workout_routines';
 
       const status: RemoteBackupEntityStatus = {
@@ -215,7 +236,9 @@ function computeLatestRestorableBackupAt(
   return candidates.sort((a, b) => b.localeCompare(a))[0] ?? null;
 }
 
-function buildUnavailableEntityStatuses(): Record<SyncBackedEntity, RemoteBackupEntityStatus> {
+function buildUnavailableEntityStatuses(
+  errorMessage: string | null = null,
+): Record<SyncBackedEntity, RemoteBackupEntityStatus> {
   return Object.fromEntries(
     SYNC_BACKED_ENTITIES.map((entity) => [
       entity,
@@ -227,7 +250,7 @@ function buildUnavailableEntityStatuses(): Record<SyncBackedEntity, RemoteBackup
         remoteRowCount: null,
         latestUpdatedAt: null,
         reason: entity === 'workout_routines' ? WORKOUT_RESTORE_EXCLUSION_REASON : null,
-        errorMessage: null,
+        errorMessage,
       } satisfies RemoteBackupEntityStatus,
     ]),
   ) as Record<SyncBackedEntity, RemoteBackupEntityStatus>;
@@ -273,11 +296,15 @@ function buildEligibility(
 
 async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
   entity: TEntity,
+  ownerUserId: string,
 ): Promise<RemoteRestoreRowMap[TEntity][]> {
   if (!isRemoteEnabled()) {
     throw new Error('[restore] Remote backup is disabled.');
   }
   if (!supabase) return [];
+  if (!ownerUserId) {
+    throw new Error(`[restore] ${REMOTE_AUTH_UNAVAILABLE_MESSAGE}`);
+  }
 
   const rows: RemoteRestoreRowMap[TEntity][] = [];
   let from = 0;
@@ -287,6 +314,7 @@ async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
     const result = await supabase
       .from(entity)
       .select('*')
+      .eq('user_id', ownerUserId)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(from, to);
@@ -308,16 +336,19 @@ async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
   return rows;
 }
 
-export async function getRestorePreview(): Promise<RestorePreview> {
+async function buildRestorePreview(ownerUserId: string | null): Promise<RestorePreview> {
   const remoteEnabled = isRemoteEnabled();
   const [db, localCounts, entityStatuses] = await Promise.all([
     getDatabase(),
     getLocalSyncBackedCounts(),
-    remoteEnabled ? getRemoteEntityStatuses() : Promise.resolve(buildUnavailableEntityStatuses()),
+    remoteEnabled
+      ? getRemoteEntityStatuses(ownerUserId)
+      : Promise.resolve(buildUnavailableEntityStatuses()),
   ]);
 
   const remoteAvailable =
     remoteEnabled &&
+    ownerUserId !== null &&
     RESTORE_SCOPED_ENTITIES.some((entity) => {
       const status = entityStatuses[entity];
       return status.remoteState === 'available' && (status.remoteRowCount ?? 0) > 0;
@@ -345,6 +376,20 @@ export async function getRestorePreview(): Promise<RestorePreview> {
   };
 }
 
+async function getCurrentRemoteUserId(): Promise<string | null> {
+  if (!isRemoteEnabled() || !supabase) return null;
+
+  try {
+    return await getSupabaseAuthUserId();
+  } catch {
+    return null;
+  }
+}
+
+export async function getRestorePreview(): Promise<RestorePreview> {
+  return buildRestorePreview(await getCurrentRemoteUserId());
+}
+
 export async function dismissCurrentRestorePrompt(
   freshnessSignature: BackupFreshnessSignature | null,
 ): Promise<void> {
@@ -362,7 +407,8 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     };
   }
 
-  const preview = await getRestorePreview();
+  const ownerUserId = await getCurrentRemoteUserId();
+  const preview = await buildRestorePreview(ownerUserId);
   if (preview.eligibility.kind !== 'empty_device') {
     return {
       status: 'blocked',
@@ -378,10 +424,15 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     };
   }
 
+  const refreshedOwnerUserId = await getCurrentRemoteUserId();
+  if (!ownerUserId || refreshedOwnerUserId !== ownerUserId) {
+    throw new Error('[restore] Authenticated owner changed or is unavailable; restore aborted.');
+  }
+
   const [todos, habits, calorieEntries] = await Promise.all([
-    fetchRemoteRows('todos'),
-    fetchRemoteRows('habits'),
-    fetchRemoteRows('calorie_entries'),
+    fetchRemoteRows('todos', ownerUserId),
+    fetchRemoteRows('habits', ownerUserId),
+    fetchRemoteRows('calorie_entries', ownerUserId),
   ]);
 
   const db = await getDatabase();

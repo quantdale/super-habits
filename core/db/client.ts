@@ -484,6 +484,14 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       await setAppMetaText(db, appMetaKeys.syncOutbox, '[]');
     });
   }
+  if (version < 15) {
+    await applyMigration(db, 15, async () => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(sync_outbox)');
+      if (!columns.some((column) => column.name === 'owner_user_id')) {
+        await db.runAsync('ALTER TABLE sync_outbox ADD COLUMN owner_user_id TEXT');
+      }
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

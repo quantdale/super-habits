@@ -6,6 +6,7 @@ import type { SyncPersistence, SyncRecord, SyncStatus } from '@/core/sync/sync.e
 function isSyncRecord(value: unknown): value is SyncRecord {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
+  const ownerUserId = candidate.ownerUserId;
   return (
     typeof candidate.entity === 'string' &&
     candidate.entity.length > 0 &&
@@ -14,7 +15,8 @@ function isSyncRecord(value: unknown): value is SyncRecord {
     typeof candidate.updatedAt === 'string' &&
     (candidate.operation === 'create' ||
       candidate.operation === 'update' ||
-      candidate.operation === 'delete')
+      candidate.operation === 'delete') &&
+    (ownerUserId === undefined || ownerUserId === null || typeof ownerUserId === 'string')
   );
 }
 
@@ -51,9 +53,10 @@ export class SqliteSyncPersistence implements SyncPersistence {
       id: string;
       updated_at: string;
       operation: SyncRecord['operation'];
+      owner_user_id: string | null;
       revision: number;
     }>(
-      `SELECT entity, id, updated_at, operation, revision
+      `SELECT entity, id, updated_at, operation, owner_user_id, revision
        FROM sync_outbox
        ORDER BY revision ASC`,
     );
@@ -63,6 +66,7 @@ export class SqliteSyncPersistence implements SyncPersistence {
         id: row.id,
         updatedAt: row.updated_at,
         operation: row.operation,
+        ownerUserId: row.owner_user_id,
         revision: row.revision,
       }))
       .filter(isSyncRecord);
@@ -117,14 +121,37 @@ export async function upsertSyncOutboxRecord(
   record: SyncRecord,
   revision: number,
 ): Promise<void> {
+  const existing = await db.getFirstAsync<{ owner_user_id: string | null }>(
+    `SELECT owner_user_id
+     FROM sync_outbox
+     WHERE entity = ? AND id = ?`,
+    [record.entity, record.id],
+  );
+  const existingOwner = existing?.owner_user_id ?? null;
+  const requestedOwner = record.ownerUserId ?? null;
+
+  // A known owner can survive a temporary auth outage, but an unowned legacy
+  // intent must never be rebound to whichever account happens to be current.
+  if (
+    existing &&
+    ((existingOwner !== null && requestedOwner !== null && existingOwner !== requestedOwner) ||
+      (existingOwner === null && requestedOwner !== null))
+  ) {
+    throw new Error(
+      `Sync outbox owner mismatch for ${record.entity}:${record.id}; refusing to rebind a pending intent.`,
+    );
+  }
+
+  const ownerUserId = requestedOwner ?? existingOwner;
   await db.runAsync(
-    `INSERT INTO sync_outbox (entity, id, updated_at, operation, revision)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO sync_outbox (entity, id, updated_at, operation, owner_user_id, revision)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(entity, id) DO UPDATE SET
        updated_at = excluded.updated_at,
        operation = excluded.operation,
+       owner_user_id = COALESCE(sync_outbox.owner_user_id, excluded.owner_user_id),
        revision = excluded.revision
      WHERE excluded.revision > sync_outbox.revision`,
-    [record.entity, record.id, record.updatedAt, record.operation, revision],
+    [record.entity, record.id, record.updatedAt, record.operation, ownerUserId, revision],
   );
 }

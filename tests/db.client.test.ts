@@ -152,7 +152,7 @@ describe('core/db/client', () => {
     expect(cutoverCall?.[1]).toEqual(['date_key_cutover', expect.any(String)]);
   });
 
-  it('applies migrations from version 0 and bumps to schema version 14', async () => {
+  it('applies migrations from version 0 and bumps to schema version 15', async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
@@ -162,7 +162,7 @@ describe('core/db/client', () => {
         String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
         Array.isArray(args) &&
         args[0] === 'db_schema_version' &&
-        args[1] === '14',
+        args[1] === '15',
     );
     expect(hasSchemaV10Write).toBe(true);
   });
@@ -274,13 +274,34 @@ describe('core/db/client', () => {
     ).toBe(true);
   });
 
+  it('adds the durable outbox owner binding in migration 15', async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: '14' });
+
+    await client.getDatabase();
+
+    expect(
+      db.runAsync.mock.calls.some(([sql]) =>
+        String(sql).includes('ALTER TABLE sync_outbox ADD COLUMN owner_user_id TEXT'),
+      ),
+    ).toBe(true);
+    expect(
+      db.runAsync.mock.calls.some(
+        ([sql, args]) =>
+          String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
+          Array.isArray(args) &&
+          args[0] === 'db_schema_version' &&
+          args[1] === '15',
+      ),
+    ).toBe(true);
+  });
+
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 through v14 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(5);
+    // v10 through v15 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(6);
 
-    const upToDate = await loadDbClient({ schemaVersion: '14' });
+    const upToDate = await loadDbClient({ schemaVersion: '15' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });

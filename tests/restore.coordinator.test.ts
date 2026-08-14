@@ -9,7 +9,9 @@ function buildSupabaseMock(
   remoteRowsByEntity: RemoteRowsByEntity,
   remoteErrorsByEntity: RemoteErrorByEntity = {},
 ) {
+  const ownerFilters: { entity: string; value: unknown }[] = [];
   return {
+    ownerFilters,
     from: vi.fn((entity: string) => {
       const rows = remoteRowsByEntity[entity] ?? [];
       const entityErrors = remoteErrorsByEntity[entity] ?? {};
@@ -23,7 +25,11 @@ function buildSupabaseMock(
             state.onlyActiveRows ? rows.filter((row) => row.deleted_at == null) : rows;
 
           if (options?.head) {
-            return {
+            const headQuery = {
+              eq: vi.fn((column: string, value: unknown) => {
+                if (column === 'user_id') ownerFilters.push({ entity, value });
+                return headQuery;
+              }),
               is: vi.fn(() => {
                 state.onlyActiveRows = true;
                 if (entityErrors.countError) {
@@ -40,9 +46,14 @@ function buildSupabaseMock(
                 });
               }),
             };
+            return headQuery;
           }
 
           const query = {
+            eq: vi.fn((column: string, value: unknown) => {
+              if (column === 'user_id') ownerFilters.push({ entity, value });
+              return query;
+            }),
             is: vi.fn(() => {
               state.onlyActiveRows = true;
               return query;
@@ -154,11 +165,17 @@ async function loadCoordinator(options: {
   initialMeta?: Record<string, string>;
   applyFailure?: { entity: 'todos' | 'habits' | 'calorie_entries'; sql?: string };
   remoteEnabled?: boolean;
+  authUserIds?: (string | null)[];
 }) {
   vi.resetModules();
 
   const db = buildDb(options.localCounts, options.initialMeta);
   const supabaseMock = buildSupabaseMock(options.remoteRowsByEntity, options.remoteErrorsByEntity);
+  const authUserIds = options.authUserIds ?? ['user_a'];
+  const getSupabaseAuthUserId = vi.fn(async () => {
+    if (authUserIds.length > 1) return authUserIds.shift() ?? null;
+    return authUserIds[0] ?? null;
+  });
   const applyRemoteTodos = vi.fn(async (database, rows) => {
     if (options.applyFailure?.entity === 'todos') {
       if (options.applyFailure.sql) {
@@ -196,6 +213,7 @@ async function loadCoordinator(options: {
   vi.doMock('@/lib/supabase', () => ({
     supabase: supabaseMock,
     isRemoteEnabled: vi.fn(() => options.remoteEnabled ?? true),
+    getSupabaseAuthUserId,
   }));
   vi.doMock('@/features/todos/todos.data', () => ({
     applyRemoteTodos,
@@ -211,6 +229,7 @@ async function loadCoordinator(options: {
   return {
     db,
     supabaseMock,
+    getSupabaseAuthUserId,
     applyRemoteTodos,
     applyRemoteHabits,
     applyRemoteCalorieEntries,
@@ -365,6 +384,29 @@ describe('core/sync/restore.coordinator', () => {
       reason: 'remote_disabled',
     });
     expect(preview.entityStatuses.todos.remoteState).toBe('unavailable');
+    expect(loaded.supabaseMock.from).not.toHaveBeenCalled();
+  });
+
+  it('reports remote authentication as unavailable without querying backup rows', async () => {
+    const loaded = await loadCoordinator({
+      localCounts: {
+        todos: 0,
+        habits: 0,
+        calorie_entries: 0,
+        workout_routines: 0,
+      },
+      remoteRowsByEntity: { todos: [{ id: 'todo_1' }] },
+      authUserIds: [null],
+    });
+
+    const preview = await loaded.getRestorePreview();
+
+    expect(preview.remoteAvailable).toBe(false);
+    expect(preview.eligibility).toMatchObject({
+      kind: 'blocked',
+      reason: 'remote_backup_unavailable',
+    });
+    expect(preview.warnings.join(' ')).toContain('authentication is unavailable');
     expect(loaded.supabaseMock.from).not.toHaveBeenCalled();
   });
 
@@ -662,6 +704,10 @@ describe('core/sync/restore.coordinator', () => {
     expect(loaded.applyRemoteTodos).toHaveBeenCalledTimes(1);
     expect(loaded.applyRemoteHabits).toHaveBeenCalledTimes(1);
     expect(loaded.applyRemoteCalorieEntries).toHaveBeenCalledTimes(1);
+    expect(loaded.supabaseMock.ownerFilters.length).toBeGreaterThan(0);
+    expect(loaded.supabaseMock.ownerFilters.every((filter) => filter.value === 'user_a')).toBe(
+      true,
+    );
     const metaWrites = loaded.db
       .getCommittedWrites()
       .filter(
@@ -698,6 +744,31 @@ describe('core/sync/restore.coordinator', () => {
     expect(loaded.db.getCommittedWrites()).toEqual([]);
     expect(loaded.db.getMeta()).not.toHaveProperty('last_restore_at');
     expect(loaded.db.getMeta()).not.toHaveProperty('last_restore_signature');
+  });
+
+  it('aborts restore when the authenticated owner changes after preview', async () => {
+    const loaded = await loadCoordinator({
+      localCounts: {
+        todos: 0,
+        habits: 0,
+        calorie_entries: 0,
+        workout_routines: 0,
+      },
+      remoteRowsByEntity: {
+        todos: [
+          {
+            id: 'todo_1',
+            updated_at: '2026-04-20T12:00:00.000Z',
+            created_at: '2026-04-19T12:00:00.000Z',
+          },
+        ],
+      },
+      authUserIds: ['user_a', 'user_b'],
+    });
+
+    await expect(loaded.restoreFromRemoteBackup()).rejects.toThrow('Authenticated owner changed');
+    expect(loaded.applyRemoteTodos).not.toHaveBeenCalled();
+    expect(loaded.db.getCommittedWrites()).toEqual([]);
   });
 
   it('aborts inside the transaction when local rows appear after the eligibility preview', async () => {

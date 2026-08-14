@@ -1,7 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
 import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAuthUserId, supabase } from '@/lib/supabase';
 
 /** SQLite table names that are enqueued for sync — must match `syncEngine.enqueue` entity strings. */
 const SYNCABLE_ENTITIES = ['todos', 'habits', 'calorie_entries', 'workout_routines'] as const;
@@ -39,6 +39,20 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       throw new Error('Supabase is not configured; keeping the outbox intact.');
     }
 
+    let currentUserId: string | null;
+    try {
+      currentUserId = await getSupabaseAuthUserId();
+    } catch (error) {
+      throw new Error(
+        `Supabase auth is unavailable; keeping the outbox intact: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    if (!currentUserId) {
+      throw new Error('Supabase auth user is unavailable; keeping the outbox intact.');
+    }
+
     const db = await getDatabase();
     const byEntity = collectIdsByEntity(records);
     const failedRecords: SyncRecord[] = [];
@@ -58,6 +72,15 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         const ids = [...idSet];
         if (ids.length === 0) continue;
 
+        const unownedOrWrongSession = entityRecords.filter(
+          (record) => record.ownerUserId !== currentUserId,
+        );
+        if (unownedOrWrongSession.length > 0) {
+          throw new Error(
+            `Sync owner mismatch for ${entity}; refusing to push under the current Supabase user.`,
+          );
+        }
+
         const placeholders = ids.map(() => '?').join(', ');
         const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
 
@@ -71,7 +94,12 @@ export class SupabaseSyncAdapter implements SyncAdapter {
           throw new Error(`Missing local rows for ${entity}: ${missingIds.join(', ')}`);
         }
 
-        const { error } = await supabase.from(entity).upsert(rows, {
+        const payloadRows = rows.map((row) => {
+          const { user_id: _localOwner, ...localRow } = row;
+          return { ...localRow, user_id: currentUserId };
+        });
+
+        const { error } = await supabase.from(entity).upsert(payloadRows, {
           onConflict: 'id',
         });
 

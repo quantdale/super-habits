@@ -133,7 +133,7 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **14** (`app_meta.db_schema_version`), including durable processed-notification-action state and the SQLite sync outbox. Next migration: add a new `if (version < 15) { ... }` block.
+- Current stored schema version: **15** (`app_meta.db_schema_version`), including durable processed-notification-action state, the SQLite sync outbox, and its durable owner binding. Next migration: add a new `if (version < 16) { ... }` block.
 - `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v14 outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 

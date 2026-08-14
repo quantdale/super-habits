@@ -28,9 +28,10 @@ The drift procedure below makes that divergence a finding, never a quiet edit.
   adapter (`core/sync/supabase.adapter.ts`) selects the full local row
   (`SELECT *`) and upserts keyed on `id`, so every local column must exist
   remotely with a compatible type.
-- RLS: enabled permissive for `anon` (and `authenticated`) with
-  `USING (true) WITH CHECK (true)` — the app is single-user and anonymous
-  (design D8: isolation comes from the disposable project + guard, not RLS).
+- RLS: enabled with four explicit owner-scoped policies per table for
+  `authenticated`, using `((select auth.uid()) = user_id)` and explicit
+  update `USING`/`WITH CHECK`; the unauthenticated `anon` role has no backup
+  CRUD grant or policy.
 - Non-synced tables intentionally have **no** remote counterpart:
   `habit_completions`, `pomodoro_sessions`, `saved_meals`, `workout_logs`,
   `routine_exercises`, `routine_exercise_sets`, `workout_session_exercises`,

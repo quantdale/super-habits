@@ -157,7 +157,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `core/db/client.ts` includes linked actions, notification-action, and durable sync-outbox migrations through schema version `14`:
+- `core/db/client.ts` includes linked actions, notification-action, and durable sync-outbox migrations through schema version `15`:
   - `linked_action_rules`
   - `linked_action_events`
   - `linked_action_executions`
@@ -236,7 +236,7 @@ Companion docs in this folder:
 - `linked_action_events`
 - `linked_action_executions`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `14`; next migration slot is `if (version < 15)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table.
+- Current runtime schema version is `15`; next migration slot is `if (version < 16)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
@@ -389,8 +389,8 @@ Companion docs in this folder:
 ### Confirmed from code vs docs
 
 - `core/db/schema.sql` is a hand-maintained reference snapshot of the runtime
-  bootstrap DDL plus migrations through schema version `14`; the next
-  append-only slot is `if (version < 15)`.
+  bootstrap DDL plus migrations through schema version `15`; the next
+  append-only slot is `if (version < 16)`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 

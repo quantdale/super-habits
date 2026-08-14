@@ -12,6 +12,7 @@ import {
 import { resetAll } from '../helpers/reset';
 import { setOffline } from '../helpers/failure';
 import { clickCaloriesAddEntry, fillCaloriesMacros } from '../helpers/forms';
+import { DUMMY_SUPABASE_USER_ID, fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
 
 /**
  * J3 — "The commute" (P5, Alex the Commuter). OpenSpec task 4.3.
@@ -135,23 +136,19 @@ async function registerOfflineWasmRoute(page: Page): Promise<void> {
 
 /**
  * Supabase route used through the ONLINE/offline phases: counts every request
- * (boundary detection) and WITHHOLDS success — auth 400 (supabase-js retries
- * 5xx, not 4xx, so bootstrap stays fast), REST 503 — so an opportunist online
- * flush (e.g. the mount-time NetInfo callback after a reload) can never drain
- * the outbox before the reconnect step asserts it.
+ * (boundary detection) and WITHHOLDS REST success — Auth returns the stable
+ * signed-in anonymous test user, while REST returns 503 — so an opportunist
+ * online flush cannot drain the outbox before the reconnect assertion.
  */
 async function installWithholdingSupabaseRoute(page: Page): Promise<void> {
   await page.route('**/*.supabase.co/**', (route) => {
     supabaseRequestsSeen += 1;
     if (route.request().url().includes('/auth/v1/')) {
-      return route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: '{"error":"anonymous sign-in disabled (injected)"}',
-      });
+      return fulfillDummySupabaseAuth(route);
     }
     return route.fulfill({
       status: 503,
+      headers: { 'access-control-allow-origin': '*' },
       contentType: 'application/json',
       body: '{"error":"injected server error"}',
     });
@@ -340,26 +337,27 @@ defineJourney({
         // upsert so "exactly once" is observable at the network boundary.
         // Auth stays 400 (supabase-js retries 5xx, not 4xx) so bootstrap and
         // any incidental load stay fast/deterministic.
-        const pushed: { entity: string; id: string }[] = [];
+        const pushed: { entity: string; id: string; userId: unknown }[] = [];
         await page.route('**/*.supabase.co/**', async (route) => {
           const req = route.request();
           if (req.url().includes('/auth/v1/')) {
-            return route.fulfill({
-              status: 400,
-              contentType: 'application/json',
-              body: '{"error":"anonymous sign-in disabled (injected)"}',
-            });
+            return fulfillDummySupabaseAuth(route);
           }
           const match = req.url().match(/\/rest\/v1\/(todos|habits|calorie_entries)\?/);
           if (req.method() === 'POST' && match) {
             const body = req.postDataJSON();
             for (const row of Array.isArray(body) ? body : [body]) {
               if (row && typeof row.id === 'string') {
-                pushed.push({ entity: match[1], id: row.id });
+                pushed.push({ entity: match[1], id: row.id, userId: row.user_id });
               }
             }
           }
-          await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+          await route.fulfill({
+            status: 200,
+            headers: { 'access-control-allow-origin': '*' },
+            contentType: 'application/json',
+            body: '[]',
+          });
         });
 
         // The page is on the app (calories) from step 5. Force one
@@ -411,6 +409,8 @@ defineJourney({
           const hits = pushed.filter((p) => p.entity === exp.entity && p.id === exp.id);
           expect(hits, `pushed ${exp.entity}:${exp.id} exactly once`).toHaveLength(1);
         }
+
+        expect(pushed.every((entry) => entry.userId === DUMMY_SUPABASE_USER_ID)).toBe(true);
       },
     },
   ],

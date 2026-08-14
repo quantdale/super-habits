@@ -7,6 +7,8 @@ export type SyncRecord = {
   id: string;
   updatedAt: string;
   operation: 'create' | 'update' | 'delete';
+  /** Auth owner captured when this durable sync intent was created. */
+  ownerUserId?: string | null;
   /** Internal durable ordering metadata. Adapters never receive this field. */
   revision?: number;
 };
