@@ -65,10 +65,10 @@
 ## 9. Reconcile, publish, and close
 
 - [x] 9.1 Update the top-level ExecPlan checkpoint, validation ledger, changed-file inventory, OpenSpec task checkboxes, and final outcomes with actual evidence.
-- [ ] 9.2 Reconcile `origin/main` without overwriting remote work, run final `git diff --check`, and create coherent main-only commits.
-- [ ] 9.3 Push `main` without force, verify local `main` equals `origin/main`, and verify the only remote branch is `main`.
-- [ ] 9.4 Inspect actual GitHub Actions quality/e2e runs, fix repository-caused regressions, repush, and record final run IDs/statuses.
-- [ ] 9.5 Mark the ExecPlan and OpenSpec change complete only when the stated definition of done and all required external evidence are satisfied or explicitly blocked.
+- [x] 9.2 Reconcile `origin/main` without overwriting remote work, run final `git diff --check`, and create coherent main-only commits.
+- [x] 9.3 Push `main` without force, verify local `main` equals `origin/main`, and verify the only remote branch is `main`.
+- [x] 9.4 Inspect actual GitHub Actions quality/e2e runs, fix repository-caused regressions, repush, and record final run IDs/statuses.
+- [x] 9.5 Mark the ExecPlan and OpenSpec change complete after the stated definition of done and all required external evidence were satisfied or explicitly blocked; the broader native per-action matrix remains an explicit documented follow-up.
 
 Native evidence note: a current-source local release APK was built and
 installed on `Nitro_API_36`. The serialized Command V2 native flow verifies

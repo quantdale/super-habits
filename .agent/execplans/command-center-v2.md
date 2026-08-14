@@ -1,7 +1,7 @@
 # ExecPlan: SuperHabits Command Center V2
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -232,8 +232,9 @@ raising thresholds.
 - [x] Add unit, integration, E2E, simulation, timezone, security, and native
       coverage appropriate to changed surfaces.
 - [x] Deploy and inspect Edge Functions in project `kruubbynsmxzxfdunaal`.
-- [ ] Reconcile, commit, push `main`, and inspect GitHub CI.
-- [ ] Complete this plan only after all intended evidence is recorded.
+- [x] Reconcile, commit, push `main`, and inspect GitHub CI.
+- [x] Complete this plan after recording the intended evidence and explicit
+      native / credential limitations.
 
 ## Surprises & Discoveries
 
@@ -352,6 +353,15 @@ raising thresholds.
   whose available forced fix changes the Expo dependency line. The global
   `npm run format:check` still reports repository-wide pre-existing formatting
   findings; every V2-touched file was individually formatted and checked.
+- 2026-08-14 — `npm test` final source gate — PASS; 838 tests across 81 files.
+- 2026-08-14 — main-only publish — PASS; coherent commit
+  `39662fe74e16c912272408a725640bf41c5d1178` pushed without force, then
+  `main` and `origin/main` matched exactly and the remote branch inventory
+  remained `origin/main` only.
+- 2026-08-14 — GitHub Actions CI #351 — PASS; run `31799688744` for the final
+  implementation commit completed `quality` successfully and `e2e`
+  successfully; `nightly` was skipped by workflow design. The final
+  documentation closure commit triggers the final post-closure CI run.
 
 ## Changed Files / Areas
 
@@ -381,15 +391,16 @@ raising thresholds.
 
 ## Current Checkpoint
 
-- Current milestone: delivery reconciliation — V2 implementation, broad web /
-  sync / simulation coverage, deployment inspection, and current-source
-  Android evidence are complete; only main/GitHub delivery remains.
+- Current milestone: completed delivery — V2 implementation, broad web / sync /
+  simulation coverage, deployment inspection, current-source Android evidence,
+  main publication, and GitHub CI are recorded.
 - Completed: clean-main recovery, guidance/skills read, architecture inventory,
   baseline QA, valid OpenSpec artifacts, V2 command contracts/review/execution,
   canonical feature integrations, bounded Ask retrieval, remote contracts,
   focused unit/integration tests, typecheck, and lint.
-- In progress: reconcile the unchanged remote `main`, create the coherent
-  commit, push it, and inspect the resulting GitHub Actions runs.
+- In progress: None in this plan. This closure update is the final
+  documentation checkpoint; its post-closure CI observation is a transport /
+  verification step and must not change product content.
 - Important modified files: `.agent/execplans/command-center-v2.md`,
   `openspec/changes/command-center-v2/`, `features/command/`, the canonical
   entity feature seams, remote functions, tests, and E2E coverage.
@@ -408,14 +419,14 @@ raising thresholds.
 - Condition required to unblock: Expo credentials/iOS infrastructure are
   external and are not required to validate local SQLite or deployed function
   behavior; CI must still be inspected after push.
-- Exact resume action after unblock: Re-run the final Git reconciliation and
-  publish steps, then inspect GitHub Actions.
-- Exact next action: Run `git status --short`, fetch and compare `main` with
-  `origin/main`, create the coherent commit, push without force, verify the
-  only remote branch is `main`, and inspect/fix the GitHub quality/e2e runs.
-- Remaining definition of done: published main, matching local/remote SHA,
-  actual GitHub CI evidence, and the final report; native/EAS/iOS limitations
-  remain explicitly documented rather than represented as passing.
+- Exact resume action after unblock: None — the implementation and main
+  publication are complete; observe the final closure CI only.
+- Exact next action: None — implementation delivery is complete; after this
+  documentation closure is pushed, verify the final closure SHA's GitHub CI
+  and report the already-recorded native/EAS/iOS limitations.
+- Remaining definition of done: No remaining work in this plan; the final
+  closure commit's CI is the last delivery check and native/EAS/iOS limitations
+  remain honestly classified.
 
 ## Recovery / Resume Instructions
 
@@ -429,10 +440,11 @@ raising thresholds.
 
 ## Outcomes & Retrospective
 
-- Status: Active pending publish and CI inspection.
+- Status: Completed pending only the post-closure CI observation.
 - Summary: V2 implementation, deterministic safety pipeline, canonical
   mutations, bounded Ask retrieval, deployed Edge Functions, broad headless
   validation, and current-source Android regression evidence are complete.
-- Follow-up: Full per-action native Command coverage still depends on broader
-  native infrastructure/scope; EAS credentials, iOS, and a safe authenticated
-  AI canary session were unavailable in this run.
+- Follow-up: Full per-action native Command coverage remains an explicit
+  follow-up; EAS credentials, iOS, and a safe authenticated AI canary session
+  were unavailable in this run. These are reported as partial/external status,
+  never as passing evidence.
