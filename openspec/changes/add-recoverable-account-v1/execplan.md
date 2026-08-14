@@ -1,7 +1,7 @@
 # ExecPlan: Recoverable Account V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose
 
@@ -265,21 +265,22 @@ Record pre/post Auth configuration and backup row/owner counts without destructi
 - 2026-08-15 — Journey assertion stabilization — PASS — added explicit UI commit/readiness waits in `e2e/journeys/a-tuesday.spec.ts` and `e2e/journeys/fat-fingers.spec.ts`; the focused journey subset passed 19/19 and `npm run qa:fast` passed with 775 unit tests across 65 files. SQL persistence assertions remain unchanged.
 - 2026-08-15 — GitHub Actions run #355 (`31835064798`, head `b264a925`) — FAIL/DIAGNOSED — `quality` passed; the full E2E job exposed async journey read-after-write races in the calorie and stale-edit assertions (with two additional timing flakes). The failures were reproduced/isolated locally, classified as test synchronization rather than product behavior, and fixed with event-driven UI waits in `6a97d55`.
 - 2026-08-15 — GitHub Actions run #356 (`31840061085`, head `6a97d551`) — PASS — `quality` job `94894769551` and the full `e2e` job `94895177048` completed successfully for the pushed stabilization commit.
+- 2026-08-15 — GitHub Actions run #357 (`31842128710`, head `d00c2e8e`) — PASS — final closure commit passed `quality` job `94901070919` and full `e2e` job `94901487015`; the run completed successfully.
 
 ## Current Checkpoint
 
-- Current milestone: Product implementation, documentation reconciliation, stabilization, main delivery, and the first pushed CI verification are complete; final plan closure and one final CI verification remain.
-- Completed: Reconciled Git, confirmed main-only remote, read durable guidance and prior security plans, created/validated OpenSpec artifacts and ExecPlan, reviewed current official Supabase Auth documentation, audited all user-owned tables, verified SDK 2.101.1 signatures, inspected live Auth settings without mutation, implemented durable owner binding and account coordinator, hardened bootstrap/sync/restore, added protection/recovery Settings UI, added unit/SQLite/mocked web coverage, added simulation personas, ran web/sync/native QA, reconciled durable docs, stabilized async journey assertions, pushed `main`, and verified GitHub Actions run #356.
-- In progress: Record the successful delivery evidence in the plan, validate the closure artifacts, commit/push that plan state on `main`, and inspect CI for that final closure SHA before marking this plan COMPLETED.
+- Current milestone: Recoverable Account V1 implementation, documentation, validation, main delivery, and final GitHub CI verification are complete.
+- Completed: Reconciled Git, confirmed main-only remote, read durable guidance and prior security plans, created/validated OpenSpec artifacts and ExecPlan, reviewed current official Supabase Auth documentation, audited all user-owned tables, verified SDK 2.101.1 signatures, inspected live Auth settings without mutation, implemented durable owner binding and account coordinator, hardened bootstrap/sync/restore, added protection/recovery Settings UI, added unit/SQLite/mocked web coverage, added simulation personas, ran web/sync/native QA, reconciled durable docs, stabilized async journey assertions, pushed `main`, and verified GitHub Actions run #357 for the final closure SHA.
+- In progress: None.
 - Important modified files: `core/auth/`, `core/db/appMeta.ts`, `core/providers/`, `core/sync/`, `lib/supabase.ts`, `features/settings/`, account/restore integration tests, `e2e/journeys/recoverable-account-v1.spec.ts`, `e2e/journeys/a-tuesday.spec.ts`, `e2e/journeys/fat-fingers.spec.ts`, simulation personas, reconciled guidance docs, and the OpenSpec change directory.
 - Last successful validation: full Vitest (873/873), serial integration/timezone/contract gates, final web exports, Chromium 88/95, journeys 72/93, sync 30/30, account focus 4/4, focused journey stabilization 19/19, simulation browser 3/3, deterministic simulation 21/21, Android smoke/persistence/lifecycle lanes, and GitHub Actions quality/e2e run #356.
 - Current failures: No product assertion failures. Whole-repository `format:check` reports 90 pre-existing repository files; npm audit reports 16 known transitive advisories; neither was “fixed” by weakening the task scope or forcing an Expo/RN downgrade.
 - Relevant quarantines: Live manual-linking/template/redirect/CAPTCHA settings and real email delivery are not verified; no live canary is claimed. iOS/EAS and native real-email account delivery remain external infrastructure gaps.
-- Blockers: None for repository implementation. Production Auth configuration requires Dashboard/Management API credentials; a live canary requires a disposable test identity and safe cleanup path. The remaining delivery action is to push this closure evidence and verify its final CI run.
-- Condition required to unblock: Validate and commit the closure evidence on `main`, verify final SHA equality and main-only remote topology, then inspect quality/e2e GitHub Actions results for that closure SHA.
-- Exact resume action after unblock: Run the OpenSpec/plan validators, inspect the plan diff, commit the closure evidence on `main`, fetch/push with SHA reconciliation, and poll the final GitHub Actions run.
-- Exact next action: Run the closure validators and inspect the plan/tasks diff before committing the delivery evidence.
-- Remaining definition of done: Closure evidence committed and pushed on `main`, final SHA equality, final GitHub CI quality/e2e status, and then Status COMPLETED in this plan.
+- Blockers: None for repository implementation or delivery. Production Auth configuration requires Dashboard/Management API credentials; a live canary requires a disposable test identity and safe cleanup path, and those limitations remain explicitly documented.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None; if resumed, inspect this completed plan before starting a separately scoped follow-up.
+- Exact next action: None — the Recoverable Account V1 definition of done is satisfied.
+- Remaining definition of done: Complete — closure evidence is committed and pushed on `main`, final SHA equality and main-only topology are verified, and final GitHub quality/e2e are green.
 
 ## Progress
 
@@ -292,7 +293,7 @@ Record pre/post Auth configuration and backup row/owner counts without destructi
 - [x] Implement owner binding, account coordinator, protection, recovery, sync/restore gates, and UI.
 - [x] Add unit/integration/E2E/simulation/native coverage and run affected/full QA.
 - [x] Reconcile documentation, live configuration/canary evidence, complete artifacts, commit/push main, and verify GitHub CI for the implementation/stabilization delivery.
-- [ ] Close the ExecPlan after pushing the closure evidence and verifying CI for the final closure SHA.
+- [x] Close the ExecPlan after pushing the closure evidence and verifying CI for the final closure SHA.
 
 ## Changed Files / Areas
 
@@ -315,8 +316,8 @@ Record pre/post Auth configuration and backup row/owner counts without destructi
 
 ## Outcomes & Retrospective
 
-- Status: Active; implementation, local validation, main delivery, and GitHub Actions run #356 are complete, while closure-plan delivery and its final CI verification remain.
+- Status: Completed; implementation, local validation, main delivery, and GitHub Actions run #357 are complete.
 - Summary: The repository now has a UUID-preserving anonymous protection flow, empty-device-only existing-account recovery, durable local ownership, and fail-closed session/outbox/restore behavior, with live configuration limitations explicitly recorded.
 - Evidence: Git reconciliation, official Supabase documentation, implementation files, unit/SQLite/web/native/simulation QA, and live read-only Auth inspection are recorded above.
-- Remaining work: Commit/push the closure evidence on `main`, verify final SHA equality and remote branch topology, inspect GitHub quality/e2e for that final closure SHA, then mark this plan COMPLETED.
+- Remaining work: None within Recoverable Account V1. Follow-up work remains intentionally limited to broader backup completeness, account switching/merge, account deletion, and production Auth configuration/canary work requiring external credentials.
 - Follow-up: Broader backup completeness, account switching/merge, and account deletion remain outside V1.

@@ -44,4 +44,4 @@
 - [x] 6.3 Reconcile README/AGENTS/project map/knowledge docs with Recoverable Account V1, current outbox/ownership, Restore V1 scope, Command Center facts, and non-volatile QA wording.
 - [x] 6.4 Run affected QA, full headless QA, builds, sync/full E2E, deterministic simulation, Expo Doctor, audit, schema/OpenSpec/plan/impact validation, and diff checks; preserve failures and classifications.
 - [x] 6.5 Complete the delivery evidence, create coherent commits on `main`, reconcile/fetch without overwrite, push only `origin/main`, and verify the implementation/stabilization SHA equality and remote branch topology.
-- [ ] 6.6 Inspect actual GitHub Actions quality/e2e for the final pushed SHA; fix repository-caused failures and repush until CI status is known.
+- [x] 6.6 Inspect actual GitHub Actions quality/e2e for the final pushed SHA; fix repository-caused failures and repush until CI status is known.
