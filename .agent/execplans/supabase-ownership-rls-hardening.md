@@ -1,7 +1,7 @@
 # ExecPlan: Supabase ownership and RLS hardening
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose
 
@@ -56,9 +56,9 @@ the final local `main` SHA must equal `origin/main`.
 
 ## Current Checkpoint
 
-- Current Milestone: Repository implementation and QA are complete; commit the validated work on `main`, push it, verify the final GitHub run, then close this plan.
+- Current Milestone: Campaign complete; repository work is pushed on `main`, the first delivery SHA's required GitHub CI is green, and the final closure commit records the completed plan and residual blockers.
 - Completed: Main-only baseline; required repository and skill guidance; official Supabase documentation/changelog and pinned CLI capability review; authenticated read-only discovery of project `kruubbynsmxzxfdunaal`; focused OpenSpec artifacts; append-only remote ownership migration; SQLite outbox owner binding; trusted auth-scoped sync/restore; schema validator; disposable-policy repository harness; focused and full tests; web/sync E2E; deterministic simulation; Expo health; live read-only advisors; serialized native attempt with exact blocker recorded.
-- In Progress: Commit/push/reconcile `main`, inspect the actual GitHub CI run, and record final SHA/evidence.
+- In Progress: None. The final closure commit records this completed state; its GitHub CI run is the final transport verification.
 - Important Modified Files: `supabase/migrations/20260814160000_secure_sync_row_ownership.sql`; `core/sync/`; `lib/supabase.ts`; `core/db/client.ts`; `scripts/validate-supabase-schema.mjs`; `simulation/backend/`; focused OpenSpec artifacts; security tests.
 - Last Successful Validation: `npm test` passed with 79 files and 793 tests; `npm run typecheck`, `npm run lint`, schema/OpenSpec/plan validators, all required headless QA, and the focused 46-test ownership boundary rerun passed. `npm run e2e:sync` passed 15 with 4 intentional restore skips; `npm run e2e:full` passed 153 with 17 intentional skips; deterministic simulation passed 17/17; Expo Doctor passed 19/19.
 - Current Failures: Android Maestro smoke failed because the current debug APK displayed React Native's `Unable to load script` redbox after cold launch; a current-source release build exceeded the 20-minute environment timeout. Direct `supabase` is not on PATH; pinned `npx --no-install supabase` is `2.113.0`. Docker/Podman is unavailable, so real disposable Postgres RLS execution is not available. Live deployed Edge Functions/quota objects remain stale/absent relative to the repository.
@@ -66,8 +66,8 @@ the final local `main` SHA must equal `origin/main`.
 - Blockers: Remote migration history is inconsistent with the repository (only `20260810130000` is recorded remotely while the repository baseline/quota migrations are absent); the linked schema was provisioned separately. No supported disposable SQL target is available. These facts block a safe live apply in this session. Native QA depends on current emulator/build tooling; GitHub CI access must be verified after push.
 - Condition Required to Unblock: A reviewed migration path compatible with the live schema/history, an approved authenticated apply/recovery path, and disposable or dedicated Postgres RLS execution evidence. Live AI security requires deploying/verifying the current repository Edge Functions and quota objects separately.
 - Exact Resume Action After Unblock: Re-run the serialized Android campaign only after a current-source bundle can be attached to the emulator; no repository change is indicated by the current redbox artifact.
-- Exact Next Action: Stage the explicit changed-file set, commit on `main`, fetch/reconcile, push without force, inspect the CI run for the pushed SHA, then update this plan to `COMPLETED` in a final closure commit.
-- Remaining Definition of Done: Final Git SHA equality and branch topology; known GitHub CI result; final plan/OpenSpec completion; explicit live-migration classification.
+- Exact Next Action: None — task complete; only the normal post-push transport verification is being recorded for this closure commit.
+- Remaining Definition of Done: Complete; the ownership implementation, OpenSpec tasks, migration classification, first delivery push, and required CI result are recorded.
 
 ## Current Git State
 
@@ -261,7 +261,7 @@ the final local `main` SHA must equal `origin/main`.
 - [x] Run full headless/native QA and final security sweep; native Android
       remains partial because the current debug bundle could not attach to
       Metro and the release build timed out.
-- [ ] Commit, push main, verify CI, and close this plan.
+- [x] Commit, push main, verify CI, and close this plan; the first delivery SHA `8f0fd3fe54eed8a00ce3e24a56ad91ae8d00a3cd` has a successful GitHub CI run.
 
 ## Surprises & Discoveries
 
@@ -332,6 +332,7 @@ the final local `main` SHA must equal `origin/main`.
 - 2026-08-14 — `npm audit` and `npm audit --omit=dev` — EXPECTED ADVISORY EXIT; both report 0 low, 6 moderate, 10 high, 0 critical. No forced remediation was attempted.
 - 2026-08-14 — Live Supabase security/performance advisors — PASS read-only collection; security warns on current live anonymous policies for all four sync tables and leaked-password protection; performance warns on existing live `auth.uid()` init-plan policies. These are expected evidence of the unmodified vulnerable live state and are not claimed resolved.
 - 2026-08-14 — Android native preflight — PARTIAL/ENVIRONMENT; `Nitro_API_36` booted on `emulator-5554`, current debug APK installed, but `npm run qa:native:android` and a direct Maestro smoke both failed on the missing Metro bundle redbox. Current-source release build timed out after 1,204 seconds; persistence flows were not claimed.
+- 2026-08-14 — First delivery commit `8f0fd3fe54eed8a00ce3e24a56ad91ae8d00a3cd` pushed to `origin/main` — PASS; local `main`, `origin/main`, and the only remote branch matched. GitHub CI run `31764346998` completed successfully: quality passed, main e2e passed, nightly skipped by event.
 
 ## Changed Files / Areas
 
@@ -390,8 +391,10 @@ results before committing and pushing `main`.
 
 ## Outcomes
 
-- Status: Active; repository ownership hardening is implemented and no live
-  migration has been claimed.
-- Final outcome, exact QA evidence, native/CI result, live migration
-  classification, and residual risks will be recorded before changing
-  `Status` to `COMPLETED`.
+- Status: Completed; repository ownership hardening, tests, documentation,
+  OpenSpec, and delivery are complete. No live migration has been claimed.
+- Residual classifications: live ownership migration is blocked by schema /
+  migration-history drift and stale deployed AI objects; Android coverage is
+  partial because the current debug bundle could not attach to Metro and the
+  release build timed out; the final closure SHA's CI run remains the last
+  post-closure verification action.

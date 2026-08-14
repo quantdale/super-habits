@@ -25,5 +25,5 @@
 - [x] 4.1 Run affected, integration, timezone, web build, sync build, E2E, simulation, Expo, audit, and schema/OpenSpec/plan gates; classify failures.
 - [x] 4.2 Inspect and run the available serialized Android/native regression campaign; record exact environment blockers if unavailable.
 - [x] 4.3 Decide and document the live migration gate from fresh read-only evidence; apply only if all required safety conditions are met and re-verify.
-- [ ] 4.4 Commit coherent changes on main, reconcile origin/main, push without force, verify branch topology and SHA equality, and inspect final GitHub CI.
-- [ ] 4.5 Update the ExecPlan with final evidence, classification, remaining gaps, and COMPLETED status only after the definition of done is met.
+- [x] 4.4 Commit coherent changes on main, reconcile origin/main, push without force, verify branch topology and SHA equality, and inspect final GitHub CI.
+- [x] 4.5 Update the ExecPlan with final evidence, classification, remaining gaps, and COMPLETED status only after the definition of done is met.
