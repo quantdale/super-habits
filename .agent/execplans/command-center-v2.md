@@ -362,6 +362,11 @@ raising thresholds.
   implementation commit completed `quality` successfully and `e2e`
   successfully; `nightly` was skipped by workflow design. The final
   documentation closure commit triggers the final post-closure CI run.
+- 2026-08-14 — GitHub Actions CI #352 — PASS; run `31802263767` for the final
+  documentation closure commit completed `quality` and `e2e` successfully,
+  including the full E2E lane, deterministic scenarios, `dist-sync` build,
+  remote-boundary journeys, and artifact uploads; `nightly` was skipped by
+  workflow design.
 
 ## Changed Files / Areas
 
@@ -407,8 +412,8 @@ raising thresholds.
 - Last successful validation: post-fix full web E2E (163 passed/24 skipped),
   sync E2E (22 passed/4 skipped), deterministic simulation (21/21), fast /
   integration/timezone gates, current Android release install, serialized
-  native Command V2 preview, and Pomodoro lifecycle rerun after fixing the
-  `NaN` crash.
+  native Command V2 preview, Pomodoro lifecycle rerun after fixing the `NaN`
+  crash, and final closure CI #352 (quality/e2e PASS).
 - Current failures: none in the corrected-source lanes; the first Pomodoro
   native artifact is preserved as a fixed product regression. `npm audit`
   still reports the known dependency findings.
@@ -416,17 +421,15 @@ raising thresholds.
   skips; no new Command V2 quarantine.
 - Blockers: EAS account/token unavailable; no safe authenticated app JWT for a
   live AI canary; iOS target unavailable on Windows.
-- Condition required to unblock: Expo credentials/iOS infrastructure are
-  external and are not required to validate local SQLite or deployed function
-  behavior; CI must still be inspected after push.
-- Exact resume action after unblock: None — the implementation and main
-  publication are complete; observe the final closure CI only.
-- Exact next action: None — implementation delivery is complete; after this
-  documentation closure is pushed, verify the final closure SHA's GitHub CI
-  and report the already-recorded native/EAS/iOS limitations.
-- Remaining definition of done: No remaining work in this plan; the final
-  closure commit's CI is the last delivery check and native/EAS/iOS limitations
-  remain honestly classified.
+- Condition required to unblock: None for the completed repository delivery;
+  the EAS, iOS, and authenticated-canary items remain explicit external
+  follow-ups.
+- Exact resume action after unblock: None — final closure CI is green and the
+  main publication is complete.
+- Exact next action: None — report the verified Git, QA, deployment, CI, and
+  documented native/external limitations.
+- Remaining definition of done: No remaining work in this plan; native/EAS/
+  iOS limitations remain honestly classified in the handoff.
 
 ## Recovery / Resume Instructions
 
@@ -440,7 +443,7 @@ raising thresholds.
 
 ## Outcomes & Retrospective
 
-- Status: Completed pending only the post-closure CI observation.
+- Status: Completed; final post-closure CI observation is green.
 - Summary: V2 implementation, deterministic safety pipeline, canonical
   mutations, bounded Ask retrieval, deployed Edge Functions, broad headless
   validation, and current-source Android regression evidence are complete.
