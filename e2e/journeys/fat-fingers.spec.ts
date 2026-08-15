@@ -286,6 +286,13 @@ defineJourney({
         const ring = page.getByLabel(/Double-tap habit: \d+ of \d+ today/);
         await ring.waitFor({ state: 'visible' });
         await rapidPress(ring, 2);
+        // The taps' async mutation chains outlive the dispatched events; the
+        // SQL oracle below navigates the page away, which would abort an
+        // in-flight transaction on slower runners. Wait for the ring to show
+        // the committed count (2 of 2) before the oracle.
+        await expect(ring).toHaveAttribute('aria-label', /Double-tap habit: 2 of \d+ today/, {
+          timeout: 10_000,
+        });
         // Row oracle: exactly one habit_completions row for this habit, count == 2.
         // (Fresh device: only these two increments can exist for the habit, so no
         // date-key filter is needed and no browser/SQLite TZ mismatch can flake.)
