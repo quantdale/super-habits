@@ -178,7 +178,7 @@ jobs:
             echo '::group::E2E failure summary'
             tail -120 /tmp/e2e.log
             echo '::endgroup::'
-            grep -aE 'Error|error|failed|Timed out|webServer|ENOENT|Cannot find|throw' /tmp/e2e.log | tail -30 | sed 's/^/::error::/'
+            grep -aE 'Error|error|failed|Timed out|webServer|ENOENT|Cannot find|throw|Expected:|Received:' /tmp/e2e.log | tail -40 | sed 's/^/::error::/'
             node -e "
               const fs = require('fs');
               const dir = 'test-results';
