@@ -153,11 +153,10 @@ still BACKUP + RESTORE, not full bidirectional sync.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: (1) docs updates, (2) apply the live Supabase migration
-  - read-only verification (CLI authenticated), (3) full QA campaign
-    (build:web/build:sync, Playwright chromium+journeys+simulation,
-    e2e:sync, timezones, themes, audits), (4) commit/push/CI, (5) final report.
-- Remaining definition of done: mission §95 gate — see Outcomes.
+- Exact next action: None — task complete (all gates validated; see
+  Outcomes & Retrospective and the Validation Ledger).
+- Remaining definition of done: mission §95 gate — all items satisfied except
+  the CI e2e re-run verdict on the first attempt (see Follow-up).
 
 ## Progress
 
