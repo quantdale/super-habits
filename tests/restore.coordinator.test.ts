@@ -713,7 +713,8 @@ describe('core/sync/restore.coordinator', () => {
       .filter(
         (entry) => entry.sql === 'INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)',
       );
-    expect(metaWrites).toHaveLength(3);
+    // owner binding + binding state + restore signature + restore timestamp.
+    expect(metaWrites).toHaveLength(4);
   });
 
   it('uses a transaction so failed restore writes do not commit partial local changes', async () => {

@@ -14,6 +14,9 @@ export type AccountDecisionInput = {
 export type AccountDecision = {
   status: AccountStatus;
   bindCurrentUserId: string | null;
+  /** Bind a pristine empty dataset to a temporary anonymous session as
+   * replaceable (provisional) until first meaningful content exists. */
+  bindProvisionalUserId: string | null;
   seedOwnerUserId: string | null;
   shouldCreateAnonymous: boolean;
   canRecoverExisting: boolean;
@@ -25,14 +28,21 @@ export type AccountDecision = {
 const hasLocalContent = (local: LocalAccountDataState): boolean =>
   local.hasUserData || local.pendingOutboxCount > 0 || local.ownerBinding !== null;
 
+/** True when the device has no committed user content and no pending sync work
+ * of its own, so a provisional anonymous binding may still be replaced. */
+const isPristineForReplacement = (local: LocalAccountDataState): boolean =>
+  !local.hasUserData &&
+  local.pendingOutboxCount === 0 &&
+  local.unownedOutboxCount === 0 &&
+  local.outboxOwnerIds.length === 0;
+
 export function decideAccountState(input: AccountDecisionInput): AccountDecision {
   const { configured, remoteEnabled, local, auth } = input;
   const canRecoverExisting =
-    !local.hasUserData &&
-    local.pendingOutboxCount === 0 &&
-    local.ownerBinding === null &&
-    local.outboxOwnerIds.length === 0;
+    isPristineForReplacement(local) &&
+    (local.ownerBinding === null || local.ownerBindingProvisional);
   const canRecoverOwner =
+    !local.ownerBindingProvisional &&
     local.ownerBinding !== null &&
     local.outboxOwnerIds.every((ownerUserId) => ownerUserId === local.ownerBinding) &&
     auth.verifiedUserId !== local.ownerBinding;
@@ -41,6 +51,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'not_configured',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -54,6 +65,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'remote_disabled',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -67,6 +79,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'account_conflict',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -83,6 +96,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'owner_mismatch',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -94,13 +108,20 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
   }
 
   if (local.ownerBinding) {
+    // A pristine device with a provisional anonymous binding may still choose
+    // Recover Existing; the temporary owner is replaceable until content is
+    // committed. A lost session on a pristine device simply starts a fresh
+    // temporary anonymous session (pristine implies no remote rows under it).
+    const pristineProvisional = local.ownerBindingProvisional && isPristineForReplacement(local);
+
     if (!auth.verifiedUserId) {
       return {
         status: 'recovery_required',
         bindCurrentUserId: null,
+        bindProvisionalUserId: null,
         seedOwnerUserId: null,
-        shouldCreateAnonymous: false,
-        canRecoverExisting: false,
+        shouldCreateAnonymous: pristineProvisional && auth.sessionUserId === null,
+        canRecoverExisting: pristineProvisional,
         canRecoverOwner: canRecoverOwner,
         canProtect: false,
         message:
@@ -112,9 +133,10 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       return {
         status: 'owner_mismatch',
         bindCurrentUserId: null,
+        bindProvisionalUserId: null,
         seedOwnerUserId: null,
         shouldCreateAnonymous: false,
-        canRecoverExisting: false,
+        canRecoverExisting: pristineProvisional,
         canRecoverOwner: canRecoverOwner,
         canProtect: false,
         message:
@@ -126,9 +148,10 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: anonymous ? 'anonymous_ready' : 'protected',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
-      canRecoverExisting: false,
+      canRecoverExisting: pristineProvisional,
       canRecoverOwner: false,
       canProtect: anonymous,
       message: anonymous
@@ -141,6 +164,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'recovery_required',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: local.outboxOwnerIds[0],
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -155,6 +179,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'owner_mismatch',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -173,6 +198,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       return {
         status: auth.verifiedIsAnonymous === true ? 'anonymous_ready' : 'protected',
         bindCurrentUserId: auth.verifiedUserId,
+        bindProvisionalUserId: null,
         seedOwnerUserId: null,
         shouldCreateAnonymous: false,
         canRecoverExisting: false,
@@ -187,6 +213,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: 'legacy_owner_unknown',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -199,9 +226,11 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
 
   if (auth.verifiedUserId) {
     const shouldBindLegacy = hasLocalContent(local);
+    const pristineAnonymous = !shouldBindLegacy && auth.verifiedIsAnonymous === true;
     return {
       status: auth.verifiedIsAnonymous === true ? 'anonymous_ready' : 'protected',
       bindCurrentUserId: shouldBindLegacy ? auth.verifiedUserId : null,
+      bindProvisionalUserId: pristineAnonymous ? auth.verifiedUserId : null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: canRecoverExisting && auth.sessionIsAnonymous === true,
@@ -218,6 +247,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     return {
       status: local.hasUserData ? 'legacy_owner_unknown' : 'recovery_required',
       bindCurrentUserId: null,
+      bindProvisionalUserId: null,
       seedOwnerUserId: null,
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
@@ -232,6 +262,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
   return {
     status: 'remote_unavailable',
     bindCurrentUserId: null,
+    bindProvisionalUserId: null,
     seedOwnerUserId: null,
     shouldCreateAnonymous: auth.sessionUserId === null,
     canRecoverExisting: canRecoverExisting,
@@ -253,18 +284,4 @@ export function sameOwnerIds(left: string[], right: string[]): boolean {
   const a = [...new Set(left)].sort();
   const b = [...new Set(right)].sort();
   return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-export function sameRemoteFingerprint(
-  left: { counts: Record<string, number>; ownerIds: string[] },
-  right: { counts: Record<string, number>; ownerIds: string[] },
-): boolean {
-  const leftKeys = Object.keys(left.counts).sort();
-  const rightKeys = Object.keys(right.counts).sort();
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every((key, index) => key === rightKeys[index]) &&
-    leftKeys.every((key) => left.counts[key] === right.counts[key]) &&
-    sameOwnerIds(left.ownerIds, right.ownerIds)
-  );
 }

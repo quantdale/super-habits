@@ -3,15 +3,16 @@ import { appMetaKeys, getAppMetaJson, setAppMetaJson } from '@/core/db/appMeta';
 import {
   adoptUnownedOutboxRows,
   bindLocalDatasetOwner,
+  bindProvisionalLocalDatasetOwner,
   inspectLocalAccountDataState,
   isEmptyForAccountReplacement,
+  promoteLocalDatasetOwnerIfProvisional,
+  replaceProvisionalLocalDatasetOwner,
 } from '@/core/auth/account.data';
 import {
   decideAccountState,
   isValidAccountEmail,
   isValidAccountOtp,
-  sameOwnerIds,
-  sameRemoteFingerprint,
 } from '@/core/auth/account.domain';
 import type {
   AccountActionResult,
@@ -133,6 +134,17 @@ function isRemoteFingerprint(value: unknown): value is AccountRemoteFingerprint 
 
 function isPendingProtection(value: unknown): value is PendingProtection {
   if (!isRecord(value)) return false;
+  const hasLegacyCount =
+    value.beforePendingOutboxCount === undefined ||
+    (typeof value.beforePendingOutboxCount === 'number' &&
+      Number.isInteger(value.beforePendingOutboxCount) &&
+      value.beforePendingOutboxCount >= 0);
+  const hasLegacyOwners =
+    value.beforeOutboxOwnerIds === undefined || isStringArray(value.beforeOutboxOwnerIds);
+  const hasLegacyFingerprint =
+    value.beforeRemoteFingerprint === undefined ||
+    value.beforeRemoteFingerprint === null ||
+    isRemoteFingerprint(value.beforeRemoteFingerprint);
   return (
     typeof value.email === 'string' &&
     isValidAccountEmail(value.email) &&
@@ -140,11 +152,9 @@ function isPendingProtection(value: unknown): value is PendingProtection {
     value.originalUserId.length > 0 &&
     typeof value.requestedAt === 'string' &&
     Number.isFinite(Date.parse(value.requestedAt)) &&
-    isStringArray(value.beforeOutboxOwnerIds) &&
-    typeof value.beforePendingOutboxCount === 'number' &&
-    Number.isInteger(value.beforePendingOutboxCount) &&
-    value.beforePendingOutboxCount >= 0 &&
-    (value.beforeRemoteFingerprint === null || isRemoteFingerprint(value.beforeRemoteFingerprint))
+    hasLegacyCount &&
+    hasLegacyOwners &&
+    hasLegacyFingerprint
   );
 }
 
@@ -243,17 +253,6 @@ export class AccountCoordinator {
         beforeLocal = await this.inspect();
       }
 
-      let beforeRemoteFingerprint: AccountRemoteFingerprint | null = null;
-      try {
-        beforeRemoteFingerprint = await this.dependencies.getRemoteFingerprint(auth.verifiedUserId);
-      } catch (error) {
-        return actionResult(
-          false,
-          'remote_unavailable',
-          safeActionErrorMessage(classifySupabaseAuthError(error)),
-        );
-      }
-
       try {
         await this.dependencies.requestEmailProtection(normalizedEmail);
       } catch (error) {
@@ -264,13 +263,13 @@ export class AccountCoordinator {
         );
       }
 
+      // Ownership-only snapshot: no outbox or remote row counts are frozen.
+      // The user may keep writing and sync may keep flushing while the OTP is
+      // pending; verification checks ownership facts, never dataset volume.
       const pending: PendingProtection = {
         email: normalizedEmail,
         originalUserId: auth.verifiedUserId,
         requestedAt: this.dependencies.now().toISOString(),
-        beforeOutboxOwnerIds: beforeLocal.outboxOwnerIds,
-        beforePendingOutboxCount: beforeLocal.pendingOutboxCount,
-        beforeRemoteFingerprint,
       };
       await this.savePendingProtection(pending);
       return actionResult(
@@ -306,6 +305,8 @@ export class AccountCoordinator {
         );
       }
 
+      // RETRYABLE_PRE_VERIFICATION_FAILURE: the OTP itself failed; the pending
+      // record stays so the user can resend and retry.
       try {
         await this.dependencies.verifyEmailChangeOtp(pending.email, token.trim());
       } catch (error) {
@@ -317,7 +318,13 @@ export class AccountCoordinator {
       }
 
       const afterAuth = await this.getAuthEvidence();
+
+      // TERMINAL: the identity changed. Supabase converted the session to a
+      // different account, so the original protection intent is void; do not
+      // leave a stale pending record masquerading as an unverified account.
       if (afterAuth.verifiedUserId !== pending.originalUserId) {
+        await this.recordProtectionFailure(pending, 'uuid_changed');
+        await this.clearPendingProtection();
         await this.signOutQuietly();
         return actionResult(
           false,
@@ -325,6 +332,8 @@ export class AccountCoordinator {
           'The verified identity changed unexpectedly. Remote backup remains paused for safety.',
         );
       }
+
+      // RETRYABLE: conversion has not taken effect yet (still anonymous).
       if (afterAuth.verifiedIsAnonymous !== false) {
         return actionResult(
           false,
@@ -333,12 +342,16 @@ export class AccountCoordinator {
         );
       }
 
+      // Ownership invariants only — never row/outbox counts. The user may have
+      // written more data and sync may have drained the outbox while the code
+      // was in flight; that is legitimate activity, not corruption.
       const afterLocal = await this.inspect();
       if (
         afterLocal.ownerBinding !== pending.originalUserId ||
-        afterLocal.pendingOutboxCount !== pending.beforePendingOutboxCount ||
-        !sameOwnerIds(afterLocal.outboxOwnerIds, pending.beforeOutboxOwnerIds)
+        afterLocal.outboxOwnerIds.some((ownerUserId) => ownerUserId !== pending.originalUserId)
       ) {
+        await this.recordProtectionFailure(pending, 'local_foreign_owner');
+        await this.clearPendingProtection();
         await this.signOutQuietly();
         return actionResult(
           false,
@@ -347,28 +360,49 @@ export class AccountCoordinator {
         );
       }
 
-      if (pending.beforeRemoteFingerprint) {
-        try {
-          const afterRemoteFingerprint = await this.dependencies.getRemoteFingerprint(
-            pending.originalUserId,
-          );
-          if (!sameRemoteFingerprint(pending.beforeRemoteFingerprint, afterRemoteFingerprint)) {
-            await this.signOutQuietly();
-            return actionResult(
-              false,
-              'error',
-              'Remote backup ownership changed unexpectedly. Remote backup remains paused for safety.',
-            );
-          }
-        } catch (error) {
+      // Remote evidence is ownership-only (defense-in-depth; RLS already scopes
+      // rows to the caller). Counts may change freely.
+      try {
+        const afterRemoteFingerprint = await this.dependencies.getRemoteFingerprint(
+          pending.originalUserId,
+        );
+        if (
+          afterRemoteFingerprint.ownerIds.some(
+            (ownerUserId) => ownerUserId !== pending.originalUserId,
+          )
+        ) {
+          await this.recordProtectionFailure(pending, 'remote_foreign_owner');
+          await this.clearPendingProtection();
+          await this.signOutQuietly();
           return actionResult(
             false,
-            'remote_unavailable',
-            safeActionErrorMessage(classifySupabaseAuthError(error)),
+            'error',
+            'Remote backup ownership changed unexpectedly. Remote backup remains paused for safety.',
           );
         }
+      } catch {
+        // Conversion has definitely succeeded; the ownership evidence could not
+        // be certified. Fail closed and terminate the pending record so it can
+        // never loop as stale after restart.
+        await this.recordProtectionFailure(pending, 'remote_evidence_unavailable');
+        await this.clearPendingProtection();
+        await this.signOutQuietly();
+        return actionResult(
+          false,
+          'recovery_required',
+          'Backup was protected, but remote ownership could not be confirmed. Sign back in to resume remote backup.',
+        );
       }
 
+      // Protection makes the owner durable: a provisional anonymous binding
+      // becomes permanent so the account can never be replaced later.
+      try {
+        const db = await this.getDatabase();
+        await promoteLocalDatasetOwnerIfProvisional(db);
+      } catch {
+        // Promotion is best-effort; the permanent owner gate still holds via
+        // the persisted binding and pristine checks.
+      }
       await this.clearPendingProtection();
       return actionResult(
         true,
@@ -420,7 +454,11 @@ export class AccountCoordinator {
 
     try {
       const local = await this.inspect();
-      const ownerRecovery = local.ownerBinding !== null;
+      // Only a PERMANENT binding supports owner sign-back-in. A provisional
+      // binding is replaceable strictly while the device is pristine; once any
+      // content exists the device is fail-closed against account switching
+      // (promotion to permanent happens in the write paths / reconcile).
+      const ownerRecovery = local.ownerBinding !== null && !local.ownerBindingProvisional;
       if (!ownerRecovery && !isEmptyForAccountReplacement(local)) {
         return actionResult(
           false,
@@ -447,7 +485,10 @@ export class AccountCoordinator {
           'The temporary session could not be verified. Try again when remote backup is available.',
         );
       }
-      if (auth.verifiedUserId && !(ownerRecovery && auth.verifiedUserId !== local.ownerBinding)) {
+      // Fresh recovery must not orphan remote rows of the current temporary
+      // session; owner recovery skips this because the owner's own rows are
+      // expected.
+      if (auth.verifiedUserId && !ownerRecovery) {
         try {
           const fingerprint = await this.dependencies.getRemoteFingerprint(auth.verifiedUserId);
           if (Object.values(fingerprint.counts).some((count) => count > 0)) {
@@ -569,7 +610,13 @@ export class AccountCoordinator {
       } else {
         const db = await this.getDatabase();
         try {
-          await bindLocalDatasetOwner(db, afterAuth.verifiedUserId);
+          // Fresh recovery on a pristine device: bind the recovered account
+          // permanently, replacing a provisional temporary anonymous owner.
+          if (after.ownerBinding === null) {
+            await bindLocalDatasetOwner(db, afterAuth.verifiedUserId);
+          } else {
+            await replaceProvisionalLocalDatasetOwner(db, afterAuth.verifiedUserId);
+          }
         } catch {
           await this.signOutQuietly();
           return actionResult(
@@ -641,6 +688,12 @@ export class AccountCoordinator {
     const auth = await this.getAuthEvidence();
     const decision = decideAccountState({ configured, remoteEnabled, local, auth });
 
+    if (decision.bindProvisionalUserId && !local.ownerBinding) {
+      const db = await this.getDatabase();
+      await bindProvisionalLocalDatasetOwner(db, decision.bindProvisionalUserId);
+      local = await this.inspect();
+    }
+
     if (decision.seedOwnerUserId && !local.ownerBinding) {
       const db = await this.getDatabase();
       await bindLocalDatasetOwner(db, decision.seedOwnerUserId);
@@ -653,12 +706,47 @@ export class AccountCoordinator {
       local = await this.inspect();
     }
 
+    // Session loss on a pristine device: a fresh temporary anonymous session
+    // safely replaces the old provisional owner (pristine implies no remote
+    // rows under the old temporary UID). Permanent bindings are never touched.
+    if (
+      local.ownerBindingProvisional &&
+      isEmptyForAccountReplacement(local) &&
+      auth.verifiedUserId &&
+      auth.verifiedUserId !== local.ownerBinding &&
+      auth.verifiedIsAnonymous === true
+    ) {
+      const db = await this.getDatabase();
+      await replaceProvisionalLocalDatasetOwner(db, auth.verifiedUserId, {
+        keepProvisional: true,
+      });
+      local = await this.inspect();
+    }
+
     let resolvedDecision = decideAccountState({
       configured,
       remoteEnabled,
       local,
       auth,
     });
+
+    // Safety net: any committed content promotes a provisional binding to
+    // permanent (the write-path hooks normally do this synchronously).
+    if (
+      local.ownerBindingProvisional &&
+      (local.hasUserData || local.pendingOutboxCount > 0 || local.outboxOwnerIds.length > 0)
+    ) {
+      const db = await this.getDatabase();
+      await promoteLocalDatasetOwnerIfProvisional(db);
+      local = await this.inspect();
+      resolvedDecision = decideAccountState({
+        configured,
+        remoteEnabled,
+        local,
+        auth,
+      });
+    }
+
     if (
       local.ownerBinding &&
       auth.verifiedUserId === local.ownerBinding &&
@@ -677,6 +765,16 @@ export class AccountCoordinator {
     const protection = await this.getPendingProtection();
     const recovery = await this.getPendingRecovery();
 
+    // A pending protection belongs to one original user only. If a different
+    // user is verified, the record is stale and must not linger indefinitely.
+    if (protection && auth.verifiedUserId && protection.originalUserId !== auth.verifiedUserId) {
+      await this.clearPendingProtection();
+    }
+    // A fresh-recovery record dies once the device is no longer replaceable.
+    if (recovery && !recovery.expectedOwnerUserId && !isEmptyForAccountReplacement(local)) {
+      await this.clearPendingRecovery();
+    }
+
     let status = resolvedDecision.status;
     let message = resolvedDecision.message;
     let email = auth.verifiedEmail;
@@ -687,9 +785,7 @@ export class AccountCoordinator {
     } else if (
       recovery &&
       ((recovery.expectedOwnerUserId && recovery.expectedOwnerUserId === local.ownerBinding) ||
-        (!recovery.expectedOwnerUserId &&
-          !local.ownerBinding &&
-          isEmptyForAccountReplacement(local)))
+        (!recovery.expectedOwnerUserId && isEmptyForAccountReplacement(local)))
     ) {
       status = 'sign_in_pending';
       email = recovery.email;
@@ -731,6 +827,22 @@ export class AccountCoordinator {
 
   private async clearPendingProtection(): Promise<void> {
     await setAppMetaJson(await this.getDatabase(), appMetaKeys.accountProtectionPending, null);
+  }
+
+  /** Durable diagnostic for post-verification terminal failures; never used as
+   * a state-machine input, so it cannot create a stale pending loop. */
+  private async recordProtectionFailure(pending: PendingProtection, reason: string): Promise<void> {
+    try {
+      await setAppMetaJson(await this.getDatabase(), appMetaKeys.accountProtectionLastFailure, {
+        originalUserId: pending.originalUserId,
+        email: pending.email,
+        reason,
+        at: this.dependencies.now().toISOString(),
+      });
+    } catch {
+      // Diagnostics are best-effort; the cleared pending record is the
+      // authoritative state change.
+    }
   }
 
   private async getPendingRecovery(): Promise<PendingRecovery | null> {

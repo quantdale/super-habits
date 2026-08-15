@@ -1,8 +1,10 @@
 import type * as SQLite from 'expo-sqlite';
 import {
   getCachedLocalDatasetOwner,
+  getCachedOwnerBindingProvisional,
   inspectLocalAccountDataState,
   primeLocalDatasetOwner,
+  promoteLocalDatasetOwnerIfProvisional,
   setLocalDatasetOwner,
 } from '@/core/auth/account.data';
 import { withSQLiteTransaction } from '@/core/db/transactions';
@@ -61,6 +63,12 @@ export async function runSyncedMutation<T>(input: {
     if (result.changed) {
       if (!existingOwnerUserId && ownerUserId && canPersistOwner) {
         await setLocalDatasetOwner(transactionDb, ownerUserId);
+      }
+      // First meaningful content durably claims the dataset: a provisional
+      // anonymous binding becomes permanent in the same transaction as the
+      // write, so later activity can never re-open account replacement.
+      if (getCachedOwnerBindingProvisional() === true) {
+        await promoteLocalDatasetOwnerIfProvisional(transactionDb);
       }
       await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
     }

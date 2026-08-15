@@ -1,6 +1,7 @@
 import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { CalorieEntry, SavedMeal } from '@/core/db/types';
+import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { nowIso, toDateKey } from '@/lib/time';
@@ -254,6 +255,9 @@ export async function upsertSavedMeal(input: {
       now,
     ],
   );
+  // A saved meal is meaningful user content: it durably claims the dataset
+  // for the current anonymous owner.
+  await claimOwnerBindingOnFirstContent(db);
 }
 
 export async function listRecentSavedMeals(limit: number = 5): Promise<SavedMeal[]> {

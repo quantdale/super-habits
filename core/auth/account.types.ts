@@ -34,6 +34,12 @@ export type LocalAccountDataState = {
   unownedOutboxCount: number;
   outboxOwnerIds: string[];
   ownerBinding: string | null;
+  /**
+   * True when the owner binding was created for a temporary anonymous session
+   * on a pristine device and is still replaceable by Recover Existing. Any
+   * meaningful local content promotes the binding to permanent.
+   */
+  ownerBindingProvisional: boolean;
 };
 
 export type AccountAuthEvidence = {
@@ -79,6 +85,7 @@ export type AccountActionResult = {
 };
 
 export type AccountRemoteFingerprint = {
+  /** Diagnostics only — never used as a security invariant. */
   counts: Record<string, number>;
   ownerIds: string[];
 };
@@ -87,9 +94,13 @@ export type PendingProtection = {
   email: string;
   originalUserId: string;
   requestedAt: string;
-  beforeOutboxOwnerIds: string[];
-  beforePendingOutboxCount: number;
-  beforeRemoteFingerprint: AccountRemoteFingerprint | null;
+  /**
+   * Legacy snapshot fields kept only for records written before protection
+   * switched to ownership-only verification. New records omit them.
+   */
+  beforeOutboxOwnerIds?: string[];
+  beforePendingOutboxCount?: number;
+  beforeRemoteFingerprint?: AccountRemoteFingerprint | null;
 };
 
 export type PendingRecovery = {

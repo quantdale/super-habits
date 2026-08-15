@@ -1,6 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { Habit, HabitCategory, HabitCompletion, HabitIcon } from '@/core/db/types';
+import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
@@ -165,6 +166,9 @@ export async function incrementHabit(
      RETURNING id, count`,
     [createId('hcmp'), habitId, dateKey, now, now],
   );
+  // A completion is meaningful user content: it durably claims the dataset
+  // for the current anonymous owner.
+  await claimOwnerBindingOnFirstContent(db);
   requestHabitReminderReconciliation();
 
   const nextCount = row?.count ?? 1;
@@ -331,6 +335,8 @@ async function runCompleteHabitFromNotification(input: {
        RETURNING id, count`,
       [createId('hcmp'), input.habitId, input.dateKey, updatedAt, updatedAt],
     );
+    // Processed completion actions are user-driven content as well.
+    await claimOwnerBindingOnFirstContent(db);
     nextCount = updatedCompletion?.count ?? nextCount + 1;
     completionId = updatedCompletion?.id ?? completionId;
     mutationApplied = true;

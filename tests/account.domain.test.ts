@@ -33,6 +33,7 @@ function local(overrides: Partial<LocalAccountDataState> = {}): LocalAccountData
     unownedOutboxCount: 0,
     outboxOwnerIds: [],
     ownerBinding: null,
+    ownerBindingProvisional: false,
     ...overrides,
   };
 }
@@ -80,6 +81,121 @@ describe('recoverable account state machine', () => {
     expect(result.status).toBe('anonymous_ready');
     expect(result.canRecoverExisting).toBe(true);
     expect(result.shouldCreateAnonymous).toBe(false);
+  });
+
+  it('provisionally binds a pristine empty install to the verified anonymous session', () => {
+    const result = decide(
+      local(),
+      auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    );
+
+    expect(result.bindProvisionalUserId).toBe('anon_a');
+    expect(result.bindCurrentUserId).toBeNull();
+    expect(result.status).toBe('anonymous_ready');
+  });
+
+  it('keeps a pristine provisional binding recoverable under its own session', () => {
+    const result = decide(
+      local({ ownerBinding: 'anon_a', ownerBindingProvisional: true }),
+      auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    );
+
+    expect(result.status).toBe('anonymous_ready');
+    expect(result.canRecoverExisting).toBe(true);
+    expect(result.canRecoverOwner).toBe(false);
+    expect(result.canProtect).toBe(true);
+  });
+
+  it('starts a fresh temporary anonymous session when a pristine provisional session is lost', () => {
+    const result = decide(local({ ownerBinding: 'anon_a', ownerBindingProvisional: true }));
+
+    expect(result.status).toBe('recovery_required');
+    expect(result.shouldCreateAnonymous).toBe(true);
+    expect(result.canRecoverExisting).toBe(true);
+    expect(result.canRecoverOwner).toBe(false);
+  });
+
+  it('fails closed when a different account is verified on a pristine provisional device', () => {
+    const result = decide(
+      local({ ownerBinding: 'anon_a', ownerBindingProvisional: true }),
+      auth({ sessionUserId: 'user_b', verifiedUserId: 'user_b', verifiedIsAnonymous: false }),
+    );
+
+    expect(result.status).toBe('owner_mismatch');
+    expect(result.bindCurrentUserId).toBeNull();
+    expect(result.bindProvisionalUserId).toBeNull();
+    expect(result.canRecoverExisting).toBe(true);
+  });
+
+  it('no longer allows replacement once a provisional binding has content', () => {
+    const result = decide(
+      local({
+        hasUserData: true,
+        activeUserDataCount: 1,
+        ownerBinding: 'anon_a',
+        ownerBindingProvisional: true,
+      }),
+      auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    );
+
+    expect(result.status).toBe('anonymous_ready');
+    expect(result.canRecoverExisting).toBe(false);
+    expect(result.canRecoverOwner).toBe(false);
+  });
+
+  it('treats a populated permanent binding as non-replaceable', () => {
+    const result = decide(
+      local({ hasUserData: true, activeUserDataCount: 1, ownerBinding: 'user_a' }),
+      auth({
+        sessionUserId: 'user_a',
+        verifiedUserId: 'user_a',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'a@example.com',
+      }),
+    );
+
+    expect(result.status).toBe('protected');
+    expect(result.canRecoverExisting).toBe(false);
+  });
+
+  it('offers owner sign-back-in for a permanent binding only', () => {
+    const permanent = decide(
+      local({ hasUserData: true, ownerBinding: 'user_a' }),
+      auth({ sessionUserId: 'user_b', verifiedUserId: null }),
+    );
+    expect(permanent.canRecoverOwner).toBe(true);
+
+    const provisional = decide(
+      local({ ownerBinding: 'anon_a', ownerBindingProvisional: true }),
+      auth({ sessionUserId: 'user_b', verifiedUserId: null }),
+    );
+    expect(provisional.canRecoverOwner).toBe(false);
+  });
+
+  it('does not bind a pristine install to a verified permanent session', () => {
+    const result = decide(
+      local(),
+      auth({ sessionUserId: 'user_b', verifiedUserId: 'user_b', verifiedIsAnonymous: false }),
+    );
+
+    expect(result.bindCurrentUserId).toBeNull();
+    expect(result.bindProvisionalUserId).toBeNull();
+    expect(result.status).toBe('protected');
   });
 
   it('legacy-binds data to a compatible verified session', () => {

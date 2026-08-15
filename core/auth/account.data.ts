@@ -22,6 +22,8 @@ const TABLES_WITH_DELETED_AT = new Set<AccountUserTable>([
 // code on the cache avoids adding an app_meta read to every feature write and
 // keeps local feature transactions independent of auth/network availability.
 let cachedLocalDatasetOwner: string | null | undefined;
+// undefined = not primed; a missing binding-state key means permanent.
+let cachedOwnerBindingProvisional: boolean | undefined;
 
 async function countTable(
   db: SQLite.SQLiteDatabase,
@@ -49,6 +51,7 @@ async function countTable(
 export async function getLocalDatasetOwner(db: SQLite.SQLiteDatabase): Promise<string | null> {
   const value = await getAppMetaText(db, appMetaKeys.accountOwnerUserId);
   cachedLocalDatasetOwner = typeof value === 'string' ? value : null;
+  await primeOwnerBindingProvisionalCache(db);
   return cachedLocalDatasetOwner;
 }
 
@@ -56,8 +59,23 @@ export function getCachedLocalDatasetOwner(): string | null | undefined {
   return cachedLocalDatasetOwner;
 }
 
-export function primeLocalDatasetOwner(owner: string | null): void {
+/** Reads the durable binding state; a missing key means permanent. */
+export async function getLocalDatasetOwnerProvisional(db: SQLite.SQLiteDatabase): Promise<boolean> {
+  const value = await getAppMetaText(db, appMetaKeys.accountOwnerBindingState);
+  return value === 'provisional';
+}
+
+export function getCachedOwnerBindingProvisional(): boolean | undefined {
+  return cachedOwnerBindingProvisional;
+}
+
+export function primeLocalDatasetOwner(owner: string | null, provisional = false): void {
   cachedLocalDatasetOwner = owner;
+  cachedOwnerBindingProvisional = provisional;
+}
+
+async function primeOwnerBindingProvisionalCache(db: SQLite.SQLiteDatabase): Promise<void> {
+  cachedOwnerBindingProvisional = await getLocalDatasetOwnerProvisional(db);
 }
 
 export async function setLocalDatasetOwner(
@@ -69,6 +87,8 @@ export async function setLocalDatasetOwner(
     throw new Error('LOCAL_DATASET_OWNER_CONFLICT');
   }
   await setAppMetaText(db, appMetaKeys.accountOwnerUserId, userId);
+  await setAppMetaText(db, appMetaKeys.accountOwnerBindingState, 'permanent');
+  primeLocalDatasetOwner(userId, false);
 }
 
 /**
@@ -105,7 +125,84 @@ export async function bindLocalDatasetOwner(
       await adoptUnownedOutboxRows(db, userId);
     }
   });
-  primeLocalDatasetOwner(userId);
+  primeLocalDatasetOwner(userId, false);
+}
+
+/**
+ * Binds a pristine empty dataset to a temporary anonymous session. The binding
+ * stays replaceable (provisional) until the first meaningful local content
+ * promotes it, so Recover Existing on a fresh device keeps working.
+ */
+export async function bindProvisionalLocalDatasetOwner(
+  db: SQLite.SQLiteDatabase,
+  userId: string,
+): Promise<void> {
+  const current = await getLocalDatasetOwner(db);
+  if (current && current !== userId) {
+    throw new Error('LOCAL_DATASET_OWNER_CONFLICT');
+  }
+  await setAppMetaText(db, appMetaKeys.accountOwnerUserId, userId);
+  await setAppMetaText(db, appMetaKeys.accountOwnerBindingState, 'provisional');
+  primeLocalDatasetOwner(userId, true);
+}
+
+/**
+ * Promotes a provisional binding to permanent. Safe to call on every
+ * meaningful first write: no-op unless the binding is currently provisional.
+ */
+export async function promoteLocalDatasetOwnerIfProvisional(
+  db: SQLite.SQLiteDatabase,
+): Promise<void> {
+  if (cachedOwnerBindingProvisional !== true) {
+    return;
+  }
+  const owner = await getLocalDatasetOwner(db);
+  if (!owner) {
+    return;
+  }
+  if ((await getLocalDatasetOwnerProvisional(db)) === true) {
+    await setAppMetaText(db, appMetaKeys.accountOwnerBindingState, 'permanent');
+  }
+  primeLocalDatasetOwner(owner, false);
+}
+
+/**
+ * Fast-path hook for local-only first writes (pomodoro sessions, workout
+ * history, habit completions, saved meals, linked-action rules). It performs
+ * one durable state update only when the cached binding is provisional.
+ */
+export async function claimOwnerBindingOnFirstContent(db: SQLite.SQLiteDatabase): Promise<void> {
+  if (cachedOwnerBindingProvisional === true) {
+    await promoteLocalDatasetOwnerIfProvisional(db);
+  }
+}
+
+/**
+ * Replaces a PROVISIONAL owner binding with another account. Never applies to
+ * permanent bindings or populated datasets — callers must have already
+ * verified the device is pristine. By default the replacement is permanent
+ * (verified recovered account); pass `keepProvisional` when a fresh temporary
+ * anonymous session takes over a pristine device.
+ */
+export async function replaceProvisionalLocalDatasetOwner(
+  db: SQLite.SQLiteDatabase,
+  userId: string,
+  options: { keepProvisional?: boolean } = {},
+): Promise<void> {
+  const current = await getLocalDatasetOwner(db);
+  if (current && current !== userId) {
+    const provisional = await getLocalDatasetOwnerProvisional(db);
+    if (!provisional) {
+      throw new Error('LOCAL_DATASET_OWNER_CONFLICT');
+    }
+  }
+  await setAppMetaText(db, appMetaKeys.accountOwnerUserId, userId);
+  await setAppMetaText(
+    db,
+    appMetaKeys.accountOwnerBindingState,
+    options.keepProvisional ? 'provisional' : 'permanent',
+  );
+  primeLocalDatasetOwner(userId, options.keepProvisional === true);
 }
 
 export async function inspectLocalAccountDataState(
@@ -141,6 +238,7 @@ export async function inspectLocalAccountDataState(
      ORDER BY owner_user_id`,
   );
 
+  const ownerBinding = await getLocalDatasetOwner(db);
   return {
     counts,
     activeUserDataCount,
@@ -149,7 +247,8 @@ export async function inspectLocalAccountDataState(
     pendingOutboxCount: Number(pending?.count ?? 0),
     unownedOutboxCount: Number(unowned?.count ?? 0),
     outboxOwnerIds: ownerRows.map((row) => row.owner_user_id),
-    ownerBinding: await getLocalDatasetOwner(db),
+    ownerBinding,
+    ownerBindingProvisional: await getLocalDatasetOwnerProvisional(db),
   };
 }
 
@@ -157,7 +256,8 @@ export function isEmptyForAccountReplacement(local: LocalAccountDataState): bool
   return (
     !local.hasUserData &&
     local.pendingOutboxCount === 0 &&
-    local.ownerBinding === null &&
-    local.outboxOwnerIds.length === 0
+    local.unownedOutboxCount === 0 &&
+    local.outboxOwnerIds.length === 0 &&
+    (local.ownerBinding === null || local.ownerBindingProvisional)
   );
 }

@@ -1,6 +1,7 @@
 import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { PomodoroSession } from '@/core/db/types';
+import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
@@ -50,6 +51,9 @@ async function insertPomodoroSessionRecord(input: {
      ) VALUES (?, ?, ?, ?, ?, ?)`,
     [input.id, input.startedAtIso, input.endedAtIso, input.durationSeconds, input.type, createdAt],
   );
+  // First local-only content durably claims the dataset for the current
+  // anonymous owner so later synced work can never become ownerless.
+  await claimOwnerBindingOnFirstContent(db);
 
   return {
     id: input.id,

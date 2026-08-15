@@ -1,6 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { RoutineExercise, RoutineExerciseSet, WorkoutLog, WorkoutRoutine } from '@/core/db/types';
+import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import {
   deleteLinkedActionRulesForTargetEntity,
@@ -65,6 +66,9 @@ async function insertWorkoutLogRecord(input: {
        VALUES (?, ?, ?, ?, ?)`,
       [input.logId, input.routineId, input.notes, input.completedAtIso, input.createdAtIso],
     );
+    // Workout history is meaningful user content: it durably claims the
+    // dataset for the current anonymous owner.
+    await claimOwnerBindingOnFirstContent(input.db);
   }
 
   return {

@@ -1,5 +1,6 @@
 import { getDatabase } from '@/core/db/client';
 import type * as SQLite from 'expo-sqlite';
+import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
 import {
@@ -66,6 +67,9 @@ async function insertLinkedActionRuleRow(
       row.deleted_at,
     ],
   );
+  // A linked-action rule is meaningful user content: it durably claims the
+  // dataset for the current anonymous owner.
+  await claimOwnerBindingOnFirstContent(db);
 }
 
 async function updateLinkedActionRuleRow(

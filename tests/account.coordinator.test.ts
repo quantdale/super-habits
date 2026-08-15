@@ -10,6 +10,7 @@ type FakeDatabaseOptions = {
   unownedOutboxCount?: number;
   outboxOwnerIds?: string[];
   ownerBinding?: string | null;
+  ownerBindingProvisional?: boolean;
 };
 
 function fakeDatabase(options: FakeDatabaseOptions = {}) {
@@ -20,6 +21,7 @@ function fakeDatabase(options: FakeDatabaseOptions = {}) {
   let unownedOutboxCount = options.unownedOutboxCount ?? 0;
   let outboxOwnerIds = [...(options.outboxOwnerIds ?? [])];
   if (options.ownerBinding) meta.set('account.owner_user_id', options.ownerBinding);
+  if (options.ownerBindingProvisional) meta.set('account.owner_binding_state', 'provisional');
 
   const db = {
     getFirstAsync: vi.fn(async (sql: string, params?: unknown[]) => {
@@ -74,6 +76,15 @@ function fakeDatabase(options: FakeDatabaseOptions = {}) {
       unownedOutboxCount,
       outboxOwnerIds: [...outboxOwnerIds],
     }),
+    __setOutbox: (next: {
+      pendingOutboxCount?: number;
+      unownedOutboxCount?: number;
+      outboxOwnerIds?: string[];
+    }) => {
+      if (next.pendingOutboxCount !== undefined) pendingOutboxCount = next.pendingOutboxCount;
+      if (next.unownedOutboxCount !== undefined) unownedOutboxCount = next.unownedOutboxCount;
+      if (next.outboxOwnerIds !== undefined) outboxOwnerIds = [...next.outboxOwnerIds];
+    },
   };
 }
 
@@ -130,7 +141,7 @@ function coordinatorFor(
 }
 
 describe('AccountCoordinator', () => {
-  it('creates anonymous auth only for an empty unbound installation', async () => {
+  it('creates anonymous auth for an empty unbound installation and provisionally binds it', async () => {
     const database = fakeDatabase();
     const currentAuth = { value: auth() };
     const ensureAnonymousSession = vi.fn(async () => {
@@ -145,7 +156,30 @@ describe('AccountCoordinator', () => {
 
     await expect(coordinator.bootstrap()).resolves.toMatchObject({ status: 'anonymous_ready' });
     expect(ensureAnonymousSession).toHaveBeenCalledTimes(1);
-    expect(database.meta.has('account.owner_user_id')).toBe(false);
+    // The fresh dataset is claimed for the temporary anonymous session as a
+    // replaceable (provisional) owner so first local-only activity can never
+    // strand later synced writes.
+    expect(database.meta.get('account.owner_user_id')).toBe('anon_a');
+    expect(database.meta.get('account.owner_binding_state')).toBe('provisional');
+  });
+
+  it('does not create anonymous auth when a session already exists', async () => {
+    const database = fakeDatabase();
+    const currentAuth = {
+      value: auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    };
+    const ensureAnonymousSession = vi.fn();
+    const coordinator = coordinatorFor(database, currentAuth, { ensureAnonymousSession });
+
+    await expect(coordinator.bootstrap()).resolves.toMatchObject({ status: 'anonymous_ready' });
+    expect(ensureAnonymousSession).not.toHaveBeenCalled();
+    expect(database.meta.get('account.owner_user_id')).toBe('anon_a');
+    expect(database.meta.get('account.owner_binding_state')).toBe('provisional');
   });
 
   it('does not recreate anonymous auth after a bound session disappears', async () => {
@@ -490,5 +524,306 @@ describe('AccountCoordinator', () => {
       status: 'sign_in_pending',
     });
     expect(requestExistingAccountRecovery).toHaveBeenCalledWith('recover@example.com');
+  });
+
+  it('SCENARIO A: allows new outbox rows while the protection OTP is pending', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'user_a',
+      activeRows: { todos: 1 },
+      pendingOutboxCount: 1,
+      outboxOwnerIds: ['user_a'],
+    });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const coordinator = coordinatorFor(database, currentAuth, {
+      verifyEmailChangeOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_a',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'a@example.com',
+          sessionUserId: 'user_a',
+        });
+      }),
+    });
+
+    await coordinator.protect('a@example.com');
+    // The user creates a synced Todo while waiting for the email code.
+    database.__setOutbox({ pendingOutboxCount: 2, outboxOwnerIds: ['user_a'] });
+    await expect(coordinator.verifyProtection('123456')).resolves.toMatchObject({
+      ok: true,
+      status: 'protected',
+    });
+    expect(database.meta.get('account.owner_user_id')).toBe('user_a');
+    await expect(coordinator.refresh()).resolves.toMatchObject({ status: 'protected' });
+  });
+
+  it('SCENARIO B: allows outbox flush and remote row-count changes while the OTP is pending', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'user_a',
+      activeRows: { todos: 1 },
+      pendingOutboxCount: 1,
+      outboxOwnerIds: ['user_a'],
+    });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const coordinator = coordinatorFor(database, currentAuth, {
+      verifyEmailChangeOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_a',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'a@example.com',
+          sessionUserId: 'user_a',
+        });
+      }),
+      getRemoteFingerprint: async () =>
+        fingerprint({
+          counts: { todos: 12, habits: 3, calorie_entries: 5, workout_routines: 1 },
+          ownerIds: ['user_a'],
+        }),
+    });
+
+    await coordinator.protect('a@example.com');
+    // Background sync drains the outbox and pushes more rows while pending.
+    database.__setOutbox({ pendingOutboxCount: 0, outboxOwnerIds: [] });
+    await expect(coordinator.verifyProtection('123456')).resolves.toMatchObject({
+      ok: true,
+      status: 'protected',
+    });
+  });
+
+  it('SCENARIO C: linked-action cascades while pending still succeed when ownership is intact', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'user_a',
+      activeRows: { todos: 1, habit_completions: 2 },
+      pendingOutboxCount: 3,
+      outboxOwnerIds: ['user_a'],
+    });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const coordinator = coordinatorFor(database, currentAuth, {
+      verifyEmailChangeOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_a',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'a@example.com',
+          sessionUserId: 'user_a',
+        });
+      }),
+    });
+
+    await coordinator.protect('a@example.com');
+    // A habit completion triggered a linked action that mutated a todo too.
+    database.__setOutbox({ pendingOutboxCount: 4, outboxOwnerIds: ['user_a'] });
+    await expect(coordinator.verifyProtection('123456')).resolves.toMatchObject({
+      ok: true,
+      status: 'protected',
+    });
+  });
+
+  it('SCENARIO D: a foreign owner appearing in the outbox while pending fails closed', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'user_a',
+      activeRows: { todos: 1 },
+      pendingOutboxCount: 1,
+      outboxOwnerIds: ['user_a'],
+    });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const signOut = vi.fn(async () => {
+      currentAuth.value = auth();
+    });
+    const coordinator = coordinatorFor(database, currentAuth, {
+      signOut,
+      verifyEmailChangeOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_a',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'a@example.com',
+          sessionUserId: 'user_a',
+        });
+      }),
+    });
+
+    await coordinator.protect('a@example.com');
+    database.__setOutbox({ pendingOutboxCount: 2, outboxOwnerIds: ['user_a', 'user_b'] });
+    await expect(coordinator.verifyProtection('123456')).resolves.toMatchObject({
+      ok: false,
+      status: 'error',
+      message: expect.stringContaining('ownership changed'),
+    });
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(database.meta.get('account.owner_user_id')).toBe('user_a');
+    expect(database.meta.has('account.protection_last_failure')).toBe(true);
+    // Restart: no stale protection_pending, session gone, and the foreign
+    // owner evidence remains → fail-closed account conflict, never a stale
+    // protection_pending loop.
+    const restarted = coordinatorFor(database, currentAuth);
+    await expect(restarted.refresh()).resolves.toMatchObject({ status: 'account_conflict' });
+  });
+
+  it('SCENARIO E: a changed verified user after the OTP fails closed and clears the pending record', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'user_a',
+      activeRows: { todos: 1 },
+      pendingOutboxCount: 1,
+      outboxOwnerIds: ['user_a'],
+    });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const signOut = vi.fn(async () => {
+      currentAuth.value = auth();
+    });
+    const coordinator = coordinatorFor(database, currentAuth, {
+      signOut,
+      verifyEmailChangeOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_b',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'b@example.com',
+          sessionUserId: 'user_b',
+        });
+      }),
+    });
+
+    await coordinator.protect('a@example.com');
+    await expect(coordinator.verifyProtection('123456')).resolves.toMatchObject({
+      ok: false,
+      status: 'recovery_required',
+    });
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(database.meta.get('account.owner_user_id')).toBe('user_a');
+    expect(database.meta.has('account.protection_last_failure')).toBe(true);
+    // The converted-but-unsafe session is gone; restart must not loop as
+    // protection_pending.
+    const restarted = coordinatorFor(database, currentAuth);
+    await expect(restarted.refresh()).resolves.toMatchObject({ status: 'recovery_required' });
+  });
+
+  it('reconciles a stale pending protection after a different user takes over', async () => {
+    const database = fakeDatabase({ ownerBinding: 'user_a', activeRows: { todos: 1 } });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const coordinator = coordinatorFor(database, currentAuth);
+    await coordinator.protect('a@example.com');
+    expect(database.meta.has('account.protection_pending')).toBe(true);
+
+    currentAuth.value = auth({
+      verifiedUserId: 'user_b',
+      verifiedIsAnonymous: false,
+      sessionUserId: 'user_b',
+    });
+    await expect(coordinator.refresh()).resolves.toMatchObject({ status: 'owner_mismatch' });
+    expect(database.meta.get('account.protection_pending')).toBe('null');
+  });
+
+  it('replaces a provisional anonymous owner with a recovered account on a pristine device', async () => {
+    const database = fakeDatabase({ ownerBinding: 'anon_a', ownerBindingProvisional: true });
+    const currentAuth = {
+      value: auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    };
+    const coordinator = coordinatorFor(database, currentAuth, {
+      verifyExistingAccountOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_b',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'b@example.com',
+          sessionUserId: 'user_b',
+        });
+      }),
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    await expect(coordinator.requestRecovery('b@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
+    await expect(coordinator.verifyRecovery('654321')).resolves.toMatchObject({
+      ok: true,
+      status: 'protected',
+    });
+    expect(database.meta.get('account.owner_user_id')).toBe('user_b');
+    expect(database.meta.get('account.owner_binding_state')).toBe('permanent');
+  });
+
+  it('blocks recovery once local-only content exists on a provisionally bound device', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'anon_a',
+      ownerBindingProvisional: true,
+      activeRows: { pomodoro_sessions: 1 },
+    });
+    const currentAuth = {
+      value: auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    };
+    const requestExistingAccountRecovery = vi.fn();
+    const coordinator = coordinatorFor(database, currentAuth, { requestExistingAccountRecovery });
+
+    await expect(coordinator.requestRecovery('b@example.com')).resolves.toMatchObject({
+      ok: false,
+      message: expect.stringContaining('switching'),
+    });
+    expect(requestExistingAccountRecovery).not.toHaveBeenCalled();
+  });
+
+  it('promotes a provisional binding when content exists and the owner session is present', async () => {
+    const database = fakeDatabase({
+      ownerBinding: 'anon_a',
+      ownerBindingProvisional: true,
+      activeRows: { pomodoro_sessions: 1 },
+    });
+    const currentAuth = {
+      value: auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    };
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    await expect(coordinator.refresh()).resolves.toMatchObject({ status: 'anonymous_ready' });
+    expect(database.meta.get('account.owner_binding_state')).toBe('permanent');
+    expect(database.meta.get('account.owner_user_id')).toBe('anon_a');
+  });
+
+  it('starts a fresh temporary anonymous session on a pristine provisional device after session loss', async () => {
+    const database = fakeDatabase({ ownerBinding: 'anon_a', ownerBindingProvisional: true });
+    const currentAuth = { value: auth() };
+    const ensureAnonymousSession = vi.fn(async () => {
+      currentAuth.value = auth({
+        sessionUserId: 'anon_b',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_b',
+        verifiedIsAnonymous: true,
+      });
+    });
+    const coordinator = coordinatorFor(database, currentAuth, { ensureAnonymousSession });
+
+    await expect(coordinator.bootstrap()).resolves.toMatchObject({ status: 'anonymous_ready' });
+    expect(ensureAnonymousSession).toHaveBeenCalledTimes(1);
+    expect(database.meta.get('account.owner_user_id')).toBe('anon_b');
+    expect(database.meta.get('account.owner_binding_state')).toBe('provisional');
+  });
+
+  it('keeps a provisional binding provisional while the device stays pristine', async () => {
+    const database = fakeDatabase({ ownerBinding: 'anon_a', ownerBindingProvisional: true });
+    const currentAuth = {
+      value: auth({
+        sessionUserId: 'anon_a',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'anon_a',
+        verifiedIsAnonymous: true,
+      }),
+    };
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      status: 'anonymous_ready',
+      canRecoverExisting: true,
+    });
+    expect(database.meta.get('account.owner_binding_state')).toBe('provisional');
   });
 });
