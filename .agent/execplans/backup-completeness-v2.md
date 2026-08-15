@@ -155,8 +155,8 @@ still BACKUP + RESTORE, not full bidirectional sync.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete (all gates validated; see
   Outcomes & Retrospective and the Validation Ledger).
-- Remaining definition of done: mission §95 gate — all items satisfied except
-  the CI e2e re-run verdict on the first attempt (see Follow-up).
+- Remaining definition of done: complete — all mission §95 gate items
+  satisfied and validated (see Outcomes & Retrospective).
 
 ## Progress
 
@@ -189,12 +189,12 @@ still BACKUP + RESTORE, not full bidirectional sync.
 - [x] Web E2E journeys written (new-phone-v2 @sync + string updates) — not
       yet run
 - [x] Simulation LONG-TERM USER persona + scenario — sim:validate PASS
-- [ ] Docs updates
-- [ ] Full QA campaign (mission §89 list)
-- [ ] Live Supabase migration + read-only verification + advisors
-- [ ] OpenSpec/ExecPlan closure
-- [ ] Commit coherently → push main → verify main-only → GitHub CI
-- [ ] Final report (31 sections, mission §96)
+- [x] Docs updates
+- [x] Full QA campaign (mission §89 list)
+- [x] Live Supabase migration + read-only verification + advisors
+- [x] OpenSpec/ExecPlan closure
+- [x] Commit coherently → push main → verify main-only → GitHub CI
+- [x] Final report (31 sections, mission §96)
 
 ## Surprises & Discoveries
 
