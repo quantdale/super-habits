@@ -170,28 +170,34 @@ jobs:
       # ---- main lane: full suite ----
       - name: Run full E2E suite incl. full journeys + simulation self-test (lane journeys@main)
         if: github.event_name != 'pull_request'
-        run: npm run e2e
+        run: |
+          set +e
+          npm run e2e > /tmp/e2e.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            echo '::group::E2E failure summary'
+            tail -120 /tmp/e2e.log
+            echo '::endgroup::'
+            grep -aE 'Error|error|failed|Timed out|webServer|ENOENT|Cannot find|throw' /tmp/e2e.log | tail -30 | sed 's/^/::error::/'
+            node -e "
+              const fs = require('fs');
+              const dir = 'test-results';
+              if (!fs.existsSync(dir)) { console.log('::warning::no test-results dir'); process.exit(0); }
+              for (const f of fs.readdirSync(dir)) {
+                if (f.endsWith('.json')) continue;
+                console.log('::error::E2E FAILURE DIR: ' + f);
+              }
+              try {
+                const last = JSON.parse(fs.readFileSync(dir + '/.last-run.json', 'utf8'));
+                console.log('::error::failedFiles=' + JSON.stringify(last.failedFiles || []));
+              } catch (e) {
+                console.log('::warning::no .last-run.json: ' + e.message);
+              }
+            "
+          fi
+          exit $code
         env:
           TZ: Asia/Manila
-
-      - name: Emit E2E failure names as annotations
-        if: failure()
-        run: |
-          node -e "
-            const fs = require('fs');
-            const dir = 'test-results';
-            if (!fs.existsSync(dir)) { console.log('::warning::no test-results dir'); process.exit(0); }
-            for (const f of fs.readdirSync(dir)) {
-              if (f.endsWith('.json')) continue;
-              console.log('::error::E2E FAILURE DIR: ' + f);
-            }
-            try {
-              const last = JSON.parse(fs.readFileSync(dir + '/.last-run.json', 'utf8'));
-              console.log('::error::failedFiles=' + JSON.stringify(last.failedFiles || []));
-            } catch (e) {
-              console.log('::warning::no .last-run.json: ' + e.message);
-            }
-          "
 
       # ---- scenario lane (deterministic; needs the served dist/) ----
       - name: Start static server for the scenario lane
