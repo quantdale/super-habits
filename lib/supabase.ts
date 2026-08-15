@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import { resolveAuthRuntime, resolveSupabaseAuthOptions } from '@/lib/supabaseAuthOptions';
 
 export type RemoteMode = 'disabled' | 'enabled';
 
@@ -18,36 +19,17 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-const isBrowser = typeof window !== 'undefined';
-const isNative = Platform.OS !== 'web';
-
-/** AsyncStorage touches `window` internally; avoid it during Expo static web export / SSR. */
-const ssrSafeStorage = {
-  getItem: (_key: string) => Promise.resolve<string | null>(null),
-  setItem: (_key: string, _value: string) => Promise.resolve(),
-  removeItem: (_key: string) => Promise.resolve(),
-};
-
-/** `createClient` throws if the URL is empty — skip on CI/Vercel when env vars are unset. */
-const authOptions = isBrowser
-  ? {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    }
-  : isNative
-    ? {
-        storage: AsyncStorage,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-      }
-    : {
-        storage: ssrSafeStorage,
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-      };
+/**
+ * Platform-first auth storage selection: the platform abstraction decides
+ * native vs web; the browser-window check only distinguishes in-browser web
+ * from the static export / SSR build. React Native always receives durable
+ * AsyncStorage session persistence, even in runtimes where a `window` global
+ * happens to exist.
+ */
+const authOptions = resolveSupabaseAuthOptions(
+  resolveAuthRuntime(Platform.OS, typeof window !== 'undefined'),
+  AsyncStorage,
+);
 
 export const supabase: SupabaseClient | null = supabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, { auth: authOptions })
@@ -239,12 +221,12 @@ export async function signOutSupabase(): Promise<void> {
 }
 
 export async function startSupabaseAutoRefresh(): Promise<void> {
-  if (!supabase || !isNative) return;
+  if (!supabase || Platform.OS === 'web') return;
   await supabase.auth.startAutoRefresh();
 }
 
 export async function stopSupabaseAutoRefresh(): Promise<void> {
-  if (!supabase || !isNative) return;
+  if (!supabase || Platform.OS === 'web') return;
   await supabase.auth.stopAutoRefresh();
 }
 
