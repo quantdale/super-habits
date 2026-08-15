@@ -39,6 +39,12 @@ export const appMetaKeys = {
   syncStatus: defineJsonKey('sync_status', 'sync'),
   calorieGoal: defineJsonKey('calorie_goal', 'calories'),
   pomodoroSettings: defineJsonKey('pomodoro_settings', 'pomodoro'),
+  backupScopeVersion: defineTextKey('backup.scope_version', 'sync'),
+  backupBackfillStatus: defineTextKey('backup.backfill_status', 'sync'),
+  backupBackfillDoneEntities: defineJsonKey('backup.backfill_done_entities', 'sync'),
+  backupDirty: defineTextKey('backup.dirty', 'sync'),
+  backupPendingManifest: defineJsonKey('backup.pending_manifest', 'sync'),
+  backupLastCompleteGeneration: defineTextKey('backup.last_complete_generation', 'sync'),
 } as const;
 
 export async function getAppMetaText(

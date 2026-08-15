@@ -7,6 +7,18 @@ const repoRoot = path.resolve(scriptDir, '..');
 const supabaseRoot = path.join(repoRoot, 'supabase');
 const migrationsRoot = path.join(supabaseRoot, 'migrations');
 const syncTables = ['todos', 'habits', 'calorie_entries', 'workout_routines'];
+const backupTables = [
+  'habit_completions',
+  'pomodoro_sessions',
+  'routine_exercises',
+  'routine_exercise_sets',
+  'workout_logs',
+  'workout_session_exercises',
+  'saved_meals',
+  'linked_action_rules',
+  'user_backup_settings',
+  'backup_manifest',
+];
 
 const failures = [];
 
@@ -42,8 +54,14 @@ for (const migration of requiredMigrations) {
 const ownershipMigrationName = migrationNames.find((name) =>
   /_secure_sync_row_ownership\.sql$/.test(name),
 );
+const v2MigrationName = migrationNames.find((name) =>
+  /_add_backup_completeness_v2\.sql$/.test(name),
+);
 if (!ownershipMigrationName) {
   failures.push('missing secure sync ownership migration');
+}
+if (!v2MigrationName) {
+  failures.push('missing backup completeness v2 migration');
 }
 if (migrationNames.join('\n') !== [...migrationNames].sort().join('\n')) {
   failures.push('migration filenames are not lexically ordered');
@@ -54,6 +72,7 @@ const quota = read('supabase/migrations/20260814150000_ai_request_quota.sql');
 const ownership = ownershipMigrationName
   ? read(`supabase/migrations/${ownershipMigrationName}`)
   : '';
+const v2Migration = v2MigrationName ? read(`supabase/migrations/${v2MigrationName}`) : '';
 const fixture = read('simulation/backend/schema.sql');
 const config = read('supabase/config.toml');
 const clientSource = [
@@ -67,8 +86,7 @@ for (const table of syncTables) {
     `baseline ${table}`,
     baseline,
     new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}\\b`),
-  );
-  requireText(
+  );  requireText(
     `baseline ${table} RLS`,
     baseline,
     new RegExp(`ALTER TABLE public\\.${table} ENABLE ROW LEVEL SECURITY`),
@@ -88,6 +106,128 @@ for (const table of syncTables) {
   requireText(`fixture ${table}.user_id`, fixture, /user_id\s+UUID/i);
 }
 requireText('ownership UUID owner column migration', ownership, /ADD COLUMN user_id UUID/i);
+
+for (const table of backupTables) {
+  requireText(
+    `v2 migration ${table}`,
+    v2Migration,
+    new RegExp(`CREATE TABLE public\\.${table}\\b`),
+  );
+  requireText(
+    `v2 migration ${table} RLS`,
+    v2Migration,
+    new RegExp(`ALTER TABLE public\\.${table} ENABLE ROW LEVEL SECURITY`),
+  );
+  requireText(
+    `v2 migration ${table} owner FK`,
+    v2Migration,
+    new RegExp(`user_id UUID NOT NULL DEFAULT auth\\.uid\\(\\) REFERENCES auth\\.users\\(id\\) ON DELETE CASCADE`),
+  );
+  requireText(
+    `v2 migration ${table} owner predicate`,
+    v2Migration,
+    new RegExp(
+      `CREATE POLICY sync_${table}_[a-z]+_owner ON public\\.${table}[\\s\\S]*?\\(\\s*select\\s+auth\\.uid\\(\\)\\s*\\)\\s*=\\s*user_id`,
+      'i',
+    ),
+  );
+  requireText(
+    `v2 migration ${table} update USING`,
+    v2Migration,
+    new RegExp(
+      `CREATE POLICY sync_${table}_update_owner[\\s\\S]*?USING \\([\\s\\S]*?auth\\.uid\\(\\)[\\s\\S]*?user_id`,
+      'i',
+    ),
+  );
+  requireText(
+    `v2 migration ${table} update WITH CHECK`,
+    v2Migration,
+    new RegExp(
+      `CREATE POLICY sync_${table}_update_owner[\\s\\S]*?WITH CHECK \\([\\s\\S]*?auth\\.uid\\(\\)[\\s\\S]*?user_id`,
+      'i',
+    ),
+  );
+  for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+    const suffix = operation.toLowerCase();
+    requireText(
+      `v2 migration ${table} ${operation} policy`,
+      v2Migration,
+      new RegExp(
+        `CREATE POLICY sync_${table}_${suffix}_owner ON public\\.${table}[\\s\\S]*?FOR ${operation} TO authenticated`,
+        'i',
+      ),
+    );
+  }
+  requireText(
+    `fixture ${table}`,
+    fixture,
+    new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}\\b`),
+  );
+  requireText(`fixture ${table}.user_id`, fixture, /user_id\s+UUID/i);
+  requireText(
+    `v2 migration ${table} no anon grant`,
+    v2Migration,
+    /^(?![\s\S]*\bTO\s+anon\b)/i,
+  );
+}
+
+const backupOwnerIndexTables = [
+  'habit_completions',
+  'pomodoro_sessions',
+  'routine_exercises',
+  'routine_exercise_sets',
+  'workout_logs',
+  'workout_session_exercises',
+  'saved_meals',
+  'linked_action_rules',
+];
+for (const table of backupOwnerIndexTables) {
+  requireText(`v2 migration ${table} owner index`, v2Migration, new RegExp(`idx_${table}_user_id`));
+}
+
+const backupRequiredColumns = {
+  habit_completions: ['habit_id', 'date_key', 'count'],
+  pomodoro_sessions: ['started_at', 'ended_at', 'duration_seconds', 'session_type'],
+  routine_exercises: ['routine_id', 'name', 'sort_order'],
+  routine_exercise_sets: ['exercise_id', 'set_number', 'active_seconds', 'rest_seconds'],
+  workout_logs: ['routine_id', 'notes', 'completed_at'],
+  workout_session_exercises: ['log_id', 'exercise_name', 'sets_completed'],
+  saved_meals: ['food_name', 'use_count', 'last_used_at', 'meal_type'],
+  linked_action_rules: ['status', 'direction_policy', 'effect_type', 'effect_payload', 'deleted_at'],
+};
+for (const [table, columns] of Object.entries(backupRequiredColumns)) {
+  for (const column of columns) {
+    requireText(`v2 migration ${table}.${column}`, v2Migration, new RegExp(`\\b${column}\\b`));
+    requireText(`fixture ${table}.${column}`, fixture, new RegExp(`\\b${column}\\b`));
+  }
+}
+
+requireText(
+  'v2 settings table',
+  v2Migration,
+  /CREATE TABLE public\.user_backup_settings\b[\s\S]*?settings_version INTEGER[\s\S]*?payload JSONB/,
+);
+requireText(
+  'v2 manifest table',
+  v2Migration,
+  /CREATE TABLE public\.backup_manifest\b[\s\S]*?backup_schema_version INTEGER[\s\S]*?generation INTEGER[\s\S]*?entity_metadata JSONB/,
+);
+requireText(
+  'v2 migration anon/public revoke',
+  v2Migration,
+  /REVOKE ALL PRIVILEGES ON TABLE[\s\S]*FROM anon, PUBLIC/i,
+);
+requireText(
+  'v2 migration authenticated grant',
+  v2Migration,
+  /GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE[\s\S]*TO authenticated, service_role/i,
+);
+requireText('v2 migration does not use global USING true', v2Migration, /^(?![\s\S]*USING\s*\(\s*true\s*\))/i);
+requireText(
+  'v2 migration does not grant policy access to anon',
+  v2Migration,
+  /^(?![\s\S]*CREATE POLICY[\s\S]*TO\s+(?:anon|public)\b)/i,
+);
 
 const requiredColumns = {
   todos: ['due_date', 'priority', 'sort_order', 'recurrence', 'recurrence_id'],
@@ -251,6 +391,7 @@ if (failures.length > 0) {
 } else {
   console.log(
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
-      '4 owner-scoped sync tables; private AI quota RPC).',
+      `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
+      'private AI quota RPC).',
   );
 }
