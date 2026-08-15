@@ -48,8 +48,9 @@ describe('features/habits/habits.data', () => {
     const result = await incrementHabit('habit_1', '2026-04-14');
 
     // COR-001: the mutation returns its post-write count from the same SQL
-    // statement instead of performing a race-prone follow-up SELECT.
-    expect(db.getFirstAsync).toHaveBeenCalledTimes(2);
+    // statement instead of performing a race-prone follow-up SELECT. The third
+    // getFirstAsync call is the backup transaction's sync_outbox owner read.
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(3);
     const [upsertSql, upsertArgs] = db.getFirstAsync.mock.calls[1];
     expect(upsertSql).toContain('INSERT INTO habit_completions');
     expect(upsertSql).toContain('ON CONFLICT(habit_id, date_key) DO UPDATE SET');
@@ -102,7 +103,7 @@ describe('features/habits/habits.data', () => {
 
     const result = await incrementHabit('habit_1', '2026-04-14');
 
-    expect(db.getFirstAsync).toHaveBeenCalledTimes(2);
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(3);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result).toEqual({
       count: 2,
@@ -131,7 +132,7 @@ describe('features/habits/habits.data', () => {
 
     const result = await incrementHabit('habit_1', '2026-04-14');
 
-    expect(db.getFirstAsync).toHaveBeenCalledTimes(2);
+    expect(db.getFirstAsync).toHaveBeenCalledTimes(3);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
     expect(result.count).toBe(3);
   });
@@ -159,13 +160,21 @@ describe('features/habits/habits.data', () => {
   });
 
   it('uses the same atomic upsert on repeated increments (double-tap safety)', async () => {
+    // Each tap performs a habit read, the atomic upsert (RETURNING), and a
+    // sync_outbox owner read inside the backup transaction. Resolve by SQL
+    // shape so the two upserts report counts 1 then 2.
+    let upsertCount = 0;
     const db = {
-      getFirstAsync: vi
-        .fn()
-        .mockResolvedValueOnce({ name: 'Hydrate', target_per_day: 5 })
-        .mockResolvedValueOnce({ id: 'hcmp_1', count: 1 })
-        .mockResolvedValueOnce({ name: 'Hydrate', target_per_day: 5 })
-        .mockResolvedValueOnce({ id: 'hcmp_1', count: 2 }),
+      getFirstAsync: vi.fn(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('INSERT INTO habit_completions')) {
+          upsertCount += 1;
+          return { id: 'hcmp_1', count: upsertCount };
+        }
+        if (typeof sql === 'string' && sql.includes('FROM habits')) {
+          return { name: 'Hydrate', target_per_day: 5 };
+        }
+        return null;
+      }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
@@ -176,8 +185,13 @@ describe('features/habits/habits.data', () => {
     // Both calls issue the single ON CONFLICT statement — there is no
     // SELECT-then-INSERT branch left to interleave. (Mock-level proof of the
     // statement shape; the SQL itself was validated against real SQLite.)
-    expect(db.getFirstAsync).toHaveBeenCalledTimes(4);
-    for (const [sql] of [db.getFirstAsync.mock.calls[1], db.getFirstAsync.mock.calls[3]]) {
+    // Filter on the upsert statements so the backup transaction's extra
+    // sync_outbox owner reads (one per tap) don't disturb the assertion.
+    const completionUpserts = db.getFirstAsync.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO habit_completions'),
+    );
+    expect(completionUpserts).toHaveLength(2);
+    for (const [sql] of completionUpserts) {
       expect(sql).toContain('ON CONFLICT(habit_id, date_key) DO UPDATE SET');
     }
     expect(first.count).toBe(1);

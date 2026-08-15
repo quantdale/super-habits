@@ -343,7 +343,15 @@ defineJourney({
             expect(Number(rows[0]?.n ?? 0)).toBe(2);
           },
         );
-        await expectOutbox(page, []);
+        // Backup Completeness V2: changing Pomodoro defaults enqueues the
+        // allowlisted settings snapshot (coalesced to a single record) —
+        // but never a pomodoro session row.
+        await expectOutbox(page, (outbox) => {
+          expect(outbox).toHaveLength(1);
+          expect(outbox[0].entity).toBe('user_backup_settings');
+          expect(outbox[0].id).toBe('settings');
+          expect(outbox[0].operation).toBe('update');
+        });
 
         // Survives a reload: the fresh Focus section idle timer is the new
         // default (40:00), not the old 35:00.

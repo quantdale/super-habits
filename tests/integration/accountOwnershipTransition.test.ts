@@ -214,7 +214,15 @@ describe('real SQLite first-activity ownership transitions', () => {
       expect(inspected.hasUserData).toBe(true);
       await restarted.closeAsync();
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      // Windows can briefly hold the file handle after close; retry.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+          break;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
     }
   });
 
@@ -258,7 +266,9 @@ describe('real SQLite first-activity ownership transitions', () => {
       expect(inspected.ownerBindingProvisional).toBe(false);
       expect(inspected.hasUserData).toBe(true);
       expect(inspected.outboxOwnerIds).toEqual(['anon_a']);
-      expect(inspected.pendingOutboxCount).toBe(1);
+      // Backup Completeness V2: pomodoro sessions are backup-scoped too, so
+      // the local-only session and the todo both carry durable intents.
+      expect(inspected.pendingOutboxCount).toBe(2);
 
       // Owner A returns; flush pushes only owner-A records.
       const pushed = vi.fn(async (records: { ownerUserId?: string | null }[]) => {
@@ -276,7 +286,15 @@ describe('real SQLite first-activity ownership transitions', () => {
       ).resolves.toEqual({ count: 0 });
       await restarted.closeAsync();
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      // Windows can briefly hold the file handle after close; retry.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+          break;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
     }
   });
 

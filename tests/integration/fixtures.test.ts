@@ -56,6 +56,9 @@ describe('tests/integration/fixtures', () => {
     await db.closeAsync();
   });
 
+  // Backup Completeness V2 made every seeded mutation durably enqueue a
+  // backup intent (outbox + dirty flag) in its transaction, so the HEAVY
+  // volume seed legitimately does more per write than before.
   it('HEAVY spans three months at volume', async () => {
     const db = await seedHeavy();
     expect(
@@ -72,7 +75,7 @@ describe('tests/integration/fixtures', () => {
       60,
     );
     await db.closeAsync();
-  });
+  }, 30_000);
 
   it('date keys are local-calendar and consistent with the injected clock', async () => {
     const db = await seedSmall();

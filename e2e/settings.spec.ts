@@ -21,7 +21,7 @@ test.describe('Settings backup restore', () => {
     await openSettingsScreen(page);
     await dismissStartupRestorePromptIfPresent(page);
 
-    await expect(page.getByText('Backup status and restore')).toBeVisible();
+    await expect(page.getByText('Backup status and restore', { exact: true })).toBeVisible();
     await page.getByText('Current restore disclosures').scrollIntoViewIfNeeded();
     await expect(
       page.getByText('Habits restore definitions only. Habit completion history stays local-only.'),
@@ -44,10 +44,10 @@ test.describe('Settings backup restore', () => {
 
     await openSettingsScreen(page);
 
-    await expect(page.getByText('Backup status and restore')).toBeVisible();
+    await expect(page.getByText('Backup status and restore', { exact: true })).toBeVisible();
     await expect(
       page.getByText(
-        'Restore is only available on an empty device in this phase. Existing active synced local rows block import.',
+        'Restore is only available on an empty device. Any local user data — including history such as focus sessions or workout logs — blocks import.',
       ),
     ).toBeVisible();
   });

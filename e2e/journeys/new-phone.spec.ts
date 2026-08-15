@@ -183,7 +183,19 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
 
   const match = path.match(/^\/rest\/v1\/(todos|habits|calorie_entries|workout_routines)$/);
   if (!match) {
-    return route.fulfill({ status: 404, headers: REMOTE_HEADERS, body: '{"error":"not found"}' });
+    // A pre-V2 server has no backup_manifest/user_backup_settings tables;
+    // PostgREST answers with PGRST205 (relation does not exist). The app must
+    // recognize that as a legacy-only backup, not a corrupt one.
+    return route.fulfill({
+      status: 404,
+      headers: REMOTE_HEADERS,
+      body: JSON.stringify({
+        code: 'PGRST205',
+        details: 'pre-V2 dummy backend',
+        hint: null,
+        message: 'relation "public.backup_manifest" does not exist',
+      }),
+    });
   }
 
   const entity = match[1];
@@ -255,12 +267,12 @@ const NOT_RESTORED_SQL = `
 `;
 
 const PROMPT_SUBTITLE =
-  'A remote backup is available and this device is still empty for synced tables.';
+  'A remote backup is available and this device is still empty for user data.';
 const LOCAL_DATA_PRESENT_MESSAGE =
-  'Restore is only available on an empty device in this phase. Existing active synced local rows block import.';
+  'Restore is only available on an empty device. Any local user data — including history such as focus sessions or workout logs — blocks import.';
 
 const EMPTY_DEVICE_MESSAGE =
-  'This device is empty for synced tables, so importing the remote backup is allowed.';
+  'This device is empty for user data, so importing the remote backup is allowed.';
 
 /** The restore prompt is present iff the app surfaced a restorable remote. */
 function restorePromptVisible(page: Page): Promise<boolean> {

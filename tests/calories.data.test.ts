@@ -47,6 +47,15 @@ describe('calories.data', () => {
     vi.mocked(nowIso).mockReturnValue('2026-04-06T10:00:00.000Z');
     vi.mocked(toDateKey).mockReturnValue('2026-04-06');
     db.runAsync.mockResolvedValue({ changes: 1 });
+    // Backup Completeness V2: upsertSavedMeal writes through an atomic
+    // INSERT ... RETURNING id statement (getFirstAsync) instead of runAsync,
+    // and the surrounding transaction reads the outbox owner via getFirstAsync.
+    db.getFirstAsync.mockImplementation(async (sql: string) => {
+      if (typeof sql === 'string' && sql.includes('INSERT INTO saved_meals')) {
+        return { id: 'smeal_test' };
+      }
+      return null;
+    });
   });
 
   it('addCalorieEntry inserts the entry, saves the meal, and enqueues create', async () => {
@@ -80,18 +89,21 @@ describe('calories.data', () => {
         '2026-04-06T10:00:00.000Z',
       ],
     );
-    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO saved_meals'), [
-      'smeal_1',
-      'Chicken breast',
-      220,
-      40,
-      0,
-      5,
-      0,
-      'lunch',
-      '2026-04-06T10:00:00.000Z',
-      '2026-04-06T10:00:00.000Z',
-    ]);
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO saved_meals'),
+      [
+        'smeal_1',
+        'Chicken breast',
+        220,
+        40,
+        0,
+        5,
+        0,
+        'lunch',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
+      ],
+    );
     expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
       {
         entity: 'calorie_entries',
@@ -122,18 +134,21 @@ describe('calories.data', () => {
       expect.stringContaining('UPDATE calorie_entries SET'),
       ['Protein oats', 360, 30, 40, 10, 5, 'breakfast', '2026-04-06T10:00:00.000Z', 'cal_1'],
     );
-    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO saved_meals'), [
-      'smeal_2',
-      'Protein oats',
-      360,
-      30,
-      40,
-      10,
-      5,
-      'breakfast',
-      '2026-04-06T10:00:00.000Z',
-      '2026-04-06T10:00:00.000Z',
-    ]);
+    expect(db.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO saved_meals'),
+      [
+        'smeal_2',
+        'Protein oats',
+        360,
+        30,
+        40,
+        10,
+        5,
+        'breakfast',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
+      ],
+    );
     expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
       {
         entity: 'calorie_entries',
@@ -179,10 +194,15 @@ describe('calories.data', () => {
     });
 
     // COR-001: one INSERT ... ON CONFLICT statement instead of the old
-    // read-then-branch, which raced idx_saved_meals_food_name.
-    expect(db.getFirstAsync).not.toHaveBeenCalled();
-    expect(db.runAsync).toHaveBeenCalledTimes(1);
-    const [sql, args] = db.runAsync.mock.calls[0];
+    // read-then-branch, which raced idx_saved_meals_food_name. The upsert now
+    // runs through getFirstAsync with a RETURNING id clause, so assert the
+    // single atomic statement there rather than counting runAsync calls (the
+    // surrounding backup transaction also writes sync_outbox + app_meta rows).
+    const savedMealUpserts = db.getFirstAsync.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO saved_meals'),
+    );
+    expect(savedMealUpserts).toHaveLength(1);
+    const [sql, args] = savedMealUpserts[0];
     expect(sql).toContain('INSERT INTO saved_meals');
     expect(sql).toContain('ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET');
     expect(sql).toContain('use_count    = use_count + 1');

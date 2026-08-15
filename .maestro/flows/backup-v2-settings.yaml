@@ -1,0 +1,36 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - backup-v2
+---
+# Backup Completeness V2 — Settings backup-coverage surface on Android.
+#
+# The complete V2 restore round trip is exercised by the web E2E journey
+# (new-phone-v2, @sync lane) and the real-SQLite integration suite; this flow
+# pins the native surface: the Backup / Sync / Restore bucket renders the
+# coverage row, the recoverable-areas scope, and the conservative backup
+# model disclosure on a fresh install.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 15000
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Theme and display'
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: 'Backup coverage'
+    direction: DOWN
+    timeout: 20000
+- assertVisible: 'Backup status and restore'
+- assertVisible: 'Recoverable areas'
+- assertVisible: 'V2 scope'
+- scrollUntilVisible:
+    element:
+      text: 'Current backup model'
+    direction: DOWN
+    timeout: 10000
+- assertVisible: 'Backup'
+- stopApp

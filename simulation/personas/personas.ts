@@ -288,6 +288,32 @@ export const unknownEmailRecoverer = definePersona({
 });
 
 /** The library's canonical `PERSONAS` record (task 6.1), keyed by persona id. */
+/** P7 — Long-Term User: years of history, streaks, and continuity across device loss. */
+export const longTermUser = definePersona({
+  id: 'long-term-user',
+  name: 'Liam, the Long-Term User',
+  description:
+    'Has used the app for months to years: long habit streaks, deep calorie and focus history, saved meals, and workout routines with history. Values historical continuity above all — losing streaks or past sessions is the worst outcome. Methodical, low error rates, one long session a day plus quick check-ins.',
+  goals: [
+    'keep every streak alive day after day',
+    'preserve workout and focus history across device changes',
+    'log meals from saved meals without retyping macros',
+    'never lose linked-action rules that automate daily habits',
+  ],
+  behavior: {
+    thinkTime: { mu: 5.5, sigma: 0.3, minMs: 150, maxMs: 2500 },
+    mistakeRate: 0.02,
+    doubleTapRate: 0.01,
+    typoRate: 0.02,
+    abandonmentRate: 0.01,
+    offlineToggleRate: 0,
+    tabHideRate: 0,
+    sessionLength: { minMinutes: 15, maxMinutes: 60 },
+    featureAffinity: { habits: 3, calories: 2, workout: 2, pomodoro: 2, todos: 1, overview: 2 },
+  },
+  traits: ['long-history', 'streak-focused', 'continuity-driven'],
+});
+
 export const PERSONAS: Record<string, Persona> = {
   'daily-driver': dailyDriver,
   'weekend-returner': weekendReturner,
@@ -300,4 +326,5 @@ export const PERSONAS: Record<string, Persona> = {
   'wrong-account-user': wrongAccountUser,
   'new-phone-recoverer': newPhoneRecoverer,
   'unknown-email-recoverer': unknownEmailRecoverer,
+  'long-term-user': longTermUser,
 };

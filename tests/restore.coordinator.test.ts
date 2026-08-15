@@ -107,10 +107,27 @@ function buildDb(localCounts: Record<string, number>, initialMeta: Record<string
 
   return {
     getFirstAsync: vi.fn(async (sql: string, params?: unknown[]) => {
+      // Backup Completeness V2: inspectLocalAccountDataState issues per-table
+      // counts. Tables with a deleted_at column use the active/deleted variant.
+      const activeCountMatch = sql.match(
+        /^SELECT COUNT\(\*\) AS total,([\s\S]*?)FROM ([a-z_]+)\s*$/i,
+      );
+      if (activeCountMatch) {
+        const entity = activeCountMatch[2] ?? '';
+        const count = localCounts[entity] ?? 0;
+        return { total: count, active: count, deleted: 0 };
+      }
+
       const countMatch = sql.match(/^SELECT COUNT\(\*\) AS total FROM ([a-z_]+)$/i);
       if (countMatch) {
         const entity = countMatch[1] ?? '';
         return { total: localCounts[entity] ?? 0 };
+      }
+
+      // sync_outbox count queries issued by inspectLocalAccountDataState and
+      // getBackupStateSummary.
+      if (/^SELECT COUNT\(\*\) AS count/i.test(sql)) {
+        return { count: 0 };
       }
 
       if (sql === 'SELECT value FROM app_meta WHERE key = ?') {
@@ -123,6 +140,8 @@ function buildDb(localCounts: Record<string, number>, initialMeta: Record<string
 
       return null;
     }),
+    // inspectLocalAccountDataState reads distinct outbox owners via getAllAsync.
+    getAllAsync: vi.fn(async () => []),
     runAsync: vi.fn(async (sql: string, params: unknown[] = []) => {
       if (
         sql === 'INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)' &&
@@ -764,7 +783,10 @@ describe('core/sync/restore.coordinator', () => {
           },
         ],
       },
-      authUserIds: ['user_a', 'user_b'],
+      // restoreFromRemoteBackup now calls restoreFromRemoteBackupV2() first,
+      // which consumes one getSupabaseAuthUserId() value before the V1 path
+      // runs its preview (user_a) and its post-preview owner refresh (user_b).
+      authUserIds: ['user_a', 'user_a', 'user_b'],
     });
 
     await expect(loaded.restoreFromRemoteBackup()).rejects.toThrow('Authenticated owner changed');

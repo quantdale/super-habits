@@ -351,6 +351,12 @@ defineJourney({
         // tick and confirm it did NOT retry (failure count unchanged, record
         // still pending, nextRetryAt still in the future).
         await ensureAppContext(page);
+        // The reload fires the NetInfo reconnect flush, which legitimately
+        // bypasses backoff (like an explicit reconnect) and fails once under
+        // the injected 503. Measure the interval behavior from that
+        // post-reload baseline.
+        const afterReload = await readSyncStatus(page);
+        expect(Number(afterReload?.consecutiveFailures ?? 0)).toBe(n + 1);
         await page.waitForTimeout(35_000);
         const afterWait = await readSyncStatus(page);
         expect(Number(afterWait?.consecutiveFailures ?? 0)).toBe(n + 1);
@@ -361,14 +367,17 @@ defineJourney({
           expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
         });
 
-        // A later success clears the failure state and the outbox.
+        // A later success clears the failure state and the outbox (only the
+        // Backup Completeness V2 manifest checkpoint record may remain,
+        // pending its own push).
         await injectRestSuccess(page);
         await triggerReconnectFlush(page);
         const after = await readSyncStatus(page);
         expect(Number(after?.consecutiveFailures ?? 0)).toBe(0);
         expect(after?.lastErrorMessage).toBeNull();
         await expectOutbox(page, (outbox) => {
-          expect(outbox).toEqual([]);
+          const dataRecords = outbox.filter((r) => r.entity !== 'backup_manifest');
+          expect(dataRecords).toEqual([]);
         });
 
         // Settings now shows the healthy state.

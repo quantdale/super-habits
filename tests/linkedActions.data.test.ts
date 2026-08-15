@@ -29,6 +29,7 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('creates a linked action rule with serialized effect payload', async () => {
     const db = {
+      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
@@ -55,8 +56,13 @@ describe('core/linked-actions/linkedActions.data', () => {
 
     expect(created.status).toBe('active');
     expect(created.directionPolicy).toBe('bidirectional_peer');
-    expect(db.runAsync).toHaveBeenCalledTimes(1);
-    const [, args] = db.runAsync.mock.calls[0];
+    // The backup transaction also writes sync_outbox + app_meta rows, so scope
+    // to the single rule INSERT.
+    const ruleInserts = db.runAsync.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO linked_action_rules'),
+    );
+    expect(ruleInserts).toHaveLength(1);
+    const [, args] = ruleInserts[0];
     expect(args[0]).toMatch(/^link_/);
     expect(args[1]).toBe('active');
     expect(args[2]).toBe('bidirectional_peer');
@@ -66,6 +72,7 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('creates todo.completed -> habit.increment with the fixed +1 source-date payload', async () => {
     const db = {
+      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
@@ -90,7 +97,10 @@ describe('core/linked-actions/linkedActions.data', () => {
       },
     });
 
-    const [, args] = db.runAsync.mock.calls[0];
+    const ruleInserts = db.runAsync.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO linked_action_rules'),
+    );
+    const [, args] = ruleInserts[0];
     expect(args[4]).toBe('todos');
     expect(args[7]).toBe('todo.completed');
     expect(args[8]).toBe('habits');
@@ -174,6 +184,7 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('updates status and soft deletes without changing other runtime behavior', async () => {
     const db = {
+      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
@@ -181,20 +192,24 @@ describe('core/linked-actions/linkedActions.data', () => {
     await updateLinkedActionRuleStatus('link_1', 'paused');
     await deleteLinkedActionRule('link_1');
 
-    expect(db.runAsync).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining('SET status = ?, updated_at = ?'),
-      ['paused', expect.any(String), 'link_1'],
+    // Each write now runs inside a backup transaction that also touches
+    // sync_outbox + app_meta, so scope to the status and tombstone UPDATEs.
+    const statusUpdate = db.runAsync.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('SET status = ?, updated_at = ?'),
     );
-    expect(db.runAsync).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('SET deleted_at = ?, updated_at = ?'),
-      [expect.any(String), expect.any(String), 'link_1'],
+    const deleteUpdate = db.runAsync.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('SET deleted_at = ?, updated_at = ?'),
     );
+    expect(statusUpdate?.[1]).toEqual(['paused', expect.any(String), 'link_1']);
+    expect(deleteUpdate?.[1]).toEqual([expect.any(String), expect.any(String), 'link_1']);
   });
 
   it('soft deletes rules when a linked target entity is removed', async () => {
     const db = {
+      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
+      // The soft-delete now also reads the touched rule ids (post-update
+      // SELECT) so it can enqueue one tombstone intent per rule.
+      getAllAsync: vi.fn().mockResolvedValue([]),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);
@@ -410,6 +425,7 @@ describe('core/linked-actions/linkedActions.data', () => {
       target_entity_id: 'todo_removed',
     };
     const db = {
+      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       getAllAsync: vi.fn().mockResolvedValue([existingRow, removedRow]),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };

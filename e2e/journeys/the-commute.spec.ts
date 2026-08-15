@@ -253,6 +253,11 @@ defineJourney({
         // allowing the app's 30s flush interval to run.
         await setOffline(page, false);
         const { rideId, draftId, stretchId, trailId } = await fetchJourneyIds(page);
+        const mealRows = await queryRows(
+          page,
+          "SELECT id FROM saved_meals WHERE food_name = 'Trail mix'",
+        );
+        const mealId = String(mealRows[0]?.id ?? '');
         await setOffline(page, true);
         await expectOutboxRecords(page, [
           { entity: 'todos', id: rideId, operation: 'create' },
@@ -261,6 +266,9 @@ defineJourney({
           // create → delete deduped to a single 'delete' record
           { entity: 'habits', id: stretchId, operation: 'delete' },
           { entity: 'calorie_entries', id: trailId, operation: 'create' },
+          // Backup Completeness V2: the entry's saved-meal maintenance
+          // enqueues a durable intent of its own.
+          { entity: 'saved_meals', id: mealId, operation: 'create' },
         ]);
         await expectRows(
           page,
@@ -294,11 +302,18 @@ defineJourney({
         await setOffline(page, false);
         await returnToApp(page); // full reload; hydrate() must restore the outbox
         const { rideId, draftId, stretchId, trailId } = await fetchJourneyIds(page);
+        const mealRows = await queryRows(
+          page,
+          "SELECT id FROM saved_meals WHERE food_name = 'Trail mix'",
+        );
+        const mealId = String(mealRows[0]?.id ?? '');
         await expectOutboxRecords(page, [
           { entity: 'todos', id: rideId, operation: 'create' },
           { entity: 'todos', id: draftId, operation: 'update' },
           { entity: 'habits', id: stretchId, operation: 'delete' },
           { entity: 'calorie_entries', id: trailId, operation: 'create' },
+          // Backup Completeness V2: the saved-meal intent survives reload too.
+          { entity: 'saved_meals', id: mealId, operation: 'create' },
         ]);
         // Surviving surfaces agree with the surviving outbox after reload.
         await returnToApp(page);

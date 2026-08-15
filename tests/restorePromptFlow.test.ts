@@ -43,6 +43,11 @@ function buildBlockedPreview(message: string): RestorePreview {
     entityStatuses: buildEntityStatuses(),
     warnings: [],
     disclosures: [],
+    backupState: 'unavailable',
+    lastCompleteBackupAt: null,
+    recoverableAreas: [],
+    pendingChangeCount: 0,
+    backfillInProgress: false,
   };
 }
 
