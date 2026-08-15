@@ -1,7 +1,7 @@
 # ExecPlan: Recoverable Account V1 Closure (Native Persistence + Ownership Transition + Concurrent Protection + Live Canary)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -318,21 +318,21 @@ smoke/persistence/lifecycle gates. Record APK SHA-256.
 
 ## Current Checkpoint
 
-- Current milestone: All implementation + validation complete; native auth persistence proven; commits + push + CI pending.
-- Completed: Findings 1–3 fixed and tested; unit 912/912 (87 files); integration 104/104; timezones 5 zones PASS; simulation deterministic 21/21; journeys-sync 33/33 (recoverable-account journey 7/7 incl. concurrent-protection + first-local-only-switch-block) with bad-backend step 5 classified FLAKY_TEST (passed 2/3 full runs + standalone 6/6); standard E2E 172 passed / 0 failed; builds web+sync PASS; themes 140/140; supabase schema contract PASS; impact map valid; expo-doctor 20/20; audit = baseline 16 transitive advisories; Android: smoke 2/2 (release APK), persistence 10/10 verified (8/8 in-run + 2 isolated re-runs; lane failures classified FLAKY_TEST under contention — same APK passes isolated), lifecycle 5/5 (E2E-flag APK), native auth lane 3/3 flows on the final APK (SHA-256 cb96f15a…; later manifest-cleartext-local build 88e192fa…, gitignored android/): exactly ONE anonymous signup across clearState-launch → force-stop → relaunch → protect; same synthetic UID 00000000-…ca1a throughout; UI 'ANONYMOUS / UNPROTECTED' (not RECOVERY REQUIRED) after relaunch; on-device OTP → 'PROTECTED' with same UID. Live canary/config: NOT RUN — CREDENTIAL_REQUIRED (no URL/anon key/CLI/token; `.env.local` is an empty template). OpenSpec amended + validated; prior execplan closure notice added.
-- In progress: none — next action is commit, push, CI verification.
-- Important modified files: full list in git status (18 modified + 8 new); see Changed Files / Areas.
-- Last successful validation: the gates above.
+- Current milestone: COMPLETE — closure delivered, pushed, and CI-verified.
+- Completed: all implementation, tests, QA, native proof, docs, push, and CI verification (run #359: quality + e2e success on final SHA).
+- In progress: none.
+- Important modified files: 18 modified + 8 new files across 4 commits (66bbdb6, 1ae1236, 229cd19, 97944bb).
+- Last successful validation: GitHub Actions run 31865207540 — quality success, e2e success, nightly skipped (schedule-only).
 - Current failures: None.
 - Relevant quarantines: none.
-- Blockers: Live Supabase config/canary = CREDENTIAL_REQUIRED; iOS/EAS = ENVIRONMENT (no EAS CLI / macOS).
+- Blockers: Live Supabase config/canary = CREDENTIAL_REQUIRED; iOS/EAS = ENVIRONMENT.
 - Condition required to unblock: N/A.
 - Exact resume action after unblock: N/A.
-- Exact next action: Commit the four coherent commits, `git fetch origin`, verify no origin advance, push main (no force), confirm main == origin/main and main-only remote, then verify the GitHub Actions quality + e2e runs for the final SHA.
-- Remaining definition of done: push + GitHub CI quality/e2e green + final report.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete — closure evidence committed and pushed on main, SHA equality verified, main-only topology, GitHub quality/e2e green.
 
 ## Outcomes & Retrospective
 
-- Status: Active (final commit/push/CI step remains).
+- Status: Completed.
 - Summary: All three findings fixed: (1) platform-first auth storage with a testable resolver and 13 regression tests; (2) protection verifies ownership facts only, with explicit terminal lifecycle and stale-pending reconciliation; (3) provisional anonymous ownership claims the dataset at bootstrap, promotes durably on first meaningful content (synced + local-only hooks), keeps Recover Existing available only while pristine, and blocks switching on populated devices. Proven by 912 unit/integration tests, 33 journeys-sync + 172 standard E2E steps, 21 deterministic simulations, 5 timezones, Android smoke/persistence/lifecycle lanes, and a hermetic native auth-persistence lane (force-stop/relaunch restores the same session with no second anonymous user; on-device OTP protection preserves the UID).
 - Follow-up: Live Supabase Auth configuration (manual linking, OTP template six-digit code) and a real-email canary remain CREDENTIAL_REQUIRED — a future session with project credentials should run `scripts/live-account-canary.sh`-style flow (script was intentionally not committed; rebuild from this plan) or use the Dashboard to verify the email-change/OTP templates before marking live production readiness. iOS/EAS remains ENVIRONMENT.
