@@ -478,7 +478,17 @@ export async function seedFixture(
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   });
   const sql = buildFixtureSql(anchorKey, size);
-  await seedSql(page, sql);
+  // Raw-SQL fixtures represent a long-running device whose Backup
+  // Completeness V2 scope is already complete: mark the backfill done so the
+  // app never re-enqueues the seeded rows and the D14 responsiveness
+  // measurements measure steady-state app performance (the backfill itself is
+  // covered by the dedicated integration suite).
+  await seedSql(
+    page,
+    `${sql};
+     INSERT OR REPLACE INTO app_meta (key, value) VALUES ('backup.scope_version', '2');
+     INSERT OR REPLACE INTO app_meta (key, value) VALUES ('backup.backfill_status', 'complete');`,
+  );
   await ensureAppContext(page);
 }
 
