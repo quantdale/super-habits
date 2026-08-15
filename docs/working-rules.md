@@ -65,15 +65,25 @@ If this file conflicts with current code, trust the code and document the confli
 - Restore v1 preview/import is live through `core/sync/restore.coordinator.ts`, but it is intentionally narrower than full sync.
 - Main synced entities use soft delete with `deleted_at`.
 - Do not hard-delete synced main entities.
-- Enqueue sync immediately after mutating writes for synced entities:
-  - `todos`
-  - `habits`
-  - `calorie_entries`
-  - `workout_routines`
-- `pomodoro_sessions`, `habit_completions`, `workout_logs`, nested workout tables, and `saved_meals` are not part of active Supabase sync.
-- Nested workout edits should continue to bump `workout_routines.updated_at` and enqueue the parent routine instead of inventing nested sync.
-- Restore v1 only imports `todos`, `habits`, and `calorie_entries`, and only when synced local tables are still empty.
-- Do not document workout restore, saved meal restore, or habit completion restore as shipped behavior.
+- Enqueue sync immediately after mutating writes for the full recoverable
+  scope (see Backup Completeness V2 below): `todos`, `habits`,
+  `habit_completions`, `calorie_entries`, `saved_meals`,
+  `pomodoro_sessions`, `workout_routines`, `routine_exercises`,
+  `routine_exercise_sets`, `workout_logs`, `workout_session_exercises`,
+  `linked_action_rules`, plus the synthetic settings/manifest records.
+- Backup Completeness V2 (backup scope version 2) syncs the full recoverable
+  scope: todos, habits, habit_completions, calorie_entries, saved_meals,
+  pomodoro_sessions, workout_routines, routine_exercises,
+  routine_exercise_sets, workout_logs, workout_session_exercises,
+  linked_action_rules, plus the synthetic `user_backup_settings` and
+  `backup_manifest` records.
+- Hard-delete entities (`habit_completions` at count 0, `saved_meals`)
+  remote-delete; soft-delete tables push tombstones.
+- Nested workout edits bump `workout_routines.updated_at` AND enqueue the
+  nested rows in the same transaction.
+- Restore V2 imports the complete scope on a fully empty device (all user
+  tables + outbox) in one transaction with no historical side effects;
+  legacy V1 backups remain restorable and are labeled `V1 LEGACY/PARTIAL`.
 
 ## IDs, Dates, and Migrations
 

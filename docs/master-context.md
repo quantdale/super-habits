@@ -272,22 +272,29 @@ Companion docs in this folder:
 ### Confirmed from code
 
 - SQLite is the source of truth.
-- Syncable entities currently are:
-  - `todos`
-  - `habits`
-  - `calorie_entries`
-  - `workout_routines`
-- Not synced:
-  - `pomodoro_sessions`
-  - `habit_completions`
-  - `workout_logs`
-  - nested workout tables
-  - `saved_meals`
-- Workout nested edits bump the parent `workout_routines.updated_at` and enqueue the parent routine instead of syncing nested rows directly.
-- If remote mode is disabled, flush listeners are skipped and the in-memory queue can grow until a later flush path runs.
-- Restore v1 eligibility requires an empty device for synced tables.
-- Restore v1 imports `todos`, `habits`, and `calorie_entries`.
-- Habit completion history, saved meals, and workout restore are intentionally out of scope for restore v1.
+- Backup Completeness V2 (backup scope version 2) backs up the complete
+  recoverable scope through the durable outbox: `todos`, `habits`,
+  `habit_completions`, `calorie_entries`, `saved_meals`,
+  `pomodoro_sessions`, `workout_routines`, `routine_exercises`,
+  `routine_exercise_sets`, `workout_logs`, `workout_session_exercises`,
+  `linked_action_rules`, plus the synthetic `user_backup_settings` and
+  `backup_manifest` records.
+- Hard-delete entities (`habit_completions` at count 0, `saved_meals`)
+  carry an owner-scoped remote DELETE intent; soft-delete tables push
+  tombstones.
+- Workout nested edits bump the parent `workout_routines.updated_at` AND
+  enqueue the nested rows in the same transaction.
+- A versioned completeness checkpoint (`backup_manifest`, schema version 2)
+  is published only after the queue drains; it carries per-entity row counts
+  and deterministic SHA-256 checksums, so restore verifies integrity before
+  importing.
+- If remote mode is disabled, flush listeners are skipped and the in-memory
+  queue can grow until a later flush path runs.
+- Restore V2 requires a completely empty device (ALL user tables plus
+  outbox, via `inspectLocalAccountDataState`) and imports the full V2 scope
+  in one transaction with no historical side effects. Legacy V1 backups
+  (no manifest) remain restorable through the V1 path and are labeled
+  `V1 LEGACY/PARTIAL`.
 
 ## Feature Inventory
 

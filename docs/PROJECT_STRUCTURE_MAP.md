@@ -139,6 +139,18 @@ Format: `{prefix}_{ms}_{rand8}` — rand8 from a CSPRNG (`expo-crypto` / `crypto
 
 Enqueued after writes: **todos**, **habits** (not completions), **calorie_entries**, **workout_routines** (+ bump after nested routine edits).
 
-**Not synced:** `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `workout_session_exercises`, nested workout tables (routine row bump covers remote story).
+**Backup Completeness V2** extends the sync scope to the complete
+recoverable set: `habit_completions`, `pomodoro_sessions`, `saved_meals`,
+`routine_exercises`, `routine_exercise_sets`, `workout_logs`,
+`workout_session_exercises`, `linked_action_rules`, plus synthetic
+`user_backup_settings` / `backup_manifest` records (hard-delete entities
+remote-delete; soft-delete tables push tombstones; nested workout edits
+enqueue their own rows).
 
-Restore V1 imports only **todos**, **habits**, and **calorie_entries**, and only when the device is empty for synced tables. `workout_routines` backup status is visible but workout restore is intentionally excluded in phase one because nested routine structure is not synced yet. Recover Existing binds an authenticated protected UUID before entering this same preview/import path; it does not add merging or account switching.
+Restore V2 imports the full V2 scope atomically on a completely empty
+device (ALL user tables + outbox via `inspectLocalAccountDataState`) with
+integrity verification against the versioned manifest; legacy V1 backups
+(no manifest) remain restorable through the V1 path and are labeled
+`V1 LEGACY/PARTIAL`. Recover Existing binds an authenticated protected
+UUID before entering this same preview/import path; it does not add
+merging or account switching.
