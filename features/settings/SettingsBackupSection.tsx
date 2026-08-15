@@ -31,6 +31,54 @@ const RESTORE_ENTITY_LABELS: Record<SyncBackedEntity, string> = {
   workout_routines: 'Workout backup',
 };
 
+const BACKUP_STATE_LABELS: Record<RestorePreview['backupState'], string> = {
+  v2_complete: 'Complete (V2)',
+  v1_legacy: 'Legacy (V1)',
+  in_progress: 'In progress',
+  invalid: 'Invalid',
+  unavailable: 'Unavailable',
+};
+
+function describeBackupCoverage(preview: RestorePreview | null): string {
+  if (!preview) return 'Backup status is not available yet.';
+  switch (preview.backupState) {
+    case 'v2_complete': {
+      const lastComplete = preview.lastCompleteBackupAt
+        ? ` Last complete backup: ${new Date(preview.lastCompleteBackupAt).toLocaleString()}.`
+        : '';
+      const pending =
+        preview.pendingChangeCount > 0
+          ? ` ${preview.pendingChangeCount} change(s) pending since the checkpoint.`
+          : '';
+      return `A verified complete V2 backup exists.${lastComplete}${pending}`;
+    }
+    case 'v1_legacy':
+      return 'Only the legacy V1 backup exists (todos, habits, calorie entries). History and settings are not yet backed up.';
+    case 'in_progress':
+      return preview.backfillInProgress
+        ? 'Backup upgrade in progress: existing history is being added to the remote backup.'
+        : 'Backup in progress: pending changes have not yet reached a complete checkpoint.';
+    case 'invalid':
+      return 'The remote backup failed verification and cannot be restored as-is.';
+    case 'unavailable':
+      return 'Remote backup status is unavailable for this account.';
+  }
+}
+
+function backupCoverageTone(state: RestorePreview['backupState'] | null): SettingsStatusTone {
+  switch (state) {
+    case 'v2_complete':
+      return 'accent';
+    case 'in_progress':
+    case 'v1_legacy':
+      return 'warning';
+    case 'invalid':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
 function formatBackupTime(value: string | null) {
   if (!value) return 'No restorable backup timestamp is available yet.';
   return new Date(value).toLocaleString();
@@ -131,7 +179,7 @@ export function SettingsBackupSection({
       <SettingsSectionHeading
         eyebrow="Backup / Sync / Restore"
         title="Backup status and restore"
-        subtitle="Remote backup status and phase-one restore. This is backup sync, not full two-way sync."
+        subtitle="Remote backup status and restore. This is backup sync, not full two-way sync."
         icon="cloud-sync"
         accentColor={BACKUP_ACCENT}
       />
@@ -166,10 +214,36 @@ export function SettingsBackupSection({
             accentColor={BACKUP_ACCENT}
           />
           <SettingsRow
+            label="Backup coverage"
+            description={
+              restoreLoading
+                ? 'Checking backup completeness...'
+                : describeBackupCoverage(restorePreview)
+            }
+            statusLabel={
+              restoreLoading
+                ? 'Loading'
+                : BACKUP_STATE_LABELS[restorePreview?.backupState ?? 'unavailable']
+            }
+            statusTone={
+              restoreLoading ? 'neutral' : backupCoverageTone(restorePreview?.backupState ?? null)
+            }
+            accentColor={BACKUP_ACCENT}
+          />
+          {!restoreLoading && (restorePreview?.recoverableAreas.length ?? 0) > 0 ? (
+            <SettingsRow
+              label="Recoverable areas"
+              description={(restorePreview?.recoverableAreas ?? []).join(' · ')}
+              statusLabel="V2 scope"
+              statusTone="neutral"
+              accentColor={BACKUP_ACCENT}
+            />
+          ) : null}
+          <SettingsRow
             label="Restore rule"
             description={
               restoreLoading
-                ? 'Checking whether this device is still eligible for phase-one restore.'
+                ? 'Checking whether this device is still eligible for restore.'
                 : (restorePreview?.eligibility.message ?? 'Backup status is not available yet.')
             }
             statusLabel={restoreEligibilityLabel}

@@ -23,6 +23,10 @@ export type RemoteBackupEntityStatus = {
 
 export type LocalSyncBackedCounts = Record<SyncBackedEntity, number>;
 
+/** Backup completeness state shown in Settings and the startup prompt. */
+export type BackupCoverageState =
+  'v2_complete' | 'v1_legacy' | 'in_progress' | 'invalid' | 'unavailable';
+
 export type RestoreEligibility =
   | {
       kind: 'empty_device';
@@ -47,18 +51,31 @@ export type RestorePreview = {
   entityStatuses: Record<SyncBackedEntity, RemoteBackupEntityStatus>;
   warnings: string[];
   disclosures: string[];
+  /** Backup Completeness V2 state. */
+  backupState: BackupCoverageState;
+  lastCompleteBackupAt: string | null;
+  recoverableAreas: string[];
+  pendingChangeCount: number;
+  backfillInProgress: boolean;
 };
 
 export type RestoreExecutionResult =
   | {
       status: 'blocked';
       preview: RestorePreview;
+      message?: string;
+    }
+  | {
+      status: 'invalid';
+      message: string;
+      diagnostics: string[];
+      preview: RestorePreview;
     }
   | {
       status: 'restored';
       restoredAt: string;
       freshnessSignature: BackupFreshnessSignature;
-      importedCounts: Record<RestoreScopedEntity, number>;
+      importedCounts: Record<string, number>;
     };
 
 export type RemoteRestoreRowMap = {

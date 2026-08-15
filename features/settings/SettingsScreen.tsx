@@ -200,6 +200,12 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
       const result = await restoreFromRemoteBackup();
       if (result.status === 'blocked') {
         setRestoreError(result.preview.eligibility.message);
+      } else if (result.status === 'invalid') {
+        setRestoreError(
+          `${result.message}${
+            result.diagnostics.length > 0 ? ` (${result.diagnostics.slice(0, 3).join('; ')})` : ''
+          }`,
+        );
       }
       await loadRestorePreview();
     } catch (err) {

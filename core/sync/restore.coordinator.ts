@@ -1,12 +1,22 @@
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
-import { getLocalDatasetOwner, setLocalDatasetOwner } from '@/core/auth/account.data';
+import {
+  getLocalDatasetOwner,
+  setLocalDatasetOwner,
+  inspectLocalAccountDataState,
+} from '@/core/auth/account.data';
+
 import { applyRemoteCalorieEntries } from '@/features/calories/calories.data';
 import { applyRemoteHabits } from '@/features/habits/habits.data';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { applyRemoteTodos } from '@/features/todos/todos.data';
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { nowIso } from '@/lib/time';
+import {
+  getBackupStateSummary,
+  isDeviceEmptyForRestore,
+  restoreFromRemoteBackupV2,
+} from '@/core/backup/backupRestore';
 import type {
   BackupFreshnessSignature,
   LocalSyncBackedCounts,
@@ -259,12 +269,11 @@ function buildUnavailableEntityStatuses(
 
 function buildEligibility(
   localCounts: LocalSyncBackedCounts,
+  localEmpty: boolean,
   remoteAvailable: boolean,
   remoteEnabled: boolean,
   ownerMatches: boolean,
 ): RestoreEligibility {
-  const hasAnyLocalSyncRows = SYNC_BACKED_ENTITIES.some((entity) => localCounts[entity] > 0);
-
   if (!remoteEnabled) {
     return buildBlockedEligibility(
       'remote_disabled',
@@ -281,10 +290,10 @@ function buildEligibility(
     );
   }
 
-  if (hasAnyLocalSyncRows) {
+  if (!localEmpty) {
     return buildBlockedEligibility(
       'local_data_present',
-      'Restore is only available on an empty device in this phase. Existing active synced local rows block import.',
+      'Restore is only available on an empty device. Any local user data — including history such as focus sessions or workout logs — blocks import.',
       localCounts,
     );
   }
@@ -299,7 +308,7 @@ function buildEligibility(
 
   return {
     kind: 'empty_device',
-    message: 'This device is empty for synced tables, so importing the remote backup is allowed.',
+    message: 'This device is empty for user data, so importing the remote backup is allowed.',
     localCounts,
   };
 }
@@ -349,10 +358,11 @@ async function fetchRemoteRows<TEntity extends RestoreScopedEntity>(
 async function buildRestorePreview(ownerUserId: string | null): Promise<RestorePreview> {
   const remoteEnabled = isRemoteEnabled();
   const dbPromise = getDatabase();
-  const [db, localCounts, localOwner] = await Promise.all([
+  const [db, localCounts, localOwner, localState] = await Promise.all([
     dbPromise,
     getLocalSyncBackedCounts(),
     dbPromise.then((database) => getLocalDatasetOwner(database)),
+    dbPromise.then((database) => inspectLocalAccountDataState(database)),
   ]);
 
   const ownerMatches = !localOwner || (ownerUserId !== null && localOwner === ownerUserId);
@@ -360,6 +370,7 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
   const entityStatuses = remoteEnabled
     ? await getRemoteEntityStatuses(effectiveOwnerUserId)
     : buildUnavailableEntityStatuses();
+  const backupSummary = await getBackupStateSummary(effectiveOwnerUserId);
 
   const remoteAvailable =
     remoteEnabled &&
@@ -375,11 +386,18 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
       : await getAppMetaText(db, appMetaKeys.restorePromptDismissedSignature);
   const dismissedForCurrentBackup =
     freshnessSignature !== null && dismissedSignature === freshnessSignature;
-  const eligibility = buildEligibility(localCounts, remoteAvailable, remoteEnabled, ownerMatches);
+  const eligibility = buildEligibility(
+    localCounts,
+    isDeviceEmptyForRestore(localState),
+    remoteAvailable,
+    remoteEnabled,
+    ownerMatches,
+  );
 
   return {
     remoteAvailable,
-    latestRestorableBackupAt: computeLatestRestorableBackupAt(entityStatuses),
+    latestRestorableBackupAt:
+      backupSummary.lastCompleteAt ?? computeLatestRestorableBackupAt(entityStatuses),
     freshnessSignature,
     dismissedForCurrentBackup,
     startupPromptEligible:
@@ -388,7 +406,24 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
     entityStatuses,
     warnings: buildWarnings(entityStatuses),
     disclosures: buildDisclosures(),
+    backupState: backupSummary.state,
+    lastCompleteBackupAt: backupSummary.lastCompleteAt,
+    recoverableAreas: buildRecoverableAreas(),
+    pendingChangeCount: backupSummary.pendingChangeCount,
+    backfillInProgress: backupSummary.backfillInProgress,
   };
+}
+
+function buildRecoverableAreas(): string[] {
+  return [
+    'Todos',
+    'Habits and completion history',
+    'Calories and saved meals',
+    'Focus (pomodoro) history',
+    'Workout routines, exercises, sets, and history',
+    'Linked Action rules',
+    'Settings (calorie goal, pomodoro defaults, theme)',
+  ];
 }
 
 async function getCurrentRemoteUserId(): Promise<string | null> {
@@ -421,6 +456,35 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
       preview: await getRestorePreview(),
     };
   }
+
+  // Backup Completeness V2 first: a manifest-backed restore validates,
+  // verifies integrity, and imports the complete scope atomically. Legacy
+  // backups without a manifest fall through to the V1 path below.
+  const v2Result = await restoreFromRemoteBackupV2();
+  if (v2Result.status === 'restored') {
+    return {
+      status: 'restored',
+      restoredAt: v2Result.restoredAt,
+      freshnessSignature: `v2:${v2Result.generation}`,
+      importedCounts: v2Result.importedCounts,
+    };
+  }
+  if (v2Result.status === 'invalid') {
+    return {
+      status: 'invalid',
+      message: v2Result.message,
+      diagnostics: v2Result.diagnostics,
+      preview: await getRestorePreview(),
+    };
+  }
+  if (v2Result.status === 'blocked') {
+    return {
+      status: 'blocked',
+      message: v2Result.message,
+      preview: await getRestorePreview(),
+    };
+  }
+  // v2Result.status === 'legacy' → run the V1 path.
 
   const ownerUserId = await getCurrentRemoteUserId();
   const preview = await buildRestorePreview(ownerUserId);
@@ -460,10 +524,11 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
 
   let localRowsAppeared = false;
   await db.withTransactionAsync(async () => {
-    // Re-verify emptiness inside the transaction: local rows written between
-    // the eligibility preview and this point must abort the import.
-    const counts = await getLocalSyncBackedCounts();
-    if (SYNC_BACKED_ENTITIES.some((entity) => counts[entity] > 0)) {
+    // Re-verify complete emptiness (ALL user tables, not only synced tables)
+    // inside the transaction: local rows written between the eligibility
+    // preview and this point must abort the import.
+    const transactionState = await inspectLocalAccountDataState(db);
+    if (!isDeviceEmptyForRestore(transactionState)) {
       localRowsAppeared = true;
       return;
     }

@@ -33,9 +33,12 @@ export function resolveRestorePromptOutcome(
     input.nextPreview.eligibility.kind === 'blocked'
       ? nonEmptyMessage(input.nextPreview.eligibility.message)
       : null;
+  const invalidMessage =
+    input.result.status === 'invalid' ? nonEmptyMessage(input.result.message) : null;
 
   return {
     dismissPrompt: false,
-    errorMessage: directBlockedMessage ?? refreshedBlockedMessage ?? DEFAULT_BLOCKED_MESSAGE,
+    errorMessage:
+      invalidMessage ?? directBlockedMessage ?? refreshedBlockedMessage ?? DEFAULT_BLOCKED_MESSAGE,
   };
 }

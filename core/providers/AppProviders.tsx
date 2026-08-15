@@ -12,6 +12,7 @@ import {
   getRestorePreview,
   restoreFromRemoteBackup,
 } from '@/core/sync/restore.coordinator';
+import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
 import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessage';
 import { resolveRestorePromptOutcome } from '@/core/providers/restorePromptFlow';
 import type { RestorePreview } from '@/core/sync/restore.types';
@@ -117,6 +118,18 @@ export function AppProviders({ children }: PropsWithChildren) {
       } catch (e) {
         console.error('[restore] getRestorePreview failed during bootstrap', e);
       }
+
+      // Backup Completeness V2: backfill existing local state and publish a
+      // completeness checkpoint once the owner is established and the queue
+      // drains. Best-effort; never blocks bootstrap.
+      try {
+        await runBackupMaintenance({ skipFlush: true });
+        if (cancelled) return;
+        const refreshedPreview = await getRestorePreview();
+        if (!cancelled) setRestorePreview(refreshedPreview);
+      } catch (e) {
+        console.error('[backup] maintenance failed during bootstrap', e);
+      }
     };
 
     void bootstrap();
@@ -209,9 +222,19 @@ export function AppProviders({ children }: PropsWithChildren) {
     if (!isRemoteEnabled() || !remoteAccountReady) return;
 
     const flush = () => {
-      void syncEngine.flush().catch((e) => {
-        console.error('[sync] flush failed', e);
-      });
+      void syncEngine
+        .flush()
+        .then(() => {
+          // After a successful push, run the backup maintenance cycle: it
+          // checks whether a new completeness checkpoint is due and publishes
+          // it only after the queue fully drains. Best-effort. The flush just
+          // happened, so the cycle must not flush again (that would double
+          // the sync-failure accounting while the backend is down).
+          return runBackupMaintenance({ skipFlush: true });
+        })
+        .catch((e) => {
+          console.error('[sync] flush failed', e);
+        });
     };
 
     // The fixed interval respects backoff — no point hammering a backend
@@ -396,12 +419,13 @@ function RestorePrompt({
           accentColor="#475569"
           variant="header"
           headerTitle="Restore backup"
-          headerSubtitle="A remote backup is available and this device is still empty for synced tables."
+          headerSubtitle="A remote backup is available and this device is still empty for user data."
           className="mb-0"
         >
           <View className="gap-3">
             <Text style={{ color: tokens.text, fontSize: 14, lineHeight: 20 }}>
-              Restoring now imports your backed-up todos, habits, and calorie entries.
+              Restoring now imports your backed-up todos, habits, calorie history, focus history,
+              workouts, saved meals, linked-action rules, and settings.
             </Text>
             {preview.latestRestorableBackupAt ? (
               <Text style={{ color: tokens.textMuted, fontSize: 13 }}>
