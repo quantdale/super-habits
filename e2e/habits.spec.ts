@@ -237,6 +237,12 @@ test.describe('Scheduled habits', () => {
     await page.getByLabel('Habit groups').getByText('Edit', { exact: true }).first().click();
     await page.getByLabel('Target per day', { exact: true }).fill('2');
     await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
+    // The save's async mutation chain outlives the click; a SQL oracle below
+    // navigates the page away, which would abort an in-flight transaction on
+    // slower runners. The modal closes only after the edit commits.
+    await expect(page.getByText('Save changes', { exact: true })).toBeHidden({
+      timeout: 10_000,
+    });
     await expect(page.getByText('Read target history', { exact: true })).toBeVisible();
 
     await expectRows(page, "SELECT count FROM habit_completions WHERE date_key = '2026-08-10'", [

@@ -530,15 +530,22 @@ async function switchTab(page: Page, tab: keyof typeof TAB_LABELS): Promise<void
 
 /** Click a habit's ring (the HabitCircle wrapper is the sibling before its name). */
 async function tickHabit(page: Page, name: string): Promise<void> {
-  // Click the habit ring through its accessibility label. The ring re-renders
-  // (and can shift) when a count changes, so a geometric
-  // "preceding-sibling" click is timing-sensitive on slower runners — the
-  // label locator re-resolves to the live element.
+  // Click the habit ring through its accessibility label (the label locator
+  // re-resolves to the live element across re-renders), then WAIT for the
+  // ring to reflect the increment: the click's async mutation chain runs
+  // after the click resolves, and a SQL oracle navigates the page away —
+  // which would abort an in-flight transaction on slower runners. The UI
+  // label only updates after the mutation commits.
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  await page
-    .getByLabel(new RegExp(`^${escapedName}: \\d+ of \\d+ today\\.`))
-    .first()
-    .click({ force: true });
+  const ring = page.getByLabel(new RegExp(`^${escapedName}: (\\d+) of \\d+ today\\.`)).first();
+  const before = Number((await ring.getAttribute('aria-label'))?.match(/(\d+) of/)?.[1] ?? 0);
+  await ring.click({ force: true });
+  await expect
+    .poll(
+      async () => Number((await ring.getAttribute('aria-label'))?.match(/(\d+) of/)?.[1] ?? 0),
+      { timeout: 10_000 },
+    )
+    .toBe(before + 1);
 }
 
 /** Assert a FeatureStatCard's value (scoped so hidden Overview cards don't collide). */
