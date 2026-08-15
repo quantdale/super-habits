@@ -1,7 +1,10 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
+import { installClock } from '../helpers/clock';
 import { openSettingsScreen } from '../helpers/commandObservation';
-import { returnToApp } from '../helpers/dbHarness';
+import { queryRows, returnToApp } from '../helpers/dbHarness';
+import { expectRows } from '../helpers/oracles';
+import { TAB_LABELS } from '../helpers/navigation';
 import { resetAll } from '../helpers/reset';
 
 const SUPABASE_ROUTE = '**/*.supabase.co/**';
@@ -52,6 +55,9 @@ const JSON_HEADERS = {
 let currentUser: typeof ANONYMOUS_USER | typeof PERMANENT_USER = ANONYMOUS_USER;
 let requestShouldCreateUser: boolean | null = null;
 let supabaseRequestsSeen = 0;
+let verifyUserOverride: typeof ANONYMOUS_USER | typeof PERMANENT_USER | typeof WRONG_USER | null =
+  null;
+let pushedTodoUserIds: string[] = [];
 
 function sessionBody(user: typeof currentUser) {
   const now = Math.floor(Date.now() / 1_000);
@@ -140,7 +146,7 @@ async function handleAccountMock(route: Route): Promise<void> {
       });
       return;
     }
-    currentUser = PERMANENT_USER;
+    currentUser = verifyUserOverride ?? PERMANENT_USER;
     await route.fulfill({
       status: 200,
       headers: JSON_HEADERS,
@@ -165,6 +171,21 @@ async function handleAccountMock(route: Route): Promise<void> {
   }
 
   const table = tableMatch[1];
+  // Capture pushed rows so the journey can prove the outbox owner reached the
+  // backup endpoint without exposing token material.
+  if (method === 'POST') {
+    const body = request.postDataJSON() as { user_id?: string }[] | { user_id?: string } | null;
+    const rows = Array.isArray(body) ? body : body ? [body] : [];
+    for (const row of rows) {
+      if (row && typeof row.user_id === 'string') pushedTodoUserIds.push(row.user_id);
+    }
+    await route.fulfill({
+      status: 201,
+      headers: JSON_HEADERS,
+      body: JSON.stringify(rows),
+    });
+    return;
+  }
   const requestedOwner = url.searchParams.get('user_id')?.replace(/^eq\./, '');
   const hasBackup =
     currentUser.is_anonymous === false &&
@@ -218,6 +239,8 @@ async function installAccountMock(page: Page): Promise<void> {
   currentUser = ANONYMOUS_USER;
   requestShouldCreateUser = null;
   supabaseRequestsSeen = 0;
+  verifyUserOverride = null;
+  pushedTodoUserIds = [];
   await page.route(SUPABASE_ROUTE, handleAccountMock);
 }
 
@@ -324,6 +347,156 @@ defineJourney({
           page.getByText('This device belongs to another backup account.', { exact: false }),
         ).toBeVisible();
         await expect(page.getByText('Blocked', { exact: true }).last()).toBeVisible();
+      },
+    },
+    {
+      name: 'first synced activity is durably owned by the anonymous account',
+      run: async ({ page }) => {
+        requireAccountBoundary();
+        verifyUserOverride = null;
+        pushedTodoUserIds = [];
+        await resetAll(page);
+        await returnToApp(page);
+        await page.getByRole('button', { name: 'Open settings' }).click();
+        await expect(page.getByText('Anonymous / unprotected', { exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Close settings' }).click();
+
+        // First synced write on the fresh anonymous install.
+        await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
+        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByPlaceholder(/Add a task/i).fill('First synced todo');
+        await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+        await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });
+
+        // Trigger a background flush (NetInfo online signal) and wait for the
+        // push: the first outbox row must reach the backup endpoint owned by
+        // the anonymous UID — never ownerless.
+        await page.evaluate(() => {
+          const conn = (
+            navigator as unknown as {
+              connection?: { dispatchEvent(ev: Event): boolean };
+              mozConnection?: { dispatchEvent(ev: Event): boolean };
+              webkitConnection?: { dispatchEvent(ev: Event): boolean };
+            }
+          ).connection;
+          if (conn) conn.dispatchEvent(new Event('change'));
+          window.dispatchEvent(new Event('online'));
+        });
+        await expect.poll(() => pushedTodoUserIds).toEqual([ANONYMOUS_USER.id]);
+        const owners = await queryRows(page, 'SELECT DISTINCT owner_user_id FROM sync_outbox');
+        expect(owners.every((row) => row.owner_user_id === ANONYMOUS_USER.id)).toBe(true);
+      },
+    },
+    {
+      name: 'protection succeeds while the user keeps writing and sync keeps flushing',
+      run: async ({ page }) => {
+        requireAccountBoundary();
+        verifyUserOverride = null;
+        pushedTodoUserIds = [];
+        await resetAll(page);
+        await returnToApp(page);
+        await openSettingsScreen(page);
+        await page.getByLabel('Email for backup recovery').fill('recover@example.com');
+        await page.getByRole('button', { name: 'Protect backup with email', exact: true }).click();
+        await expect(page.getByText('Verification pending', { exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Close settings' }).click();
+
+        // The user keeps using the app while the OTP is pending.
+        await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
+        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByPlaceholder(/Add a task/i).fill('Todo while code pending');
+        await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+        await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });
+        await page.evaluate(() => {
+          const conn = (
+            navigator as unknown as {
+              connection?: { dispatchEvent(ev: Event): boolean };
+              mozConnection?: { dispatchEvent(ev: Event): boolean };
+              webkitConnection?: { dispatchEvent(ev: Event): boolean };
+            }
+          ).connection;
+          if (conn) conn.dispatchEvent(new Event('change'));
+          window.dispatchEvent(new Event('online'));
+        });
+        // Background sync drains the outbox while protection is pending.
+        await expect.poll(() => pushedTodoUserIds).toContain(ANONYMOUS_USER.id);
+
+        await openSettingsScreen(page);
+        // A reload re-bootstraps with the pending protection record: the app
+        // must still surface verification pending, never a stale state.
+        await expect(page.getByText('Verification pending', { exact: true })).toBeVisible();
+        await page.getByLabel('Backup protection verification code').fill('123456');
+        await page.getByRole('button', { name: 'Verify email', exact: true }).click();
+        await expect(page.getByText('Protected', { exact: true })).toBeVisible();
+        // UUID and local binding are unchanged.
+        const owner = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'account.owner_user_id'",
+        );
+        expect(owner).toEqual([{ value: ANONYMOUS_USER.id }]);
+      },
+    },
+    {
+      name: 'a populated device cannot switch to a different account after local-only activity',
+      run: async ({ page }) => {
+        requireAccountBoundary();
+        verifyUserOverride = null;
+        pushedTodoUserIds = [];
+        await resetAll(page);
+        // Fake clock BEFORE the app's first render so the focus timer can be
+        // completed deterministically.
+        await installClock(page);
+        await returnToApp(page);
+
+        // First activity is local-only: complete a Pomodoro focus session.
+        await page.getByRole('button', { name: TAB_LABELS.pomodoro, exact: true }).click();
+        await page.getByText('Start focus', { exact: true }).click();
+        await page.clock.fastForward(25 * 60 * 1000);
+        // After the focus session completes the timer advances to the next
+        // mode — the completion marker.
+        await expect(page.getByText('Start short break', { exact: true })).toBeVisible({
+          timeout: 10_000,
+        });
+
+        // The settings card still reflects the bootstrap view; attempting
+        // recovery on the now-populated device sends the OTP, but verifying
+        // with a DIFFERENT account (different UUID) must fail closed.
+        // The settings shortcut lives on the Overview section; return there.
+        await page.getByRole('button', { name: TAB_LABELS.overview, exact: true }).click();
+        await page.getByRole('button', { name: 'Open settings' }).click();
+        await expect(page.getByText('Anonymous / unprotected', { exact: true })).toBeVisible();
+        await page.getByLabel('Protected account email').fill('other@example.com');
+        await page.getByRole('button', { name: 'Recover existing backup', exact: true }).click();
+        await expect(page.getByText('Sign-in pending', { exact: true })).toBeVisible();
+
+        verifyUserOverride = WRONG_USER;
+        await page.getByLabel('Account recovery verification code').fill('123456');
+        await page.getByRole('button', { name: 'Sign in and continue', exact: true }).click();
+        await expect(page.getByText(/different account/i)).toBeVisible();
+        // The unsafe session was cleared (fail closed), local data intact, and
+        // the retry path stays available — the switch was rejected without
+        // reassigning anything.
+        await expect(
+          page.getByText(
+            'Recovery verification is pending. Enter the code sent to recover this backup.',
+          ),
+        ).toBeVisible();
+
+        // The local-only write durably claimed the dataset for the anonymous
+        // owner; the failed switch reassigned nothing.
+        const owner = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'account.owner_user_id'",
+        );
+        expect(owner).toEqual([{ value: ANONYMOUS_USER.id }]);
+        const state = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'account.owner_binding_state'",
+        );
+        expect(state).toEqual([{ value: 'permanent' }]);
+        await expectRows(page, 'SELECT COUNT(*) AS n FROM pomodoro_sessions', (rows) =>
+          expect(Number(rows[0]?.n)).toBe(1),
+        );
       },
     },
   ],

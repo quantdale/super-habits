@@ -1,0 +1,34 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - account-v1
+  - auth-persistence
+---
+# On-device protection OTP flow against the hermetic local Auth mock: the
+# anonymous session converts to a permanent account with the SAME user id
+# (the mock server logs the id for the harness assertion). The mock OTP is
+# always 123456.
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 15000
+- tapOn: 'Open settings'
+- scrollUntilVisible:
+    element: 'Email for backup recovery'
+    direction: DOWN
+- tapOn: 'Email for backup recovery'
+- inputText: 'canary@example.test'
+- hideKeyboard
+- tapOn: 'Protect backup with email'
+- extendedWaitUntil:
+    visible: 'VERIFICATION PENDING'
+    timeout: 20000
+- tapOn: 'Backup protection verification code'
+- inputText: '123456'
+- hideKeyboard
+- tapOn: 'Verify email'
+- extendedWaitUntil:
+    visible: 'PROTECTED'
+    timeout: 20000
+- assertNotVisible: 'ACCOUNT MISMATCH'
+- killApp

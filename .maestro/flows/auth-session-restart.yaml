@@ -1,0 +1,32 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - account-v1
+  - auth-persistence
+---
+# Auth persistence across process restart — SECOND launch after killApp (no
+# state clearing). The SAME anonymous session must be restored: the account
+# card stays 'Anonymous / unprotected' and must NOT enter 'Recovery required'
+# (which would mean the persisted session was lost and no new anonymous user
+# may be created for the bound dataset).
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 15000
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Close settings'
+    timeout: 5000
+# The SAME anonymous session must be restored: the account card stays
+# 'ANONYMOUS / UNPROTECTED' (pill renders uppercase) and must NOT enter
+# 'RECOVERY REQUIRED' (which would mean the persisted session was lost and no
+# new anonymous user may be created for the bound dataset).
+- scrollUntilVisible:
+    element: 'ANONYMOUS / UNPROTECTED'
+    direction: DOWN
+    timeout: 30000
+- assertNotVisible: 'RECOVERY REQUIRED'
+- assertNotVisible: 'ACCOUNT MISMATCH'
+# Close settings is scrolled off-screen at this point; the kill is the
+# state boundary that matters for the restart proof.
+- killApp

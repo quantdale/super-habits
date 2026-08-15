@@ -1,0 +1,30 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - account-v1
+  - auth-persistence
+---
+# Auth persistence across process restart — FIRST launch on a fresh install.
+# The app bootstraps an anonymous Supabase session and provisionally binds the
+# empty dataset. The test harness extracts the durable owner UID from the app's
+# SQLite (app_meta.account.owner_user_id) and the Auth session id from
+# AsyncStorage between this flow and auth-session-restart.yaml, then asserts
+# both are unchanged after the force-stop/relaunch.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 15000
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Close settings'
+    timeout: 5000
+# Anonymous bootstrap + provisional owner binding complete asynchronously.
+# The status pill renders uppercase on native.
+- scrollUntilVisible:
+    element: 'ANONYMOUS / UNPROTECTED'
+    direction: DOWN
+    timeout: 30000
+# Close settings is scrolled off-screen at this point; the kill is the
+# state boundary that matters for the restart proof.
+- killApp
