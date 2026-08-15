@@ -530,9 +530,14 @@ async function switchTab(page: Page, tab: keyof typeof TAB_LABELS): Promise<void
 
 /** Click a habit's ring (the HabitCircle wrapper is the sibling before its name). */
 async function tickHabit(page: Page, name: string): Promise<void> {
+  // Click the habit ring through its accessibility label. The ring re-renders
+  // (and can shift) when a count changes, so a geometric
+  // "preceding-sibling" click is timing-sensitive on slower runners — the
+  // label locator re-resolves to the live element.
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   await page
-    .getByText(name, { exact: true })
-    .locator('xpath=preceding-sibling::*[1]')
+    .getByLabel(new RegExp(`^${escapedName}: \\d+ of \\d+ today\\.`))
+    .first()
     .click({ force: true });
 }
 
