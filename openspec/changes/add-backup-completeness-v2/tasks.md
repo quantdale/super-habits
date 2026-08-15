@@ -61,8 +61,8 @@
 
 ## 11. Full QA and closure
 
-- [ ] 11.1 Full headless QA (mission §89 list), `npx expo-doctor`, `npm audit` (no `--force`), `git diff --check`.
+- [x] 11.1 Full headless QA (mission §89 list), `npx expo-doctor`, `npm audit` (no `--force`), `git diff --check`.
 - [x] 11.2 Live Supabase migration apply + read-only verification (ledger, tables, RLS, grants, indexes, FKs, existing V1 row/owner counts unchanged, advisors).
-- [ ] 11.3 Android native QA (Nitro_API_36) or record BLOCKED/ENVIRONMENT with evidence.
-- [ ] 11.4 Docs updates (backup scope, exclusions, checkpoint semantics, V1 legacy, Restore V2, security).
-- [ ] 11.5 Commit coherently → push main (no force) → verify local == origin/main and main-only remote → inspect GitHub CI (quality + e2e PASS) → complete ExecPlan → final 31-section report.
+- [x] 11.3 Android native QA (Nitro_API_36) or record BLOCKED/ENVIRONMENT with evidence.
+- [x] 11.4 Docs updates (backup scope, exclusions, checkpoint semantics, V1 legacy, Restore V2, security).
+- [x] 11.5 Commit coherently → push main (no force) → verify local == origin/main and main-only remote → inspect GitHub CI (quality + e2e PASS) → complete ExecPlan → final 31-section report.
