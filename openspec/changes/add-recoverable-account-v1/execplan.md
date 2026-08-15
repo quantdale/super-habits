@@ -3,6 +3,17 @@
 Plan-Version: 2
 Status: COMPLETED
 
+> **Closure notice (2026-08-14):** An independent post-delivery review found
+> three correctness/lifecycle defects in the shipped implementation: (1) native
+> Auth storage was selected window-first instead of platform-first, (2) account
+> protection verified frozen outbox/remote COUNTS instead of immutable
+> ownership facts, and (3) fresh anonymous installs left the dataset unbound so
+> local-only-first activity could strand later synced writes. The remediation
+> is tracked authoritatively in
+> `.agent/execplans/recoverable-account-v1-closure.md` (ACTIVE) and supersedes
+> the completion claims below for those three areas. This plan's record of the
+> original delivery work is preserved unchanged.
+
 ## Purpose
 
 Build a recoverable account boundary for Super Habits so anonymous users can protect the existing Supabase identity with a verified email, recover that same identity on an empty device, and never silently rebind populated local data or durable outbox work to another owner.

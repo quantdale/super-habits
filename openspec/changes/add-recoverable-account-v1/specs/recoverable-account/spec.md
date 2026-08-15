@@ -19,6 +19,77 @@ The application MUST continue to allow ordinary anonymous or local-only use with
 - **WHEN** Supabase authentication or the network is unavailable
 - **THEN** local features remain readable and writable, while remote backup is reported as unavailable or recovery-required.
 
+### Requirement: Fresh anonymous installations claim ownership provisionally
+
+A pristine device whose dataset is still empty MUST claim the dataset for the current temporary anonymous session as a REPLACEABLE (provisional) owner as soon as anonymous authentication succeeds. The FIRST meaningful local user content — in any user-owned table, including local-only tables such as pomodoro sessions, workout history, habit completions, saved meals, or linked-action rules — MUST promote that claim to a permanent owner binding. A provisional claim MUST be replaceable by Recover Existing ONLY while the dataset is pristine (no user content, no pending outbox); a promoted binding MUST NOT be replaceable.
+
+#### Scenario: Pristine install binds a replaceable provisional owner
+
+- **WHEN** a fresh configured install authenticates an anonymous session A and the dataset has no content
+- **THEN** the dataset is bound to A as a provisional owner, Recover Existing remains available, and no outbox row is ever created ownerless.
+
+#### Scenario: First meaningful local content promotes the claim
+
+- **WHEN** the user commits ANY first meaningful local state (for example a pomodoro session) on a provisionally bound device
+- **THEN** the binding is durably promoted to permanent and Recover Existing is no longer offered or allowed for that dataset.
+
+#### Scenario: Local-only-first activity cannot strand later synced writes
+
+- **WHEN** the user's first activity is local-only (pomodoro, workout history, habit completion, saved meal, or linked-action rule) and a synced write follows
+- **THEN** the synced outbox record MUST be owned by the original anonymous UID and remote flush MUST succeed under that UID without an ownerless queue.
+
+#### Scenario: Session loss before any content starts a fresh temporary anonymous session
+
+- **WHEN** a pristine provisionally bound device loses its session
+- **THEN** the application MAY create a fresh temporary anonymous session and replace the provisional claim, because a pristine device has no remote rows under the old temporary UID; a populated dataset MUST NOT be treated this way.
+
+### Requirement: The first synced write is never ownerless on a configured install
+
+On a normal configured fresh anonymous installation, the first synced entity write MUST carry a real durable owner (the provisional or promoted anonymous owner) in its outbox record. The application MUST NOT emit `owner_user_id = NULL` outbox work on such an install, and MUST NOT assign a new anonymous identity to populated data after session loss.
+
+#### Scenario: First Todo owns its outbox record
+
+- **WHEN** a fresh anonymous install creates its first Todo
+- **THEN** the outbox record and dataset binding both belong to the anonymous UID and the sync adapter accepts the flush.
+
+### Requirement: Account protection validates ownership, not dataset immutability
+
+Protection verification MUST validate immutable identity/ownership facts only: the final verified UID equals the captured original UID; the account is no longer anonymous; the local dataset owner remains the original UID; every non-null durable outbox owner equals the original UID; and remote rows visible to the user remain owned by the original UID. Protection MUST NOT require the pending outbox count, remote row counts, or updated timestamps to stay frozen while the OTP is pending: legitimate user writes, linked-action cascades, and background sync MUST NOT invalidate a successful identity conversion.
+
+#### Scenario: New local writes while the code is pending do not invalidate protection
+
+- **WHEN** the user creates synced content while protection is pending and then verifies the correct code with the same UID
+- **THEN** protection succeeds and every new outbox record remains owned by the original UID.
+
+#### Scenario: Background sync while the code is pending does not invalidate protection
+
+- **WHEN** the outbox drains and remote row counts grow while protection is pending and the correct code is then verified
+- **THEN** protection succeeds because ownership evidence is unchanged.
+
+#### Scenario: A foreign owner appearing while pending fails closed
+
+- **WHEN** any outbox or remote owner other than the original UID appears while protection is pending
+- **THEN** protection MUST fail closed, the unsafe session MUST be cleared, and no owner MUST be rewritten.
+
+#### Scenario: Post-verification terminal failures clear the pending record
+
+- **WHEN** identity conversion succeeded remotely but a post-verification ownership check fails (or evidence cannot be fetched)
+- **THEN** the pending protection record MUST be terminated (never left as a stale unverified loop across restart), a diagnostic record is preserved, and the local dataset keeps its original owner.
+
+### Requirement: Native auth sessions persist durably across restarts
+
+On Android and iOS the Supabase Auth client MUST persist sessions in durable native storage (AsyncStorage or another deliberately chosen supported native store), MUST auto-refresh tokens, and MUST restore the SAME user identity after a process restart. Storage selection MUST be platform-first: the platform abstraction decides native vs web, and a browser-window check applies only within the web platform to distinguish an in-browser session from the static export/SSR build. The static export MUST never touch native-only or browser-only storage APIs at runtime.
+
+#### Scenario: Native process restart restores the same anonymous session
+
+- **WHEN** a native app establishes anonymous session A, is force-stopped, and relaunched
+- **THEN** the app restores session A without creating a second anonymous user and the account coordinator reports the same owner state.
+
+#### Scenario: Static web export stays storage-safe
+
+- **WHEN** the web app is statically exported or server-rendered without a browser or native runtime
+- **THEN** the Auth client uses an SSR-safe no-op storage and does not crash on missing `window` or `localStorage`.
+
 ### Requirement: The local dataset has one durable owner binding
 
 The application MUST persist a local-only binding between the SQLite dataset and one Supabase user UUID. The binding MUST NOT be synced as user-editable data, and account protection MUST NOT require rewriting local entity rows.
@@ -99,20 +170,6 @@ For a current anonymous user with a compatible local owner binding, the applicat
 - **WHEN** anonymous user A attempts to protect with an email already belonging to permanent user B
 - **THEN** the app MUST show an explicit conflict, remain on A, and MUST NOT sign into B, merge data, transfer rows, or rewrite ownership.
 
-### Requirement: Existing-account recovery is empty-device-only
-
-The Recover Existing flow MUST inspect local account data before authentication and MUST proceed only when there is no meaningful user data and no pending outbox. It MUST NOT delete local data, merge datasets, or provide a sign-in-anyway bypass on a populated device.
-
-#### Scenario: Empty device can start recovery
-
-- **WHEN** the local dataset has no meaningful user data and the outbox is empty
-- **THEN** the user may request recovery of an existing protected account.
-
-#### Scenario: Populated device cannot replace its account
-
-- **WHEN** meaningful local data or pending outbox work exists
-- **THEN** Recover Existing MUST be blocked before session replacement with copy that account switching and merging are not supported.
-
 ### Requirement: Recover Existing does not create accounts
 
 The existing-account passwordless request MUST use the current Supabase equivalent of `shouldCreateUser: false` and MUST treat unknown or mistyped email addresses as safe failures. The UI MUST use bounded input, in-flight guards, resend cooldown/expiration messaging, generic account-not-found-safe errors, and MUST NOT log OTPs, JWTs, refresh tokens, or raw auth internals.
@@ -157,4 +214,20 @@ The client MUST continue to use the authenticated Supabase session for remote op
 #### Scenario: Protection leaves remote owners unchanged
 
 - **WHEN** an anonymous account is protected and the UUID-preservation checks pass
-- **THEN** pre-existing remote rows retain their original `user_id`, and row counts/ownership remain unchanged.
+- **THEN** pre-existing remote rows retain their original `user_id`; row COUNTS are mutable diagnostics (they may grow or shrink through legitimate sync) and MUST NOT be treated as a security fingerprint.
+
+## MODIFIED Requirements
+
+### Requirement: Existing-account recovery is empty-device-only
+
+The Recover Existing flow MUST inspect local account data before authentication and MUST proceed only when there is no meaningful user data and no pending outbox. A replaceable provisional owner binding on a pristine device does NOT block recovery; any promoted (permanent) binding or any committed content DOES. It MUST NOT delete local data, merge datasets, or provide a sign-in-anyway bypass on a populated device.
+
+#### Scenario: Empty device can start recovery
+
+- **WHEN** the local dataset has no meaningful user data, the outbox is empty, and any owner binding is provisional/replaceable
+- **THEN** the user may request recovery of an existing protected account, and after verified authentication the provisional owner is replaced by the recovered account.
+
+#### Scenario: Populated device cannot replace its account
+
+- **WHEN** meaningful local data or pending outbox work exists
+- **THEN** Recover Existing MUST be blocked before session replacement with copy that account switching and merging are not supported.
