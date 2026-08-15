@@ -58,7 +58,7 @@ corrected lifecycle:
 - [ ] Web E2E run (journeys-sync + full)
 - [ ] Full headless QA chain
 - [ ] Android native restart proof
-- [ ] Live config inspection + canary (if credentials allow)
+- [x] Live config inspection + canary (blocked — CREDENTIAL_REQUIRED, classified; no project credentials exist on this machine)
 - [ ] Push main, verify CI, final report
 
 ## Starting Git State
