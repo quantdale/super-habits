@@ -55,11 +55,11 @@ corrected lifecycle:
 - [x] Finding 2: ownership-only protection + terminal lifecycle
 - [x] Unit + integration coverage (808 unit / 104 integration)
 - [x] OpenSpec amendment + prior-plan closure notice
-- [ ] Web E2E run (journeys-sync + full)
-- [ ] Full headless QA chain
-- [ ] Android native restart proof
+- [x] Web E2E run (journeys-sync 33/33 + standard 172/0)
+- [x] Full headless QA chain (unit 912, integration 104, timezones, sim 21/21, builds, gates)
+- [x] Android native restart proof (3/3 auth flows; smoke/persistence/lifecycle lanes)
 - [x] Live config inspection + canary (blocked — CREDENTIAL_REQUIRED, classified; no project credentials exist on this machine)
-- [ ] Push main, verify CI, final report
+- [x] Push main (e8ee8d1), GitHub CI run #359 quality+e2e success
 
 ## Starting Git State
 
