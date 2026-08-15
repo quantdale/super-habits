@@ -1,8 +1,19 @@
 import { getDatabase } from '@/core/db/client';
 import type * as SQLite from 'expo-sqlite';
-import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
+import {
+  claimOwnerBindingOnFirstContent,
+  getCachedLocalDatasetOwner,
+  getCachedOwnerBindingProvisional,
+  promoteLocalDatasetOwnerIfProvisional,
+  setLocalDatasetOwner,
+} from '@/core/auth/account.data';
+import { appMetaKeys, setAppMetaText } from '@/core/db/appMeta';
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
+import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
+import { syncEngine, type PreparedSyncRecord, type SyncRecord } from '@/core/sync/sync.engine';
+import { resolveSyncOwnerUserId } from '@/core/sync/syncedMutation';
 import {
   type CreateLinkedActionRuleInput,
   type LinkedActionEventRecord,
@@ -24,6 +35,52 @@ import {
   normalizeLinkedActionExecutionRow,
   normalizeLinkedActionRuleRow,
 } from '@/core/linked-actions/linkedActions.types';
+
+/**
+ * Wrap a rule write (or set of rule writes) and its durable backup intents in
+ * one SQLite transaction. Rule configuration is recoverable user state, so
+ * every created/updated/tombstoned rule row enqueues a `linked_action_rules`
+ * outbox record in the same transaction the row lands in. Owner resolution
+ * mirrors `runBackupMutation`.
+ */
+async function runWithBackupIntents<T>(
+  db: SQLite.SQLiteDatabase,
+  collect: (transactionDb: SQLite.SQLiteDatabase, intents: SyncRecord[]) => Promise<T>,
+): Promise<T> {
+  const ownerUserId = await resolveSyncOwnerUserId(db);
+  const existingOwnerUserId = getCachedLocalDatasetOwner();
+  const preparedList: PreparedSyncRecord[] = [];
+  const result = await withSQLiteTransaction(db, async (transactionDb) => {
+    const intents: SyncRecord[] = [];
+    const value = await collect(transactionDb, intents);
+    if (intents.length === 0) return value;
+    if (!existingOwnerUserId && ownerUserId) {
+      await setLocalDatasetOwner(transactionDb, ownerUserId);
+    }
+    if (getCachedOwnerBindingProvisional() === true) {
+      await promoteLocalDatasetOwnerIfProvisional(transactionDb);
+    }
+    for (const intent of intents) {
+      const prepared = syncEngine.prepare(ownerUserId ? { ...intent, ownerUserId } : intent);
+      preparedList.push(prepared);
+      await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
+    }
+    await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+    return value;
+  });
+  for (const prepared of preparedList) {
+    syncEngine.enqueuePrepared(prepared, { durablyPersisted: true });
+  }
+  return result;
+}
+
+function ruleIntent(
+  id: string,
+  operation: 'create' | 'update' | 'delete',
+  updatedAt: string,
+): SyncRecord {
+  return { entity: 'linked_action_rules', id, updatedAt, operation };
+}
 
 async function insertLinkedActionRuleRow(
   db: Awaited<ReturnType<typeof getDatabase>>,
@@ -219,7 +276,10 @@ export async function createLinkedActionRule(
 
   const row = buildLinkedActionRuleRow(rule);
   const db = await getDatabase();
-  await insertLinkedActionRuleRow(db, row);
+  await runWithBackupIntents(db, async (transactionDb, intents) => {
+    await insertLinkedActionRuleRow(transactionDb, row);
+    intents.push(ruleIntent(rule.id, 'create', now));
+  });
 
   return rule;
 }
@@ -230,46 +290,77 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
   entityId: string;
   rules: SaveLinkedActionRuleForSourceInput[];
   db?: Awaited<ReturnType<typeof getDatabase>>;
+  enqueue?: (record: SyncRecord) => void;
 }): Promise<void> {
   const db = input.db ?? (await getDatabase());
-  const existingRows = await db.getAllAsync<LinkedActionRuleRow>(
-    `SELECT *
-     FROM linked_action_rules
-     WHERE deleted_at IS NULL
-       AND source_feature = ?
-       AND source_entity_type = ?
-       AND source_entity_id = ?`,
-    [input.feature, input.entityType, input.entityId],
-  );
-  const existingById = new Map(
-    existingRows.map((row) => [row.id, normalizeLinkedActionRuleRow(row)]),
-  );
-  const keptRuleIds = new Set<string>();
-  const now = nowIso();
-
-  for (const ruleInput of input.rules) {
-    const source = {
-      feature: input.feature,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      triggerType: ruleInput.triggerType,
+  const apply = async (
+    transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+    intents: SyncRecord[] | null,
+  ): Promise<void> => {
+    const pushIntent = (intent: SyncRecord): void => {
+      if (input.enqueue) input.enqueue(intent);
+      else intents?.push(intent);
     };
-    const existingRule = ruleInput.existingRuleId
-      ? existingById.get(ruleInput.existingRuleId)
-      : undefined;
+    const existingRows = await transactionDb.getAllAsync<LinkedActionRuleRow>(
+      `SELECT *
+       FROM linked_action_rules
+       WHERE deleted_at IS NULL
+         AND source_feature = ?
+         AND source_entity_type = ?
+         AND source_entity_id = ?`,
+      [input.feature, input.entityType, input.entityId],
+    );
+    const existingById = new Map(
+      existingRows.map((row) => [row.id, normalizeLinkedActionRuleRow(row)]),
+    );
+    const keptRuleIds = new Set<string>();
+    const now = nowIso();
 
-    if (existingRule) {
-      if (existingRule.isUnsupported) {
-        throw new Error(
-          'Unsupported linked action rules must be removed or replaced before saving.',
-        );
+    for (const ruleInput of input.rules) {
+      const source = {
+        feature: input.feature,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        triggerType: ruleInput.triggerType,
+      };
+      const existingRule = ruleInput.existingRuleId
+        ? existingById.get(ruleInput.existingRuleId)
+        : undefined;
+
+      if (existingRule) {
+        if (existingRule.isUnsupported) {
+          throw new Error(
+            'Unsupported linked action rules must be removed or replaced before saving.',
+          );
+        }
+
+        const updatedRule: LinkedActionRuleDefinition = {
+          id: existingRule.id,
+          status: ruleInput.status ?? existingRule.status,
+          directionPolicy: ruleInput.directionPolicy ?? existingRule.directionPolicy,
+          bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? existingRule.bidirectionalGroupId,
+          source,
+          target: ruleInput.target,
+          isUnsupported: false,
+          unsupportedReason: null,
+          rawTargetFeature: ruleInput.target.feature,
+          rawTargetEntityType: ruleInput.target.entityType,
+          rawEffectType: ruleInput.target.effect.type,
+          createdAt: existingRule.createdAt,
+          updatedAt: now,
+          deletedAt: null,
+        };
+        await updateLinkedActionRuleRow(transactionDb, buildLinkedActionRuleRow(updatedRule));
+        pushIntent(ruleIntent(existingRule.id, 'update', now));
+        keptRuleIds.add(existingRule.id);
+        continue;
       }
 
-      const updatedRule: LinkedActionRuleDefinition = {
-        id: existingRule.id,
-        status: ruleInput.status ?? existingRule.status,
-        directionPolicy: ruleInput.directionPolicy ?? existingRule.directionPolicy,
-        bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? existingRule.bidirectionalGroupId,
+      const createdRule: LinkedActionRuleDefinition = {
+        id: createId('link'),
+        status: ruleInput.status ?? 'active',
+        directionPolicy: ruleInput.directionPolicy ?? 'one_way',
+        bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? null,
         source,
         target: ruleInput.target,
         isUnsupported: false,
@@ -277,47 +368,37 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
         rawTargetFeature: ruleInput.target.feature,
         rawTargetEntityType: ruleInput.target.entityType,
         rawEffectType: ruleInput.target.effect.type,
-        createdAt: existingRule.createdAt,
+        createdAt: now,
         updatedAt: now,
         deletedAt: null,
       };
-      await updateLinkedActionRuleRow(db, buildLinkedActionRuleRow(updatedRule));
-      keptRuleIds.add(existingRule.id);
-      continue;
+      await insertLinkedActionRuleRow(transactionDb, buildLinkedActionRuleRow(createdRule));
+      pushIntent(ruleIntent(createdRule.id, 'create', now));
+      keptRuleIds.add(createdRule.id);
     }
 
-    const createdRule: LinkedActionRuleDefinition = {
-      id: createId('link'),
-      status: ruleInput.status ?? 'active',
-      directionPolicy: ruleInput.directionPolicy ?? 'one_way',
-      bidirectionalGroupId: ruleInput.bidirectionalGroupId ?? null,
-      source,
-      target: ruleInput.target,
-      isUnsupported: false,
-      unsupportedReason: null,
-      rawTargetFeature: ruleInput.target.feature,
-      rawTargetEntityType: ruleInput.target.entityType,
-      rawEffectType: ruleInput.target.effect.type,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-    };
-    await insertLinkedActionRuleRow(db, buildLinkedActionRuleRow(createdRule));
-    keptRuleIds.add(createdRule.id);
-  }
-
-  for (const existingRow of existingRows) {
-    if (keptRuleIds.has(existingRow.id)) {
-      continue;
+    for (const existingRow of existingRows) {
+      if (keptRuleIds.has(existingRow.id)) {
+        continue;
+      }
+      await transactionDb.runAsync(
+        `UPDATE linked_action_rules
+         SET deleted_at = ?, updated_at = ?
+         WHERE id = ?
+           AND deleted_at IS NULL`,
+        [now, now, existingRow.id],
+      );
+      pushIntent(ruleIntent(existingRow.id, 'delete', now));
     }
-    await db.runAsync(
-      `UPDATE linked_action_rules
-       SET deleted_at = ?, updated_at = ?
-       WHERE id = ?
-         AND deleted_at IS NULL`,
-      [now, now, existingRow.id],
-    );
+  };
+
+  if (input.enqueue) {
+    await apply(db, null);
+    return;
   }
+  await runWithBackupIntents(db, async (transactionDb, intents) => {
+    await apply(transactionDb, intents);
+  });
 }
 
 export async function updateLinkedActionRuleStatus(
@@ -325,25 +406,32 @@ export async function updateLinkedActionRuleStatus(
   status: LinkedActionRuleDefinition['status'],
 ): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(
-    `UPDATE linked_action_rules
-     SET status = ?, updated_at = ?
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [status, nowIso(), id],
-  );
+  const now = nowIso();
+  await runWithBackupIntents(db, async (transactionDb, intents) => {
+    await transactionDb.runAsync(
+      `UPDATE linked_action_rules
+       SET status = ?, updated_at = ?
+       WHERE id = ?
+         AND deleted_at IS NULL`,
+      [status, now, id],
+    );
+    intents.push(ruleIntent(id, 'update', now));
+  });
 }
 
 export async function deleteLinkedActionRule(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await db.runAsync(
-    `UPDATE linked_action_rules
-     SET deleted_at = ?, updated_at = ?
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [now, now, id],
-  );
+  await runWithBackupIntents(db, async (transactionDb, intents) => {
+    await transactionDb.runAsync(
+      `UPDATE linked_action_rules
+       SET deleted_at = ?, updated_at = ?
+       WHERE id = ?
+         AND deleted_at IS NULL`,
+      [now, now, id],
+    );
+    intents.push(ruleIntent(id, 'delete', now));
+  });
 }
 
 export async function deleteLinkedActionRulesForTargetEntity(input: {
@@ -352,18 +440,44 @@ export async function deleteLinkedActionRulesForTargetEntity(input: {
   entityId: string;
   deletedAt?: string;
   db?: Awaited<ReturnType<typeof getDatabase>>;
+  enqueue?: (record: SyncRecord) => void;
 }): Promise<void> {
   const db = input.db ?? (await getDatabase());
   const now = input.deletedAt ?? nowIso();
-  await db.runAsync(
-    `UPDATE linked_action_rules
-     SET deleted_at = ?, updated_at = ?
-     WHERE deleted_at IS NULL
-       AND target_feature = ?
-       AND target_entity_type = ?
-       AND target_entity_id = ?`,
-    [now, now, input.feature, input.entityType, input.entityId],
-  );
+  const apply = async (
+    transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+    intents: SyncRecord[] | null,
+  ): Promise<void> => {
+    await transactionDb.runAsync(
+      `UPDATE linked_action_rules
+       SET deleted_at = ?, updated_at = ?
+       WHERE deleted_at IS NULL
+         AND target_feature = ?
+         AND target_entity_type = ?
+         AND target_entity_id = ?`,
+      [now, now, input.feature, input.entityType, input.entityId],
+    );
+    const rows = await transactionDb.getAllAsync<{ id: string }>(
+      `SELECT id
+       FROM linked_action_rules
+       WHERE target_feature = ?
+         AND target_entity_type = ?
+         AND target_entity_id = ?`,
+      [input.feature, input.entityType, input.entityId],
+    );
+    for (const row of rows) {
+      if (input.enqueue) input.enqueue(ruleIntent(row.id, 'delete', now));
+      else intents?.push(ruleIntent(row.id, 'delete', now));
+    }
+  };
+
+  if (input.enqueue) {
+    await apply(db, null);
+    return;
+  }
+  await runWithBackupIntents(db, async (transactionDb, intents) => {
+    await apply(transactionDb, intents);
+  });
 }
 
 export async function getLinkedActionEvent(
@@ -708,4 +822,56 @@ export async function claimLinkedActionExecution(
     [nowIso(), id, staleBefore],
   );
   return result.changes === 1;
+}
+
+/**
+ * Restore-only import for linked-action rule configuration. Plain INSERT OR
+ * REPLACE preserving ids, status, direction, effect payloads, tombstones, and
+ * timestamps. Rules are inert after restore: they fire only for FUTURE source
+ * events — import never dispatches anything.
+ */
+export async function applyRemoteLinkedActionRules(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: LinkedActionRuleRow[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO linked_action_rules (
+         id,
+         status,
+         direction_policy,
+         bidirectional_group_id,
+         source_feature,
+         source_entity_type,
+         source_entity_id,
+         trigger_type,
+         target_feature,
+         target_entity_type,
+         target_entity_id,
+         effect_type,
+         effect_payload,
+         created_at,
+         updated_at,
+         deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.status,
+        row.direction_policy,
+        row.bidirectional_group_id,
+        row.source_feature,
+        row.source_entity_type,
+        row.source_entity_id,
+        row.trigger_type,
+        row.target_feature,
+        row.target_entity_type,
+        row.target_entity_id,
+        row.effect_type,
+        row.effect_payload,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+      ],
+    );
+  }
 }

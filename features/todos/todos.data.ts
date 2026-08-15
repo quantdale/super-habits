@@ -530,7 +530,7 @@ export async function removeTodo(id: string): Promise<void> {
   const result = await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'delete' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const tombstone = await transactionDb.runAsync(
         'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
         [now, now, id],
@@ -543,6 +543,7 @@ export async function removeTodo(id: string): Promise<void> {
         entityId: id,
         rules: [],
         db: transactionDb,
+        enqueue,
       });
       await deleteLinkedActionRulesForTargetEntity({
         feature: 'todos',
@@ -550,6 +551,7 @@ export async function removeTodo(id: string): Promise<void> {
         entityId: id,
         deletedAt: now,
         db: transactionDb,
+        enqueue,
       });
       return { changed: true, value: undefined };
     },

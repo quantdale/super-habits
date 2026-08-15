@@ -1,7 +1,11 @@
 import { getDatabase } from '@/core/db/client';
-import { withSQLiteTransaction } from '@/core/db/transactions';
-import { RoutineExercise, RoutineExerciseSet, WorkoutLog, WorkoutRoutine } from '@/core/db/types';
-import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
+import {
+  RoutineExercise,
+  RoutineExerciseSet,
+  WorkoutLog,
+  WorkoutRoutine,
+  WorkoutSessionExercise,
+} from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import {
   deleteLinkedActionRulesForTargetEntity,
@@ -9,7 +13,8 @@ import {
 } from '@/core/linked-actions/linkedActions.data';
 import { createId } from '@/lib/id';
 import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
-import { runSyncedMutation } from '@/core/sync/syncedMutation';
+import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
+import type { SyncRecord } from '@/core/sync/sync.engine';
 import { validateSetTiming } from '@/lib/validation';
 
 /** Nested configuration changes bump the synced parent so remotes refetch the full routine. */
@@ -33,6 +38,7 @@ async function insertWorkoutLogRecord(input: {
   completedAtIso: string;
   createdAtIso: string;
   requireActiveRoutine: boolean;
+  enqueue: (record: SyncRecord) => void;
 }): Promise<{
   status: 'applied' | 'skipped';
   reason: string | null;
@@ -66,9 +72,15 @@ async function insertWorkoutLogRecord(input: {
        VALUES (?, ?, ?, ?, ?)`,
       [input.logId, input.routineId, input.notes, input.completedAtIso, input.createdAtIso],
     );
+    input.enqueue({
+      entity: 'workout_logs',
+      id: input.logId,
+      updatedAt: input.completedAtIso,
+      operation: 'create',
+    });
     // Workout history is meaningful user content: it durably claims the
-    // dataset for the current anonymous owner.
-    await claimOwnerBindingOnFirstContent(input.db);
+    // dataset for the current anonymous owner (handled by the mutation
+    // wrapper's owner-claiming transaction).
   }
 
   return {
@@ -92,7 +104,7 @@ export async function addRoutine(name: string, description: string): Promise<voi
   await runSyncedMutation({
     db,
     record: { entity: 'workout_routines', id, updatedAt: now, operation: 'create' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       await transactionDb.runAsync(
         'INSERT INTO workout_routines (id, name, description, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL)',
         [id, name, description || null, now, now],
@@ -116,17 +128,23 @@ export async function completeRoutine(
   const logId = createId('wrk');
   const now = nowIso();
 
-  return withSQLiteTransaction(db, async (transactionDb) => {
-    return insertWorkoutLogRecord({
-      db: transactionDb,
-      logId,
-      routineId,
-      notes: notes ?? null,
-      completedAtIso: now,
-      createdAtIso: now,
-      requireActiveRoutine: true,
-    });
+  const outcome = await runBackupMutation<CompleteRoutineResult>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const record = await insertWorkoutLogRecord({
+        db: transactionDb,
+        logId,
+        routineId,
+        notes: notes ?? null,
+        completedAtIso: now,
+        createdAtIso: now,
+        requireActiveRoutine: true,
+        enqueue,
+      });
+      return { changed: record.status === 'applied', value: record };
+    },
   });
+  return outcome.value;
 }
 
 export async function listWorkoutLogs(limit: number = 30): Promise<WorkoutLog[]> {
@@ -161,7 +179,7 @@ export async function deleteRoutine(routineId: string): Promise<void> {
   await runSyncedMutation({
     db,
     record: { entity: 'workout_routines', id: routineId, updatedAt: now, operation: 'delete' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const result = await transactionDb.runAsync(
         'UPDATE workout_routines SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
         [now, now, routineId],
@@ -171,6 +189,17 @@ export async function deleteRoutine(routineId: string): Promise<void> {
       // Configuration children are tombstoned with their parent. Historical
       // workout logs intentionally remain so past sessions keep their audit
       // trail after a routine is removed.
+      const exerciseRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM routine_exercises WHERE routine_id = ? AND deleted_at IS NULL`,
+        [routineId],
+      );
+      const setRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM routine_exercise_sets
+         WHERE exercise_id IN (
+           SELECT id FROM routine_exercises WHERE routine_id = ?
+         ) AND deleted_at IS NULL`,
+        [routineId],
+      );
       await transactionDb.runAsync(
         `UPDATE routine_exercises
          SET deleted_at = ?, updated_at = ?
@@ -185,12 +214,29 @@ export async function deleteRoutine(routineId: string): Promise<void> {
          ) AND deleted_at IS NULL`,
         [now, now, routineId],
       );
+      for (const exercise of exerciseRows) {
+        enqueue({
+          entity: 'routine_exercises',
+          id: exercise.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      }
+      for (const setRow of setRows) {
+        enqueue({
+          entity: 'routine_exercise_sets',
+          id: setRow.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      }
       await replaceLinkedActionRulesForSourceEntity({
         feature: 'workout',
         entityType: 'workout_routine',
         entityId: routineId,
         rules: [],
         db: transactionDb,
+        enqueue,
       });
       await deleteLinkedActionRulesForTargetEntity({
         feature: 'workout',
@@ -198,6 +244,7 @@ export async function deleteRoutine(routineId: string): Promise<void> {
         entityId: routineId,
         deletedAt: now,
         db: transactionDb,
+        enqueue,
       });
       return { changed: true, value: undefined };
     },
@@ -214,15 +261,9 @@ export async function addExercise(input: {
   const db = await getDatabase();
   const id = createId('ex');
   const now = nowIso();
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: {
-      entity: 'workout_routines',
-      id: input.routineId,
-      updatedAt: now,
-      operation: 'update',
-    },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const routine = await transactionDb.getFirstAsync<{ id: string }>(
         'SELECT id FROM workout_routines WHERE id = ? AND deleted_at IS NULL',
         [input.routineId],
@@ -237,6 +278,13 @@ export async function addExercise(input: {
       if (!(await touchWorkoutRoutine(transactionDb, input.routineId, now))) {
         throw new Error('Routine was deleted while adding the exercise.');
       }
+      enqueue({
+        entity: 'workout_routines',
+        id: input.routineId,
+        updatedAt: now,
+        operation: 'update',
+      });
+      enqueue({ entity: 'routine_exercises', id, updatedAt: now, operation: 'create' });
       return { changed: true, value: undefined };
     },
   });
@@ -261,10 +309,13 @@ export async function deleteExercise(id: string): Promise<void> {
     [id],
   );
   if (!row) return;
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: { entity: 'workout_routines', id: row.routine_id, updatedAt: now, operation: 'update' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
+      const setRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM routine_exercise_sets WHERE exercise_id = ? AND deleted_at IS NULL`,
+        [id],
+      );
       const result = await transactionDb.runAsync(
         `UPDATE routine_exercises
        SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL
@@ -279,6 +330,21 @@ export async function deleteExercise(id: string): Promise<void> {
       );
       if (!(await touchWorkoutRoutine(transactionDb, row.routine_id, now))) {
         throw new Error('Routine was deleted while deleting the exercise.');
+      }
+      enqueue({
+        entity: 'workout_routines',
+        id: row.routine_id,
+        updatedAt: now,
+        operation: 'update',
+      });
+      enqueue({ entity: 'routine_exercises', id, updatedAt: now, operation: 'delete' });
+      for (const setRow of setRows) {
+        enqueue({
+          entity: 'routine_exercise_sets',
+          id: setRow.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
       }
       return { changed: true, value: undefined };
     },
@@ -297,15 +363,9 @@ export async function updateExerciseOrder(orderedIds: string[]): Promise<void> {
     [orderedIds[0]],
   );
   if (!first) return;
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: {
-      entity: 'workout_routines',
-      id: first.routine_id,
-      updatedAt: now,
-      operation: 'update',
-    },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const placeholders = orderedIds.map(() => '?').join(', ');
       const rows = await transactionDb.getAllAsync<{ id: string; routine_id: string }>(
         `SELECT id, routine_id FROM routine_exercises
@@ -327,6 +387,20 @@ export async function updateExerciseOrder(orderedIds: string[]): Promise<void> {
       }
       if (!(await touchWorkoutRoutine(transactionDb, first.routine_id, now))) {
         throw new Error('Routine was deleted while reordering exercises.');
+      }
+      enqueue({
+        entity: 'workout_routines',
+        id: first.routine_id,
+        updatedAt: now,
+        operation: 'update',
+      });
+      for (const orderedId of orderedIds) {
+        enqueue({
+          entity: 'routine_exercises',
+          id: orderedId,
+          updatedAt: now,
+          operation: 'update',
+        });
       }
       return { changed: true, value: undefined };
     },
@@ -354,15 +428,9 @@ export async function addSet(input: {
     [input.exerciseId],
   );
   if (!exRow) throw new Error('Exercise or routine not found.');
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: {
-      entity: 'workout_routines',
-      id: exRow.routine_id,
-      updatedAt: now,
-      operation: 'update',
-    },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const activeExercise = await transactionDb.getFirstAsync<{ routine_id: string }>(
         `SELECT e.routine_id
        FROM routine_exercises e
@@ -381,6 +449,13 @@ export async function addSet(input: {
       if (!(await touchWorkoutRoutine(transactionDb, activeExercise.routine_id, now))) {
         throw new Error('Routine was deleted while adding the set.');
       }
+      enqueue({
+        entity: 'workout_routines',
+        id: activeExercise.routine_id,
+        updatedAt: now,
+        operation: 'update',
+      });
+      enqueue({ entity: 'routine_exercise_sets', id, updatedAt: now, operation: 'create' });
       return { changed: true, value: undefined };
     },
   });
@@ -423,15 +498,9 @@ export async function updateSet(
     [id],
   );
   if (!setRow?.routine_id) return;
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: {
-      entity: 'workout_routines',
-      id: setRow.routine_id,
-      updatedAt: now,
-      operation: 'update',
-    },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const activeSet = await transactionDb.getFirstAsync<{
         active_seconds: number;
         rest_seconds: number;
@@ -455,6 +524,13 @@ export async function updateSet(
       if (!(await touchWorkoutRoutine(transactionDb, activeSet.routine_id, now))) {
         throw new Error('Routine was deleted while updating the set.');
       }
+      enqueue({
+        entity: 'workout_routines',
+        id: activeSet.routine_id,
+        updatedAt: now,
+        operation: 'update',
+      });
+      enqueue({ entity: 'routine_exercise_sets', id, updatedAt: now, operation: 'update' });
       return { changed: true, value: undefined };
     },
   });
@@ -471,15 +547,9 @@ export async function deleteSet(id: string): Promise<void> {
     [id],
   );
   if (!setRow?.routine_id) return;
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: {
-      entity: 'workout_routines',
-      id: setRow.routine_id,
-      updatedAt: now,
-      operation: 'update',
-    },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const result = await transactionDb.runAsync(
         `UPDATE routine_exercise_sets
        SET deleted_at = ?, updated_at = ?
@@ -496,6 +566,13 @@ export async function deleteSet(id: string): Promise<void> {
       if (!(await touchWorkoutRoutine(transactionDb, setRow.routine_id, now))) {
         throw new Error('Routine was deleted while deleting the set.');
       }
+      enqueue({
+        entity: 'workout_routines',
+        id: setRow.routine_id,
+        updatedAt: now,
+        operation: 'update',
+      });
+      enqueue({ entity: 'routine_exercise_sets', id, updatedAt: now, operation: 'delete' });
       return { changed: true, value: undefined };
     },
   });
@@ -564,28 +641,39 @@ export async function logWorkoutSession(input: {
   const logId = createId('wrk');
   const now = nowIso();
 
-  await withSQLiteTransaction(db, async (transactionDb) => {
-    const record = await insertWorkoutLogRecord({
-      db: transactionDb,
-      logId,
-      routineId: input.routineId,
-      notes: input.notes ?? null,
-      completedAtIso: now,
-      createdAtIso: now,
-      requireActiveRoutine: true,
-    });
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const record = await insertWorkoutLogRecord({
+        db: transactionDb,
+        logId,
+        routineId: input.routineId,
+        notes: input.notes ?? null,
+        completedAtIso: now,
+        createdAtIso: now,
+        requireActiveRoutine: true,
+        enqueue,
+      });
 
-    if (record.status !== 'applied') return;
+      if (record.status !== 'applied') return { changed: false, value: undefined };
 
-    for (const ex of input.exercises) {
-      const exId = createId('wsex');
-      await transactionDb.runAsync(
-        `INSERT INTO workout_session_exercises
-           (id, log_id, exercise_name, sets_completed, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [exId, logId, ex.exerciseName, ex.setsCompleted, now],
-      );
-    }
+      for (const ex of input.exercises) {
+        const exId = createId('wsex');
+        await transactionDb.runAsync(
+          `INSERT INTO workout_session_exercises
+             (id, log_id, exercise_name, sets_completed, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [exId, logId, ex.exerciseName, ex.setsCompleted, now],
+        );
+        enqueue({
+          entity: 'workout_session_exercises',
+          id: exId,
+          updatedAt: now,
+          operation: 'create',
+        });
+      }
+      return { changed: true, value: undefined };
+    },
   });
 }
 
@@ -596,18 +684,24 @@ export async function logWorkoutFromLinkedAction(input: {
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
   const now = nowIso();
-  const record = await withSQLiteTransaction(db, (transactionDb) =>
-    insertWorkoutLogRecord({
-      db: transactionDb,
-      logId: input.id,
-      routineId: input.routineId,
-      notes: input.notes ?? null,
-      completedAtIso: now,
-      createdAtIso: now,
-      requireActiveRoutine: true,
-    }),
-  );
+  const outcome = await runBackupMutation<CompleteRoutineResult>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const record = await insertWorkoutLogRecord({
+        db: transactionDb,
+        logId: input.id,
+        routineId: input.routineId,
+        notes: input.notes ?? null,
+        completedAtIso: now,
+        createdAtIso: now,
+        requireActiveRoutine: true,
+        enqueue,
+      });
+      return { changed: record.status === 'applied', value: record };
+    },
+  });
 
+  const record = outcome.value;
   if (record.status !== 'applied') {
     return { status: 'skipped', reason: record.reason ?? 'target_missing' };
   }
@@ -618,4 +712,97 @@ export async function logWorkoutFromLinkedAction(input: {
     producedEntityType: 'workout_log',
     producedEntityId: input.id,
   };
+}
+
+/**
+ * Restore-only import functions. Plain INSERT OR REPLACE preserving ids,
+ * ordering, timings, tombstones, and timestamps — data reconstruction only;
+ * no workout-completion events, no linked actions.
+ */
+export async function applyRemoteWorkoutRoutines(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: WorkoutRoutine[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO workout_routines (
+         id, name, description, created_at, updated_at, deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+      [row.id, row.name, row.description, row.created_at, row.updated_at, row.deleted_at],
+    );
+  }
+}
+
+export async function applyRemoteRoutineExercises(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: RoutineExercise[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO routine_exercises (
+         id, routine_id, name, sort_order, created_at, updated_at, deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.routine_id,
+        row.name,
+        row.sort_order,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+      ],
+    );
+  }
+}
+
+export async function applyRemoteRoutineExerciseSets(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: RoutineExerciseSet[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO routine_exercise_sets (
+         id, exercise_id, set_number, active_seconds, rest_seconds,
+         created_at, updated_at, deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.exercise_id,
+        row.set_number,
+        row.active_seconds,
+        row.rest_seconds,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+      ],
+    );
+  }
+}
+
+export async function applyRemoteWorkoutLogs(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: WorkoutLog[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO workout_logs (
+         id, routine_id, notes, completed_at, created_at
+       ) VALUES (?, ?, ?, ?, ?)`,
+      [row.id, row.routine_id, row.notes, row.completed_at, row.created_at],
+    );
+  }
+}
+
+export async function applyRemoteWorkoutSessionExercises(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: WorkoutSessionExercise[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO workout_session_exercises (
+         id, log_id, exercise_name, sets_completed, created_at
+       ) VALUES (?, ?, ?, ?, ?)`,
+      [row.id, row.log_id, row.exercise_name, row.sets_completed, row.created_at],
+    );
+  }
 }

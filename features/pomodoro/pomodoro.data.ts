@@ -1,10 +1,11 @@
 import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { PomodoroSession } from '@/core/db/types';
-import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
+import { runBackupMutation, enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
+
 import {
   DEFAULT_SETTINGS,
   normalizePomodoroSettings,
@@ -24,42 +25,74 @@ async function insertPomodoroSessionRecord(input: {
   inserted: boolean;
 }> {
   const db = await getDatabase();
-  const existing = await db.getFirstAsync<Pick<PomodoroSession, 'id' | 'session_type'>>(
-    `SELECT id, session_type
-     FROM pomodoro_sessions
-     WHERE id = ?`,
-    [input.id],
-  );
-
-  if (existing) {
-    return {
-      id: existing.id,
-      sessionType: existing.session_type,
-      inserted: false,
-    };
-  }
-
   const createdAt = nowIso();
-  await db.runAsync(
-    `INSERT INTO pomodoro_sessions (
-       id,
-       started_at,
-       ended_at,
-       duration_seconds,
-       session_type,
-       created_at
-     ) VALUES (?, ?, ?, ?, ?, ?)`,
-    [input.id, input.startedAtIso, input.endedAtIso, input.durationSeconds, input.type, createdAt],
-  );
-  // First local-only content durably claims the dataset for the current
-  // anonymous owner so later synced work can never become ownerless.
-  await claimOwnerBindingOnFirstContent(db);
-
-  return {
-    id: input.id,
-    sessionType: input.type,
-    inserted: true,
+  type Outcome = {
+    id: string;
+    sessionType: PomodoroSession['session_type'];
+    inserted: boolean;
   };
+  const outcome = await runBackupMutation<Outcome>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const existing = await transactionDb.getFirstAsync<
+        Pick<PomodoroSession, 'id' | 'session_type'>
+      >(
+        `SELECT id, session_type
+         FROM pomodoro_sessions
+         WHERE id = ?`,
+        [input.id],
+      );
+
+      if (existing) {
+        return {
+          changed: false,
+          value: {
+            id: existing.id,
+            sessionType: existing.session_type,
+            inserted: false,
+          },
+        };
+      }
+
+      await transactionDb.runAsync(
+        `INSERT INTO pomodoro_sessions (
+           id,
+           started_at,
+           ended_at,
+           duration_seconds,
+           session_type,
+           created_at
+         ) VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          input.id,
+          input.startedAtIso,
+          input.endedAtIso,
+          input.durationSeconds,
+          input.type,
+          createdAt,
+        ],
+      );
+      enqueue({
+        entity: 'pomodoro_sessions',
+        id: input.id,
+        updatedAt: createdAt,
+        operation: 'create',
+      });
+      // First local-only content durably claims the dataset for the current
+      // anonymous owner so later synced work can never become ownerless
+      // (handled by runBackupMutation's owner-claiming transaction).
+      return {
+        changed: true,
+        value: {
+          id: input.id,
+          sessionType: input.type,
+          inserted: true,
+        },
+      };
+    },
+  });
+
+  return outcome.value;
 }
 
 export async function getPomodoroSettings(): Promise<PomodoroSettings> {
@@ -75,6 +108,7 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
   await setAppMetaJson(db, appMetaKeys.pomodoroSettings, normalizePomodoroSettings(settings));
+  await enqueueBackupSettingsRecord(db);
 }
 
 export async function logPomodoroSession(
@@ -140,4 +174,34 @@ export async function logPomodoroSessionFromLinkedAction(input: {
     producedEntityType: 'pomodoro_session',
     producedEntityId: record.id,
   };
+}
+
+/**
+ * Restore-only import for pomodoro history. Plain INSERT OR REPLACE — no
+ * timers are started, no notifications scheduled, no lifecycle events fired.
+ */
+export async function applyRemotePomodoroSessions(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: PomodoroSession[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO pomodoro_sessions (
+         id,
+         started_at,
+         ended_at,
+         duration_seconds,
+         session_type,
+         created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.started_at,
+        row.ended_at,
+        row.duration_seconds,
+        row.session_type,
+        row.created_at,
+      ],
+    );
+  }
 }

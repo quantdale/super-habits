@@ -1,11 +1,15 @@
 import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { CalorieEntry, SavedMeal } from '@/core/db/types';
-import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { nowIso, toDateKey } from '@/lib/time';
-import { runSyncedMutation } from '@/core/sync/syncedMutation';
+import {
+  runBackupMutation,
+  runSyncedMutation,
+  enqueueBackupSettingsRecord,
+} from '@/core/sync/syncedMutation';
+
 import {
   DEFAULT_CALORIE_GOAL,
   kcalFromMacros,
@@ -69,6 +73,7 @@ export async function getCalorieGoal(): Promise<CalorieGoal> {
 export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
   const db = await getDatabase();
   await setAppMetaJson(db, appMetaKeys.calorieGoal, normalizeCalorieGoal(goal));
+  await enqueueBackupSettingsRecord(db);
 }
 
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {
@@ -227,37 +232,51 @@ export async function upsertSavedMeal(input: {
   // Atomic upsert keyed on the case-insensitive unique index
   // (idx_saved_meals_food_name); the previous read-then-insert raced it and
   // threw on concurrent duplicates. On conflict the original id, created_at,
-  // and food_name casing are kept, matching the old UPDATE branch.
-  await db.runAsync(
-    `INSERT INTO saved_meals
-       (id, food_name, calories, protein, carbs, fats, fiber,
-        meal_type, use_count, last_used_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-     ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET
-       calories     = excluded.calories,
-       protein      = excluded.protein,
-       carbs        = excluded.carbs,
-       fats         = excluded.fats,
-       fiber        = excluded.fiber,
-       meal_type    = excluded.meal_type,
-       use_count    = use_count + 1,
-       last_used_at = excluded.last_used_at`,
-    [
-      createId('smeal'),
-      input.foodName,
-      input.calories,
-      input.protein,
-      input.carbs,
-      input.fats,
-      input.fiber,
-      input.mealType,
-      now,
-      now,
-    ],
-  );
+  // and food_name casing are kept, matching the old UPDATE branch. The backup
+  // intent is created in the same transaction with the actual row id.
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const saved = await transactionDb.getFirstAsync<{ id: string }>(
+        `INSERT INTO saved_meals
+           (id, food_name, calories, protein, carbs, fats, fiber,
+            meal_type, use_count, last_used_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+         ON CONFLICT(food_name COLLATE NOCASE) DO UPDATE SET
+           calories     = excluded.calories,
+           protein      = excluded.protein,
+           carbs        = excluded.carbs,
+           fats         = excluded.fats,
+           fiber        = excluded.fiber,
+           meal_type    = excluded.meal_type,
+           use_count    = use_count + 1,
+           last_used_at = excluded.last_used_at
+         RETURNING id`,
+        [
+          createId('smeal'),
+          input.foodName,
+          input.calories,
+          input.protein,
+          input.carbs,
+          input.fats,
+          input.fiber,
+          input.mealType,
+          now,
+          now,
+        ],
+      );
+      if (!saved) return { changed: false, value: undefined };
+      enqueue({
+        entity: 'saved_meals',
+        id: saved.id,
+        updatedAt: now,
+        operation: 'create',
+      });
+      return { changed: true, value: undefined };
+    },
+  });
   // A saved meal is meaningful user content: it durably claims the dataset
-  // for the current anonymous owner.
-  await claimOwnerBindingOnFirstContent(db);
+  // for the current anonymous owner (handled by runBackupMutation).
 }
 
 export async function listRecentSavedMeals(limit: number = 5): Promise<SavedMeal[]> {
@@ -295,7 +314,18 @@ export async function searchSavedMeals(query: string): Promise<SavedMeal[]> {
 
 export async function deleteSavedMeal(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(`DELETE FROM saved_meals WHERE id = ?`, [id]);
+  const now = nowIso();
+  // Saved meals hard-delete locally (documented exception), so the backup
+  // intent is an owner-scoped remote DELETE carried by the same outbox.
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const result = await transactionDb.runAsync('DELETE FROM saved_meals WHERE id = ?', [id]);
+      if (result.changes !== 1) return { changed: false, value: undefined };
+      enqueue({ entity: 'saved_meals', id, updatedAt: now, operation: 'delete' });
+      return { changed: true, value: undefined };
+    },
+  });
 }
 
 export async function deleteCalorieEntry(id: string): Promise<'deleted' | 'not_found'> {
@@ -448,6 +478,46 @@ export async function applyRemoteCalorieEntries(
         row.created_at,
         row.updated_at,
         row.deleted_at,
+      ],
+    );
+  }
+}
+
+/**
+ * Restore-only import for saved meals. Plain INSERT OR REPLACE preserving
+ * use_count and last_used_at — importing must never look like usage.
+ */
+export async function applyRemoteSavedMeals(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: SavedMeal[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO saved_meals (
+         id,
+         food_name,
+         calories,
+         protein,
+         carbs,
+         fats,
+         fiber,
+         meal_type,
+         use_count,
+         last_used_at,
+         created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.food_name,
+        row.calories,
+        row.protein,
+        row.carbs,
+        row.fats,
+        row.fiber,
+        row.meal_type,
+        row.use_count,
+        row.last_used_at,
+        row.created_at,
       ],
     );
   }

@@ -10,6 +10,7 @@ import {
   isThemeId,
   type ThemeId,
 } from '@/core/theme';
+import { enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
 import { ThemeContext, type ResolvedTheme, type ThemeMode } from '@/core/providers/themeContext';
 
 export type { ResolvedTheme, ThemeMode } from '@/core/providers/themeContext';
@@ -82,6 +83,9 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   const setMode = useCallback((nextMode: ThemeMode) => {
     setModeState(nextMode);
     void AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
+    // Theme preference is recoverable user state; keep the backup snapshot
+    // in the durable queue (best-effort, never blocks the UI).
+    void enqueueBackupSettingsRecord().catch(() => undefined);
   }, []);
 
   const resolvedTheme = useMemo(() => resolveTheme(mode, systemTheme), [mode, systemTheme]);
@@ -100,6 +104,8 @@ export function ThemeProvider({ children }: PropsWithChildren) {
         void AsyncStorage.setItem(THEME_SLOTS_STORAGE_KEY, JSON.stringify(next)).catch(
           () => undefined,
         );
+        // Theme preference is recoverable user state.
+        void enqueueBackupSettingsRecord().catch(() => undefined);
         return next;
       });
       // A fixed mode must flip appearance so the chosen theme becomes visible

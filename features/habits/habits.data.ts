@@ -10,7 +10,10 @@ import type {
 } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
-import { runSyncedMutation } from '@/core/sync/syncedMutation';
+import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
+import { appMetaKeys, setAppMetaText } from '@/core/db/appMeta';
+import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
+import { syncEngine } from '@/core/sync/sync.engine';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import {
   deleteLinkedActionRulesForTargetEntity,
@@ -91,7 +94,7 @@ export async function addHabit(
   await runSyncedMutation({
     db,
     record: { entity: 'habits', id, updatedAt: now, operation: 'create' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       await transactionDb.runAsync(
         'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
         [
@@ -154,26 +157,43 @@ export async function incrementHabit(
     safeTimestampToLocalDateKey(habit.created_at),
   );
 
-  // Atomic upsert instead of read-modify-write: two rapid taps previously
-  // either raced the UNIQUE(habit_id, date_key) constraint (crash) or lost
-  // an increment.
-  const row = await db.getFirstAsync<{ id: string; count: number }>(
-    `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?)
-     ON CONFLICT(habit_id, date_key) DO UPDATE SET
-       count = count + 1,
-       updated_at = excluded.updated_at
-     RETURNING id, count`,
-    [createId('hcmp'), habitId, dateKey, now, now],
-  );
-  // A completion is meaningful user content: it durably claims the dataset
-  // for the current anonymous owner.
-  await claimOwnerBindingOnFirstContent(db);
+  // Atomic upsert inside a transaction with a durable backup intent: two
+  // rapid taps previously either raced the UNIQUE(habit_id, date_key)
+  // constraint (crash) or lost an increment. The outbox record carries the
+  // actual row id returned by the upsert (which may predate this tap).
+  type IncrementOutcome = {
+    completionId: string | null;
+    count: number;
+  };
+  const outcome = await runBackupMutation<IncrementOutcome>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const row = await transactionDb.getFirstAsync<{ id: string; count: number }>(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)
+         ON CONFLICT(habit_id, date_key) DO UPDATE SET
+           count = count + 1,
+           updated_at = excluded.updated_at
+         RETURNING id, count`,
+        [createId('hcmp'), habitId, dateKey, now, now],
+      );
+      if (!row) {
+        return { changed: false, value: { completionId: null, count: 0 } };
+      }
+      enqueue({
+        entity: 'habit_completions',
+        id: row.id,
+        updatedAt: now,
+        operation: 'create',
+      });
+      return { changed: true, value: { completionId: row.id, count: row.count } };
+    },
+  });
   requestHabitReminderReconciliation();
 
-  const nextCount = row?.count ?? 1;
+  const nextCount = outcome.value.count;
   const previousCount = nextCount - 1;
-  const completionId = row?.id ?? null;
+  const completionId = outcome.value.completionId;
 
   if (previousCount >= targetPerDay || nextCount < targetPerDay) {
     return {
@@ -263,6 +283,7 @@ async function runCompleteHabitFromNotification(input: {
   let shouldDispatchLinkedActions = false;
   let mutationApplied = false;
   let nextCount = 0;
+  let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
 
   await db.withTransactionAsync(async () => {
     claim = await claimNotificationActionInTransaction(db, {
@@ -337,6 +358,16 @@ async function runCompleteHabitFromNotification(input: {
     );
     // Processed completion actions are user-driven content as well.
     await claimOwnerBindingOnFirstContent(db);
+    if (updatedCompletion) {
+      completionPrepared = syncEngine.prepare({
+        entity: 'habit_completions',
+        id: updatedCompletion.id,
+        updatedAt,
+        operation: 'create',
+      });
+      await upsertSyncOutboxRecord(db, completionPrepared, completionPrepared.revision);
+      await setAppMetaText(db, appMetaKeys.backupDirty, '1');
+    }
     nextCount = updatedCompletion?.count ?? nextCount + 1;
     completionId = updatedCompletion?.id ?? completionId;
     mutationApplied = true;
@@ -353,6 +384,9 @@ async function runCompleteHabitFromNotification(input: {
       ? 'applied'
       : 'noop'
     : 'duplicate';
+  if (completionPrepared) {
+    syncEngine.enqueuePrepared(completionPrepared, { durablyPersisted: true });
+  }
   if (claim.claimed) requestHabitDataRefresh();
   if (claim.claimed && habitName) requestHabitReminderReconciliation();
 
@@ -399,19 +433,52 @@ async function runCompleteHabitFromNotification(input: {
 export async function decrementHabit(habitId: string, dateKey = toDateKey()): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  // Atomic decrement instead of a read-modify-write: two rapid taps previously
-  // SELECTed the same count and both wrote count-1, losing a decrement (the
-  // same race incrementHabit was fixed for). Decrement count > 0, then hard
-  // delete the row when it reaches 0 (habit_completions is the documented
-  // non-synced toggle-off exception).
-  await db.runAsync(
-    'UPDATE habit_completions SET count = count - 1, updated_at = ? WHERE habit_id = ? AND date_key = ? AND count > 0',
-    [now, habitId, dateKey],
-  );
-  await db.runAsync(
-    'DELETE FROM habit_completions WHERE habit_id = ? AND date_key = ? AND count = 0',
-    [habitId, dateKey],
-  );
+  // Atomic decrement inside a transaction with a durable backup intent:
+  // two rapid taps previously either SELECTed the same count and both wrote
+  // count-1, losing a decrement (the same race incrementHabit was fixed
+  // for). The row is hard-deleted when the count reaches 0 (the documented
+  // non-synced toggle-off exception), and the outbox intent follows the
+  // actual row state (update vs delete).
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const existing = await transactionDb.getFirstAsync<{ id: string }>(
+        `SELECT id FROM habit_completions WHERE habit_id = ? AND date_key = ?`,
+        [habitId, dateKey],
+      );
+      if (!existing) {
+        return { changed: false, value: undefined };
+      }
+      await transactionDb.runAsync(
+        'UPDATE habit_completions SET count = count - 1, updated_at = ? WHERE habit_id = ? AND date_key = ? AND count > 0',
+        [now, habitId, dateKey],
+      );
+      const remaining = await transactionDb.getFirstAsync<{ count: number }>(
+        `SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?`,
+        [habitId, dateKey],
+      );
+      if ((remaining?.count ?? 0) === 0) {
+        await transactionDb.runAsync(
+          'DELETE FROM habit_completions WHERE habit_id = ? AND date_key = ? AND count = 0',
+          [habitId, dateKey],
+        );
+        enqueue({
+          entity: 'habit_completions',
+          id: existing.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      } else {
+        enqueue({
+          entity: 'habit_completions',
+          id: existing.id,
+          updatedAt: now,
+          operation: 'update',
+        });
+      }
+      return { changed: true, value: undefined };
+    },
+  });
   requestHabitReminderReconciliation();
 }
 
@@ -602,7 +669,7 @@ export async function deleteHabit(habitId: string): Promise<void> {
   const result = await runSyncedMutation({
     db,
     record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'delete' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const result = await transactionDb.runAsync(
         'UPDATE habits SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
         [now, now, habitId],
@@ -615,6 +682,7 @@ export async function deleteHabit(habitId: string): Promise<void> {
         entityId: habitId,
         rules: [],
         db: transactionDb,
+        enqueue,
       });
       await deleteLinkedActionRulesForTargetEntity({
         feature: 'habits',
@@ -622,6 +690,7 @@ export async function deleteHabit(habitId: string): Promise<void> {
         entityId: habitId,
         deletedAt: now,
         db: transactionDb,
+        enqueue,
       });
       return { changed: true, value: undefined };
     },
@@ -636,6 +705,7 @@ export async function incrementHabitFromLinkedAction(input: {
   executionId?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
+  let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
   const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
     const habit = await transactionDb.getFirstAsync<Pick<Habit, 'id' | 'name' | 'deleted_at'>>(
       `SELECT id, name, deleted_at
@@ -679,7 +749,7 @@ export async function incrementHabitFromLinkedAction(input: {
       };
     }
 
-    await transactionDb.getFirstAsync<{ id: string; count: number }>(
+    const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(habit_id, date_key) DO UPDATE SET
@@ -688,6 +758,17 @@ export async function incrementHabitFromLinkedAction(input: {
        RETURNING id, count`,
       [createId('hcmp'), input.habitId, input.dateKey, input.amount, nowIso(), nowIso()],
     );
+
+    if (updatedCompletion) {
+      completionPrepared = syncEngine.prepare({
+        entity: 'habit_completions',
+        id: updatedCompletion.id,
+        updatedAt: nowIso(),
+        operation: 'create',
+      });
+      await upsertSyncOutboxRecord(transactionDb, completionPrepared, completionPrepared.revision);
+      await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+    }
 
     if (input.executionId) {
       await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
@@ -705,6 +786,9 @@ export async function incrementHabitFromLinkedAction(input: {
     };
   });
 
+  if (outcome.mutated && completionPrepared) {
+    syncEngine.enqueuePrepared(completionPrepared, { durablyPersisted: true });
+  }
   if (outcome.mutated) requestHabitReminderReconciliation();
   return outcome.result;
 }
@@ -716,6 +800,7 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
   executionId?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
+  let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
   const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
     const habit = await transactionDb.getFirstAsync<
       Pick<Habit, 'id' | 'name' | 'target_per_day' | 'created_at' | 'rule_history' | 'deleted_at'>
@@ -774,7 +859,7 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
       };
     }
 
-    await transactionDb.getFirstAsync<{ id: string; count: number }>(
+    const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
       `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(habit_id, date_key) DO UPDATE SET
@@ -783,6 +868,16 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
        RETURNING id, count`,
       [createId('hcmp'), input.habitId, input.dateKey, desiredCount, nowIso(), nowIso()],
     );
+    if (updatedCompletion) {
+      completionPrepared = syncEngine.prepare({
+        entity: 'habit_completions',
+        id: updatedCompletion.id,
+        updatedAt: nowIso(),
+        operation: 'create',
+      });
+      await upsertSyncOutboxRecord(transactionDb, completionPrepared, completionPrepared.revision);
+      await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+    }
     if (input.executionId) {
       await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
         status: 'applied',
@@ -799,6 +894,9 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
     };
   });
 
+  if (outcome.mutated && completionPrepared) {
+    syncEngine.enqueuePrepared(completionPrepared, { durablyPersisted: true });
+  }
   if (outcome.mutated) requestHabitReminderReconciliation();
   return outcome.result;
 }
@@ -841,6 +939,31 @@ export async function applyRemoteHabits(
         row.updated_at,
         row.deleted_at,
       ],
+    );
+  }
+}
+
+/**
+ * Restore-only import for habit completion history. Plain INSERT OR REPLACE
+ * preserving ids, date keys, counts, and timestamps — this is data
+ * reconstruction, not a mutation: no threshold events, no linked actions, no
+ * reminder actions, no use-count semantics.
+ */
+export async function applyRemoteHabitCompletions(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: HabitCompletion[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO habit_completions (
+         id,
+         habit_id,
+         date_key,
+         count,
+         created_at,
+         updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+      [row.id, row.habit_id, row.date_key, row.count, row.created_at, row.updated_at],
     );
   }
 }
