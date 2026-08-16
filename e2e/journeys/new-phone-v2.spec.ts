@@ -238,6 +238,47 @@ function entityChecksum(rows: Record<string, unknown>[]): { count: number; check
   return { count: rows.length, checksum: sha256Hex(lines.join('\n')) };
 }
 
+/**
+ * Settings integrity checksum, mirroring `canonicalizeSettingsPayload`:
+ * fixed allowlist shape, explicit null defaults, sorted theme-slot keys —
+ * independent of JSON key order, so it also verifies the slot-ordering
+ * invariance of the app's canonicalization.
+ */
+function settingsChecksum(payload: Record<string, unknown>): string {
+  const raw = (payload ?? {}) as {
+    calorieGoal?: Record<string, number> | null;
+    pomodoroSettings?: Record<string, number> | null;
+    theme?: { mode?: string | null; slots?: Record<string, string> | null } | null;
+  };
+  const canonical: Record<string, unknown> = {
+    calorieGoal: raw.calorieGoal
+      ? {
+          calories: raw.calorieGoal.calories,
+          protein: raw.calorieGoal.protein,
+          carbs: raw.calorieGoal.carbs,
+          fats: raw.calorieGoal.fats,
+        }
+      : null,
+    pomodoroSettings: raw.pomodoroSettings
+      ? {
+          focusMinutes: raw.pomodoroSettings.focusMinutes,
+          shortBreakMinutes: raw.pomodoroSettings.shortBreakMinutes,
+          longBreakMinutes: raw.pomodoroSettings.longBreakMinutes,
+          sessionsBeforeLongBreak: raw.pomodoroSettings.sessionsBeforeLongBreak,
+        }
+      : null,
+    theme: {
+      mode: raw.theme?.mode ?? null,
+      slots: raw.theme?.slots
+        ? Object.fromEntries(
+            Object.entries(raw.theme.slots).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+          )
+        : null,
+    },
+  };
+  return sha256Hex(JSON.stringify(canonical));
+}
+
 // ---------------------------------------------------------------------------
 // The complete V2 backup fixture ("source device" state).
 // ---------------------------------------------------------------------------
@@ -477,6 +518,7 @@ function buildManifest(): Record<string, unknown> {
     completed_at: '2026-01-11T12:00:00.000Z',
     entity_metadata: entityMetadata,
     settings_version: 2,
+    settings_metadata: { version: 2, checksum: settingsChecksum(SETTINGS_PAYLOAD) },
     updated_at: '2026-01-11T12:00:00.000Z',
   };
 }
@@ -566,11 +608,20 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
     });
   }
 
-  if (entity === 'user_backup_settings' && q.get('select') === 'payload') {
+  if (entity === 'user_backup_settings') {
+    // Restore V2 fetches the full owner-scoped settings row and verifies it
+    // (version + canonical checksum) against the manifest BEFORE importing.
     return route.fulfill({
       status: 200,
       headers: REMOTE_HEADERS,
-      body: JSON.stringify([{ payload: SETTINGS_PAYLOAD }]),
+      body: JSON.stringify([
+        {
+          user_id: 'dummy-anon',
+          settings_version: 2,
+          payload: SETTINGS_PAYLOAD,
+          updated_at: '2026-01-11T12:00:00.000Z',
+        },
+      ]),
     });
   }
 
@@ -716,6 +767,29 @@ defineJourney({
               focusMinutes?: number;
             };
             expect(settings.focusMinutes).toBe(50);
+          },
+        );
+
+        // Theme restored through the durable cross-store reconciliation:
+        // AsyncStorage is written AFTER the SQLite import commits (and the
+        // pending-application marker is cleared only on success).
+        await expect
+          .poll(async () => page.evaluate(() => localStorage.getItem('superhabits.theme.mode')), {
+            timeout: 10_000,
+          })
+          .toBe('dark');
+        await expect
+          .poll(
+            async () => page.evaluate(() => localStorage.getItem('superhabits.theme.slots.v2')),
+            { timeout: 10_000 },
+          )
+          .toBe('{"lightThemeId":"ocean","darkThemeId":"midnight"}');
+        // No pending theme application remains — the durable marker cleared.
+        await expectRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'backup.pending_theme_apply'",
+          (rows) => {
+            expect(rows[0]?.value ?? 'null').toBe('null');
           },
         );
 

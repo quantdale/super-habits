@@ -87,6 +87,7 @@ export const MUTATING_STEPS: ReadonlySet<SemanticStepName> = new Set<SemanticSte
   'tickHabit',
   'logCalories',
   'buildRoutine',
+  'setCalorieGoal',
   'startPomodoro',
   'commandConfirm',
   'injectFailure', // tolerated as state-affecting: offline toggling mutates connectivity
@@ -187,6 +188,15 @@ export const SEMANTIC_STEP_CATALOG: Record<SemanticStepName, StepDefinition> = {
     description: 'Create a workout routine (name + exercise/set shape).',
     mutating: true,
     parentHelper: 'forms.fillRoutineName',
+  },
+  setCalorieGoal: {
+    kind: 'setCalorieGoal',
+    category: 'entity',
+    description:
+      'Save the daily calorie goal through the Settings → Nutrition UI (recoverable settings allowlist).',
+    mutating: true,
+    parentHelper: null,
+    note: 'Runner-owned Settings modal interaction: fill the Calories (kcal) field and save nutrition defaults.',
   },
   startPomodoro: {
     kind: 'startPomodoro',

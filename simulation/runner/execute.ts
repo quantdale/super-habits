@@ -68,6 +68,7 @@ import {
   actionExpectAcrossSurfaces,
   actionGoOffline,
   actionGoOnline,
+  actionSetCalorieGoal,
   actionInjectFailure,
   actionLogCalories,
   actionMaybeMakeMistake,
@@ -312,6 +313,8 @@ async function dispatchAction(page: Page, step: SemanticStep): Promise<string> {
       return actionLogCalories(page, step);
     case 'buildRoutine':
       return actionBuildRoutine(page, step);
+    case 'setCalorieGoal':
+      return actionSetCalorieGoal(page, step);
     case 'startPomodoro':
       return actionStartPomodoro(page, step);
     case 'waitThinkTime':

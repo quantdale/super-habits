@@ -90,6 +90,37 @@ export async function actionOpenSettings(page: Page): Promise<string> {
   return 'openSettings';
 }
 
+/**
+ * Save the daily calorie goal through the Settings → Nutrition defaults UI.
+ * The settings save path enqueues the recoverable `user_backup_settings`
+ * snapshot, so this step exercises the allowlisted settings contract that a
+ * V2 backup must certify.
+ */
+export async function actionSetCalorieGoal(
+  page: Page,
+  step: Extract<SemanticStep, { kind: 'setCalorieGoal' }>,
+): Promise<string> {
+  await ensureApp(page);
+  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+  await expect(page.getByText('Theme and display', { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  const caloriesInput = page.getByRole('textbox', { name: 'Calories (kcal)' });
+  await caloriesInput.waitFor({ state: 'visible', timeout: 10_000 });
+  await caloriesInput.fill(String(step.calories));
+  await page
+    .getByRole('button', { name: 'Save nutrition defaults', exact: true })
+    .click({ force: true });
+  // The save commits (button cycles Saving... back to the idle label); the
+  // in-app notice or form state updates asynchronously.
+  await expect(
+    page.getByRole('button', { name: 'Save nutrition defaults', exact: true }),
+  ).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByText('Theme and display', { exact: true })).toHaveCount(0);
+  return `setCalorieGoal calories=${step.calories}`;
+}
+
 export async function actionOpenCommand(page: Page): Promise<string> {
   await ensureApp(page);
   // Tolerate 0..N launcher instances (COMMAND_EXPERIMENT_ENABLED gates it).

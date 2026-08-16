@@ -167,6 +167,7 @@ export type SemanticStepName =
   | 'tickHabit'
   | 'logCalories'
   | 'buildRoutine'
+  | 'setCalorieGoal'
   | 'startPomodoro'
   // realism
   | 'waitThinkTime'
@@ -252,6 +253,11 @@ export type SemanticStep =
       mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
     } & StepBase)
   | ({ kind: 'buildRoutine'; name: string; exercises?: number } & StepBase)
+  | ({
+      kind: 'setCalorieGoal';
+      /** Target daily calorie goal saved through the Settings → Nutrition UI. */
+      calories: number;
+    } & StepBase)
   | ({
       kind: 'startPomodoro';
       mode?: 'focus' | 'short_break' | 'long_break';

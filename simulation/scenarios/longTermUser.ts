@@ -91,6 +91,18 @@ const steps: SemanticStep[] = [
       },
     ],
   },
+  {
+    kind: 'setCalorieGoal',
+    calories: 2100,
+    note: 'settings integrity: save a non-default calorie goal through the Settings → Nutrition UI (the recoverable allowlist snapshot that a V2 backup must certify)',
+    oracles: [
+      {
+        kind: 'rows',
+        sql: "SELECT json_extract(value, '$.calories') AS calories FROM app_meta WHERE key = 'calorie_goal'",
+        expected: [{ calories: 2100 }],
+      },
+    ],
+  },
 ];
 
 // Twelve weeks of ordinary long-term usage (84 days × habit ticks + meals +
@@ -144,6 +156,17 @@ steps.push(
       sql: `SELECT
         (SELECT COUNT(*) FROM habit_completions hc JOIN habits h ON h.id = hc.habit_id WHERE h.name = 'Drink water') AS completions`,
       expected: [{ completions: 85 }],
+    },
+  },
+  {
+    kind: 'expectOracle',
+    note: 'settings integrity oracle: the certified recoverable settings (calorie goal saved through the Settings UI) survived the restore-boundary continuity, pomodoro defaults were never saved by this persona (null is the honest state), and no pending theme application is stuck',
+    oracle: {
+      kind: 'rows',
+      sql: `SELECT
+        (SELECT json_extract(value, '$.calories') FROM app_meta WHERE key = 'calorie_goal') AS calories,
+        (SELECT COUNT(*) FROM app_meta WHERE key = 'backup.pending_theme_apply' AND value != 'null') AS pending_theme`,
+      expected: [{ calories: 2100, pending_theme: 0 }],
     },
   },
   {

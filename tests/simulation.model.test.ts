@@ -422,6 +422,7 @@ describe('semantic step catalog', () => {
       'tickHabit',
       'logCalories',
       'buildRoutine',
+      'setCalorieGoal',
       'startPomodoro',
       // realism
       'waitThinkTime',
@@ -455,6 +456,7 @@ describe('semantic step catalog', () => {
       'tickHabit',
       'logCalories',
       'buildRoutine',
+      'setCalorieGoal',
       'startPomodoro',
       'commandConfirm',
       'injectFailure',
@@ -464,7 +466,7 @@ describe('semantic step catalog', () => {
     for (const name of SEMANTIC_STEP_NAMES) {
       expect(isMutatingStep(name)).toBe(mutating.has(name));
     }
-    expect(MUTATING_STEPS.size).toBe(11);
+    expect(MUTATING_STEPS.size).toBe(12);
   });
 
   it('maps every mutating step to the oracle requirement', () => {
