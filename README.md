@@ -2,7 +2,9 @@
 
 SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, six tab surfaces, a six-bucket settings IA, and an experimental command center that now launches as a global overlay. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
-Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes synced entities to Supabase, and Restore V1 can import a limited subset back onto an empty device. This is not full two-way sync. When remote backup is configured, the local SQLite dataset also keeps a durable owner binding so auth loss cannot silently attach existing data to a new anonymous user.
+Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes the complete recoverable scope to Supabase, and Restore V2 can import that full scope back onto an empty device. This is not full two-way sync. When remote backup is configured, the local SQLite dataset also keeps a durable owner binding so auth loss cannot silently attach existing data to a new anonymous user.
+
+Beyond cloud backup, users also get **Portable Backup V1**: a user-controlled file export/import path that works fully offline — no Supabase, no account, no network required. Export produces one self-contained, versioned, integrity-protected JSON file containing the complete recoverable dataset; import validates the file completely, shows a preview, requires explicit confirmation, and restores everything atomically onto an eligible empty device. The file is plain text (not encrypted) and must be stored somewhere the user trusts. Portable backup is distinct from cloud backup: it never routes through Supabase and never marks the cloud backup complete.
 
 ## Project Overview
 
@@ -11,16 +13,18 @@ Data is stored locally in SQLite first, then optionally backed up to Supabase. T
 - Native support through Expo for Android and iOS
 - Feature modules with strict data/domain/UI layering
 - Optional anonymous Supabase backup/restore integration with Recoverable Account V1 email protection and empty-device recovery
+- Portable file export/import (Backup V1) that works without Supabase
 - Global command-center overlay across the six sections (no `/command` route)
 - Calories `Form` / `Diary` modes with remembered last-view preference
 - Settings grouped into Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal
 
 ## Tech Stack
 
-- Expo SDK 55 + React Native 0.83.4 + Expo Router
+- Expo SDK 55 + React Native 0.83.10 + Expo Router
 - TypeScript 5.9 + NativeWind 4
 - SQLite via `expo-sqlite` (WAL on native); web runtime uses SQLite WASM + OPFS
-- Supabase (`@supabase/supabase-js`) for anonymous auth, push backup, and restore v1 preview/import
+- Supabase (`@supabase/supabase-js`) for anonymous auth, push backup, and Restore V2 preview/import
+- Portable file export/import via `expo-file-system` + `expo-sharing` + `expo-document-picker` (native) and browser Blob download + file input (web)
 - Vercel for static PWA hosting (`dist/` output + SPA rewrites + COOP/COEP headers)
 - Vitest for unit tests; Playwright for E2E
 
@@ -38,17 +42,28 @@ Data is stored locally in SQLite first, then optionally backed up to Supabase. T
 2. Reads current rows from local SQLite by id
 3. Upserts those rows to matching Supabase tables (`onConflict: "id"`)
 
-Current adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pull()` is still a stub (`[]`) today, but the app also ships a separate restore coordinator for empty-device restore v1.
+The Backup Completeness V2 scope rides the same durable outbox: all 12 recoverable entity tables (todos, habits, habit completions, calorie entries, saved meals, full workout structure and history, pomodoro sessions, linked-action rules), plus the synthetic `user_backup_settings` and `backup_manifest` records that carry the certified settings snapshot and the versioned completeness checkpoint. Adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pull()` is still a stub (`[]`) today; empty-device recovery goes through the Restore V2 coordinator (with the legacy V1 path as the labeled fallback).
 
-### Restore V1
+### Cloud Backup & Restore (Backup Completeness V2 / Restore V2)
 
-`core/sync/restore.coordinator.ts` provides the current restore path used by startup and Settings:
+`core/backup/` implements the owner-scoped cloud backup and restore contract:
 
-- Restore is only allowed when the device is empty for synced tables.
-- Restore imports `todos`, `habits`, and `calorie_entries`.
-- Habit completion history stays local-only.
-- Saved meals stay local-only.
-- `workout_routines` backup status is shown, but workout restore is intentionally excluded in this phase because nested routine structure is not fully synced.
+- The recoverable scope is versioned (`backup.scope_version`, schema version 2): todos, habits, habit completions, calorie entries, saved meals, workout routines/exercises/sets, workout logs/session exercises, pomodoro sessions, linked-action rules, and the allowlisted recoverable settings (calorie goal, pomodoro defaults, theme).
+- A maintenance cycle publishes an owner-scoped `backup_manifest` (generation, per-entity counts + deterministic SHA-256 checksums, certified settings checksum) only after the durable outbox drains — one atomic local coherence boundary.
+- Restore V2 (`core/backup/backupRestore.ts`) prefetches and validates every row + the settings payload, verifies all checksums and the dependency graph, requires a completely empty device (all user tables + outbox), then imports everything in ONE SQLite transaction with no historical side effects (no linked-action replay, no notifications, no recurring-todo creation). Theme is staged durably and applied to AsyncStorage after commit with restart retry.
+- Legacy V1 backups remain restorable through the legacy path and are labeled `V1 LEGACY/PARTIAL`.
+- Restore is only allowed on an empty device; anything — including pomodoro or workout history — blocks it.
+
+### Portable Backup V1 (file export/import)
+
+`core/portable/` implements the user-controlled file path, which works without Supabase:
+
+- **Export** produces ONE self-contained JSON file (`superhabits-backup-*.json`, MIME `application/json`) from a coherent read-only SQLite snapshot: all 12 recoverable entities + recoverable settings (including theme). No secrets: no tokens, no raw user UUIDs, no `sync_outbox`, no internal `app_meta`. When the dataset has a durable owner binding, the file carries a one-way owner fingerprint (SHA-256 of a fixed domain separator + owner UUID) — compatibility metadata only, never authentication.
+- **Import** requires an explicit file selection, enforces a 100 MB bound, then validates everything before any write: envelope + format/domain versions, every row, settings, per-entity checksums, settings checksum, payload checksum, dependency graph, owner compatibility, and complete destination emptiness. A human-readable preview is shown, the user confirms explicitly, and ONE atomic SQLite transaction restores all state through the side-effect-free Restore V2 import paths. Historical side effects never replay.
+- **Owner compatibility**: same-owner files import onto the matching owner's empty device; different-owner files are blocked; ownerless (local-only) files import with an explicit adoption disclosure; a file can never set the owner binding. Import-origin metadata is recorded so a later unrelated account cannot silently claim an imported dataset.
+- **Cloud interaction**: a file import never marks cloud backup complete. Backfill markers are reset and the backup is marked dirty, so a compatible owner's next maintenance cycle uploads the imported state and publishes a fresh checkpoint only after a real push.
+- The exported file is **not encrypted** and contains personal productivity data — the UI discloses this before export.
+- Excluded from portable backup: linked-action events/executions, notification-processing state, `sync_outbox`, auth/session state, account protection/recovery state, backup checkpoint runtime metadata, schema migration metadata, and transient UI state.
 
 ### Recoverable Account V1
 

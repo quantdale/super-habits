@@ -53,7 +53,7 @@ If this file conflicts with current code, trust the code and document the confli
 - The command launcher is hidden on the settings modal and is suppressed during active pomodoro/workout sessions.
 - Calories supports `Form` and `Diary` modes and remembers the last selected mode.
 - Settings keeps six buckets in this order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
-- Backup wording must stay conservative: push backup + restore v1 preview/import, not full two-way sync.
+- Backup wording must stay conservative: push backup + Restore V2 (legacy V1 labeled) + Portable file export/import, not full two-way sync.
 
 ## Data and Sync Invariants
 
