@@ -180,6 +180,16 @@ export type EntityIntegrityMetadata = {
   checksum: string;
 };
 
+/**
+ * Settings integrity certification: the deterministic SHA-256 of the
+ * canonicalized allowlisted settings payload captured with the manifest
+ * generation, plus the payload contract version.
+ */
+export type SettingsMetadata = {
+  version: number;
+  checksum: string;
+};
+
 /** Local snapshot captured at enqueue time; the remote row mirrors this. */
 export type BackupManifest = {
   backupSchemaVersion: number;
@@ -187,6 +197,12 @@ export type BackupManifest = {
   completedAt: string;
   entityMetadata: Partial<Record<BackupEntity, EntityIntegrityMetadata>>;
   settingsVersion: number;
+  /**
+   * Settings integrity certification (closure contract). The checkpoint
+   * always writes it; a v2 manifest WITHOUT it cannot certify the settings
+   * payload and is treated as incomplete by restore and the status UI.
+   */
+  settingsMetadata?: SettingsMetadata;
 };
 
 /** Remote row shape for `backup_manifest`. */
@@ -197,6 +213,7 @@ export type RemoteBackupManifestRow = {
   completed_at: string;
   entity_metadata: Record<string, EntityIntegrityMetadata>;
   settings_version: number;
+  settings_metadata: SettingsMetadata | null;
   updated_at: string;
 };
 

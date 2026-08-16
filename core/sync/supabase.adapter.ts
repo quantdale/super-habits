@@ -1,5 +1,10 @@
 import { getDatabase } from '@/core/db/client';
-import { appMetaKeys, getAppMetaJsonOrDefault, getAppMetaText } from '@/core/db/appMeta';
+import {
+  appMetaKeys,
+  getAppMetaJsonOrDefault,
+  getAppMetaText,
+  setAppMetaText,
+} from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
 import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
@@ -12,7 +17,7 @@ import {
   BACKUP_SETTINGS_VERSION,
   type BackupManifest,
 } from '@/core/backup/backup.types';
-import { readRecoverableSettings } from '@/core/backup/backupSettings';
+import { canonicalizeSettingsPayload, readRecoverableSettings } from '@/core/backup/backupSettings';
 
 /**
  * SQLite entity names enqueued for remote backup — must match
@@ -202,7 +207,21 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     currentUserId: string,
     records: SyncRecord[],
   ): Promise<void> {
-    const payload = await readRecoverableSettings(db);
+    // The payload is the snapshot stored at enqueue/capture time
+    // (`backup.pending_settings`), never a fresh read at push time: the
+    // manifest certifies exactly the snapshot that was captured with its
+    // generation, so the uploaded payload must be that snapshot. Continuous
+    // settings saves keep the stored snapshot current (outbox coalescing
+    // makes the latest record win).
+    const stored = await getAppMetaJsonOrDefault<unknown>(
+      db,
+      appMetaKeys.backupPendingSettings,
+      null,
+    );
+    const payload =
+      stored && typeof stored === 'object' && 'payload' in stored
+        ? stored.payload
+        : await readRecoverableSettings(db);
     const latestUpdatedAt = records
       .map((record) => record.updatedAt)
       .sort((a, b) => b.localeCompare(a))[0];
@@ -226,22 +245,78 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     currentUserId: string,
     records: SyncRecord[],
   ): Promise<void> {
-    // The manifest snapshot is captured at enqueue time (after the data queue
-    // drained) and stored in app_meta; it is never recomputed at push time, so
-    // the pushed checkpoint always describes the state that was actually
-    // pushed.
+    // The manifest snapshot is captured at enqueue time (inside the
+    // checkpoint's atomic coherence boundary) and stored in app_meta; it is
+    // never recomputed at push time, so the pushed checkpoint always
+    // describes the state that was actually pushed.
     const pending = await getAppMetaJsonOrDefault<unknown>(
       db,
       appMetaKeys.backupPendingManifest,
       null,
     );
     if (!pending || typeof pending !== 'object') {
-      throw new Error('backup_manifest record has no pending manifest snapshot.');
+      // No certifiable snapshot exists for this queued manifest record
+      // (corruption or a pre-closure artifact). Dropping the stale intent is
+      // the only non-looping resolution: the next maintenance cycle captures
+      // a fresh snapshot and enqueues a replacement record.
+      await setAppMetaText(db, appMetaKeys.backupPendingManifest, 'null');
+      console.error('[sync] dropping queued backup_manifest record: no pending manifest snapshot.');
+      return;
     }
     const manifest = pending as BackupManifest;
+    if (!manifest.settingsMetadata) {
+      await setAppMetaText(db, appMetaKeys.backupPendingManifest, 'null');
+      console.error(
+        '[sync] dropping queued backup_manifest record: snapshot has no settings integrity metadata.',
+      );
+      return;
+    }
+    // Settings-G before manifest-G: the manifest certifies exactly the
+    // settings snapshot stored for its generation. If a newer settings save
+    // replaced the stored snapshot after capture, the certified payload is no
+    // longer the current one — the stale intent can never be published
+    // coherently. Drop it (and its pending snapshot) so the next cycle
+    // recaptures a fresh checkpoint that certifies the CURRENT settings; the
+    // previous remote manifest remains authoritative meanwhile. Keeping the
+    // record queued would block every later cycle (a stale manifest that can
+    // never push), an infinite manifest loop.
+    const pendingSettings = await getAppMetaJsonOrDefault<{ payload?: unknown } | null>(
+      db,
+      appMetaKeys.backupPendingSettings,
+      null,
+    );
+    const pendingChecksum = pendingSettings
+      ? canonicalizeSettingsPayload(pendingSettings.payload)
+      : null;
+    if (pendingChecksum !== manifest.settingsMetadata.checksum) {
+      await setAppMetaText(db, appMetaKeys.backupPendingManifest, 'null');
+      console.warn(
+        '[sync] dropping stale backup_manifest record: settings changed after capture; a newer checkpoint will certify the current settings.',
+      );
+      return;
+    }
     const latestUpdatedAt = records
       .map((record) => record.updatedAt)
       .sort((a, b) => b.localeCompare(a))[0];
+    const updatedAt = latestUpdatedAt ?? new Date().toISOString();
+    // (Re)upload the certified settings payload immediately before the
+    // manifest so the remote settings row always matches the certified
+    // checksum when the manifest becomes authoritative. Idempotent with the
+    // settings record push that precedes this entity in the same batch.
+    const settingsResult = await client.from('user_backup_settings').upsert(
+      {
+        user_id: currentUserId,
+        settings_version: manifest.settingsMetadata.version,
+        payload: pendingSettings?.payload ?? null,
+        updated_at: updatedAt,
+      },
+      { onConflict: 'user_id' },
+    );
+    if (settingsResult.error) {
+      throw new Error(
+        `Supabase upsert failed for user_backup_settings: ${settingsResult.error.message}`,
+      );
+    }
     const { error } = await client.from('backup_manifest').upsert(
       {
         user_id: currentUserId,
@@ -250,7 +325,8 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         completed_at: manifest.completedAt,
         entity_metadata: manifest.entityMetadata,
         settings_version: manifest.settingsVersion,
-        updated_at: latestUpdatedAt ?? new Date().toISOString(),
+        settings_metadata: manifest.settingsMetadata,
+        updated_at: updatedAt,
       },
       { onConflict: 'user_id' },
     );

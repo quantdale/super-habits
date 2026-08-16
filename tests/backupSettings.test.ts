@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildRecoverableSettings,
+  canonicalizeSettingsPayload,
   normalizeRecoverableSettings,
   isValidRecoverableSettings,
 } from '@/core/backup/backupSettings';
@@ -76,5 +77,97 @@ describe('recoverable settings allowlist', () => {
       theme: { mode: 'light', slots: { lightThemeId: 'ocean' } },
     };
     expect(normalizeRecoverableSettings(input)).toEqual(input);
+  });
+});
+
+describe('canonicalizeSettingsPayload (settings integrity)', () => {
+  const sample = {
+    calorieGoal: { calories: 2000, protein: 150, carbs: 200, fats: 70 },
+    pomodoroSettings: {
+      focusMinutes: 50,
+      shortBreakMinutes: 10,
+      longBreakMinutes: 30,
+      sessionsBeforeLongBreak: 3,
+    },
+    theme: { mode: 'dark', slots: { darkThemeId: 'midnight', lightThemeId: 'ocean' } },
+  };
+
+  it('returns a deterministic 64-hex SHA-256 digest', () => {
+    const digest = canonicalizeSettingsPayload(sample);
+    expect(digest).toMatch(/^[0-9a-f]{64}$/);
+    expect(canonicalizeSettingsPayload(sample)).toBe(digest);
+  });
+
+  it('is independent of object key order and theme-slot order', () => {
+    const reordered = {
+      theme: { slots: { lightThemeId: 'ocean', darkThemeId: 'midnight' }, mode: 'dark' },
+      pomodoroSettings: {
+        sessionsBeforeLongBreak: 3,
+        longBreakMinutes: 30,
+        shortBreakMinutes: 10,
+        focusMinutes: 50,
+      },
+      calorieGoal: { fats: 70, carbs: 200, protein: 150, calories: 2000 },
+    };
+    expect(canonicalizeSettingsPayload(reordered)).toBe(canonicalizeSettingsPayload(sample));
+  });
+
+  it('drops unknown/poisoned keys before hashing', () => {
+    const poisoned = {
+      ...sample,
+      account: { owner_user_id: 'should-never-hash' },
+      secret: 'nope',
+      extraNested: { anything: 'ignored' },
+    };
+    expect(canonicalizeSettingsPayload(poisoned)).toBe(canonicalizeSettingsPayload(sample));
+  });
+
+  it('treats missing and null fields identically', () => {
+    const withNulls = {
+      calorieGoal: null,
+      pomodoroSettings: null,
+      theme: { mode: null, slots: null },
+    };
+    const withAbsents = {};
+    expect(canonicalizeSettingsPayload(withNulls)).toBe(canonicalizeSettingsPayload(withAbsents));
+  });
+
+  it('changes when a certified value changes', () => {
+    const changed = {
+      ...sample,
+      calorieGoal: { ...sample.calorieGoal, calories: 2100 },
+    };
+    expect(canonicalizeSettingsPayload(changed)).not.toBe(canonicalizeSettingsPayload(sample));
+  });
+
+  it('is stable across the JSON round-trip a JSONB remote row would produce', () => {
+    // JSONB reorders keys and normalizes whitespace; re-parsing must hash the
+    // same because canonicalization re-sorts keys client-side.
+    const roundTripped = JSON.parse(JSON.stringify(sample));
+    const reshuffled = JSON.parse(JSON.stringify(sample));
+    expect(canonicalizeSettingsPayload(roundTripped)).toBe(canonicalizeSettingsPayload(sample));
+    expect(canonicalizeSettingsPayload(reshuffled)).toBe(canonicalizeSettingsPayload(sample));
+  });
+
+  it('never includes user_id, updated_at, auth, or sync data in the hash input', () => {
+    const withRemoteColumns = {
+      ...sample,
+      user_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      updated_at: '2026-08-15T12:00:00.000Z',
+      auth: { session: 'secret' },
+    };
+    expect(canonicalizeSettingsPayload(withRemoteColumns)).toBe(
+      canonicalizeSettingsPayload(sample),
+    );
+  });
+
+  it('matches the digest of the same payload built through the allowlist builder', () => {
+    const built = buildRecoverableSettings({
+      calorieGoal: sample.calorieGoal,
+      pomodoroSettings: sample.pomodoroSettings,
+      themeMode: sample.theme.mode,
+      themeSlots: sample.theme.slots,
+    });
+    expect(canonicalizeSettingsPayload(built)).toBe(canonicalizeSettingsPayload(sample));
   });
 });

@@ -7,7 +7,7 @@ import {
   promoteLocalDatasetOwnerIfProvisional,
   setLocalDatasetOwner,
 } from '@/core/auth/account.data';
-import { appMetaKeys, setAppMetaText } from '@/core/db/appMeta';
+import { appMetaKeys, setAppMetaJson, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
@@ -15,6 +15,7 @@ import { syncEngine, type PreparedSyncRecord, type SyncRecord } from '@/core/syn
 import { getSupabaseSessionUserId } from '@/lib/supabase';
 import { nowIso } from '@/lib/time';
 import { BACKUP_SETTINGS_RECORD_ID } from '@/core/backup/backup.types';
+import { readRecoverableSettings } from '@/core/backup/backupSettings';
 
 export type SyncedMutationOutcome<T> = {
   value: T;
@@ -136,11 +137,17 @@ export async function runSyncedMutation<T>(input: {
 /**
  * Durably enqueue the settings snapshot as a synthetic outbox record so it
  * rides the same hardened owner-scoped queue as every other backup entity.
- * Call after a settings save; outbox coalescing keeps at most one record.
+ * The allowlisted snapshot is captured NOW (SQLite app_meta + AsyncStorage
+ * theme) and stored in app_meta `backup.pending_settings` in the same
+ * transaction as the outbox record — the adapter pushes that captured
+ * snapshot, never a fresh read, so the settings payload is generation-bound
+ * and the manifest can certify it. Call after a settings save; outbox
+ * coalescing keeps at most one record.
  */
 export async function enqueueBackupSettingsRecord(db?: SQLite.SQLiteDatabase): Promise<void> {
   const database = db ?? (await getDatabase());
   const ownerUserId = await resolveSyncOwnerUserId(database);
+  const settingsSnapshot = await readRecoverableSettings(database);
   const record = {
     entity: 'user_backup_settings',
     id: BACKUP_SETTINGS_RECORD_ID,
@@ -151,6 +158,10 @@ export async function enqueueBackupSettingsRecord(db?: SQLite.SQLiteDatabase): P
   let prepared: ReturnType<typeof syncEngine.prepare> | null = null;
   await withSQLiteTransaction(database, async (transactionDb) => {
     prepared = syncEngine.prepare(record);
+    await setAppMetaJson(transactionDb, appMetaKeys.backupPendingSettings, {
+      generation: null,
+      payload: settingsSnapshot,
+    });
     await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
     await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
   });

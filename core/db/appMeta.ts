@@ -44,6 +44,8 @@ export const appMetaKeys = {
   backupBackfillDoneEntities: defineJsonKey('backup.backfill_done_entities', 'sync'),
   backupDirty: defineTextKey('backup.dirty', 'sync'),
   backupPendingManifest: defineJsonKey('backup.pending_manifest', 'sync'),
+  backupPendingSettings: defineJsonKey('backup.pending_settings', 'sync'),
+  backupPendingThemeApply: defineJsonKey('backup.pending_theme_apply', 'sync'),
   backupLastCompleteGeneration: defineTextKey('backup.last_complete_generation', 'sync'),
 } as const;
 
