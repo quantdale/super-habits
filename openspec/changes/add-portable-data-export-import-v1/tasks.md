@@ -53,5 +53,5 @@
 
 - [x] 8.1 Reconcile README (Restore V1 → V2 + portable, local-only history claims, workout restore, SupabaseSyncAdapter, Command Center draft kinds, RN version), `docs/PROJECT_STRUCTURE_MAP.md`, `docs/working-rules.md`, `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`, `openspec/config.yaml` schema-version drift — factual corrections only.
 - [x] 8.2 Document Portable V1 (scope, exclusions, format/versioning, integrity, owner policy, plain-text warning, cloud-vs-portable distinction) in README + knowledge base.
-- [ ] 8.3 Complete ExecPlan (Validation Ledger, Changed Files, Outcomes) + OpenSpec tasks; `npm run agent:plan:validate:all` + `npm run openspec:validate` green.
-- [ ] 8.4 Coherent commits → `git fetch origin --prune` → reconcile → push main (no force) → verify local == origin/main, remote main-only, working tree clean → GitHub CI quality + e2e PASS on the final SHA → final report (mission §67 format).
+- [x] 8.3 Complete ExecPlan (Validation Ledger, Changed Files, Outcomes) + OpenSpec tasks; `npm run agent:plan:validate:all` + `npm run openspec:validate` green.
+- [x] 8.4 Coherent commits → `git fetch origin --prune` → reconcile → push main (no force) → verify local == origin/main, remote main-only, working tree clean → GitHub CI quality + e2e PASS on the final SHA → final report (mission §67 format).

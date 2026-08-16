@@ -1,7 +1,7 @@
 # ExecPlan: Portable Data Export & Import V1 — user-controlled file backup + verified atomic import
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -137,50 +137,43 @@ never imports onto populated user data.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: none.
-- Exact next action: commit the five coherent commit groups, `git fetch
-origin --prune`, reconcile, push main (no force), verify local ==
-  origin/main + remote main-only + clean tree, inspect GitHub CI
-  (quality + e2e) on the final SHA, fix any repository-caused failure, mark
-  OpenSpec 8.3/8.4 + this plan COMPLETED, deliver the final report.
-- Remaining definition of done: mission completion gate §66 (36 items) —
-  full recoverable scope exports; excluded state proven absent; no secrets in
-  export; versioned format; entity/settings/payload hashes verify; export is
-  read-only; web export works; native path implemented (Android verified if a
-  device is available, else exact limitation documented); import validates
-  everything before write; future or unsupported versions fail safely; malformed
-  files fail safely; dependency corruption fails safely; wrong checksums fail
-  safely; owner incompatibility fails safely; populated device cannot import;
-  preview before import; explicit confirmation; no double-confirm; atomic
-  SQLite transaction; no historical side-effect replay; theme application
-  crash-recoverable; no false cloud-complete claim; compatible imported data
-  can later backfill; semantic source→import equivalence; Backup V2 /
-  Recoverable Account / Command Center regressions; full headless QA;
-  Android status known; GitHub CI green; local main == origin/main; working
-  tree clean; remote main-only; English-only prose.
+- Exact next action: None — task complete; final report delivered (mission §67).
+- Remaining definition of done: All 36 items of the mission §66 completion
+  gate are complete and validated — see the Validation Ledger and Outcomes
+  & Retrospective for the evidence (full-scope export, excluded state
+  absent, no secrets, versioned format, entity/settings/payload hashes,
+  read-only export, web + native paths, validate-before-write, safe
+  version/malformed/checksum/dependency/owner failures, empty-device-only,
+  preview + explicit confirmation + no double-confirm, atomic transaction,
+  no side-effect replay, crash-recoverable theme, no false cloud-complete
+  claim, later backfill, semantic equivalence, Backup V2 / Recoverable
+  Account / Command Center regressions, full headless QA, Android status
+  known, GitHub CI green, local main == origin/main, working tree clean,
+  remote main-only, English-only prose).
 
 ## Progress
 
 - [x] Prior-session hygiene: commit + push closure docs (`7a6189e`), main-only verified
 - [x] Durable guidance + source inventory (Backup V2, account, settings, DB, tests)
 - [x] Design: envelope, canonicalization, payload checksum, owner model, post-import backfill
-- [ ] ExecPlan + OpenSpec change written and validated
-- [ ] Baseline QA recorded (typecheck/lint/test/qa:fast/qa:integration/validators/build)
-- [ ] `core/portable/portable.types.ts` + `portableFormat.ts` (pure envelope + integrity)
-- [ ] `lib/portableOwnerFingerprint.ts` + backupSettings canonical-text refactor
-- [ ] `core/portable/portableExport.ts` (coherent read-only snapshot + serialization)
-- [ ] `core/portable/portableFileIo.ts` (web download/input; native File/DocumentPicker/Sharing)
-- [ ] `core/portable/portableImport.ts` (full validation pipeline + preview + atomic confirm)
-- [ ] appMeta keys + `clearLocalDatasetOwner` + account-domain import-origin gating
-- [ ] Settings UI (Backup / Sync / Restore bucket: Export + Import + preview card)
-- [ ] Unit tests: format canonicalization/shuffle, fingerprint, version rejection
-- [ ] Integration tests: source→export→import equivalence (all domains + settings)
-- [ ] Integration tests: corruption matrix + owner matrix + no-write-before-confirm
-- [ ] Integration tests: large long-term dataset (thousands of rows, measured)
-- [ ] Web E2E: export/download round-trip, preview, cancel, import, corrupt file, populated block
-- [ ] Android validation (Nitro_API_36 or exact environment limitation)
-- [ ] Full QA gates (qa:fast/integration/timezones, themes, supabase, openspec, impact, plans, build:web/sync, e2e:sync, e2e:full, simulation, expo-doctor, audit, diff --check)
-- [ ] Documentation reconciliation (README, structure map, working rules, knowledge base, config)
-- [ ] Complete ExecPlan/OpenSpec → coherent commits → reconcile → push main → CI green → final report
+- [x] ExecPlan + OpenSpec change written and validated
+- [x] Baseline QA recorded (typecheck/lint/test/qa:fast/qa:integration/validators/build)
+- [x] `core/portable/portable.types.ts` + `portableFormat.ts` (pure envelope + integrity)
+- [x] `lib/portableOwnerFingerprint.ts` + backupSettings canonical-text refactor
+- [x] `core/portable/portableExport.ts` (coherent read-only snapshot + serialization)
+- [x] `core/portable/portableFileIo.ts` (web download/input; native File/DocumentPicker/Sharing)
+- [x] `core/portable/portableImport.ts` (full validation pipeline + preview + atomic confirm)
+- [x] appMeta keys + `clearLocalDatasetOwner` + account-domain import-origin gating
+- [x] Settings UI (Backup / Sync / Restore bucket: Export + Import + preview card)
+- [x] Unit tests: format canonicalization/shuffle, fingerprint, version rejection
+- [x] Integration tests: source→export→import equivalence (all domains + settings)
+- [x] Integration tests: corruption matrix + owner matrix + no-write-before-confirm
+- [x] Integration tests: large long-term dataset (thousands of rows, measured)
+- [x] Web E2E: export/download round-trip, preview, cancel, import, corrupt file, populated block
+- [x] Android validation (Nitro_API_36 or exact environment limitation)
+- [x] Full QA gates (qa:fast/integration/timezones, themes, supabase, openspec, impact, plans, build:web/sync, e2e:sync, e2e:full, simulation, expo-doctor, audit, diff --check)
+- [x] Documentation reconciliation (README, structure map, working rules, knowledge base, config)
+- [x] Complete ExecPlan/OpenSpec → coherent commits → reconcile → push main → CI green → final report
 
 ## Surprises & Discoveries
 
@@ -274,10 +267,38 @@ origin --prune`, reconcile, push main (no force), verify local ==
 - 2026-08-16 — Portable import eligibility fix — PASS — portable import no longer depends on the cloud-restore eligibility; it computes the semantic device emptiness itself, so the Import action works on local-only devices (web E2E re-run 6/6 with a new enabled-state assertion).
 - 2026-08-16 — `npm run e2e:sync` — PASS — 40/40 effective (38 passed + bad-backend step 5 failed under concurrent load; isolated re-run with the correct lane env 6/6 PASS — FLAKY_TEST/ENVIRONMENT, code untouched).
 - 2026-08-16 — `npm run qa:simulation -- --all --mode deterministic` — PASS — all 22 scenarios passed.
+- 2026-08-16 — Push — PASS — 5 coherent commits `7a6189e..0cd992e` (no force); local main == origin/main == `0cd992e50f2d96576857cd93f97a606d0723e7b8`; `git ls-remote --heads origin` shows refs/heads/main only; working tree clean.
+- 2026-08-16 — GitHub CI run 31940749716 (FINAL SHA 0cd992e) — COMPLETE — quality PASS; e2e PASS (main lane: full e2e + deterministic simulation + dist-sync build + e2e:sync); nightly skipped (push trigger). Run conclusion: success.
 
 ## Changed Files / Areas
 
-- (populated as the work lands)
+- core/portable/portable.types.ts — portable envelope contract (format `superhabits-portable-backup`, formatVersion 1, 100 MB import bound, preview/outcome types).
+- core/portable/portableFormat.ts — canonical payload text + payload checksum, `buildPortableBackupFile`, `validatePortableBackupFile` (full validation chain), `portableExportFileName`.
+- core/portable/portableExport.ts — coherent read-only export snapshot (one serialized read transaction + settings re-verify/retry), owner fingerprint from the durable binding.
+- core/portable/portableImport.ts — prepare (parse → validate → owner compatibility → emptiness → preview) + confirm (in-transaction re-checks → atomic import via side-effect-free Restore V2 apply paths → import-origin metadata → backfill reset + dirty → post-commit theme/reminders/backfill).
+- core/portable/portableFileIo.ts — web Blob download + file input; native `expo-file-system` temp file + `expo-sharing` + `expo-document-picker`; size-bound reads.
+- lib/portableOwnerFingerprint.ts — one-way SHA-256 owner fingerprint (`superhabits-portable-owner-v1:` domain).
+- core/backup/backupSettings.ts — `canonicalSettingsPayloadText` extracted; checksum byte-identical.
+- core/db/appMeta.ts — `portable.last_import_at` / `portable.last_import_format_version` / `portable.last_import_owner_fingerprint` keys + `deleteAppMetaKey`.
+- core/auth/account.data.ts — `clearLocalDatasetOwner`.
+- core/auth/account.domain.ts — `importOriginOwnerFingerprint` fail-closed gate (unrelated accounts cannot bind an imported dataset).
+- core/auth/accountCoordinator.ts — reads the import-origin fingerprint and passes it into every decision.
+- core/sync/restore.coordinator.ts — stale phase-one disclosure strings corrected (V2-accurate).
+- features/settings/SettingsPortableSection.tsx — Portable data card (disclosure, Export, Import with semantic emptiness gate, preview card with Cancel/Import, accessible labels).
+- features/settings/SettingsScreen.tsx — portable section wiring.
+- eslint.config.mjs — DB-client exemption for `core/portable/**`.
+- package.json / package-lock.json / app.json — `expo-file-system`, `expo-document-picker`, `expo-sharing` (SDK 55-compatible).
+- tests/portableFormat.test.ts (46), tests/portableAccountGating.test.ts (9) — format canonicalization/tamper/version + owner gating.
+- tests/integration/portableExportImport.test.ts (6) — read-only proof, semantic equivalence, double-confirm, theme crash recovery, backfill enqueue.
+- tests/integration/portableImportCorruption.test.ts (6) — corruption matrix, owner matrix, oversized-file bound, populated-device block.
+- tests/integration/portableLargeDataset.test.ts (1) — 18,127 rows / 5.15 MB measured round trip.
+- e2e/portable-backup.spec.ts (6) — export download round trip, large file, preview → cancel → confirm, corrupt/invalid files, populated block.
+- e2e/fixtures/portable-backup-fixture.json — production-generated fixture for the native picker smoke.
+- .maestro/flows/portable-backup.yaml + portable-backup-blocked.yaml — native surface flows (CI native lane).
+- e2e/settings.spec.ts, e2e/journeys/new-phone.spec.ts, tests/restore.coordinator.test.ts — disclosure-string updates.
+- README.md, docs/PROJECT_STRUCTURE_MAP.md, docs/working-rules.md, docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md, openspec/config.yaml — documentation reconciliation + portable backup docs.
+- openspec/changes/add-portable-data-export-import-v1/ — proposal, design, tasks (32/32), spec delta.
+- .agent/execplans/portable-data-export-import-v1.md — this plan.
 
 ## Recovery / Resume Instructions
 
@@ -294,6 +315,34 @@ origin --prune`, reconcile, push main (no force), verify local ==
 
 ## Outcomes & Retrospective
 
-- Status: ACTIVE.
-- Summary: (filled at completion).
-- Follow-up: (filled at completion).
+- Status: COMPLETED.
+- Summary: Portable Data Export & Import V1 is implemented, validated, and
+  live on main (`0cd992e`; CI run 31940749716 quality + e2e PASS). Export
+  produces ONE self-contained, versioned, integrity-protected JSON file
+  (all 12 recoverable entities + recoverable settings incl. theme) from a
+  coherent read-only snapshot with per-entity + settings + payload
+  checksums and a one-way owner fingerprint — no Supabase, no secrets.
+  Import validates everything before any write (envelope, versions, rows,
+  settings, checksums, dependency graph, owner compatibility, complete
+  emptiness), shows a human preview, requires explicit confirmation, and
+  restores atomically through the side-effect-free Restore V2 apply paths
+  with durable staged theme application. Owner compatibility fails closed
+  (same-owner allow, different-owner block, unclaimed-device imports record
+  import-origin metadata so an unrelated account can never silently claim
+  an imported dataset), and a file import never marks cloud backup complete
+  (backfill markers reset + dirty, so the owner's next checkpoint uploads
+  the imported state). Web E2E round-trips the real download/re-import;
+  Android native smoke verified through the real OS share sheet and
+  document picker with persistence across relaunch; corruption matrix
+  (19 cases), owner matrix, and an 18k-row long-term dataset all pass.
+- Follow-up: (1) The Maestro native flows (`.maestro/flows/portable-*`) are
+  written for CI's native lane; local Maestro scroll gestures were
+  unreliable on the Nitro_API_36 emulator's RN ScrollView, so the local
+  native smoke was driven via adb/uiautomator with the same production code
+  paths — CI should confirm the Maestro flows on its own runners. (2) The
+  share sheet on the bare emulator image had no `application/json` targets
+  ("No apps can perform this action") — an environment limitation; the
+  production `expo-sharing` path, temp-file lifecycle, and success message
+  were verified. (3) Plain-text (unencrypted) files are a deliberate V1
+  contract with explicit UI disclosure; encryption remains a possible
+  future phase.
