@@ -1,0 +1,57 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - portable-backup
+---
+# Portable Backup V1 — native surface on Android.
+#
+# The full portable export/import pipeline (envelope integrity, validation,
+# preview, atomic import, side-effect suppression, owner compatibility) is
+# exercised by the web E2E journey (e2e/portable-backup.spec.ts) and the
+# real-SQLite integration suite (tests/integration/portable*). This flow pins
+# the native surface: the Portable data card under Backup / Sync / Restore,
+# the plain-text disclosure, the Export share-sheet path (real OS surface),
+# and the Import document picker (real OS surface, cancelled).
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 15000
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Theme and display'
+    timeout: 10000
+# Scroll down in stages to the Portable data card (after the backup section).
+- repeat:
+    times: 10
+    commands:
+      - swipe:
+          start: 50%, 85%
+          end: 50%, 30%
+          duration: 200
+# The fling reaches the bottom; scroll back up until the card is found.
+- scrollUntilVisible:
+    element:
+      text: 'Portable data'
+    direction: UP
+    timeout: 30000
+- assertVisible: 'Portable data'
+- assertVisible: 'This file contains your Super Habits data. Store it somewhere you trust. The exported file is not encrypted — anyone with the file can read its contents.'
+- assertVisible: 'Export data'
+- assertVisible: 'Import data'
+# Empty device: import is offered (not blocked).
+- assertNotVisible: 'Import is available only on an empty device'
+# Real OS share surface: export opens the Android share sheet.
+- tapOn: 'Export data'
+- extendedWaitUntil:
+    visible: 'Export Super Habits backup'
+    timeout: 10000
+# Dismiss the share sheet without saving (semi-automated share smoke).
+- back
+# Real OS document picker: import selection surface opens and cancels.
+- tapOn: 'Import data'
+- extendedWaitUntil:
+    visible: 'Import data'
+    timeout: 10000
+- back
+- stopApp

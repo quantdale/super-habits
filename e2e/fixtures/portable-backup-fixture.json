@@ -1,0 +1,186 @@
+{
+  "format": "superhabits-portable-backup",
+  "formatVersion": 1,
+  "backupSchemaVersion": 2,
+  "exportedAt": "2026-08-16T09:31:31.433Z",
+  "source": {
+    "appVersion": "1.0.0",
+    "platform": "ios",
+    "ownerFingerprint": null
+  },
+  "entities": {
+    "todos": [
+      {
+        "id": "todo_1786872691345_11235563",
+        "title": "Portable native fixture todo",
+        "notes": null,
+        "completed": 0,
+        "created_at": "2026-08-16T09:31:31.345Z",
+        "updated_at": "2026-08-16T09:31:31.345Z",
+        "deleted_at": null,
+        "due_date": null,
+        "priority": "urgent",
+        "sort_order": 1,
+        "recurrence": null,
+        "recurrence_id": null
+      },
+      {
+        "id": "todo_1786872691346_21236563",
+        "title": "Second fixture todo",
+        "notes": null,
+        "completed": 0,
+        "created_at": "2026-08-16T09:31:31.346Z",
+        "updated_at": "2026-08-16T09:31:31.346Z",
+        "deleted_at": null,
+        "due_date": null,
+        "priority": "normal",
+        "sort_order": 2,
+        "recurrence": null,
+        "recurrence_id": null
+      }
+    ],
+    "habits": [],
+    "habit_completions": [],
+    "calorie_entries": [
+      {
+        "id": "cal_1786872691347_31237563",
+        "food_name": "Oatmeal",
+        "calories": 300,
+        "protein": 10,
+        "carbs": 50,
+        "fats": 5,
+        "fiber": 4,
+        "meal_type": "breakfast",
+        "consumed_on": "2026-08-15",
+        "created_at": "2026-08-16T09:31:31.347Z",
+        "updated_at": "2026-08-16T09:31:31.347Z",
+        "deleted_at": null
+      }
+    ],
+    "saved_meals": [
+      {
+        "id": "smeal_1786872691347_41230563",
+        "food_name": "Oatmeal",
+        "calories": 300,
+        "protein": 10,
+        "carbs": 50,
+        "fats": 5,
+        "fiber": 4,
+        "meal_type": "breakfast",
+        "use_count": 1,
+        "last_used_at": "2026-08-16T09:31:31.347Z",
+        "created_at": "2026-08-16T09:31:31.347Z"
+      }
+    ],
+    "workout_routines": [
+      {
+        "id": "wrk_1786872691348_61232563",
+        "name": "Fixture routine",
+        "description": "Seeded for native smoke",
+        "created_at": "2026-08-16T09:31:31.348Z",
+        "updated_at": "2026-08-16T09:31:31.348Z",
+        "deleted_at": null
+      }
+    ],
+    "routine_exercises": [
+      {
+        "id": "ex_1786872691348_71233563",
+        "routine_id": "wrk_1786872691348_61232563",
+        "name": "Squat",
+        "sort_order": 0,
+        "created_at": "2026-08-16T09:31:31.348Z",
+        "updated_at": "2026-08-16T09:31:31.348Z",
+        "deleted_at": null
+      }
+    ],
+    "routine_exercise_sets": [],
+    "workout_logs": [],
+    "workout_session_exercises": [],
+    "pomodoro_sessions": [
+      {
+        "id": "pom_1786872691348_51231563",
+        "started_at": "2026-08-15T09:00:00.000Z",
+        "ended_at": "2026-08-15T09:25:00.000Z",
+        "duration_seconds": 1500,
+        "session_type": "focus",
+        "created_at": "2026-08-16T09:31:31.348Z"
+      }
+    ],
+    "linked_action_rules": []
+  },
+  "settings": {
+    "calorieGoal": {
+      "calories": 2000,
+      "protein": 150,
+      "carbs": 200,
+      "fats": 65
+    },
+    "pomodoroSettings": {
+      "focusMinutes": 25,
+      "shortBreakMinutes": 5,
+      "longBreakMinutes": 15,
+      "sessionsBeforeLongBreak": 4
+    },
+    "theme": {
+      "mode": "dark",
+      "slots": null
+    }
+  },
+  "integrity": {
+    "entities": {
+      "todos": {
+        "count": 2,
+        "checksum": "14bfa24d98b2e064c15843cc40b43d6d0020cb41b4c36121d348723e0a835a5c"
+      },
+      "habits": {
+        "count": 0,
+        "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "habit_completions": {
+        "count": 0,
+        "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "calorie_entries": {
+        "count": 1,
+        "checksum": "0bdafc9fccdb4da0a795d720b8d03de7de238f840f96eaf753b4f200b2e3ea39"
+      },
+      "saved_meals": {
+        "count": 1,
+        "checksum": "f408fd2b8ac30a888223bf506c8fb8f731723a16d659481884e01aa14f226aa5"
+      },
+      "workout_routines": {
+        "count": 1,
+        "checksum": "a14ee58c3c4594c1ded183979af94eb5b47de6724f118153a742de9ae02bd5c6"
+      },
+      "routine_exercises": {
+        "count": 1,
+        "checksum": "2e101f9ea1276d5057a4522454b364dc990e14a08f61f9155fc1f3b656c5a8a9"
+      },
+      "routine_exercise_sets": {
+        "count": 0,
+        "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "workout_logs": {
+        "count": 0,
+        "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "workout_session_exercises": {
+        "count": 0,
+        "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "pomodoro_sessions": {
+        "count": 1,
+        "checksum": "d89f75f98b494f83df2b129bb29c40095f9a10fbe85e8b8d5357803f16119e2a"
+      },
+      "linked_action_rules": {
+        "count": 0,
+        "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "settings": {
+      "version": 2,
+      "checksum": "ac81658a4ea6413f35b4205a7d8c5bc5859d57f81e600531cc52d7cc93cf17be"
+    },
+    "payloadChecksum": "5b25db15e1f14f66b9bc0b0c94ddd0dd4249d43dbe94c43920d987873e7d3771"
+  }
+}

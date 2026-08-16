@@ -1,0 +1,35 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - portable-backup
+---
+# Portable Backup V1 — populated-device import block on Android.
+#
+# Import is a consequential, empty-device-only action: on a device with local
+# data the Import control is disabled and the reason is shown.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 15000
+- tapOn: 'Add task'
+- extendedWaitUntil:
+    visible: 'Add a task'
+    timeout: 10000
+- tapOn: 'Add a task'
+- inputText: 'Native local todo'
+- tapOn: 'Add task'
+- extendedWaitUntil:
+    visible: 'Native local todo'
+    timeout: 10000
+- tapOn: 'Open settings'
+- extendedWaitUntil:
+    visible: 'Theme and display'
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: 'Portable data'
+    direction: DOWN
+    timeout: 20000
+- assertVisible: 'Import is available only on an empty device. This device contains local data, so portable import is paused here.'
+- stopApp
