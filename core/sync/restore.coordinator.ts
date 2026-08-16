@@ -33,7 +33,7 @@ import { RESTORE_SCOPED_ENTITIES, SYNC_BACKED_ENTITIES } from '@/core/sync/resto
 const RESTORE_SCOPE_VERSION = 'phase_one_restore_v1';
 const PAGE_SIZE = 1_000;
 const WORKOUT_RESTORE_EXCLUSION_REASON =
-  'Workout routines are excluded in this phase because nested routine structure is not synced yet.';
+  'Workout routines are excluded from phase-one restore. Full workout structure and history are included in Backup V2 restore.';
 const REMOTE_AUTH_UNAVAILABLE_MESSAGE =
   'Remote backup authentication is unavailable for the current account.';
 
@@ -113,8 +113,8 @@ function buildWarnings(statuses: Record<SyncBackedEntity, RemoteBackupEntityStat
 
 function buildDisclosures(): string[] {
   return [
-    'Habits restore definitions only. Habit completion history stays local-only.',
-    'Calories restore entries only. Saved meals stay local-only.',
+    'Habits restore definitions only (phase-one restore surface). Habit completion history is included in Backup V2 restore.',
+    'Calories restore entries only (phase-one restore surface). Saved meals are included in Backup V2 restore.',
     WORKOUT_RESTORE_EXCLUSION_REASON,
   ];
 }

@@ -26,6 +26,7 @@ import { validateCalorieGoal, validatePomodoroSettings } from '@/lib/validation'
 import { maybeLoadRestorePreviewForSettings } from '@/features/settings/settingsRestorePreview';
 import { SettingsAppearanceSection } from '@/features/settings/SettingsAppearanceSection';
 import { SettingsBackupSection } from '@/features/settings/SettingsBackupSection';
+import { SettingsPortableSection } from '@/features/settings/SettingsPortableSection';
 import { SettingsCaloriesSection } from '@/features/settings/SettingsCaloriesSection';
 import { SettingsCommandSection } from '@/features/settings/SettingsCommandSection';
 import { SettingsDeveloperSection } from '@/features/settings/SettingsDeveloperSection';
@@ -362,6 +363,8 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         onVerifyAccountRecovery={verifyAccountRecovery}
         onResendAccountRecovery={resendAccountRecovery}
       />
+
+      <SettingsPortableSection />
 
       <SettingsCommandSection
         commandInternalRolloutAvailable={commandInternalRolloutAvailable}

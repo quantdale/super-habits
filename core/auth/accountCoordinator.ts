@@ -1,5 +1,5 @@
 import { getDatabase } from '@/core/db/client';
-import { appMetaKeys, getAppMetaJson, setAppMetaJson } from '@/core/db/appMeta';
+import { appMetaKeys, getAppMetaJson, getAppMetaText, setAppMetaJson } from '@/core/db/appMeta';
 import {
   adoptUnownedOutboxRows,
   bindLocalDatasetOwner,
@@ -190,6 +190,7 @@ export class AccountCoordinator {
       remoteEnabled: true,
       local,
       auth,
+      importOriginOwnerFingerprint: await this.readPortableImportOriginFingerprint(),
     });
 
     if (decision.shouldCreateAnonymous && !auth.sessionUserId) {
@@ -674,6 +675,24 @@ export class AccountCoordinator {
     return inspectLocalAccountDataState(await this.getDatabase());
   }
 
+  /**
+   * Durable import-origin owner fingerprint written by Portable Import V1
+   * (`portable.last_import_owner_fingerprint`; the literal string `null`
+   * records a local-only source file). Compatibility metadata only — the
+   * account coordinator uses it to fail closed against unrelated accounts.
+   */
+  private async readPortableImportOriginFingerprint(): Promise<string | null> {
+    try {
+      const value = await getAppMetaText(
+        await this.getDatabase(),
+        appMetaKeys.portableLastImportOwnerFingerprint,
+      );
+      return value && value !== 'null' ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
   private async getDatabase() {
     return (this.dependencies.getDatabase ?? getDatabase)();
   }
@@ -686,7 +705,13 @@ export class AccountCoordinator {
     const configured = this.dependencies.isConfigured();
     const remoteEnabled = this.dependencies.isRemoteEnabled();
     const auth = await this.getAuthEvidence();
-    const decision = decideAccountState({ configured, remoteEnabled, local, auth });
+    const decision = decideAccountState({
+      configured,
+      remoteEnabled,
+      local,
+      auth,
+      importOriginOwnerFingerprint: await this.readPortableImportOriginFingerprint(),
+    });
 
     if (decision.bindProvisionalUserId && !local.ownerBinding) {
       const db = await this.getDatabase();
@@ -728,6 +753,7 @@ export class AccountCoordinator {
       remoteEnabled,
       local,
       auth,
+      importOriginOwnerFingerprint: await this.readPortableImportOriginFingerprint(),
     });
 
     // Safety net: any committed content promotes a provisional binding to
@@ -744,6 +770,7 @@ export class AccountCoordinator {
         remoteEnabled,
         local,
         auth,
+        importOriginOwnerFingerprint: await this.readPortableImportOriginFingerprint(),
       });
     }
 
@@ -760,6 +787,7 @@ export class AccountCoordinator {
         remoteEnabled,
         local,
         auth,
+        importOriginOwnerFingerprint: await this.readPortableImportOriginFingerprint(),
       });
     }
     const protection = await this.getPendingProtection();

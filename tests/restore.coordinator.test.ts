@@ -367,10 +367,10 @@ describe('core/sync/restore.coordinator', () => {
     expect(preview.entityStatuses.workout_routines).toMatchObject({
       phaseOneStatus: 'excluded_in_phase_one',
       reason:
-        'Workout routines are excluded in this phase because nested routine structure is not synced yet.',
+        'Workout routines are excluded from phase-one restore. Full workout structure and history are included in Backup V2 restore.',
     });
     expect(preview.warnings).toContain(
-      'Workout routines are excluded in this phase because nested routine structure is not synced yet.',
+      'Workout routines are excluded from phase-one restore. Full workout structure and history are included in Backup V2 restore.',
     );
   });
 

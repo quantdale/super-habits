@@ -24,10 +24,14 @@ test.describe('Settings backup restore', () => {
     await expect(page.getByText('Backup status and restore', { exact: true })).toBeVisible();
     await page.getByText('Current restore disclosures').scrollIntoViewIfNeeded();
     await expect(
-      page.getByText('Habits restore definitions only. Habit completion history stays local-only.'),
+      page.getByText(
+        'Habits restore definitions only (phase-one restore surface). Habit completion history is included in Backup V2 restore.',
+      ),
     ).toBeVisible();
     await expect(
-      page.getByText('Calories restore entries only. Saved meals stay local-only.'),
+      page.getByText(
+        'Calories restore entries only (phase-one restore surface). Saved meals are included in Backup V2 restore.',
+      ),
     ).toBeVisible();
     await expect(page.getByText('Backup identity', { exact: true })).toBeVisible();
     await expect(page.getByText('Unavailable', { exact: true }).last()).toBeVisible();

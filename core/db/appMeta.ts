@@ -47,6 +47,14 @@ export const appMetaKeys = {
   backupPendingSettings: defineJsonKey('backup.pending_settings', 'sync'),
   backupPendingThemeApply: defineJsonKey('backup.pending_theme_apply', 'sync'),
   backupLastCompleteGeneration: defineTextKey('backup.last_complete_generation', 'sync'),
+  portableLastImportAt: defineTextKey('portable.last_import_at', 'sync'),
+  portableLastImportFormatVersion: defineTextKey('portable.last_import_format_version', 'sync'),
+  /** Stored as the fingerprint hex, or the literal string `null` when the
+   *  imported file had no source owner. Read via `readPortableImportOriginFingerprint`. */
+  portableLastImportOwnerFingerprint: defineTextKey(
+    'portable.last_import_owner_fingerprint',
+    'sync',
+  ),
 } as const;
 
 export async function getAppMetaText(
@@ -102,4 +110,11 @@ export async function setAppMetaJson<T>(
   value: T,
 ): Promise<void> {
   await setAppMetaText(db, metaKey, JSON.stringify(value));
+}
+
+export async function deleteAppMetaKey(
+  db: SQLite.SQLiteDatabase,
+  metaKey: AppMetaTextKey | AppMetaJsonKey,
+): Promise<void> {
+  await db.runAsync('DELETE FROM app_meta WHERE key = ?', [metaKey.key]);
 }

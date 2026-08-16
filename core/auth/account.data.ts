@@ -92,6 +92,22 @@ export async function setLocalDatasetOwner(
 }
 
 /**
+ * Removes the local dataset-owner binding entirely (both the owner key and
+ * the binding-state key) and resets the cache. Used by portable import on a
+ * pristine device whose only binding is a replaceable PROVISIONAL anonymous
+ * session: the device is unclaimed, and the imported dataset must not be
+ * attached to a throwaway temporary account. Never called on a permanent
+ * binding or a populated dataset.
+ */
+export async function clearLocalDatasetOwner(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.runAsync('DELETE FROM app_meta WHERE key = ? OR key = ?', [
+    appMetaKeys.accountOwnerUserId.key,
+    appMetaKeys.accountOwnerBindingState.key,
+  ]);
+  primeLocalDatasetOwner(null, false);
+}
+
+/**
  * Initializes owner IDs that were NULL before outbox ownership was added.
  * This is allowed only after the coordinator has established compatible legacy
  * ownership evidence; it never changes a non-NULL owner.

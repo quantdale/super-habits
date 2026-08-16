@@ -3,12 +3,22 @@ import type {
   AccountStatus,
   LocalAccountDataState,
 } from '@/core/auth/account.types';
+import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 
 export type AccountDecisionInput = {
   configured: boolean;
   remoteEnabled: boolean;
   local: LocalAccountDataState;
   auth: AccountAuthEvidence;
+  /**
+   * Durable import-origin owner fingerprint recorded by Portable Import V1
+   * (`app_meta portable.last_import_owner_fingerprint`), or `null` when the
+   * dataset was never imported from a portable file (or the file had no
+   * source owner). A populated dataset carrying a fingerprint can only be
+   * bound by the account whose fingerprint matches; unrelated accounts fail
+   * closed so an imported dataset is never silently claimed.
+   */
+  importOriginOwnerFingerprint?: string | null;
 };
 
 export type AccountDecision = {
@@ -38,6 +48,7 @@ const isPristineForReplacement = (local: LocalAccountDataState): boolean =>
 
 export function decideAccountState(input: AccountDecisionInput): AccountDecision {
   const { configured, remoteEnabled, local, auth } = input;
+  const importOriginOwnerFingerprint = input.importOriginOwnerFingerprint ?? null;
   const canRecoverExisting =
     isPristineForReplacement(local) &&
     (local.ownerBinding === null || local.ownerBindingProvisional);
@@ -226,6 +237,27 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
 
   if (auth.verifiedUserId) {
     const shouldBindLegacy = hasLocalContent(local);
+    // Portable Import V1 fail-closed gate: a dataset that was imported from
+    // another device's backup records the source owner fingerprint. Only the
+    // matching account may bind it; an unrelated verified account must never
+    // silently claim imported data.
+    const importOriginBlocksBind =
+      importOriginOwnerFingerprint !== null &&
+      portableOwnerFingerprint(auth.verifiedUserId) !== importOriginOwnerFingerprint;
+    if (shouldBindLegacy && importOriginBlocksBind) {
+      return {
+        status: 'owner_mismatch',
+        bindCurrentUserId: null,
+        bindProvisionalUserId: null,
+        seedOwnerUserId: null,
+        shouldCreateAnonymous: false,
+        canRecoverExisting: false,
+        canRecoverOwner: false,
+        canProtect: false,
+        message:
+          'This device’s dataset was imported from another backup account. Sign in with the account that created it.',
+      };
+    }
     const pristineAnonymous = !shouldBindLegacy && auth.verifiedIsAnonymous === true;
     return {
       status: auth.verifiedIsAnonymous === true ? 'anonymous_ready' : 'protected',
@@ -244,6 +276,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
   }
 
   if (hasLocalContent(local)) {
+    const importedDataset = importOriginOwnerFingerprint !== null;
     return {
       status: local.hasUserData ? 'legacy_owner_unknown' : 'recovery_required',
       bindCurrentUserId: null,
@@ -254,7 +287,9 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       canRecoverOwner: false,
       canProtect: false,
       message: local.hasUserData
-        ? 'This local dataset has no recoverable owner evidence. Remote backup is paused.'
+        ? importedDataset
+          ? 'This device’s dataset was imported from another device’s backup. Sign in with the account that created it to resume remote backup.'
+          : 'This local dataset has no recoverable owner evidence. Remote backup is paused.'
         : 'Pending backup work needs the account that created it before remote backup can resume.',
     };
   }
