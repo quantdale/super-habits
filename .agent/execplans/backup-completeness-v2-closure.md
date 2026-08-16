@@ -316,6 +316,15 @@ JSONB` present; RLS 4 policies/table unchanged; anon 0 grants;
   cold emulator restart resolved it). Native V2 restore round-trip is covered
   by web E2E + integration (native build has no Supabase env); the
   backup-v2-settings flow pins the native V2 surface.
+- 2026-08-16 — Final gates on the committed state — PASS — typecheck; lint;
+  npm test 985/985; openspec:validate 27/27; supabase:schema:validate (7
+  migrations); agent:plan:validate:all.
+- 2026-08-16 — Push — PASS — `git push origin main` (6e005a2..3d2f7db,
+  no force); local main == origin/main == 3d2f7db3...; remote heads: main
+  only. 5 coherent commits.
+- 2026-08-16 — GitHub CI run 31925374349 — quality PASS; e2e in progress
+  (main lane: full e2e + deterministic simulation + dist-sync + e2e:sync);
+  nightly skipped (push trigger).
 
 ## Changed Files / Areas
 
