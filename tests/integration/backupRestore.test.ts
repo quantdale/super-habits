@@ -14,27 +14,84 @@ import { freshDatabase } from './helpers/db';
  * settings) and the absence of any historical side effects (empty linked
  * action ledgers, empty outbox, no notifications replayed).
  *
- * Failure cases: corrupt checksum, malformed row, missing parent, duplicate
- * completion key, local-content race, fetch failure — each must leave the
- * target database untouched.
+ * Closure contract coverage: settings are fetched and verified BEFORE any
+ * local write (every `{ data, error }` outcome is a restore failure that
+ * leaves the device untouched), settings integrity is checksum-bound to the
+ * manifest, NO network call can occur inside the import transaction (a
+ * transaction-open guard in the Supabase stub would throw), and theme
+ * (AsyncStorage) recovery is durable with restart retry.
  */
+
+/** Controllable AsyncStorage double shared by every test in this file. */
+const asyncStorageMock = vi.hoisted(() => {
+  const state = new Map<string, string>();
+  const failWrites = { value: false };
+  return {
+    state,
+    failWrites,
+    impl: {
+      getItem: async (key: string) => state.get(key) ?? null,
+      setItem: async (key: string, value: string) => {
+        if (failWrites.value) throw new Error('simulated AsyncStorage write failure');
+        state.set(key, value);
+      },
+      removeItem: async (key: string) => {
+        state.delete(key);
+      },
+    },
+  };
+});
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: asyncStorageMock.impl.getItem,
+    setItem: asyncStorageMock.impl.setItem,
+    removeItem: asyncStorageMock.impl.removeItem,
+  },
+}));
+
+/** True while any withSQLiteTransaction callback is executing. */
+const transactionOpen = vi.hoisted(() => ({ value: false }));
+
+vi.mock('@/core/db/transactions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/core/db/transactions')>();
+  return {
+    ...actual,
+    withSQLiteTransaction: async (
+      db: Parameters<typeof actual.withSQLiteTransaction>[0],
+      task: Parameters<typeof actual.withSQLiteTransaction>[1],
+    ) => {
+      transactionOpen.value = true;
+      try {
+        return await actual.withSQLiteTransaction(db, task);
+      } finally {
+        transactionOpen.value = false;
+      }
+    },
+  };
+});
 
 type UpsertCall = { entity: string; rows: Record<string, unknown>[] };
 
 function buildRecordingSupabase() {
   const upserted: UpsertCall[] = [];
-  const from = vi.fn((entity: string) => ({
-    upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
-      const rowList = Array.isArray(rows) ? rows : [rows];
-      upserted.push({ entity, rows: rowList });
-      return { error: null };
-    }),
-    delete: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(async () => ({ error: null })),
+  const from = vi.fn((entity: string) => {
+    if (transactionOpen.value) {
+      throw new Error('network call issued inside an open SQLite transaction');
+    }
+    return {
+      upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
+        const rowList = Array.isArray(rows) ? rows : [rows];
+        upserted.push({ entity, rows: rowList });
+        return { error: null };
+      }),
+      delete: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(async () => ({ error: null })),
+        })),
       })),
-    })),
-  }));
+    };
+  });
   return { supabase: { from }, upserted };
 }
 
@@ -46,9 +103,13 @@ function buildServingSupabase(
     dropParent?: { entity: string; id: string } | null;
     duplicateCompletion?: boolean;
     failEntity?: string | null;
+    failSettingsFetch?: boolean;
   } = {},
 ) {
   const from = vi.fn((entity: string) => {
+    if (transactionOpen.value) {
+      throw new Error('network call issued inside an open SQLite transaction');
+    }
     const allRows = (remote.get(entity) ?? []).map((row) => ({ ...row }));
     const rowsForQuery = () => {
       let rows = allRows;
@@ -86,6 +147,14 @@ function buildServingSupabase(
               return Promise.resolve({
                 data: null,
                 error: { message: 'simulated network failure' },
+              });
+            }
+            if (entity === 'user_backup_settings' && options.failSettingsFetch) {
+              // The exact `{ data: null, error: {...} }` shape the closure bug
+              // depended on: a real PostgREST failure, not a missing row.
+              return Promise.resolve({
+                data: null,
+                error: { message: 'simulated settings fetch failure' },
               });
             }
             if (columns === 'payload') {
@@ -152,6 +221,247 @@ function remoteFromUpserts(upserted: UpsertCall[]): Map<string, Record<string, u
   }
   return map;
 }
+
+/**
+ * Phase 1 helper: build a real source device, publish its backup to the
+ * recording stub, and return the captured remote material.
+ */
+async function publishSourceBackup(): Promise<Map<string, Record<string, unknown>[]>> {
+  const recording = buildRecordingSupabase();
+  installSupabaseMock(recording.supabase);
+  const sourceDb = await freshDatabase();
+  const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+  await setLocalDatasetOwner(sourceDb as never, 'user_a');
+  await seedSourceDevice(sourceDb);
+  const checkpoint = await import('@/core/backup/backupCheckpoint');
+  await checkpoint.runBackupMaintenance();
+  await sourceDb.closeAsync();
+  return remoteFromUpserts(recording.upserted);
+}
+
+/** Every user table must be untouched after a blocked restore. */
+async function expectZeroImportedRows(db: TestDatabase): Promise<void> {
+  for (const table of [
+    'todos',
+    'habits',
+    'habit_completions',
+    'calorie_entries',
+    'saved_meals',
+    'workout_routines',
+    'routine_exercises',
+    'routine_exercise_sets',
+    'workout_logs',
+    'workout_session_exercises',
+    'pomodoro_sessions',
+    'linked_action_rules',
+  ]) {
+    const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
+    expect(Number(row?.count), table).toBe(0);
+  }
+  const goal = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM app_meta WHERE key = 'calorie_goal'",
+  );
+  expect(goal?.value ?? null).toBeNull();
+}
+
+describe('backup completeness v2 restore — settings integrity (closure)', () => {
+  it('blocks on a settings fetch error ({data: null, error: {...}}) and leaves the device untouched', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote, { failSettingsFetch: true });
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('fetch_failed');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('blocks when the settings row is missing despite the manifest', async () => {
+    const remote = await publishSourceBackup();
+    remote.delete('user_backup_settings');
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('incomplete_manifest');
+      expect(result.diagnostics.join(' ')).toContain('user_backup_settings');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('blocks on a malformed settings payload', async () => {
+    const remote = await publishSourceBackup();
+    const settingsRow = remote.get('user_backup_settings')?.[0];
+    if (settingsRow) settingsRow.payload = { calorieGoal: 'not-an-object' };
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('validation_failed');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('blocks on a settings checksum mismatch', async () => {
+    const remote = await publishSourceBackup();
+    const settingsRow = remote.get('user_backup_settings')?.[0];
+    if (settingsRow) {
+      const payload = settingsRow.payload as {
+        calorieGoal: { calories: number };
+      };
+      settingsRow.payload = {
+        ...payload,
+        calorieGoal: { ...payload.calorieGoal, calories: payload.calorieGoal.calories + 100 },
+      };
+    }
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('integrity_mismatch');
+      expect(result.diagnostics.join(' ')).toContain('settings');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('blocks on an unsupported settings version', async () => {
+    const remote = await publishSourceBackup();
+    const settingsRow = remote.get('user_backup_settings')?.[0];
+    if (settingsRow) settingsRow.settings_version = 99;
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('unsupported_version');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('blocks a v2 manifest that does not certify settings integrity', async () => {
+    const remote = await publishSourceBackup();
+    const manifestRow = remote.get('backup_manifest')?.[0];
+    if (manifestRow) delete manifestRow.settings_metadata;
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('incomplete_manifest');
+      expect(result.diagnostics.join(' ')).toContain('settings integrity');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('never issues a network call inside the import transaction (guarded full restore)', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    // The serving stub throws if `supabase.from` is reached while a
+    // withSQLiteTransaction callback is open; reaching 'restored' proves the
+    // transaction performed zero network calls.
+    expect(result.status).toBe('restored');
+    await targetDb.closeAsync();
+  });
+
+  it('reports BACKUP INVALID when the remote manifest lacks settings integrity metadata', async () => {
+    const remote = await publishSourceBackup();
+    const manifestRow = remote.get('backup_manifest')?.[0];
+    if (manifestRow) delete manifestRow.settings_metadata;
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { getBackupStateSummary } = await import('@/core/backup/backupRestore');
+    const summary = await getBackupStateSummary('user_a');
+    expect(summary.state).toBe('invalid');
+    expect(summary.lastCompleteAt).toBeNull();
+    await targetDb.closeAsync();
+  });
+
+  it('reports V2 COMPLETE with the certified settings integrity for a valid manifest', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { getBackupStateSummary } = await import('@/core/backup/backupRestore');
+    const summary = await getBackupStateSummary('user_a');
+    expect(summary.state).toBe('v2_complete');
+    expect(summary.lastCompleteGeneration).toBe(1);
+    expect(summary.lastCompleteAt).not.toBeNull();
+    await targetDb.closeAsync();
+  });
+
+  it('keeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart', async () => {
+    const recording = buildRecordingSupabase();
+    installSupabaseMock(recording.supabase);
+    asyncStorageMock.state.set('superhabits.theme.mode', 'dark');
+    asyncStorageMock.state.set(
+      'superhabits.theme.slots.v2',
+      JSON.stringify({ lightThemeId: 'ocean' }),
+    );
+    const sourceDb = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(sourceDb as never, 'user_a');
+    await seedSourceDevice(sourceDb);
+    const checkpoint = await import('@/core/backup/backupCheckpoint');
+    await checkpoint.runBackupMaintenance();
+    await sourceDb.closeAsync();
+    const remote = remoteFromUpserts(recording.upserted);
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    // Domain import commits, but the AsyncStorage theme application fails.
+    asyncStorageMock.failWrites.value = true;
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('restored');
+
+    // The durable marker survives and records the staged theme.
+    const marker = await targetDb.getFirstAsync<{ value: string }>(
+      "SELECT value FROM app_meta WHERE key = 'backup.pending_theme_apply'",
+    );
+    expect(marker).not.toBeNull();
+    expect(JSON.parse(marker?.value ?? '{}')).toMatchObject({ mode: 'dark' });
+
+    // Restart: the bootstrap retry applies the theme and clears the marker
+    // only on success.
+    asyncStorageMock.failWrites.value = false;
+    const { applyPendingThemeApplication } = await import('@/core/backup/backupSettings');
+    expect(await applyPendingThemeApplication()).toBe(true);
+    const after = await targetDb.getFirstAsync<{ value: string }>(
+      "SELECT value FROM app_meta WHERE key = 'backup.pending_theme_apply'",
+    );
+    expect(after?.value).toBe('null');
+    expect(asyncStorageMock.state.get('superhabits.theme.mode')).toBe('dark');
+    await targetDb.closeAsync();
+  });
+});
 
 async function seedSourceDevice(db: TestDatabase) {
   const todos = await import('@/features/todos/todos.data');

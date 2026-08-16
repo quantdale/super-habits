@@ -13,6 +13,7 @@ import {
   restoreFromRemoteBackup,
 } from '@/core/sync/restore.coordinator';
 import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
+import { applyPendingThemeApplication } from '@/core/backup/backupSettings';
 import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessage';
 import { resolveRestorePromptOutcome } from '@/core/providers/restorePromptFlow';
 import type { RestorePreview } from '@/core/sync/restore.types';
@@ -129,6 +130,16 @@ export function AppProviders({ children }: PropsWithChildren) {
         if (!cancelled) setRestorePreview(refreshedPreview);
       } catch (e) {
         console.error('[backup] maintenance failed during bootstrap', e);
+      }
+
+      // Durable cross-store settings recovery: a restore may have committed
+      // the domain import but been interrupted before its theme settings were
+      // applied to AsyncStorage. Retry the staged application until it
+      // succeeds; the marker is cleared only on success.
+      try {
+        await applyPendingThemeApplication();
+      } catch (e) {
+        console.error('[backup] pending theme application failed during bootstrap', e);
       }
     };
 

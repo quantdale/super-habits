@@ -14,13 +14,22 @@ import {
   BACKUP_ENTITY_COLUMNS,
   BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
+  BACKUP_SETTINGS_VERSION,
   BACKUP_SCOPE_VERSION,
   type BackupEntity,
   type BackupManifest,
   type RemoteBackupManifestRow,
+  type RemoteUserBackupSettingsRow,
 } from '@/core/backup/backup.types';
 import { validateBackupGraph, validateBackupRow } from '@/core/backup/backupValidators';
-import { applyRecoverableSettings } from '@/core/backup/backupSettings';
+import {
+  applyRecoverableSettingsToSqlite,
+  applyPendingThemeApplication,
+  canonicalizeSettingsPayload,
+  isValidRecoverableSettings,
+  normalizeRecoverableSettings,
+  stagePendingThemeApplication,
+} from '@/core/backup/backupSettings';
 import type {
   CalorieEntry,
   Habit,
@@ -94,7 +103,7 @@ export type BackupStateSummary = {
 
 const PAGE_SIZE = 1_000;
 
-function parseManifestRow(row: unknown): BackupManifest | null {
+export function parseManifestRow(row: unknown): BackupManifest | null {
   if (!row || typeof row !== 'object') return null;
   const candidate = row as Record<string, unknown>;
   if (
@@ -120,12 +129,24 @@ function parseManifestRow(row: unknown): BackupManifest | null {
     }
     metadata[entity as BackupEntity] = { count: meta.count, checksum: meta.checksum };
   }
+  // Settings integrity metadata (closure contract). A v2 manifest without it
+  // cannot certify the settings payload — the caller treats it as incomplete.
+  let settingsMetadata: BackupManifest['settingsMetadata'];
+  const rawSettingsMetadata = candidate.settings_metadata;
+  if (rawSettingsMetadata !== null && rawSettingsMetadata !== undefined) {
+    if (typeof rawSettingsMetadata !== 'object') return null;
+    const meta = rawSettingsMetadata as Record<string, unknown>;
+    if (typeof meta.version !== 'number' || typeof meta.checksum !== 'string') return null;
+    if (!/^[0-9a-f]{64}$/.test(meta.checksum)) return null;
+    settingsMetadata = { version: meta.version, checksum: meta.checksum };
+  }
   return {
     backupSchemaVersion: candidate.backup_schema_version,
     generation: candidate.generation,
     completedAt: candidate.completed_at,
     entityMetadata: metadata,
     settingsVersion: candidate.settings_version,
+    settingsMetadata,
   };
 }
 
@@ -141,6 +162,29 @@ async function fetchManifestRow(ownerUserId: string): Promise<RemoteBackupManife
   }
   const row = (result.data?.[0] ?? null) as RemoteBackupManifestRow | null;
   return row;
+}
+
+/**
+ * Fetch exactly one owner-scoped recoverable-settings row BEFORE any local
+ * write. Every Supabase `{ error }` — including `{ data: null, error: {...} }`
+ * — is a restore failure, never a silent "settings absent" skip: the manifest
+ * declares a settings snapshot, so its row must exist and verify.
+ */
+async function fetchRemoteRecoverableSettings(
+  ownerUserId: string,
+): Promise<RemoteUserBackupSettingsRow | null> {
+  if (!supabase) {
+    throw new Error('[restore] Remote backup is not configured.');
+  }
+  const result = await supabase
+    .from('user_backup_settings')
+    .select('*')
+    .eq('user_id', ownerUserId)
+    .limit(1);
+  if (result.error) {
+    throw new Error(`[restore] Failed to fetch user_backup_settings: ${result.error.message}`);
+  }
+  return (result.data?.[0] ?? null) as RemoteUserBackupSettingsRow | null;
 }
 
 /**
@@ -369,6 +413,83 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
 
+  // Settings are part of the coherent recovery point. The manifest certifies
+  // a settings snapshot (closure contract): the row must exist, carry the
+  // supported contract version, survive runtime normalization, and hash to
+  // the certified checksum — ALL before any local write. Every Supabase
+  // `{ error }` here is a restore failure.
+  if (!manifest.settingsMetadata) {
+    return {
+      status: 'invalid',
+      reason: 'incomplete_manifest',
+      message: 'The remote backup manifest does not certify settings integrity.',
+      diagnostics: ['missing settings_metadata (settings integrity) in backup_manifest'],
+    };
+  }
+  let settingsRow: RemoteUserBackupSettingsRow | null;
+  try {
+    settingsRow = await fetchRemoteRecoverableSettings(ownerUserId);
+  } catch (error) {
+    return {
+      status: 'invalid',
+      reason: 'fetch_failed',
+      message: error instanceof Error ? error.message : String(error),
+      diagnostics: [],
+    };
+  }
+  if (!settingsRow) {
+    return {
+      status: 'invalid',
+      reason: 'incomplete_manifest',
+      message: 'The remote backup declares a settings snapshot but has no settings row.',
+      diagnostics: ['missing user_backup_settings row for the declared settings snapshot'],
+    };
+  }
+  if (settingsRow.user_id !== ownerUserId) {
+    return {
+      status: 'invalid',
+      reason: 'validation_failed',
+      message: 'The remote backup settings row does not belong to the verified owner.',
+      diagnostics: ['user_backup_settings.user_id does not match the restore owner'],
+    };
+  }
+  if (
+    settingsRow.settings_version !== BACKUP_SETTINGS_VERSION ||
+    settingsRow.settings_version !== manifest.settingsVersion ||
+    settingsRow.settings_version !== manifest.settingsMetadata.version
+  ) {
+    return {
+      status: 'invalid',
+      reason: 'unsupported_version',
+      message: `The remote backup carries an unsupported settings version ${settingsRow.settings_version}.`,
+      diagnostics: [
+        `user_backup_settings.settings_version=${settingsRow.settings_version}; ` +
+          `manifest settings_version=${manifest.settingsVersion}; ` +
+          `settings_metadata.version=${manifest.settingsMetadata.version}`,
+      ],
+    };
+  }
+  if (!isValidRecoverableSettings(settingsRow.payload)) {
+    return {
+      status: 'invalid',
+      reason: 'validation_failed',
+      message: 'The remote backup settings payload is malformed and was not imported.',
+      diagnostics: ['user_backup_settings payload failed runtime validation'],
+    };
+  }
+  const normalizedSettings = normalizeRecoverableSettings(settingsRow.payload);
+  const settingsChecksum = canonicalizeSettingsPayload(normalizedSettings);
+  if (settingsChecksum !== manifest.settingsMetadata.checksum) {
+    return {
+      status: 'invalid',
+      reason: 'integrity_mismatch',
+      message: 'The remote backup settings failed integrity verification.',
+      diagnostics: [
+        `settings: expected checksum=${manifest.settingsMetadata.checksum}; actual=${settingsChecksum}`,
+      ],
+    };
+  }
+
   // Re-verify identity immediately before the import transaction.
   const refreshedOwnerUserId = await getSupabaseAuthUserId();
   if (!refreshedOwnerUserId || refreshedOwnerUserId !== ownerUserId) {
@@ -423,21 +544,13 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       typed<LinkedActionRuleRow[]>('linked_action_rules'),
     );
 
-    // The settings payload was validated structurally during parsing; apply
-    // through the allowlist normalizer so no excluded key can leak through.
-    const settingsRow = manifest.settingsVersion >= 0 ? manifestRow : null;
-    if (settingsRow) {
-      const settingsResult = await supabase
-        ?.from('user_backup_settings')
-        .select('payload')
-        .eq('user_id', ownerUserId)
-        .limit(1);
-      const firstRow = settingsResult?.data?.[0] as { payload?: unknown } | undefined;
-      const payload = firstRow?.payload ?? null;
-      if (payload !== undefined && payload !== null) {
-        await applyRecoverableSettings(transactionDb, payload);
-      }
-    }
+    // Settings: the payload was fetched and integrity-verified ABOVE, before
+    // this transaction began. SQLite-backed settings join the transaction
+    // directly; theme (AsyncStorage) is staged durably here and applied after
+    // commit with restart reconciliation. NO network call happens inside this
+    // transaction.
+    await applyRecoverableSettingsToSqlite(transactionDb, normalizedSettings);
+    await stagePendingThemeApplication(transactionDb, normalizedSettings, restoredAt);
 
     await setAppMetaText(
       transactionDb,
@@ -480,7 +593,10 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
 
-  // Post-restore reconciliation: ONLY current/future reminder scheduling.
+  // Post-restore reconciliation: apply the staged theme settings to
+  // AsyncStorage (durable marker; retried on bootstrap until it succeeds),
+  // then ONLY current/future reminder scheduling.
+  await applyPendingThemeApplication();
   requestHabitReminderReconciliation();
 
   const importedCounts = Object.fromEntries(
@@ -566,11 +682,17 @@ export async function getBackupStateSummary(
   }
 
   const manifest = parseManifestRow(manifestRow);
-  if (!manifest || manifest.backupSchemaVersion !== BACKUP_SCHEMA_VERSION) {
+  if (
+    !manifest ||
+    manifest.backupSchemaVersion !== BACKUP_SCHEMA_VERSION ||
+    // The v2 contract certifies settings integrity (closure): a manifest
+    // without settings metadata cannot be called a known-good recovery point.
+    !manifest.settingsMetadata
+  ) {
     return {
       state: 'invalid',
       lastCompleteAt: null,
-      lastCompleteGeneration: manifestRow ? null : null,
+      lastCompleteGeneration: null,
       pendingChangeCount,
       backfillInProgress: false,
       missingEntities: [],

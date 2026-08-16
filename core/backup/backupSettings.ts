@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type * as SQLite from 'expo-sqlite';
-import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
+import {
+  appMetaKeys,
+  getAppMetaJsonOrDefault,
+  setAppMetaJson,
+  setAppMetaText,
+} from '@/core/db/appMeta';
+import { getDatabase } from '@/core/db/client';
 import {
   DEFAULT_SETTINGS as DEFAULT_POMODORO_SETTINGS,
   normalizePomodoroSettings,
@@ -8,6 +14,7 @@ import {
 } from '@/features/pomodoro/pomodoro.domain';
 import { DEFAULT_CALORIE_GOAL, normalizeCalorieGoal } from '@/features/calories/calories.domain';
 import type { CalorieGoal } from '@/features/calories/types';
+import { sha256Hex } from '@/lib/checksum';
 import { type RecoverableSettingsV2 } from '@/core/backup/backup.types';
 
 const THEME_MODE_STORAGE_KEY = 'superhabits.theme.mode';
@@ -99,6 +106,54 @@ export function isValidRecoverableSettings(input: unknown): input is Recoverable
   return true;
 }
 
+function sortedEntries(record: Record<string, string>): [string, string][] {
+  return Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/**
+ * Deterministic SHA-256 of the allowlisted settings payload.
+ *
+ * Both the backing-up device (at checkpoint capture) and the restoring device
+ * (at pre-import verification) normalize then canonicalize the payload to a
+ * fixed shape: explicit null defaults for absent keys, fixed field order,
+ * sorted theme-slot keys, `undefined` normalized to `null`. Remote JSONB key
+ * reordering/whitespace normalization is therefore neutralized (values are
+ * re-canonicalized client-side before hashing), and only the allowlisted
+ * contract is hashed — `user_id`, remote `updated_at`, auth and sync data are
+ * excluded by construction.
+ *
+ * The hash is byte-identical across node (tests), web (WASM SQLite), and
+ * native (Hermes) because it uses the pure-TS SHA-256 in `lib/checksum.ts`.
+ */
+export function canonicalizeSettingsPayload(payload: unknown): string {
+  const normalized = normalizeRecoverableSettings(payload);
+  const canonical: Record<string, unknown> = {
+    calorieGoal: normalized.calorieGoal
+      ? {
+          calories: normalized.calorieGoal.calories,
+          protein: normalized.calorieGoal.protein,
+          carbs: normalized.calorieGoal.carbs,
+          fats: normalized.calorieGoal.fats,
+        }
+      : null,
+    pomodoroSettings: normalized.pomodoroSettings
+      ? {
+          focusMinutes: normalized.pomodoroSettings.focusMinutes,
+          shortBreakMinutes: normalized.pomodoroSettings.shortBreakMinutes,
+          longBreakMinutes: normalized.pomodoroSettings.longBreakMinutes,
+          sessionsBeforeLongBreak: normalized.pomodoroSettings.sessionsBeforeLongBreak,
+        }
+      : null,
+    theme: {
+      mode: normalized.theme.mode ?? null,
+      slots: normalized.theme.slots
+        ? Object.fromEntries(sortedEntries(normalized.theme.slots))
+        : null,
+    },
+  };
+  return sha256Hex(JSON.stringify(canonical));
+}
+
 async function readThemeSnapshot(): Promise<{
   mode: string | null;
   slots: Record<string, string> | null;
@@ -157,10 +212,13 @@ export async function readRecoverableSettings(
 }
 
 /**
- * Apply a validated settings payload to local storage (restore path only).
- * Theme writes are fire-and-forget like the provider's own persistence.
+ * Apply the SQLite-backed recoverable settings (calorie goal + pomodoro
+ * defaults) to app_meta — restore import path, called INSIDE the import
+ * transaction. Theme settings live in AsyncStorage and cannot join the SQLite
+ * transaction; stage them with `stagePendingThemeApplication` in the same
+ * transaction and apply after commit with restart reconciliation.
  */
-export async function applyRecoverableSettings(
+export async function applyRecoverableSettingsToSqlite(
   db: SQLite.SQLiteDatabase,
   payload: unknown,
 ): Promise<RecoverableSettingsV2> {
@@ -171,14 +229,76 @@ export async function applyRecoverableSettings(
   if (normalized.pomodoroSettings) {
     await setAppMetaJson(db, appMetaKeys.pomodoroSettings, normalized.pomodoroSettings);
   }
-  if (normalized.theme.mode) {
-    void AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, normalized.theme.mode).catch(() => undefined);
-  }
-  if (normalized.theme.slots) {
-    void AsyncStorage.setItem(
-      THEME_SLOTS_STORAGE_KEY,
-      JSON.stringify(normalized.theme.slots),
-    ).catch(() => undefined);
-  }
   return normalized;
+}
+
+export type PendingThemeApplication = {
+  mode: string | null;
+  slots: Record<string, string> | null;
+  signature: string;
+};
+
+/**
+ * Durably stage the validated theme settings so AsyncStorage can be updated
+ * AFTER the import transaction commits (SQLite cannot transactionally commit
+ * AsyncStorage). The marker survives crashes; `applyPendingThemeApplication`
+ * retries it until successful and only then clears it.
+ */
+export async function stagePendingThemeApplication(
+  db: SQLite.SQLiteDatabase,
+  payload: unknown,
+  signature: string,
+): Promise<void> {
+  const normalized = normalizeRecoverableSettings(payload);
+  await setAppMetaJson(db, appMetaKeys.backupPendingThemeApply, {
+    mode: normalized.theme.mode,
+    slots: normalized.theme.slots,
+    signature,
+  } satisfies PendingThemeApplication);
+}
+
+export async function readPendingThemeApplication(
+  db: SQLite.SQLiteDatabase,
+): Promise<PendingThemeApplication | null> {
+  const stored = await getAppMetaJsonOrDefault<unknown>(
+    db,
+    appMetaKeys.backupPendingThemeApply,
+    null,
+  );
+  if (!stored || typeof stored !== 'object') return null;
+  const candidate = stored as Record<string, unknown>;
+  if (
+    (candidate.mode !== null && typeof candidate.mode !== 'string') ||
+    (candidate.slots !== null && typeof candidate.slots !== 'object') ||
+    typeof candidate.signature !== 'string'
+  ) {
+    return null;
+  }
+  return candidate as unknown as PendingThemeApplication;
+}
+
+/**
+ * Apply a staged theme application to AsyncStorage and clear the durable
+ * marker ONLY on success. Returns true when nothing is pending or the
+ * application completed; false when the marker remains and must be retried
+ * (bootstrap maintenance retries until it succeeds).
+ */
+export async function applyPendingThemeApplication(): Promise<boolean> {
+  const db = await getDatabase();
+  const pending = await readPendingThemeApplication(db);
+  if (!pending) return true;
+  try {
+    if (pending.mode !== null) {
+      await AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, pending.mode);
+    }
+    if (pending.slots !== null) {
+      await AsyncStorage.setItem(THEME_SLOTS_STORAGE_KEY, JSON.stringify(pending.slots));
+    }
+    // Marker cleared only after both AsyncStorage writes succeeded.
+    await setAppMetaText(db, appMetaKeys.backupPendingThemeApply, 'null');
+    return true;
+  } catch {
+    // AsyncStorage failed; the marker stays durable for the next retry.
+    return false;
+  }
 }
