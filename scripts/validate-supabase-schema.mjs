@@ -57,11 +57,17 @@ const ownershipMigrationName = migrationNames.find((name) =>
 const v2MigrationName = migrationNames.find((name) =>
   /_add_backup_completeness_v2\.sql$/.test(name),
 );
+const remediationMigrationName = migrationNames.find((name) =>
+  /_backup_v2_closure_remediation\.sql$/.test(name),
+);
 if (!ownershipMigrationName) {
   failures.push('missing secure sync ownership migration');
 }
 if (!v2MigrationName) {
   failures.push('missing backup completeness v2 migration');
+}
+if (!remediationMigrationName) {
+  failures.push('missing backup v2 closure remediation migration');
 }
 if (migrationNames.join('\n') !== [...migrationNames].sort().join('\n')) {
   failures.push('migration filenames are not lexically ordered');
@@ -73,6 +79,9 @@ const ownership = ownershipMigrationName
   ? read(`supabase/migrations/${ownershipMigrationName}`)
   : '';
 const v2Migration = v2MigrationName ? read(`supabase/migrations/${v2MigrationName}`) : '';
+const remediationMigration = remediationMigrationName
+  ? read(`supabase/migrations/${remediationMigrationName}`)
+  : '';
 const fixture = read('simulation/backend/schema.sql');
 const config = read('supabase/config.toml');
 const clientSource = [
@@ -183,6 +192,58 @@ const backupOwnerIndexTables = [
 ];
 for (const table of backupOwnerIndexTables) {
   requireText(`v2 migration ${table} owner index`, v2Migration, new RegExp(`idx_${table}_user_id`));
+}
+
+// ---- Backup V2 closure remediation contract ----
+// The global saved_meals food-name uniqueness from the V2 migration must be
+// removed and replaced by an owner-scoped, case-insensitive index; the
+// manifest must gain settings integrity metadata; and no migration may
+// reintroduce global food-name uniqueness afterwards.
+requireText(
+  'remediation drops global saved_meals food-name constraint',
+  remediationMigration,
+  /ALTER TABLE public\.saved_meals[\s\S]*DROP CONSTRAINT saved_meals_food_name_unique/i,
+);
+requireText(
+  'remediation creates owner-scoped saved_meals unique index',
+  remediationMigration,
+  /CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name\s+ON public\.saved_meals\s*\(\s*user_id\s*,\s*lower\(\s*food_name\s*\)\s*\)/i,
+);
+requireText(
+  'remediation adds manifest settings metadata column',
+  remediationMigration,
+  /ALTER TABLE public\.backup_manifest[\s\S]*ADD COLUMN IF NOT EXISTS settings_metadata JSONB/i,
+);
+requireText(
+  'fixture saved_meals has owner-scoped unique index',
+  fixture,
+  /CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name\s+ON public\.saved_meals\s*\(\s*user_id\s*,\s*lower\(\s*food_name\s*\)\s*\)/i,
+);
+requireText(
+  'fixture saved_meals has no global food_name constraint',
+  fixture,
+  /^(?![\s\S]*CONSTRAINT saved_meals_food_name_unique\s+UNIQUE\s*\(\s*food_name\s*\))/i,
+);
+requireText(
+  'fixture manifest has settings_metadata column',
+  fixture,
+  /CREATE TABLE IF NOT EXISTS public\.backup_manifest\b[\s\S]*?settings_metadata\s+JSONB/,
+);
+// The v2 migration itself contains the historical global constraint (it is
+// immutable applied history); the remediation must be the migration that
+// removes it, and nothing after the remediation may reintroduce it.
+if (remediationMigrationName) {
+  const remediationIndex = migrationNames.indexOf(remediationMigrationName);
+  for (const migrationName of migrationNames.slice(remediationIndex)) {
+    const source = read(`supabase/migrations/${migrationName}`);
+    if (
+      /CREATE TABLE IF NOT EXISTS public\.saved_meals\b[\s\S]*UNIQUE\s*\(\s*food_name\s*\)/i.test(
+        source,
+      )
+    ) {
+      failures.push(`${migrationName} reintroduces global saved_meals food-name uniqueness`);
+    }
+  }
 }
 
 const backupRequiredColumns = {

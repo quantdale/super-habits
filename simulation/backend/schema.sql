@@ -219,9 +219,13 @@ CREATE TABLE IF NOT EXISTS public.saved_meals (
   meal_type    TEXT NOT NULL DEFAULT 'breakfast',
   use_count    INTEGER NOT NULL DEFAULT 1,
   last_used_at TEXT NOT NULL,
-  created_at   TEXT NOT NULL,
-  CONSTRAINT saved_meals_food_name_unique UNIQUE (food_name)
+  created_at   TEXT NOT NULL
 );
+
+-- Owner-scoped, case-insensitive saved-meal uniqueness (closure contract):
+-- different owners may store the same food name; one owner may not.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name
+  ON public.saved_meals (user_id, lower(food_name));
 
 CREATE TABLE IF NOT EXISTS public.linked_action_rules (
   id                      TEXT PRIMARY KEY NOT NULL,
@@ -257,6 +261,7 @@ CREATE TABLE IF NOT EXISTS public.backup_manifest (
   completed_at           TIMESTAMPTZ NOT NULL,
   entity_metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
   settings_version       INTEGER NOT NULL DEFAULT 0,
+  settings_metadata      JSONB,
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
