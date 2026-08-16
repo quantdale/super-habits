@@ -39,7 +39,8 @@
       "expo-notifications",
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "./plugins/withAndroidCxxRuntime"
+      "./plugins/withAndroidCxxRuntime",
+      "expo-sharing"
     ],
     "web": {
       "favicon": "./assets/favicon.png",

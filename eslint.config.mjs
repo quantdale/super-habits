@@ -249,6 +249,7 @@ export default [
       'core/auth/**',
       'core/sync/**',
       'core/backup/**',
+      'core/portable/**',
       'core/providers/AppProviders.tsx',
       'core/linked-actions/linkedActions.data.ts',
       'core/**/__tests__/**',

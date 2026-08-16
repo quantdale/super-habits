@@ -126,6 +126,16 @@ function sortedEntries(record: Record<string, string>): [string, string][] {
  * native (Hermes) because it uses the pure-TS SHA-256 in `lib/checksum.ts`.
  */
 export function canonicalizeSettingsPayload(payload: unknown): string {
+  return sha256Hex(canonicalSettingsPayloadText(payload));
+}
+
+/**
+ * Canonical TEXT form of the allowlisted settings payload (the exact string
+ * that `canonicalizeSettingsPayload` hashes). Exported so the portable
+ * backup envelope can cover the same canonical settings text in its payload
+ * checksum; the checksum itself is byte-identical either way.
+ */
+export function canonicalSettingsPayloadText(payload: unknown): string {
   const normalized = normalizeRecoverableSettings(payload);
   const canonical: Record<string, unknown> = {
     calorieGoal: normalized.calorieGoal
@@ -151,7 +161,7 @@ export function canonicalizeSettingsPayload(payload: unknown): string {
         : null,
     },
   };
-  return sha256Hex(JSON.stringify(canonical));
+  return JSON.stringify(canonical);
 }
 
 async function readThemeSnapshot(): Promise<{
