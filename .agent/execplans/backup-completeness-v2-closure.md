@@ -1,7 +1,7 @@
 # ExecPlan: Backup Completeness V2 — closure remediation (owner-scoped saved-meal uniqueness + transactional checkpoint coherence + full settings-atomic restore)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -76,27 +76,32 @@ idx_saved_meals_food_name ON saved_meals (food_name COLLATE NOCASE)` —
 
 ## Current Checkpoint
 
-- Current milestone: 3 — Implementation + unit/integration tests complete
-  (985/985); E2E journeys extended + new settings-failures journey written;
-  simulation model extended (setCalorieGoal) + scenario settings oracles;
-  simulation scenario run in progress; full headless QA + live migration +
-  Android + docs + push pending.
-- Completed: git reconcile (main == origin/main == 6e005a2); guidance +
-  source inspection; closure ExecPlan (validated) + OpenSpec closure change
-  (27/27); baseline QA (951/951); live read-only snapshot; Finding 1 repro +
-  remedial migration + fixture + validator (bad DDL fails validation);
-  Finding 2 transactional coherence boundary (capture in one
-  withSQLiteTransaction; in-transaction outbox rechecks; settings capture;
-  stale-manifest drop + recapture; generation reuse for dropped intents;
-  lastComplete recorded only for actually-pushed manifests; crash
-  reconciliation); Finding 3 settings prefetch/verify before transaction
-  (owner/version/checksum/row-presence), no-network-in-transaction (guarded
-  integration test), generation-bound settings push (settings-G before
-  manifest-G; adapter verifies pending checksum and re-upserts settings
-  before manifest), durable theme pending-apply + bootstrap retry,
-  getBackupStateSummary invalid for manifests without settings integrity.
-- In progress: long-term simulation rerun (setCalorieGoal selector fixed);
-  then full headless QA; live migration; Android; docs; push.
+- Current milestone: 6 — COMPLETED. All three closure defects fixed,
+  validated, live-remediated, and pushed; final GitHub CI (run
+  31925796872, SHA bc428d5) quality PASS + e2e PASS; mission §62 gate all
+  30 items true; final report delivered.
+- Completed: git reconcile (main == origin/main == 6e005a2 → final
+  bc428d5); guidance + source inspection; closure ExecPlan (validated) +
+  OpenSpec closure change (27/27); baseline QA (951/951); live read-only
+  snapshot; Finding 1 repro + remedial migration + fixture + validator
+  (bad DDL fails validation); Finding 2 transactional coherence boundary
+  (capture in one withSQLiteTransaction; in-transaction outbox rechecks;
+  settings capture; stale-manifest drop + recapture; generation reuse for
+  dropped intents; lastComplete recorded only for actually-pushed
+  manifests; crash reconciliation); Finding 3 settings prefetch/verify
+  before transaction (owner/version/checksum/row-presence),
+  no-network-in-transaction (guarded integration test), generation-bound
+  settings push (settings-G before manifest-G; adapter verifies pending
+  checksum and re-upserts settings before manifest), durable theme
+  pending-apply + bootstrap retry, getBackupStateSummary invalid for
+  manifests without settings integrity; full headless QA §52 (all green
+  except one documented pre-existing D14 flake that passed on re-run);
+  live remedial migration applied + verified + advisors; Android
+  regression 7/7 Maestro PASS; docs/OpenSpec/ExecPlan finalization;
+  push main (6e005a2..bc428d5, no force) — local main == origin/main ==
+  bc428d5; remote heads: main only.
+- In progress: GitHub CI run 31925796872 (final SHA bc428d5) — quality
+  PASS; e2e job (main lane) running; nightly skipped.
 - Important modified files: core/backup/{backupCheckpoint,backupRestore,
   backupSettings,backup.types}.ts, core/sync/{supabase.adapter,
   syncedMutation}.ts, core/db/appMeta.ts, core/providers/AppProviders.tsx,
@@ -111,18 +116,20 @@ idx_saved_meals_food_name ON saved_meals (food_name COLLATE NOCASE)` —
   docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md,
   openspec/changes/fix-backup-v2-closure-defects/* (new).
 - Last successful validation: npm test 985/985 (96 files); typecheck PASS;
-  lint PASS; sim:validate PASS (22 scenarios); supabase:schema:validate PASS
-  (7 migrations); openspec:validate 27/27; expo-doctor 20/20; npm audit
-  matches baseline (16 total; omit=dev: image-size+uuid, breaking-only).
+  lint PASS; sim:validate PASS (22 scenarios) + full deterministic library
+  PASS (22/22); supabase:schema:validate PASS (7 migrations);
+  openspec:validate 27/27; expo-doctor 20/20; e2e:sync 40/40; e2e standard
+  159 passed / 37 skipped / 4 did-not-run / 1 pre-existing flake
+  (re-run PASS); npm audit matches baseline.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: none.
-- Exact next action: collect the long-term-user-disaster-recovery simulation
-  result; then run full headless QA (§52), then live remedial migration +
-  verification, Android regression, docs, commit + push + CI.
-- Remaining definition of done: mission §62 gate (30 items) + final report.
+- Exact next action: None — task complete. Final report delivered (mission
+  §63), plan COMPLETED.
+- Remaining definition of done: all 30 items complete (mission §62 gate);
+  final report delivered (mission §63).
 
 ## Progress
 
@@ -152,12 +159,12 @@ idx_saved_meals_food_name ON saved_meals (food_name COLLATE NOCASE)` —
       status summary, performance recording)
 - [x] Semantic equivalence + long-term simulation (settings integrity)
 - [x] Web E2E extensions (settings error/checksum/restore-with-settings)
-- [ ] Full headless QA (§52 list)
-- [ ] Live remedial migration + verification + advisors (§53–55)
-- [ ] Android regression (Nitro_API_36, serial Maestro)
-- [ ] Docs + OpenSpec + ExecPlan finalization
-- [ ] Coherent commits → reconcile → push main → verify main-only → CI green
-- [ ] Final report (mission §63 format)
+- [x] Full headless QA (§52 list)
+- [x] Live remedial migration + verification + advisors (§53–55)
+- [x] Android regression (Nitro_API_36, serial Maestro)
+- [x] Docs + OpenSpec + ExecPlan finalization
+- [x] Coherent commits → reconcile → push main → verify main-only → CI green
+- [x] Final report (mission §63 format)
 
 ## Surprises & Discoveries
 
@@ -322,13 +329,55 @@ JSONB` present; RLS 4 policies/table unchanged; anon 0 grants;
 - 2026-08-16 — Push — PASS — `git push origin main` (6e005a2..3d2f7db,
   no force); local main == origin/main == 3d2f7db3...; remote heads: main
   only. 5 coherent commits.
-- 2026-08-16 — GitHub CI run 31925374349 — quality PASS; e2e in progress
-  (main lane: full e2e + deterministic simulation + dist-sync + e2e:sync);
+- 2026-08-16 — GitHub CI run 31925374349 (SHA 3d2f7db) — quality PASS;
+  e2e cancelled by the subsequent push (no concurrency group, superseded);
   nightly skipped (push trigger).
+- 2026-08-16 — Push — PASS — docs-only final commit `bc428d5` pushed
+  (`3d2f7db..bc428d5`, no force); local main == origin/main ==
+  bc428d5be87daa6f738406237aeebc23ef6117e0; `git ls-remote --heads origin`
+  shows refs/heads/main only; working tree clean (before plan finalization).
+- 2026-08-16 — GitHub CI run 31925796872 (FINAL SHA bc428d5) — COMPLETE —
+  quality PASS (job 95113065393); e2e PASS (job 95113242517, main lane:
+  full e2e + deterministic simulation library + dist-sync build +
+  e2e:sync); nightly skipped (push trigger). Run conclusion: success.
+  https://github.com/quantdale/super-habits/actions/runs/31925796872
 
 ## Changed Files / Areas
 
-- (populated as the work lands)
+- core/backup/backupCheckpoint.ts — single-transaction capture (outbox
+  recheck → dirty verify → snapshot → recheck → settings capture →
+  pending manifest/settings → enqueue settings+manifest → clear dirty),
+  stale-intent drop + recapture, lastComplete only after confirmed push,
+  crash reconciliation; `BackupMaintenanceHooks` test barriers.
+- core/backup/backupRestore.ts — settings prefetch before transaction,
+  full validation chain, no network in import transaction.
+- core/backup/backupSettings.ts — allowlist + `canonicalizeSettingsPayload`
+  - canonical SHA-256 checksum.
+- core/backup/backup.types.ts — `settingsMetadata {version, checksum}`.
+- core/sync/supabase.adapter.ts — settings-before-manifest push ordering,
+  stale-settings-intent handling.
+- core/sync/syncedMutation.ts — settings/theme restore-side mutation
+  helpers (pending apply markers).
+- core/db/appMeta.ts — `backup.pending_settings`, `backup.pending_theme_apply`
+  keys.
+- core/providers/AppProviders.tsx — bootstrap retry of pending theme
+  application.
+- supabase/migrations/20260815200000_backup_v2_closure_remediation.sql —
+  owner-scoped saved-meal uniqueness + backup_manifest.settings_metadata.
+- scripts/validate-supabase-schema.mjs — closure assertions (old DDL now
+  fails validation).
+- simulation/backend/schema.sql, simulation/{model/types,model/steps,
+  runner/actions,runner/execute}.ts, simulation/scenarios/longTermUser.ts —
+  setCalorieGoal step + settings oracles.
+- e2e/journeys/new-phone-v2.spec.ts (extended), e2e/journeys/
+  new-phone-v2-settings-failures.spec.ts (new).
+- tests/backupSettings.test.ts, tests/backupManifest.test.ts (new),
+  tests/simulation.model.test.ts; tests/integration/backupCheckpoint.test.ts,
+  backupRestore.test.ts, savedMealUniqueness.test.ts (new),
+  backupPerformance.test.ts (new).
+- docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md (cloud
+  sync/restore rows).
+- openspec/changes/fix-backup-v2-closure-defects/ (new closure delta).
 
 ## Recovery / Resume Instructions
 
@@ -340,6 +389,31 @@ JSONB` present; RLS 4 policies/table unchanged; anon 0 grants;
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: (filled at completion).
-- Follow-up: (filled at completion).
+- Status: COMPLETED.
+- Summary: All three independently-audited Backup V2 closure defects are
+  fixed, validated, and live. (1) Saved-meal remote uniqueness is now
+  owner-scoped and case-insensitive, matching the local NOCASE contract,
+  via additive migration `20260815200000` (global `UNIQUE(food_name)`
+  dropped; `uq_saved_meals_owner_food_name (user_id, lower(food_name))`
+  created); adversarial proof passed with zero canary rows. (2) Checkpoint
+  publication moved entirely inside one serialized SQLite transaction with
+  in-transaction outbox rechecks, settings capture, and dirty-clear only at
+  the coherent state transition — the mutation-race window is closed and
+  proven by a deterministic race matrix (A–H). (3) Restore fetches,
+  error-checks, owner/version/runtime-validates, and canonical-checksum-
+  verifies `user_backup_settings` BEFORE any local write; no network call
+  exists inside the import transaction (guarded test); theme/AsyncStorage
+  application is staged durably in SQLite and retried on bootstrap. Full
+  headless QA, 22-scenario deterministic simulation, web E2E (incl. new
+  settings-failure journeys), live production migration + advisors, and
+  Android Maestro regression (7/7) all pass. Pushed main-only
+  (6e005a2..bc428d5); quality CI green on the final SHA, e2e job in flight.
+- Follow-up: (1) Confirm e2e job of CI run 31925796872 (bc428d5) and
+  record it in the Validation Ledger; then deliver the mission §63 final
+  report and mark this plan COMPLETED. (2) Known remaining issue: the
+  documented pre-existing, machine-sensitive `three-months-in` D14
+  section-switch ceiling flake (811–1137ms observed; 1024ms once this
+  session, re-run 781ms PASS) — classified FLAKY_TEST/ENVIRONMENT, not a
+  product defect; no test weakening. (3) Native full V2 restore round-trip
+  is covered by web E2E + integration (the native build has no Supabase
+  env); backup-v2-settings Maestro flow pins the native V2 surface.

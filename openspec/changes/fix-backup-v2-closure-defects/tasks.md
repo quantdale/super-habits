@@ -47,4 +47,4 @@
 - [x] 6.2 Live remedial migration apply + read-only verification (ledger, saved_meals constraints/indexes, settings_metadata, RLS/grants unchanged, row counts preserved, advisors).
 - [x] 6.3 Android regression (Nitro_API_36; serial Maestro: backup-v2 settings status, smoke, persistence, V2 restore path).
 - [x] 6.4 Docs updates (V2 design/spec, ExecPlan, durable docs; record the six closure contracts).
-- [ ] 6.5 Coherent commits → push main (no force) → verify local == origin/main, main-only remote → GitHub CI quality + e2e PASS → complete ExecPlan → final report (mission §63).
+- [x] 6.5 Coherent commits → push main (no force) → verify local == origin/main, main-only remote → GitHub CI quality + e2e PASS → complete ExecPlan → final report (mission §63).
