@@ -489,6 +489,7 @@ const REMOTE_BACKUP: Record<string, Record<string, unknown>[]> = {
       deleted_at: null,
     },
   ],
+  weekly_reviews: [],
 };
 
 const BACKUP_ENTITIES = [
@@ -504,6 +505,7 @@ const BACKUP_ENTITIES = [
   'workout_session_exercises',
   'pomodoro_sessions',
   'linked_action_rules',
+  'weekly_reviews',
 ];
 
 function buildManifest(): Record<string, unknown> {

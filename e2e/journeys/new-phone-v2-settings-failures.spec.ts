@@ -194,6 +194,7 @@ function buildManifest(): Record<string, unknown> {
       workout_session_exercises: { count: 0, checksum: sha256Hex('') },
       pomodoro_sessions: { count: 0, checksum: sha256Hex('') },
       linked_action_rules: { count: 0, checksum: sha256Hex('') },
+      weekly_reviews: { count: 0, checksum: sha256Hex('') },
     },
     settings_version: 2,
     settings_metadata:
