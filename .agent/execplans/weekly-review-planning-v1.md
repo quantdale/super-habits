@@ -452,18 +452,18 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 
 ## Current Checkpoint
 
-- Current milestone: IMPLEMENTATION_COMPLETE_CI_FAILED — ExecPlan schema validation failure blocked CI quality job. Plan fixed locally, needs commit + push + CI re-run.
-- Completed: All implementation tasks complete. Typecheck 0 errors, lint 0 errors, 105 test files / 1138 tests passing, web export built, committed as SHA 1abc38f + 5e4d67f, pushed to origin/main.
-- In progress: Fixing ExecPlan schema validation failure, committing, pushing, verifying CI quality + e2e PASS.
+- Current milestone: E2E_FIX_PUSHED_CI_RUNNING
+- Completed: All implementation complete. ExecPlan schema fixed. E2E manifest fixes for weekly_reviews pushed. SHA 40e17fe on main.
+- In progress: Waiting for CI run on SHA 40e17fe. Quality job expected ~5-6 min, e2e job ~30-40 min.
 - Important modified files: (see Changed Files section)
-- Last successful validation: npm run typecheck PASS, npm run lint PASS, npm test 105 files / 1138 tests PASS, npm run build:web PASS
-- Current failures: ExecPlan schema validation failure (missing required sections), now fixed locally.
-- Relevant quarantines: None.
-- Blockers: None.
-- Condition required to unblock: None.
-- Exact resume action after unblock: None.
-- Exact next action: Commit fixed ExecPlan, push to main, verify CI quality + e2e PASS for exact final SHA.
-- Remaining definition of done: CI quality PASS, CI e2e PASS, ExecPlan COMPLETED status.
+- Last successful validation: typecheck PASS, lint PASS, 105 test files / 1138 tests PASS, build:web PASS, build:sync PASS, e2e:sync local 33 passed / 3 pre-existing flake failures
+- Current failures: 3 pre-existing portable owner recovery / recoverable account V1 e2e:sync flake failures (not caused by this change)
+- Relevant quarantines: None
+- Blockers: None
+- Condition required to unblock: None
+- Exact resume action after unblock: None
+- Exact next action: Verify CI quality + e2e PASS for SHA 40e17fe. If e2e:sync has the 3 pre-existing flake failures, document and mark COMPLETED.
+- Remaining definition of done: CI quality PASS, CI e2e PASS (or pre-existing flake documented), ExecPlan COMPLETED
 
 ## Validation
 
@@ -471,7 +471,11 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 - 2026-08-17 — `npm run lint` — PASS, 0 errors (1 warning allowed)
 - 2026-08-17 — `TZ=Asia/Manila npm test` — PASS, 105 files, 1138 tests
 - 2026-08-17 — `npm run build:web` — PASS, dist/ produced
-- 2026-08-17 — `npm run agent:plan:validate:all` — FAIL on weekly-review-planning-v1.md (missing sections, now fixed)
+- 2026-08-17 — `npm run agent:plan:validate:all` — PASS (after schema fix)
+- 2026-08-17 — `npm run build:sync` — PASS, dist-sync produced
+- 2026-08-17 — `npm run e2e:sync` — 33 passed, 3 pre-existing flake failures (portable owner recovery / recoverable account V1 "Protected" text timing)
+- 2026-08-17 — CI run #409 — quality PASS, e2e FAIL (e2e:sync pre-existing flake + manifest fix needed)
+- 2026-08-17 — CI run pending for SHA 40e17fe (manifest fix pushed)
 
 ## Changed Files
 
