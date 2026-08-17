@@ -14,6 +14,11 @@ import {
   isValidAccountEmail,
   isValidAccountOtp,
 } from '@/core/auth/account.domain';
+import { ensureBackupBackfill } from '@/core/backup/backupBackfill';
+import {
+  isPortableOwnerFingerprint,
+  portableOwnerFingerprint,
+} from '@/lib/portableOwnerFingerprint';
 import type {
   AccountActionResult,
   AccountAuthEvidence,
@@ -166,7 +171,9 @@ function isPendingRecovery(value: unknown): value is PendingRecovery {
     typeof value.requestedAt === 'string' &&
     Number.isFinite(Date.parse(value.requestedAt)) &&
     (value.temporarySessionUserId === null || typeof value.temporarySessionUserId === 'string') &&
-    (value.expectedOwnerUserId === null || typeof value.expectedOwnerUserId === 'string')
+    (value.expectedOwnerUserId === null || typeof value.expectedOwnerUserId === 'string') &&
+    (value.expectedOwnerFingerprint === null ||
+      isPortableOwnerFingerprint(value.expectedOwnerFingerprint))
   );
 }
 
@@ -460,7 +467,17 @@ export class AccountCoordinator {
       // content exists the device is fail-closed against account switching
       // (promotion to permanent happens in the write paths / reconcile).
       const ownerRecovery = local.ownerBinding !== null && !local.ownerBindingProvisional;
-      if (!ownerRecovery && !isEmptyForAccountReplacement(local)) {
+      // Imported-owner recovery: the ONE populated-unbound exception. A
+      // validated Portable Import V1 recorded the source-owner fingerprint on
+      // this unclaimed dataset; the matching source account must have a legal
+      // path to authenticate and bind it. This is NOT generic account
+      // switching — eligibility is narrow and the fingerprint must match at
+      // verification time.
+      const importOriginFingerprint = await this.readPortableImportOriginFingerprint();
+      const importedOwnerRecovery =
+        isPortableOwnerFingerprint(importOriginFingerprint) &&
+        this.isImportedOwnerRecoveryEligible(local);
+      if (!ownerRecovery && !importedOwnerRecovery && !isEmptyForAccountReplacement(local)) {
         return actionResult(
           false,
           local.ownerBinding ? 'owner_mismatch' : 'account_conflict',
@@ -523,6 +540,7 @@ export class AccountCoordinator {
         requestedAt: this.dependencies.now().toISOString(),
         temporarySessionUserId: auth.sessionUserId,
         expectedOwnerUserId: ownerRecovery ? local.ownerBinding : null,
+        expectedOwnerFingerprint: importedOwnerRecovery ? importOriginFingerprint : null,
       };
       await this.savePendingRecovery(pending);
       return actionResult(
@@ -551,7 +569,13 @@ export class AccountCoordinator {
       const before = await this.inspect();
       const beforeIsUnsafe = pending.expectedOwnerUserId
         ? before.ownerBinding !== pending.expectedOwnerUserId
-        : !isEmptyForAccountReplacement(before);
+        : pending.expectedOwnerFingerprint
+          ? !(
+              this.isImportedOwnerRecoveryEligible(before) &&
+              (await this.readPortableImportOriginFingerprint()) ===
+                pending.expectedOwnerFingerprint
+            )
+          : !isEmptyForAccountReplacement(before);
       if (beforeIsUnsafe) {
         await this.signOutQuietly();
         return actionResult(
@@ -587,7 +611,13 @@ export class AccountCoordinator {
       const afterIsUnsafe = pending.expectedOwnerUserId
         ? after.ownerBinding !== pending.expectedOwnerUserId ||
           after.outboxOwnerIds.some((ownerUserId) => ownerUserId !== pending.expectedOwnerUserId)
-        : !isEmptyForAccountReplacement(after);
+        : pending.expectedOwnerFingerprint
+          ? !(
+              this.isImportedOwnerRecoveryEligible(after) &&
+              (await this.readPortableImportOriginFingerprint()) ===
+                pending.expectedOwnerFingerprint
+            )
+          : !isEmptyForAccountReplacement(after);
       if (afterIsUnsafe) {
         await this.signOutQuietly();
         return actionResult(
@@ -606,6 +636,36 @@ export class AccountCoordinator {
             false,
             'owner_mismatch',
             'That email belongs to a different account. Sign back into the account that owns this device.',
+          );
+        }
+      } else if (pending.expectedOwnerFingerprint) {
+        // Imported-owner recovery. The portable FILE is compatibility
+        // metadata, never authentication: only a Supabase-VERIFIED account
+        // whose UID hashes exactly to the recorded source fingerprint may
+        // bind the populated imported dataset. Any other account is signed
+        // out with local data, the binding, and the fingerprint untouched.
+        if (
+          portableOwnerFingerprint(afterAuth.verifiedUserId) !== pending.expectedOwnerFingerprint
+        ) {
+          await this.signOutQuietly();
+          await this.clearPendingRecovery();
+          return actionResult(
+            false,
+            'owner_mismatch',
+            'That email belongs to a different account. This imported dataset can only be claimed by the account that created it.',
+          );
+        }
+        const db = await this.getDatabase();
+        try {
+          await bindLocalDatasetOwner(db, afterAuth.verifiedUserId, {
+            adoptUnownedOutbox: true,
+          });
+        } catch {
+          await this.signOutQuietly();
+          return actionResult(
+            false,
+            'account_conflict',
+            'This device changed while recovery was completing. Remote backup remains paused for safety.',
           );
         }
       } else {
@@ -636,6 +696,17 @@ export class AccountCoordinator {
           'remote_unavailable',
           'Recovery completed remotely, but local account state could not be saved. Remote backup remains paused for safety.',
         );
+      }
+      if (pending.expectedOwnerFingerprint) {
+        // The imported dataset is not cloud-complete yet: enqueue every
+        // imported row for the matched owner so Backup V2 publishes a fresh
+        // checkpoint only after a real remote upload. Best-effort — the next
+        // maintenance cycle retries if this fails.
+        try {
+          await ensureBackupBackfill();
+        } catch {
+          // Backfill retries on the next maintenance cycle; local use is intact.
+        }
       }
       return actionResult(
         true,
@@ -673,6 +744,19 @@ export class AccountCoordinator {
 
   private async inspect(): Promise<LocalAccountDataState> {
     return inspectLocalAccountDataState(await this.getDatabase());
+  }
+
+  /**
+   * Narrow imported-owner recovery eligibility. NOT generic populated-device
+   * account switching: the dataset must be populated, locally UNBOUND, and
+   * free of any other account's pending backup work. The validated Portable
+   * Import V1 origin (the durable source fingerprint, checked by callers) is
+   * what makes this a special recovery transition instead of an arbitrary
+   * switch. Unowned outbox rows are allowed — they were created locally on
+   * this unclaimed device and are adopted by the matched owner on bind.
+   */
+  private isImportedOwnerRecoveryEligible(local: LocalAccountDataState): boolean {
+    return !local.ownerBinding && local.hasUserData && local.outboxOwnerIds.length === 0;
   }
 
   /**
@@ -799,7 +883,25 @@ export class AccountCoordinator {
       await this.clearPendingProtection();
     }
     // A fresh-recovery record dies once the device is no longer replaceable.
-    if (recovery && !recovery.expectedOwnerUserId && !isEmptyForAccountReplacement(local)) {
+    // An imported-owner record (fingerprint-based) dies when its narrow
+    // eligibility drifts (bound, other owner's outbox work, or the recorded
+    // source fingerprint changed). Owner records are governed by the binding.
+    if (
+      recovery &&
+      !recovery.expectedOwnerUserId &&
+      !recovery.expectedOwnerFingerprint &&
+      !isEmptyForAccountReplacement(local)
+    ) {
+      await this.clearPendingRecovery();
+    }
+    if (
+      recovery &&
+      recovery.expectedOwnerFingerprint &&
+      !(
+        this.isImportedOwnerRecoveryEligible(local) &&
+        (await this.readPortableImportOriginFingerprint()) === recovery.expectedOwnerFingerprint
+      )
+    ) {
       await this.clearPendingRecovery();
     }
 
@@ -813,7 +915,13 @@ export class AccountCoordinator {
     } else if (
       recovery &&
       ((recovery.expectedOwnerUserId && recovery.expectedOwnerUserId === local.ownerBinding) ||
-        (!recovery.expectedOwnerUserId && isEmptyForAccountReplacement(local)))
+        (recovery.expectedOwnerFingerprint &&
+          this.isImportedOwnerRecoveryEligible(local) &&
+          (await this.readPortableImportOriginFingerprint()) ===
+            recovery.expectedOwnerFingerprint) ||
+        (!recovery.expectedOwnerUserId &&
+          !recovery.expectedOwnerFingerprint &&
+          isEmptyForAccountReplacement(local)))
     ) {
       status = 'sign_in_pending';
       email = recovery.email;
@@ -832,6 +940,8 @@ export class AccountCoordinator {
       canProtect: resolvedDecision.canProtect && status !== 'protection_pending',
       canRecoverExisting: resolvedDecision.canRecoverExisting && status !== 'sign_in_pending',
       canRecoverOwner: resolvedDecision.canRecoverOwner && status !== 'sign_in_pending',
+      canRecoverImportedOwner:
+        resolvedDecision.canRecoverImportedOwner && status !== 'sign_in_pending',
       message,
       resendAvailableAt,
     };

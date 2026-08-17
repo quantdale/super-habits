@@ -135,12 +135,22 @@ export async function bindLocalDatasetOwner(
   userId: string,
   options: { adoptUnownedOutbox?: boolean } = {},
 ): Promise<void> {
-  await db.withTransactionAsync(async () => {
-    await setLocalDatasetOwner(db, userId);
-    if (options.adoptUnownedOutbox) {
-      await adoptUnownedOutboxRows(db, userId);
+  try {
+    await db.withTransactionAsync(async () => {
+      await setLocalDatasetOwner(db, userId);
+      if (options.adoptUnownedOutbox) {
+        await adoptUnownedOutboxRows(db, userId);
+      }
+    });
+  } catch (error) {
+    // Web SQLite WASM: withTransactionAsync may throw "cannot rollback - no
+    // transaction is active" AFTER a successful commit. The error is cosmetic
+    // — the writes are durable. Distinguish it from genuine failures.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes('no transaction is active')) {
+      throw error;
     }
-  });
+  }
   primeLocalDatasetOwner(userId, false);
 }
 

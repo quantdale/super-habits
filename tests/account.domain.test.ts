@@ -4,6 +4,7 @@ import {
   isValidAccountEmail,
   isValidAccountOtp,
 } from '@/core/auth/account.domain';
+import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 import type { AccountAuthEvidence, LocalAccountDataState } from '@/core/auth/account.types';
 
 const emptyCounts = {
@@ -57,6 +58,24 @@ function decide(localState: LocalAccountDataState, authState: AccountAuthEvidenc
     auth: authState,
   });
 }
+
+function decideWithImport(
+  localState: LocalAccountDataState,
+  authState: AccountAuthEvidence,
+  fingerprint: string | null,
+) {
+  return decideAccountState({
+    configured: true,
+    remoteEnabled: true,
+    local: localState,
+    auth: authState,
+    importOriginOwnerFingerprint: fingerprint,
+  });
+}
+
+/** A's real fingerprint; FP_B is a different valid-format fingerprint. */
+const FP_A = portableOwnerFingerprint('user_a');
+const FP_B = 'b'.repeat(64);
 
 describe('recoverable account state machine', () => {
   it('allows an empty install to create a temporary anonymous session', () => {
@@ -311,6 +330,123 @@ describe('recoverable account state machine', () => {
         auth: auth(),
       }).status,
     ).toBe('remote_disabled');
+  });
+});
+
+describe('imported-owner recovery state', () => {
+  const populated = local({ hasUserData: true });
+
+  it('surfaces imported-owner recovery on a populated unbound dataset with a recorded fingerprint and no session', () => {
+    const result = decideWithImport(populated, auth(), FP_A);
+    expect(result.status).toBe('legacy_owner_unknown');
+    expect(result.canRecoverImportedOwner).toBe(true);
+    expect(result.canRecoverExisting).toBe(false);
+    expect(result.canRecoverOwner).toBe(false);
+  });
+
+  it('surfaces imported-owner recovery while a wrong anonymous session T remains signed in', () => {
+    const result = decideWithImport(
+      populated,
+      auth({
+        sessionUserId: 'temp-t',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'temp-t',
+        verifiedIsAnonymous: true,
+      }),
+      FP_A,
+    );
+    expect(result.status).toBe('owner_mismatch');
+    expect(result.canRecoverImportedOwner).toBe(true);
+  });
+
+  it('hides the recovery form when a wrong NON-anonymous account is verified', () => {
+    const result = decideWithImport(
+      populated,
+      auth({
+        sessionUserId: 'user_b',
+        sessionIsAnonymous: false,
+        verifiedUserId: 'user_b',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'b@example.com',
+      }),
+      FP_A,
+    );
+    expect(result.status).toBe('owner_mismatch');
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('auto-binds the matching verified account without a recovery form', () => {
+    const result = decideWithImport(
+      populated,
+      auth({
+        sessionUserId: 'user_a',
+        sessionIsAnonymous: false,
+        verifiedUserId: 'user_a',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'a@example.com',
+      }),
+      FP_A,
+    );
+    expect(result.status).toBe('protected');
+    expect(result.bindCurrentUserId).toBe('user_a');
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('never grants the exception to a local-only portable import (no fingerprint)', () => {
+    const result = decideWithImport(populated, auth(), null);
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('never grants the exception to a malformed fingerprint', () => {
+    const result = decideWithImport(populated, auth(), 'not-a-fingerprint');
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('never grants the exception while the dataset is owner-bound', () => {
+    const result = decideWithImport(
+      local({ hasUserData: true, ownerBinding: 'user_b' }),
+      auth(),
+      FP_A,
+    );
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('never grants the exception when another account has pending outbox work', () => {
+    const result = decideWithImport(
+      local({ hasUserData: true, pendingOutboxCount: 1, outboxOwnerIds: ['user_b'] }),
+      auth(),
+      FP_A,
+    );
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('never grants the exception on an empty dataset even with a recorded fingerprint', () => {
+    const result = decideWithImport(local(), auth(), FP_A);
+    expect(result.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('does not grant the capability when remote backup is not configured or disabled', () => {
+    const notConfigured = decideAccountState({
+      configured: false,
+      remoteEnabled: true,
+      local: populated,
+      auth: auth(),
+      importOriginOwnerFingerprint: FP_A,
+    });
+    expect(notConfigured.canRecoverImportedOwner).toBe(false);
+    const remoteDisabled = decideAccountState({
+      configured: true,
+      remoteEnabled: false,
+      local: populated,
+      auth: auth(),
+      importOriginOwnerFingerprint: FP_A,
+    });
+    expect(remoteDisabled.canRecoverImportedOwner).toBe(false);
+  });
+
+  it('keeps FP_B out: only the recorded fingerprint grants the exception', () => {
+    const result = decideWithImport(populated, auth(), FP_B);
+    expect(result.canRecoverImportedOwner).toBe(true);
   });
 });
 

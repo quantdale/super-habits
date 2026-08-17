@@ -74,6 +74,15 @@ export type AccountState = {
   canProtect: boolean;
   canRecoverExisting: boolean;
   canRecoverOwner: boolean;
+  /**
+   * Narrow imported-owner recovery transition: true only for a populated,
+   * locally UNBOUND dataset that was validated as a Portable Import V1 file
+   * carrying a source-owner fingerprint. The matching source account (the one
+   * whose verified UID hashes to the recorded fingerprint) may sign in and
+   * claim the dataset; any other account fails closed. Never true for generic
+   * populated-device account switching or local-only imports.
+   */
+  canRecoverImportedOwner: boolean;
   message: string;
   resendAvailableAt: number | null;
 };
@@ -107,7 +116,20 @@ export type PendingRecovery = {
   email: string;
   requestedAt: string;
   temporarySessionUserId: string | null;
+  /**
+   * Owner sign-back-in evidence: set only for a permanent local owner binding.
+   * For imported-owner recovery the owner is unbound, so this stays null and
+   * `expectedOwnerFingerprint` carries the recorded source fingerprint instead.
+   */
   expectedOwnerUserId: string | null;
+  /**
+   * Imported-owner recovery evidence: the recorded portable import source
+   * fingerprint. Set only when recovery was requested for a populated unbound
+   * dataset carrying a validated import-origin fingerprint. Exactly one of
+   * `expectedOwnerUserId` / `expectedOwnerFingerprint` may be non-null (both
+   * are null for pristine-device fresh recovery).
+   */
+  expectedOwnerFingerprint: string | null;
 };
 
 export type AccountCoordinatorDependencies = {

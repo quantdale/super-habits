@@ -16,3 +16,8 @@ export const PORTABLE_OWNER_DOMAIN = 'superhabits-portable-owner-v1:';
 export function portableOwnerFingerprint(userId: string): string {
   return sha256Hex(PORTABLE_OWNER_DOMAIN + userId);
 }
+
+/** True for a well-formed owner fingerprint (64 lowercase hex characters). */
+export function isPortableOwnerFingerprint(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}

@@ -3,7 +3,10 @@ import type {
   AccountStatus,
   LocalAccountDataState,
 } from '@/core/auth/account.types';
-import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
+import {
+  isPortableOwnerFingerprint,
+  portableOwnerFingerprint,
+} from '@/lib/portableOwnerFingerprint';
 
 export type AccountDecisionInput = {
   configured: boolean;
@@ -31,6 +34,7 @@ export type AccountDecision = {
   shouldCreateAnonymous: boolean;
   canRecoverExisting: boolean;
   canRecoverOwner: boolean;
+  canRecoverImportedOwner: boolean;
   canProtect: boolean;
   message: string;
 };
@@ -57,6 +61,20 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     local.ownerBinding !== null &&
     local.outboxOwnerIds.every((ownerUserId) => ownerUserId === local.ownerBinding) &&
     auth.verifiedUserId !== local.ownerBinding;
+  /**
+   * Narrow imported-owner recovery capability. This is NOT generic
+   * populated-device account switching: it exists only when a validated
+   * Portable Import V1 recorded a source-owner fingerprint on an otherwise
+   * UNBOUND populated dataset with no other account's pending backup work.
+   * The recorded fingerprint is compatibility metadata; authentication still
+   * happens through Supabase, and only the account whose verified UID hashes
+   * to the fingerprint may bind the dataset.
+   */
+  const canRecoverImportedOwner =
+    !local.ownerBinding &&
+    local.hasUserData &&
+    local.outboxOwnerIds.length === 0 &&
+    isPortableOwnerFingerprint(importOriginOwnerFingerprint);
 
   if (!configured) {
     return {
@@ -67,6 +85,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message: 'Remote backup is not configured. Super Habits remains local-only.',
     };
@@ -81,6 +100,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message: 'Remote backup is disabled. Local Super Habits data remains available.',
     };
@@ -95,6 +115,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message: 'Backup ownership is conflicting, so remote work is paused until it is recovered.',
     };
@@ -112,6 +133,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message:
         'This device has pending backup work for another account. Sign back into the account that owns it.',
@@ -134,6 +156,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
         shouldCreateAnonymous: pristineProvisional && auth.sessionUserId === null,
         canRecoverExisting: pristineProvisional,
         canRecoverOwner: canRecoverOwner,
+        canRecoverImportedOwner: false,
         canProtect: false,
         message:
           'This device has local data for a previous backup account. Sign in to that account to resume backup.',
@@ -149,6 +172,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
         shouldCreateAnonymous: false,
         canRecoverExisting: pristineProvisional,
         canRecoverOwner: canRecoverOwner,
+        canRecoverImportedOwner: false,
         canProtect: false,
         message:
           'This device belongs to another backup account. Sign back into the account that owns its backup.',
@@ -164,6 +188,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: pristineProvisional,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: anonymous,
       message: anonymous
         ? 'Your backup is anonymous. Protect it with a verified email to recover it elsewhere.'
@@ -180,6 +205,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: canRecoverOwner,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message:
         'Pending backup work identifies a previous account. Sign in to recover remote backup.',
@@ -195,6 +221,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message:
         'This device has pending backup work for another account. Sign back into that account.',
@@ -214,6 +241,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
         shouldCreateAnonymous: false,
         canRecoverExisting: false,
         canRecoverOwner: false,
+        canRecoverImportedOwner: false,
         canProtect: auth.verifiedIsAnonymous === true,
         message:
           auth.verifiedIsAnonymous === true
@@ -229,6 +257,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: false,
       message:
         'Pending local backup work has no owner evidence. Remote backup is paused until the original account is identified.',
@@ -253,6 +282,10 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
         shouldCreateAnonymous: false,
         canRecoverExisting: false,
         canRecoverOwner: false,
+        // A wrong ANONYMOUS session (temporary T) must still surface the
+        // source-account recovery form; a verified non-anonymous account is
+        // an owner mismatch and gets no form (verify signs it out).
+        canRecoverImportedOwner: canRecoverImportedOwner && auth.verifiedIsAnonymous === true,
         canProtect: false,
         message:
           'This device’s dataset was imported from another backup account. Sign in with the account that created it.',
@@ -267,6 +300,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: canRecoverExisting && auth.sessionIsAnonymous === true,
       canRecoverOwner: false,
+      canRecoverImportedOwner: false,
       canProtect: auth.verifiedIsAnonymous === true,
       message:
         auth.verifiedIsAnonymous === true
@@ -285,6 +319,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
+      canRecoverImportedOwner: importedDataset && canRecoverImportedOwner,
       canProtect: false,
       message: local.hasUserData
         ? importedDataset
@@ -302,6 +337,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
     shouldCreateAnonymous: auth.sessionUserId === null,
     canRecoverExisting: canRecoverExisting,
     canRecoverOwner: false,
+    canRecoverImportedOwner: false,
     canProtect: false,
     message: 'Remote backup is ready when you choose anonymous use or recover an existing account.',
   };

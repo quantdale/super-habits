@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { ValidationError } from '@/core/ui/ValidationError';
@@ -25,6 +26,7 @@ const PORTABLE_ACCENT = '#0f766e';
 
 export function SettingsPortableSection() {
   const { tokens } = useAppTheme();
+  const { refreshAccountState } = useAppBootstrapState();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -175,6 +177,11 @@ export function SettingsPortableSection() {
         setPreview(null);
         setPendingFile(null);
         setSelectedFileName(null);
+        // The import changes the local dataset shape (user data + possible
+        // import-origin fingerprint), so the account card must re-decide
+        // immediately — an imported owner-backed dataset must expose
+        // source-account recovery instead of a stale pre-import state.
+        void refreshAccountState().catch(() => undefined);
       } else {
         setError(outcome.message);
       }

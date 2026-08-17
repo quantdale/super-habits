@@ -454,7 +454,11 @@ function SettingsAccountCard({
   const protectionPending = accountState.status === 'protection_pending';
   const recoveryPending = accountState.status === 'sign_in_pending';
   const ownerRecovery = accountState.canRecoverOwner;
-  const canRequestRecovery = accountState.canRecoverExisting || accountState.canRecoverOwner;
+  const importedOwnerRecovery = accountState.canRecoverImportedOwner;
+  const canRequestRecovery =
+    accountState.canRecoverExisting ||
+    accountState.canRecoverOwner ||
+    accountState.canRecoverImportedOwner;
   const resendRemaining = accountState.resendAvailableAt
     ? Math.max(0, Math.ceil((accountState.resendAvailableAt - now) / 1_000))
     : 0;
@@ -558,12 +562,18 @@ function SettingsAccountCard({
       {canRequestRecovery && !recoveryPending ? (
         <View className="mt-5 border-t pt-4" style={{ borderColor: tokens.border }}>
           <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            {ownerRecovery ? 'Sign back into this device account' : 'Recover existing backup'}
+            {ownerRecovery
+              ? 'Sign back into this device account'
+              : importedOwnerRecovery
+                ? 'Imported backup account required'
+                : 'Recover existing backup'}
           </Text>
           <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
             {ownerRecovery
               ? 'Use the email that protects this device’s backup. Local data stays available while remote backup is paused.'
-              : 'On a new or empty device, sign in to an existing protected account. Account merging is not supported.'}
+              : importedOwnerRecovery
+                ? 'This dataset was imported from another device and belongs to a protected Super Habits backup account. Sign in with the account that created the portable backup to enable cloud backup.'
+                : 'On a new or empty device, sign in to an existing protected account. Account merging is not supported.'}
           </Text>
           <View className="mt-3">
             <TextField
@@ -577,7 +587,7 @@ function SettingsAccountCard({
               label={
                 busy
                   ? 'Sending...'
-                  : ownerRecovery
+                  : ownerRecovery || importedOwnerRecovery
                     ? 'Send sign-in code'
                     : 'Recover existing backup'
               }

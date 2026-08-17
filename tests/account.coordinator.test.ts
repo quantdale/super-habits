@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountCoordinator } from '@/core/auth/accountCoordinator';
+import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 import type { AccountAuthEvidence, AccountRemoteFingerprint } from '@/core/auth/account.types';
 
 type FakeDatabaseOptions = {
@@ -825,5 +826,317 @@ describe('AccountCoordinator', () => {
       canRecoverExisting: true,
     });
     expect(database.meta.get('account.owner_binding_state')).toBe('provisional');
+  });
+});
+
+describe('AccountCoordinator — imported-owner recovery (Portable V1 closure)', () => {
+  const FP_A = portableOwnerFingerprint('user_a');
+
+  function importedOwnerDatabase(overrides: FakeDatabaseOptions = {}) {
+    const database = fakeDatabase({
+      activeRows: { todos: 1 },
+      ...overrides,
+    });
+    // The durable Portable Import V1 origin fingerprint (validated import).
+    database.meta.set('portable.last_import_owner_fingerprint', FP_A);
+    return database;
+  }
+
+  /** Anonymous temporary session T still signed in after the import. */
+  function tempSessionAuth() {
+    return {
+      value: auth({
+        sessionUserId: 'temp_t',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'temp_t',
+        verifiedIsAnonymous: true,
+      }),
+    };
+  }
+
+  it('A: matching account binds the imported dataset after fingerprint-verified recovery', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const verifyExistingAccountOtp = vi.fn(async () => {
+      currentAuth.value = auth({
+        sessionUserId: 'user_a',
+        sessionIsAnonymous: false,
+        verifiedUserId: 'user_a',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'a@example.com',
+      });
+    });
+    const coordinator = coordinatorFor(database, currentAuth, {
+      verifyExistingAccountOtp,
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    const state = await coordinator.refresh();
+    expect(state.canRecoverImportedOwner).toBe(true);
+    expect(state.canRecoverExisting).toBe(false);
+    expect(state.canRecoverOwner).toBe(false);
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
+    const pending = JSON.parse(database.meta.get('account.recovery_pending') ?? 'null') as {
+      expectedOwnerUserId: string | null;
+      expectedOwnerFingerprint: string | null;
+    };
+    expect(pending.expectedOwnerUserId).toBeNull();
+    expect(pending.expectedOwnerFingerprint).toBe(FP_A);
+
+    await expect(coordinator.verifyRecovery('123456')).resolves.toMatchObject({
+      ok: true,
+      status: 'protected',
+    });
+    expect(database.meta.get('account.owner_user_id')).toBe('user_a');
+    expect(database.meta.get('account.owner_binding_state')).toBe('permanent');
+    // Pending record cleared; source fingerprint retained (inert diagnostics).
+    expect(database.meta.get('account.recovery_pending')).toBe('null');
+    expect(database.meta.get('portable.last_import_owner_fingerprint')).toBe(FP_A);
+  });
+
+  it('B: wrong account is signed out, nothing binds, fingerprint and data are preserved', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const signOut = vi.fn(async () => {
+      currentAuth.value = auth();
+    });
+    const verifyExistingAccountOtp = vi.fn(async () => {
+      currentAuth.value = auth({
+        sessionUserId: 'user_b',
+        sessionIsAnonymous: false,
+        verifiedUserId: 'user_b',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'b@example.com',
+      });
+    });
+    const coordinator = coordinatorFor(database, currentAuth, {
+      signOut,
+      verifyExistingAccountOtp,
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    await expect(coordinator.requestRecovery('b@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
+    await expect(coordinator.verifyRecovery('123456')).resolves.toMatchObject({
+      ok: false,
+      status: 'owner_mismatch',
+      message: expect.stringContaining('different account'),
+    });
+    expect(signOut).toHaveBeenCalled();
+    expect(currentAuth.value.verifiedUserId).toBeNull();
+    // Never bound, never rewritten: the imported dataset stays unclaimed.
+    expect(database.meta.has('account.owner_user_id')).toBe(false);
+    expect(database.meta.get('portable.last_import_owner_fingerprint')).toBe(FP_A);
+    // Pending record is terminated after the wrong-account attempt.
+    expect(database.meta.get('account.recovery_pending')).toBe('null');
+  });
+
+  it('C: blocks imported-owner recovery when temporary session T has remote backup rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const requestExistingAccountRecovery = vi.fn();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      requestExistingAccountRecovery,
+      getRemoteFingerprint: async () => fingerprint(),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+      message: expect.stringContaining('remote backup data'),
+    });
+    expect(requestExistingAccountRecovery).not.toHaveBeenCalled();
+  });
+
+  it('D: allows imported-owner recovery when temporary session T has no remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
+  });
+
+  it('E: returns a retryable remote-unavailable state when the footprint check fails', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => {
+        throw new Error('offline');
+      },
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'remote_unavailable',
+    });
+    expect(database.meta.has('account.owner_user_id')).toBe(false);
+  });
+
+  it('F: local-only portable import (no fingerprint) never grants the exception', async () => {
+    const database = fakeDatabase({ activeRows: { todos: 1 } });
+    // Local-only source file: the durable marker is the literal `null`.
+    database.meta.set('portable.last_import_owner_fingerprint', 'null');
+    // No session after import: no anonymous claim happens, and the imported
+    // local-only dataset stays unbound with NO account-switch exception.
+    const currentAuth = { value: auth() };
+    const requestExistingAccountRecovery = vi.fn();
+    const coordinator = coordinatorFor(database, currentAuth, { requestExistingAccountRecovery });
+
+    const state = await coordinator.refresh();
+    expect(state.canRecoverImportedOwner).toBe(false);
+    expect(state.status).toBe('legacy_owner_unknown');
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      message: expect.stringContaining('switching'),
+    });
+    expect(requestExistingAccountRecovery).not.toHaveBeenCalled();
+  });
+
+  it('F2: a local-only import with anonymous session T still follows legacy first-account claim', async () => {
+    const database = fakeDatabase({ activeRows: { todos: 1 } });
+    database.meta.set('portable.last_import_owner_fingerprint', 'null');
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    // Legacy Recoverable Account semantics: the first anonymous session
+    // claims the local-only dataset; no imported-owner exception exists.
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      status: 'anonymous_ready',
+      canRecoverImportedOwner: false,
+      hasOwnerBinding: true,
+    });
+    expect(database.meta.get('account.owner_user_id')).toBe('temp_t');
+  });
+
+  it('G: legacy populated unbound dataset without import origin stays fail-closed', async () => {
+    const database = fakeDatabase({ activeRows: { todos: 1 } });
+    const currentAuth = { value: auth() };
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    const state = await coordinator.refresh();
+    expect(state.canRecoverImportedOwner).toBe(false);
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      message: expect.stringContaining('switching'),
+    });
+  });
+
+  it('H: a permanent owner-bound device never surfaces the imported-owner exception', async () => {
+    const database = importedOwnerDatabase({ ownerBinding: 'user_b' });
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    const state = await coordinator.refresh();
+    expect(state.canRecoverImportedOwner).toBe(false);
+    expect(database.meta.get('account.owner_user_id')).toBe('user_b');
+  });
+
+  it('I: a matching account already authenticated after import binds automatically', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = {
+      value: auth({
+        sessionUserId: 'user_a',
+        sessionIsAnonymous: false,
+        verifiedUserId: 'user_a',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'a@example.com',
+      }),
+    };
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      status: 'protected',
+      canRecoverImportedOwner: false,
+    });
+    expect(database.meta.get('account.owner_user_id')).toBe('user_a');
+  });
+
+  it('J: wrong anonymous session T keeps the source-account recovery form visible', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    const state = await coordinator.refresh();
+    expect(state.canRecoverImportedOwner).toBe(true);
+    expect(state.status).toBe('owner_mismatch');
+    expect(state.message).toContain('created');
+  });
+
+  it('keeps an imported-owner pending recovery visible across refresh', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: true,
+    });
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      status: 'sign_in_pending',
+      email: 'a@example.com',
+    });
+  });
+
+  it('clears an imported-owner pending recovery when eligibility drifts (owner binds elsewhere)', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: true,
+    });
+    // The dataset becomes owner-bound while the code is pending.
+    database.meta.set('account.owner_user_id', 'user_b');
+    database.meta.delete('account.owner_binding_state');
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      status: 'owner_mismatch',
+      canRecoverImportedOwner: false,
+    });
+    expect(database.meta.get('account.recovery_pending')).toBe('null');
+  });
+
+  it('fails closed when the source fingerprint changes while recovery is pending', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const verifyExistingAccountOtp = vi.fn(async () => {
+      currentAuth.value = auth({
+        sessionUserId: 'user_a',
+        sessionIsAnonymous: false,
+        verifiedUserId: 'user_a',
+        verifiedIsAnonymous: false,
+        verifiedEmail: 'a@example.com',
+      });
+    });
+    const coordinator = coordinatorFor(database, currentAuth, {
+      verifyExistingAccountOtp,
+      getRemoteFingerprint: async () => fingerprint({ counts: {}, ownerIds: [] }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
+    // The recorded fingerprint is rewritten (or cleared) while pending.
+    database.meta.set('portable.last_import_owner_fingerprint', 'b'.repeat(64));
+    await expect(coordinator.verifyRecovery('123456')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+    expect(database.meta.has('account.owner_user_id')).toBe(false);
+    expect(currentAuth.value.verifiedUserId).toBeNull();
   });
 });

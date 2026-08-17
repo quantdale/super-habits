@@ -25,6 +25,7 @@ const AppBootstrapStateContext = createContext<AppBootstrapState>({
     canProtect: false,
     canRecoverExisting: false,
     canRecoverOwner: false,
+    canRecoverImportedOwner: false,
     message: 'Account status is loading.',
     resendAvailableAt: null,
   },
