@@ -11,20 +11,22 @@ The user must be able to review bounded facts from Todos, Habits, Focus, Workout
 
 The feature must preserve existing Todo recurrence, Linked Action, backup, owner, restore, and portability guarantees. Completed weekly reviews are authoritative user state and must be added to Backup Completeness V2 and Portable Backup V1.
 
-## Starting Git State
+## Context
 
-- Repository: `quantdale/super-habits`
-- Canonical branch: `main`
-- Spec-authoring commit sequence was created directly on GitHub before implementation.
-- Historical implementation baseline immediately before spec authoring: `27330f56a9f3b77973f88d4bf18744721d564241`.
-- The implementation agent MUST run `git fetch origin --prune` and record the actual `origin/main` SHA before editing because this plan/spec authoring may have advanced `main`.
-- Final policy: validated work ends on `main`, local `main == origin/main`, only remote `main`, clean working tree, no force push.
+- Repository: `quantdale/super-habits`, Expo + React Native, offline-first SQLite
+- Six tab surfaces: Overview, Todos, Habits, Pomodoro, Workout, Calories
+- Single-page model in `app/index.tsx` behind `NavigationContext.activeSection`
+- Local SQLite is source of truth; optional Supabase backup
+- Current schema version: 15 (before this change)
+- Backup Completeness V2 scope: 12 entities, scope_version 2
+- Portable Backup V1: single JSON file export/import
+- No existing week-start convention; habits use ISO weekday 1=Mon
 
 ## Scope
 
 In scope:
 
-- canonical local week calculation
+- canonical local week calculation (Monday-start)
 - deterministic weekly summary
 - Todo review/planning decisions
 - 1–5 next-week priorities
@@ -40,7 +42,7 @@ In scope:
 - optional bounded read-only Command Center integration if it remains small
 - comprehensive unit/integration/E2E/simulation/native validation
 
-Out of scope:
+## Non-Goals
 
 - autonomous AI planning
 - automatic calendar integration
@@ -51,6 +53,14 @@ Out of scope:
 - full two-way multi-device sync
 - social/shared review workflows
 - push-notification subsystem for weekly review
+
+## Starting Git State
+
+- Repository: `quantdale/super-habits`
+- Canonical branch: `main`
+- Spec-authoring commit sequence was created directly on GitHub before implementation.
+- Historical implementation baseline immediately before spec authoring: `27330f56a9f3b77973f88d4bf18744721d564241`.
+- Final policy: validated work ends on `main`, local `main == origin/main`, only remote `main`, clean working tree, no force push.
 
 ## Architecture
 
@@ -442,40 +452,61 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 
 ## Current Checkpoint
 
-- milestone: IMPLEMENTATION_COMPLETE_CI_RUNNING
-- completed: All implementation tasks complete. Typecheck 0 errors, lint 0 errors, 105 test files / 1138 tests passing, web export built, committed as SHA 1abc38f, pushed to origin/main. CI workflow #407 triggered on push.
-- inProgress: Waiting for GitHub Actions quality + e2e jobs to complete for SHA 1abc38f.
-- blockers: None. CI is running; no code issues identified.
-- nextAction: Poll GitHub Actions for CI run #407 status. If quality or e2e fails, diagnose and fix. Once both pass, mark ExecPlan COMPLETED.
-- modifiedFiles: (same as previous checkpoint)
-  - features/weekly-review/weeklyReview.types.ts (new)
-  - features/weekly-review/weeklyReview.domain.ts (new)
-  - features/weekly-review/weeklyReview.data.ts (new)
-  - features/weekly-review/weeklyReview.summary.ts (new)
-  - features/weekly-review/weeklyReview.executor.ts (new)
-  - features/weekly-review/WeeklyReviewScreen.tsx (new)
-  - features/weekly-review/index.ts (new)
-  - core/db/client.ts (migration 16)
-  - core/db/types.ts (WeeklyReview type)
-  - core/db/schema.sql (reference snapshot)
-  - core/backup/backup.types.ts (BACKUP_ENTITIES, columns, soft delete, scope version)
-  - core/backup/backupValidators.ts (WEEKLY_REVIEW_RULES)
-  - core/backup/backupRestore.ts (applyRemoteWeeklyReviews)
-  - core/auth/account.types.ts (ACCOUNT_USER_TABLES)
-  - core/portable/portable.types.ts (PORTABLE_DOMAIN_LABELS)
-  - core/providers/navigationContext.ts (weekly review modal state)
-  - core/providers/NavigationProvider.tsx (weekly review state)
-  - app/index.tsx (weekly review modal)
-  - features/overview/OverviewScreen.tsx (weekly review button)
-  - features/workout/workout.data.ts (getRoutineNamesByIds helper)
-  - tests/weeklyReview.domain.test.ts (new, 27 tests)
-  - tests/integration/migrations.test.ts (version 16)
-  - tests/db.client.test.ts (migration count)
-  - tests/portableFormat.test.ts (weekly_reviews fixture)
-  - tests/integration/portableExportImport.test.ts (scope version)
-  - tests/integration/portableOwnerRecovery.test.ts (scope version)
-  - tests/integration/fixtures.test.ts (version 16)
+- Current milestone: IMPLEMENTATION_COMPLETE_CI_FAILED — ExecPlan schema validation failure blocked CI quality job. Plan fixed locally, needs commit + push + CI re-run.
+- Completed: All implementation tasks complete. Typecheck 0 errors, lint 0 errors, 105 test files / 1138 tests passing, web export built, committed as SHA 1abc38f + 5e4d67f, pushed to origin/main.
+- In progress: Fixing ExecPlan schema validation failure, committing, pushing, verifying CI quality + e2e PASS.
+- Important modified files: (see Changed Files section)
+- Last successful validation: npm run typecheck PASS, npm run lint PASS, npm test 105 files / 1138 tests PASS, npm run build:web PASS
+- Current failures: ExecPlan schema validation failure (missing required sections), now fixed locally.
+- Relevant quarantines: None.
+- Blockers: None.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: Commit fixed ExecPlan, push to main, verify CI quality + e2e PASS for exact final SHA.
+- Remaining definition of done: CI quality PASS, CI e2e PASS, ExecPlan COMPLETED status.
+
+## Validation
+
+- 2026-08-17 — `npm run typecheck` — PASS, 0 errors
+- 2026-08-17 — `npm run lint` — PASS, 0 errors (1 warning allowed)
+- 2026-08-17 — `TZ=Asia/Manila npm test` — PASS, 105 files, 1138 tests
+- 2026-08-17 — `npm run build:web` — PASS, dist/ produced
+- 2026-08-17 — `npm run agent:plan:validate:all` — FAIL on weekly-review-planning-v1.md (missing sections, now fixed)
+
+## Changed Files
+
+- `features/weekly-review/` — new feature module (types, domain, data, summary, executor, screen, index)
+- `core/db/client.ts` — migration 16 (weekly_reviews table)
+- `core/db/types.ts` — WeeklyReview type
+- `core/db/schema.sql` — reference snapshot update
+- `core/backup/backup.types.ts` — BACKUP_ENTITIES, columns, soft delete, scope version bump
+- `core/backup/backupValidators.ts` — WEEKLY_REVIEW_RULES
+- `core/backup/backupRestore.ts` — applyRemoteWeeklyReviews import
+- `core/auth/account.types.ts` — ACCOUNT_USER_TABLES
+- `core/portable/portable.types.ts` — PORTABLE_DOMAIN_LABELS
+- `core/providers/navigationContext.ts` — weekly review modal state
+- `core/providers/NavigationProvider.tsx` — weekly review state
+- `app/index.tsx` — weekly review modal
+- `features/overview/OverviewScreen.tsx` — weekly review button
+- `features/workout/workout.data.ts` — getRoutineNamesByIds helper
+- `tests/weeklyReview.domain.test.ts` — 27 domain tests
+- `tests/integration/migrations.test.ts` — version 16 assertions
+- `tests/db.client.test.ts` — migration count update
+- `tests/portableFormat.test.ts` — weekly_reviews fixture
+- `tests/integration/portableExportImport.test.ts` — scope version
+- `tests/integration/portableOwnerRecovery.test.ts` — scope version
+- `tests/integration/fixtures.test.ts` — version 16
+
+## Recovery / Resume Instructions
+
+1. Read `AGENTS.md`
+2. Read `.agent/PLANS.md`
+3. Read this ExecPlan completely
+4. Run `git status --short` and `git diff --stat`
+5. Reconcile checkpoint with working tree
+6. Run `npm run agent:plan:validate:all` to check schema
+7. Continue from `exactNextAction`
 
 ## Outcomes
 
-Pending implementation.
+Pending CI completion.
