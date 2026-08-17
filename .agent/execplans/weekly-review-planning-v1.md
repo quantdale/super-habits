@@ -442,12 +442,12 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 
 ## Current Checkpoint
 
-- milestone: CORE_IMPLEMENTATION_COMPLETE_QA_IN_PROGRESS
-- completed: Tasks 0–8 of the OpenSpec task plan. Week semantics (Monday-start), types, data layer, SQLite migration v16, deterministic summary, draft validation, exactly-once executor, guided UI with step-by-step flow, review history, Home integration (Overview header button), Backup V2 integration (BACKUP_ENTITIES, validators, restore, scope version bump, portable labels, account tables), and all existing tests updated and passing.
-- inProgress: Building web export, running E2E, pushing to main, verifying CI.
-- blockers: None.
-- nextAction: Build web export with `npm run build:web`, run E2E suite, commit all changes, push to main, verify GitHub Actions quality + e2e PASS for the exact final SHA.
-- modifiedFiles:
+- milestone: IMPLEMENTATION_COMPLETE_CI_RUNNING
+- completed: All implementation tasks complete. Typecheck 0 errors, lint 0 errors, 105 test files / 1138 tests passing, web export built, committed as SHA 1abc38f, pushed to origin/main. CI workflow #407 triggered on push.
+- inProgress: Waiting for GitHub Actions quality + e2e jobs to complete for SHA 1abc38f.
+- blockers: None. CI is running; no code issues identified.
+- nextAction: Poll GitHub Actions for CI run #407 status. If quality or e2e fails, diagnose and fix. Once both pass, mark ExecPlan COMPLETED.
+- modifiedFiles: (same as previous checkpoint)
   - features/weekly-review/weeklyReview.types.ts (new)
   - features/weekly-review/weeklyReview.domain.ts (new)
   - features/weekly-review/weeklyReview.data.ts (new)
@@ -466,8 +466,8 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
   - core/providers/navigationContext.ts (weekly review modal state)
   - core/providers/NavigationProvider.tsx (weekly review state)
   - app/index.tsx (weekly review modal)
-  - app/_layout.tsx (no changes needed)
   - features/overview/OverviewScreen.tsx (weekly review button)
+  - features/workout/workout.data.ts (getRoutineNamesByIds helper)
   - tests/weeklyReview.domain.test.ts (new, 27 tests)
   - tests/integration/migrations.test.ts (version 16)
   - tests/db.client.test.ts (migration count)
