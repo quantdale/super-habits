@@ -44,6 +44,7 @@ import type {
   WorkoutSessionExercise,
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
+import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
 import { applyRemoteTodos } from '@/features/todos/todos.data';
 import { applyRemoteHabits, applyRemoteHabitCompletions } from '@/features/habits/habits.data';
 import {
@@ -59,6 +60,7 @@ import {
   applyRemoteWorkoutSessionExercises,
 } from '@/features/workout/workout.data';
 import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
+import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
 
 export type RestoreV2Result =
   | {
@@ -543,6 +545,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       transactionDb,
       typed<LinkedActionRuleRow[]>('linked_action_rules'),
     );
+    await applyRemoteWeeklyReviews(typed<WeeklyReview[]>('weekly_reviews'));
 
     // Settings: the payload was fetched and integrity-verified ABOVE, before
     // this transaction began. SQLite-backed settings join the transaction

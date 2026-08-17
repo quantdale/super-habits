@@ -91,6 +91,7 @@ export const PORTABLE_DOMAIN_LABELS: Record<BackupEntity, string> = {
   workout_session_exercises: 'Session exercises',
   pomodoro_sessions: 'Focus sessions',
   linked_action_rules: 'Linked action rules',
+  weekly_reviews: 'Weekly reviews',
 };
 
 /** Import-eligibility owner verdicts surfaced in the preview. */

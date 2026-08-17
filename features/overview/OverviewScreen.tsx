@@ -168,7 +168,7 @@ function OverviewMetricCard({
 }
 
 export function OverviewScreen({ isActive }: { isActive: boolean }) {
-  const { openSettings, setActiveSection } = useAppNavigation();
+  const { openSettings, setActiveSection, openWeeklyReview } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -607,6 +607,12 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           subtitle="A compact snapshot of focus, habits, calories, todos, and workouts."
           actions={
             <>
+              <IconButton
+                icon="date-range"
+                onPress={openWeeklyReview}
+                accessibilityLabel="Open weekly review"
+                accentColor={sectionAccents.focus.text}
+              />
               <IconButton
                 icon="settings"
                 onPress={openSettings}

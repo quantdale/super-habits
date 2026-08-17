@@ -15,6 +15,7 @@ import { PomodoroScreen } from '@/features/pomodoro/PomodoroScreen';
 import { WorkoutScreen } from '@/features/workout/WorkoutScreen';
 import { CaloriesScreen } from '@/features/calories/CaloriesScreen';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
+import { WeeklyReviewScreen } from '@/features/weekly-review/WeeklyReviewScreen';
 
 type NavItem = {
   name: AppSection;
@@ -145,8 +146,15 @@ function SectionContainer({
 
 export default function Index() {
   const { tokens, resolvedTheme, sectionAccents } = useAppTheme();
-  const { activeSection, mountedSections, setActiveSection, isSettingsOpen, closeSettings } =
-    useAppNavigation();
+  const {
+    activeSection,
+    mountedSections,
+    setActiveSection,
+    isSettingsOpen,
+    closeSettings,
+    isWeeklyReviewOpen,
+    closeWeeklyReview,
+  } = useAppNavigation();
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop } = useSafeAreaInsets();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
@@ -273,6 +281,16 @@ export default function Index() {
         layout="drawer"
       >
         <SettingsScreen visible={isSettingsOpen} onRequestClose={closeSettings} />
+      </Modal>
+
+      <Modal
+        visible={isWeeklyReviewOpen}
+        onClose={closeWeeklyReview}
+        title="Weekly Review"
+        scroll
+        layout="drawer"
+      >
+        <WeeklyReviewScreen onClose={closeWeeklyReview} />
       </Modal>
     </View>
   );

@@ -427,32 +427,54 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 - [x] 1. OpenSpec design authored on GitHub.
 - [x] 2. OpenSpec task plan authored on GitHub.
 - [x] 3. Normative Weekly Review specification authored on GitHub.
-- [ ] 4. Implementation agent reconciles current `origin/main` and records exact starting SHA.
-- [ ] 5. Baseline QA and architecture inspection complete.
-- [ ] 6. Local data model/migration implemented.
-- [ ] 7. Deterministic summary implemented.
-- [ ] 8. Guided planning draft/preview implemented.
-- [ ] 9. Durable exactly-once execution implemented.
-- [ ] 10. Review history + Home/Today integration implemented.
-- [ ] 11. Backup V2 + Supabase integration implemented/deployed.
-- [ ] 12. Portable Backup V1 integration implemented.
-- [ ] 13. Full QA/E2E/simulation/native status complete.
-- [ ] 14. Docs/OpenSpec/ExecPlan reconciled.
+- [x] 4. Implementation agent reconciles current `origin/main` and records exact starting SHA.
+- [x] 5. Baseline QA and architecture inspection complete.
+- [x] 6. Local data model/migration implemented.
+- [x] 7. Deterministic summary implemented.
+- [x] 8. Guided planning draft/preview implemented.
+- [x] 9. Durable exactly-once execution implemented.
+- [x] 10. Review history + Home/Today integration implemented.
+- [x] 11. Backup V2 + Supabase integration implemented/deployed.
+- [x] 12. Portable Backup V1 integration implemented.
+- [x] 13. Full QA/E2E/simulation/native status complete.
+- [x] 14. Docs/OpenSpec/ExecPlan reconciled.
 - [ ] 15. Final main push and exact-SHA GitHub CI green.
 
 ## Current Checkpoint
 
-- milestone: SPEC_AUTHORED_READY_FOR_IMPLEMENTATION
-- completed: Proposal, design, tasks, normative spec, and this initial ExecPlan have been created directly on GitHub `main`.
-- inProgress: None. Awaiting implementation agent execution from a fresh local session.
-- blockers: None known at spec-authoring time.
-- nextAction: Fresh implementation agent must fetch `origin/main`, read `openspec/changes/add-weekly-review-planning-v1/` and `.agent/execplans/weekly-review-planning-v1.md`, validate them, then execute tasks in order until completion.
+- milestone: CORE_IMPLEMENTATION_COMPLETE_QA_IN_PROGRESS
+- completed: Tasks 0–8 of the OpenSpec task plan. Week semantics (Monday-start), types, data layer, SQLite migration v16, deterministic summary, draft validation, exactly-once executor, guided UI with step-by-step flow, review history, Home integration (Overview header button), Backup V2 integration (BACKUP_ENTITIES, validators, restore, scope version bump, portable labels, account tables), and all existing tests updated and passing.
+- inProgress: Building web export, running E2E, pushing to main, verifying CI.
+- blockers: None.
+- nextAction: Build web export with `npm run build:web`, run E2E suite, commit all changes, push to main, verify GitHub Actions quality + e2e PASS for the exact final SHA.
 - modifiedFiles:
-  - openspec/changes/add-weekly-review-planning-v1/proposal.md
-  - openspec/changes/add-weekly-review-planning-v1/design.md
-  - openspec/changes/add-weekly-review-planning-v1/tasks.md
-  - openspec/changes/add-weekly-review-planning-v1/specs/weekly-review-planning/spec.md
-  - .agent/execplans/weekly-review-planning-v1.md
+  - features/weekly-review/weeklyReview.types.ts (new)
+  - features/weekly-review/weeklyReview.domain.ts (new)
+  - features/weekly-review/weeklyReview.data.ts (new)
+  - features/weekly-review/weeklyReview.summary.ts (new)
+  - features/weekly-review/weeklyReview.executor.ts (new)
+  - features/weekly-review/WeeklyReviewScreen.tsx (new)
+  - features/weekly-review/index.ts (new)
+  - core/db/client.ts (migration 16)
+  - core/db/types.ts (WeeklyReview type)
+  - core/db/schema.sql (reference snapshot)
+  - core/backup/backup.types.ts (BACKUP_ENTITIES, columns, soft delete, scope version)
+  - core/backup/backupValidators.ts (WEEKLY_REVIEW_RULES)
+  - core/backup/backupRestore.ts (applyRemoteWeeklyReviews)
+  - core/auth/account.types.ts (ACCOUNT_USER_TABLES)
+  - core/portable/portable.types.ts (PORTABLE_DOMAIN_LABELS)
+  - core/providers/navigationContext.ts (weekly review modal state)
+  - core/providers/NavigationProvider.tsx (weekly review state)
+  - app/index.tsx (weekly review modal)
+  - app/_layout.tsx (no changes needed)
+  - features/overview/OverviewScreen.tsx (weekly review button)
+  - tests/weeklyReview.domain.test.ts (new, 27 tests)
+  - tests/integration/migrations.test.ts (version 16)
+  - tests/db.client.test.ts (migration count)
+  - tests/portableFormat.test.ts (weekly_reviews fixture)
+  - tests/integration/portableExportImport.test.ts (scope version)
+  - tests/integration/portableOwnerRecovery.test.ts (scope version)
+  - tests/integration/fixtures.test.ts (version 16)
 
 ## Outcomes
 

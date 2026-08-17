@@ -264,3 +264,24 @@ CREATE TABLE IF NOT EXISTS sync_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_sync_outbox_revision
   ON sync_outbox (revision ASC);
+
+-- v16: Weekly Reviews
+CREATE TABLE IF NOT EXISTS weekly_reviews (
+  id TEXT PRIMARY KEY,
+  week_key TEXT NOT NULL,
+  week_start_date TEXT NOT NULL,
+  week_end_date TEXT NOT NULL,
+  next_week_start_date TEXT NOT NULL,
+  completed_at TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  summary_payload TEXT NOT NULL DEFAULT '{}',
+  plan_payload TEXT NOT NULL DEFAULT '{}',
+  reflection TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_reviews_week_key
+  ON weekly_reviews (week_key) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_weekly_reviews_created_at
+  ON weekly_reviews (created_at);

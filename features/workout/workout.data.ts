@@ -806,3 +806,13 @@ export async function applyRemoteWorkoutSessionExercises(
     );
   }
 }
+
+/** Get routine names by their IDs. Used by the weekly review summary. */
+export async function getRoutineNamesByIds(ids: string[]): Promise<{ id: string; name: string }[]> {
+  if (ids.length === 0) return [];
+  const db = await getDatabase();
+  return db.getAllAsync<{ id: string; name: string }>(
+    `SELECT id, name FROM workout_routines WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ids,
+  );
+}

@@ -14,10 +14,13 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     calories: false,
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
   const [pendingHabitFocusId, setPendingHabitFocusId] = useState<string | null>(null);
 
   const openSettings = useCallback(() => setIsSettingsOpen(true), []);
   const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
+  const openWeeklyReview = useCallback(() => setIsWeeklyReviewOpen(true), []);
+  const closeWeeklyReview = useCallback(() => setIsWeeklyReviewOpen(false), []);
   const setActiveSection = useCallback((section: AppSection) => {
     setMountedSections((current) => (current[section] ? current : { ...current, [section]: true }));
     setActiveSectionState(section);
@@ -50,6 +53,9 @@ export function NavigationProvider({ children }: PropsWithChildren) {
         isSettingsOpen,
         openSettings,
         closeSettings,
+        isWeeklyReviewOpen,
+        openWeeklyReview,
+        closeWeeklyReview,
       }}
     >
       {children}

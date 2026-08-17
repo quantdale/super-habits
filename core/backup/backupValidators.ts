@@ -441,6 +441,22 @@ const LINKED_ACTION_RULE_RULES: FieldRule[] = [
   nullableIsoRule('deleted_at'),
 ];
 
+const WEEKLY_REVIEW_RULES: FieldRule[] = [
+  idRule('id'),
+  textRule('week_key', true),
+  textRule('week_start_date', true),
+  textRule('week_end_date', true),
+  textRule('next_week_start_date', true),
+  nullableIsoRule('completed_at'),
+  enumRule('status', ['draft', 'completed']),
+  textRule('summary_payload', true),
+  textRule('plan_payload', true),
+  textRule('reflection', true),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+];
+
 const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   todos: TODO_RULES,
   habits: HABIT_RULES,
@@ -454,6 +470,7 @@ const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   workout_session_exercises: WORKOUT_SESSION_EXERCISE_RULES,
   pomodoro_sessions: POMODORO_SESSION_RULES,
   linked_action_rules: LINKED_ACTION_RULE_RULES,
+  weekly_reviews: WEEKLY_REVIEW_RULES,
 };
 
 /**

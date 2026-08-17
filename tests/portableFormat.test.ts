@@ -152,6 +152,21 @@ function makeRow(
       updated_at: ISO,
       deleted_at: null,
     },
+    weekly_reviews: {
+      id: 'wrev_1',
+      week_key: '2026-08-11',
+      week_start_date: '2026-08-11',
+      week_end_date: '2026-08-17',
+      next_week_start_date: '2026-08-18',
+      completed_at: ISO,
+      status: 'completed',
+      summary_payload: '{"version":1}',
+      plan_payload: '{"priorities":[]}',
+      reflection: 'Good week',
+      created_at: ISO,
+      updated_at: ISO,
+      deleted_at: null,
+    },
   } as const;
   return { ...(base[entity] as Record<string, unknown>), ...overrides };
 }

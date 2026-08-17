@@ -273,7 +273,7 @@ describe('imported-owner recovery — real SQLite end to end', () => {
     const scope = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'backup.scope_version'",
     );
-    expect(scope?.value).toBe('2');
+    expect(scope?.value).toBe('3');
     const backfillStatus = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'backup.backfill_status'",
     );

@@ -126,3 +126,19 @@ export type SavedMeal = {
   last_used_at: string;
   created_at: string;
 };
+
+export type WeeklyReview = {
+  id: string;
+  week_key: string;
+  week_start_date: string;
+  week_end_date: string;
+  next_week_start_date: string;
+  completed_at: string | null;
+  status: 'draft' | 'completed';
+  summary_payload: string;
+  plan_payload: string;
+  reflection: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};

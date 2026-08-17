@@ -16,6 +16,9 @@ export type NavigationContextValue = {
   isSettingsOpen: boolean;
   openSettings: () => void;
   closeSettings: () => void;
+  isWeeklyReviewOpen: boolean;
+  openWeeklyReview: () => void;
+  closeWeeklyReview: () => void;
 };
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);

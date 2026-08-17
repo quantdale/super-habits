@@ -15,6 +15,7 @@ export const ACCOUNT_USER_TABLES = [
   'linked_action_rules',
   'linked_action_events',
   'linked_action_executions',
+  'weekly_reviews',
 ] as const;
 
 export type AccountUserTable = (typeof ACCOUNT_USER_TABLES)[number];

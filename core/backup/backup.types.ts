@@ -6,7 +6,7 @@ export const BACKUP_SCHEMA_VERSION = 2;
 /** Version of the recoverable-settings payload contract. */
 export const BACKUP_SETTINGS_VERSION = 2;
 /** Local scope marker: when `backup.scope_version` is below this, backfill runs. */
-export const BACKUP_SCOPE_VERSION = 2;
+export const BACKUP_SCOPE_VERSION = 3;
 
 /**
  * Every locally durable, user-owned table in the recoverable backup scope,
@@ -25,6 +25,7 @@ export const BACKUP_ENTITIES = [
   'workout_session_exercises',
   'pomodoro_sessions',
   'linked_action_rules',
+  'weekly_reviews',
 ] as const;
 
 export type BackupEntity = (typeof BACKUP_ENTITIES)[number];
@@ -150,6 +151,21 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'updated_at',
     'deleted_at',
   ],
+  weekly_reviews: [
+    'id',
+    'week_key',
+    'week_start_date',
+    'week_end_date',
+    'next_week_start_date',
+    'completed_at',
+    'status',
+    'summary_payload',
+    'plan_payload',
+    'reflection',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
 };
 
 /** Entities whose local rows carry a soft-delete tombstone column. */
@@ -161,6 +177,7 @@ export const BACKUP_SOFT_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
   'routine_exercises',
   'routine_exercise_sets',
   'linked_action_rules',
+  'weekly_reviews',
 ]);
 
 /**
