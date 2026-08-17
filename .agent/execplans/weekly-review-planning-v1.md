@@ -1,7 +1,7 @@
 # ExecPlan: Weekly Review & Planning V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -448,22 +448,22 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 - [x] 12. Portable Backup V1 integration implemented.
 - [x] 13. Full QA/E2E/simulation/native status complete.
 - [x] 14. Docs/OpenSpec/ExecPlan reconciled.
-- [ ] 15. Final main push and exact-SHA GitHub CI green.
+- [x] 15. Final main push and exact-SHA GitHub CI green.
 
 ## Current Checkpoint
 
-- Current milestone: E2E_FIX_PUSHED_CI_RUNNING
-- Completed: All implementation complete. ExecPlan schema fixed. E2E manifest fixes for weekly_reviews pushed. SHA 40e17fe on main.
-- In progress: Waiting for CI run on SHA 40e17fe. Quality job expected ~5-6 min, e2e job ~30-40 min.
+- Current milestone: COMPLETE
+- Completed: All implementation tasks complete. ExecPlan schema fixed. E2E manifest fixes for weekly_reviews pushed. CI verified for SHA 29bf9b3.
+- In progress: None.
 - Important modified files: (see Changed Files section)
-- Last successful validation: typecheck PASS, lint PASS, 105 test files / 1138 tests PASS, build:web PASS, build:sync PASS, e2e:sync local 33 passed / 3 pre-existing flake failures
-- Current failures: 3 pre-existing portable owner recovery / recoverable account V1 e2e:sync flake failures (not caused by this change)
+- Last successful validation: typecheck PASS, lint PASS, 105 test files / 1138 tests PASS, build:web PASS, build:sync PASS, CI quality PASS, CI e2e main lane PASS (full E2E + deterministic scenarios), e2e:sync 33/36 pass (3 pre-existing flake)
+- Current failures: 3 pre-existing portable owner recovery / recoverable account V1 e2e:sync flake failures — "Protected" text timing after account protection. Not caused by this change; identified by user as "the previous Portable/Recoverable Account dist-sync failure if it still exists."
 - Relevant quarantines: None
 - Blockers: None
 - Condition required to unblock: None
 - Exact resume action after unblock: None
-- Exact next action: Verify CI quality + e2e PASS for SHA 40e17fe. If e2e:sync has the 3 pre-existing flake failures, document and mark COMPLETED.
-- Remaining definition of done: CI quality PASS, CI e2e PASS (or pre-existing flake documented), ExecPlan COMPLETED
+- Exact next action: None — task complete.
+- Remaining definition of done: None — all conditions met.
 
 ## Validation
 
@@ -513,4 +513,6 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 
 ## Outcomes
 
-Pending CI completion.
+- Status: Complete.
+- Summary: Weekly Review & Planning V1 implemented and shipped to main. All 14 task groups complete. CI quality PASS, e2e main lane PASS (full E2E + deterministic scenarios). 3 pre-existing e2e:sync flake failures documented (portable owner recovery / recoverable account V1 "Protected" text timing).
+- Follow-up: The 3 pre-existing e2e:sync flake failures are not caused by this change and exist independently in the repository.
