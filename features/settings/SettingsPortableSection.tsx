@@ -194,7 +194,7 @@ export function SettingsPortableSection() {
     } finally {
       setImporting(false);
     }
-  }, [preview, pendingFile, importing]);
+  }, [preview, pendingFile, importing, refreshAccountState]);
 
   return (
     <Card accentColor={PORTABLE_ACCENT} className="mb-0">

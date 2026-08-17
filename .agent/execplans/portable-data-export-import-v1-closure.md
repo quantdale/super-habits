@@ -140,6 +140,7 @@ canRecoverOwner}`.
   E2E journeys matching-account (A) + wrong-account (B) on `journeys-sync`.
 - In progress: full E2E (chromium + journeys) running in background;
   docs + ExecPlan/OpenSpec completion.
+- Modified files: `core/portable/portable.types.ts`, `core/portable/portableExport.ts`, `core/portable/portableFileIo.ts`, `core/auth/account.types.ts`, `core/auth/account.domain.ts`, `core/auth/accountCoordinator.ts`, `features/settings/SettingsBackupSection.tsx`, `tests/integration/portableOwnerRecovery.test.ts`, `tests/portableNativeSize.test.ts`, `tests/portableExportSize.test.ts`, `e2e/journeys/portable-owner-recovery.spec.ts`.
 - Last successful validation:
   - typecheck: 0 errors; lint: 0 errors, 2 pre-existing warnings.
   - npm test: 104 files, 1101 tests PASS.

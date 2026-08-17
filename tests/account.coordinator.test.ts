@@ -1109,6 +1109,232 @@ describe('AccountCoordinator — imported-owner recovery (Portable V1 closure)',
     expect(database.meta.get('account.recovery_pending')).toBe('null');
   });
 
+  it('V2-1: blocks imported-owner recovery when T has only pomodoro_sessions remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const requestExistingAccountRecovery = vi.fn();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      requestExistingAccountRecovery,
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          pomodoro_sessions: 25,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+      message: expect.stringContaining('remote backup data'),
+    });
+    expect(requestExistingAccountRecovery).not.toHaveBeenCalled();
+  });
+
+  it('V2-2: blocks imported-owner recovery when T has only saved_meals remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          saved_meals: 3,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-3: blocks imported-owner recovery when T has only habit_completions remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          habit_completions: 42,
+          calorie_entries: 0,
+          workout_routines: 0,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-4: blocks imported-owner recovery when T has only linked_action_rules remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          linked_action_rules: 2,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-5: blocks imported-owner recovery when T has only user_backup_settings remote row', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          user_backup_settings: 1,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-6: blocks imported-owner recovery when T has only backup_manifest remote row', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          backup_manifest: 1,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-7: blocks imported-owner recovery when T has only routine_exercise_sets remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          routine_exercise_sets: 8,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-8: blocks imported-owner recovery when T has only workout_logs remote rows', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          calorie_entries: 0,
+          workout_routines: 0,
+          workout_logs: 5,
+        },
+        ownerIds: ['temp_t'],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'account_conflict',
+    });
+  });
+
+  it('V2-9: allows imported-owner recovery when all remote backup entity counts are zero', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => ({
+        counts: {
+          todos: 0,
+          habits: 0,
+          habit_completions: 0,
+          calorie_entries: 0,
+          saved_meals: 0,
+          workout_routines: 0,
+          routine_exercises: 0,
+          routine_exercise_sets: 0,
+          workout_logs: 0,
+          workout_session_exercises: 0,
+          pomodoro_sessions: 0,
+          linked_action_rules: 0,
+          user_backup_settings: 0,
+          backup_manifest: 0,
+        },
+        ownerIds: [],
+      }),
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
+  });
+
+  it('V2-10: returns remote_unavailable when footprint check fails (covers all V2 entities)', async () => {
+    const database = importedOwnerDatabase();
+    const currentAuth = tempSessionAuth();
+    const coordinator = coordinatorFor(database, currentAuth, {
+      getRemoteFingerprint: async () => {
+        throw new Error('network timeout');
+      },
+    });
+
+    await expect(coordinator.requestRecovery('a@example.com')).resolves.toMatchObject({
+      ok: false,
+      status: 'remote_unavailable',
+    });
+  });
+
   it('fails closed when the source fingerprint changes while recovery is pending', async () => {
     const database = importedOwnerDatabase();
     const currentAuth = tempSessionAuth();

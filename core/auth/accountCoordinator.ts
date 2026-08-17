@@ -14,6 +14,7 @@ import {
   isValidAccountEmail,
   isValidAccountOtp,
 } from '@/core/auth/account.domain';
+import { BACKUP_ENTITIES, BACKUP_SYNTHETIC_ENTITIES } from '@/core/backup/backup.types';
 import { ensureBackupBackfill } from '@/core/backup/backupBackfill';
 import {
   isPortableOwnerFingerprint,
@@ -45,7 +46,17 @@ import {
   isSupabaseConfigured,
 } from '@/lib/supabase';
 
-const SYNC_ENTITIES = ['todos', 'habits', 'calorie_entries', 'workout_routines'] as const;
+/**
+ * Complete owner-scoped remote backup scope derived from Backup V2. Temporary
+ * account safety gate must check every entity that can carry meaningful user
+ * backup state — not just the original four V1 sync tables.
+ *
+ * Covers all `BACKUP_ENTITIES` (12 table-backed entities) plus
+ * `BACKUP_SYNTHETIC_ENTITIES` (`user_backup_settings`, `backup_manifest`).
+ * AI quota counters and implementation-only infrastructure tables are excluded
+ * because they are not user recovery data.
+ */
+const ACCOUNT_REMOTE_BACKUP_ENTITIES = [...BACKUP_ENTITIES, ...BACKUP_SYNTHETIC_ENTITIES] as const;
 const RESEND_COOLDOWN_MS = 60_000;
 
 function defaultNow(): Date {
@@ -57,22 +68,22 @@ async function getRemoteFingerprint(userId: string): Promise<AccountRemoteFinger
   if (!client) return { counts: {}, ownerIds: [] };
 
   const results = await Promise.all(
-    SYNC_ENTITIES.map(async (entity) => {
-      const { data, error } = await client.from(entity).select('user_id').eq('user_id', userId);
+    ACCOUNT_REMOTE_BACKUP_ENTITIES.map(async (entity) => {
+      const { count, error } = await client
+        .from(entity)
+        .select('user_id', { count: 'exact', head: true })
+        .eq('user_id', userId);
       if (error) throw error;
       return {
         entity,
-        rows: (data ?? []).map((row) => ({ user_id: String(row.user_id ?? '') })),
+        count: count ?? 0,
       };
     }),
   );
 
-  const ownerIds = [
-    ...new Set(results.flatMap(({ rows }) => rows.map((row) => row.user_id).filter(Boolean))),
-  ].sort();
   return {
-    counts: Object.fromEntries(results.map(({ entity, rows }) => [entity, rows.length])),
-    ownerIds,
+    counts: Object.fromEntries(results.map(({ entity, count }) => [entity, count])),
+    ownerIds: results.some((r) => r.count > 0) ? [userId] : [],
   };
 }
 
