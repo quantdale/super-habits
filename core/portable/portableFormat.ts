@@ -144,6 +144,13 @@ export function portableExportFileName(exportedAt: string): string {
   return `superhabits-backup-${safe}.json`;
 }
 
+/** Human-readable byte size for user-facing copy (no technical byte counts). */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export type PortableValidationResult =
   { ok: true; file: PortableBackupFile } | { ok: false; errors: string[] };
 

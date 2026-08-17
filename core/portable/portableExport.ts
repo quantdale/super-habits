@@ -11,7 +11,12 @@ import { withSQLiteTransaction } from '@/core/db/transactions';
 import { utf8Bytes } from '@/lib/checksum';
 import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 import { nowIso } from '@/lib/time';
-import { buildPortableBackupFile, portableExportFileName } from '@/core/portable/portableFormat';
+import {
+  buildPortableBackupFile,
+  portableExportFileName,
+  formatBytes,
+} from '@/core/portable/portableFormat';
+import { PORTABLE_V1_MAX_BYTES } from '@/core/portable/portable.types';
 import type { BackupEntity, RecoverableSettingsV2 } from '@/core/backup/backup.types';
 
 /**
@@ -36,7 +41,16 @@ export type PortableSnapshot = {
 };
 
 export type PortableExportResult =
-  { ok: true; fileName: string; json: string; byteLength: number } | { ok: false; error: string };
+  | { ok: true; fileName: string; json: string; byteLength: number }
+  | {
+      ok: false;
+      /** The dataset exceeds the V1 size contract; NO file was produced. */
+      reason: 'too_large';
+      error: string;
+      byteLength: number;
+      maxBytes: number;
+    }
+  | { ok: false; error: string };
 
 async function capturePortableSnapshot(
   db: Awaited<ReturnType<typeof getDatabase>>,
@@ -97,11 +111,27 @@ export async function exportPortableBackup(): Promise<PortableExportResult> {
       settings: snapshot!.settings,
     });
     const json = JSON.stringify(file, null, 2);
+    const byteLength = utf8Bytes(json).length;
+    // Round-trip contract: every SUCCESSFUL V1 export must fit within the V1
+    // import size bound. An oversized dataset fails here — before any file is
+    // presented — instead of producing a backup that the V1 importer would
+    // reject later. Cloud backup is unaffected; nothing is truncated.
+    if (byteLength > PORTABLE_V1_MAX_BYTES) {
+      return {
+        ok: false,
+        reason: 'too_large',
+        byteLength,
+        maxBytes: PORTABLE_V1_MAX_BYTES,
+        error: `Your dataset is larger than Portable Backup V1 can safely package (current size ${formatBytes(
+          byteLength,
+        )}; supported maximum ${formatBytes(PORTABLE_V1_MAX_BYTES)}). No portable file was created. Your local data was not changed.`,
+      };
+    }
     return {
       ok: true,
       fileName: portableExportFileName(exportedAt),
       json,
-      byteLength: utf8Bytes(json).length,
+      byteLength,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

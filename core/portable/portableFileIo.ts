@@ -2,7 +2,8 @@ import { Platform } from 'react-native';
 import { getDocumentAsync } from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { PORTABLE_IMPORT_MAX_BYTES } from '@/core/portable/portable.types';
+import { formatBytes } from '@/core/portable/portableFormat';
+import { PORTABLE_V1_MAX_BYTES } from '@/core/portable/portable.types';
 
 /**
  * Platform file I/O for portable backups.
@@ -66,24 +67,97 @@ export async function savePortableFileNative(fileName: string, json: string): Pr
   }
 }
 
-/** Web: read an explicitly selected file, bounded by the import size limit. */
+/** User-facing copy for files beyond the shared V1 size contract. */
+function oversizedImportError(actualBytes: number, maxBytes: number): string {
+  return `This portable backup is larger than this version of Super Habits can safely import. Current size: ${formatBytes(
+    actualBytes,
+  )}; supported maximum: ${formatBytes(maxBytes)}.`;
+}
+
+/**
+ * Web: read an explicitly selected file, bounded by the shared V1 size
+ * limit. The pre-read `File.size` guard runs BEFORE `File.text()` so an
+ * oversized file is never loaded into a JS string; the post-read UTF-8 byte
+ * count is a second defense in case metadata under-reports.
+ */
 export async function readPickedPortableFileWeb(
   file: File,
 ): Promise<PortablePickedFile | { error: string }> {
-  if (file.size > PORTABLE_IMPORT_MAX_BYTES) {
-    return {
-      error: `This file is ${formatBytes(file.size)}; the import limit is ${formatBytes(
-        PORTABLE_IMPORT_MAX_BYTES,
-      )}.`,
-    };
+  if (file.size > PORTABLE_V1_MAX_BYTES) {
+    return { error: oversizedImportError(file.size, PORTABLE_V1_MAX_BYTES) };
   }
   const text = await file.text();
-  return { name: file.name, text, byteLength: utf8ByteLength(text) };
+  const byteLength = utf8ByteLength(text);
+  if (byteLength > PORTABLE_V1_MAX_BYTES) {
+    return { error: oversizedImportError(byteLength, PORTABLE_V1_MAX_BYTES) };
+  }
+  return { name: file.name, text, byteLength };
+}
+
+/**
+ * Minimal surface a native picked file must expose for the pre-read size
+ * gate. `expo-file-system`'s `File` satisfies it: `size` (0 when the file
+ * cannot be measured), `info()` (metadata, may omit `size`), and `text()`.
+ */
+export type NativeReadableFile = {
+  name?: string;
+  size: number;
+  info(): { size?: number };
+  text(): Promise<string>;
+};
+
+/**
+ * Native pre-read size gate, shared by the real picker and the test seam.
+ *
+ * Order of defenses:
+ * 1. DocumentPicker asset metadata (`asset.size`) — reject without reading.
+ * 2. `File` metadata (`info().size`, then `File.size`) when the picker did
+ *    not report a size — still before any body read.
+ * 3. If no platform reports a measurable size, fail conservatively: never
+ *    fall back to an unbounded `text()`.
+ * 4. Post-read UTF-8 byte count — catches metadata that under-reports.
+ */
+export async function readNativePortableAsset(
+  asset: { name?: string | null; uri: string; size?: number | null },
+  file: NativeReadableFile,
+): Promise<PortablePickedFile | { error: string }> {
+  let measured: number | null = null;
+  if (typeof asset.size === 'number' && asset.size > 0) {
+    measured = asset.size;
+  } else {
+    let infoSize: number | undefined;
+    try {
+      infoSize = file.info().size;
+    } catch {
+      infoSize = undefined;
+    }
+    if (typeof infoSize === 'number' && infoSize > 0) {
+      measured = infoSize;
+    } else if (typeof file.size === 'number' && file.size > 0) {
+      measured = file.size;
+    }
+  }
+  if (measured === null) {
+    return {
+      error: 'This file could not be measured safely and was not imported.',
+    };
+  }
+  if (measured > PORTABLE_V1_MAX_BYTES) {
+    return { error: oversizedImportError(measured, PORTABLE_V1_MAX_BYTES) };
+  }
+  const text = await file.text();
+  const byteLength = utf8ByteLength(text);
+  if (byteLength > PORTABLE_V1_MAX_BYTES) {
+    return { error: oversizedImportError(byteLength, PORTABLE_V1_MAX_BYTES) };
+  }
+  return { name: asset.name ?? file.name ?? 'portable-backup.json', text, byteLength };
 }
 
 /**
  * Native: open the system document picker for explicit file selection and
- * read the picked file, bounded by the import size limit.
+ * read the picked file, bounded by the shared V1 size limit. The size gate
+ * runs on picker/metadata values BEFORE `File.text()` so an oversized file
+ * is never loaded into a JS string.
  */
 export async function pickPortableFileNative(): Promise<
   PortablePickedFile | { error: string } | null
@@ -98,16 +172,7 @@ export async function pickPortableFileNative(): Promise<
   }
   const asset = result.assets[0];
   const file = new FileSystem.File(asset.uri);
-  const text = await file.text();
-  const byteLength = utf8ByteLength(text);
-  if (byteLength > PORTABLE_IMPORT_MAX_BYTES) {
-    return {
-      error: `This file is ${formatBytes(byteLength)}; the import limit is ${formatBytes(
-        PORTABLE_IMPORT_MAX_BYTES,
-      )}.`,
-    };
-  }
-  return { name: asset.name ?? file.name, text, byteLength };
+  return readNativePortableAsset(asset, file);
 }
 
 function utf8ByteLength(text: string): number {
@@ -127,12 +192,6 @@ function utf8ByteLength(text: string): number {
     else bytes += 4;
   }
   return bytes;
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} bytes`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** True when the platform uses the native (non-web) file paths. */

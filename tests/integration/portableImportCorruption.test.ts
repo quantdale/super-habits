@@ -328,11 +328,11 @@ describe('corruption matrix', () => {
 
   it('rejects an oversized file at the I/O boundary before reading it', async () => {
     const { readPickedPortableFileWeb } = await import('@/core/portable/portableFileIo');
-    const { PORTABLE_IMPORT_MAX_BYTES } = await import('@/core/portable/portable.types');
-    const oversized = { size: PORTABLE_IMPORT_MAX_BYTES + 1 } as File;
+    const { PORTABLE_V1_MAX_BYTES } = await import('@/core/portable/portable.types');
+    const oversized = { size: PORTABLE_V1_MAX_BYTES + 1 } as File;
     const result = await readPickedPortableFileWeb(oversized);
     expect('error' in result).toBe(true);
-    if ('error' in result) expect(result.error).toMatch(/import limit/);
+    if ('error' in result) expect(result.error).toMatch(/can safely import/);
   });
 });
 

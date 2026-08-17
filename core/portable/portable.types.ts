@@ -25,12 +25,16 @@ export const PORTABLE_BACKUP_FORMAT = 'superhabits-portable-backup';
 export const PORTABLE_BACKUP_FORMAT_VERSION = 1;
 
 /**
- * Import size bound. Imported files are untrusted: before any parsing, a
- * file larger than this is rejected. 100 MB is far beyond realistic long-term
- * Super Habits use (years of history fit in a few MB) yet still bounds memory
- * (transiently ~2x file size while reading + parsing).
+ * Portable V1 file size contract — the SINGLE bound shared by export and
+ * import. Every successful V1 export satisfies
+ * `utf8Bytes(json).length <= PORTABLE_V1_MAX_BYTES`, and every importer
+ * (web and native) rejects files above this bound before loading the full
+ * body into memory. Imported files are untrusted: 100 MB is far beyond
+ * realistic long-term Super Habits use (years of history fit in a few MB)
+ * yet still bounds memory (transiently ~2x file size while reading +
+ * parsing).
  */
-export const PORTABLE_IMPORT_MAX_BYTES = 100 * 1024 * 1024;
+export const PORTABLE_V1_MAX_BYTES = 100 * 1024 * 1024;
 
 export type PortableSourceInfo = {
   /** App version that produced the file (`Constants.expoConfig.version`). */
