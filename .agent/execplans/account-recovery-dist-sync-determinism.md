@@ -1,7 +1,7 @@
 # ExecPlan: Account Recovery Dist-Sync Determinism Closure
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -72,8 +72,8 @@ fixme/quarantine band-aids are used.
 
 ## Current Checkpoint
 
-- Current milestone: IMPLEMENT — build shared boundary + drift guard, refactor
-  the two journeys, reconcile the Weekly Review plan, then run full QA.
+- Current milestone: CLOSED — all implementation, QA, commit, push, and
+  exact-SHA CI confirmation complete; plan COMPLETED.
 - Completed:
   - Root cause independently verified from GitHub Actions run `32024054019`
     (per proposal/README).
@@ -83,28 +83,27 @@ fixme/quarantine band-aids are used.
     `a82bbe4` (fast-forward, tree clean).
   - Verified request/response shape by reading `postgrest-js` (HEAD +
     `content-range` count) and the Account Coordinator source.
-- In progress: authoring the shared helper + drift guard and refactoring the two
-  journeys.
+- In progress: none — all milestones closed.
 - Important modified files: (expected) `e2e/helpers/accountBackupEntities.ts`
   (new), `e2e/helpers/accountSupabaseMock.ts` (new),
   `tests/accountSupabaseMock.drift.test.ts` (new),
   `e2e/journeys/recoverable-account-v1.spec.ts` (refactor),
   `e2e/journeys/portable-owner-recovery.spec.ts` (refactor),
   `.agent/execplans/weekly-review-planning-v1.md` (reconcile).
-- Last successful validation: `npm run e2e:sync` — 44 passed (3.6m); main-lane
-  E2E — 167 passed / 41 skipped; all quality gates green.
-- Current failures: none (pre-commit).
+- Last successful validation: exact-SHA CI run `32108157251` (head `8b1a1e3`) —
+  `quality` success, `e2e` success, `nightly` skipped; local `e2e:sync` 44/44,
+  main-lane E2E 167 passed / 41 skipped.
+- Current failures: none.
 - Relevant quarantines: none.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: none.
-- Exact next action: commit all changes to `main`, push without force, verify
-  exact-SHA GitHub Actions `quality` + `e2e` PASS.
-- Remaining definition of done: see OpenSpec `tasks.md` Definition of Done —
-  dist-sync fully green, production safety unchanged, Weekly Review plan
-  reconciled, all QA green, committed + pushed, working tree clean, local
-  `main == origin/main`, only remote `main`, exact final SHA has GitHub Actions
-  `quality` PASS and `e2e` PASS.
+- Exact next action: none — closure complete; plan marked COMPLETED.
+- Remaining definition of done: Complete — dist-sync fully green (e2e:sync
+  44/44), production safety unchanged, Weekly Review plan reconciled, all QA
+  green, committed + pushed (8b1a1e3), working tree clean, local
+  `main == origin/main`, only remote `main`, exact final SHA 8b1a1e3 has GitHub
+  Actions `quality` PASS and `e2e` PASS (run 32108157251).
 
 ## Progress
 
@@ -124,7 +123,7 @@ fixme/quarantine band-aids are used.
 - [x] 9.x Weekly Review plan reconciliation.
 - [x] 10.x Full repository QA.
 - [x] 11.x Documentation / plan closure.
-- [ ] 12.x Git + exact-SHA CI closure.
+- [x] 12.x Git + exact-SHA CI closure (8b1a1e3 committed + pushed; run 32108157251 quality+e2e PASS).
 
 ## Surprises & Discoveries
 
@@ -159,6 +158,8 @@ fixme/quarantine band-aids are used.
 - 2026-08-17 — `npm run e2e:sync` — PASS, 44/44 (full `journeys-sync`
   remote-boundary lane green).
 - 2026-08-17 — main-lane `chromium`+`journeys` E2E — PASS, 167 passed / 41 skipped.
+- 2026-08-18 — exact-SHA CI run `32108157251` (head `8b1a1e3`) — `quality`
+  success, `e2e` success, `nightly` skipped. Closure confirmed.
 
 ## Changed Files / Areas
 
@@ -185,7 +186,7 @@ fixme/quarantine band-aids are used.
 
 ## Outcomes & Retrospective
 
-- Status: Active (final commit + exact-SHA CI confirmation pending).
+- Status: Completed (exact-SHA CI confirmed: run 32108157251 for 8b1a1e3 — quality success, e2e success, nightly skipped).
 - Summary: The stale four-table Supabase mock contract drift (only
   `todos|habits|calorie_entries|workout_routines` routed) was replaced by a shared
   backup-aware E2E boundary that recognizes the full production
@@ -196,5 +197,5 @@ fixme/quarantine band-aids are used.
   3 red account/recovery journeys) is resolved: `npm run e2e:sync` is fully green
   (44/44), and main-lane E2E is green (167 passed / 41 skipped). No production
   account fail-closed / ownership semantics were weakened.
-- Follow-up: commit to `main`, push without force, and confirm exact-SHA GitHub
-  Actions `quality` + `e2e` PASS before marking this plan COMPLETED.
+- Follow-up: none — committed (8b1a1e3), pushed to origin/main, and exact-SHA CI
+  confirmed green (run 32108157251: quality success, e2e success).
