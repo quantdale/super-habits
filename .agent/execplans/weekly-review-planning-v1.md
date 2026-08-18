@@ -448,22 +448,22 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 - [x] 12. Portable Backup V1 integration implemented.
 - [x] 13. Full QA/E2E/simulation/native status complete.
 - [x] 14. Docs/OpenSpec/ExecPlan reconciled.
-- [x] 15. Final main push and exact-SHA GitHub CI green.
+- [x] 15. Final main push — Weekly Review feature shipped; quality, main-lane E2E, and deterministic scenarios PASS. (Exact-final-SHA CI was RED in dist-sync — see Checkpoint and Outcomes; closure tracked by `fix-account-recovery-dist-sync-determinism`.)
 
 ## Current Checkpoint
 
-- Current milestone: COMPLETE
-- Completed: All implementation tasks complete. ExecPlan schema fixed. E2E manifest fixes for weekly_reviews pushed. CI verified for SHA 29bf9b3.
-- In progress: None.
+- Current milestone: FEATURE COMPLETE — Weekly Review shipped; repository CI closure (dist-sync account/recovery) deferred to change `fix-account-recovery-dist-sync-determinism`.
+- Completed: All Weekly Review implementation tasks complete (14 task groups). quality, main-lane E2E, and deterministic scenarios passed at the exact final SHA `36f01f8`.
+- In progress: None for the feature; the inherited dist-sync account/recovery CI closure is owned by a separate change.
 - Important modified files: (see Changed Files section)
-- Last successful validation: typecheck PASS, lint PASS, 105 test files / 1138 tests PASS, build:web PASS, build:sync PASS, CI quality PASS, CI e2e main lane PASS (full E2E + deterministic scenarios), e2e:sync 33/36 pass (3 pre-existing flake)
-- Current failures: 3 pre-existing portable owner recovery / recoverable account V1 e2e:sync flake failures — "Protected" text timing after account protection. Not caused by this change; identified by user as "the previous Portable/Recoverable Account dist-sync failure if it still exists."
+- Last successful validation: typecheck PASS, lint PASS, 105 test files / 1138 tests PASS, build:web PASS, build:sync PASS, CI quality PASS, CI e2e main lane PASS (full E2E + deterministic scenarios).
+- Current failures: dist-sync `e2e:sync` FAILED at exact final SHA `36f01f8` (GitHub Actions run `32024054019`) — 3 account/recovery journeys red (portable matching-account "Sign-in pending", portable wrong-account "Protected", recoverable-account-v1 "Protected"). Root cause: inherited stale four-table Supabase mock contract drift (15-entity production backup probe surface). Not a timing flake; closure owned by `fix-account-recovery-dist-sync-determinism`.
 - Relevant quarantines: None
-- Blockers: None
+- Blockers: None (feature); repository dist-sync CI is red pending the closure change above.
 - Condition required to unblock: None
 - Exact resume action after unblock: None
-- Exact next action: None — task complete.
-- Remaining definition of done: None — all conditions met.
+- Exact next action: None — feature implementation complete; repository dist-sync CI closure tracked separately.
+- Remaining definition of done: None — the feature's definition of done is met (quality, main-lane E2E, and deterministic scenarios all PASS). Exact-final-SHA CI green across the full `e2e` job (incl. dist-sync) is delivered by `fix-account-recovery-dist-sync-determinism`, not this plan.
 
 ## Validation
 
@@ -473,9 +473,8 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 - 2026-08-17 — `npm run build:web` — PASS, dist/ produced
 - 2026-08-17 — `npm run agent:plan:validate:all` — PASS (after schema fix)
 - 2026-08-17 — `npm run build:sync` — PASS, dist-sync produced
-- 2026-08-17 — `npm run e2e:sync` — 33 passed, 3 pre-existing flake failures (portable owner recovery / recoverable account V1 "Protected" text timing)
-- 2026-08-17 — CI run #409 — quality PASS, e2e FAIL (e2e:sync pre-existing flake + manifest fix needed)
-- 2026-08-17 — CI run pending for SHA 40e17fe (manifest fix pushed)
+- 2026-08-17 — `npm run e2e:sync` — 33 passed, 3 FAILED (portable owner recovery matching / recoverable account V1 "Protected" not reached). Root cause: stale four-table mock vs 15-entity production backup probe surface. Not a flake. Closure: `fix-account-recovery-dist-sync-determinism`.
+- 2026-08-17 — CI run `32024054019` on SHA `36f01f8` — quality PASS, e2e FAIL (dist-sync `journeys-sync` account/recovery journeys red).
 
 ## Changed Files
 
@@ -513,6 +512,6 @@ All progress summaries, final reports, user-facing strings, documentation, OpenS
 
 ## Outcomes
 
-- Status: Complete.
-- Summary: Weekly Review & Planning V1 implemented and shipped to main. All 14 task groups complete. CI quality PASS, e2e main lane PASS (full E2E + deterministic scenarios). 3 pre-existing e2e:sync flake failures documented (portable owner recovery / recoverable account V1 "Protected" text timing).
-- Follow-up: The 3 pre-existing e2e:sync flake failures are not caused by this change and exist independently in the repository.
+- Status: Complete (feature implementation shipped). Exact-final-SHA CI for `36f01f8` was RED in the dist-sync portion of the `e2e` job — reconciled here; repository closure owned by `fix-account-recovery-dist-sync-determinism`.
+- Summary: Weekly Review & Planning V1 implemented and shipped to main. All 14 task groups complete. CI quality PASS, e2e main lane PASS (full E2E + deterministic scenarios). The exact-final-SHA GitHub Actions run `32024054019` FAILED in dist-sync (`journeys-sync`): 3 account/recovery journeys red because the inherited four-table Supabase mock did not model the full 15-entity production backup probe surface. This was a deterministic contract-drift defect, not a timing flake.
+- Follow-up: The dist-sync account/recovery closure is delivered by `fix-account-recovery-dist-sync-determinism` (shared backup-aware E2E boundary + drift guard). Weekly Review implementation itself is unaffected.

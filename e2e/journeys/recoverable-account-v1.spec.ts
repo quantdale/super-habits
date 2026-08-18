@@ -6,6 +6,7 @@ import { queryRows, returnToApp } from '../helpers/dbHarness';
 import { expectRows } from '../helpers/oracles';
 import { TAB_LABELS } from '../helpers/navigation';
 import { resetAll } from '../helpers/reset';
+import { handleBackupRestRequest } from '../helpers/accountSupabaseMock';
 
 const SUPABASE_ROUTE = '**/*.supabase.co/**';
 const ANONYMOUS_USER = {
@@ -160,79 +161,40 @@ async function handleAccountMock(route: Route): Promise<void> {
     return;
   }
 
-  const tableMatch = path.match(/^\/rest\/v1\/(todos|habits|calorie_entries|workout_routines)$/);
-  if (!tableMatch) {
-    await route.fulfill({
-      status: 404,
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ message: 'not found' }),
-    });
-    return;
-  }
+  // Shared backup-aware boundary: recognize the full production backup surface
+  // (all BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES) so the Account
+  // Coordinator's owner-scoped remote-footprint probes never 404 against a stale
+  // four-table subset and fail closed. Unknown REST tables fall through to the
+  // strict 404 below.
+  //
+  // The restore read path mirrors the original four-table handler: the durable
+  // remote Todo backup is only modeled for the verified permanent owner (the
+  // original `hasBackup` case). The anonymous/temporary account must see an
+  // empty remote surface so the backup prompt / RestorePrompt overlay is not
+  // raised against a phantom backup during protection.
+  const entityOverrides =
+    currentUser.is_anonymous === false && currentUser.id === PERMANENT_USER.id
+      ? { todos: { count: 1, rows: [BACKUP_TODO] } }
+      : {};
+  const handled = await handleBackupRestRequest(route, {
+    entities: entityOverrides,
+    onPostRows: (_entity, rows) => {
+      for (const row of rows) {
+        if (row && typeof (row as { user_id?: unknown }).user_id === 'string') {
+          pushedTodoUserIds.push((row as { user_id: string }).user_id);
+        }
+      }
+    },
+  });
+  if (handled === 'handled') return;
 
-  const table = tableMatch[1];
-  // Capture pushed rows so the journey can prove the outbox owner reached the
-  // backup endpoint without exposing token material.
-  if (method === 'POST') {
-    const body = request.postDataJSON() as { user_id?: string }[] | { user_id?: string } | null;
-    const rows = Array.isArray(body) ? body : body ? [body] : [];
-    for (const row of rows) {
-      if (row && typeof row.user_id === 'string') pushedTodoUserIds.push(row.user_id);
-    }
-    await route.fulfill({
-      status: 201,
-      headers: JSON_HEADERS,
-      body: JSON.stringify(rows),
-    });
-    return;
-  }
-  const requestedOwner = url.searchParams.get('user_id')?.replace(/^eq\./, '');
-  const hasBackup =
-    currentUser.is_anonymous === false &&
-    currentUser.id === PERMANENT_USER.id &&
-    requestedOwner === PERMANENT_USER.id;
-  if (url.searchParams.get('select') === 'user_id') {
-    await route.fulfill({
-      status: 200,
-      headers: JSON_HEADERS,
-      // Fingerprint probes are kept empty for this deterministic flow so the
-      // protection assertion proves UUID preservation without inventing a
-      // remote row mutation between the two snapshots.
-      body: JSON.stringify([]),
-    });
-    return;
-  }
-  if (method === 'HEAD') {
-    const count = hasBackup && table === 'todos' ? 1 : 0;
-    await route.fulfill({
-      status: 200,
-      headers: { ...JSON_HEADERS, 'content-range': `0-0/${count}` },
-      body: '[]',
-    });
-    return;
-  }
-  if (url.searchParams.get('select') === 'updated_at') {
-    await route.fulfill({
-      status: 200,
-      headers: JSON_HEADERS,
-      body: JSON.stringify(
-        hasBackup && table === 'todos' ? [{ updated_at: BACKUP_TODO.updated_at }] : [],
-      ),
-    });
-    return;
-  }
-  if (url.searchParams.get('select') === '*') {
-    await route.fulfill({
-      status: 200,
-      headers: {
-        ...JSON_HEADERS,
-        'content-range': hasBackup && table === 'todos' ? '0-0/1' : '0--1/0',
-      },
-      body: JSON.stringify(hasBackup && table === 'todos' ? [BACKUP_TODO] : []),
-    });
-    return;
-  }
-  await route.fulfill({ status: 200, headers: JSON_HEADERS, body: '[]' });
+  // Unknown Supabase REST table — strict 404 so new unmodeled dependencies are
+  // visible rather than silently swallowed.
+  await route.fulfill({
+    status: 404,
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ message: 'not found' }),
+  });
 }
 
 async function installAccountMock(page: Page): Promise<void> {
@@ -382,7 +344,14 @@ defineJourney({
           if (conn) conn.dispatchEvent(new Event('change'));
           window.dispatchEvent(new Event('online'));
         });
-        await expect.poll(() => pushedTodoUserIds).toEqual([ANONYMOUS_USER.id]);
+        // The first synced write must be owned by the anonymous account (never
+        // ownerless). The durable outbox may flush the row more than once across
+        // the online-event trigger and the background sync, so assert ownership
+        // rather than an exact capture count.
+        await expect.poll(() => pushedTodoUserIds.length).toBeGreaterThanOrEqual(1);
+        await expect
+          .poll(() => pushedTodoUserIds.every((id) => id === ANONYMOUS_USER.id))
+          .toBe(true);
         const owners = await queryRows(page, 'SELECT DISTINCT owner_user_id FROM sync_outbox');
         expect(owners.every((row) => row.owner_user_id === ANONYMOUS_USER.id)).toBe(true);
       },

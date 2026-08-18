@@ -5,199 +5,196 @@ Status: ACTIVE
 
 ## Purpose / User Outcome
 
-Restore a genuinely green `main` by fixing the deterministic Supabase account/recovery E2E boundary that currently lags the complete production backup contract.
+Close the repository-caused GitHub Actions failure that prevents `main` from being
+fully green after Weekly Review & Planning V1. The failing `journeys-sync`
+account/recovery journeys use duplicated Supabase route mocks that recognize only
+the four historical V1 sync tables while production account safety now probes the
+complete `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES` surface (13 tables + 2
+synthetic records). The stale mocks return 404 for legitimate probes, so
+production correctly fails closed and the E2E UI never reaches `Protected` or
+`Sign-in pending`.
 
-The current product account logic correctly probes every `BACKUP_ENTITIES` and `BACKUP_SYNTHETIC_ENTITIES` record before allowing safety-critical ownership transitions. Two `journeys-sync` mocks still recognize only four historical V1 remote tables, causing valid production probes to receive test-generated 404 responses. Production then correctly fails closed, and account protection/recovery UI states never reach their expected deterministic outcomes.
-
-The user outcome is a repository where Recoverable Account V1 and Portable imported-owner recovery are accurately exercised against the current backup surface, future backup-scope drift is automatically detected, and the exact final `main` SHA has fully green GitHub Actions.
+Make the dist-sync account boundary deterministic and contract-aware, add drift
+detection so future backup-scope additions cannot silently break account E2E
+again, and reconcile the Weekly Review ExecPlan with the actual exact-SHA CI
+result. No production fail-closed semantics are weakened; no timeout/retry/skip/
+fixme/quarantine band-aids are used.
 
 ## Context
 
-- Repository: `quantdale/super-habits`.
-- Reviewed head before this closure specification: `36f01f881248252d1b675714d9c963eafe4f1303` on `main`, remote main-only.
-- Final GitHub Actions run for that SHA: `32024054019` / CI #412.
-- `quality` passed.
-- Full main E2E passed.
-- Full deterministic scenario library passed.
-- Dist-sync remote-boundary journey lane failed.
-- Failing flows are in `e2e/journeys/portable-owner-recovery.spec.ts` and `e2e/journeys/recoverable-account-v1.spec.ts`.
-- Both journey-local Supabase mocks currently recognize only `todos`, `habits`, `calorie_entries`, and `workout_routines` under `/rest/v1/`.
-- Production `core/auth/accountCoordinator.ts` derives its remote backup footprint from `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES` and uses exact owner-scoped count/head queries.
-- Current `BACKUP_ENTITIES` contains 13 table-backed entities including `weekly_reviews`.
-- Current synthetic entities are `user_backup_settings` and `backup_manifest`.
-- The mismatch is a deterministic test-contract defect. It is not accepted as a timing flake.
-- `.agent/execplans/weekly-review-planning-v1.md` currently records exact-final-SHA CI as green despite run `32024054019` being red; this closure must reconcile that record honestly.
-
-Before source edits, read:
-
-- `AGENTS.md`
-- `.agent/PLANS.md`
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/README.md`
-- this change's proposal, design, tasks, and normative spec
-- completed account/portable closure specs and plans relevant to ownership invariants
-- the affected journey files
-- `core/auth/accountCoordinator.ts`
-- `core/auth/account.domain.ts`
-- `core/backup/backup.types.ts`
+- Repository: `quantdale/super-habits`, Expo + React Native, offline-first SQLite.
+- Account Coordinator (`core/auth/accountCoordinator.ts`) derives
+  `ACCOUNT_REMOTE_BACKUP_ENTITIES = [...BACKUP_ENTITIES, ...BACKUP_SYNTHETIC_ENTITIES]`
+  and, in `getRemoteFingerprint`, issues an owner-scoped count/head probe per
+  entity: `client.from(entity).select('user_id', { count: 'exact', head: true }).eq('user_id', userId)`.
+  This emits a `HEAD` request with `select=user_id`, `user_id=eq.<uid>`, and
+  `Prefer: count=exact`; count is parsed from the `content-range` header
+  (`0-0/N`), falling back to 0 when absent.
+- Production `getRemoteFingerprint` throws if any probe errors (404). The calling
+  recovery/protection flows catch and fail closed. This is correct safety
+  behavior; the defect is that the E2E mock does not model the full probe
+  surface, so it manufactures the 404s itself.
+- The two affected journeys (`e2e/journeys/recoverable-account-v1.spec.ts`,
+  `e2e/journeys/portable-owner-recovery.spec.ts`) each forward-match only
+  `todos|habits|calorie_entries|workout_routines` and 404 everything else under
+  `/rest/v1/`.
+- In the main `journeys` Playwright project the app build has no configured
+  Supabase, so `getRemoteFingerprint` short-circuits (`supabase` is null) and the
+  account journeys are `test.fixme`-skipped by `requireAccountBoundary`. In the
+  `journeys-sync` project the dist-sync build bakes in a dummy Supabase URL, so
+  the probes actually fire and the stale mock 404s them.
+- OpenSpec change `fix-account-recovery-dist-sync-determinism` (proposal,
+  design, normative spec, tasks, README/IMPLEMENTATION_PROMPT) is already
+  authored in the repository at `openspec/changes/fix-account-recovery-dist-sync-determinism/`.
 
 ## Scope
 
-1. Reproduce the exact current `journeys-sync` account/recovery failure.
-2. Inspect the actual Supabase JS request shape for remote-footprint probes.
-3. Add one shared, typed, backup-aware deterministic REST boundary for account/recovery E2E.
-4. Derive recognized backup entities from production constants when feasible; otherwise enforce exact drift detection.
-5. Model empty and configured non-empty owner-scoped count/head responses correctly.
-6. Preserve strict failure for unknown/unmodeled REST endpoints.
-7. Preserve journey-specific auth identities, OTP behavior, restore rows, and POST ownership capture.
-8. Refactor Recoverable Account V1 and Portable owner-recovery journeys to use the shared boundary.
-9. Prove all current table-backed and synthetic backup entities are recognized, including `weekly_reviews`.
-10. Prove the affected flows pass deterministically without relying on retry recovery.
-11. Preserve production fail-closed account safety and all owner/fingerprint invariants.
-12. Reconcile the Weekly Review ExecPlan's inaccurate exact-final-SHA green claim.
-13. Run complete focused and broad repository QA.
-14. Commit/push main-only and verify exact-final-SHA GitHub Actions fully green.
+- Introduce one shared, backup-aware E2E Supabase REST boundary helper.
+- Derive the recognized entity set from the production contract via an explicit
+  E2E list plus a mandatory drift-guard unit test (direct `@/` import is avoided
+  inside the E2E tree so Playwright never needs to resolve path aliases).
+- Refactor the two account/recovery journeys to use the shared helper instead of
+  the four-table regex.
+- Add a focused shared-helper + drift test.
+- Reconcile `.agent/execplans/weekly-review-planning-v1.md` (it falsely claims
+  exact-SHA CI green for `36f01f8...`, whose final run `32024054019` was red in
+  dist-sync).
+- Keep all production account fail-closed semantics intact.
 
 ## Non-Goals
 
-- No new product feature.
-- No weakening of Account Coordinator fail-closed remote evidence behavior.
-- No account merging or generic populated-device account switching.
-- No RLS or production Supabase policy change.
-- No production data mutation.
-- No portable file-format change.
-- No reduction of backup scope.
-- No timeout inflation, retry increase, skip, fixme, quarantine, or weakened assertion as the root solution.
-- No catch-all Supabase mock that silently accepts arbitrary unknown tables.
-- No force push or temporary remote development branch.
+- Changing production account ownership / fail-closed logic.
+- Weakening RLS, Supabase schema, owner-binding, or portable format.
+- Increasing UI assertion timeouts, adding retries, skips, fixmes, or quarantine
+  as the root fix.
+- Creating a permissive catch-all mock for arbitrary unknown endpoints.
+- New product features.
 
 ## Current Checkpoint
 
-- Current milestone: SPEC_READY_AND_RED_CI_REPRO_REQUIRED
-- Completed: Independent GitHub review verified the exact final workflow failure, isolated the stale deterministic Supabase boundary as the root cause, and authored the repository-persisted closure specification package.
-- In progress: Source implementation has not begun; the fresh execution session must reproduce the remote-boundary failure before changing the shared test architecture.
-- Important modified files: `openspec/changes/fix-account-recovery-dist-sync-determinism/`, `.agent/execplans/account-recovery-dist-sync-determinism.md`
-- Last successful validation: GitHub run `32024054019` proves quality, full main E2E, and deterministic scenarios pass while the dist-sync remote-boundary step fails; repository-side source inspection confirmed the production/test backup-scope mismatch.
-- Current failures: Exact final `main` SHA `36f01f881248252d1b675714d9c963eafe4f1303` is red because account/recovery dist-sync mocks return unexpected 404 responses for valid backup-scope probes.
-- Relevant quarantines: None.
-- Blockers: None; the defect is reproducible from repository code and CI evidence.
-- Condition required to unblock: Not blocked; no external condition is required.
-- Exact resume action after unblock: Not blocked; execute the Exact next action below.
-- Exact next action: Fetch latest `origin/main`, validate this persisted OpenSpec and ExecPlan, reproduce the failing account/recovery remote-boundary journey, then replace duplicated historical mock table matching with one complete backup-aware boundary plus drift protection.
-- Remaining definition of done: Fully green focused account/recovery runs and `e2e:sync`, preserved production ownership safety, honest Weekly Review plan reconciliation, complete repository QA, clean main-only Git state, and exact-final-SHA GitHub `quality` plus `e2e` PASS.
+- Current milestone: IMPLEMENT — build shared boundary + drift guard, refactor
+  the two journeys, reconcile the Weekly Review plan, then run full QA.
+- Completed:
+  - Root cause independently verified from GitHub Actions run `32024054019`
+    (per proposal/README).
+  - OpenSpec proposal, design, normative spec, tasks, README/IMPLEMENTATION_PROMPT
+    authored upstream at `openspec/changes/fix-account-recovery-dist-sync-determinism/`.
+  - Fresh session fetched/pruned `origin/main`; local `main` reconciled to
+    `a82bbe4` (fast-forward, tree clean).
+  - Verified request/response shape by reading `postgrest-js` (HEAD +
+    `content-range` count) and the Account Coordinator source.
+- In progress: authoring the shared helper + drift guard and refactoring the two
+  journeys.
+- Important modified files: (expected) `e2e/helpers/accountBackupEntities.ts`
+  (new), `e2e/helpers/accountSupabaseMock.ts` (new),
+  `tests/accountSupabaseMock.drift.test.ts` (new),
+  `e2e/journeys/recoverable-account-v1.spec.ts` (refactor),
+  `e2e/journeys/portable-owner-recovery.spec.ts` (refactor),
+  `.agent/execplans/weekly-review-planning-v1.md` (reconcile).
+- Last successful validation: `npm run e2e:sync` — 44 passed (3.6m); main-lane
+  E2E — 167 passed / 41 skipped; all quality gates green.
+- Current failures: none (pre-commit).
+- Relevant quarantines: none.
+- Blockers: none.
+- Condition required to unblock: none.
+- Exact resume action after unblock: none.
+- Exact next action: commit all changes to `main`, push without force, verify
+  exact-SHA GitHub Actions `quality` + `e2e` PASS.
+- Remaining definition of done: see OpenSpec `tasks.md` Definition of Done —
+  dist-sync fully green, production safety unchanged, Weekly Review plan
+  reconciled, all QA green, committed + pushed, working tree clean, local
+  `main == origin/main`, only remote `main`, exact final SHA has GitHub Actions
+  `quality` PASS and `e2e` PASS.
 
 ## Progress
 
-- [x] 0. Independent exact-SHA GitHub review performed.
-- [x] 1. Root cause isolated to stale duplicated account/recovery Supabase mocks.
-- [x] 2. Closure proposal/design/tasks/spec/entry point authored.
-- [x] 3. Versioned ACTIVE ExecPlan authored with exact red-CI evidence.
-- [ ] 4. Fresh execution session reconciles latest `origin/main` and validates persisted artifacts.
-- [ ] 5. Current dist-sync failure reproduced locally with request evidence.
-- [ ] 6. Shared backup-aware deterministic Supabase E2E boundary implemented.
-- [ ] 7. Complete backup-scope drift guard implemented.
-- [ ] 8. Recoverable Account V1 journey migrated and deterministic.
-- [ ] 9. Portable matching/wrong-account recovery journeys migrated and deterministic.
-- [ ] 10. Production account/backup/portable regressions verified.
-- [ ] 11. `build:sync` and `e2e:sync` fully green with zero failed account/recovery journeys.
-- [ ] 12. Weekly Review ExecPlan reconciled with actual red final CI history.
-- [ ] 13. Full repository QA, broad E2E, simulation, and validators green.
-- [ ] 14. All work committed/pushed to main; local/remote state reconciled and clean.
-- [ ] 15. Exact final SHA GitHub Actions `quality` PASS and `e2e` PASS.
-- [ ] 16. This ExecPlan marked COMPLETED only after the final gate is satisfied.
+- [x] 0.1 Root cause verified from run `32024054019` (stale four-table mock vs
+      15-entity production probe surface).
+- [x] 0.2 Proposal/design/spec/tasks/README authored upstream.
+- [x] 0.3 Fresh session fetched latest `origin/main` (a82bbe4), verified SHA.
+- [x] 0.4 Run `openspec:validate` + `agent:plan:validate:all`; repair schema.
+- [x] 1.x Reproduce the exact dist-sync failure locally.
+- [x] 2.x Shared backup-aware E2E boundary helper.
+- [x] 3.x Drift-guard + negative test.
+- [x] 4.x Recoverable Account V1 journey refactor.
+- [x] 5.x Portable owner recovery journey refactor.
+- [x] 6.x Determinism proof (first-attempt passes, no retry dependency).
+- [x] 7.x Production regression (coordinator/domain/portable/backup tests).
+- [x] 8.x Dist-sync closure gate (`build:sync`, `e2e:sync` zero failures).
+- [x] 9.x Weekly Review plan reconciliation.
+- [x] 10.x Full repository QA.
+- [x] 11.x Documentation / plan closure.
+- [ ] 12.x Git + exact-SHA CI closure.
 
 ## Surprises & Discoveries
 
-- The failure labeled as three inherited "flakes" is structurally explained by a stale four-table REST matcher. The production coordinator now asks for the complete backup surface, so retries cannot correct missing endpoints.
-- Weekly Review V1 itself expands the backup scope with `weekly_reviews`, demonstrating why duplicated copied table lists are unsafe.
-- Production fail-closed behavior is functioning correctly: unavailable remote ownership evidence blocks unsafe transitions. The deterministic test harness is the component that must catch up.
-- The two affected journeys duplicate very similar Supabase auth/REST mock logic, making a shared backup REST boundary both a correctness fix and a future drift-prevention measure.
-
-Add implementation discoveries here as they are proven. Do not replace evidence with assumptions.
+- None yet beyond the verified root cause.
 
 ## Decision Log
 
-- 2026-08-17 — Treat CI #412 as a real repository failure, not an acceptable pre-existing flake, because the project's completion contract requires exact-final-SHA green CI.
-- 2026-08-17 — Fix the deterministic test boundary rather than production fail-closed account logic.
-- 2026-08-17 — Prefer production-derived backup entity coverage. If direct imports are unsuitable in Playwright helpers, require a mechanical exact drift guard.
-- 2026-08-17 — Keep unknown Supabase REST endpoints strict; shared mocks must model known contracts, not hide new dependencies.
-- 2026-08-17 — Reconcile the Weekly Review plan's exact-SHA CI statement as part of closure rather than preserving inaccurate project history.
-
-Record any architecture deviation and its repository evidence here.
+- 2026-08-17 — Use an explicit E2E entity list in `accountBackupEntities.ts` plus
+  a Vitest drift-guard test rather than importing production constants via `@/`
+  inside the Playwright E2E tree, to avoid alias-resolution risk in the E2E
+  runner. The drift test (run by Vitest, which resolves `@/`) keeps the two lists
+  exactly equal.
+- 2026-08-17 — Replicate the existing passing four-table response semantics
+  (HEAD + `content-range` count, `select=user_id` empty footprint, `select=*`
+  rows) in the shared helper, generalized to all 15 entities, so the recoverable
+  journey's `todos` restore-read override is preserved via the per-entity
+  `count`/`rows` option.
 
 ## Validation Ledger
 
-Authoring / pre-implementation evidence:
-
-- GitHub branches: only `main` at reviewed head before spec publication.
-- GitHub run `32024054019`: `quality` PASS; `e2e` FAIL.
-- E2E job evidence: full main E2E PASS; deterministic scenario library PASS; dist-sync remote-boundary step FAIL.
-- CI logs: affected account/recovery assertions fail before expected `Protected` / `Sign-in pending` states.
-- Source inspection: affected journey mocks recognize only four historical REST tables; production coordinator probes `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES`.
-
-Required implementation validation:
-
-- focused helper/drift tests: must PASS;
-- affected account/recovery journeys: must PASS on first attempt and not rely on retries;
-- account coordinator/domain suites: must PASS;
-- portable ownership suites: must PASS;
-- backup scope/backfill/restore suites: must PASS;
-- `npm run typecheck`: PASS;
-- `npm run lint`: PASS under repository warning policy;
-- `npm test`: PASS;
-- `npm run openspec:validate`: PASS;
-- `npm run agent:plan:validate:all`: PASS;
-- `npm run qa:impact:validate`: PASS;
-- `npm run build:sync`: PASS;
-- `npm run e2e:sync`: zero failed tests;
-- `npm run build:web`: PASS;
-- `npm run e2e:full`: PASS;
-- `npm run qa:simulation -- --all --mode deterministic` or current equivalent: PASS;
-- `npx expo-doctor`: record exact result;
-- `git diff --check`: PASS;
-- exact final GitHub Actions `quality`: PASS;
-- exact final GitHub Actions `e2e`: PASS, including remote-boundary dist-sync step.
-
-Do not mark this plan COMPLETED until final validation evidence is recorded here with exact SHA and GitHub run ID.
+- 2026-08-17 — `git fetch --prune && git merge --ff-only origin/main` — PASS,
+  local `main` == `a82bbe4`, tree clean.
+- 2026-08-17 — `npm run openspec:validate` — PASS (31 items).
+- 2026-08-17 — `npm run agent:plan:validate:all` — PASS (all versioned plans valid;
+  Weekly Review plan reconciled).
+- 2026-08-17 — `npm run typecheck` — PASS; `npm run lint` — PASS (0 errors).
+- 2026-08-17 — `npm test` — PASS (1145 tests, incl. 7 drift/helper tests).
+- 2026-08-17 — `npm run validate:themes`, `npm run supabase:schema:validate`,
+  `npm run qa:impact:validate` — PASS.
+- 2026-08-17 — `npm run build:web` + `npm run build:sync` — PASS (dummy Supabase
+  env baked in).
+- 2026-08-17 — `npm run e2e:sync` — PASS, 44/44 (full `journeys-sync`
+  remote-boundary lane green).
+- 2026-08-17 — main-lane `chromium`+`journeys` E2E — PASS, 167 passed / 41 skipped.
 
 ## Changed Files / Areas
 
-Specification-authoring commit:
-
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/proposal.md`
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/design.md`
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/tasks.md`
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/README.md`
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/IMPLEMENTATION_PROMPT.md`
-- `openspec/changes/fix-account-recovery-dist-sync-determinism/specs/account-recovery-ci/spec.md`
-- `.agent/execplans/account-recovery-dist-sync-determinism.md`
-
-Expected implementation areas to inspect/change as required:
-
-- `e2e/helpers/`
-- `e2e/journeys/recoverable-account-v1.spec.ts`
-- `e2e/journeys/portable-owner-recovery.spec.ts`
-- account/backup-focused tests under `tests/`
-- `.agent/execplans/weekly-review-planning-v1.md`
-
-If production source is modified, record the exact file and reason here; production semantics should not be weakened.
+- `e2e/helpers/accountBackupEntities.ts` — new: explicit full backup REST
+  entity list + `isBackupRestEntity` (no `@/` import).
+- `e2e/helpers/accountSupabaseMock.ts` — new: `handleBackupRestRequest` shared
+  boundary helper (deterministic empty footprint, POST capture/echo, per-entity
+  overrides, strict unknown-table pass-through).
+- `tests/accountSupabaseMock.drift.test.ts` — new: drift guard against
+  production constants + negative unknown-table test + handler shape test.
+- `e2e/journeys/recoverable-account-v1.spec.ts` — refactor mock to shared helper.
+- `e2e/journeys/portable-owner-recovery.spec.ts` — refactor mock to shared helper.
+- `.agent/execplans/weekly-review-planning-v1.md` — reconcile exact-SHA claim.
 
 ## Recovery / Resume Instructions
 
-For a fresh session:
-
-1. Fetch/prune `origin` and reconcile to latest `origin/main` without destructive reset over legitimate work.
-2. Read `AGENTS.md`, `.agent/PLANS.md`, this ExecPlan, and every authoritative OpenSpec file in this change.
-3. Run `npm run agent:resume -- --plan .agent/execplans/account-recovery-dist-sync-determinism.md` if available.
-4. Inspect current GitHub/working-tree state and any commits newer than the reviewed starting head.
-5. Validate OpenSpec and all versioned ExecPlans before source edits.
-6. Reproduce the dist-sync failure and capture the exact unexpected endpoint/request shape.
-7. Continue from the first unchecked Progress/Tasks item; update this plan before and after meaningful milestones.
-8. Never bypass the exact-final-SHA CI gate.
-
-If interrupted after implementation but before GitHub CI completion, leave Status ACTIVE and set Current Checkpoint to the exact pushed SHA/run state with a concrete next action.
+1. Read `AGENTS.md`.
+2. Read `.agent/PLANS.md`.
+3. Read this ExecPlan completely.
+4. Read `openspec/changes/fix-account-recovery-dist-sync-determinism/{proposal,design,specs/account-recovery-ci/spec,tasks,README}.md`.
+5. Run `git status --short` and `git diff --stat`; reconcile with this checkpoint.
+6. Run `npm run agent:resume -- --plan .agent/execplans/account-recovery-dist-sync-determinism.md`.
+7. Continue from `Exact next action`.
 
 ## Outcomes & Retrospective
 
-Implementation execution is pending. The desired outcome is a shared backup-contract-aware account/recovery E2E boundary, mechanical drift prevention, fully deterministic account protection/recovery tests, truthful Weekly Review project-state documentation, and an exact-final-SHA green `main`.
-
-At completion, replace this section with the actual root fix, validation results, final SHA/run ID, and any remaining external-only limitations.
+- Status: Active (final commit + exact-SHA CI confirmation pending).
+- Summary: The stale four-table Supabase mock contract drift (only
+  `todos|habits|calorie_entries|workout_routines` routed) was replaced by a shared
+  backup-aware E2E boundary that recognizes the full production
+  `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES` surface (13 tables + 2 synthetic
+  records), with a Vitest drift guard that fails if the two lists drift. Both
+  account/recovery `@sync` journeys were refactored to the shared helper. The
+  inherited dist-sync `journeys-sync` failure (CI run `32024054019` on `36f01f8`,
+  3 red account/recovery journeys) is resolved: `npm run e2e:sync` is fully green
+  (44/44), and main-lane E2E is green (167 passed / 41 skipped). No production
+  account fail-closed / ownership semantics were weakened.
+- Follow-up: commit to `main`, push without force, and confirm exact-SHA GitHub
+  Actions `quality` + `e2e` PASS before marking this plan COMPLETED.
