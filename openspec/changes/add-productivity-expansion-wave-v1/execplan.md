@@ -1,7 +1,7 @@
 # ExecPlan: Productivity Expansion Implementation Wave V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -60,19 +60,19 @@ Authoritative artifacts:
 
 ## Current Checkpoint
 
-- Current milestone: IMPLEMENTATION_WAVE_TYPECHECK_CLEAN_PRE_COMMIT
-- Completed: All implementation slices done and typecheck 0 errors — local migration 17 plus organization columns (`project_id`/`goal_id`), DB types (`Project`/`Goal`/`DailyPlan` plus extensions, `ACCOUNT_USER_TABLES` + `TABLES_WITH_DELETED_AT`), `core/db/localMutation.ts`, feature modules (`projects`, `goals`, `daily-plan`, `planning-hub`, `quick-capture`, `activity`, `progress`), `app/index.tsx` + `OverviewScreen` planning entry points, organization-link helpers, vector-icons typo + `TextField` token fixes, lint max-warnings satisfied.
+- Current milestone: IMPLEMENTATION_WAVE_COMPLETE
+- Completed: All implementation slices done and typecheck 0 errors — local migration 17 plus organization columns, DB types (`Project`/`Goal`/`DailyPlan` plus extensions, `ACCOUNT_USER_TABLES` + `TABLES_WITH_DELETED_AT`), `core/db/localMutation.ts`, feature modules (`projects`, `goals`, `daily-plan`, `planning-hub`, `quick-capture`, `activity`, `progress`), `app/index.tsx` + `OverviewScreen` planning entry points, organization-link helpers, vector-icons and `TextField` token fixes, lint satisfied.
 - Reconciled: prior `fix-account-recovery-dist-sync-closure-audit` to COMPLETED on run `32269563521` at session head `b6745dd`; local DB at schema version 17 (next is 18).
-- In progress: Pushing the implementation wave to `main`.
-- Important modified files: `core/db/client.ts`, `core/db/types.ts`, `core/auth/account.types.ts`, `core/auth/account.data.ts`, `core/db/localMutation.ts`, `core/providers/navigationContext.ts`, `core/providers/NavigationProvider.tsx`, `app/index.tsx`, `features/overview/OverviewScreen.tsx`, `features/projects/`, `features/goals/`, `features/daily-plan/`, `features/planning-hub/`, `features/quick-capture/`, `features/activity/`, `features/progress/`, tests (`command.v2.contracts.test.ts`, `habitInsights.domain.test.ts`, `integration/restore.test.ts`, `restore.helpers.test.ts`), `tsconfig.json`.
-- Last successful validation: `npm run typecheck` — 0 errors (was at 14 in wave `b6745dd` spec-only, fixed to 0 here).
-- Current failures: None on typecheck. Lint baseline max-warnings 25 from `eslint .` clean.
+- In progress: None. Wave pushed to `main` at `a4c0d4f`.
+- Important modified files: `core/db/client.ts`, `core/db/types.ts`, `core/auth/account.types.ts`, `core/auth/account.data.ts`, `core/db/localMutation.ts`, `core/providers/navigationContext.ts`, `core/providers/NavigationProvider.tsx`, `app/index.tsx`, `features/overview/OverviewScreen.tsx`, `features/projects/`, `features/goals/`, `features/daily-plan/`, `features/planning-hub/`, `features/quick-capture/`, `features/activity/`, `features/progress/`, tests (fixture updates), `tsconfig.json`.
+- Last successful validation: `npm run typecheck` — 0 errors; `npm run openspec:validate` — 33 passed, 0 failed; `npm run agent:plan:validate:all` — PASS; `git diff --check` — 0.
+- Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: `git diff --check` → stage wave code → commit `main` → push `main` → verify `main == origin/main`.
-- Remaining definition of done: Minimal gates (`typecheck` 0, `lint`, `openspec:validate`, `agent:plan:validate:all`, `git diff --check` 0); commit; push; verify `main == origin/main`.
+- Exact next action: None. Implementation wave complete — hardening campaign owns remaining validation.
+- Remaining definition of done: Complete.
 
 ## Progress
 
@@ -118,13 +118,13 @@ Authoring evidence:
 - GitHub `main` independently verified at `6f18cce75459e21d11c29a2b82330a402336d9f4` before spec publication.
 - GitHub Actions run `32269563521`: `quality` success; `e2e` success; full main journeys, full deterministic scenarios, build-dist-sync, and remote-boundary dist-sync step all success.
 
-Implementation-wave minimal required validation at the end:
+Implementation-wave minimal required validation at the end (post-push, before docs commit):
 
-- `npm run typecheck`
-- `npm run lint`
-- `npm run openspec:validate`
-- `npm run agent:plan:validate:all`
-- `git diff --check`
+- `npm run typecheck` — PASS, 0 errors, at `a4c0d4f` (was 14 typecheck errors at `b6745dd` spec-only head for the wave's new types before the migration/data/domain/views fix).
+- `npm run lint` — PASS with 7 warnings within `max-warnings 25` (all baseline: 3 `react-hooks/set-state-in-effect` on `void load()`/`void refreshOptions()` + 1 `no-console` in `backupPerformance.test.ts`).
+- `npm run openspec:validate` — PASS, 33 passed, 0 failed (spec scenarios added for the 5 requirements that were scenario-less).
+- `npm run agent:plan:validate:all` — PASS (including this wave's plan reconciled to COMPLETED and the prior `fix-account-recovery-dist-sync-closure-audit` reconciled to COMPLETED on `6f18cce`/`32269563521`).
+- `git diff --check` — PASS, 0 whitespace errors (CRLF handled by repo `.gitattributes` `text eol=crlf`).
 
 Explicitly deferred to hardening unless required to resolve a compile blocker:
 
@@ -178,13 +178,14 @@ Do not add new planning entities to remote Backup/Portable/Supabase areas during
 
 ## Outcomes & Retrospective
 
-Wave implemented and minimal gates green; push to `main` pending in the same session.
-
-- Implemented: local migration 17 (`projects`, `goals`, `daily_plans`, `todos`/`habits` organization columns), `core/db/types.ts` (`Project`, `Goal`, `DailyPlan` + `Habit`/`Todo` extensions), `ACCOUNT_USER_TABLES` + `TABLES_WITH_DELETED_AT` for `projects`/`goals`/`daily_plans`, `core/db/localMutation.ts`, `core/providers/navigationContext.ts` (`isPlanningHubOpen`/`isQuickCaptureOpen` + `openPlanningHub`/`openQuickCapture`), feature modules (`projects`, `goals`, `daily-plan`, `activity`, `progress`, `planning-hub`, `quick-capture`), `app/index.tsx` (Planning Hub + Quick Capture + FAB + `OverviewScreen` Plan-Today/Progress entry points), and `todos`/`habits` organization-link helpers (`setTodoProjectGoal`, `setHabitProjectGoal`).
-- Schema/version: migration 17 (local-only during the wave; remote Backup/Portable intentionally out of scope until hardening).
-- Minimal validation at final push: `npm run typecheck` 0, `npm run lint` 0, `git diff --check` clean, `openspec:validate`/`agent:plan:validate:all` green.
-- Full test/E2E/simulation/native/Supabase validation intentionally deferred (Overnight Wave).
-- Hardening debt: Supabase table + RLS for `projects`/`goals`/`daily_plans`; wire `core/backup`/portable; cross-feature rule coverage for project-scoped habits; richer Today-candidate filtering and goal-progress aggregation QA.
-- Final SHA to be recorded after the `main` push in the session commit.
+- Local schema v17 (`projects`, `goals`, `daily_plans`, `todos`/`habits` `project_id`/`goal_id`) — pre-wave baseline was v16 (`weekly_reviews`); this wave adds one append-only migration, local-only so no Supabase deployment tonight (intentional hardening debt).
+- Data/domain/views: `core/db/types.ts` (`Project`/`Goal`/`DailyPlan` + `Todo`/`Habit` extensions), `core/db/localMutation.ts` (local-only write primitive — no Supabase outbox enqueue, claims provisional binding), `core/auth/account.types.ts`/`account.data.ts` (`projects`/`goals`/`daily_plans` added to `ACCOUNT_USER_TABLES`/`TABLES_WITH_DELETED_AT`), `core/providers/navigationContext.ts` + `NavigationProvider.tsx` (`PlanningHubView` + `isPlanningHubOpen`/`isQuickCaptureOpen` + `openPlanningHub`/`openQuickCapture`), `app/index.tsx` (Planning Hub `Modal` drawer + Quick Capture `Modal` bottom-sheet + `WeeklyReviewScreen`-style wiring, top-rail `SectionScreens` unchanged, FAB respects `safeAreaBottom`), `features/overview/OverviewScreen.tsx` (compact `Plan Today`/`Progress` entry points calling `openPlanningHub('today')`/`('progress')` alongside `Weekly Review`), `features/todos/todos.data.ts` + `features/habits/habits.data.ts` (`project_id`/`goal_id` via `addColumnIfMissing`, `setTodoProjectGoal`/`setHabitProjectGoal` + create-path passthrough, `applyRemote*` + Habit-circle/`isHabitScheduledOn` semantics unchanged).
+- Feature modules: `features/projects/` (`projects.types.ts`/`projects.domain.ts`/`projects.data.ts`/`ProjectListView.tsx`/`ProjectDetailView.tsx` — CRUD/list/reorder/status/soft-delete, status archive/pause, color palette, `active`/`paused`/`completed`/`archived` closed unions, 1000/120-char bounds, `0–100` progress-style status), `features/goals/` (`goals.types.ts`/`goals.domain.ts`/`goals.data.ts`/`GoalListView.tsx`/`GoalDetailView.tsx` — `GoalHorizon`/`GoalStatus` closed unions, 160/1000-char bounds, `progress_percent` 0–100, optional `project_id`, planning-hub linkage), `features/daily-plan/` (`dailyPlan.types.ts`/`dailyPlan.domain.ts`/`dailyPlan.data.ts`/`DailyPlanView.tsx` — one `date_key` per local `YYYY-MM-DD`, `up to 3` `top_todo_ids` via `serializeTopTodoIds`/`parseTopTodoIds`, `toDateKey`/`timestampToLocalDateKey` semantics, `schedule-aware` habit summary (`isHabitScheduledOn` + `target_per_day` fallback), focus target `getCalorieGoal`/`listTodo` pattern, `dailyPlan` reflection/energy focus), `features/planning-hub/PlanningHubScreen.tsx` (Today/Projects/Goals/Progress/Timeline internal tabs, `Today` → `DailyPlanView`, `Projects`/`Goals` → list→detail drill-down, `Progress` → `ProgressInsightsView`, `Timeline` → `ActivityTimelineView`; no seventh tab — modal/drawer via `openPlanningHub(initialView?)`/`closePlanningHub()` in `core/providers/NavigationProvider.tsx`; close/back via stock `Modal`), `features/quick-capture/QuickCaptureOverlay.tsx` (global launcher FAB in `app/index.tsx`, modes: Todo/Habit/Calorie/Project/Goal/Start Focus; Todo/Habit/Calorie reuse `addTodo`/`addHabit`/`addCalorieEntry` canonical paths with `createId(prefix)`/`nowIso`/`runSyncedMutation`; Project/Goal via `projects.data.ts`/`goals.data.ts` `createId('goal')`/`localMutation`; Focus delegates to `setActiveSection('pomodoro')` then `closeQuickCapture`), `features/activity/` (`activityTimeline.types.ts`/`activityTimeline.domain.ts`/`activityTimeline.data.ts`/`ActivityTimelineView.tsx` — derived read model only: Todo completion via `updated_at` exact, Habit completions via `habit_completions` deterministic, Focus via `pomodoro_sessions`, Workout via `workout_logs`, Calories aggregated by `consumed_on` per-day (so the feed doesn't flood), Weekly Review `completed_at`, Daily Plan `completed`, Project `created/completed`, Goal `created/achieved`; bounded by `days` window, `PillChip` filter `All/Productivity/Health/Planning`), `features/progress/` (`progress.types.ts`/`progress.domain.ts`/`progress.summary.ts`/`ProgressInsightsView.tsx` — current-7-day vs prior-7-day `ProgressSummary` from `core/db/client.ts` `weekly_reviews` + `todo`/`habit`/`pomodoro_sessions`/`workout_logs`/`calorie_entries` + `getCalorieGoal` + `habitInsights`; cards are plain `Todo/Habit/Focus/Workout/Calories/WeeklyReview/Project/Goal` delta comparisons, no composite score).
+- Minimal validation at final push: `npm run typecheck` — 0 errors (was 14 typecheck + 7 vector-icons en-dash `TS2307` before the wave — all fixed: `Todo`/`Habit` fixture `project_id`/`goal_id`, `ApplicationEffectData` `scheduleId`/`occurrenceId`, vector-icons `@expo/vector-icons` vs `@expo-vector-icons`, `removeTopTodoId` `string→string[]` via `parseTopTodoIds(serializeTopTodoIds(...))`, `scheduleId` string-typed `buildTopTodoIds` removal, `appliesToScope`/`appliesToScopeId` `schedule` alias, `prettier` max-line-breaks); `npm run lint` — 0 errors, 7 warnings within `max-warnings 25` (3 `react-hooks/set-state-in-effect` on `void load()`/`void refreshOptions()` + 1 `no-console` in `tests/integration/backupPerformance.test.ts`); `npm run openspec:validate` — 33 passed, 0 failed (spec deltas updated for scenario-less `ADDED` requirements: Today-facts/Progress-bounded/Navigation-stable/Blocker-bypass/Final-verdict); `npm run agent:plan:validate:all` — PASS with prior `fix-account-recovery-dist-sync-closure-audit` reconciled to COMPLETED on `32269563521`; `git diff --check` — 0 (CRLF handled by repo `.gitattributes` `text eol=crlf`).
+- Full test/E2E/simulation/native/Supabase validation intentionally deferred (Overnight Wave — see `openspec/changes/add-productivity-expansion-wave-v1/README.md` hardening handoff).
+- Files added: `core/db/localMutation.ts`, `features/activity/*`, `features/daily-plan/*`, `features/goals/*`, `features/planning-hub/*`, `features/progress/*`, `features/projects/*`, `features/quick-capture/*`.
+- Files modified: `core/db/client.ts` (migration 17 + `DISTRIBUTED_DB_ID` guard for `projects`/`goals`/`daily_plans`), `core/db/types.ts` (`Project`/`Goal`/`DailyPlan` plus `Todo`/`Habit` `project_id`/`goal_id`), `core/auth/account.types.ts`/`account.data.ts` (`TABLES_WITH_DELETED_AT` + `accountRecovery` scope for the 3 new tables), navigation shell (`NavigationProvider`/`navigationContext` + `app/index.tsx` `isWeeklyReviewOpen`-style `isPlanningHubOpen`/`isQuickCaptureOpen` + `planningHubInitialView` plumbing), `OverviewScreen` entry points, `todos`/`habits` organization linkage, `tsconfig.json` fix, tests fixtures plus 5 missing scenario backfills.
+- Hardening debt: Supabase `migrations`/`RLS`/`Backup` + portable export/import for `projects`/`goals`/`daily_plans` (local-only tonight to avoid enqueueing to undeployed tables — `core/db/localMutation.ts` isolation is temporary); dedupe the provisional-owner promotion block that runs in `localMutation` + in `runBackupMutation`/`runSyncedMutation` (next hardening should centralize it); the `lint` warnings above (lift `set-state-in-effect` disables after `useEffect` refactor) plus `openspec`/`agent:plan` warnings that were deferred per the overnight-wave contract.
+- Final implementation SHA (this wave's code push): `a4c0d4f71a34fc0ef97d3bc3d327b0a55346f6c9`; documentation/completion bookkeeping SHA to follow. GitHub Actions for `a4c0d4f` is left to the next session's hardening campaign per the wave's "do not chase CI" policy — not blocking for implementation-complete.
 
 `PRODUCTIVITY EXPANSION WAVE V1: IMPLEMENTATION COMPLETE — HARDENING REQUIRED`
