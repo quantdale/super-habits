@@ -2,6 +2,8 @@
 
 Keep this checklist synchronized with `.agent/execplans/account-recovery-dist-sync-determinism.md`.
 
+> AUDIT RECONCILIATION 2026-08-19 (fresh session at `a043141` / `origin/main`): checklist reconciled honestly per `fix-account-recovery-dist-sync-closure-audit`. Item 2.5 unchecked — `e2e/helpers/accountSupabaseMock.ts` `select=user_id` branch at this head hardcodes `content-range: 0-0/0` and ignores configured `count`/`countByOwnerUserId`, so non-zero production-shape footprint is not actually modeled. QA items 10.1, 10.5-10.7, 10.16-10.19, 11.4, 12.x remain unchecked here because those gates were not executed/recorded in this closure; see remediation tasks 6.x/7.x. Valid `8b1a1e3` CI evidence preserved in ExecPlan but that SHA is not final head after `684dae9`/`a043141`.
+
 ## 0. Specification handoff
 
 - [x] 0.1 Root cause independently verified from exact final GitHub Actions run `32024054019`.
@@ -22,7 +24,7 @@ Keep this checklist synchronized with `.agent/execplans/account-recovery-dist-sy
 - [x] 2.2 Derive recognized remote entities directly from `BACKUP_ENTITIES` + `BACKUP_SYNTHETIC_ENTITIES` if the test environment permits it.
 - [x] 2.3 If direct derivation is not viable, centralize one E2E list and add an exact drift guard against production constants.
 - [x] 2.4 Support deterministic owner-scoped empty count/head responses for every known backup entity.
-- [x] 2.5 Support configured per-entity non-zero counts/rows when a journey requires them.
+- [ ] 2.5 Support configured per-entity non-zero counts/rows when a journey requires them. — RECONCILED UNCHECKED 2026-08-19: at head `a043141` the helper handles `select=user_id` before generic HEAD and hardcodes `0-0/0`, ignoring `count`/`countByOwnerUserId`; verified head file + missing scenarios. Fixed by `fix-account-recovery-dist-sync-closure-audit` remediation (owner-scoped `select=user_id` count + `weekly_reviews` non-zero footprint proof).
 - [x] 2.6 Support configured POST capture/echo behavior where ownership assertions require it.
 - [x] 2.7 Preserve strict failure for unknown/unmodeled Supabase REST tables.
 - [x] 2.8 Keep auth endpoints owned by journey-specific handlers or a clean layered abstraction; do not create opaque cross-test global state.

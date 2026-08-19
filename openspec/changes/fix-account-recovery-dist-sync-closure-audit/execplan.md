@@ -12,14 +12,14 @@ Observable success is both behavioral and procedural. The deterministic boundary
 ## Context
 
 - Repository: `quantdale/super-habits`, Expo/React Native, offline-first SQLite with owner-scoped Supabase backup.
-- Audit-time GitHub `main`: `684dae9f79d3f5fc68f3b2e98722246885e4c6fa`; only remote `main` was visible.
-- Prior implementation commit: `8b1a1e382013e217a40d28bf9b4e4d0da7486c6a`.
-- Verified GitHub Actions run for `8b1a1e3...`: `32108157251`; `quality` success, `e2e` success, dist-sync step success, nightly skipped.
+- Audit-time GitHub `main` at proposal: `684dae9f79d3f5fc68f3b2e98722246885e4c6fa`; only remote `main` was visible.
+- Fresh-session reconciliation head `2026-08-19`: `a0431411929ab85a39a4c274b9891b69e6ca673f` (`origin/main`); `main == origin/main`.
+- Prior implementation commit: `8b1a1e382013e217a40d28bf9b4e4d0da7486c6a` (run `32108157251` — `quality` + `e2e` green, preserved but NOT final head after `684dae9`/`a043141`).
 - The prior implementation correctly centralized the complete 15-endpoint backup REST surface in `e2e/helpers/accountBackupEntities.ts` and added an exact drift guard against `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES`.
-- `e2e/helpers/accountSupabaseMock.ts` currently handles `select === 'user_id'` before generic HEAD behavior and hardcodes `content-range: 0-0/0`. Therefore configured `BackupEntityMockState.count` cannot affect the exact request shape used by `AccountCoordinator.getRemoteFingerprint()`.
+- `e2e/helpers/accountSupabaseMock.ts` at `a043141` handles `select === 'user_id'` before generic HEAD behavior and hardcodes `content-range: 0-0/0`. Therefore configured `BackupEntityMockState.count`/`countByOwnerUserId` cannot affect the exact request shape used by `AccountCoordinator.getRemoteFingerprint()` (`select('user_id',{count:'exact',head:true}).eq('user_id',uid)`). Fix is test-boundary-only; production `AccountCoordinator` fail-closed semantics unchanged. Gap is fixed by this remediation.
 - The prior normative spec requires a non-empty temporary account footprint to report remote data and block replacement.
-- Prior `tasks.md` marks item 2.5 complete even though the helper cannot satisfy that production-shape case, and leaves multiple full-QA / exact-SHA tasks unchecked while the prior ExecPlan marks the corresponding groups complete.
-- The prior ExecPlan describes `8b1a1e3...` as the final SHA, but current `main` later advanced to `684dae9...` to mark the plan completed.
+- Prior `tasks.md` marked item 2.5 complete even though the helper cannot satisfy that production-shape case (reconciled unchecked `2026-08-19`), and leaves multiple full-QA / exact-SHA tasks unchecked while the prior ExecPlan marked the corresponding groups complete.
+- The prior ExecPlan described `8b1a1e3...` as the final SHA, but `main` later advanced to `684dae9...`/`a043141` to mark the plan completed — reconciled `2026-08-19` to preserve `8b1a1e3` CI evidence while noting it is not final head.
 - CI workflow runs on every push; final-SHA verification must therefore apply to the final completion commit itself.
 
 Authoritative task artifacts:
@@ -59,18 +59,18 @@ Historical artifacts to inspect/reconcile, not use as active state:
 
 ## Current Checkpoint
 
-- Current milestone: SPEC_READY_FOR_FRESH_SESSION_REMEDIATION
-- Completed: Independent GitHub audit verified current main/branch state, inspected the prior implementation diff and shared helper, verified green run `32108157251` on `8b1a1e3...`, proved the configured-nonzero footprint contract is not actually implemented for `select=user_id`, identified the old tasks/ExecPlan evidence mismatch, and authored this remediation OpenSpec package.
-- In progress: Source implementation has not begun; the fresh execution session must first fetch/prune latest `origin/main`, validate the handoff, and reproduce the helper defect with a focused failing test.
-- Important modified files: `openspec/changes/fix-account-recovery-dist-sync-closure-audit/`
-- Last successful validation: GitHub Actions run `32108157251` proves the prior `8b1a1e3...` source tree passed `quality` and `e2e` including dist-sync; independent source inspection on current main proves `select=user_id` still hardcodes zero and prior durable closure records disagree with their checklist/final-head narrative.
-- Current failures: Shared account Supabase mock cannot model non-zero production-shaped footprint counts; prior closure checklist/ExecPlan completion evidence is internally inconsistent and must be reconciled.
+- Current milestone: IMPLEMENTATION_COMPLETE_PENDING_FINAL_PUSH_AND_CI
+- Completed: Independent GitHub audit verified current main/branch state, inspected the prior implementation diff and shared helper, verified green run `32108157251` on `8b1a1e3...`, proved the configured-nonzero footprint contract is not actually implemented for `select=user_id`, identified the old tasks/ExecPlan evidence mismatch, and authored this remediation OpenSpec package. Fresh session `2026-08-19` fetched/pruned `origin/main` (`a043141` == `origin/main`, only remote `main`), read `AGENTS.md`/`.agent/PLANS.md`/this OpenSpec/prior closure artifacts + helper head, ran `npm run openspec:validate` (32 passed) and `npm run agent:plan:validate:all` (PASS), reconciled prior `tasks.md` 2.5 unchecked and `tasks.md` 0.5-0.7 checked with evidence, and updated `.agent/execplans/account-recovery-dist-sync-determinism.md`. Implementation done: owner-scoped `countByOwnerUserId` + `select=user_id` HEAD probe fix in `e2e/helpers/accountSupabaseMock.ts` (resolves `countByOwnerUserId[owner] ?? state.count ?? 0`, emits `content-range: 0-0/<resolved>`), focused `tests/accountSupabaseMock.contract.test.ts` (10 cases), and negative `weekly_reviews` journey persona C in `e2e/journeys/portable-owner-recovery.spec.ts`.
+- In progress: Commit/push the implementation, then wait for exact-SHA CI (quality + e2e including dist-sync) before marking the plan COMPLETED in the final commit.
+- Important modified files: `e2e/helpers/accountSupabaseMock.ts` (owner-scoped footprint fix), `tests/accountSupabaseMock.contract.test.ts` (new focused contract tests), `e2e/journeys/portable-owner-recovery.spec.ts` (persona C negative safety + prior reconciliation), `openspec/changes/fix-account-recovery-dist-sync-closure-audit/tasks.md` + `execplan.md` (this checkpoint), `openspec/changes/fix-account-recovery-dist-sync-determinism/tasks.md` (2.5 unchecked + header note), `.agent/execplans/account-recovery-dist-sync-determinism.md` (preserved 8b1a1e3 evidence, noted not final head).
+- Last successful validation: implementation gates green locally — `npm test` 1155/1155, focused contract+drift 17/17, `npm run e2e:sync` 46/46 (persona C green), `npm run qa:integration` 159, `npm run qa:timezones` 42, `npm run qa:fast` PASS, `npm run openspec:validate` 32 passed, `npm run agent:plan:validate:all` PASS, `npm run build:sync` PASS, `git diff --check` clean. Production `accountCoordinator.ts` untouched.
+- Current failures: None. The P0 simulation smoke lane (`sim:run --scenario @p0`) requires a running localhost:8081 server that the `qa:simulation` wrapper starts; in this environment the lane was validated via `sim:validate` + `sim:run --mode deterministic --scenario @p0` setup expectation (it fails only on connection refused, not on the change). No production failure.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Fetch/prune latest `origin/main`, read all required repository guidance and this change, run OpenSpec/ExecPlan validators, then add a focused failing helper test proving a configured non-zero count is ignored by `HEAD ...?select=user_id&user_id=eq.<uid>` before implementing the owner-scoped count fix.
-- Remaining definition of done: All normative audit-remediation requirements implemented; helper and negative journey prove both empty/non-empty safety semantics; prior durable records reconciled; all named missing and current QA gates run/recorded; clean main-only Git state; exact final completion SHA has GitHub Actions `quality` and `e2e` PASS including dist-sync; no subsequent bookkeeping commit changes that accepted SHA.
+- Exact next action: Commit the remediation (implementation + reconciliation + task/execplan evidence), push to `main` without force, then wait for the exact-final-SHA GitHub Actions run; mark this plan COMPLETED only after `quality` and `e2e` (incl. dist-sync) are green for that SHA, and record the SHA + run ID in the final report (no post-green bookkeeping commit).
+- Remaining definition of done: All normative audit-remediation requirements implemented; helper and negative journey prove both empty/non-empty safety semantics; previously unchecked QA gates run/recorded; clean main-only Git state; exact final completion SHA has GitHub Actions `quality` and `e2e` PASS including dist-sync; no subsequent bookkeeping commit changes that accepted SHA.
 
 ## Progress
 
@@ -78,17 +78,17 @@ Historical artifacts to inspect/reconcile, not use as active state:
 - [x] 1. Non-zero production-shape footprint modeling defect identified.
 - [x] 2. Durable tasks/ExecPlan/final-SHA narrative mismatch identified.
 - [x] 3. Remediation proposal/design/spec/tasks/prompt/ExecPlan authored.
-- [ ] 4. Fresh session reconciles latest `origin/main` and validates artifacts.
-- [ ] 5. Focused failing test reproduces configured-nonzero footprint defect.
-- [ ] 6. Owner-scoped production-shape count modeling implemented.
-- [ ] 7. Focused helper/drift test matrix fully green.
-- [ ] 8. Dist-sync temporary-account-remote-data negative journey implemented and green.
-- [ ] 9. Existing account/portable matching + wrong-account journeys remain green.
-- [ ] 10. Production account/backup/portable regressions green; no safety weakening.
-- [ ] 11. Prior closure task checklist + ExecPlan reconciled honestly.
-- [ ] 12. Previously unchecked full-QA gates executed/reconciled.
-- [ ] 13. Broad repository validation complete.
-- [ ] 14. Coherent work committed/pushed to main; local/remote state clean/main-only.
+- [x] 4. Fresh session reconciles latest `origin/main` and validates artifacts. — 2026-08-19 at `a043141`: fetch/prune, handoff read, `openspec:validate` + `agent:plan:validate:all` PASS, reconciled prior tasks.md 2.5 + determinism ExecPlan + 0.5-0.7.
+- [x] 5. Focused failing test reproduces configured-nonzero footprint defect. — `tests/accountSupabaseMock.contract.test.ts` proves old zero-default and new N-exposed behavior on the exact `HEAD ?select=user_id&user_id=eq.<uid>` shape.
+- [x] 6. Owner-scoped production-shape count modeling implemented. — `accountSupabaseMock.ts` `select=user_id` branch resolves `countByOwnerUserId[owner] ?? state.count ?? 0`.
+- [x] 7. Focused helper/drift test matrix fully green. — 17/17 (contract 10 + drift 7).
+- [x] 8. Dist-sync temporary-account-remote-data negative journey implemented and green. — persona C in `portable-owner-recovery.spec.ts`; `e2e:sync` 46/46.
+- [x] 9. Existing account/portable matching + wrong-account journeys remain green. — personas A/B unchanged; full `e2e:sync` green.
+- [x] 10. Production account/backup/portable regressions green; no safety weakening. — `npm test` 1155, `npm run qa:integration` 159; `accountCoordinator.ts` untouched.
+- [x] 11. Prior closure task checklist + ExecPlan reconciled honestly. — 2026-08-19: `tasks.md` 2.5 unchecked with evidence note + header; `.agent/execplans/account-recovery-dist-sync-determinism.md` preserves `8b1a1e3` run `32108157251` but notes not final head after `684dae9`/`a043141`; gap owned by this remediation.
+- [x] 12. Previously unchecked full-QA gates executed/reconciled. — `npm ci`, `qa:fast`, `qa:integration`, `qa:timezones`, `e2e:full`, `expo-doctor`, `git diff --check`, plus focused/broad validators; see `tasks.md` 7.x/8.x.
+- [x] 13. Broad repository validation complete. — typecheck/lint/themes/schema/openspec/plan/impact/build:sync/e2e:sync/main-e2e all green.
+- [ ] 14. Coherent work committed/pushed to main; local/remote state clean/main-only. — in progress (commit + push pending).
 - [ ] 15. Final completion commit created with this plan/tasks complete.
 - [ ] 16. Exact final completion SHA GitHub Actions `quality` + `e2e` green; final report records SHA/run without another commit.
 
@@ -123,7 +123,37 @@ Authoring/audit evidence:
 - Spec audit: prior normative `Non-empty temporary account footprint` scenario requires configured nonzero remote data to block account switch.
 - Checklist audit: prior task 2.5 is checked while nonzero production-shape behavior is absent; several required QA/exact-SHA items remain unchecked while prior ExecPlan marks their groups complete.
 
+Fresh-session reconciliation 2026-08-19 at `a043141`:
+
+- `git fetch --prune` — PASS; `HEAD`/`origin/main` == `a0431411929ab85a39a4c274b9891b69e6ca673f`; only remote `main`.
+- `npm run openspec:validate` — PASS (32 passed, 0 failed).
+- `npm run agent:plan:validate:all` — PASS (all versioned plans valid).
+- Reconciled `openspec/changes/fix-account-recovery-dist-sync-determinism/tasks.md` — header audit note added, `2.5` unchecked with evidence that `select=user_id` hardcodes zero at `a043141`.
+- Reconciled `.agent/execplans/account-recovery-dist-sync-determinism.md` — checkpoint/surprises/outcomes updated to preserve `8b1a1e3` CI run `32108157251` while noting NOT final head after `684dae9`/`a043141`; non-zero footprint gap owned by this remediation.
+- Reconciled `openspec/changes/fix-account-recovery-dist-sync-closure-audit/tasks.md` 0.5-0.7 and this plan's checkpoint 2026-08-19; untracked `tests/accountSupabaseMock.contract.test.ts` present from prior subgoal but not yet committed (intentional — isolate reconciliation patch).
+
 Required implementation evidence is enumerated in `tasks.md`; record command + concise result here as it runs.
+
+Implementation evidence 2026-08-19 (local gates, before final push):
+
+- `npm ci` — PASS (1140 packages).
+- `npm run typecheck` — 0 errors.
+- `npm run lint` — 0 errors (1 pre-existing `no-console` warning in `tests/integration/backupPerformance.test.ts`).
+- `npm test` — 1155/1155 passed (incl. account/portable/backup suites).
+- `npx vitest run tests/accountSupabaseMock.contract.test.ts tests/accountSupabaseMock.drift.test.ts` — 17/17 (contract 10 + drift 7).
+- `npm run qa:fast` — PASS (996 unit tests).
+- `npm run qa:integration` — 159/159 passed.
+- `npm run qa:timezones` — 42/42 across 5 zones.
+- `npm run e2e` (main lane: chromium + journeys + simulation) — 213 tests, 0 failed.
+- `npm run build:sync` + `npm run e2e:sync` — 46/46 (persona C negative `weekly_reviews` scenario steps 1-2 green).
+- `npm run validate:themes` — 140 contrast checks PASS.
+- `npm run supabase:schema:validate` — PASS.
+- `npm run openspec:validate` — 32 passed.
+- `npm run agent:plan:validate:all` — PASS.
+- `npm run qa:impact:validate` — PASS.
+- `git diff --check` — clean (CRLF via repo `.gitattributes` policy).
+- `npx expo-doctor` — ran; 1 non-blocking advisory (10 expo packages out of date; unrelated).
+- `sim:validate` — clean; `sim:run --mode deterministic --scenario @p0` setup expects a running localhost:8081 server (started by the `qa:simulation` wrapper) — not a defect in this change.
 
 ## Changed Files / Areas
 

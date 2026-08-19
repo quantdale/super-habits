@@ -79,6 +79,7 @@ let currentUser:
 let supabaseRequestsSeen = 0;
 let verifyUserOverride: typeof SOURCE_PROTECTED_USER | typeof WRONG_USER | null = null;
 let portableFileText: string | null = null;
+let tRemoteWeeklyReviewEnabled = false;
 
 function sessionBody(
   user:
@@ -178,10 +179,17 @@ async function handleAccountMock(route: Route): Promise<void> {
   // Shared backup-aware boundary: recognize the full production backup surface
   // so the Account Coordinator's owner-scoped remote-footprint probes never 404
   // against a stale four-table subset. No remote rows exist for any account in
-  // this deterministic flow, so every probe resolves to an empty backup surface
-  // — exactly the state the matching-account journey needs. Unknown REST tables
-  // fall through to the strict 404 below.
-  const handled = await handleBackupRestRequest(route);
+  // the default deterministic flow, so every probe resolves to an empty backup
+  // surface — exactly the state the matching-account journey needs. The
+  // temporary-account safety journey opts into an owner-scoped non-zero
+  // `weekly_reviews` footprint for T only (design §4) via
+  // `tRemoteWeeklyReviewEnabled`. Unknown REST tables fall through to the strict
+  // 404 below.
+  const handled = await handleBackupRestRequest(route, {
+    entities: tRemoteWeeklyReviewEnabled
+      ? { weekly_reviews: { countByOwnerUserId: { [DEST_TEMP_ANON_ID]: 1 } } }
+      : {},
+  });
   if (handled === 'handled') return;
 
   await route.fulfill({
@@ -195,6 +203,7 @@ async function installAccountMock(page: Page): Promise<void> {
   currentUser = SOURCE_ANON_USER;
   supabaseRequestsSeen = 0;
   verifyUserOverride = null;
+  tRemoteWeeklyReviewEnabled = false;
   await page.route(SUPABASE_ROUTE, handleAccountMock);
 }
 
@@ -412,6 +421,116 @@ defineJourney({
         await expect(
           page.getByRole('button', { name: 'Send sign-in code', exact: true }).first(),
         ).toBeVisible();
+      },
+    },
+  ],
+});
+
+defineJourney({
+  persona:
+    'C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery',
+  goal: 'prove A export → T import → T weekly_reviews footprint → matching A recovery is production-blocked with imported dataset intact',
+  tags: ['@portable-owner', '@sync'],
+  risks: [
+    'temporary account T with remote weekly_reviews state must block imported-owner replacement via real production safety',
+    'the block is not a 404/unknown-endpoint failure',
+    'imported local dataset and source fingerprint remain unchanged and no bind to A occurs',
+    'retry path stays available',
+  ],
+  steps: [
+    {
+      name: 'export owner-backed file for A',
+      run: async ({ page }) => {
+        await installAccountMock(page);
+        await resetAll(page);
+        await returnToApp(page);
+        requireAccountBoundary();
+        await protectSourceOwner(page);
+        await seedPortableTodo(page, 'Safety-block todo');
+        await openSettingsScreen(page);
+        const text = await exportPortableFile(page);
+        portableFileText = text;
+      },
+    },
+    {
+      name: 'T imports A and acquires remote weekly_reviews state; matching A recovery is blocked by production safety',
+      run: async ({ page }) => {
+        requireAccountBoundary();
+        // Design §4: A export → T import → configure T weekly_reviews count=1 (owner-scoped)
+        currentUser = DEST_TEMP_ANON_USER;
+        await resetAll(page);
+        await returnToApp(page);
+        requireAccountBoundary();
+        await importPortableFile(page);
+
+        // Prove the imported dataset is intact before the blocked recovery attempt.
+        const beforeTodos = await queryRows(page, 'SELECT COUNT(*) AS n FROM todos');
+        expect(Number(beforeTodos[0]?.n)).toBe(1);
+        const beforeOwner = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'account.owner_user_id'",
+        );
+        expect(beforeOwner).toEqual([]);
+        const beforeFingerprint = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'portable.last_import_owner_fingerprint'",
+        );
+        expect(beforeFingerprint[0]?.value).toMatch(/^[0-9a-f]{64}$/);
+        const expectedFingerprint = beforeFingerprint[0]?.value as string;
+        await returnToApp(page);
+        await openSettingsScreen(page);
+        await expect(
+          page.getByText('Imported backup account required', { exact: true }),
+        ).toBeVisible();
+
+        // Configure T's owner-scoped remote footprint. The shared boundary
+        // exposes this as content-range 0-0/1 via the production-shape
+        // HEAD ?select=user_id&user_id=eq.<T> probe for `weekly_reviews` only;
+        // no other entity exposes remote data, so the failure is by production
+        // account safety, not by an accidental 404.
+        tRemoteWeeklyReviewEnabled = true;
+
+        await page.getByLabel('Protected account email').fill(SOURCE_EMAIL);
+        await page.getByRole('button', { name: 'Send sign-in code', exact: true }).first().click();
+        await expect(page.getByText(/already has remote backup data/i)).toBeVisible();
+        await expect(page.getByText(/Automatic account merging is not supported/i)).toBeVisible();
+
+        // No OTP was dispatched — pending recovery was never created.
+        const pending = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'account.recovery_pending'",
+        );
+        expect(pending).toEqual([]);
+
+        // No bind to A: local owner remains unbound.
+        const ownerAfter = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'account.owner_user_id'",
+        );
+        expect(ownerAfter).toEqual([]);
+
+        // Imported local dataset untouched, retry path still available, and
+        // source fingerprint unchanged so a matching bind after clearing the
+        // temporary account's remote data would still be possible.
+        const todosAfter = await queryRows(page, 'SELECT COUNT(*) AS n FROM todos');
+        expect(Number(todosAfter[0]?.n)).toBe(1);
+        const fingerprintAfter = await queryRows(
+          page,
+          "SELECT value FROM app_meta WHERE key = 'portable.last_import_owner_fingerprint'",
+        );
+        expect(fingerprintAfter[0]?.value).toBe(expectedFingerprint);
+        await returnToApp(page);
+        await openSettingsScreen(page);
+        await expect(
+          page.getByText('Imported backup account required', { exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: 'Send sign-in code', exact: true }).first(),
+        ).toBeVisible();
+
+        // Failures are 404s on unknown REST tables only; this journey's block
+        // is a 200-footprint safety result, so a strict 404 counter is not needed.
+        await page.unroute(SUPABASE_ROUTE);
       },
     },
   ],

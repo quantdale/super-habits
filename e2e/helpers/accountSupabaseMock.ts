@@ -19,6 +19,8 @@ const JSON_HEADERS = {
 export type BackupEntityMockState = {
   /** Owner-scoped count returned for count/HEAD probes. Default 0. */
   count?: number;
+  /** Owner-specific footprint for production-shape probe (select=user_id + user_id=eq.<uid>). */
+  countByOwnerUserId?: Record<string, number>;
   /** Rows returned for read queries (select=* / select=updated_at / etc). */
   rows?: unknown[];
 };
@@ -84,13 +86,18 @@ export async function handleBackupRestRequest(
     return 'handled';
   }
 
-  // Owner-scoped footprint probe: the Account Coordinator always uses
-  // select('user_id', { count: 'exact', head: true }). An empty count keeps a
-  // temporary/anonymous account from failing closed.
+  // Owner-scoped footprint probe: production AccountCoordinator.getRemoteFingerprint()
+  // uses select('user_id', { count: 'exact', head: true }).eq('user_id', uid).
   if (select === 'user_id') {
+    const userIdEq = url.searchParams.get('user_id');
+    const ownerUserId = userIdEq && userIdEq.startsWith('eq.') ? userIdEq.slice(3) : null;
+    const byOwner = state.countByOwnerUserId;
+    const ownerScopedCount =
+      ownerUserId !== null && byOwner !== undefined ? byOwner[ownerUserId] : undefined;
+    const resolvedCount = ownerScopedCount !== undefined ? ownerScopedCount : (state.count ?? 0);
     await route.fulfill({
       status: 200,
-      headers: { ...JSON_HEADERS, 'content-range': '0-0/0' },
+      headers: { ...JSON_HEADERS, 'content-range': `0-0/${resolvedCount}` },
       body: '[]',
     });
     return 'handled';

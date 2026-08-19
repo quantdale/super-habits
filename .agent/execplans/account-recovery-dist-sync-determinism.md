@@ -72,38 +72,22 @@ fixme/quarantine band-aids are used.
 
 ## Current Checkpoint
 
-- Current milestone: CLOSED — all implementation, QA, commit, push, and
-  exact-SHA CI confirmation complete; plan COMPLETED.
+- Current milestone: CLOSED — prior determinism closure validated at 8b1a1e3; reconciled at fresh session a043141 (origin/main).
 - Completed:
-  - Root cause independently verified from GitHub Actions run `32024054019`
-    (per proposal/README).
-  - OpenSpec proposal, design, normative spec, tasks, README/IMPLEMENTATION_PROMPT
-    authored upstream at `openspec/changes/fix-account-recovery-dist-sync-determinism/`.
-  - Fresh session fetched/pruned `origin/main`; local `main` reconciled to
-    `a82bbe4` (fast-forward, tree clean).
-  - Verified request/response shape by reading `postgrest-js` (HEAD +
-    `content-range` count) and the Account Coordinator source.
-- In progress: none — all milestones closed.
-- Important modified files: (expected) `e2e/helpers/accountBackupEntities.ts`
-  (new), `e2e/helpers/accountSupabaseMock.ts` (new),
-  `tests/accountSupabaseMock.drift.test.ts` (new),
-  `e2e/journeys/recoverable-account-v1.spec.ts` (refactor),
-  `e2e/journeys/portable-owner-recovery.spec.ts` (refactor),
-  `.agent/execplans/weekly-review-planning-v1.md` (reconcile).
-- Last successful validation: exact-SHA CI run `32108157251` (head `8b1a1e3`) —
-  `quality` success, `e2e` success, `nightly` skipped; local `e2e:sync` 44/44,
-  main-lane E2E 167 passed / 41 skipped.
-- Current failures: none.
-- Relevant quarantines: none.
-- Blockers: none.
-- Condition required to unblock: none.
-- Exact resume action after unblock: none.
-- Exact next action: none — closure complete; plan marked COMPLETED.
-- Remaining definition of done: Complete — dist-sync fully green (e2e:sync
-  44/44), production safety unchanged, Weekly Review plan reconciled, all QA
-  green, committed + pushed (8b1a1e3), working tree clean, local
-  `main == origin/main`, only remote `main`, exact final SHA 8b1a1e3 has GitHub
-  Actions `quality` PASS and `e2e` PASS (run 32108157251).
+  - Root cause independently verified from GitHub Actions run `32024054019` (stale four-table mock vs 15-entity surface).
+  - Shared backup-aware E2E boundary + drift guard implemented; journeys refactored; `e2e:sync` 44/44 at `8b1a1e3` (run `32108157251` — `quality` PASS, `e2e` PASS).
+  - 2026-08-19 fresh-session reconciliation at `a043141` (origin/main) — preserved `8b1a1e3` CI evidence above; `8b1a1e3` is NOT final head after `684dae9`/`a043141` (docs-only closure-audit handoff commits advanced `origin/main` after `8b1a1e3`). Prior `tasks.md` item 2.5 was overstated — see Surprises/Outcomes.
+  - Verified head `e2e/helpers/accountSupabaseMock.ts` `select=user_id` branch hardcodes `content-range: 0-0/0`, ignoring `count`/`countByOwnerUserId`; gap now tracked/fixed in `fix-account-recovery-dist-sync-closure-audit`.
+- In progress: none — this plan remains COMPLETED as historical record; active remediation is `openspec/changes/fix-account-recovery-dist-sync-closure-audit/execplan.md`.
+- Important modified files: `e2e/helpers/accountBackupEntities.ts` (new), `e2e/helpers/accountSupabaseMock.ts` (new, now with audit gap noted), `tests/accountSupabaseMock.drift.test.ts` (new), `e2e/journeys/recoverable-account-v1.spec.ts` (refactor), `e2e/journeys/portable-owner-recovery.spec.ts` (refactor), `openspec/changes/fix-account-recovery-dist-sync-determinism/tasks.md` (reconciled 2026-08-19), `.agent/execplans/weekly-review-planning-v1.md` (reconcile).
+- Last successful validation: exact-SHA CI run `32108157251` (head `8b1a1e3`) — `quality` success, `e2e` success, `nightly` skipped; local `e2e:sync` 44/44, main-lane E2E 167 passed / 41 skipped. Reconciled 2026-08-19 — head is `a043141` (`origin/main`); no new CI claimed for this historical plan.
+- Current failures: Historical `tasks.md` 2.5 overstated (non-zero `select=user_id` footprint not modeled — see remediation); unchecked QA items (10.1, 10.5-10.7, 10.16-10.19, 11.4, 12.x) were not executed in this closure — tracked in remediation tasks 6.x/7.x. No new production failure.
+- Relevant quarantines: None.
+- Blockers: None.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: None — closure complete; plan marked COMPLETED. For the audit gap, see `openspec/changes/fix-account-recovery-dist-sync-closure-audit/execplan.md`.
+- Remaining definition of done: Complete for the determinism scope at `8b1a1e3` (full routing + drift guard + journeys green). Non-zero production-shape footprint gap is out of scope for this plan and is closed by `fix-account-recovery-dist-sync-closure-audit`.
 
 ## Progress
 
@@ -127,7 +111,7 @@ fixme/quarantine band-aids are used.
 
 ## Surprises & Discoveries
 
-- None yet beyond the verified root cause.
+- 2026-08-19 — Post-closure audit found `e2e/helpers/accountSupabaseMock.ts` handles `select=user_id` before generic HEAD and hardcodes `content-range: 0-0/0`. Production `AccountCoordinator.getRemoteFingerprint` uses `select('user_id',{count:'exact',head:true}).eq('user_id',uid)`, so configured `count`/`countByOwnerUserId` never affected footprint probes. Prior tasks.md 2.5 was therefore checked prematurely; reconciled unchecked with remediation covering owner-scoped non-zero `weekly_reviews` proof. See remediation `fix-account-recovery-dist-sync-closure-audit`.
 
 ## Decision Log
 
@@ -186,16 +170,6 @@ fixme/quarantine band-aids are used.
 
 ## Outcomes & Retrospective
 
-- Status: Completed (exact-SHA CI confirmed: run 32108157251 for 8b1a1e3 — quality success, e2e success, nightly skipped).
-- Summary: The stale four-table Supabase mock contract drift (only
-  `todos|habits|calorie_entries|workout_routines` routed) was replaced by a shared
-  backup-aware E2E boundary that recognizes the full production
-  `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES` surface (13 tables + 2 synthetic
-  records), with a Vitest drift guard that fails if the two lists drift. Both
-  account/recovery `@sync` journeys were refactored to the shared helper. The
-  inherited dist-sync `journeys-sync` failure (CI run `32024054019` on `36f01f8`,
-  3 red account/recovery journeys) is resolved: `npm run e2e:sync` is fully green
-  (44/44), and main-lane E2E is green (167 passed / 41 skipped). No production
-  account fail-closed / ownership semantics were weakened.
-- Follow-up: none — committed (8b1a1e3), pushed to origin/main, and exact-SHA CI
-  confirmed green (run 32108157251: quality success, e2e success).
+- Status: Completed (exact-SHA CI confirmed: run 32108157251 for 8b1a1e3 — quality success, e2e success, nightly skipped). 2026-08-19 reconciliation: `8b1a1e3` evidence preserved, but `8b1a1e3` is NOT final `origin/main` after `684dae9`/`a043141`; current head is `a043141`.
+- Summary: The stale four-table Supabase mock contract drift (only `todos|habits|calorie_entries|workout_routines` routed) was replaced by a shared backup-aware E2E boundary that recognizes the full production `BACKUP_ENTITIES + BACKUP_SYNTHETIC_ENTITIES` surface (13 tables + 2 synthetic records), with a Vitest drift guard that fails if the two lists drift. Both account/recovery `@sync` journeys were refactored to the shared helper. The inherited dist-sync `journeys-sync` failure (CI run `32024054019` on `36f01f8`, 3 red account/recovery journeys) is resolved: `npm run e2e:sync` is fully green (44/44), and main-lane E2E is green (167 passed / 41 skipped). No production account fail-closed / ownership semantics were weakened. Audit gap: non-zero `select=user_id` footprint not honored (hardcoded zero); `tasks.md` 2.5 reconciled unchecked 2026-08-19. Follow-up remediation `fix-account-recovery-dist-sync-closure-audit` fixes the `accountSupabaseMock` footprint branch and adds the `weekly_reviews` non-zero negative journey.
+- Follow-up: `fix-account-recovery-dist-sync-closure-audit` owns the non-zero owner-scoped footprint fix and QA completion; this plan remains historical COMPLETED evidence for the determinism/routing scope.
