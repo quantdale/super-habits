@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
+import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { Modal } from '@/core/ui/Modal';
@@ -16,6 +16,8 @@ import { WorkoutScreen } from '@/features/workout/WorkoutScreen';
 import { CaloriesScreen } from '@/features/calories/CaloriesScreen';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { WeeklyReviewScreen } from '@/features/weekly-review/WeeklyReviewScreen';
+import { PlanningHubScreen } from '@/features/planning-hub/PlanningHubScreen';
+import { QuickCaptureOverlay } from '@/features/quick-capture/QuickCaptureOverlay';
 
 type NavItem = {
   name: AppSection;
@@ -154,9 +156,17 @@ export default function Index() {
     closeSettings,
     isWeeklyReviewOpen,
     closeWeeklyReview,
+    isPlanningHubOpen,
+    planningHubInitialView,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    openPlanningHub: _openPlanningHub,
+    closePlanningHub,
+    isQuickCaptureOpen,
+    openQuickCapture,
+    closeQuickCapture,
   } = useAppNavigation();
   const { width: screenWidth } = useWindowDimensions();
-  const { top: safeAreaTop } = useSafeAreaInsets();
+  const { top: safeAreaTop, bottom: safeAreaBottom } = useSafeAreaInsets();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
 
   const currentIndex = useMemo(
@@ -292,6 +302,44 @@ export default function Index() {
       >
         <WeeklyReviewScreen onClose={closeWeeklyReview} />
       </Modal>
+
+      <Modal
+        visible={isPlanningHubOpen}
+        onClose={closePlanningHub}
+        title="Planning Hub"
+        scroll
+        layout="drawer"
+      >
+        <PlanningHubScreen initialView={planningHubInitialView} />
+      </Modal>
+
+      <Modal
+        visible={isQuickCaptureOpen}
+        onClose={closeQuickCapture}
+        title="Quick Capture"
+        scroll
+        layout="bottom-sheet"
+      >
+        <QuickCaptureOverlay />
+      </Modal>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Quick capture"
+        onPress={openQuickCapture}
+        className="absolute right-4 h-14 w-14 items-center justify-center rounded-full shadow-lg"
+        style={{
+          bottom: safeAreaBottom + 16,
+          backgroundColor: SECTION_COLORS.focus,
+          shadowColor: tokens.shadowColor,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.2,
+          shadowRadius: 12,
+          elevation: 6,
+        }}
+      >
+        <MaterialIcons name="add" size={26} color={tokens.textOnAccent} />
+      </Pressable>
     </View>
   );
 }

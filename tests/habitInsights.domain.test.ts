@@ -25,6 +25,8 @@ function habit(
     icon: 'check-circle',
     color: '#2563eb',
     rule_history: JSON.stringify(rules),
+    project_id: null,
+    goal_id: null,
     created_at: `${effectiveFromDate}T12:00:00.000Z`,
     updated_at: `${effectiveFromDate}T12:00:00.000Z`,
     deleted_at: null,

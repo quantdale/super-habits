@@ -130,6 +130,8 @@ function remoteTodo(overrides: Partial<Omit<Todo, 'id'>> & { id: string }): Todo
     sort_order: 1,
     recurrence: null,
     recurrence_id: null,
+    project_id: null,
+    goal_id: null,
     created_at: '2026-06-01T00:00:00.000Z',
     updated_at: '2026-06-02T00:00:00.000Z',
     deleted_at: null,
@@ -296,6 +298,8 @@ describe('applyRemote* import behaviour (INSERT OR REPLACE)', () => {
         rule_history: JSON.stringify([
           { effective_from_date: '2026-06-01', weekdays: [1, 3, 5], target_per_day: 2 },
         ]),
+        project_id: null,
+        goal_id: null,
         created_at: '2026-06-01T00:00:00.000Z',
         updated_at: '2026-06-02T00:00:00.000Z',
         deleted_at: null,

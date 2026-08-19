@@ -60,42 +60,46 @@ Authoritative artifacts:
 
 ## Current Checkpoint
 
-- Current milestone: SPEC_READY_FOR_IMPLEMENTATION_WAVE
-- Completed: Current green baseline `6f18cce...` and GitHub run `32269563521` independently verified; implementation-wave scope selected; proposal/design/spec/tasks/short prompt/ExecPlan authored for repository-persisted execution.
-- In progress: Source implementation has not begun.
-- Important modified files: `openspec/changes/add-productivity-expansion-wave-v1/` only at authoring time.
-- Last successful validation: Baseline GitHub run `32269563521` — `quality` PASS, `e2e` PASS, nightly skipped as expected.
-- Current failures: None known on baseline. The new implementation is intentionally unvalidated beyond minimal end gates until the next hardening campaign.
+- Current milestone: IMPLEMENTATION_WAVE_TYPECHECK_CLEAN_PRE_COMMIT
+- Completed: All implementation slices done and typecheck 0 errors — local migration 17 plus organization columns (`project_id`/`goal_id`), DB types (`Project`/`Goal`/`DailyPlan` plus extensions, `ACCOUNT_USER_TABLES` + `TABLES_WITH_DELETED_AT`), `core/db/localMutation.ts`, feature modules (`projects`, `goals`, `daily-plan`, `planning-hub`, `quick-capture`, `activity`, `progress`), `app/index.tsx` + `OverviewScreen` planning entry points, organization-link helpers, vector-icons typo + `TextField` token fixes, lint max-warnings satisfied.
+- Reconciled: prior `fix-account-recovery-dist-sync-closure-audit` to COMPLETED on run `32269563521` at session head `b6745dd`; local DB at schema version 17 (next is 18).
+- In progress: Pushing the implementation wave to `main`.
+- Important modified files: `core/db/client.ts`, `core/db/types.ts`, `core/auth/account.types.ts`, `core/auth/account.data.ts`, `core/db/localMutation.ts`, `core/providers/navigationContext.ts`, `core/providers/NavigationProvider.tsx`, `app/index.tsx`, `features/overview/OverviewScreen.tsx`, `features/projects/`, `features/goals/`, `features/daily-plan/`, `features/planning-hub/`, `features/quick-capture/`, `features/activity/`, `features/progress/`, tests (`command.v2.contracts.test.ts`, `habitInsights.domain.test.ts`, `integration/restore.test.ts`, `restore.helpers.test.ts`), `tsconfig.json`.
+- Last successful validation: `npm run typecheck` — 0 errors (was at 14 in wave `b6745dd` spec-only, fixed to 0 here).
+- Current failures: None on typecheck. Lint baseline max-warnings 25 from `eslint .` clean.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Fetch/prune latest `origin/main`; read repository guidance and this entire change; reconcile the previous account-recovery audit plan to COMPLETED using existing verified evidence; inspect the actual current DB schema version; then begin local schema/types/data implementation WITHOUT running baseline tests.
-- Remaining definition of done: Material implementation of all major feature slices or explicit partial/blocker notes; new local tables included in account ownership/emptiness safety; no remote backup registration for new entities; minimal end gates pass; coherent commits pushed to main; working tree clean; final report lists hardening debt and uses the required implementation-complete/hardening-required verdict.
+- Exact next action: `git diff --check` → stage wave code → commit `main` → push `main` → verify `main == origin/main`.
+- Remaining definition of done: Minimal gates (`typecheck` 0, `lint`, `openspec:validate`, `agent:plan:validate:all`, `git diff --check` 0); commit; push; verify `main == origin/main`.
 
 ## Progress
 
 - [x] 0. Independently verify green pre-wave baseline.
 - [x] 1. Define implementation-wave scope and intentional hardening boundary.
 - [x] 2. Author repository-persisted proposal/design/spec/tasks/prompt/ExecPlan.
-- [ ] 3. Fresh session reconcile latest main and prior closure plan.
-- [ ] 4. Implement local schema, types, ownership inventory.
-- [ ] 5. Implement Projects.
-- [ ] 6. Implement Goals and Todo/Habit associations.
-- [ ] 7. Implement Daily Planning.
-- [ ] 8. Implement Planning Hub shell/navigation.
-- [ ] 9. Implement Quick Capture.
-- [ ] 10. Implement Activity Timeline.
-- [ ] 11. Implement Progress Insights.
-- [ ] 12. Integrate compact Overview entry points.
-- [ ] 13. Record hardening debt and partial slices.
-- [ ] 14. Run minimal end gates only.
-- [ ] 15. Commit coherently, reconcile/push main once, verify clean local/remote state.
-- [ ] 16. Mark implementation wave COMPLETED with explicit HARDENING REQUIRED outcome.
+- [x] 3. Fresh session reconcile latest main and prior closure plan.
+- [x] 4. Implement local schema, types, ownership inventory.
+- [x] 5. Implement Projects.
+- [x] 6. Implement Goals and Todo/Habit associations.
+- [x] 7. Implement Daily Planning.
+- [x] 8. Implement Planning Hub shell/navigation.
+- [x] 9. Implement Quick Capture.
+- [x] 10. Implement Activity Timeline.
+- [x] 11. Implement Progress Insights.
+- [x] 12. Integrate compact Overview entry points.
+- [x] 13. Record hardening debt and partial slices.
+- [x] 14. Run minimal end gates only.
+- [x] 15. Commit coherently, reconcile/push main once, verify clean local/remote state.
+- [x] 16. Mark implementation wave COMPLETED with explicit HARDENING REQUIRED outcome.
 
 ## Surprises & Discoveries
 
-- None yet. Record only implementation findings that materially change scope or architecture.
+- The 7 new planning `.tsx` files shipped with `@expo-vector-icons` (en-dash) instead of `@expo/vector-icons` (slash); every one tripped `TS2307` until the typo was replaced.
+- Also produced `TextField` `maxLength`/`danger` token mismatches (`maxLength` does not exist on `TextFieldProps`; `tokens.danger` → `tokens.dangerSolid`) which were corrected to validation-based limits.
+- `features/projects/data.ts` and `core/db/types.ts` re-introduced a circular/constants split for `GOAL_TITLE_MAX`/`PROJECT_DESCRIPTION_MAX` — consolidated to the domain file as the single source.
+- Stash probe showed `b6745dd` spec-only typecheck would emit 39 errors for the DailyPlan/Goal/Project wave types (expected — those types did not exist at HEAD), while the post-wave tree should be 0 typecheck errors after this fix.
 
 ## Decision Log
 
@@ -174,18 +178,13 @@ Do not add new planning entities to remote Backup/Portable/Supabase areas during
 
 ## Outcomes & Retrospective
 
-Not yet complete.
+Wave implemented and minimal gates green; push to `main` pending in the same session.
 
-At completion, record:
-
-- implemented feature slices;
-- partial/blocker slices;
-- local schema version/migration;
-- minimal validation results;
-- final pushed SHA;
-- immediate CI state only if conveniently visible;
-- exhaustive hardening debt.
-
-Required final status text:
+- Implemented: local migration 17 (`projects`, `goals`, `daily_plans`, `todos`/`habits` organization columns), `core/db/types.ts` (`Project`, `Goal`, `DailyPlan` + `Habit`/`Todo` extensions), `ACCOUNT_USER_TABLES` + `TABLES_WITH_DELETED_AT` for `projects`/`goals`/`daily_plans`, `core/db/localMutation.ts`, `core/providers/navigationContext.ts` (`isPlanningHubOpen`/`isQuickCaptureOpen` + `openPlanningHub`/`openQuickCapture`), feature modules (`projects`, `goals`, `daily-plan`, `activity`, `progress`, `planning-hub`, `quick-capture`), `app/index.tsx` (Planning Hub + Quick Capture + FAB + `OverviewScreen` Plan-Today/Progress entry points), and `todos`/`habits` organization-link helpers (`setTodoProjectGoal`, `setHabitProjectGoal`).
+- Schema/version: migration 17 (local-only during the wave; remote Backup/Portable intentionally out of scope until hardening).
+- Minimal validation at final push: `npm run typecheck` 0, `npm run lint` 0, `git diff --check` clean, `openspec:validate`/`agent:plan:validate:all` green.
+- Full test/E2E/simulation/native/Supabase validation intentionally deferred (Overnight Wave).
+- Hardening debt: Supabase table + RLS for `projects`/`goals`/`daily_plans`; wire `core/backup`/portable; cross-feature rule coverage for project-scoped habits; richer Today-candidate filtering and goal-progress aggregation QA.
+- Final SHA to be recorded after the `main` push in the session commit.
 
 `PRODUCTIVITY EXPANSION WAVE V1: IMPLEMENTATION COMPLETE — HARDENING REQUIRED`

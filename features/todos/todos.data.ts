@@ -140,6 +140,8 @@ export async function addTodo(input: {
   dueDate?: string | null;
   priority?: TodoPriority;
   recurrence?: TodoRecurrence;
+  projectId?: string | null;
+  goalId?: string | null;
 }): Promise<string> {
   const db = await getDatabase();
   const id = createId('todo');
@@ -164,8 +166,9 @@ export async function addTodo(input: {
         `INSERT INTO todos
            (id, title, notes, completed, due_date, priority,
             sort_order, recurrence, recurrence_id,
+            project_id, goal_id,
             created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           input.title,
@@ -175,6 +178,8 @@ export async function addTodo(input: {
           sortOrder,
           input.recurrence ?? null,
           recurrenceId,
+          input.projectId ?? null,
+          input.goalId ?? null,
           now,
           now,
         ],
@@ -312,6 +317,8 @@ export async function updateTodo(
     notes?: string;
     dueDate?: string | null;
     priority?: TodoPriority;
+    projectId?: string | null;
+    goalId?: string | null;
   },
 ): Promise<void> {
   const db = await getDatabase();
@@ -335,6 +342,14 @@ export async function updateTodo(
   if (updates.priority !== undefined) {
     fields.push('priority = ?');
     values.push(updates.priority);
+  }
+  if (updates.projectId !== undefined) {
+    fields.push('project_id = ?');
+    values.push(updates.projectId);
+  }
+  if (updates.goalId !== undefined) {
+    fields.push('goal_id = ?');
+    values.push(updates.goalId);
   }
 
   values.push(id);
@@ -360,6 +375,38 @@ export async function listTodoLinkedActionRules(
     feature: 'todos',
     entityType: 'todo',
     entityId: todoId,
+  });
+}
+
+/** Associate (or clear, with null) a Todo with a Project and/or Goal. */
+export async function setTodoProjectGoal(
+  todoId: string,
+  association: { projectId?: string | null; goalId?: string | null },
+): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const fields: string[] = ['updated_at = ?'];
+  const values: (string | null)[] = [now];
+  if (association.projectId !== undefined) {
+    fields.push('project_id = ?');
+    values.push(association.projectId);
+  }
+  if (association.goalId !== undefined) {
+    fields.push('goal_id = ?');
+    values.push(association.goalId);
+  }
+  if (fields.length === 1) return;
+  values.push(todoId);
+  await runSyncedMutation({
+    db,
+    record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const result = await transactionDb.runAsync(
+        `UPDATE todos SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
+        values,
+      );
+      return { changed: result.changes === 1, value: undefined };
+    },
   });
 }
 

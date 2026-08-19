@@ -79,6 +79,8 @@ export async function addHabit(
   color: string = DEFAULT_HABIT_COLOR,
   weekdays: readonly HabitWeekday[] = ALL_HABIT_WEEKDAYS,
   reminderTime: string | null = null,
+  projectId?: string | null,
+  goalId?: string | null,
 ): Promise<string> {
   const parsedReminderTime = reminderTime === null ? null : parseHabitReminderTime(reminderTime);
   if (reminderTime !== null && !parsedReminderTime) {
@@ -96,7 +98,7 @@ export async function addHabit(
     record: { entity: 'habits', id, updatedAt: now, operation: 'create' },
     mutate: async (transactionDb, enqueue) => {
       await transactionDb.runAsync(
-        'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+        'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, project_id, goal_id, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
         [
           id,
           name,
@@ -106,6 +108,8 @@ export async function addHabit(
           icon,
           color,
           serializeHabitRuleHistory(ruleHistory),
+          projectId ?? null,
+          goalId ?? null,
           now,
           now,
         ],
@@ -637,6 +641,38 @@ export async function updateHabit(
     },
   });
   if (result.changed) requestHabitReminderReconciliation();
+}
+
+/** Associate (or clear, with null) a Habit with a Project and/or Goal. */
+export async function setHabitProjectGoal(
+  habitId: string,
+  association: { projectId?: string | null; goalId?: string | null },
+): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const fields: string[] = ['updated_at = ?'];
+  const values: (string | null)[] = [now];
+  if (association.projectId !== undefined) {
+    fields.push('project_id = ?');
+    values.push(association.projectId);
+  }
+  if (association.goalId !== undefined) {
+    fields.push('goal_id = ?');
+    values.push(association.goalId);
+  }
+  if (fields.length === 1) return;
+  values.push(habitId);
+  await runSyncedMutation({
+    db,
+    record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb) => {
+      const result = await transactionDb.runAsync(
+        `UPDATE habits SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
+        values,
+      );
+      return { changed: result.changes === 1, value: undefined };
+    },
+  });
 }
 
 export async function listHabitLinkedActionRules(

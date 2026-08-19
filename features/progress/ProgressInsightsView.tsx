@@ -1,0 +1,156 @@
+import { useCallback, useEffect, useState } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Text, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { Card } from '@/core/ui/Card';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { SECTION_COLORS } from '@/constants/sectionColors';
+import { buildProgressSummary } from '@/features/progress/progress.summary';
+import { pctDelta } from '@/features/progress/progress.domain';
+import type { ProgressSummary } from '@/features/progress/progress.types';
+
+type StatCard = {
+  label: string;
+  current: number;
+  previous: number;
+  unit?: string;
+  color: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+};
+
+export function ProgressInsightsView() {
+  const { tokens } = useAppTheme();
+  const [summary, setSummary] = useState<ProgressSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      setSummary(await buildProgressSummary());
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!isLoading && !summary) {
+    return (
+      <EmptyStateCard
+        accentColor={SECTION_COLORS.todos}
+        title="No progress data yet"
+        description="Complete tasks, habits, and sessions to start seeing weekly comparisons."
+        icon={<Text style={{ fontSize: 18 }}>•</Text>}
+      />
+    );
+  }
+
+  const cards: StatCard[] = summary
+    ? [
+        {
+          label: 'Tasks completed',
+          current: summary.todosCompleted.current,
+          previous: summary.todosCompleted.previous,
+          color: SECTION_COLORS.todos,
+          icon: 'check-circle',
+        },
+        {
+          label: 'Habit completions',
+          current: summary.habitCompletions.current,
+          previous: summary.habitCompletions.previous,
+          color: SECTION_COLORS.habits,
+          icon: 'loop',
+        },
+        {
+          label: 'Focus minutes',
+          current: summary.focusMinutes.current,
+          previous: summary.focusMinutes.previous,
+          unit: 'min',
+          color: SECTION_COLORS.focus,
+          icon: 'timer',
+        },
+        {
+          label: 'Workouts',
+          current: summary.workoutSessions.current,
+          previous: summary.workoutSessions.previous,
+          color: SECTION_COLORS.workout,
+          icon: 'fitness-center',
+        },
+        {
+          label: 'Calorie days',
+          current: summary.calorieTrackingDays.current,
+          previous: summary.calorieTrackingDays.previous,
+          color: SECTION_COLORS.calories,
+          icon: 'restaurant-menu',
+        },
+        {
+          label: 'Weekly reviews',
+          current: summary.weeklyReviewsCompleted.current,
+          previous: summary.weeklyReviewsCompleted.previous,
+          color: SECTION_COLORS.focus,
+          icon: 'date-range',
+        },
+      ]
+    : [];
+
+  return (
+    <View className="gap-3">
+      <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+        Progress
+      </Text>
+      {summary ? (
+        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          This week ({summary.range.currentStart} → {summary.range.currentEnd}) vs prior week
+        </Text>
+      ) : null}
+
+      <View className="flex-row flex-wrap gap-3">
+        {cards.map((card) => {
+          const delta = pctDelta(card.current, card.previous);
+          return (
+            <Card key={card.label} accentColor={card.color} className="flex-1" innerClassName="p-3">
+              <View className="flex-row items-center gap-2">
+                <Text style={{ fontSize: 18 }}>•</Text>
+                <Text className="text-sm" style={{ color: tokens.textMuted }} numberOfLines={1}>
+                  {card.label}
+                </Text>
+              </View>
+              <Text className="mt-2 text-2xl font-bold tabular-nums" style={{ color: tokens.text }}>
+                {card.current}
+                {card.unit ? ` ${card.unit}` : ''}
+              </Text>
+              <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+                Prior: {card.previous}
+                {delta === null ? ' (new)' : ` · ${delta >= 0 ? '+' : ''}${delta}%`}
+              </Text>
+            </Card>
+          );
+        })}
+      </View>
+
+      {summary ? (
+        <Card accentColor={SECTION_COLORS.todos} className="flex-1" innerClassName="p-3">
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Planning
+          </Text>
+          <View className="mt-2 gap-1">
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              Active projects: {summary.activeProjects}
+            </Text>
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              Active goals: {summary.activeGoals}
+            </Text>
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              Avg goal progress: {summary.goalsAverageProgress}%
+            </Text>
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              Calorie goal: {summary.calorieGoal} kcal
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+    </View>
+  );
+}

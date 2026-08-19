@@ -16,6 +16,9 @@ const TABLES_WITH_DELETED_AT = new Set<AccountUserTable>([
   'routine_exercise_sets',
   'calorie_entries',
   'linked_action_rules',
+  'projects',
+  'goals',
+  'daily_plans',
 ]);
 
 // The coordinator primes this cache after SQLite bootstrap. Keeping mutation

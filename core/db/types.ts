@@ -18,6 +18,33 @@ export type Todo = BaseEntity & {
   sort_order: number;
   recurrence: TodoRecurrence;
   recurrence_id: string | null;
+  project_id: string | null;
+  goal_id: string | null;
+};
+
+export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived';
+
+export type Project = BaseEntity & {
+  name: string;
+  description: string | null;
+  color: string;
+  status: ProjectStatus;
+  target_date: string | null;
+  sort_order: number;
+};
+
+export type GoalHorizon = 'week' | 'month' | 'quarter' | 'year' | 'custom';
+
+export type GoalStatus = 'active' | 'paused' | 'completed' | 'archived';
+
+export type Goal = BaseEntity & {
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  horizon: GoalHorizon;
+  target_date: string | null;
+  status: GoalStatus;
+  progress_percent: number;
 };
 
 export type HabitCategory = 'anytime' | 'morning' | 'afternoon' | 'evening';
@@ -46,6 +73,8 @@ export type Habit = BaseEntity & {
   /** JSON-serialized effective-dated schedule/target rules. */
   /** Optional in the TypeScript boundary so older remote/test rows normalize safely. */
   rule_history?: string;
+  project_id: string | null;
+  goal_id: string | null;
 };
 
 export type HabitCompletion = {
@@ -141,4 +170,19 @@ export type WeeklyReview = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+};
+
+export type DailyPlanStatus = 'draft' | 'committed' | 'completed';
+
+export type DailyPlan = BaseEntity & {
+  date_key: string;
+  intention: string;
+  /** JSON-serialized array of up to three Todo IDs (string[]). */
+  top_todo_ids: string;
+  focus_target_minutes: number;
+  notes: string;
+  reflection: string;
+  /** Energy score 1–5, or null when not yet recorded. */
+  energy_score: number | null;
+  status: DailyPlanStatus;
 };

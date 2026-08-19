@@ -98,6 +98,11 @@ The Today view SHALL surface current pending Todo candidates and today's schedul
 
 It SHALL NOT invent a second Habit scheduling formula or automatically rewrite existing records.
 
+#### Scenario: Today candidates reuse existing semantics
+
+- **WHEN** the user opens the Today planning view,
+- **THEN** the candidate Todo list and today's Habit summary are derived using the established Todo/Habit domain semantics without introducing a parallel scheduling formula.
+
 ### Requirement: Quick Capture is globally accessible
 
 The app SHALL provide a quick-capture launcher accessible from the normal application shell without obstructing core navigation.
@@ -151,6 +156,11 @@ It SHALL include at least Todos, Habits, Focus, Workout, calorie-tracking contex
 
 It SHALL NOT introduce an opaque global productivity score.
 
+#### Scenario: Progress comparison is bounded and untusked
+
+- **WHEN** the user opens the Progress view,
+- **THEN** the displayed comparison contrasts the current local 7-day window with the immediately preceding 7-day window using deterministic local facts, without an opaque global score.
+
 ### Requirement: New planning entities participate in local account safety
 
 `projects`, `goals`, and `daily_plans` SHALL be included in the complete local user-data inventory used by account ownership/recovery emptiness safety.
@@ -175,6 +185,11 @@ The UI SHALL NOT falsely claim these entities are protected by the existing comp
 ### Requirement: Existing six-section navigation remains stable
 
 The implementation SHALL preserve the six primary sections and SHALL NOT introduce a seventh primary tab for Planning/Projects/Goals.
+
+#### Scenario: Navigation count stays at six
+
+- **WHEN** the Planning Hub or Quick Capture surfaces are mounted,
+- **THEN** the six primary tab items remain unchanged and no seventh top-level navigation tab appears.
 
 ### Requirement: Implementation-wave validation is intentionally minimal
 
@@ -201,6 +216,11 @@ If one feature slice encounters a non-safety-critical implementation blocker, th
 
 Critical compile/data-loss issues must still be fixed before push.
 
+#### Scenario: Non-critical slice is bypassed
+
+- **WHEN** one non-critical feature slice is blocked,
+- **THEN** the session records the blocker and continues implementing independent slices instead of halting the wave.
+
 ### Requirement: Final status distinguishes implementation from readiness
 
 The final report SHALL NOT use production-ready language.
@@ -208,3 +228,8 @@ The final report SHALL NOT use production-ready language.
 If the implementation scope is materially complete, the final verdict SHALL be:
 
 `PRODUCTIVITY EXPANSION WAVE V1: IMPLEMENTATION COMPLETE — HARDENING REQUIRED`
+
+#### Scenario: Final verdict uses hardening-required language
+
+- **WHEN** the implementation wave completes with material scope,
+- **THEN** the final report text is exactly `PRODUCTIVITY EXPANSION WAVE V1: IMPLEMENTATION COMPLETE — HARDENING REQUIRED`.

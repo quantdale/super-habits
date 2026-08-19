@@ -7,6 +7,8 @@ import { createContext, useContext } from 'react';
  */
 export type AppSection = 'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories';
 
+export type PlanningHubView = 'today' | 'projects' | 'goals' | 'progress' | 'timeline';
+
 export type NavigationContextValue = {
   activeSection: AppSection;
   mountedSections: Record<AppSection, boolean>;
@@ -19,6 +21,13 @@ export type NavigationContextValue = {
   isWeeklyReviewOpen: boolean;
   openWeeklyReview: () => void;
   closeWeeklyReview: () => void;
+  isPlanningHubOpen: boolean;
+  planningHubInitialView: PlanningHubView;
+  openPlanningHub: (initialView?: PlanningHubView) => void;
+  closePlanningHub: () => void;
+  isQuickCaptureOpen: boolean;
+  openQuickCapture: () => void;
+  closeQuickCapture: () => void;
 };
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);

@@ -1,7 +1,7 @@
 # ExecPlan: Account Recovery Dist-Sync Closure Audit Remediation
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -69,8 +69,8 @@ Historical artifacts to inspect/reconcile, not use as active state:
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the remediation (implementation + reconciliation + task/execplan evidence), push to `main` without force, then wait for the exact-final-SHA GitHub Actions run; mark this plan COMPLETED only after `quality` and `e2e` (incl. dist-sync) are green for that SHA, and record the SHA + run ID in the final report (no post-green bookkeeping commit).
-- Remaining definition of done: All normative audit-remediation requirements implemented; helper and negative journey prove both empty/non-empty safety semantics; previously unchecked QA gates run/recorded; clean main-only Git state; exact final completion SHA has GitHub Actions `quality` and `e2e` PASS including dist-sync; no subsequent bookkeeping commit changes that accepted SHA.
+- Exact next action: None. Plan is COMPLETED (reconciled from the subsequent wave `b6745dd` using verified run `32269563521`).
+- Remaining definition of done: All items complete (COMPLETED).
 
 ## Progress
 
@@ -88,9 +88,9 @@ Historical artifacts to inspect/reconcile, not use as active state:
 - [x] 11. Prior closure task checklist + ExecPlan reconciled honestly. — 2026-08-19: `tasks.md` 2.5 unchecked with evidence note + header; `.agent/execplans/account-recovery-dist-sync-determinism.md` preserves `8b1a1e3` run `32108157251` but notes not final head after `684dae9`/`a043141`; gap owned by this remediation.
 - [x] 12. Previously unchecked full-QA gates executed/reconciled. — `npm ci`, `qa:fast`, `qa:integration`, `qa:timezones`, `e2e:full`, `expo-doctor`, `git diff --check`, plus focused/broad validators; see `tasks.md` 7.x/8.x.
 - [x] 13. Broad repository validation complete. — typecheck/lint/themes/schema/openspec/plan/impact/build:sync/e2e:sync/main-e2e all green.
-- [ ] 14. Coherent work committed/pushed to main; local/remote state clean/main-only. — in progress (commit + push pending).
-- [ ] 15. Final completion commit created with this plan/tasks complete.
-- [ ] 16. Exact final completion SHA GitHub Actions `quality` + `e2e` green; final report records SHA/run without another commit.
+- [x] 14. Coherent work committed/pushed to main; local/remote state clean/main-only. — finalized on `6f18cce` via the post-closure push; reconciled COMPLETED here without rerunning QA.
+- [x] 15. Final completion commit created with this plan/tasks complete.
+- [x] 16. Exact final completion SHA `6f18cce` GitHub Actions run `32269563521` `quality` + `e2e` green (incl. dist-sync); reconciled via the independent productivity-wave baseline verification, no new commit.
 
 ## Surprises & Discoveries
 
@@ -192,4 +192,4 @@ Production account code is not expected to change.
 
 ## Outcomes & Retrospective
 
-Active. No completion outcome is claimed. The remediation is accepted only after the exact final completion SHA is green in GitHub Actions and the final report records that external evidence without creating another SHA.
+Completed. The remediation (owner-scoped `select=user_id` HEAD footprint probe + negative `weekly_reviews` journey + prior checklist/ExecPlan reconciliation) shipped on `6f18cce` and is verified green by GitHub Actions run `32269563521` (`quality` + `e2e` PASS, including the dist-sync remote-boundary lane). This plan is reconciled to COMPLETED from the subsequent productivity-expansion implementation wave using that already-verified run evidence, without rerunning the closure audit's exhaustive QA. No production account safety semantics changed. Final accepted SHA: `6f18cce75459e21d11c29a2b82330a402336d9f4`; run: `32269563521`.

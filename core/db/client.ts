@@ -519,6 +519,76 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       `);
     });
   }
+
+  // Migration 17: Productivity Expansion Wave V1 — local-only planning entities.
+  // Projects, Goals, and Daily Plans are authoritative local state only; they are
+  // NOT registered in the remote backup/sync/restore/portable contracts during
+  // this wave (see design.md section 16). They DO participate in account
+  // local-data ownership/emptiness safety (account.types.ts ACCOUNT_USER_TABLES).
+  if (version < 17) {
+    await applyMigration(db, 17, async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS projects (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          color TEXT NOT NULL,
+          status TEXT NOT NULL,
+          target_date TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_projects_status_order
+          ON projects (status, sort_order) WHERE deleted_at IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_projects_target_date
+          ON projects (target_date) WHERE deleted_at IS NULL;
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS goals (
+          id TEXT PRIMARY KEY NOT NULL,
+          project_id TEXT,
+          title TEXT NOT NULL,
+          description TEXT,
+          horizon TEXT NOT NULL,
+          target_date TEXT,
+          status TEXT NOT NULL,
+          progress_percent INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_goals_project_id ON goals (project_id);
+        CREATE INDEX IF NOT EXISTS idx_goals_status ON goals (status) WHERE deleted_at IS NULL;
+      `);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS daily_plans (
+          id TEXT PRIMARY KEY NOT NULL,
+          date_key TEXT NOT NULL UNIQUE,
+          intention TEXT NOT NULL DEFAULT '',
+          top_todo_ids TEXT NOT NULL DEFAULT '[]',
+          focus_target_minutes INTEGER NOT NULL DEFAULT 0,
+          notes TEXT NOT NULL DEFAULT '',
+          reflection TEXT NOT NULL DEFAULT '',
+          energy_score INTEGER,
+          status TEXT NOT NULL DEFAULT 'draft',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_daily_plans_date_key
+          ON daily_plans (date_key) WHERE deleted_at IS NULL;
+      `);
+
+      await addColumnIfMissing(db, 'todos', 'project_id', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'goal_id', 'TEXT');
+      await addColumnIfMissing(db, 'habits', 'project_id', 'TEXT');
+      await addColumnIfMissing(db, 'habits', 'goal_id', 'TEXT');
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
