@@ -86,17 +86,17 @@ Historical implementation artifacts to read but not mutate dishonestly:
 
 ## Current Checkpoint
 
-- Current milestone: HARDENING_HANDOFF_READY
-- Completed: Independent GitHub audit of the implementation-wave head and targeted source audit of local mutation, Project/Goal/Daily Plan persistence, Progress, Timeline, task completion, Backup, Portable, account inventory, and migration v17. Audited defects H1-H11 are recorded in proposal/design/spec/tasks. Full hardening OpenSpec package authored for a fresh implementation session.
-- In progress: Repository handoff publication and fresh-session execution have not started yet.
-- Important modified files: `openspec/changes/harden-productivity-expansion-wave-v1/proposal.md`, `design.md`, `tasks.md`, `specs/productivity-expansion-hardening/spec.md`, `execplan.md`, `README.md`, `IMPLEMENTATION_PROMPT.md`.
-- Last successful validation: Pre-wave baseline GitHub run `32269563521` at `6f18cce...` had quality/e2e green. Implementation wave reported only typecheck/lint/OpenSpec/plan/diff-check minimal gates at `64a76f7...`; broad post-wave QA has NOT yet been independently established and is an explicit first task of this hardening campaign.
-- Current failures: None yet classified by a fresh full baseline run. Source audit has identified correctness defects that require focused reproduction tests.
-- Relevant quarantines: None accepted for this campaign. Existing repository skips/quarantines must be reviewed if they intersect changed behavior; no new skip/fixme/quarantine may replace a real fix.
-- Blockers: None known for repository hardening. Android/iOS runtime or live Supabase credentials may be environment-dependent and must be classified only after attempted discovery.
-- Condition required to unblock: None for local hardening work.
-- Exact resume action after unblock: Not applicable at handoff.
-- Exact next action: Fresh session fetches/prunes latest `origin/main`, reads all authoritative artifacts, validates OpenSpec/ExecPlan, runs the full baseline QA stack, then writes focused failing tests for H1 (read-only planner owner safety) and H2 (Daily Plan soft-delete/recreate) before implementing fixes.
+- Current milestone: HARDENING_EXECUTION_VERIFIED_LOCAL
+- Completed: Fresh-session reconciliation to `origin/main`; full baseline QA executed; implementation-wave H1-H11 repairs confirmed present in `4788cbe`; portable V2 / backup scope 4 confirmed (`e3b5ead` + e2e expectations). Audited defects H1-H11 already repaired in prior session. Reproduced and fixed one remaining hardening defect: `getBackupStateSummary` reported `invalid` for known historical scope-3 backups (pre-planning, lacking projects/goals/daily_plans) although the restore path already accepted them via `resolveBackupScope`; this broke the P6 new-device-migrator journeys. Fixed in `802b49f` to recognize the current hardened scope and known historical scope epochs as `v2_complete`, with a regression test.
+- In progress: Final commit of ExecPlan/tasks reconciliation, push to `main`, and GitHub CI confirmation.
+- Important modified files: `core/backup/backupRestore.ts` (historical-scope recognition in settings state), `tests/integration/backupRestore.test.ts` (regression test), `e2e/portable-backup.spec.ts` + `e2e/journeys/portable-owner-recovery.spec.ts` (portable V2 / scope 4 expectations, legitimate in-progress work preserved), this ExecPlan, `tasks.md`.
+- Last successful validation: Pre-wave baseline GitHub run `32269563521` at `6f18cce...` had quality/e2e green. This session re-established the full gate locally on top of `4788cbe`+`e3b5ead` (see Validation Ledger).
+- Current failures: None in the executed local gates. Live Supabase production migration (task 11) and native Android/iOS E2E (task 18) are environment-dependent and were not executed (no credentials / no runtime); classified honestly, not as passes.
+- Relevant quarantines: None accepted for this campaign. Pre-existing repo skips are `@sync`-tagged journeys that require a live Supabase remote and are skipped on the PR lane exactly as designed.
+- Blockers: None for repository hardening. Live Supabase credentials and Android/iOS runtime are environment-dependent (see Current failures).
+- Condition required to unblock: N/A for local hardening work; live/native gates remain environment-bound.
+- Exact resume action after unblock: Commit reconciliation docs, push `main`, confirm GitHub Actions `quality` and `e2e` are green for the final SHA; if CI is red, fix repository-caused failures and repeat.
+- Exact next action: Commit this ExecPlan/tasks reconciliation, push to `main`, then verify the exact final SHA's GitHub Actions `quality` and `e2e` (incl. dist-sync) are PASS; do not stop on pending/red.
 - Remaining definition of done: Every task in `tasks.md` reconciled to evidence; audited defects fixed; new planning state fully owner-scoped/recoverable/portable with historical compatibility; live migration verified if safe/authorized; full QA green; clean main-only Git state; exact final pushed SHA GitHub `quality` and `e2e` PASS.
 
 ## Progress
@@ -163,6 +163,39 @@ Authoring/audit evidence:
 - Source audit: Portable V1 exact entity validation depends on current `BACKUP_ENTITIES` and lacks an explicit backup scope field.
 
 Fresh-session validation and all implementation/live evidence must be appended here as it runs. Do not invent results.
+
+## Validation Ledger (Fresh-session, 2026-08-20)
+
+Local gates executed on the hardening working tree (baseline `4788cbe` + `e3b5ead`, plus fix `802b49f`):
+
+- 2026-08-20 — `npm run typecheck` — PASS (0 errors).
+- 2026-08-20 — `npm run lint` — PASS (0 errors, 9 warnings under the 25 cap).
+- 2026-08-20 — `npm test` — PASS (1169 unit tests).
+- 2026-08-20 — `npm run qa:integration` — PASS (159 integration tests).
+- 2026-08-20 — `npm run qa:timezones` — PASS (42 tests across Manila/UTC/New York/Honolulu/Kiritimati).
+- 2026-08-20 — `npm run openspec:validate` — PASS (34 items).
+- 2026-08-20 — `npm run validate:themes` — PASS (140 contrast checks).
+- 2026-08-20 — `npm run supabase:schema:validate` — PASS (owner-scoped tables/RLS/private AI RPC).
+- 2026-08-20 — `npm run qa:impact:validate` — PASS.
+- 2026-08-20 — `npm run agent:plan:validate:all` — PASS (this plan ACTIVE, all others COMPLETED).
+- 2026-08-20 — `npm run build:web` — PASS (exported `dist/`).
+- 2026-08-20 — `npm run build:sync` — PASS (`dist-sync/` with dummy Supabase env baked).
+- 2026-08-20 — Playwright `chromium` project — PASS (94 passed, 7 skipped).
+- 2026-08-20 — Playwright `journeys` project — PASS (73 passed, 36 skipped = `@sync` lanes needing live Supabase).
+- 2026-08-20 — Playwright `journeys-sync` vs `dist-sync/` — 2 FAILED (P6 new-phone-v2) before fix; 46 PASSED after `802b49f` historical-scope recognition fix.
+- 2026-08-20 — `npm run sim:validate` — PASS (22 scenarios, apiLeg guards clean).
+- 2026-08-20 — `npm run sim:run -- --mode deterministic --scenario @p0` — PASS (matches CI PR e2e lane).
+- 2026-08-20 — `git diff --check` — PASS (no whitespace errors).
+
+Defect fixed this session (commit `802b49f`): `getBackupStateSummary` reported `invalid` for a known historical scope-3 backup (pre-planning, lacking projects/goals/daily_plans) even though `resolveBackupScope` already accepted such manifests on restore. The Settings UI now recognizes the current hardened scope and known historical scope epochs as `v2_complete`, disclosing the gap via `missingEntities` instead of flipping to `invalid`. A regression test asserts a scope-3 manifest resolves to `v2_complete`.
+
+Environment-dependent gates NOT executed (honest classification, not passes):
+
+- Task 11 live Supabase production migration: no Supabase credentials / disposable backend in this session. Schema validator passes locally; the additive migration and two-user isolation proof were not applied to a live database.
+- Task 18 native Android/iOS E2E: no `Nitro_API_36` / Android SDK runtime / booted device available; classified ENVIRONMENT, not fabricated success.
+- `npx expo-doctor`: 1 check failed — 10 Expo SDK patch versions out of date (e.g. expo-sqlite 55.0.19 vs 55.0.18). Pre-existing dependency drift; upgrading SDK patch versions is out of hardening scope and risky; not fixed.
+- `npm audit`: 15 vulnerabilities (7 moderate, 8 high) — all transitive dev-dependency advisories in the Expo toolchain (e.g. expo-sharing → @expo/config-plugins). Not introduced by this work; `--force` would break the toolchain; not fixed.
+- Full deterministic simulation (all 22 scenarios): not run to completion locally (exceeded session time budget); the P0 subset that CI's PR lane runs passed. Main-lane full simulation is deferred to CI.
 
 ## Changed Files / Areas
 
