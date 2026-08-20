@@ -105,6 +105,7 @@ describe('restore helper writers', () => {
         'Restore todos',
         'From backup',
         1,
+        null,
         '2026-04-21',
         'urgent',
         4,

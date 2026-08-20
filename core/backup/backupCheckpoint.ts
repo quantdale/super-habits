@@ -18,6 +18,7 @@ import {
   BACKUP_ENTITIES,
   BACKUP_MANIFEST_RECORD_ID,
   BACKUP_SCHEMA_VERSION,
+  BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_RECORD_ID,
   BACKUP_SETTINGS_VERSION,
   type BackupEntity,
@@ -248,6 +249,7 @@ async function runMaintenanceCycle(options?: {
       const completedAt = nowIso();
       const nextManifest: BackupManifest = {
         backupSchemaVersion: BACKUP_SCHEMA_VERSION,
+        backupScopeVersion: BACKUP_SCOPE_VERSION,
         generation,
         completedAt,
         entityMetadata,

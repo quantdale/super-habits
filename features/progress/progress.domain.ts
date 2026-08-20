@@ -1,4 +1,4 @@
-import { toDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, getUtcIsoRangeForLocalDateKeys, toDateKey } from '@/lib/time';
 import type { ProgressPeriodStat } from '@/features/progress/progress.types';
 
 export const PROGRESS_WINDOW_DAYS = 7;
@@ -19,37 +19,39 @@ export type ProgressDateRange = {
 /**
  * Compute deterministic local 7-day windows using sanctioned local-date helpers.
  * Current window is the last 7 inclusive local days; the previous window is the
- * 7 local days immediately before it.
+ * 7 local days immediately before it. UTC bounds are half-open local-midnight
+ * instants derived via getUtcIsoRangeForLocalDateKeys (DST-safe via setDate).
  */
 export function buildProgressDateRange(today: Date = new Date()): ProgressDateRange {
-  const end = new Date(today);
-  const currentStart = new Date(end);
-  currentStart.setDate(currentStart.getDate() - (PROGRESS_WINDOW_DAYS - 1));
+  const todayKey = toDateKey(today);
+  const todayMidnight = dateKeyToLocalDate(todayKey);
 
-  const previousEndExclusive = new Date(currentStart);
-  const previousStart = new Date(previousEndExclusive);
-  previousStart.setDate(previousStart.getDate() - PROGRESS_WINDOW_DAYS);
+  const currentStartMidnight = new Date(todayMidnight);
+  currentStartMidnight.setDate(todayMidnight.getDate() - (PROGRESS_WINDOW_DAYS - 1));
 
-  const currentStartKey = toDateKey(currentStart);
-  const currentEndKey = toDateKey(end);
-  const previousStartKey = toDateKey(previousStart);
-  const previousEndKey = toDateKey(new Date(previousEndExclusive.getTime() - 1));
+  const currentStartKey = toDateKey(currentStartMidnight);
+  const currentEndKey = todayKey;
 
-  // UTC ISO half-open bounds for timestamp columns.
-  const currentStartUtc = new Date(currentStart);
-  const currentEndUtc = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-  const previousStartUtc = new Date(previousStart);
-  const previousEndUtc = new Date(previousEndExclusive);
+  const previousEndExclusiveMidnight = new Date(currentStartMidnight);
+  const previousStartMidnight = new Date(previousEndExclusiveMidnight);
+  previousStartMidnight.setDate(previousEndExclusiveMidnight.getDate() - PROGRESS_WINDOW_DAYS);
+  const previousStartKey = toDateKey(previousStartMidnight);
+  const previousEndMidnight = new Date(previousEndExclusiveMidnight);
+  previousEndMidnight.setDate(previousEndExclusiveMidnight.getDate() - 1);
+  const previousEndKey = toDateKey(previousEndMidnight);
+
+  const currentUtc = getUtcIsoRangeForLocalDateKeys(currentStartKey, currentEndKey);
+  const previousUtc = getUtcIsoRangeForLocalDateKeys(previousStartKey, previousEndKey);
 
   return {
     currentStart: currentStartKey,
     currentEnd: currentEndKey,
     previousStart: previousStartKey,
     previousEnd: previousEndKey,
-    currentStartUtcIso: currentStartUtc.toISOString(),
-    currentEndUtcExclusiveIso: currentEndUtc.toISOString(),
-    previousStartUtcIso: previousStartUtc.toISOString(),
-    previousEndUtcExclusiveIso: previousEndUtc.toISOString(),
+    currentStartUtcIso: currentUtc.startUtcIso,
+    currentEndUtcExclusiveIso: currentUtc.endUtcExclusiveIso,
+    previousStartUtcIso: previousUtc.startUtcIso,
+    previousEndUtcExclusiveIso: previousUtc.endUtcExclusiveIso,
   };
 }
 

@@ -321,6 +321,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       {
         user_id: currentUserId,
         backup_schema_version: manifest.backupSchemaVersion,
+        backup_scope_version: manifest.backupScopeVersion,
         generation: manifest.generation,
         completed_at: manifest.completedAt,
         entity_metadata: manifest.entityMetadata,

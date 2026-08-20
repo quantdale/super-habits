@@ -1,4 +1,5 @@
 import type { GoalHorizon, GoalStatus } from '@/core/db/types';
+import { isValidDateKey } from '@/lib/time';
 import { clampProgressPercent } from '@/features/projects/projects.domain';
 import {
   GOAL_HORIZON_VALUES,
@@ -31,7 +32,8 @@ export function normalizeGoalStatus(value: string | undefined | null): GoalStatu
 
 export function validateGoalTargetDate(value: string | null | undefined): string | null {
   if (value === null || value === undefined || value === '') return null;
-  return GOAL_TARGET_DATE_PATTERN.test(value) ? value : null;
+  if (!GOAL_TARGET_DATE_PATTERN.test(value)) return null;
+  return isValidDateKey(value) ? value : null;
 }
 
 export type GoalValidationResult = {

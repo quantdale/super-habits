@@ -23,8 +23,9 @@ import type { BackupEntity, RecoverableSettingsV2 } from '@/core/backup/backup.t
  * Portable backup export — user-controlled, offline, read-only.
  *
  * The snapshot is captured inside ONE serialized SQLite read transaction
- * (all 12 entities + SQLite-backed recoverable settings + AsyncStorage theme),
- * then re-verified after commit: if the settings/theme canonical text changed
+ * (all recoverable entities for the current scope + SQLite-backed recoverable
+ * settings + AsyncStorage theme), then re-verified after commit: if the
+ * settings/theme canonical text changed
  * during capture, the capture runs once more. Export performs NO writes — no
  * sync records, no linked-action events, no saved-meal use-count changes, no
  * `app_meta` mutations.

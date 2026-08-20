@@ -1,7 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import { runLocalMutation } from '@/core/db/localMutation';
 import { createId } from '@/lib/id';
-import { nowIso, toDateKey } from '@/lib/time';
+import { isValidDateKey, nowIso, toDateKey } from '@/lib/time';
 import type { DailyPlan } from '@/core/db/types';
 import {
   clampFocusTargetMinutes,
@@ -12,7 +12,7 @@ import {
 } from '@/features/daily-plan/dailyPlan.domain';
 import { INTENTION_MAX, NOTES_MAX, REFLECTION_MAX } from '@/features/daily-plan/dailyPlan.types';
 
-const DAILY_PLAN_SELECT = `id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, created_at, updated_at, deleted_at`;
+const DAILY_PLAN_SELECT = `id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at`;
 
 export async function getDailyPlan(dateKey: string): Promise<DailyPlan | null> {
   const db = await getDatabase();
@@ -23,20 +23,12 @@ export async function getDailyPlan(dateKey: string): Promise<DailyPlan | null> {
 }
 
 export async function getOrCreateDailyPlan(dateKey: string = toDateKey()): Promise<DailyPlan> {
+  // Deprecated for UI use: preserved for internal callers/tests only.
+  // UI (DailyPlanView) must use getDailyPlan (read-only) + in-memory draft and
+  // explicit upsertDailyPlan on save to keep pristine devices safe.
   const existing = await getDailyPlan(dateKey);
   if (existing) return existing;
-  const db = await getDatabase();
-  const id = createId('dplan');
-  const now = nowIso();
-  await runLocalMutation(db, async (tx) => {
-    await tx.runAsync(
-      `INSERT INTO daily_plans
-         (id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, created_at, updated_at, deleted_at)
-       VALUES (?, ?, '', '[]', 0, '', '', NULL, 'draft', ?, ?, NULL)`,
-      [id, dateKey, now, now],
-    );
-  });
-  return (await getDailyPlan(dateKey)) as DailyPlan;
+  return upsertDailyPlan(dateKey, {});
 }
 
 export type DailyPlanUpdate = {
@@ -49,24 +41,51 @@ export type DailyPlanUpdate = {
   status?: DailyPlan['status'];
 };
 
+/**
+ * Prune topTodoIds to existing Todo ids at save time (H10 referential
+ * validation). Dropped stale/deleted ids are silent; ordering is preserved.
+ */
+async function filterExistingTodoIds(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return ids;
+  const db = await getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM todos WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+    ids,
+  );
+  const existingSet = new Set(rows.map((r) => r.id));
+  return ids.filter((id) => existingSet.has(id));
+}
+
 export async function upsertDailyPlan(
   dateKey: string,
   updates: DailyPlanUpdate,
 ): Promise<DailyPlan> {
+  if (!isValidDateKey(dateKey)) {
+    throw new Error('Invalid date key.');
+  }
   const db = await getDatabase();
   const now = nowIso();
   const existing = await getDailyPlan(dateKey);
-  const nextTopTodoIds = updates.topTodoIds
+  const rawNextTopTodoIds = updates.topTodoIds
     ? serializeTopTodoIds(updates.topTodoIds)
     : (existing?.top_todo_ids ?? '[]');
+  const nextTopTodoIds = updates.topTodoIds
+    ? serializeTopTodoIds(await filterExistingTodoIds(parseTopTodoIds(rawNextTopTodoIds)))
+    : rawNextTopTodoIds;
+
+  const nextStatus = updates.status ?? existing?.status ?? 'draft';
+  const willComplete = nextStatus === 'completed';
+  const wasCompleted = existing?.status === 'completed';
 
   if (!existing) {
     const id = createId('dplan');
+    const completedAt = willComplete ? now : null;
     await runLocalMutation(db, async (tx) => {
       await tx.runAsync(
         `INSERT INTO daily_plans
-           (id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+           (id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           dateKey,
@@ -76,7 +95,8 @@ export async function upsertDailyPlan(
           clampText(updates.notes, NOTES_MAX),
           clampText(updates.reflection, REFLECTION_MAX),
           normalizeEnergyScore(updates.energyScore),
-          updates.status ?? 'draft',
+          nextStatus,
+          completedAt,
           now,
           now,
         ],
@@ -113,7 +133,14 @@ export async function upsertDailyPlan(
   }
   if (updates.status !== undefined) {
     fields.push('status = ?');
-    values.push(updates.status);
+    values.push(nextStatus);
+    if (!wasCompleted && willComplete) {
+      fields.push('completed_at = ?');
+      values.push(now);
+    } else if (wasCompleted && !willComplete) {
+      fields.push('completed_at = ?');
+      values.push(null);
+    }
   }
   values.push(existing.id);
 

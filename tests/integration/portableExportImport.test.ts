@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { BACKUP_SCOPE_VERSION } from '@/core/backup/backup.types';
+import { PORTABLE_BACKUP_FORMAT_VERSION } from '@/core/portable/portable.types';
 
 /**
  * Portable Data Export & Import V1 — real-SQLite source→export→import
@@ -275,8 +277,9 @@ describe('portable export', () => {
     // Envelope contract.
     const parsed = JSON.parse(result.json) as Record<string, unknown>;
     expect(parsed.format).toBe('superhabits-portable-backup');
-    expect(parsed.formatVersion).toBe(1);
+    expect(parsed.formatVersion).toBe(PORTABLE_BACKUP_FORMAT_VERSION);
     expect(parsed.backupSchemaVersion).toBe(2);
+    expect(parsed.backupScopeVersion).toBe(BACKUP_SCOPE_VERSION);
     expect(typeof parsed.exportedAt).toBe('string');
     expect(result.fileName).toMatch(/^superhabits-backup-.*\.json$/);
     expect(result.byteLength).toBeGreaterThan(1000);
@@ -585,7 +588,7 @@ describe('portable import — cloud backup interaction', () => {
     const scope = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'backup.scope_version'",
     );
-    expect(scope?.value).toBe('3');
+    expect(scope?.value).toBe(String(BACKUP_SCOPE_VERSION));
     const status = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'backup.backfill_status'",
     );

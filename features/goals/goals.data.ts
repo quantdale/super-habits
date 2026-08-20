@@ -13,7 +13,7 @@ import {
 import type { Goal } from '@/core/db/types';
 import type { GoalInput, GoalUpdate } from '@/features/goals/goals.types';
 
-const GOAL_SELECT = `id, project_id, title, description, horizon, target_date, status, progress_percent, created_at, updated_at, deleted_at`;
+const GOAL_SELECT = `id, project_id, title, description, horizon, target_date, status, completed_at, progress_percent, created_at, updated_at, deleted_at`;
 const GOAL_ORDER = `CASE WHEN status IN ('completed', 'archived') THEN 1 ELSE 0 END, created_at DESC`;
 
 export async function listGoals(includeDeleted = false): Promise<Goal[]> {
@@ -36,11 +36,12 @@ export async function addGoal(input: GoalInput): Promise<string> {
   const id = createId('goal');
   const now = nowIso();
 
+  const completedAt = normalizeGoalStatus(input.status) === 'completed' ? now : null;
   await runLocalMutation(db, async (tx) => {
     await tx.runAsync(
       `INSERT INTO goals
-         (id, project_id, title, description, horizon, target_date, status, progress_percent, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         (id, project_id, title, description, horizon, target_date, status, completed_at, progress_percent, created_at, updated_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
       [
         id,
         input.projectId ?? null,
@@ -49,6 +50,7 @@ export async function addGoal(input: GoalInput): Promise<string> {
         normalizeGoalHorizon(input.horizon),
         validateGoalTargetDate(input.targetDate),
         normalizeGoalStatus(input.status),
+        completedAt,
         normalizeGoalProgress(input.progressPercent),
         now,
         now,
@@ -72,12 +74,15 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
   const db = await getDatabase();
   const now = nowIso();
 
+  const existing = await db.getFirstAsync<Pick<Goal, 'status' | 'completed_at'>>(
+    `SELECT status, completed_at FROM goals WHERE id = ? AND deleted_at IS NULL`,
+    [id],
+  );
+  const nextStatus =
+    updates.status !== undefined ? normalizeGoalStatus(updates.status) : existing?.status;
+
   const fields: string[] = ['updated_at = ?'];
   const values: (string | number | null)[] = [now];
-  if (updates.projectId !== undefined) {
-    fields.push('project_id = ?');
-    values.push(updates.projectId);
-  }
   if (updates.title !== undefined) {
     fields.push('title = ?');
     values.push(updates.title.trim());
@@ -96,19 +101,57 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
   }
   if (updates.status !== undefined) {
     fields.push('status = ?');
-    values.push(normalizeGoalStatus(updates.status));
+    values.push(nextStatus!);
+    const wasCompleted = existing?.status === 'completed';
+    const willBeCompleted = nextStatus === 'completed';
+    if (!wasCompleted && willBeCompleted) {
+      fields.push('completed_at = ?');
+      values.push(now);
+    } else if (wasCompleted && !willBeCompleted) {
+      fields.push('completed_at = ?');
+      values.push(null);
+    }
   }
   if (updates.progressPercent !== undefined) {
     fields.push('progress_percent = ?');
     values.push(clampProgressPercent(updates.progressPercent));
   }
-  values.push(id);
-
   await runLocalMutation(db, async (tx) => {
+    // H9: validate the target Project and reconcile linked children atomically.
+    if (updates.projectId !== undefined) {
+      const nextProjectId = updates.projectId;
+      if (nextProjectId !== null) {
+        const project = await tx.getFirstAsync<{ id: string }>(
+          `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+          [nextProjectId],
+        );
+        if (!project) throw new Error('Project not found.');
+      }
+      // Hierarchical consistency: Todos/Habits that reference this Goal follow
+      // its Project (including becoming unassigned when the goal is detached).
+      await tx.runAsync(
+        `UPDATE todos SET project_id = ?, updated_at = ?
+         WHERE goal_id = ? AND deleted_at IS NULL`,
+        [nextProjectId, now, id],
+      );
+      await tx.runAsync(
+        `UPDATE habits SET project_id = ?, updated_at = ?
+         WHERE goal_id = ? AND deleted_at IS NULL`,
+        [nextProjectId, now, id],
+      );
+      fields.push('project_id = ?');
+      values.push(nextProjectId);
+    }
+    values.push(id);
     await tx.runAsync(
       `UPDATE goals SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
       values,
     );
+    // Outbox coherence (pending remote integration): Projects/Goals/Daily Plans
+    // remain local-only this wave, so no outbox records are enqueued here. Once
+    // these entities gain a Supabase contract, the goal update and every
+    // reconciled child above must enqueue coherent owner-scoped outbox records
+    // in this same transaction.
   });
 }
 
@@ -124,10 +167,27 @@ export async function softDeleteGoal(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
   await runLocalMutation(db, async (tx) => {
+    // H9 reconciliation: clear goal_id from linked Todos/Habits so no item keeps
+    // a dangling reference to the deleted Goal. The item's current project_id
+    // (if any) is preserved, including one auto-aligned to this goal's project.
+    await tx.runAsync(
+      `UPDATE todos SET goal_id = NULL, updated_at = ?
+       WHERE goal_id = ? AND deleted_at IS NULL`,
+      [now, id],
+    );
+    await tx.runAsync(
+      `UPDATE habits SET goal_id = NULL, updated_at = ?
+       WHERE goal_id = ? AND deleted_at IS NULL`,
+      [now, id],
+    );
     await tx.runAsync(
       'UPDATE goals SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
       [now, now, id],
     );
+    // Outbox coherence (pending remote integration): Projects/Goals/Daily Plans
+    // remain local-only this wave. Once these entities gain a Supabase contract,
+    // the goal tombstone and each cleared child above must enqueue coherent
+    // owner-scoped outbox records in this same transaction.
   });
 }
 

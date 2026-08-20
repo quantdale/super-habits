@@ -1,4 +1,5 @@
 import type { ProjectStatus } from '@/core/db/types';
+import { isValidDateKey } from '@/lib/time';
 import {
   PROJECT_COLORS,
   PROJECT_STATUS_VALUES,
@@ -32,7 +33,8 @@ export function normalizeProjectStatus(value: string | undefined | null): Projec
 
 export function validateTargetDate(value: string | null | undefined): string | null {
   if (value === null || value === undefined || value === '') return null;
-  return PROJECT_TARGET_DATE_PATTERN.test(value) ? value : null;
+  if (!PROJECT_TARGET_DATE_PATTERN.test(value)) return null;
+  return isValidDateKey(value) ? value : null;
 }
 
 export type ProjectValidationResult = {

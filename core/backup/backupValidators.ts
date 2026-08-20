@@ -211,6 +211,40 @@ function nullableTextRule(field: string): FieldRule {
   };
 }
 
+function isNullableIdText(value: unknown): boolean {
+  return (
+    value === null || (typeof value === 'string' && ID_PATTERN.test(value) && value.length <= 100)
+  );
+}
+
+/**
+ * Truly optional column rule: validates `value` when the column is present and
+ * ignores it when absent. Used for the nullable `project_id`/`goal_id`/
+ * `completed_at` columns added to existing entities — historical Portable V1
+ * rows legitimately omit them, while current rows carry them (often NULL).
+ */
+function optionalColumnRule(field: string, validate: (v: unknown) => boolean): FieldRule {
+  return {
+    required: () => null,
+    optional: (row) => (field in row ? checkField(row, field, validate, field) : null),
+  };
+}
+
+function nullableDateKeyRule(field: string): FieldRule {
+  return {
+    required: () => null,
+    optional: (row) => checkField(row, field, (v) => v === null || isDateKey(v), field),
+  };
+}
+
+function nullableIntRule(field: string, min: number): FieldRule {
+  return {
+    required: () => null,
+    optional: (row) =>
+      checkField(row, field, (v) => v === null || (Number.isInteger(v) && Number(v) >= min), field),
+  };
+}
+
 const TODO_RULES: FieldRule[] = [
   idRule('id'),
   textRule('title', true),
@@ -228,6 +262,9 @@ const TODO_RULES: FieldRule[] = [
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
+  optionalColumnRule('project_id', isNullableIdText),
+  optionalColumnRule('goal_id', isNullableIdText),
+  optionalColumnRule('completed_at', isNullableIso),
 ];
 
 const HABIT_RULES: FieldRule[] = [
@@ -258,6 +295,9 @@ const HABIT_RULES: FieldRule[] = [
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
+  optionalColumnRule('project_id', isNullableIdText),
+  optionalColumnRule('goal_id', isNullableIdText),
+  optionalColumnRule('completed_at', isNullableIso),
 ];
 
 const HABIT_COMPLETION_RULES: FieldRule[] = [
@@ -457,6 +497,51 @@ const WEEKLY_REVIEW_RULES: FieldRule[] = [
   nullableIsoRule('deleted_at'),
 ];
 
+const PROJECT_RULES: FieldRule[] = [
+  idRule('id'),
+  textRule('name', true),
+  nullableTextRule('description'),
+  textRule('color', true),
+  enumRule('status', ['active', 'paused', 'completed', 'archived']),
+  nullableDateKeyRule('target_date'),
+  intRule('sort_order', true, 0),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+  nullableIsoRule('completed_at'),
+];
+
+const GOAL_RULES: FieldRule[] = [
+  idRule('id'),
+  optionalColumnRule('project_id', isNullableIdText),
+  textRule('title', true),
+  nullableTextRule('description'),
+  enumRule('horizon', ['week', 'month', 'quarter', 'year', 'custom']),
+  nullableDateKeyRule('target_date'),
+  enumRule('status', ['active', 'paused', 'completed', 'archived']),
+  intRule('progress_percent', true, 0),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+  nullableIsoRule('completed_at'),
+];
+
+const DAILY_PLAN_RULES: FieldRule[] = [
+  idRule('id'),
+  { required: (row) => checkField(row, 'date_key', isDateKey, 'date_key') },
+  nullableTextRule('intention'),
+  textRule('top_todo_ids', true),
+  intRule('focus_target_minutes', true, 0),
+  nullableTextRule('notes'),
+  nullableTextRule('reflection'),
+  nullableIntRule('energy_score', 0),
+  enumRule('status', ['draft', 'committed', 'completed']),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+  nullableIsoRule('completed_at'),
+];
+
 const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   todos: TODO_RULES,
   habits: HABIT_RULES,
@@ -471,6 +556,9 @@ const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   pomodoro_sessions: POMODORO_SESSION_RULES,
   linked_action_rules: LINKED_ACTION_RULE_RULES,
   weekly_reviews: WEEKLY_REVIEW_RULES,
+  projects: PROJECT_RULES,
+  goals: GOAL_RULES,
+  daily_plans: DAILY_PLAN_RULES,
 };
 
 /**

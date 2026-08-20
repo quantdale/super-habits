@@ -22,7 +22,7 @@ import type {
 export const PORTABLE_BACKUP_FORMAT = 'superhabits-portable-backup';
 
 /** Current portable envelope version (independent of the domain schema). */
-export const PORTABLE_BACKUP_FORMAT_VERSION = 1;
+export const PORTABLE_BACKUP_FORMAT_VERSION = 2;
 
 /**
  * Portable V1 file size contract — the SINGLE bound shared by export and
@@ -67,10 +67,17 @@ export type PortableBackupFile = {
   format: typeof PORTABLE_BACKUP_FORMAT;
   formatVersion: number;
   backupSchemaVersion: number;
+  /**
+   * Recoverable scope version (exact set of entities) this file covers. V2
+   * files persist it explicitly so a future app can unambiguously match the
+   * file against a known scope epoch. V1 files (formatVersion 1) predate
+   * scope versioning and are identified by their exact entity set instead.
+   */
+  backupScopeVersion: number;
   /** ISO-8601 timestamp of the export moment. */
   exportedAt: string;
   source: PortableSourceInfo;
-  /** All 12 recoverable entities; rows are stored sorted by id. */
+  /** All recoverable entities for this file's scope; rows are stored sorted by id. */
   entities: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
   /** Recoverable settings allowlist payload (calorie goal, pomodoro, theme). */
   settings: RecoverableSettingsV2;
@@ -92,6 +99,9 @@ export const PORTABLE_DOMAIN_LABELS: Record<BackupEntity, string> = {
   pomodoro_sessions: 'Focus sessions',
   linked_action_rules: 'Linked action rules',
   weekly_reviews: 'Weekly reviews',
+  projects: 'Projects',
+  goals: 'Goals',
+  daily_plans: 'Daily plans',
 };
 
 /** Import-eligibility owner verdicts surfaced in the preview. */

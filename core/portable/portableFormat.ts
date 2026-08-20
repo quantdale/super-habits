@@ -2,7 +2,11 @@ import {
   BACKUP_ENTITY_COLUMNS,
   BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
+  BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
+  PORTABLE_V1_ENTITY_COLUMNS,
   type BackupEntity,
 } from '@/core/backup/backup.types';
 import {
@@ -60,12 +64,31 @@ function sortedRows(rows: readonly Record<string, unknown>[]): Record<string, un
   return [...rows].sort(byId);
 }
 
+function setEqualsExactly(keys: string[], expected: readonly string[]): boolean {
+  if (keys.length !== expected.length) return false;
+  const set = new Set(keys);
+  return expected.every((entity) => set.has(entity));
+}
+
 /**
  * Deterministic canonical payload text for the portable envelope. Takes the
  * full file but reads only the covered fields, so `integrity` (including
  * `payloadChecksum`) is excluded by construction.
+ *
+ * The entity iteration order and column set are parameters so historical
+ * Portable V1 files (formatVersion 1) canonicalize/verify with their original
+ * column order/shape — otherwise their stored checksums would no longer match
+ * after the recoverable scope grew. When omitted, the current scope is used.
  */
-export function canonicalPortablePayloadText(file: PortableBackupFile): string {
+export function canonicalPortablePayloadText(
+  file: PortableBackupFile,
+  options?: {
+    entities?: readonly BackupEntity[];
+    columns?: Record<BackupEntity, readonly string[]>;
+  },
+): string {
+  const entities = options?.entities ?? BACKUP_ENTITIES;
+  const columns = options?.columns ?? BACKUP_ENTITY_COLUMNS;
   const lines: string[] = [
     `format:${PORTABLE_BACKUP_FORMAT}`,
     `formatVersion:${file.formatVersion}`,
@@ -76,11 +99,11 @@ export function canonicalPortablePayloadText(file: PortableBackupFile): string {
     `ownerFingerprint:${file.source.ownerFingerprint ?? 'null'}`,
     'entities:',
   ];
-  for (const entity of BACKUP_ENTITIES) {
+  for (const entity of entities) {
     lines.push(entity);
-    const columns = BACKUP_ENTITY_COLUMNS[entity];
+    const entityColumns = columns[entity];
     for (const row of sortedRows(file.entities[entity] ?? [])) {
-      lines.push(canonicalizeRow(row, columns));
+      lines.push(canonicalizeRow(row, entityColumns));
     }
   }
   lines.push('settings:');
@@ -88,8 +111,14 @@ export function canonicalPortablePayloadText(file: PortableBackupFile): string {
   return lines.join('\n');
 }
 
-export function computePortablePayloadChecksum(file: PortableBackupFile): string {
-  return sha256Hex(canonicalPortablePayloadText(file));
+export function computePortablePayloadChecksum(
+  file: PortableBackupFile,
+  options?: {
+    entities?: readonly BackupEntity[];
+    columns?: Record<BackupEntity, readonly string[]>;
+  },
+): string {
+  return sha256Hex(canonicalPortablePayloadText(file, options));
 }
 
 /**
@@ -118,6 +147,7 @@ export function buildPortableBackupFile(input: {
     format: PORTABLE_BACKUP_FORMAT,
     formatVersion: PORTABLE_BACKUP_FORMAT_VERSION,
     backupSchemaVersion: BACKUP_SCHEMA_VERSION,
+    backupScopeVersion: BACKUP_SCOPE_VERSION,
     exportedAt: input.exportedAt,
     source: {
       appVersion: input.appVersion,
@@ -182,7 +212,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     );
     return { ok: false, errors: errors.slice(0, 50) };
   }
-  if (input.formatVersion < PORTABLE_BACKUP_FORMAT_VERSION) {
+  if (input.formatVersion !== 1 && input.formatVersion !== PORTABLE_BACKUP_FORMAT_VERSION) {
     errors.push(`Portable format version ${input.formatVersion} is not supported.`);
     return { ok: false, errors: errors.slice(0, 50) };
   }
@@ -222,19 +252,55 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   }
   const entities = input.entities;
   const entityKeys = Object.keys(entities);
-  const expectedEntities = [...BACKUP_ENTITIES];
-  const missing = expectedEntities.filter((entity) => !(entity in entities));
-  const unknown = entityKeys.filter((key) => !(BACKUP_ENTITIES as readonly string[]).includes(key));
-  if (missing.length > 0) {
-    errors.push(`The file is missing the complete backup scope: ${missing.join(', ')}.`);
+
+  // Resolve the exact recoverable scope this file claims. Historical V1 files
+  // (formatVersion 1) are identified by their EXACT entity set; the two known
+  // historical epochs are the 12-entity pre-Weekly-Review scope and the
+  // 13-entity Weekly-Review scope. Any other/partial set is rejected — scope
+  // is never inferred permissively ("missing table = empty").
+  let scopeEntities: readonly BackupEntity[];
+  let scopeColumns: Record<BackupEntity, readonly string[]>;
+  if (input.formatVersion === 1) {
+    if (setEqualsExactly(entityKeys, KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET)) {
+      scopeEntities = KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET;
+      scopeColumns = PORTABLE_V1_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>;
+    } else if (setEqualsExactly(entityKeys, KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET)) {
+      scopeEntities = KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET;
+      scopeColumns = PORTABLE_V1_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>;
+    } else {
+      errors.push('The file uses an unrecognized or partial backup scope and cannot be imported.');
+      return { ok: false, errors: errors.slice(0, 50) };
+    }
+  } else {
+    // Current portable envelope: explicit scope version + exact current set.
+    if (
+      typeof input.backupScopeVersion !== 'number' ||
+      !Number.isInteger(input.backupScopeVersion) ||
+      input.backupScopeVersion !== BACKUP_SCOPE_VERSION
+    ) {
+      errors.push(
+        `This file uses backup scope version ${String(input.backupScopeVersion)}, which this app cannot import.`,
+      );
+      return { ok: false, errors: errors.slice(0, 50) };
+    }
+    const missing = [...BACKUP_ENTITIES].filter((entity) => !(entity in entities));
+    const unknown = entityKeys.filter(
+      (key) => !(BACKUP_ENTITIES as readonly string[]).includes(key),
+    );
+    if (missing.length > 0) {
+      errors.push(`The file is missing the complete backup scope: ${missing.join(', ')}.`);
+    }
+    if (unknown.length > 0) {
+      errors.push(`The file contains unsupported data groups: ${unknown.join(', ')}.`);
+    }
+    if (missing.length > 0 || unknown.length > 0) {
+      return { ok: false, errors: errors.slice(0, 50) };
+    }
+    scopeEntities = BACKUP_ENTITIES;
+    scopeColumns = BACKUP_ENTITY_COLUMNS;
   }
-  if (unknown.length > 0) {
-    errors.push(`The file contains unsupported data groups: ${unknown.join(', ')}.`);
-  }
-  if (missing.length > 0 || unknown.length > 0) {
-    return { ok: false, errors: errors.slice(0, 50) };
-  }
-  for (const entity of BACKUP_ENTITIES) {
+
+  for (const entity of scopeEntities) {
     if (!Array.isArray(entities[entity])) {
       errors.push(`The file's ${entity} data is not a list.`);
     }
@@ -245,9 +311,12 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     Record<BackupEntity, Record<string, unknown>[]>
   >;
 
-  // Per-row runtime validation (shared with cloud Restore V2).
+  // Per-row runtime validation (shared with cloud Restore V2). The validator
+  // tolerates absent nullable columns, so it is safe for both current rows
+  // (which carry `project_id`/`goal_id`/`completed_at`) and historical V1
+  // rows (which omit them).
   let rowErrors = 0;
-  for (const entity of BACKUP_ENTITIES) {
+  for (const entity of scopeEntities) {
     for (const row of rowsByEntity[entity] ?? []) {
       const validation = validateBackupRow(entity, row);
       if (!validation.ok) {
@@ -272,9 +341,10 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   }
   if (errors.length > 0) return { ok: false, errors: errors.slice(0, 50) };
 
-  // Entity checksums: count + deterministic SHA-256 per entity.
+  // Entity checksums: count + deterministic SHA-256 per entity, using the
+  // resolved scope's column set (historical V1 columns for V1 files).
   const entityIntegrityRecord = isRecord(entityIntegrity) ? entityIntegrity : {};
-  for (const entity of BACKUP_ENTITIES) {
+  for (const entity of scopeEntities) {
     const expected = entityIntegrityRecord[entity] as Record<string, unknown> | undefined;
     if (
       !expected ||
@@ -287,7 +357,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       errors.push(`${entity}: integrity metadata is malformed.`);
       continue;
     }
-    const actual = checksumRows(rowsByEntity[entity] ?? [], BACKUP_ENTITY_COLUMNS[entity]);
+    const actual = checksumRows(rowsByEntity[entity] ?? [], scopeColumns[entity]);
     if (expected.count !== actual.count || expected.checksum !== actual.checksum) {
       errors.push(
         `${entity}: integrity mismatch (expected ${expected.count} rows / ${expected.checksum}; found ${actual.count} / ${actual.checksum}).`,
@@ -324,7 +394,10 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       entities: rowsByEntity,
       settings: normalizeRecoverableSettings(input.settings),
     } as unknown as PortableBackupFile;
-    const actualPayloadChecksum = computePortablePayloadChecksum(candidate);
+    const actualPayloadChecksum = computePortablePayloadChecksum(candidate, {
+      entities: scopeEntities,
+      columns: scopeColumns,
+    });
     if (actualPayloadChecksum !== integrity.payloadChecksum) {
       errors.push(
         'The file\u2019s payload failed integrity verification; it may have been edited.',

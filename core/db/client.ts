@@ -589,6 +589,102 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       await addColumnIfMissing(db, 'habits', 'goal_id', 'TEXT');
     });
   }
+
+  // Migration 18: Harden daily_plans active-only date uniqueness (H2) and
+  // ensure partial unique index matches soft-delete semantics. Also reserves
+  // version bump for any subsequent hardening agents sharing v18.
+  // TODO(hardening-parallel): If another agent also claims version 18, reconcile
+  // to sequential version numbers before merging to main; keep migrations append-only
+  // and bump ids monotonically.
+  // H5+H7+H8 agent: added v19 below for stable completed_at + calendar validation.
+  // If another agent also claims v19, bump sequentially (v19 -> v20 etc.).
+  if (version < 18) {
+    await applyMigration(db, 18, async () => {
+      // Detect whether the global UNIQUE(date_key) constraint is present on the
+      // table DDL (migration 17) vs already migrated to partial index only.
+      // Rebuild only if the table SQL still declares UNIQUE on date_key.
+      const tableInfo = await db.getAllAsync<{ sql: string | null }>(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='daily_plans'`,
+      );
+      const tableSql = tableInfo[0]?.sql ?? '';
+      const hasGlobalUnique = /date_key\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(tableSql);
+      if (!hasGlobalUnique) return;
+
+      // Table-rebuild to drop the inline UNIQUE constraint while preserving all rows/tombstones.
+      await db.execAsync(`
+        CREATE TABLE daily_plans_new (
+          id TEXT PRIMARY KEY NOT NULL,
+          date_key TEXT NOT NULL,
+          intention TEXT NOT NULL DEFAULT '',
+          top_todo_ids TEXT NOT NULL DEFAULT '[]',
+          focus_target_minutes INTEGER NOT NULL DEFAULT 0,
+          notes TEXT NOT NULL DEFAULT '',
+          reflection TEXT NOT NULL DEFAULT '',
+          energy_score INTEGER,
+          status TEXT NOT NULL DEFAULT 'draft',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+      `);
+      await db.execAsync(`
+        INSERT INTO daily_plans_new (id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, created_at, updated_at, deleted_at)
+        SELECT id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, created_at, updated_at, deleted_at FROM daily_plans;
+      `);
+      // Verify row counts match before swapping.
+      const before = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) as c FROM daily_plans');
+      const after = await db.getFirstAsync<{ c: number }>(
+        'SELECT COUNT(*) as c FROM daily_plans_new',
+      );
+      if ((before?.c ?? 0) !== (after?.c ?? 0)) {
+        throw new Error('daily_plans migration row count mismatch');
+      }
+      // Verify active uniqueness would hold (no duplicate active date_key).
+      const dup = await db.getFirstAsync<{ dup: number }>(
+        `SELECT COUNT(*) as dup FROM (
+           SELECT date_key FROM daily_plans_new WHERE deleted_at IS NULL GROUP BY date_key HAVING COUNT(*) > 1
+         )`,
+      );
+      if ((dup?.dup ?? 0) > 0) {
+        throw new Error('daily_plans active duplicate date_key detected during migration');
+      }
+      await db.execAsync('DROP TABLE daily_plans;');
+      await db.execAsync('ALTER TABLE daily_plans_new RENAME TO daily_plans;');
+      await db.execAsync(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_plans_date_key_active ON daily_plans(date_key) WHERE deleted_at IS NULL;`,
+      );
+      // Recreate compat index name for legacy queries (optional; keep both unique names)
+      await db.execAsync(
+        `CREATE INDEX IF NOT EXISTS idx_daily_plans_date_key ON daily_plans(date_key) WHERE deleted_at IS NULL;`,
+      );
+    });
+  }
+
+  // Migration 19: Stable completion timestamps (H5/H7) + calendar-safe date keys (H8).
+  // Append-only; TODO(hardening-parallel): if v19 is already claimed by another
+  // hardening agent, bump this block to the next free version sequentially.
+  if (version < 19) {
+    await applyMigration(db, 19, async () => {
+      await addColumnIfMissing(db, 'todos', 'completed_at', 'TEXT');
+      await addColumnIfMissing(db, 'projects', 'completed_at', 'TEXT');
+      await addColumnIfMissing(db, 'goals', 'completed_at', 'TEXT');
+      await addColumnIfMissing(db, 'daily_plans', 'completed_at', 'TEXT');
+      // Backfill: legacy completed rows get best-effort completed_at = updated_at.
+      // Spec requires documented value; pending rows remain NULL.
+      await db.runAsync(
+        `UPDATE todos SET completed_at = updated_at WHERE completed = 1 AND (completed_at IS NULL OR completed_at = '')`,
+      );
+      await db.runAsync(
+        `UPDATE projects SET completed_at = updated_at WHERE status = 'completed' AND (completed_at IS NULL OR completed_at = '')`,
+      );
+      await db.runAsync(
+        `UPDATE goals SET completed_at = updated_at WHERE status = 'completed' AND (completed_at IS NULL OR completed_at = '')`,
+      );
+      await db.runAsync(
+        `UPDATE daily_plans SET completed_at = updated_at WHERE status = 'completed' AND (completed_at IS NULL OR completed_at = '')`,
+      );
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

@@ -13,6 +13,7 @@ export type Todo = BaseEntity & {
   title: string;
   notes: string | null;
   completed: 0 | 1;
+  completed_at?: string | null;
   due_date: string | null;
   priority: TodoPriority;
   sort_order: number;
@@ -30,6 +31,7 @@ export type Project = BaseEntity & {
   color: string;
   status: ProjectStatus;
   target_date: string | null;
+  completed_at?: string | null;
   sort_order: number;
 };
 
@@ -44,6 +46,7 @@ export type Goal = BaseEntity & {
   horizon: GoalHorizon;
   target_date: string | null;
   status: GoalStatus;
+  completed_at?: string | null;
   progress_percent: number;
 };
 
@@ -185,4 +188,5 @@ export type DailyPlan = BaseEntity & {
   /** Energy score 1–5, or null when not yet recorded. */
   energy_score: number | null;
   status: DailyPlanStatus;
+  completed_at?: string | null;
 };

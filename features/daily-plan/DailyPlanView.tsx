@@ -5,7 +5,7 @@ import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { getOrCreateDailyPlan, upsertDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import { getDailyPlan, upsertDailyPlan } from '@/features/daily-plan/dailyPlan.data';
 import {
   parseTopTodoIds,
   toggleTopTodoId,
@@ -37,16 +37,30 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const [saving, setSaving] = useState(false);
 
   const refresh = useCallback(async () => {
-    const current = await getOrCreateDailyPlan(today);
-    setPlan(current);
-    setIntention(current.intention);
-    setNotes(current.notes);
-    setReflection(current.reflection);
-    setEnergyScore(current.energy_score);
-    setFocusTarget(current.focus_target_minutes);
-    setTopTodoIds(parseTopTodoIds(current.top_todo_ids));
-
-    const [todos, habits] = await Promise.all([listPendingTodos(), listHabits()]);
+    const [existing, todos, habits] = await Promise.all([
+      getDailyPlan(today),
+      listPendingTodos(),
+      listHabits(),
+    ]);
+    if (existing) {
+      setPlan(existing);
+      setIntention(existing.intention);
+      setNotes(existing.notes);
+      setReflection(existing.reflection);
+      setEnergyScore(existing.energy_score);
+      setFocusTarget(existing.focus_target_minutes);
+      setTopTodoIds(parseTopTodoIds(existing.top_todo_ids));
+    } else {
+      // Read-only draft: do not persist until explicit Save/Commit/Complete.
+      // Keeps pristine provisional devices eligible for Recover Existing.
+      setPlan(null);
+      setIntention('');
+      setNotes('');
+      setReflection('');
+      setEnergyScore(null);
+      setFocusTarget(0);
+      setTopTodoIds([]);
+    }
     setPendingTodos(todos.map((t) => ({ id: t.id, title: t.title })));
     setScheduledHabits(
       habits
@@ -57,6 +71,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   useEffect(() => {
     void refresh();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
   }, [refresh]);
 
   const toggleTodo = useCallback((todoId: string) => {
@@ -91,9 +106,11 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   );
 
   const isCompleted = plan?.status === 'completed';
-  const selectedTitles = topTodoIds
-    .map((id) => pendingTodos.find((t) => t.id === id)?.title)
-    .filter(Boolean) as string[];
+  const pendingById = new Map(pendingTodos.map((t) => [t.id, t.title]));
+  const selectedItems = topTodoIds.map((id) => ({
+    id,
+    title: pendingById.get(id) ?? '(unavailable)',
+  }));
   const candidateTodos = pendingTodos.filter((t) => !topTodoIds.includes(t.id));
 
   return (
@@ -112,22 +129,19 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
         Top priorities ({topTodoIds.length}/{MAX_TOP_PRIORITIES})
       </Text>
-      {selectedTitles.map((title) => (
+      {selectedItems.map((item) => (
         <View
-          key={title}
+          key={item.id}
           className="mb-2 flex-row items-center justify-between rounded-xl border p-2"
           style={{ borderColor: tokens.border }}
         >
           <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={1}>
-            {title}
+            {item.title}
           </Text>
           <IconButton
             icon="remove-circle-outline"
-            onPress={() => {
-              const id = pendingTodos.find((t) => t.title === title)?.id;
-              if (id) toggleTodo(id);
-            }}
-            accessibilityLabel={`Remove ${title}`}
+            onPress={() => toggleTodo(item.id)}
+            accessibilityLabel={`Remove ${item.title}`}
           />
         </View>
       ))}

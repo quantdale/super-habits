@@ -11,11 +11,12 @@ import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase
 import { nowIso } from '@/lib/time';
 import { checksumRows } from '@/lib/checksum';
 import {
-  BACKUP_ENTITY_COLUMNS,
   BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
   BACKUP_SETTINGS_VERSION,
   BACKUP_SCOPE_VERSION,
+  backupEntityColumnsForScope,
+  resolveBackupScope,
   type BackupEntity,
   type BackupManifest,
   type RemoteBackupManifestRow,
@@ -144,6 +145,8 @@ export function parseManifestRow(row: unknown): BackupManifest | null {
   }
   return {
     backupSchemaVersion: candidate.backup_schema_version,
+    backupScopeVersion:
+      typeof candidate.backup_scope_version === 'number' ? candidate.backup_scope_version : -1,
     generation: candidate.generation,
     completedAt: candidate.completed_at,
     entityMetadata: metadata,
@@ -345,20 +348,31 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       diagnostics: [`backup_schema_version=${manifest.backupSchemaVersion}`],
     };
   }
-  const missingEntities = BACKUP_ENTITIES.filter((entity) => !manifest.entityMetadata[entity]);
-  if (missingEntities.length > 0) {
+  // Resolve the exact recoverable scope this manifest certifies. Historical
+  // manifests (no explicit scope version) are matched by their EXACT entity
+  // set; an unknown/partial set is rejected rather than permissively treated
+  // as a subset. A resolved scope guarantees the manifest's entityMetadata
+  // covers precisely that scope's entity set.
+  const scope = resolveBackupScope({
+    backupScopeVersion: manifest.backupScopeVersion,
+    entityMetadata: manifest.entityMetadata,
+  });
+  if (!scope) {
     return {
       status: 'invalid',
-      reason: 'incomplete_manifest',
-      message: 'The remote backup manifest does not cover the complete backup scope.',
-      diagnostics: missingEntities.map((entity) => `missing entity: ${entity}`),
+      reason: 'unsupported_version',
+      message: 'The remote backup uses an unrecognized or partial recoverable scope.',
+      diagnostics: ['recoverable scope does not match any known epoch'],
     };
   }
 
-  // Prefetch ALL rows before any local write; validate and verify everything.
+  // Prefetch ONLY the scope's entities before any local write; validate and
+  // verify everything. Limiting to the resolved scope also keeps historical
+  // restores from querying planning tables that did not exist when the backup
+  // was taken.
   const rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>> = {};
   try {
-    for (const entity of BACKUP_ENTITIES) {
+    for (const entity of scope.entitySet) {
       rowsByEntity[entity] = await fetchRemoteRows(entity, ownerUserId);
     }
   } catch (error) {
@@ -371,7 +385,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   }
 
   const diagnostics: string[] = [];
-  for (const entity of BACKUP_ENTITIES) {
+  for (const entity of scope.entitySet) {
     for (const row of rowsByEntity[entity] ?? []) {
       const validation = validateBackupRow(entity, row);
       if (!validation.ok) {
@@ -388,10 +402,11 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
 
-  for (const entity of BACKUP_ENTITIES) {
+  const scopeColumns = backupEntityColumnsForScope(scope.scope);
+  for (const entity of scope.entitySet) {
     const rows = rowsByEntity[entity] ?? [];
     const expected = manifest.entityMetadata[entity];
-    const actual = checksumRows(rows, BACKUP_ENTITY_COLUMNS[entity]);
+    const actual = checksumRows(rows, scopeColumns[entity]);
     if (!expected || expected.count !== actual.count || expected.checksum !== actual.checksum) {
       return {
         status: 'invalid',

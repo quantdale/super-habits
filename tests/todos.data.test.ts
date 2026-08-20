@@ -116,8 +116,8 @@ describe('features/todos/todos.data', () => {
     const result = await toggleTodo({ id: 'todo_1' } as never);
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE todos SET completed = ?, updated_at = ?'),
-      [1, '2026-04-16T10:00:00.000Z', 'todo_1', 0],
+      expect.stringContaining('UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?'),
+      [1, expect.any(String), '2026-04-16T10:00:00.000Z', 'todo_1', 0],
     );
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -483,8 +483,8 @@ describe('features/todos/todos.data', () => {
     });
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('completed = 1, updated_at = ?'),
-      [expect.any(String), 'todo_2'],
+      expect.stringContaining('completed = 1, completed_at = ?'),
+      [expect.any(String), expect.any(String), 'todo_2'],
     );
     expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
       {

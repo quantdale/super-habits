@@ -3,11 +3,7 @@ import { getCalorieGoal } from '@/features/calories/calories.data';
 import { countActiveGoals } from '@/features/goals/goals.data';
 import { countActiveProjects } from '@/features/projects/projects.data';
 import type { ProgressSummary } from '@/features/progress/progress.types';
-import {
-  buildProgressDateRange,
-  makePeriodStat,
-  type ProgressDateRange,
-} from '@/features/progress/progress.domain';
+import { buildProgressDateRange, makePeriodStat } from '@/features/progress/progress.domain';
 
 /**
  * Build deterministic current-7-day vs prior-7-day Progress Insights from
@@ -23,8 +19,10 @@ export async function buildProgressSummary(): Promise<ProgressSummary> {
     todoPrevious,
     habitCurrent,
     habitPrevious,
-    focusCurrent,
-    focusPrevious,
+    focusMinutesCurrent,
+    focusSessionsCurrent,
+    focusMinutesPrevious,
+    focusSessionsPrevious,
     workoutCurrent,
     workoutPrevious,
     calorieDaysCurrent,
@@ -41,7 +39,9 @@ export async function buildProgressSummary(): Promise<ProgressSummary> {
     countHabitCompletions(db, range.currentStart, range.currentEnd),
     countHabitCompletions(db, range.previousStart, range.previousEnd),
     sumFocusMinutes(db, range.currentStartUtcIso, range.currentEndUtcExclusiveIso),
+    countFocusSessions(db, range.currentStartUtcIso, range.currentEndUtcExclusiveIso),
     sumFocusMinutes(db, range.previousStartUtcIso, range.previousEndUtcExclusiveIso),
+    countFocusSessions(db, range.previousStartUtcIso, range.previousEndUtcExclusiveIso),
     countWorkouts(db, range.currentStartUtcIso, range.currentEndUtcExclusiveIso),
     countWorkouts(db, range.previousStartUtcIso, range.previousEndUtcExclusiveIso),
     countCalorieDays(db, range.currentStart, range.currentEnd),
@@ -63,11 +63,8 @@ export async function buildProgressSummary(): Promise<ProgressSummary> {
     },
     todosCompleted: makePeriodStat(todoCurrent, todoPrevious),
     habitCompletions: makePeriodStat(habitCurrent, habitPrevious),
-    focusMinutes: makePeriodStat(focusCurrent, focusPrevious),
-    focusSessions: makePeriodStat(
-      focusCurrent > 0 ? Math.ceil(focusCurrent / 25) : 0,
-      focusPrevious > 0 ? Math.ceil(focusPrevious / 25) : 0,
-    ),
+    focusMinutes: makePeriodStat(focusMinutesCurrent, focusMinutesPrevious),
+    focusSessions: makePeriodStat(focusSessionsCurrent, focusSessionsPrevious),
     workoutSessions: makePeriodStat(workoutCurrent, workoutPrevious),
     calorieTrackingDays: makePeriodStat(calorieDaysCurrent, calorieDaysPrevious),
     calorieGoal: calorieGoal.calories,
@@ -85,7 +82,7 @@ async function countTodoCompletions(
 ): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) AS count FROM todos
-     WHERE deleted_at IS NULL AND completed = 1 AND updated_at >= ? AND updated_at < ?`,
+     WHERE deleted_at IS NULL AND completed = 1 AND completed_at IS NOT NULL AND completed_at >= ? AND completed_at < ?`,
     [startUtcIso, endUtcExclusiveIso],
   );
   return row?.count ?? 0;
@@ -115,6 +112,19 @@ async function sumFocusMinutes(
     [startUtcIso, endUtcExclusiveIso],
   );
   return Math.round((row?.total ?? 0) / 60);
+}
+
+async function countFocusSessions(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  startUtcIso: string,
+  endUtcExclusiveIso: string,
+): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM pomodoro_sessions
+     WHERE session_type = 'focus' AND started_at >= ? AND started_at < ?`,
+    [startUtcIso, endUtcExclusiveIso],
+  );
+  return row?.count ?? 0;
 }
 
 async function countWorkouts(

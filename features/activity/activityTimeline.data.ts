@@ -35,9 +35,7 @@ function makeItem(
 /**
  * Derive a bounded, cross-domain activity timeline from authoritative local
  * state. This is a read model only — it never writes and introduces no new
- * event table (see design.md §11). Timestamps use defensible available facts;
- * Todo completion uses `updated_at` as an approximation when no dedicated
- * completion timestamp exists (documented in the hardening handoff).
+ * event table. Completion events use stable `completed_at` facts (hardened).
  */
 export async function buildActivityTimeline(
   options: BuildTimelineOptions = {},
@@ -49,16 +47,17 @@ export async function buildActivityTimeline(
   const sinceIso = windowStart.toISOString();
   const items: ActivityTimelineItem[] = [];
 
-  // Todos: completion approximated by updated_at. Subtitle flags the approximation.
-  const todos = await db.getAllAsync<{ id: string; title: string; updated_at: string }>(
-    `SELECT id, title, updated_at FROM todos
-     WHERE deleted_at IS NULL AND completed = 1 AND updated_at >= ?
-     ORDER BY updated_at DESC LIMIT 200`,
+  // Todos: stable completed_at.
+  const todos = await db.getAllAsync<{ id: string; title: string; completed_at: string | null }>(
+    `SELECT id, title, completed_at FROM todos
+     WHERE deleted_at IS NULL AND completed = 1 AND completed_at IS NOT NULL AND completed_at >= ?
+     ORDER BY completed_at DESC LIMIT 200`,
     [sinceIso],
   );
   for (const t of todos) {
+    if (!t.completed_at) continue;
     items.push(
-      makeItem('todo', t.id, t.updated_at, `Completed "${truncate(t.title)}"`, 'Task done'),
+      makeItem('todo', t.id, t.completed_at, `Completed "${truncate(t.title)}"`, 'Task done'),
     );
   }
 
@@ -126,7 +125,7 @@ export async function buildActivityTimeline(
     );
   }
 
-  // Calories: aggregated per day to avoid flooding the feed.
+  // Calories: aggregated per day — preserve authoritative local date key directly (no UTC noon fabrication).
   const calorieDays = await db.getAllAsync<{ consumed_on: string; count: number; total: number }>(
     `SELECT consumed_on, COUNT(*) AS count, COALESCE(SUM(calories), 0) AS total
      FROM calorie_entries
@@ -135,16 +134,17 @@ export async function buildActivityTimeline(
     [sinceDateKey],
   );
   for (const c of calorieDays) {
-    const occurredAt = `${c.consumed_on}T12:00:00.000Z`;
-    items.push(
-      makeItem(
-        'calories',
-        `day:${c.consumed_on}`,
-        occurredAt,
-        `Logged ${c.count} ${c.count === 1 ? 'meal' : 'meals'} · ${c.total} kcal`,
-        'Calories',
-      ),
-    );
+    items.push({
+      id: `calories:day:${c.consumed_on}`,
+      // Deterministic date-only sort key; UI must not present as precise event time.
+      occurredAt: c.consumed_on,
+      dateKey: c.consumed_on,
+      category: categoryOf('calories'),
+      source: 'calories',
+      title: `Logged ${c.count} ${c.count === 1 ? 'meal' : 'meals'} · ${c.total} kcal`,
+      subtitle: 'Calories',
+      icon: SOURCE_ICON['calories'],
+    });
   }
 
   // Weekly Reviews: completion.
@@ -160,93 +160,103 @@ export async function buildActivityTimeline(
     );
   }
 
-  // Daily Plans: completed (reflection recorded).
+  // Daily Plans: completed (stable completed_at).
   const plans = await db.getAllAsync<{
     id: string;
     date_key: string;
-    updated_at: string;
+    completed_at: string | null;
     energy_score: number | null;
   }>(
-    `SELECT id, date_key, updated_at, energy_score FROM daily_plans
-     WHERE deleted_at IS NULL AND status = 'completed' AND updated_at >= ?
-     ORDER BY updated_at DESC LIMIT 60`,
+    `SELECT id, date_key, completed_at, energy_score FROM daily_plans
+     WHERE deleted_at IS NULL AND status = 'completed' AND completed_at IS NOT NULL AND completed_at >= ?
+     ORDER BY completed_at DESC LIMIT 60`,
     [sinceIso],
   );
   for (const p of plans) {
+    if (!p.completed_at) continue;
     const energy = p.energy_score != null ? ` · energy ${p.energy_score}/5` : '';
     items.push(
       makeItem(
         'daily_plan',
         p.id,
-        p.updated_at,
+        p.completed_at,
         'Daily plan completed',
         `Plan ${p.date_key}${energy}`,
       ),
     );
   }
 
-  // Projects: creation + completion.
+  // Projects: creation + completion (both can appear if both in range).
   const projects = await db.getAllAsync<{
     id: string;
     name: string;
     created_at: string;
     status: string;
-    updated_at: string;
+    completed_at: string | null;
   }>(
-    `SELECT id, name, created_at, status, updated_at FROM projects
-     WHERE deleted_at IS NULL AND ((created_at >= ?) OR (status = 'completed' AND updated_at >= ?))
+    `SELECT id, name, created_at, status, completed_at FROM projects
+     WHERE deleted_at IS NULL AND ((created_at >= ?) OR (status = 'completed' AND completed_at IS NOT NULL AND completed_at >= ?))
      ORDER BY created_at DESC LIMIT 120`,
     [sinceIso, sinceIso],
   );
   for (const p of projects) {
-    if (p.status === 'completed' && p.updated_at >= sinceIso) {
-      items.push(
-        makeItem(
-          'project',
-          `done:${p.id}`,
-          p.updated_at,
-          `Completed project "${truncate(p.name)}"`,
-          'Project',
-        ),
-      );
-    } else {
+    // Creation event if in window.
+    if (p.created_at >= sinceIso) {
       items.push(
         makeItem('project', p.id, p.created_at, `Created project "${truncate(p.name)}"`, 'Project'),
       );
     }
+    // Completion event independent of creation — both can appear.
+    if (p.status === 'completed' && p.completed_at && p.completed_at >= sinceIso) {
+      items.push(
+        makeItem(
+          'project',
+          `done:${p.id}`,
+          p.completed_at,
+          `Completed project "${truncate(p.name)}"`,
+          'Project',
+        ),
+      );
+    }
   }
 
-  // Goals: creation + completion.
+  // Goals: creation + completion (both can appear).
   const goals = await db.getAllAsync<{
     id: string;
     title: string;
     created_at: string;
     status: string;
-    updated_at: string;
+    completed_at: string | null;
   }>(
-    `SELECT id, title, created_at, status, updated_at FROM goals
-     WHERE deleted_at IS NULL AND ((created_at >= ?) OR (status = 'completed' AND updated_at >= ?))
+    `SELECT id, title, created_at, status, completed_at FROM goals
+     WHERE deleted_at IS NULL AND ((created_at >= ?) OR (status = 'completed' AND completed_at IS NOT NULL AND completed_at >= ?))
      ORDER BY created_at DESC LIMIT 120`,
     [sinceIso, sinceIso],
   );
   for (const g of goals) {
-    if (g.status === 'completed' && g.updated_at >= sinceIso) {
-      items.push(
-        makeItem(
-          'goal',
-          `done:${g.id}`,
-          g.updated_at,
-          `Completed goal "${truncate(g.title)}"`,
-          'Goal',
-        ),
-      );
-    } else {
+    if (g.created_at >= sinceIso) {
       items.push(
         makeItem('goal', g.id, g.created_at, `Created goal "${truncate(g.title)}"`, 'Goal'),
       );
     }
+    if (g.status === 'completed' && g.completed_at && g.completed_at >= sinceIso) {
+      items.push(
+        makeItem(
+          'goal',
+          `done:${g.id}`,
+          g.completed_at,
+          `Completed goal "${truncate(g.title)}"`,
+          'Goal',
+        ),
+      );
+    }
   }
 
+  // Bound total feed size after merge.
+  if (items.length > 400) {
+    items.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+    items.length = 400;
+  }
   return items;
 }
 

@@ -164,11 +164,11 @@ export async function addTodo(input: {
     mutate: async (transactionDb) => {
       await transactionDb.runAsync(
         `INSERT INTO todos
-           (id, title, notes, completed, due_date, priority,
+           (id, title, notes, completed, completed_at, due_date, priority,
             sort_order, recurrence, recurrence_id,
             project_id, goal_id,
             created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           input.title,
@@ -223,10 +223,10 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
         mutate: async (transactionDb) => {
           const result = await transactionDb.runAsync(
             `INSERT INTO todos
-               (id, title, notes, completed, due_date, priority,
+               (id, title, notes, completed, completed_at, due_date, priority,
                 sort_order, recurrence, recurrence_id,
                 created_at, updated_at, deleted_at)
-             SELECT ?, ?, ?, 0, ?, ?, ?, 'daily', ?, ?, ?, NULL
+             SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, NULL
              WHERE NOT EXISTS (
                SELECT 1
                FROM todos
@@ -343,25 +343,71 @@ export async function updateTodo(
     fields.push('priority = ?');
     values.push(updates.priority);
   }
-  if (updates.projectId !== undefined) {
-    fields.push('project_id = ?');
-    values.push(updates.projectId);
-  }
-  if (updates.goalId !== undefined) {
-    fields.push('goal_id = ?');
-    values.push(updates.goalId);
-  }
-
-  values.push(id);
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
+      const current = await transactionDb.getFirstAsync<Pick<Todo, 'project_id' | 'goal_id'>>(
+        `SELECT project_id, goal_id FROM todos WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      if (!current) {
+        return { changed: false, value: undefined };
+      }
+
+      // H9: validate and reconcile project/goal associations.
+      let nextProjectId: string | null = current.project_id;
+      let nextGoalId: string | null = current.goal_id;
+      let projectChanged = false;
+      let goalChanged = false;
+
+      if (updates.projectId !== undefined) {
+        if (updates.projectId !== null) {
+          const project = await transactionDb.getFirstAsync<{ id: string }>(
+            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+            [updates.projectId],
+          );
+          if (!project) throw new Error('Project not found.');
+        }
+        nextProjectId = updates.projectId;
+        projectChanged = true;
+      }
+      if (updates.goalId !== undefined) {
+        if (updates.goalId !== null) {
+          const goal = await transactionDb.getFirstAsync<{
+            id: string;
+            project_id: string | null;
+          }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
+            updates.goalId,
+          ]);
+          if (!goal) throw new Error('Goal not found.');
+          nextGoalId = updates.goalId;
+          // Hierarchical consistency: assigning a Goal auto-aligns project_id to
+          // the Goal's Project when it has one.
+          if (goal.project_id !== null) {
+            nextProjectId = goal.project_id;
+            projectChanged = true;
+          }
+        } else {
+          nextGoalId = null;
+        }
+        goalChanged = true;
+      }
+
+      if (projectChanged) {
+        fields.push('project_id = ?');
+        values.push(nextProjectId);
+      }
+      if (goalChanged) {
+        fields.push('goal_id = ?');
+        values.push(nextGoalId);
+      }
+
       const result = await transactionDb.runAsync(
         `UPDATE todos SET ${fields.join(', ')}
          WHERE id = ?
            AND deleted_at IS NULL`,
-        values,
+        [...values, id],
       );
       return { changed: result.changes === 1, value: undefined };
     },
@@ -378,32 +424,77 @@ export async function listTodoLinkedActionRules(
   });
 }
 
-/** Associate (or clear, with null) a Todo with a Project and/or Goal. */
+/**
+ * Associate (or clear, with null) a Todo with a Project and/or Goal.
+ *
+ * H9 association invariants:
+ * - A non-null projectId/goalId MUST reference an existing, non-deleted parent;
+ *   otherwise the setter throws a clear error (no dangling references).
+ * - Assigning a Goal auto-aligns project_id to that Goal's project_id when the
+ *   Goal belongs to a Project. If the Goal has no Project, an explicitly
+ *   provided projectId is respected and otherwise the current project_id is
+ *   preserved (the stricter "clear project on goal-without-project" rule is not
+ *   applied for Todos).
+ * - The whole change runs inside the synced-mutation transaction so it is atomic
+ *   and the outbox intent stays coherent with the final row.
+ */
 export async function setTodoProjectGoal(
   todoId: string,
   association: { projectId?: string | null; goalId?: string | null },
 ): Promise<void> {
+  if (association.projectId === undefined && association.goalId === undefined) return;
   const db = await getDatabase();
   const now = nowIso();
-  const fields: string[] = ['updated_at = ?'];
-  const values: (string | null)[] = [now];
-  if (association.projectId !== undefined) {
-    fields.push('project_id = ?');
-    values.push(association.projectId);
-  }
-  if (association.goalId !== undefined) {
-    fields.push('goal_id = ?');
-    values.push(association.goalId);
-  }
-  if (fields.length === 1) return;
-  values.push(todoId);
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
+      const current = await transactionDb.getFirstAsync<Pick<Todo, 'project_id' | 'goal_id'>>(
+        `SELECT project_id, goal_id FROM todos WHERE id = ? AND deleted_at IS NULL`,
+        [todoId],
+      );
+      if (!current) {
+        return { changed: false, value: undefined };
+      }
+
+      let nextProjectId = current.project_id;
+      let nextGoalId = current.goal_id;
+
+      if (association.projectId !== undefined) {
+        if (association.projectId !== null) {
+          const project = await transactionDb.getFirstAsync<{ id: string }>(
+            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+            [association.projectId],
+          );
+          if (!project) throw new Error('Project not found.');
+        }
+        nextProjectId = association.projectId;
+      }
+
+      if (association.goalId !== undefined) {
+        if (association.goalId !== null) {
+          const goal = await transactionDb.getFirstAsync<{
+            id: string;
+            project_id: string | null;
+          }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
+            association.goalId,
+          ]);
+          if (!goal) throw new Error('Goal not found.');
+          nextGoalId = association.goalId;
+          // Hierarchical consistency: a Todo assigned to a Goal inherits the
+          // Goal's Project. An explicit projectId is overridden by the goal here.
+          if (goal.project_id !== null) {
+            nextProjectId = goal.project_id;
+          }
+        } else {
+          nextGoalId = null;
+        }
+      }
+
       const result = await transactionDb.runAsync(
-        `UPDATE todos SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
-        values,
+        `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?
+         WHERE id = ? AND deleted_at IS NULL`,
+        [nextProjectId, nextGoalId, now, todoId],
       );
       return { changed: result.changes === 1, value: undefined };
     },
@@ -472,10 +563,11 @@ async function setTodoCompletion(
       if (next === previous) {
         return { changed: false, value: { current, previous, next } };
       }
+      const completedAtValue = next === 1 ? now : null;
       const result = await transactionDb.runAsync(
-        `UPDATE todos SET completed = ?, updated_at = ?
+        `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
-        [next, now, current.id, previous],
+        [next, completedAtValue, now, current.id, previous],
       );
       if (result.changes !== 1) {
         return {
@@ -636,11 +728,11 @@ export async function completeTodoFromLinkedAction(
     mutate: async (transactionDb) => {
       const result = await transactionDb.runAsync(
         `UPDATE todos
-         SET completed = 1, updated_at = ?
+         SET completed = 1, completed_at = ?, updated_at = ?
          WHERE id = ?
            AND completed = 0
            AND deleted_at IS NULL`,
-        [now, todoId],
+        [now, now, todoId],
       );
       return { changed: result.changes === 1, value: undefined };
     },
@@ -671,6 +763,7 @@ export async function applyRemoteTodos(
          title,
          notes,
          completed,
+         completed_at,
          due_date,
          priority,
          sort_order,
@@ -679,12 +772,13 @@ export async function applyRemoteTodos(
          created_at,
          updated_at,
          deleted_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.title,
         row.notes,
         row.completed,
+        (row as unknown as { completed_at?: string | null }).completed_at ?? null,
         row.due_date,
         row.priority,
         row.sort_order,

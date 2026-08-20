@@ -26,6 +26,9 @@ export const BACKUP_REST_ENTITIES = [
   'pomodoro_sessions',
   'linked_action_rules',
   'weekly_reviews',
+  'projects',
+  'goals',
+  'daily_plans',
   'user_backup_settings',
   'backup_manifest',
 ] as const;

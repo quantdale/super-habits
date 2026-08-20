@@ -34,6 +34,7 @@ export function ProgressInsightsView() {
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
   }, [load]);
 
   if (!isLoading && !summary) {

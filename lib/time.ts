@@ -2,6 +2,21 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+export const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isValidDateKey(value: string): boolean {
+  if (!DATE_KEY_PATTERN.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(y, m - 1, d, 0, 0, 0, 0);
+  return (
+    dt.getFullYear() === y &&
+    dt.getMonth() === m - 1 &&
+    dt.getDate() === d &&
+    toDateKey(dt) === value
+  );
+}
+
 export function toDateKey(date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

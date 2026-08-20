@@ -298,10 +298,10 @@ describe('core/db/client', () => {
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 through v16 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(7);
+    // v10 through v19 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(10);
 
-    const upToDate = await loadDbClient({ schemaVersion: '16' });
+    const upToDate = await loadDbClient({ schemaVersion: '19' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });

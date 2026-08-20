@@ -643,32 +643,74 @@ export async function updateHabit(
   if (result.changed) requestHabitReminderReconciliation();
 }
 
-/** Associate (or clear, with null) a Habit with a Project and/or Goal. */
+/**
+ * Associate (or clear, with null) a Habit with a Project and/or Goal.
+ *
+ * H9 association invariants:
+ * - A non-null projectId/goalId MUST reference an existing, non-deleted parent;
+ *   otherwise the setter throws a clear error (no dangling references).
+ * - Assigning a Goal auto-aligns project_id to that Goal's project_id when the
+ *   Goal belongs to a Project. If the Goal has no Project, an explicitly
+ *   provided projectId is respected and otherwise the current project_id is
+ *   preserved.
+ * - The whole change runs inside the synced-mutation transaction so it is atomic
+ *   and the outbox intent stays coherent with the final row.
+ */
 export async function setHabitProjectGoal(
   habitId: string,
   association: { projectId?: string | null; goalId?: string | null },
 ): Promise<void> {
+  if (association.projectId === undefined && association.goalId === undefined) return;
   const db = await getDatabase();
   const now = nowIso();
-  const fields: string[] = ['updated_at = ?'];
-  const values: (string | null)[] = [now];
-  if (association.projectId !== undefined) {
-    fields.push('project_id = ?');
-    values.push(association.projectId);
-  }
-  if (association.goalId !== undefined) {
-    fields.push('goal_id = ?');
-    values.push(association.goalId);
-  }
-  if (fields.length === 1) return;
-  values.push(habitId);
   await runSyncedMutation({
     db,
     record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
+      const current = await transactionDb.getFirstAsync<Pick<Habit, 'project_id' | 'goal_id'>>(
+        `SELECT project_id, goal_id FROM habits WHERE id = ? AND deleted_at IS NULL`,
+        [habitId],
+      );
+      if (!current) {
+        return { changed: false, value: undefined };
+      }
+
+      let nextProjectId = current.project_id;
+      let nextGoalId = current.goal_id;
+
+      if (association.projectId !== undefined) {
+        if (association.projectId !== null) {
+          const project = await transactionDb.getFirstAsync<{ id: string }>(
+            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+            [association.projectId],
+          );
+          if (!project) throw new Error('Project not found.');
+        }
+        nextProjectId = association.projectId;
+      }
+
+      if (association.goalId !== undefined) {
+        if (association.goalId !== null) {
+          const goal = await transactionDb.getFirstAsync<{
+            id: string;
+            project_id: string | null;
+          }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
+            association.goalId,
+          ]);
+          if (!goal) throw new Error('Goal not found.');
+          nextGoalId = association.goalId;
+          if (goal.project_id !== null) {
+            nextProjectId = goal.project_id;
+          }
+        } else {
+          nextGoalId = null;
+        }
+      }
+
       const result = await transactionDb.runAsync(
-        `UPDATE habits SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
-        values,
+        `UPDATE habits SET project_id = ?, goal_id = ?, updated_at = ?
+         WHERE id = ? AND deleted_at IS NULL`,
+        [nextProjectId, nextGoalId, now, habitId],
       );
       return { changed: result.changes === 1, value: undefined };
     },
