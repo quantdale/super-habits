@@ -87,7 +87,7 @@ Historical implementation artifacts to read but not mutate dishonestly:
 ## Current Checkpoint
 
 - Current milestone: HARDENING_HANDOFF_READY
-- Completed: Independent GitHub audit of the implementation-wave head and targeted source audit of local mutation, Project/Goal/Daily Plan persistence, Progress, Timeline, Todo completion, Backup, Portable, account inventory, and migration v17. Audited defects H1-H11 are recorded in proposal/design/spec/tasks. Full hardening OpenSpec package authored for a fresh implementation session.
+- Completed: Independent GitHub audit of the implementation-wave head and targeted source audit of local mutation, Project/Goal/Daily Plan persistence, Progress, Timeline, task completion, Backup, Portable, account inventory, and migration v17. Audited defects H1-H11 are recorded in proposal/design/spec/tasks. Full hardening OpenSpec package authored for a fresh implementation session.
 - In progress: Repository handoff publication and fresh-session execution have not started yet.
 - Important modified files: `openspec/changes/harden-productivity-expansion-wave-v1/proposal.md`, `design.md`, `tasks.md`, `specs/productivity-expansion-hardening/spec.md`, `execplan.md`, `README.md`, `IMPLEMENTATION_PROMPT.md`.
 - Last successful validation: Pre-wave baseline GitHub run `32269563521` at `6f18cce...` had quality/e2e green. Implementation wave reported only typecheck/lint/OpenSpec/plan/diff-check minimal gates at `64a76f7...`; broad post-wave QA has NOT yet been independently established and is an explicit first task of this hardening campaign.
@@ -154,7 +154,7 @@ Authoring/audit evidence:
 - Source audit: `DailyPlanView` mount refresh calls `getOrCreateDailyPlan`; the data method inserts through `runLocalMutation` when absent.
 - Source audit: migration 17 uses table-level `UNIQUE` on Daily Plan date plus soft delete.
 - Source audit: Progress estimates focus-session count from focus minutes.
-- Source audit: Progress/Todo Timeline use mutable Todo `updated_at` as completion fact.
+- Source audit: Progress/task Timeline use mutable `updated_at` as completion fact.
 - Source audit: Progress local-day bounds preserve clock time and use fixed 24-hour arithmetic.
 - Source audit: calorie Timeline converts authoritative local `consumed_on` to fabricated noon UTC before deriving local date.
 - Source audit: Project/Goal setters do not validate referenced parents or reconcile soft-delete/move children.
@@ -163,6 +163,24 @@ Authoring/audit evidence:
 - Source audit: Portable V1 exact entity validation depends on current `BACKUP_ENTITIES` and lacks an explicit backup scope field.
 
 Fresh-session validation and all implementation/live evidence must be appended here as it runs. Do not invent results.
+
+## Changed Files / Areas
+
+- `openspec/changes/harden-productivity-expansion-wave-v1/proposal.md` — hardening scope and audited defects.
+- `openspec/changes/harden-productivity-expansion-wave-v1/design.md` — target architecture and invariants.
+- `openspec/changes/harden-productivity-expansion-wave-v1/specs/productivity-expansion-hardening/spec.md` — normative hardening requirements.
+- `openspec/changes/harden-productivity-expansion-wave-v1/tasks.md` — executable checklist.
+- `openspec/changes/harden-productivity-expansion-wave-v1/execplan.md` — durable plan for this campaign.
+- `core/db/client.ts` — local schema and append-only migrations.
+- `core/db/types.ts` — entity shapes for planning and completion fields.
+- `core/db/localMutation.ts` — owner promotion helper.
+- `features/planning/` — Planning Hub views and domain logic (to be hardened).
+- `features/progress/` and `features/overview/` — progress and timeline derived views.
+- `core/backup/` and `core/portable/` — backup/restore/portable scope and manifest compatibility.
+- `core/sync/` — durable outbox and Supabase adapter.
+- `supabase/migrations/` — owner-scoped remote schema.
+
+Git remains authoritative for the actual working-tree diff.
 
 ## Recovery / Resume Instructions
 
