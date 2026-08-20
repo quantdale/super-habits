@@ -62,8 +62,8 @@ Authoritative artifacts:
 - Relevant quarantines: None.
 - Blockers: None. Live CLI access (`supabase` linked to `kruubbynsmxzxfdunaal`) was available, so the closure was applied and verified end-to-end rather than left BLOCKED.
 - Exact resume action after unblock: N/A — unblocked.
-- Exact next action: Push the repository changes to `main`, then require exact-final-SHA GitHub `quality` and `e2e` to pass.
-- Remaining definition of done: Clean `main`-only Git; local == origin/main; exact-final-SHA GitHub `quality` + `e2e` green. (All live convergence work is complete.)
+- Exact next action: None — task complete.
+- Remaining definition of done: None — all requirements satisfied and verified; live schema convergence complete.
 
 ## Progress
 
