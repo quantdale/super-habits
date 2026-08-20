@@ -416,6 +416,31 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
     await targetDb.closeAsync();
   });
 
+  it('recognizes a known historical scope-3 backup (pre-planning) as complete V2, not invalid', async () => {
+    const remote = await publishSourceBackup();
+    const manifestRows = remote.get('backup_manifest');
+    const manifestRow = manifestRows?.[0];
+    expect(manifestRow).toBeDefined();
+    // Simulate a backup produced before Projects/Goals/Daily Plans entered the
+    // recoverable scope: drop the scope-4 entities and the explicit scope flag
+    // so resolution must fall back to the known historical scope-3 entity set.
+    if (manifestRow) {
+      delete manifestRow.backup_scope_version;
+      const metadata = (manifestRow as Record<string, Record<string, unknown>>).entity_metadata;
+      for (const dropped of ['projects', 'goals', 'daily_plans']) delete metadata[dropped];
+    }
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { getBackupStateSummary } = await import('@/core/backup/backupRestore');
+    const summary = await getBackupStateSummary('user_a');
+    expect(summary.state).toBe('v2_complete');
+    expect(summary.missingEntities).toEqual(
+      expect.arrayContaining(['projects', 'goals', 'daily_plans']),
+    );
+    await targetDb.closeAsync();
+  });
+
   it('keeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart', async () => {
     const recording = buildRecordingSupabase();
     installSupabaseMock(recording.supabase);

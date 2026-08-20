@@ -76,8 +76,9 @@ test.describe('Portable data export & import', () => {
     // Envelope contract + entity content of the downloaded file.
     const file = JSON.parse(text) as Record<string, unknown>;
     expect(file.format).toBe('superhabits-portable-backup');
-    expect(file.formatVersion).toBe(1);
+    expect(file.formatVersion).toBe(2);
     expect(file.backupSchemaVersion).toBe(2);
+    expect(file.backupScopeVersion).toBe(4);
     expect(typeof file.exportedAt).toBe('string');
     const entities = file.entities as Record<string, unknown[]>;
     expect(entities.todos).toHaveLength(1);

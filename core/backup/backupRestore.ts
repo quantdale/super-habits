@@ -716,10 +716,45 @@ export async function getBackupStateSummary(
       missingEntities: [],
     };
   }
+  // Recognize both the current hardened scope and known historical scope
+  // epochs (e.g. a pre-planning scope-3 backup). A manifest whose entity set
+  // exactly matches a known scope is a complete V2 backup for that scope; it is
+  // not invalid merely because the current recoverable scope has since grown.
+  const resolvedScope = resolveBackupScope({
+    backupScopeVersion: manifest.backupScopeVersion,
+    entityMetadata: manifest.entityMetadata,
+  });
+  if (!resolvedScope) {
+    return {
+      state: 'invalid',
+      lastCompleteAt: null,
+      lastCompleteGeneration: null,
+      pendingChangeCount,
+      backfillInProgress: false,
+      missingEntities: [...BACKUP_ENTITIES],
+    };
+  }
+  const missingInScope = resolvedScope.entitySet.filter(
+    (entity) => !manifest.entityMetadata[entity],
+  );
+  if (missingInScope.length > 0) {
+    return {
+      state: 'invalid',
+      lastCompleteAt: null,
+      lastCompleteGeneration: null,
+      pendingChangeCount,
+      backfillInProgress: false,
+      missingEntities: [...BACKUP_ENTITIES],
+    };
+  }
+
+  // `missingEntities` reports only what the certified scope omits relative to
+  // the *current* recoverable set, so the UI can disclose the gap without
+  // flipping a complete historical backup to "invalid".
   const missingEntities = BACKUP_ENTITIES.filter((entity) => !manifest.entityMetadata[entity]);
 
   return {
-    state: missingEntities.length === 0 ? 'v2_complete' : 'invalid',
+    state: 'v2_complete',
     lastCompleteAt: manifest.completedAt,
     lastCompleteGeneration: manifest.generation,
     pendingChangeCount,

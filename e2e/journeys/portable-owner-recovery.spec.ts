@@ -296,7 +296,7 @@ defineJourney({
           source: { ownerFingerprint: string | null };
         };
         expect(file.format).toBe('superhabits-portable-backup');
-        expect(file.formatVersion).toBe(1);
+        expect(file.formatVersion).toBe(2);
         expect(file.source.ownerFingerprint).toMatch(/^[0-9a-f]{64}$/);
         portableFileText = text;
       },
