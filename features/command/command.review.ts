@@ -1,4 +1,4 @@
-import type { Habit, Todo, WorkoutRoutine } from '@/core/db/types';
+import type { Goal, Habit, Todo, WorkoutRoutine } from '@/core/db/types';
 import { getCompletionHistory, listHabits } from '@/features/habits/habits.data';
 import {
   getHabitTargetForDate,
@@ -13,6 +13,7 @@ import { isValidCommandDateKey, validateCommandDraftFields } from './command.val
 import {
   resolutionMessage,
   resolveHabitReference,
+  resolveGoalReference,
   resolveTodoReference,
   resolveWorkoutRoutineReference,
   normalizeEntityReference,
@@ -152,6 +153,20 @@ function draftFieldStillMissing(
     case 'start_focus_session':
       value = field === 'durationMinutes' ? draft.fields.durationMinutes : undefined;
       break;
+    case 'create_project':
+      value = field === 'name' ? draft.fields.name : undefined;
+      break;
+    case 'update_goal_progress':
+      value =
+        field === 'goalTitle'
+          ? draft.fields.goalTitle
+          : field === 'percent'
+            ? draft.fields.percent
+            : undefined;
+      break;
+    case 'add_todo_to_daily_plan':
+      value = field === 'todoTitle' ? draft.fields.todoTitle : undefined;
+      break;
   }
   if (value === undefined) return true;
   return value === null || (typeof value === 'string' && value.trim().length === 0);
@@ -256,6 +271,21 @@ function prepareCreateReview(draft: DraftAiAction, todayDateKey: string): Comman
         },
       ],
       sideEffect: 'The existing Focus timer and notification lifecycle will be used.',
+    });
+  }
+
+  if (draft.kind === 'create_project') {
+    return makeReview(draft, {
+      status: missingFields.length > 0 ? 'needs_input' : 'ready',
+      missingFields,
+      title: 'Create Project',
+      subtitle: 'Nothing has been saved yet.',
+      rows: [
+        { label: 'Project', value: draft.fields.name?.trim() || 'Needs a name' },
+        { label: 'Color', value: draft.fields.color ?? 'Default' },
+        { label: 'Target date', value: draft.fields.targetDate ?? 'No target date' },
+      ],
+      sideEffect: null,
     });
   }
 
@@ -377,6 +407,20 @@ function selectRoutineResolution(
   return { status: 'exact', entity: selected };
 }
 
+function selectGoalResolution(
+  resolution: EntityResolution<Goal>,
+  goals: Goal[],
+  reference: string | null,
+  selectedEntityId: string | null | undefined,
+): EntityResolution<Goal> {
+  if (!selectedEntityId || !reference) return resolution;
+  const selected = goals.find((goal) => goal.id === selectedEntityId);
+  if (!selected || normalizeEntityReference(selected.title) !== normalizeEntityReference(reference)) {
+    return resolution;
+  }
+  return { status: 'exact', entity: selected };
+}
+
 export async function prepareCommandReview(
   draft: DraftAiAction,
   input: ReviewInput = {},
@@ -398,7 +442,8 @@ export async function prepareCommandReview(
     draft.kind === 'create_todo' ||
     draft.kind === 'create_habit' ||
     draft.kind === 'log_calorie_entry' ||
-    draft.kind === 'start_focus_session'
+    draft.kind === 'start_focus_session' ||
+    draft.kind === 'create_project'
   ) {
     return prepareCreateReview(draft, todayDateKey);
   }
@@ -533,6 +578,56 @@ export async function prepareCommandReview(
       ],
       missingFields: dateMissing,
       sideEffect: 'No exercise, set, weight, or rep details will be invented.',
+    });
+  }
+
+  if (draft.kind === 'update_goal_progress') {
+    const goals = await listGoals();
+    const resolution = selectGoalResolution(
+      resolveGoalReference(draft.fields.goalTitle, goals, goals),
+      goals,
+      draft.fields.goalTitle,
+      input.selectedEntityId,
+    );
+    const entity = resolution.status === 'exact' ? resolution.entity : null;
+    return resolutionReview(draft, resolution, {
+      title: 'Update Goal Progress',
+      subtitle: 'The Goal remains unchanged until confirmation.',
+      rows: [
+        { label: 'Goal', value: entity?.title ?? draft.fields.goalTitle ?? 'Needs a goal title' },
+        {
+          label: 'Progress',
+          value:
+            entity === null
+              ? `${draft.fields.percent ?? '?'}%`
+              : `${entity.progress_percent}% → ${draft.fields.percent}%`,
+        },
+      ],
+      sideEffect: 'Normal Goal completion status reconciliation will run after confirmation.',
+    });
+  }
+
+  if (draft.kind === 'add_todo_to_daily_plan') {
+    const todos = await listTodos();
+    const resolution = selectTodoResolution(
+      resolveTodoReference(draft.fields.todoTitle, todos, todos),
+      todos,
+      draft.fields.todoTitle,
+      input.selectedEntityId,
+    );
+    const entity =
+      resolution.status === 'exact' || resolution.status === 'already_satisfied'
+        ? resolution.entity
+        : null;
+    const plannedDate = draft.fields.dateKey ?? todayDateKey;
+    return resolutionReview(draft, resolution, {
+      title: 'Add Todo to Daily Plan',
+      subtitle: 'The plan remains unchanged until confirmation.',
+      rows: [
+        { label: 'Todo', value: entity?.title ?? draft.fields.todoTitle ?? 'Needs a Todo title' },
+        { label: 'Plan date', value: plannedDate },
+      ],
+      sideEffect: 'The plan keeps at most three top priorities; existing entries are preserved.',
     });
   }
 

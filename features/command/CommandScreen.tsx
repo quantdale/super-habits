@@ -86,6 +86,23 @@ function getInlineRequiredMissingFields(draft: DraftAiAction): DraftMissingField
       return draft.fields.durationMinutes != null
         ? []
         : [{ field: 'durationMinutes', message: 'Add the focus duration before starting.' }];
+    case 'create_project':
+      return draft.fields.name?.trim()
+        ? []
+        : [{ field: 'name', message: 'Add the project name before saving.' }];
+    case 'update_goal_progress':
+      return [
+        ...(draft.fields.goalTitle?.trim()
+          ? []
+          : [{ field: 'goalTitle', message: 'Add the goal title before saving.' }]),
+        ...(draft.fields.percent == null
+          ? [{ field: 'percent', message: 'Add the progress percent before saving.' }]
+          : []),
+      ];
+    case 'add_todo_to_daily_plan':
+      return draft.fields.todoTitle?.trim()
+        ? []
+        : [{ field: 'todoTitle', message: 'Add the Todo title before saving.' }];
   }
 }
 
@@ -108,6 +125,15 @@ function isFieldStillMissing(draft: DraftAiAction, field: string): boolean {
       return field === 'routineName' && !draft.fields.routineName?.trim();
     case 'start_focus_session':
       return field === 'durationMinutes' && draft.fields.durationMinutes == null;
+    case 'create_project':
+      return field === 'name' && !draft.fields.name?.trim();
+    case 'update_goal_progress':
+      return (
+        (field === 'goalTitle' && !draft.fields.goalTitle?.trim()) ||
+        (field === 'percent' && draft.fields.percent == null)
+      );
+    case 'add_todo_to_daily_plan':
+      return field === 'todoTitle' && !draft.fields.todoTitle?.trim();
   }
 }
 
@@ -158,6 +184,28 @@ function updateV2DraftField(draft: DraftAiAction, field: string, value: string):
     case 'start_focus_session':
       return field === 'durationMinutes'
         ? { ...draft, fields: { ...draft.fields, durationMinutes: parseOptionalNumber(value) } }
+        : draft;
+    case 'create_project':
+      if (field === 'name') {
+        return { ...draft, fields: { ...draft.fields, name: value } };
+      }
+      if (field === 'targetDate') {
+        return {
+          ...draft,
+          fields: { ...draft.fields, targetDate: value.trim().length > 0 ? value.trim() : null },
+        };
+      }
+      return draft;
+    case 'update_goal_progress':
+      if (field === 'goalTitle') {
+        return { ...draft, fields: { ...draft.fields, goalTitle: value } };
+      }
+      return field === 'percent'
+        ? { ...draft, fields: { ...draft.fields, percent: parseOptionalNumber(value) } }
+        : draft;
+    case 'add_todo_to_daily_plan':
+      return field === 'todoTitle'
+        ? { ...draft, fields: { ...draft.fields, todoTitle: value } }
         : draft;
     case 'create_todo':
     case 'create_habit':
@@ -426,13 +474,15 @@ export function CommandScreen({
   const handleAmbiguousReferenceSelection = (entityId: string, reference: string) => {
     if (!editableDraft) return;
     const field =
-      editableDraft.kind === 'complete_todo'
+      editableDraft.kind === 'complete_todo' || editableDraft.kind === 'add_todo_to_daily_plan'
         ? 'todoTitle'
         : editableDraft.kind === 'log_habit'
           ? 'habitName'
           : editableDraft.kind === 'log_workout_routine'
             ? 'routineName'
-            : null;
+            : editableDraft.kind === 'update_goal_progress'
+              ? 'goalTitle'
+              : null;
     if (!field) return;
     refreshDraftReview(updateV2DraftField(editableDraft, field, reference), entityId);
   };

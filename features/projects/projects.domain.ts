@@ -1,5 +1,5 @@
-import type { ProjectStatus } from '@/core/db/types';
-import { isValidDateKey } from '@/lib/time';
+import type { Project, ProjectStatus } from '@/core/db/types';
+import { dateKeyToLocalDate, isValidDateKey } from '@/lib/time';
 import {
   PROJECT_COLORS,
   PROJECT_STATUS_VALUES,
@@ -84,4 +84,149 @@ export function validateProjectInput(input: ProjectInput | ProjectUpdate): Proje
 export function clampProgressPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+// ---------------------------------------------------------------------------
+// Progress rollup (pure math; data layer supplies the bounded inputs)
+// ---------------------------------------------------------------------------
+
+export type ProjectTodoRollupInput = { total: number; done: number };
+export type ProjectGoalRollupInput = { count: number; averageProgressPercent: number };
+export type ProjectHabitRollupInput = {
+  habitCount: number;
+  recentCompletions: number;
+  windowDays: number;
+};
+
+export type ProjectProgressComponents = {
+  todoRatio: number | null;
+  goalRatio: number | null;
+  habitRatio: number | null;
+};
+
+export type ProjectProgress = ProjectProgressComponents & {
+  /** Blended 0-100 progress across the linked-entity kinds that have data. */
+  percent: number;
+  /** True when the project has no linked entities to measure. */
+  isEmpty: boolean;
+};
+
+function ratio(done: number, total: number): number | null {
+  if (!Number.isFinite(total) || total <= 0) return null;
+  return Math.max(0, Math.min(1, done / total));
+}
+
+/**
+ * Blend per-source ratios into a single project progress value. Sources with
+ * no data are excluded from the average rather than counted as zero.
+ */
+export function computeProjectProgress(input: {
+  todos: ProjectTodoRollupInput;
+  goals: ProjectGoalRollupInput;
+  habits: ProjectHabitRollupInput;
+}): ProjectProgress {
+  const todoRatio = ratio(input.todos.done, input.todos.total);
+  const goalRatio =
+    input.goals.count > 0
+      ? ratio(clampProgressPercent(input.goals.averageProgressPercent), 100)
+      : null;
+  const expectedSlots = input.habits.habitCount * Math.max(0, input.habits.windowDays);
+  const habitRatio =
+    input.habits.habitCount > 0 && expectedSlots > 0
+      ? ratio(input.habits.recentCompletions, expectedSlots)
+      : null;
+
+  const parts = [todoRatio, goalRatio, habitRatio].filter(
+    (r): r is number => r !== null,
+  );
+  const percent =
+    parts.length > 0
+      ? clampProgressPercent((parts.reduce((a, b) => a + b, 0) / parts.length) * 100)
+      : 0;
+
+  return { todoRatio, goalRatio, habitRatio, percent, isEmpty: parts.length === 0 };
+}
+
+/** Days from `todayKey` until `targetKey` (negative when overdue). */
+export function daysUntilDate(targetKey: string, todayKey: string): number {
+  const msPerDay = 86_400_000;
+  const target = dateKeyToLocalDate(targetKey).getTime();
+  const today = dateKeyToLocalDate(todayKey).getTime();
+  return Math.round((target - today) / msPerDay);
+}
+
+export type TargetDateCountdown = {
+  targetDate: string;
+  daysRemaining: number;
+  isOverdue: boolean;
+  isToday: boolean;
+  label: string;
+};
+
+/** Human countdown for a project target date; null when no target set. */
+export function computeTargetDateCountdown(
+  targetDate: string | null | undefined,
+  todayKey: string,
+): TargetDateCountdown | null {
+  if (!targetDate || !isValidDateKey(targetDate)) return null;
+  const daysRemaining = daysUntilDate(targetDate, todayKey);
+  const isOverdue = daysRemaining < 0;
+  const isToday = daysRemaining === 0;
+  const abs = Math.abs(daysRemaining);
+  const unit = abs === 1 ? 'day' : 'days';
+  const label = isToday
+    ? 'Due today'
+    : isOverdue
+      ? `${abs} ${unit} overdue`
+      : `${abs} ${unit} remaining`;
+  return { targetDate, daysRemaining, isOverdue, isToday, label };
+}
+
+// ---------------------------------------------------------------------------
+// List filtering / sorting (pure)
+// ---------------------------------------------------------------------------
+
+export type ProjectStatusFilter = 'all' | ProjectStatus;
+export type ProjectSortKey = 'manual' | 'target_date' | 'progress' | 'name';
+
+export type ProjectListRow = {
+  project: Project;
+  progressPercent: number;
+  linkedCounts: { todos: number; goals: number; habits: number };
+};
+
+export function filterProjectRows(
+  rows: ProjectListRow[],
+  statusFilter: ProjectStatusFilter,
+): ProjectListRow[] {
+  if (statusFilter === 'all') return rows;
+  return rows.filter((row) => row.project.status === statusFilter);
+}
+
+export function sortProjectRows(
+  rows: ProjectListRow[],
+  sortKey: ProjectSortKey,
+): ProjectListRow[] {
+  const copy = [...rows];
+  switch (sortKey) {
+    case 'target_date':
+      copy.sort((a, b) => {
+        // Ascending by target date; undated projects sink to the end.
+        if (!a.project.target_date && !b.project.target_date) return 0;
+        if (!a.project.target_date) return 1;
+        if (!b.project.target_date) return -1;
+        return a.project.target_date.localeCompare(b.project.target_date);
+      });
+      return copy;
+    case 'progress':
+      copy.sort((a, b) => b.progressPercent - a.progressPercent);
+      return copy;
+    case 'name':
+      copy.sort((a, b) => a.project.name.localeCompare(b.project.name));
+      return copy;
+    case 'manual':
+    default:
+      // Data layer already returns manual order (sort_order ASC).
+      return copy;
+  }
 }

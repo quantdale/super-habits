@@ -663,6 +663,49 @@ export async function completeTodo(todoId: string): Promise<ToggleTodoResult> {
   return setTodoCompletion(todoId, 1);
 }
 
+/** Explicitly complete or reopen a Todo (used by bulk operations). */
+export async function setTodoCompletionState(
+  todoId: string,
+  completed: 0 | 1,
+): Promise<ToggleTodoResult> {
+  return setTodoCompletion(todoId, completed);
+}
+
+/**
+ * Bulk operations apply the same per-id invariants (soft delete, sync enqueue,
+ * linked-action dispatch) as their single-item counterparts, sequentially so a
+ * failure mid-batch leaves earlier items durably committed.
+ */
+export async function bulkSetTodoCompletion(ids: string[], completed: 0 | 1): Promise<void> {
+  for (const id of ids) {
+    await setTodoCompletion(id, completed);
+  }
+}
+
+export async function bulkUpdateTodoPriority(
+  ids: string[],
+  priority: TodoPriority,
+): Promise<void> {
+  for (const id of ids) {
+    await updateTodo(id, { priority });
+  }
+}
+
+export async function bulkAssignTodosProject(
+  ids: string[],
+  projectId: string | null,
+): Promise<void> {
+  for (const id of ids) {
+    await setTodoProjectGoal(id, { projectId });
+  }
+}
+
+export async function bulkRemoveTodos(ids: string[]): Promise<void> {
+  for (const id of ids) {
+    await removeTodo(id);
+  }
+}
+
 export async function removeTodo(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();

@@ -265,9 +265,7 @@ export function findNewPersonalRecords(
 // --- Volume ---
 
 /** Total completed sets across a session's logged exercises. */
-export function computeSessionTotalSets(
-  sessionExercises: { setsCompleted: number }[],
-): number {
+export function computeSessionTotalSets(sessionExercises: { setsCompleted: number }[]): number {
   return sessionExercises.reduce((total, ex) => total + ex.setsCompleted, 0);
 }
 
@@ -340,7 +338,10 @@ export function applyRestDefault(
     }[];
   }[],
   defaultRestSeconds: number,
-): { name: string; sets: { set_number: number; active_seconds: number; rest_seconds: number }[] }[] {
+): {
+  name: string;
+  sets: { set_number: number; active_seconds: number; rest_seconds: number }[];
+}[] {
   if (!Number.isFinite(defaultRestSeconds) || defaultRestSeconds <= 0) return exercises;
   return exercises.map((ex) => ({
     name: ex.name,

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  bulkAssignTodosProject,
+  bulkRemoveTodos,
+  bulkSetTodoCompletion,
+  bulkUpdateTodoPriority,
   completeTodoFromLinkedAction,
   countPendingTodos,
   createRecurringInstance,
@@ -552,5 +556,86 @@ describe('features/todos/todos.data', () => {
 
       await expect(countPendingTodos()).resolves.toBe(0);
     });
+  });
+});
+
+describe('bulk todo operations', () => {
+  const todoRow = {
+    id: 'todo_1',
+    title: 'Bulk todo',
+    notes: null,
+    completed: 0,
+    due_date: null,
+    priority: 'normal',
+    sort_order: 1,
+    recurrence: null,
+    recurrence_id: null,
+    project_id: null,
+    goal_id: null,
+    created_at: '2026-04-16T09:00:00.000Z',
+    updated_at: '2026-04-16T09:00:00.000Z',
+    deleted_at: null,
+  };
+
+  function makeDb() {
+    return {
+      getFirstAsync: vi.fn().mockImplementation(async (sql: string) => {
+        if (/FROM todos/.test(sql)) return { ...todoRow };
+        if (/FROM projects/.test(sql)) return { id: 'proj_1' };
+        return null;
+      }),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+    };
+  }
+
+  it('bulkSetTodoCompletion completes each id exactly once', async () => {
+    const db = makeDb();
+    getDatabase.mockResolvedValue(db);
+
+    await bulkSetTodoCompletion(['todo_1', 'todo_2'], 1);
+
+    const completionCalls = db.runAsync.mock.calls.filter((call) =>
+      String(call[0]).includes('SET completed = ?'),
+    );
+    expect(completionCalls).toHaveLength(2);
+  });
+
+  it('bulkUpdateTodoPriority updates each id', async () => {
+    const db = makeDb();
+    getDatabase.mockResolvedValue(db);
+
+    await bulkUpdateTodoPriority(['todo_1', 'todo_2'], 'urgent');
+
+    const priorityCalls = db.runAsync.mock.calls.filter((call) =>
+      String(call[0]).includes('priority = ?'),
+    );
+    expect(priorityCalls).toHaveLength(2);
+    expect(priorityCalls[0][1]).toContain('urgent');
+  });
+
+  it('bulkAssignTodosProject assigns the project to each id', async () => {
+    const db = makeDb();
+    getDatabase.mockResolvedValue(db);
+
+    await bulkAssignTodosProject(['todo_1', 'todo_2'], 'proj_1');
+
+    const assignCalls = db.runAsync.mock.calls.filter((call) =>
+      String(call[0]).includes('project_id = ?, goal_id = ?'),
+    );
+    expect(assignCalls).toHaveLength(2);
+    expect(assignCalls[0][1]).toEqual(['proj_1', null, expect.any(String), 'todo_1']);
+  });
+
+  it('bulkRemoveTodos soft-deletes each id', async () => {
+    const db = makeDb();
+    getDatabase.mockResolvedValue(db);
+
+    await bulkRemoveTodos(['todo_1', 'todo_2']);
+
+    const deleteCalls = db.runAsync.mock.calls.filter(
+      (call) =>
+        String(call[0]).includes('SET deleted_at = ?') && String(call[0]).includes('todos'),
+    );
+    expect(deleteCalls).toHaveLength(2);
   });
 });
