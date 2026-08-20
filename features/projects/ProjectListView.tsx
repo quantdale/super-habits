@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';

@@ -27,7 +27,7 @@ import {
 } from '@/features/goals/goals.domain';
 import { listTodos, setTodoProjectGoal } from '@/features/todos/todos.data';
 import { listProjects } from '@/features/projects/projects.data';
-import type { Goal, GoalHorizon, GoalStatus } from '@/core/db/types';
+import type { GoalHorizon, GoalStatus } from '@/core/db/types';
 
 type GoalDetailViewProps = {
   goalId: string | null;
@@ -67,7 +67,7 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
 
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       const projectList = await listProjects();
       if (!active) return;
       setProjects(projectList.map((p) => ({ id: p.id, name: p.name })));

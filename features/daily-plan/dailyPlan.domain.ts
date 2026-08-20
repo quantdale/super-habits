@@ -18,7 +18,7 @@ export function isDailyPlanStatus(value: string | undefined | null): value is Da
 export function parseTopTodoIds(raw: string | null | undefined): string[] {
   if (!raw) return [];
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const seen = new Set<string>();
     const result: string[] = [];

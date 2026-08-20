@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
@@ -30,7 +29,7 @@ import {
 } from '@/features/projects/projects.domain';
 
 import { updateGoal } from '@/features/goals/goals.data';
-import type { Project, ProjectStatus } from '@/core/db/types';
+import type { ProjectStatus } from '@/core/db/types';
 
 type ProjectDetailViewProps = {
   projectId: string | null;
@@ -96,7 +95,7 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
 
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       if (isCreate || !projectId) return;
       const project = await getProject(projectId);
       if (!active || !project) return;
