@@ -1,7 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import { runLocalMutation } from '@/core/db/localMutation';
 import { createId } from '@/lib/id';
-import { nowIso } from '@/lib/time';
+import { nowIso, toDateKey } from '@/lib/time';
 import {
   normalizeProjectColor,
   normalizeProjectStatus,
