@@ -1,4 +1,5 @@
 import type { DailyPlanStatus } from '@/core/db/types';
+import { dateKeyToLocalDate } from '@/lib/time';
 import {
   DAILY_PLAN_STATUS_VALUES,
   ENERGY_SCORE_MAX,
@@ -6,6 +7,89 @@ import {
   FOCUS_TARGET_MAX_MINUTES,
   MAX_TOP_PRIORITIES,
 } from '@/features/daily-plan/dailyPlan.types';
+
+// ---------- carry-forward ----------
+
+/**
+ * Compute the Todo IDs worth carrying forward from a previous day's plan.
+ *
+ * A candidate is a previous-plan priority that is still unfinished and not
+ * already selected in the current plan. Pure and idempotent: running it twice
+ * (or applying its output twice) yields no additional items because existing
+ * selections are always filtered out. Output preserves previous-plan order and
+ * is bounded so that current + carried never exceeds MAX_TOP_PRIORITIES.
+ */
+export function computeCarryForwardIds(input: {
+  previousPlanTopTodoIds: string[];
+  currentPlanTopTodoIds: string[];
+  /** Returns true when the todo is still open (not completed, not deleted). */
+  isTodoUnfinished: (todoId: string) => boolean;
+}): string[] {
+  const current = new Set(input.currentPlanTopTodoIds);
+  const capacity = Math.max(0, MAX_TOP_PRIORITIES - input.currentPlanTopTodoIds.length);
+  const result: string[] = [];
+  for (const todoId of input.previousPlanTopTodoIds) {
+    if (result.length >= capacity) break;
+    if (current.has(todoId)) continue;
+    if (!input.isTodoUnfinished(todoId)) continue;
+    current.add(todoId);
+    result.push(todoId);
+  }
+  return result;
+}
+
+// ---------- adherence streaks ----------
+
+export type DailyPlanAdherence = {
+  /** Consecutive days (ending today or yesterday) whose plan reached at least 'committed'. */
+  committedStreak: number;
+  /** Consecutive days (ending today or yesterday) whose plan reached 'completed'. */
+  completedStreak: number;
+};
+
+function shiftDateKey(dateKey: string, days: number): string {
+  const d = dateKeyToLocalDate(dateKey);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Count adherence streaks over a sparse set of plans (missing days break the
+ * streak). Today is only counted once its plan actually has the status — an
+ * uncommitted today does not zero out yesterday's streak.
+ */
+export function computeAdherenceStreaks(
+  plans: { date_key: string; status: DailyPlanStatus }[],
+  todayKey: string,
+): DailyPlanAdherence {
+  const byDate = new Map<string, DailyPlanStatus>();
+  for (const p of plans) byDate.set(p.date_key, p.status);
+
+  const countStreak = (predicate: (status: DailyPlanStatus) => boolean): number => {
+    let streak = 0;
+    // Allow today to be missing/uncommitted without breaking the run.
+    let cursor = shiftDateKey(todayKey, -1);
+    for (let i = 0; i < 366; i++) {
+      const status = byDate.get(cursor);
+      if (!status || !predicate(status)) break;
+      streak++;
+      cursor = shiftDateKey(cursor, -1);
+    }
+    return streak;
+  };
+
+  let committedStreak = countStreak((s) => s === 'committed' || s === 'completed');
+  if (byDate.get(todayKey) === 'committed' || byDate.get(todayKey) === 'completed') {
+    committedStreak += 1;
+  }
+  let completedStreak = countStreak((s) => s === 'completed');
+  if (byDate.get(todayKey) === 'completed') completedStreak += 1;
+
+  return { committedStreak, completedStreak };
+}
 
 export function isDailyPlanStatus(value: string | undefined | null): value is DailyPlanStatus {
   return !!value && (DAILY_PLAN_STATUS_VALUES as readonly string[]).includes(value);

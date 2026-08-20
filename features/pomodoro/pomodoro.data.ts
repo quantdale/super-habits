@@ -111,12 +111,17 @@ export async function savePomodoroSettings(settings: PomodoroSettings): Promise<
   await enqueueBackupSettingsRecord(db);
 }
 
+/**
+ * Canonical session logging contract: one row per completed countdown, never
+ * a partial session. Returns the created session id so callers can attach
+ * local-only metadata (todo association, completion note) to it.
+ */
 export async function logPomodoroSession(
   startedAt: string,
   endedAt: string,
   durationSeconds: number,
   type: PomodoroMode,
-): Promise<void> {
+): Promise<string> {
   const id = createId('pom');
   await insertPomodoroSessionRecord({
     id,
@@ -125,6 +130,7 @@ export async function logPomodoroSession(
     durationSeconds,
     type,
   });
+  return id;
 }
 
 export async function listPomodoroSessions(limit = 20): Promise<PomodoroSession[]> {

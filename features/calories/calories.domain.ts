@@ -178,6 +178,91 @@ export function buildCalorieActivityDays(
   });
 }
 
+export type MacroDayPoint = {
+  dateKey: string;
+  label: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+};
+
+export type MacroTrendSummary = {
+  windowDays: number;
+  /** Calendar days in the window that had at least one logged entry. */
+  daysWithData: number;
+  avgCalories: number;
+  avgProtein: number;
+  avgCarbs: number;
+  avgFats: number;
+};
+
+/**
+ * Per-day macro totals for the last `days` calendar days (oldest → newest).
+ * Days without entries are zero-filled so windows stay aligned.
+ */
+export function buildMacroTrendPoints(
+  summaries: DailySummary[],
+  days: number,
+): MacroDayPoint[] {
+  const map = new Map<string, DailySummary>();
+  for (const s of summaries) {
+    map.set(s.dateKey, s);
+  }
+
+  return buildDateRangeOldestFirst(days).map((dateKey) => {
+    const s = map.get(dateKey);
+    const d = new Date(`${dateKey}T12:00:00`);
+    return {
+      dateKey,
+      label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      calories: s?.totalCalories ?? 0,
+      protein: s?.totalProtein ?? 0,
+      carbs: s?.totalCarbs ?? 0,
+      fats: s?.totalFats ?? 0,
+    };
+  });
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Rolling averages across the full calendar window (zero days count toward
+ * the divisor so the average reflects real intake frequency).
+ */
+export function summarizeMacroTrend(points: MacroDayPoint[]): MacroTrendSummary {
+  const windowDays = points.length;
+  if (windowDays === 0) {
+    return {
+      windowDays: 0,
+      daysWithData: 0,
+      avgCalories: 0,
+      avgProtein: 0,
+      avgCarbs: 0,
+      avgFats: 0,
+    };
+  }
+  const sum = points.reduce(
+    (acc, p) => ({
+      calories: acc.calories + p.calories,
+      protein: acc.protein + p.protein,
+      carbs: acc.carbs + p.carbs,
+      fats: acc.fats + p.fats,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fats: 0 },
+  );
+  return {
+    windowDays,
+    daysWithData: points.filter((p) => p.calories > 0).length,
+    avgCalories: Math.round(sum.calories / windowDays),
+    avgProtein: round1(sum.protein / windowDays),
+    avgCarbs: round1(sum.carbs / windowDays),
+    avgFats: round1(sum.fats / windowDays),
+  };
+}
+
 export function buildCalorieHeatmapDays(
   summaries: DailySummary[],
   goalCalories: number = 2000,

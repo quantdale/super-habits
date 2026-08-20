@@ -50,6 +50,7 @@ import { CaloriesEntryFields } from './CaloriesEntryFields';
 import { CaloriesFormView } from './CaloriesFormView';
 import { DailyCalorieChart } from './DailyCalorieChart';
 import { MacroDonutChart } from './MacroDonutChart';
+import { MacroTrendChart } from './MacroTrendChart';
 import { SavedMealSearchModal } from './SavedMealSearchModal';
 
 const COLOR = SECTION_COLORS.calories;
@@ -262,6 +263,21 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       </Card>
     ),
     [dailyTrend, goal.calories, tokens.textOnAccent],
+  );
+  const macroTrendSection = useMemo(
+    () => (
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Macro trends"
+        headerSubtitle="Rolling 7/30-day intake averages. Informational only."
+        headerRight={<MaterialIcons name="stacked-line-chart" size={22} color={tokens.textOnAccent} />}
+        className="mb-0"
+      >
+        <MacroTrendChart summaries={summary364} />
+      </Card>
+    ),
+    [summary364, tokens.textOnAccent],
   );
   const calorieHistorySection = useMemo(
     () => (
@@ -641,6 +657,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       </Modal>
 
       <ScreenSection>{dailyCaloriesSection}</ScreenSection>
+      <ScreenSection>{macroTrendSection}</ScreenSection>
       <ScreenSection className="mb-0">{calorieHistorySection}</ScreenSection>
     </Screen>
   );

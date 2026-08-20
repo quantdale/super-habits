@@ -8,6 +8,8 @@ import {
   filterSavedMeals,
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
+  buildMacroTrendPoints,
+  summarizeMacroTrend,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
 import type { SavedMeal } from '@/core/db/types';
@@ -220,5 +222,94 @@ describe('filterSavedMeals', () => {
     const result = filterSavedMeals(meals, 'oats');
     expect(result).toHaveLength(1);
     expect(result[0].food_name).toBe('Oats');
+  });
+});
+
+describe('buildMacroTrendPoints', () => {
+  const today = new Date();
+  const keyOffset = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  it('zero-fills days without entries and keeps oldest-first order', () => {
+    const points = buildMacroTrendPoints(
+      [
+        {
+          dateKey: keyOffset(0),
+          totalCalories: 1800,
+          totalProtein: 120,
+          totalCarbs: 150,
+          totalFats: 60,
+          totalFiber: 20,
+        },
+      ],
+      7,
+    );
+    expect(points).toHaveLength(7);
+    expect(points[6].dateKey).toBe(keyOffset(0));
+    expect(points[6].calories).toBe(1800);
+    expect(points[0].calories).toBe(0);
+    expect(points[0].protein).toBe(0);
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i - 1].dateKey < points[i].dateKey).toBe(true);
+    }
+  });
+
+  it('ignores summaries outside the window', () => {
+    const points = buildMacroTrendPoints(
+      [
+        {
+          dateKey: keyOffset(45),
+          totalCalories: 5000,
+          totalProtein: 300,
+          totalCarbs: 400,
+          totalFats: 100,
+          totalFiber: 10,
+        },
+      ],
+      30,
+    );
+    expect(points.every((p) => p.calories === 0)).toBe(true);
+  });
+});
+
+describe('summarizeMacroTrend', () => {
+  it('returns zeros for an empty window', () => {
+    expect(summarizeMacroTrend([])).toEqual({
+      windowDays: 0,
+      daysWithData: 0,
+      avgCalories: 0,
+      avgProtein: 0,
+      avgCarbs: 0,
+      avgFats: 0,
+    });
+  });
+
+  it('averages over the full calendar window including zero days', () => {
+    const points = [
+      { dateKey: '2026-04-01', label: 'Apr 1', calories: 2000, protein: 100, carbs: 200, fats: 60 },
+      { dateKey: '2026-04-02', label: 'Apr 2', calories: 1000, protein: 50, carbs: 100, fats: 30 },
+      { dateKey: '2026-04-03', label: 'Apr 3', calories: 0, protein: 0, carbs: 0, fats: 0 },
+    ];
+    expect(summarizeMacroTrend(points)).toEqual({
+      windowDays: 3,
+      daysWithData: 2,
+      avgCalories: 1000,
+      avgProtein: 50,
+      avgCarbs: 100,
+      avgFats: 30,
+    });
+  });
+
+  it('rounds macro averages to one decimal', () => {
+    const points = [
+      { dateKey: '2026-04-01', label: 'Apr 1', calories: 100, protein: 10, carbs: 10, fats: 5 },
+      { dateKey: '2026-04-02', label: 'Apr 2', calories: 0, protein: 0, carbs: 0, fats: 0 },
+    ];
+    const summary = summarizeMacroTrend(points);
+    expect(summary.avgProtein).toBe(5);
+    expect(summary.avgFats).toBe(2.5);
   });
 });

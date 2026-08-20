@@ -6,11 +6,15 @@ import type { DailyPlan } from '@/core/db/types';
 import {
   clampFocusTargetMinutes,
   clampText,
+  computeAdherenceStreaks,
+  computeCarryForwardIds,
   normalizeEnergyScore,
   parseTopTodoIds,
   serializeTopTodoIds,
 } from '@/features/daily-plan/dailyPlan.domain';
 import { INTENTION_MAX, NOTES_MAX, REFLECTION_MAX } from '@/features/daily-plan/dailyPlan.types';
+import type { DailyPlanAdherence } from '@/features/daily-plan/dailyPlan.domain';
+import { listPendingTodos } from '@/features/todos/todos.data';
 
 const DAILY_PLAN_SELECT = `id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at`;
 
@@ -187,6 +191,65 @@ export async function listRecentDailyPlans(days = 14): Promise<DailyPlan[]> {
     `SELECT ${DAILY_PLAN_SELECT} FROM daily_plans WHERE deleted_at IS NULL AND date_key >= ? ORDER BY date_key DESC`,
     [since],
   );
+}
+
+/** Bounded plan history lookup for read-only browsing (inclusive range). */
+export async function listDailyPlansInRange(
+  startKey: string,
+  endKey: string,
+): Promise<DailyPlan[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<DailyPlan>(
+    `SELECT ${DAILY_PLAN_SELECT} FROM daily_plans
+     WHERE deleted_at IS NULL AND date_key >= ? AND date_key <= ?
+     ORDER BY date_key DESC`,
+    [startKey, endKey],
+  );
+}
+
+function shiftDateKeyByDays(dateKey: string, days: number): string {
+  const d = toDateKey(new Date(`${dateKey}T00:00:00`));
+  const date = new Date(`${d}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+/**
+ * Carry unfinished priority todos from the previous day's plan into the plan
+ * for `dateKey`. Idempotent: already-selected or completed todos are skipped,
+ * so repeated invocations add nothing new. Returns the updated plan, or null
+ * when there is no previous-day plan (nothing to pull from).
+ */
+export async function carryForwardFromPreviousDay(dateKey: string): Promise<DailyPlan | null> {
+  const previousKey = shiftDateKeyByDays(dateKey, -1);
+  const [previousPlan, currentPlan, pendingTodos] = await Promise.all([
+    getDailyPlan(previousKey),
+    getDailyPlan(dateKey),
+    listPendingTodos(),
+  ]);
+  if (!previousPlan) return null;
+
+  const unfinishedById = new Map(pendingTodos.map((t) => [t.id, t]));
+  const candidates = computeCarryForwardIds({
+    previousPlanTopTodoIds: parseTopTodoIds(previousPlan.top_todo_ids),
+    currentPlanTopTodoIds: parseTopTodoIds(currentPlan?.top_todo_ids ?? '[]'),
+    isTodoUnfinished: (todoId) => unfinishedById.has(todoId),
+  });
+  if (candidates.length === 0) {
+    return currentPlan;
+  }
+  return setDailyPlanTopTodos(dateKey, [
+    ...parseTopTodoIds(currentPlan?.top_todo_ids ?? '[]'),
+    ...candidates,
+  ]);
+}
+
+/** Adherence streaks over the trailing `days` window ending today. */
+export async function getDailyPlanAdherence(days = 30): Promise<DailyPlanAdherence> {
+  const today = toDateKey();
+  const start = shiftDateKeyByDays(today, -(days - 1));
+  const plans = await listDailyPlansInRange(start, today);
+  return computeAdherenceStreaks(plans, today);
 }
 
 export { parseTopTodoIds };

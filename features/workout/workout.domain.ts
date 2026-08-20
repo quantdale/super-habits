@@ -5,6 +5,7 @@ import {
   buildDateRangeOldestFirst,
   dateKeyToLocalDate,
   timestampToLocalDateKey,
+  toDateKey,
 } from '@/lib/time';
 
 /**
@@ -160,6 +161,194 @@ export function buildTimerSequence(
   });
 
   return sequence;
+}
+
+// --- Personal records ---
+
+/** A single weighted set performed in a session (weight in the user's unit). */
+export type LoggedSet = {
+  exerciseName: string;
+  weight: number;
+  reps: number;
+};
+
+/** Best lifts found for one exercise across a set history. */
+export type PersonalRecord = {
+  exerciseName: string;
+  /** Best Epley estimated 1RM across all sets. */
+  bestEstimated1RM: number;
+  /** The set that produced bestEstimated1RM. */
+  best1RMSet: LoggedSet | null;
+  /** Heaviest single set (top set) regardless of reps. */
+  bestTopSetWeight: number;
+  bestTopSet: LoggedSet | null;
+};
+
+/**
+ * Epley estimated one-rep max: weight * (1 + reps / 30).
+ * A single rep estimates to the weight itself; invalid input returns 0.
+ */
+export function estimate1RM(weight: number, reps: number): number {
+  if (!Number.isFinite(weight) || !Number.isFinite(reps)) return 0;
+  if (weight <= 0 || reps <= 0) return 0;
+  if (reps === 1) return weight;
+  return weight * (1 + reps / 30);
+}
+
+/** Prefer higher estimated 1RM; break ties by heavier weight, then more reps. */
+function isFirstSetBetter(a: LoggedSet, b: LoggedSet): boolean {
+  const a1rm = estimate1RM(a.weight, a.reps);
+  const b1rm = estimate1RM(b.weight, b.reps);
+  if (a1rm !== b1rm) return a1rm > b1rm;
+  if (a.weight !== b.weight) return a.weight > b.weight;
+  return a.reps > b.reps;
+}
+
+/**
+ * Compute personal records per exercise from a flat set history.
+ * Exercises with no valid weighted sets are omitted.
+ */
+export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
+  const byExercise = new Map<string, LoggedSet[]>();
+  for (const set of sets) {
+    if (!Number.isFinite(set.weight) || !Number.isFinite(set.reps)) continue;
+    if (set.weight <= 0 || set.reps <= 0) continue;
+    const list = byExercise.get(set.exerciseName) ?? [];
+    list.push(set);
+    byExercise.set(set.exerciseName, list);
+  }
+
+  const records: PersonalRecord[] = [];
+  for (const [exerciseName, exerciseSets] of byExercise) {
+    let best1RMSet: LoggedSet | null = null;
+    let bestTopSet: LoggedSet | null = null;
+    for (const set of exerciseSets) {
+      if (!best1RMSet || isFirstSetBetter(set, best1RMSet)) best1RMSet = set;
+      if (!bestTopSet || set.weight > bestTopSet.weight) bestTopSet = set;
+    }
+    records.push({
+      exerciseName,
+      bestEstimated1RM: best1RMSet ? estimate1RM(best1RMSet.weight, best1RMSet.reps) : 0,
+      best1RMSet,
+      bestTopSetWeight: bestTopSet?.weight ?? 0,
+      bestTopSet,
+    });
+  }
+  records.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName));
+  return records;
+}
+
+/**
+ * Return exercise names where the current session beats the historical best
+ * estimated 1RM (strictly). Exercises with no history count as new records
+ * when the session has at least one valid weighted set.
+ */
+export function findNewPersonalRecords(
+  sessionSets: LoggedSet[],
+  historySets: LoggedSet[],
+): string[] {
+  const historyBest = new Map<string, number>();
+  for (const record of computePersonalRecords(historySets)) {
+    historyBest.set(record.exerciseName, record.bestEstimated1RM);
+  }
+
+  const names: string[] = [];
+  for (const record of computePersonalRecords(sessionSets)) {
+    const prior = historyBest.get(record.exerciseName);
+    if (prior === undefined || record.bestEstimated1RM > prior) {
+      names.push(record.exerciseName);
+    }
+  }
+  return names.sort((a, b) => a.localeCompare(b));
+}
+
+// --- Volume ---
+
+/** Total completed sets across a session's logged exercises. */
+export function computeSessionTotalSets(
+  sessionExercises: { setsCompleted: number }[],
+): number {
+  return sessionExercises.reduce((total, ex) => total + ex.setsCompleted, 0);
+}
+
+export type WeeklyVolumePoint = {
+  /** Local date key of the week's Monday. */
+  weekStartKey: string;
+  label: string;
+  totalSets: number;
+  sessions: number;
+};
+
+function mondayDateKeyFor(timestampIso: string): string {
+  const d = dateKeyToLocalDate(timestampToLocalDateKey(timestampIso));
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return toDateKey(d);
+}
+
+/**
+ * Aggregate sessions into weekly volume buckets (Monday-start, oldest first)
+ * for the last N weeks including the current one. Weeks with no sessions
+ * still appear with zero volume so charts stay aligned.
+ */
+export function buildVolumePerWeek(
+  sessions: { completedAt: string; totalSets: number }[],
+  weeks: number = 8,
+): WeeklyVolumePoint[] {
+  const buckets = new Map<string, { totalSets: number; sessions: number }>();
+  const today = new Date();
+  today.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const orderedWeekKeys: string[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - i * 7);
+    const key = toDateKey(weekStart);
+    orderedWeekKeys.push(key);
+    buckets.set(key, { totalSets: 0, sessions: 0 });
+  }
+
+  for (const session of sessions) {
+    const key = mondayDateKeyFor(session.completedAt);
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+    bucket.totalSets += session.totalSets;
+    bucket.sessions += 1;
+  }
+
+  return orderedWeekKeys.map((weekStartKey) => {
+    const bucket = buckets.get(weekStartKey) ?? { totalSets: 0, sessions: 0 };
+    const d = dateKeyToLocalDate(weekStartKey);
+    return {
+      weekStartKey,
+      label: d.toLocaleDateString('en', { month: 'short', day: 'numeric' }),
+      totalSets: bucket.totalSets,
+      sessions: bucket.sessions,
+    };
+  });
+}
+
+/**
+ * Apply the user's default rest seconds to any set that has no explicit rest
+ * (rest_seconds === 0), so unset sets inherit the configured default.
+ */
+export function applyRestDefault(
+  exercises: {
+    name: string;
+    sets: {
+      set_number: number;
+      active_seconds: number;
+      rest_seconds: number;
+    }[];
+  }[],
+  defaultRestSeconds: number,
+): { name: string; sets: { set_number: number; active_seconds: number; rest_seconds: number }[] }[] {
+  if (!Number.isFinite(defaultRestSeconds) || defaultRestSeconds <= 0) return exercises;
+  return exercises.map((ex) => ({
+    name: ex.name,
+    sets: ex.sets.map((set) => ({
+      ...set,
+      rest_seconds: set.rest_seconds > 0 ? set.rest_seconds : Math.round(defaultRestSeconds),
+    })),
+  }));
 }
 
 /**

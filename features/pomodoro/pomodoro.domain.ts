@@ -260,3 +260,261 @@ export function computePomodoroStreakFromHeatmapDays(heatmapDays: HeatmapDay[]):
   }
   return streak;
 }
+
+// ---------------------------------------------------------------------------
+// Presets
+// ---------------------------------------------------------------------------
+
+export type PomodoroPreset = {
+  id: string;
+  name: string;
+  focusMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  sessionsBeforeLongBreak: number;
+  /** Automatically begin the suggested break when a focus session completes. */
+  autoStartBreaks: boolean;
+  /** Automatically begin the next focus when a break completes. */
+  autoStartFocus: boolean;
+};
+
+export const BUILT_IN_PRESETS: PomodoroPreset[] = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    focusMinutes: 25,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    sessionsBeforeLongBreak: 4,
+    autoStartBreaks: false,
+    autoStartFocus: false,
+  },
+  {
+    id: 'deep',
+    name: 'Deep Work',
+    focusMinutes: 50,
+    shortBreakMinutes: 10,
+    longBreakMinutes: 30,
+    sessionsBeforeLongBreak: 2,
+    autoStartBreaks: true,
+    autoStartFocus: false,
+  },
+  {
+    id: 'sprint',
+    name: 'Sprint',
+    focusMinutes: 15,
+    shortBreakMinutes: 3,
+    longBreakMinutes: 10,
+    sessionsBeforeLongBreak: 4,
+    autoStartBreaks: true,
+    autoStartFocus: true,
+  },
+];
+
+function normalizePreset(candidate: Record<string, unknown>, fallback: PomodoroPreset): PomodoroPreset {
+  const name =
+    typeof candidate.name === 'string' && candidate.name.trim().length > 0
+      ? candidate.name.trim().slice(0, 40)
+      : fallback.name;
+  return {
+    id: typeof candidate.id === 'string' && candidate.id.length > 0 ? candidate.id : fallback.id,
+    name,
+    focusMinutes: boundedInteger(candidate.focusMinutes, fallback.focusMinutes, 1, 120),
+    shortBreakMinutes: boundedInteger(
+      candidate.shortBreakMinutes,
+      fallback.shortBreakMinutes,
+      1,
+      60,
+    ),
+    longBreakMinutes: boundedInteger(candidate.longBreakMinutes, fallback.longBreakMinutes, 1, 120),
+    sessionsBeforeLongBreak: boundedInteger(
+      candidate.sessionsBeforeLongBreak,
+      fallback.sessionsBeforeLongBreak,
+      2,
+      10,
+    ),
+    autoStartBreaks:
+      typeof candidate.autoStartBreaks === 'boolean'
+        ? candidate.autoStartBreaks
+        : fallback.autoStartBreaks,
+    autoStartFocus:
+      typeof candidate.autoStartFocus === 'boolean'
+        ? candidate.autoStartFocus
+        : fallback.autoStartFocus,
+  };
+}
+
+/**
+ * Normalize persisted preset JSON so malformed AsyncStorage data cannot poison
+ * the timer. Built-in presets always survive (matched by id); unrecognized or
+ * malformed entries are dropped. Returns the built-in set when nothing valid
+ * remains.
+ */
+export function normalizePomodoroPresets(value: unknown): PomodoroPreset[] {
+  if (!Array.isArray(value)) return [...BUILT_IN_PRESETS];
+  const byId = new Map(BUILT_IN_PRESETS.map((p) => [p.id, p]));
+  const result: PomodoroPreset[] = [];
+  const seen = new Set<string>();
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const candidate = raw as Record<string, unknown>;
+    if (typeof candidate.id !== 'string') continue;
+    const fallback = byId.get(candidate.id) ?? {
+      id: candidate.id,
+      name: 'Custom',
+      ...DEFAULT_SETTINGS,
+      autoStartBreaks: false,
+      autoStartFocus: false,
+    };
+    const preset = normalizePreset(candidate, fallback);
+    if (seen.has(preset.id)) continue;
+    seen.add(preset.id);
+    result.push(preset);
+  }
+  for (const builtin of BUILT_IN_PRESETS) {
+    if (!seen.has(builtin.id)) result.push(builtin);
+  }
+  return result;
+}
+
+export function findPresetById(
+  presets: PomodoroPreset[],
+  id: string | null | undefined,
+): PomodoroPreset | null {
+  if (!id) return null;
+  return presets.find((p) => p.id === id) ?? null;
+}
+
+/**
+ * Whether the timer should automatically begin the suggested next mode after
+ * the current one completes. Breaks follow `autoStartBreaks`, focus follows
+ * `autoStartFocus`.
+ */
+export function shouldAutoStartNext(completedMode: PomodoroMode, preset: PomodoroPreset): boolean {
+  return completedMode === 'focus' ? preset.autoStartBreaks : preset.autoStartFocus;
+}
+
+// ---------------------------------------------------------------------------
+// Focus stats
+// ---------------------------------------------------------------------------
+
+export type FocusStats = {
+  todayMinutes: number;
+  todaySessions: number;
+  weekMinutes: number;
+  weekSessions: number;
+  thirtyDayMinutes: number;
+  thirtyDaySessions: number;
+  bestDay: { dateKey: string; minutes: number } | null;
+};
+
+function isFocusSession(session: Pick<PomodoroSession, 'session_type'>): boolean {
+  return session.session_type === 'focus';
+}
+
+/**
+ * Aggregate completed focus sessions into headline stats. Only rows with
+ * `session_type === 'focus'` count toward minutes/sessions; breaks never do.
+ * Day bucketing uses the local calendar via `timestampToLocalDateKey`.
+ */
+export function computeFocusStats(sessions: PomodoroSession[], today: Date): FocusStats {
+  const perDay = new Map<string, { minutes: number; sessions: number }>();
+  let todayKeyCounted = false;
+  let todayMinutes = 0;
+  let todaySessions = 0;
+
+  const todayDateKey = timestampToLocalDateKey(today.toISOString());
+
+  for (const s of sessions) {
+    if (!isFocusSession(s)) continue;
+    const dateKey = timestampToLocalDateKey(s.started_at);
+    const minutes = Math.max(0, Math.round(s.duration_seconds / 60));
+    const entry = perDay.get(dateKey) ?? { minutes: 0, sessions: 0 };
+    entry.minutes += minutes;
+    entry.sessions += 1;
+    perDay.set(dateKey, entry);
+    if (!todayKeyCounted && dateKey === todayDateKey) {
+      todayMinutes += minutes;
+      todaySessions += 1;
+    }
+  }
+
+  const windowKeys = new Set<string>();
+  for (let offset = 0; offset < 7; offset++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - offset);
+    windowKeys.add(timestampToLocalDateKey(d.toISOString()));
+  }
+  let weekMinutes = 0;
+  let weekSessions = 0;
+  for (const key of windowKeys) {
+    const entry = perDay.get(key);
+    if (entry) {
+      weekMinutes += entry.minutes;
+      weekSessions += entry.sessions;
+    }
+  }
+
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 29);
+  const cutoffKey = timestampToLocalDateKey(cutoff.toISOString());
+  let thirtyDayMinutes = 0;
+  let thirtyDaySessions = 0;
+  let bestDay: FocusStats['bestDay'] = null;
+  for (const [dateKey, entry] of perDay) {
+    if (dateKey < cutoffKey) continue;
+    thirtyDayMinutes += entry.minutes;
+    thirtyDaySessions += entry.sessions;
+    if (!bestDay || entry.minutes > bestDay.minutes) {
+      bestDay = { dateKey, minutes: entry.minutes };
+    }
+  }
+
+  return {
+    todayMinutes,
+    todaySessions,
+    weekMinutes,
+    weekSessions,
+    thirtyDayMinutes,
+    thirtyDaySessions,
+    bestDay,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Interruption / abandon copy
+// ---------------------------------------------------------------------------
+
+export type TimerPhase = 'idle' | 'running' | 'paused';
+
+export type AbandonNotice = { title: string; body: string };
+
+/**
+ * UX copy clarifying what happens when the user abandons (resets) a session.
+ * Returns null when there is nothing in progress worth explaining. The core
+ * guarantee is stated explicitly: an interrupted session is never logged.
+ */
+export function getAbandonNotice(input: {
+  mode: PomodoroMode;
+  phase: TimerPhase;
+  remaining: number;
+  totalSeconds: number;
+}): AbandonNotice | null {
+  if (input.phase === 'idle') return null;
+  const elapsed = input.totalSeconds - input.remaining;
+  if (elapsed <= 0) return null;
+
+  if (input.mode === 'focus') {
+    const minutes = Math.round(elapsed / 60);
+    return {
+      title: input.phase === 'paused' ? 'Discard paused focus?' : 'Abandon this focus?',
+      body:
+        `${minutes} minute${minutes === 1 ? '' : 's'} of focus will be discarded. ` +
+        'Interrupted sessions are never logged, so your history stays clean.',
+    };
+  }
+  return {
+    title: input.phase === 'paused' ? 'Discard paused break?' : 'Skip this break?',
+    body: 'Breaks are not logged. Your focus streak and history are unaffected.',
+  };
+}
