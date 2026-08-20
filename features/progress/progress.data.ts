@@ -2,7 +2,7 @@ import { getDatabase } from '@/core/db/client';
 import { getCalorieGoal } from '@/features/calories/calories.data';
 import { countActiveGoals } from '@/features/goals/goals.data';
 import { countActiveProjects } from '@/features/projects/projects.data';
-import { buildProgressDateRange } from '@/features/progress/progress.domain';
+import { buildProgressDateRange, PROGRESS_WINDOW_DAYS } from '@/features/progress/progress.domain';
 
 export type ProgressRawData = {
   range: {
@@ -38,9 +38,11 @@ export type ProgressRawData = {
  * are taken from buildProgressDateRange() so current/prior windows align with
  * the rest of the progress feature.
  */
-export async function getProgressRawData(): Promise<ProgressRawData> {
+export async function getProgressRawData(
+  windowDays: number = PROGRESS_WINDOW_DAYS,
+): Promise<ProgressRawData> {
   const db = await getDatabase();
-  const range = buildProgressDateRange();
+  const range = buildProgressDateRange(new Date(), windowDays);
 
   const [
     todoCurrent,

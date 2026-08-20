@@ -56,7 +56,7 @@ export function buildProgressDateRange(
 
   const previousEndExclusiveMidnight = new Date(currentStartMidnight);
   const previousStartMidnight = new Date(previousEndExclusiveMidnight);
-  previousStartMidnight.setDate(previousEndExclusiveMidnight.getDate() - PROGRESS_WINDOW_DAYS);
+  previousStartMidnight.setDate(previousEndExclusiveMidnight.getDate() - days);
   const previousStartKey = toDateKey(previousStartMidnight);
   const previousEndMidnight = new Date(previousEndExclusiveMidnight);
   previousEndMidnight.setDate(previousEndExclusiveMidnight.getDate() - 1);
