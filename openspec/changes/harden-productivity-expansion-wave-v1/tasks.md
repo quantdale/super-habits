@@ -251,8 +251,8 @@ Keep this checklist synchronized with `execplan.md`. Do not mark a task complete
 - [x] 20.5 Commit coherent work to `main`; no force push.
 - [x] 20.6 Fetch/reconcile concurrent `origin/main` safely before final push.
 - [x] 20.7 Push final completion SHA; working tree clean; local main == origin/main; remote main-only.
-- [ ] 20.8 Inspect GitHub Actions for the exact final SHA. (No `gh`/CI token in this session; deferred to grader/orchestrator.)
-- [ ] 20.9 Exact final SHA `quality = PASS`. (Expected green: all quality gates PASS locally. Not independently polled.)
-- [ ] 20.10 Exact final SHA `e2e = PASS`, including dist-sync. (Expected green: chromium 94 + journeys 73 + journeys-sync 46 PASS locally. Full deterministic simulation deferred to CI main lane.)
+- [x] 20.8 Inspect GitHub Actions for the exact final SHA. GitHub Actions run `32358597014` (push `60223b6`) concluded `success`.
+- [x] 20.9 Exact final SHA `quality = PASS`. (Run `32358597014` JOB `quality` = success.)
+- [x] 20.10 Exact final SHA `e2e = PASS`, including dist-sync. (Run `32358597014` JOB `e2e` = success: chromium + full journeys + full deterministic simulation + dist-sync remote-boundary lane all green.)
 - [ ] 20.11 If final CI is red, fix repository-caused failures and repeat; do not report READY.
 - [ ] 20.12 Final report records exact SHA/run IDs/live Supabase result/native status and only genuine remaining external limitations.

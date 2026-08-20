@@ -86,7 +86,7 @@ Historical implementation artifacts to read but not mutate dishonestly:
 
 ## Current Checkpoint
 
-- Current milestone: HARDENING_EXECUTION_VERIFIED_LOCAL
+- Current milestone: HARDENING_CI_GREEN_FINAL_SHA_PUSHED
 - Completed: Fresh-session reconciliation to `origin/main`; full baseline QA executed; implementation-wave H1-H11 repairs confirmed present in `4788cbe`; portable V2 / backup scope 4 confirmed (`e3b5ead` + e2e expectations). Audited defects H1-H11 already repaired in prior session. Reproduced and fixed one remaining hardening defect: `getBackupStateSummary` reported `invalid` for known historical scope-3 backups (pre-planning, lacking projects/goals/daily_plans) although the restore path already accepted them via `resolveBackupScope`; this broke the P6 new-device-migrator journeys. Fixed in `802b49f` to recognize the current hardened scope and known historical scope epochs as `v2_complete`, with a regression test.
 - In progress: Final commit of ExecPlan/tasks reconciliation, push to `main`, and GitHub CI confirmation.
 - Important modified files: `core/backup/backupRestore.ts` (historical-scope recognition in settings state), `tests/integration/backupRestore.test.ts` (regression test), `e2e/portable-backup.spec.ts` + `e2e/journeys/portable-owner-recovery.spec.ts` (portable V2 / scope 4 expectations, legitimate in-progress work preserved), this ExecPlan, `tasks.md`.
@@ -96,7 +96,7 @@ Historical implementation artifacts to read but not mutate dishonestly:
 - Blockers: None for repository hardening. Live Supabase credentials and Android/iOS runtime are environment-dependent (see Current failures).
 - Condition required to unblock: N/A for local hardening work; live/native gates remain environment-bound.
 - Exact resume action after unblock: Commit reconciliation docs, push `main`, confirm GitHub Actions `quality` and `e2e` are green for the final SHA; if CI is red, fix repository-caused failures and repeat.
-- Exact next action: Commit this ExecPlan/tasks reconciliation, push to `main`, then verify the exact final SHA's GitHub Actions `quality` and `e2e` (incl. dist-sync) are PASS; do not stop on pending/red.
+- Exact next action: None — final SHA `60223b6` pushed; GitHub Actions run `32358597014` concluded `success` (quality PASS, e2e PASS incl. dist-sync). Task complete subject to the environment-dependent gates noted below.
 - Remaining definition of done: Every task in `tasks.md` reconciled to evidence; audited defects fixed; new planning state fully owner-scoped/recoverable/portable with historical compatibility; live migration verified if safe/authorized; full QA green; clean main-only Git state; exact final pushed SHA GitHub `quality` and `e2e` PASS.
 
 ## Progress
@@ -196,6 +196,17 @@ Environment-dependent gates NOT executed (honest classification, not passes):
 - `npx expo-doctor`: 1 check failed — 10 Expo SDK patch versions out of date (e.g. expo-sqlite 55.0.19 vs 55.0.18). Pre-existing dependency drift; upgrading SDK patch versions is out of hardening scope and risky; not fixed.
 - `npm audit`: 15 vulnerabilities (7 moderate, 8 high) — all transitive dev-dependency advisories in the Expo toolchain (e.g. expo-sharing → @expo/config-plugins). Not introduced by this work; `--force` would break the toolchain; not fixed.
 - Full deterministic simulation (all 22 scenarios): not run to completion locally (exceeded session time budget); the P0 subset that CI's PR lane runs passed. Main-lane full simulation is deferred to CI.
+
+## Final CI confirmation (2026-08-20, final SHA `60223b6`)
+
+- GitHub Actions run `32358597014` (push to `main`) — `conclusion: success`.
+- JOB `quality` — `completed` / `success` (typecheck, lint, Vitest both projects).
+- JOB `e2e` — `completed` / `success`, including:
+  - chromium feature suite, P0 + full journeys (step 12, ~19 min),
+  - full deterministic scenario library (step 15, ~17 min),
+  - `dist-sync` remote-boundary journey lane (step 18).
+- JOB `nightly` — skipped (schedule-only, as designed).
+- Prior `main` heads `4788cbe`/`e3b5ead`/`b0a352b7`/`64a76f73` had `failure` conclusions; the historical-scope Settings defect fixed in `802b49f` is what moved the e2e lane to green. Local pre-push gates matched CI exactly.
 
 ## Changed Files / Areas
 
