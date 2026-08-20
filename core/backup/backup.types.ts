@@ -99,7 +99,6 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'deleted_at',
     'project_id',
     'goal_id',
-    'completed_at',
   ],
   habit_completions: ['id', 'habit_id', 'date_key', 'count', 'created_at', 'updated_at'],
   calorie_entries: [
@@ -241,9 +240,11 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
  * when V1 files (formatVersion 1) were exported. V1 files must canonicalize
  * and verify with these columns so their stored checksums still match — the
  * current `BACKUP_ENTITY_COLUMNS` adds `project_id`/`goal_id`/`completed_at`
- * to todos/habits and adds the three planning entities, which would otherwise
- * change the V1 payload checksum. Only entities present in the V1 scope are
- * listed.
+ * to `todos` and adds the three planning entities, which would otherwise
+ * change the V1 payload checksum. Habits are ongoing scheduled entities and
+ * have no terminal completion state, so `completed_at` is intentionally
+ * excluded from the Habit canonical columns (only Todos/Projects/Goals/Daily
+ * Plans carry it). Only entities present in the V1 scope are listed.
  */
 export const PORTABLE_V1_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
   todos: [

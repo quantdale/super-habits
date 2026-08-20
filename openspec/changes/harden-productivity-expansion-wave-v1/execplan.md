@@ -91,7 +91,7 @@ Historical implementation artifacts to read but not mutate dishonestly:
 - In progress: Final commit of ExecPlan/tasks reconciliation, push to `main`, and GitHub CI confirmation.
 - Important modified files: `core/backup/backupRestore.ts` (historical-scope recognition in settings state), `tests/integration/backupRestore.test.ts` (regression test), `e2e/portable-backup.spec.ts` + `e2e/journeys/portable-owner-recovery.spec.ts` (portable V2 / scope 4 expectations, legitimate in-progress work preserved), this ExecPlan, `tasks.md`.
 - Last successful validation: Pre-wave baseline GitHub run `32269563521` at `6f18cce...` had quality/e2e green. This session re-established the full gate locally on top of `4788cbe`+`e3b5ead` (see Validation Ledger).
-- Current failures: None in the executed local gates. Live Supabase production migration (task 11) and native Android/iOS E2E (task 18) are environment-dependent and were not executed (no credentials / no runtime); classified honestly, not as passes.
+- Current failures: None in the executed local gates. Native Android/iOS E2E (task 18's runtime half) remains environment-bound and was not executed; classified honestly, not as a pass. The live Supabase production migration/owner-isolation/advisors gate (task 18's Supabase half) WAS executed live on `kruubbynsmxzxfdunaal` as part of the `close-productivity-expansion-production-schema` closure (cross-referenced there); this plan's live-Supabase blocker is therefore resolved.
 - Relevant quarantines: None accepted for this campaign. Pre-existing repo skips are `@sync`-tagged journeys that require a live Supabase remote and are skipped on the PR lane exactly as designed.
 - Blockers: None for repository hardening. Live Supabase credentials and Android/iOS runtime are environment-dependent (see Current failures).
 - Condition required to unblock: N/A for local hardening work; live/native gates remain environment-bound.
@@ -119,7 +119,7 @@ Historical implementation artifacts to read but not mutate dishonestly:
 - [ ] 15. Planning Hub/Quick Capture full E2E green.
 - [ ] 16. Full repository regression + simulation green.
 - [ ] 17. Native status established and runtime QA executed when environment exists.
-- [ ] 18. Live Supabase migration/isolation/advisors verified when safe/authorized.
+- [x] 18. Live Supabase migration/isolation/advisors verified when safe/authorized (executed live on `kruubbynsmxzxfdunaal` via the production-schema-convergence closure).
 - [ ] 19. Documentation and historical implementation-wave hardening handoff reconciled.
 - [ ] 20. Final clean main pushed and exact-SHA GitHub quality/e2e green.
 
@@ -191,7 +191,7 @@ Defect fixed this session (commit `802b49f`): `getBackupStateSummary` reported `
 
 Environment-dependent gates NOT executed (honest classification, not passes):
 
-- Task 11 live Supabase production migration: no Supabase credentials / disposable backend in this session. Schema validator passes locally; the additive migration and two-user isolation proof were not applied to a live database.
+- Task 11 live Supabase production migration: executed live on kruubbynsmxzxfdunaal as part of the close-productivity-expansion-production-schema closure (2026-08-20): additive planning migration plus backup_manifest_scope_version applied; projects/goals/daily_plans created with owner RLS/CRUD/FKs; owner-isolation and daily-plan uniqueness proven at runtime; supabase db lint clean. Cross-referenced in that closure's ExecPlan Validation Ledger.
 - Task 18 native Android/iOS E2E: no `Nitro_API_36` / Android SDK runtime / booted device available; classified ENVIRONMENT, not fabricated success.
 - `npx expo-doctor`: 1 check failed — 10 Expo SDK patch versions out of date (e.g. expo-sqlite 55.0.19 vs 55.0.18). Pre-existing dependency drift; upgrading SDK patch versions is out of hardening scope and risky; not fixed.
 - `npm audit`: 15 vulnerabilities (7 moderate, 8 high) — all transitive dev-dependency advisories in the Expo toolchain (e.g. expo-sharing → @expo/config-plugins). Not introduced by this work; `--force` would break the toolchain; not fixed.

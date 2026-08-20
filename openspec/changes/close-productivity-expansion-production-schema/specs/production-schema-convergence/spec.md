@@ -91,6 +91,12 @@ The new planning tables SHALL NOT grant table privileges to `anon` or `PUBLIC`.
 
 Authenticated Data API privileges MAY be granted as required, with RLS providing owner authorization.
 
+#### Scenario: Anonymous clients cannot reach planning tables
+
+- **GIVEN** the planning tables are deployed with RLS enabled,
+- **WHEN** an unauthenticated `anon` client attempts to read or write a planning row,
+- **THEN** the request is rejected because no `anon`/`PUBLIC` table privileges exist and RLS denies non-owner access.
+
 ### Requirement: Backup manifest scope version exists in production
 
 The production `backup_manifest` table SHALL contain `backup_scope_version` and the migration ledger SHALL reflect the repository migration that adds it.
@@ -117,6 +123,12 @@ Historical migration files SHALL NOT be rewritten.
 `supabase:schema:validate` SHALL fail if the migration set omits required planning tables/columns, owner/RLS policies, owner-safe relationships, owner-scoped Daily Plan uniqueness, or `backup_manifest.backup_scope_version`.
 
 It SHALL reject unsafe global date uniqueness or missing owner authorization.
+
+#### Scenario: Validator rejects an unsafe planning migration
+
+- **GIVEN** a planning migration that introduces a global `UNIQUE (date_key)` or grants planning tables to `anon`,
+- **WHEN** `supabase:schema:validate` runs,
+- **THEN** it fails and reports the missing owner authorization or unsafe global uniqueness before any release.
 
 ### Requirement: Live deployment is verified, not inferred
 

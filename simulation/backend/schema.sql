@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS public.todos (
   sort_order    INTEGER NOT NULL DEFAULT 0,
   recurrence    TEXT,
   recurrence_id TEXT,
+  project_id    TEXT,
+  goal_id       TEXT,
+  completed_at  TEXT,
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT
@@ -39,6 +42,8 @@ CREATE TABLE IF NOT EXISTS public.habits (
   icon           TEXT NOT NULL DEFAULT 'check-circle',
   color          TEXT NOT NULL DEFAULT '#64748b',
   rule_history   TEXT NOT NULL DEFAULT '[]',
+  project_id     TEXT,
+  goal_id        TEXT,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL,
   deleted_at     TEXT
@@ -261,6 +266,7 @@ CREATE TABLE IF NOT EXISTS public.backup_manifest (
   completed_at           TIMESTAMPTZ NOT NULL,
   entity_metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
   settings_version       INTEGER NOT NULL DEFAULT 0,
+  backup_scope_version   INTEGER,
   settings_metadata      JSONB,
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -427,4 +433,129 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   public.linked_action_rules,
   public.user_backup_settings,
   public.backup_manifest
+  TO authenticated, service_role;
+
+-- ============================================================================
+-- PLANNING SCHEMA CONVERGENCE TABLES
+-- ============================================================================
+-- Owner-scoped planning tables the hardened client now backs up as part of
+-- Backup Scope V4 (projects, goals, daily_plans). Same hardened policy model.
+
+CREATE TABLE IF NOT EXISTS public.projects (
+  id           TEXT PRIMARY KEY NOT NULL,
+  user_id      UUID NOT NULL DEFAULT auth.uid(),
+  name         TEXT NOT NULL,
+  description  TEXT,
+  color        TEXT NOT NULL,
+  status       TEXT NOT NULL,
+  target_date  TEXT,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  deleted_at   TEXT,
+  completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS public.goals (
+  id           TEXT PRIMARY KEY NOT NULL,
+  user_id      UUID NOT NULL DEFAULT auth.uid(),
+  project_id   TEXT,
+  title        TEXT NOT NULL,
+  description  TEXT,
+  horizon      TEXT NOT NULL,
+  target_date  TEXT,
+  status       TEXT NOT NULL,
+  progress_percent INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  deleted_at   TEXT,
+  completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS public.daily_plans (
+  id                    TEXT PRIMARY KEY NOT NULL,
+  user_id               UUID NOT NULL DEFAULT auth.uid(),
+  date_key              TEXT NOT NULL,
+  intention             TEXT NOT NULL DEFAULT '',
+  top_todo_ids          TEXT NOT NULL DEFAULT '[]',
+  focus_target_minutes  INTEGER NOT NULL DEFAULT 0,
+  notes                 TEXT NOT NULL DEFAULT '',
+  reflection            TEXT NOT NULL DEFAULT '',
+  energy_score          INTEGER,
+  status                TEXT NOT NULL DEFAULT 'draft',
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
+  deleted_at            TEXT,
+  completed_at          TEXT
+);
+
+-- Owner-scoped active Daily Plan uniqueness (NOT global UNIQUE(date_key)).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_plans_owner_date_active
+  ON public.daily_plans (user_id, date_key) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_daily_plans_owner_date
+  ON public.daily_plans (user_id, date_key);
+CREATE INDEX IF NOT EXISTS idx_projects_owner_status_order
+  ON public.projects (user_id, status, sort_order) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_projects_owner_target_date
+  ON public.projects (user_id, target_date);
+CREATE INDEX IF NOT EXISTS idx_goals_owner_project_id
+  ON public.goals (user_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_goals_owner_status
+  ON public.goals (user_id, status) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_todos_owner_project_id
+  ON public.todos (user_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_todos_owner_goal_id
+  ON public.todos (user_id, goal_id);
+CREATE INDEX IF NOT EXISTS idx_habits_owner_project_id
+  ON public.habits (user_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_habits_owner_goal_id
+  ON public.habits (user_id, goal_id);
+
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.daily_plans ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "sync_projects_select_owner" ON public.projects
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_projects_insert_owner" ON public.projects
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_projects_update_owner" ON public.projects
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_projects_delete_owner" ON public.projects
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+CREATE POLICY "sync_goals_select_owner" ON public.goals
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_goals_insert_owner" ON public.goals
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_goals_update_owner" ON public.goals
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_goals_delete_owner" ON public.goals
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+CREATE POLICY "sync_daily_plans_select_owner" ON public.daily_plans
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_daily_plans_insert_owner" ON public.daily_plans
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_daily_plans_update_owner" ON public.daily_plans
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_daily_plans_delete_owner" ON public.daily_plans
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+REVOKE ALL PRIVILEGES ON TABLE
+  public.projects,
+  public.goals,
+  public.daily_plans
+  FROM anon, PUBLIC;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public.projects,
+  public.goals,
+  public.daily_plans
   TO authenticated, service_role;

@@ -95,7 +95,8 @@ for (const table of syncTables) {
     `baseline ${table}`,
     baseline,
     new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}\\b`),
-  );  requireText(
+  );
+  requireText(
     `baseline ${table} RLS`,
     baseline,
     new RegExp(`ALTER TABLE public\\.${table} ENABLE ROW LEVEL SECURITY`),
@@ -130,7 +131,9 @@ for (const table of backupTables) {
   requireText(
     `v2 migration ${table} owner FK`,
     v2Migration,
-    new RegExp(`user_id UUID NOT NULL DEFAULT auth\\.uid\\(\\) REFERENCES auth\\.users\\(id\\) ON DELETE CASCADE`),
+    new RegExp(
+      `user_id UUID NOT NULL DEFAULT auth\\.uid\\(\\) REFERENCES auth\\.users\\(id\\) ON DELETE CASCADE`,
+    ),
   );
   requireText(
     `v2 migration ${table} owner predicate`,
@@ -173,11 +176,7 @@ for (const table of backupTables) {
     new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}\\b`),
   );
   requireText(`fixture ${table}.user_id`, fixture, /user_id\s+UUID/i);
-  requireText(
-    `v2 migration ${table} no anon grant`,
-    v2Migration,
-    /^(?![\s\S]*\bTO\s+anon\b)/i,
-  );
+  requireText(`v2 migration ${table} no anon grant`, v2Migration, /^(?![\s\S]*\bTO\s+anon\b)/i);
 }
 
 const backupOwnerIndexTables = [
@@ -254,7 +253,13 @@ const backupRequiredColumns = {
   workout_logs: ['routine_id', 'notes', 'completed_at'],
   workout_session_exercises: ['log_id', 'exercise_name', 'sets_completed'],
   saved_meals: ['food_name', 'use_count', 'last_used_at', 'meal_type'],
-  linked_action_rules: ['status', 'direction_policy', 'effect_type', 'effect_payload', 'deleted_at'],
+  linked_action_rules: [
+    'status',
+    'direction_policy',
+    'effect_type',
+    'effect_payload',
+    'deleted_at',
+  ],
 };
 for (const [table, columns] of Object.entries(backupRequiredColumns)) {
   for (const column of columns) {
@@ -283,7 +288,11 @@ requireText(
   v2Migration,
   /GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE[\s\S]*TO authenticated, service_role/i,
 );
-requireText('v2 migration does not use global USING true', v2Migration, /^(?![\s\S]*USING\s*\(\s*true\s*\))/i);
+requireText(
+  'v2 migration does not use global USING true',
+  v2Migration,
+  /^(?![\s\S]*USING\s*\(\s*true\s*\))/i,
+);
 requireText(
   'v2 migration does not grant policy access to anon',
   v2Migration,
@@ -440,6 +449,210 @@ requireText(
   config,
   /\[functions\.user-ai-ask\][\s\S]*?verify_jwt = true/,
 );
+
+// ---- Backup scope version migration + fixture (production closure) ----
+function req(label, src, sub) {
+  if (!src.includes(sub)) failures.push(`${label} is missing: ${sub}`);
+}
+function reqAbsent(label, src, sub) {
+  if (src.includes(sub)) failures.push(`${label} must be absent but found: ${sub}`);
+}
+
+const backupScopeVersionMigrationName = migrationNames.find((name) =>
+  name.endsWith('_backup_manifest_scope_version.sql'),
+);
+if (!backupScopeVersionMigrationName)
+  failures.push('missing backup_manifest scope version migration');
+const backupScopeVersionMigration = backupScopeVersionMigrationName
+  ? read(`supabase/migrations/${backupScopeVersionMigrationName}`)
+  : '';
+req(
+  'backup scope version migration alters backup_manifest',
+  backupScopeVersionMigration,
+  'ALTER TABLE public.backup_manifest',
+);
+req(
+  'backup scope version migration adds backup_scope_version',
+  backupScopeVersionMigration,
+  'ADD COLUMN IF NOT EXISTS backup_scope_version',
+);
+req('fixture backup_manifest has backup_scope_version', fixture, 'backup_scope_version');
+
+// ---- Planning schema convergence (production closure) ----
+const planningMigrationName = migrationNames.find((name) =>
+  name.endsWith('_planning_schema_convergence.sql'),
+);
+if (!planningMigrationName) failures.push('missing planning schema convergence migration');
+const planningMigration = planningMigrationName
+  ? read(`supabase/migrations/${planningMigrationName}`)
+  : '';
+
+const planningTables = ['projects', 'goals', 'daily_plans'];
+for (const table of planningTables) {
+  req(`planning ${table} table`, planningMigration, `CREATE TABLE public.${table} (`);
+  req(
+    `planning ${table} RLS`,
+    planningMigration,
+    `ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`,
+  );
+  req(
+    `planning ${table} owner FK`,
+    planningMigration,
+    'user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE',
+  );
+  req(`fixture planning ${table} table`, fixture, `CREATE TABLE IF NOT EXISTS public.${table} (`);
+  for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+    const suffix = operation.toLowerCase();
+    req(
+      `planning ${table} ${operation} policy`,
+      planningMigration,
+      `CREATE POLICY sync_${table}_${suffix}_owner ON public.${table}`,
+    );
+    req(
+      `planning ${table} ${operation} policy target`,
+      planningMigration,
+      `FOR ${operation} TO authenticated`,
+    );
+  }
+  req(`planning ${table} owner predicate`, planningMigration, '(select auth.uid()) = user_id');
+  req(`planning ${table} update USING`, planningMigration, 'USING ((select auth.uid()) = user_id)');
+  req(
+    `planning ${table} update WITH CHECK`,
+    planningMigration,
+    'WITH CHECK ((select auth.uid()) = user_id)',
+  );
+}
+
+const planningRequiredColumns = {
+  todos: ['project_id', 'goal_id', 'completed_at'],
+  habits: ['project_id', 'goal_id'],
+};
+for (const [table, columns] of Object.entries(planningRequiredColumns)) {
+  for (const column of columns) {
+    req(`planning ${table}.${column}`, planningMigration, column);
+    req(`fixture ${table}.${column}`, fixture, column);
+  }
+}
+
+// Habits are ongoing scheduled entities with no terminal completion state: the
+// resolved contract must NOT add completed_at to habits (neither the remote
+// migration nor the fixture), keeping the Habit backup/remote contract aligned
+// with the authoritative local SQLite schema.
+const mHabitsAlterStart = planningMigration.indexOf('ALTER TABLE public.habits');
+const mHabitsAlterEnd = planningMigration.indexOf(';', mHabitsAlterStart);
+const mHabitsAlter = planningMigration.slice(mHabitsAlterStart, mHabitsAlterEnd);
+reqAbsent(
+  'planning migration habits alter must not add completed_at',
+  mHabitsAlter,
+  'completed_at',
+);
+const fHabitsStart = fixture.indexOf('public.habits (');
+const fHabitsEnd = fixture.indexOf(');', fHabitsStart);
+const fHabitsBlock = fixture.slice(fHabitsStart, fHabitsEnd);
+reqAbsent('fixture habits table must not contain completed_at', fHabitsBlock, 'completed_at');
+
+req(
+  'planning goals -> projects owner FK',
+  planningMigration,
+  'FOREIGN KEY (project_id, user_id) REFERENCES public.projects (id, user_id)',
+);
+req(
+  'planning todos -> projects owner FK',
+  planningMigration,
+  'FOREIGN KEY (project_id, user_id) REFERENCES public.projects (id, user_id)',
+);
+req(
+  'planning todos -> goals owner FK',
+  planningMigration,
+  'FOREIGN KEY (goal_id, user_id) REFERENCES public.goals (id, user_id)',
+);
+req(
+  'planning habits -> projects owner FK',
+  planningMigration,
+  'FOREIGN KEY (project_id, user_id) REFERENCES public.projects (id, user_id)',
+);
+req(
+  'planning habits -> goals owner FK',
+  planningMigration,
+  'FOREIGN KEY (goal_id, user_id) REFERENCES public.goals (id, user_id)',
+);
+req(
+  'planning projects id/user unique',
+  planningMigration,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_projects_id_user',
+);
+req(
+  'planning goals id/user unique',
+  planningMigration,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_goals_id_user',
+);
+
+req(
+  'planning daily_plans owner-scoped active uniqueness',
+  planningMigration,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_plans_owner_date_active',
+);
+req(
+  'planning daily_plans owner-scoped active uniqueness cols',
+  planningMigration,
+  '(user_id, date_key) WHERE deleted_at IS NULL',
+);
+req(
+  'fixture daily_plans owner-scoped active uniqueness',
+  fixture,
+  'CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_plans_owner_date_active',
+);
+req(
+  'fixture daily_plans owner-scoped active uniqueness cols',
+  fixture,
+  '(user_id, date_key) WHERE deleted_at IS NULL',
+);
+reqAbsent('planning daily_plans no global date uniqueness', planningMigration, 'UNIQUE (date_key)');
+reqAbsent('fixture daily_plans no global date uniqueness', fixture, 'UNIQUE (date_key)');
+
+req('planning migration anon/public revoke', planningMigration, 'REVOKE ALL PRIVILEGES ON TABLE');
+req('planning migration anon/public revoke target', planningMigration, 'FROM anon, PUBLIC');
+req(
+  'planning migration authenticated grant',
+  planningMigration,
+  'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE',
+);
+req(
+  'planning migration authenticated grant target',
+  planningMigration,
+  'TO authenticated, service_role',
+);
+reqAbsent('planning migration does not use global USING true', planningMigration, 'USING (true)');
+reqAbsent('planning migration does not grant policy access to anon', planningMigration, 'TO anon');
+reqAbsent(
+  'planning migration does not grant policy access to public',
+  planningMigration,
+  'TO public',
+);
+
+// ---- Negative coverage: the planning checks must actually reject unsafe variants ----
+function expectPlanningRejection(badSource, label) {
+  const badFailures = [];
+  const badReq = (l, cond) => {
+    if (!cond) badFailures.push(l);
+  };
+  badReq(
+    'owner-scoped active uniqueness present',
+    badSource.includes(
+      'uq_daily_plans_owner_date_active ON public.daily_plans (user_id, date_key) WHERE deleted_at IS NULL',
+    ),
+  );
+  badReq('no global date uniqueness', !badSource.includes('UNIQUE (date_key)'));
+  badReq('anon/public revoke present', badSource.includes('FROM anon, PUBLIC'));
+  badReq('no anon policy grant', !badSource.includes('TO anon'));
+  if (badFailures.length === 0)
+    failures.push(`negative coverage failed: unsafe planning variant was NOT rejected (${label})`);
+}
+const unsafeGlobalDateUniqueness = `
+CREATE TABLE public.daily_plans (id TEXT PRIMARY KEY, user_id UUID, date_key TEXT NOT NULL, UNIQUE (date_key));
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.daily_plans TO anon, authenticated;
+`;
+expectPlanningRejection(unsafeGlobalDateUniqueness, 'global date uniqueness + anon grant');
 
 if (/SUPABASE_SERVICE_ROLE_KEY|SERVICE_ROLE_KEY/i.test(clientSource)) {
   failures.push('client Supabase source references a service-role credential');

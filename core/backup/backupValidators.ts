@@ -297,7 +297,6 @@ const HABIT_RULES: FieldRule[] = [
   nullableIsoRule('deleted_at'),
   optionalColumnRule('project_id', isNullableIdText),
   optionalColumnRule('goal_id', isNullableIdText),
-  optionalColumnRule('completed_at', isNullableIso),
 ];
 
 const HABIT_COMPLETION_RULES: FieldRule[] = [
