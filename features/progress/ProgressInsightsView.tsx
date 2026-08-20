@@ -4,9 +4,10 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { PillChip } from '@/core/ui/PillChip';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { buildProgressSummary } from '@/features/progress/progress.summary';
-import { pctDelta } from '@/features/progress/progress.domain';
+import { pctDelta, PROGRESS_WINDOW_OPTIONS, trendOf } from '@/features/progress/progress.domain';
 import type { ProgressSummary } from '@/features/progress/progress.types';
 
 type StatCard = {
@@ -18,24 +19,30 @@ type StatCard = {
   icon: keyof typeof MaterialIcons.glyphMap;
 };
 
+const TREND_ICON: Record<'up' | 'down' | 'flat', keyof typeof MaterialIcons.glyphMap> = {
+  up: 'trending-up',
+  down: 'trending-down',
+  flat: 'trending-flat',
+};
+
 export function ProgressInsightsView() {
   const { tokens } = useAppTheme();
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [windowDays, setWindowDays] = useState<number>(7);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (days: number) => {
     setIsLoading(true);
     try {
-      setSummary(await buildProgressSummary());
+      setSummary(await buildProgressSummary(days));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
-  }, [load]);
+    void load(windowDays);
+  }, [load, windowDays]);
 
   if (!isLoading && !summary) {
     return (
@@ -101,15 +108,35 @@ export function ProgressInsightsView() {
       <Text className="text-lg font-bold" style={{ color: tokens.text }}>
         Progress
       </Text>
+      <View className="flex-row flex-wrap">
+        {PROGRESS_WINDOW_OPTIONS.map((days) => (
+          <PillChip
+            key={days}
+            label={`${days}d`}
+            active={windowDays === days}
+            color={SECTION_COLORS.todos}
+            onPress={() => setWindowDays(days)}
+          />
+        ))}
+      </View>
+
       {summary ? (
         <Text className="text-xs" style={{ color: tokens.textMuted }}>
-          This week ({summary.range.currentStart} → {summary.range.currentEnd}) vs prior week
+          Last {summary.windowDays} days ({summary.range.currentStart} → {summary.range.currentEnd})
+          vs prior {summary.windowDays} days
         </Text>
       ) : null}
 
       <View className="flex-row flex-wrap gap-3">
         {cards.map((card) => {
           const delta = pctDelta(card.current, card.previous);
+          const trend = trendOf(card.current, card.previous);
+          const trendColor =
+            trend === 'up'
+              ? SECTION_COLORS.habits
+              : trend === 'down'
+                ? tokens.dangerSolid
+                : tokens.textMuted;
           return (
             <Card key={card.label} accentColor={card.color} className="flex-1" innerClassName="p-3">
               <View className="flex-row items-center gap-2">
@@ -118,10 +145,13 @@ export function ProgressInsightsView() {
                   {card.label}
                 </Text>
               </View>
-              <Text className="mt-2 text-2xl font-bold tabular-nums" style={{ color: tokens.text }}>
-                {card.current}
-                {card.unit ? ` ${card.unit}` : ''}
-              </Text>
+              <View className="mt-2 flex-row items-center gap-2">
+                <Text className="text-2xl font-bold tabular-nums" style={{ color: tokens.text }}>
+                  {card.current}
+                  {card.unit ? ` ${card.unit}` : ''}
+                </Text>
+                <MaterialIcons name={TREND_ICON[trend]} size={18} color={trendColor} />
+              </View>
               <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
                 Prior: {card.previous}
                 {delta === null ? ' (new)' : ` · ${delta >= 0 ? '+' : ''}${delta}%`}

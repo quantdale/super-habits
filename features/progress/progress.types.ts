@@ -5,6 +5,8 @@ export type ProgressPeriodStat = {
 };
 
 export type ProgressSummary = {
+  /** Length in local days of each comparison window. */
+  windowDays: number;
   range: {
     currentStart: string;
     currentEnd: string;

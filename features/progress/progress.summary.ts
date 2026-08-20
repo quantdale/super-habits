@@ -1,19 +1,22 @@
 import { getProgressRawData } from '@/features/progress/progress.data';
-import { makePeriodStat } from '@/features/progress/progress.domain';
+import { makePeriodStat, PROGRESS_WINDOW_DAYS } from '@/features/progress/progress.domain';
 import type { ProgressSummary } from '@/features/progress/progress.types';
 
 /**
- * Build deterministic current-7-day vs prior-7-day Progress Insights from
+ * Build deterministic current-N-day vs prior-N-day Progress Insights from
  * authoritative local state. No opaque composite score (design.md §12): each
  * card reports its own current/prior value and a plain delta.
  *
  * The raw DB aggregation lives in progress.data.ts (getProgressRawData); this
  * module only composes it into the summary shape via domain helpers.
  */
-export async function buildProgressSummary(): Promise<ProgressSummary> {
-  const data = await getProgressRawData();
+export async function buildProgressSummary(
+  windowDays: number = PROGRESS_WINDOW_DAYS,
+): Promise<ProgressSummary> {
+  const data = await getProgressRawData(windowDays);
 
   return {
+    windowDays,
     range: {
       currentStart: data.range.currentStart,
       currentEnd: data.range.currentEnd,

@@ -3,6 +3,23 @@ import type { ProgressPeriodStat } from '@/features/progress/progress.types';
 
 export const PROGRESS_WINDOW_DAYS = 7;
 
+/** Selectable insight windows, in local days. */
+export const PROGRESS_WINDOW_OPTIONS = [7, 30, 90] as const;
+export type ProgressWindowDays = (typeof PROGRESS_WINDOW_OPTIONS)[number];
+
+export type TrendDirection = 'up' | 'down' | 'flat';
+
+/**
+ * Plain directional trend vs the previous window. No composite scoring: a
+ * metric is "up" only when it strictly increased, "down" only when it
+ * strictly decreased.
+ */
+export function trendOf(current: number, previous: number): TrendDirection {
+  if (current > previous) return 'up';
+  if (current < previous) return 'down';
+  return 'flat';
+}
+
 export type ProgressDateRange = {
   currentStart: string;
   currentEnd: string;
@@ -17,17 +34,22 @@ export type ProgressDateRange = {
 };
 
 /**
- * Compute deterministic local 7-day windows using sanctioned local-date helpers.
- * Current window is the last 7 inclusive local days; the previous window is the
- * 7 local days immediately before it. UTC bounds are half-open local-midnight
- * instants derived via getUtcIsoRangeForLocalDateKeys (DST-safe via setDate).
+ * Compute deterministic local N-day windows using sanctioned local-date
+ * helpers. Current window is the last `windowDays` inclusive local days; the
+ * previous window is the same number of local days immediately before it.
+ * UTC bounds are half-open local-midnight instants derived via
+ * getUtcIsoRangeForLocalDateKeys (DST-safe via setDate).
  */
-export function buildProgressDateRange(today: Date = new Date()): ProgressDateRange {
+export function buildProgressDateRange(
+  today: Date = new Date(),
+  windowDays: number = PROGRESS_WINDOW_DAYS,
+): ProgressDateRange {
+  const days = Math.max(1, Math.floor(windowDays));
   const todayKey = toDateKey(today);
   const todayMidnight = dateKeyToLocalDate(todayKey);
 
   const currentStartMidnight = new Date(todayMidnight);
-  currentStartMidnight.setDate(todayMidnight.getDate() - (PROGRESS_WINDOW_DAYS - 1));
+  currentStartMidnight.setDate(todayMidnight.getDate() - (days - 1));
 
   const currentStartKey = toDateKey(currentStartMidnight);
   const currentEndKey = todayKey;
