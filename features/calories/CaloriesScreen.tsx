@@ -30,6 +30,7 @@ import {
   calculateGoalProgress,
   caloriesTotal,
   kcalFromMacros,
+  buildTargetProgress,
 } from '@/features/calories/calories.domain';
 import type {
   CalorieGoal,
@@ -38,18 +39,22 @@ import type {
   MealType,
   SavedMeal,
 } from '@/features/calories/types';
+import type { MacroTargets } from '@/features/calories/calories.domain';
+
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
 import { CalorieGoalModal } from './CalorieGoalModal';
+import { loadMacroTargets, saveMacroTargets } from './caloriesTargets';
 import { CaloriesDiaryView } from './CaloriesDiaryView';
 import type { MealSection } from './CaloriesDiaryView';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
 import { CaloriesFormView } from './CaloriesFormView';
 import { DailyCalorieChart } from './DailyCalorieChart';
 import { MacroDonutChart } from './MacroDonutChart';
+import { MacroTargetsModal } from './MacroTargetsModal';
 import { MacroTrendChart } from './MacroTrendChart';
 import { SavedMealSearchModal } from './SavedMealSearchModal';
 
@@ -141,6 +146,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<CaloriesViewMode>('form');
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
+  const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
+  const [targetsSheetVisible, setTargetsSheetVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     const startYear = new Date();
@@ -187,6 +194,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       })
       .catch(() => undefined);
 
+    loadMacroTargets()
+      .then((stored) => {
+        if (active && stored) setMacroTargets(stored);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -207,6 +219,34 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const goalProgress = useMemo(
     () => calculateGoalProgress(caloriesTotal(entries), goal.calories),
     [entries, goal.calories],
+  );
+  const effectiveTargets: MacroTargets = macroTargets ?? goal;
+  const macroTargetBars = useMemo(
+    () =>
+      (
+        [
+          {
+            key: 'protein',
+            label: 'Protein',
+            actual: todayTotals.protein,
+            target: effectiveTargets.protein,
+          },
+          {
+            key: 'carbs',
+            label: 'Carbs',
+            actual: todayTotals.carbs,
+            target: effectiveTargets.carbs,
+          },
+          { key: 'fats', label: 'Fats', actual: todayTotals.fats, target: effectiveTargets.fats },
+        ] as const
+      ).map(({ key, label, actual, target }) => ({
+        key,
+        label,
+        actual,
+        target,
+        progress: buildTargetProgress(actual, target),
+      })),
+    [todayTotals, effectiveTargets],
   );
   const groupedEntries = useMemo<MealSection[]>(
     () =>
@@ -271,7 +311,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         accentColor={COLOR}
         headerTitle="Macro trends"
         headerSubtitle="Rolling 7/30-day intake averages. Informational only."
-        headerRight={<MaterialIcons name="stacked-line-chart" size={22} color={tokens.textOnAccent} />}
+        headerRight={
+          <MaterialIcons name="stacked-line-chart" size={22} color={tokens.textOnAccent} />
+        }
         className="mb-0"
       >
         <MacroTrendChart summaries={summary364} />
@@ -502,6 +544,45 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         ) : null}
       </View>
 
+      <View className="mb-4 gap-2">
+        {macroTargetBars.map(({ key, label, actual, target, progress }) =>
+          target > 0 ? (
+            <View key={key}>
+              <View className="mb-1 flex-row items-center justify-between">
+                <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
+                  {label} {actual}g / {target}g
+                </Text>
+                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  {progress.over ? `${actual - target}g over` : `${progress.remaining}g left`}
+                </Text>
+              </View>
+              <View
+                className="h-1.5 w-full overflow-hidden rounded-full"
+                style={{ backgroundColor: tokens.border }}
+              >
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${progress.percent}%`,
+                    backgroundColor: progress.over ? tokens.dangerSolid : COLOR,
+                  }}
+                />
+              </View>
+            </View>
+          ) : null,
+        )}
+        <Pressable
+          onPress={() => setTargetsSheetVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Edit daily macro targets"
+          className="self-start"
+        >
+          <Text className="text-xs font-medium" style={{ color: colorText }}>
+            Edit daily targets ✎
+          </Text>
+        </Pressable>
+      </View>
+
       {macroDonut}
     </Card>
   );
@@ -592,6 +673,16 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           setGoal(newGoal);
         }}
         onClose={() => setGoalSheetVisible(false)}
+      />
+
+      <MacroTargetsModal
+        visible={targetsSheetVisible}
+        currentTargets={effectiveTargets}
+        onSave={(next) => {
+          setMacroTargets(next);
+          void saveMacroTargets(next).catch(() => undefined);
+        }}
+        onClose={() => setTargetsSheetVisible(false)}
       />
 
       <SavedMealSearchModal

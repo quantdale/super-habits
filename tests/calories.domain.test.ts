@@ -10,6 +10,8 @@ import {
   buildCalorieHeatmapDays,
   buildMacroTrendPoints,
   summarizeMacroTrend,
+  normalizeMacroTargets,
+  buildTargetProgress,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
 import type { SavedMeal } from '@/core/db/types';
@@ -226,7 +228,6 @@ describe('filterSavedMeals', () => {
 });
 
 describe('buildMacroTrendPoints', () => {
-  const today = new Date();
   const keyOffset = (offset: number) => {
     const d = new Date();
     d.setDate(d.getDate() - offset);
@@ -311,5 +312,50 @@ describe('summarizeMacroTrend', () => {
     const summary = summarizeMacroTrend(points);
     expect(summary.avgProtein).toBe(5);
     expect(summary.avgFats).toBe(2.5);
+  });
+});
+
+describe('normalizeMacroTargets', () => {
+  it('returns null for absent or field-less input', () => {
+    expect(normalizeMacroTargets(null)).toBeNull();
+    expect(normalizeMacroTargets('junk')).toBeNull();
+    expect(normalizeMacroTargets({})).toBeNull();
+  });
+
+  it('normalizes valid fields and clamps out-of-range ones to defaults', () => {
+    expect(normalizeMacroTargets({ calories: 2400, protein: 160 })).toEqual({
+      calories: 2400,
+      protein: 160,
+      carbs: 200,
+      fats: 65,
+    });
+    expect(normalizeMacroTargets({ calories: 10_000_000 }).calories).toBe(2000);
+  });
+});
+
+describe('buildTargetProgress', () => {
+  it('hides progress for non-positive targets', () => {
+    expect(buildTargetProgress(50, 0)).toEqual({ percent: 0, remaining: 0, over: false });
+    expect(buildTargetProgress(50, -5)).toEqual({ percent: 0, remaining: 0, over: false });
+  });
+
+  it('caps percent at 100 and reports over-target', () => {
+    expect(buildTargetProgress(180, 150)).toEqual({
+      percent: 100,
+      remaining: 0,
+      over: true,
+    });
+  });
+
+  it('reports remaining grams under target', () => {
+    expect(buildTargetProgress(90, 150)).toEqual({
+      percent: 60,
+      remaining: 60,
+      over: false,
+    });
+  });
+
+  it('treats NaN actual as zero', () => {
+    expect(buildTargetProgress(NaN, 100).percent).toBe(0);
   });
 });

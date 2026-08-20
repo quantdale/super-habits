@@ -144,6 +144,42 @@ export function calculateGoalProgress(
 }
 
 /**
+ * Editable daily macro targets (AsyncStorage-backed, separate from the
+ * synced calorie goal). Same shape and bounds as CalorieGoal.
+ */
+export type MacroTargets = CalorieGoal;
+
+/** Targets fall back to the calorie goal when unset or malformed. */
+export function normalizeMacroTargets(value: unknown): MacroTargets | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const hasAnyField = ['calories', 'protein', 'carbs', 'fats'].some(
+    (key) => typeof candidate[key] === 'number',
+  );
+  if (!hasAnyField) return null;
+  return normalizeCalorieGoal(candidate);
+}
+
+export type TargetProgress = {
+  percent: number;
+  remaining: number;
+  over: boolean;
+};
+
+/** Per-macro progress toward a daily target; a non-positive target hides the bar. */
+export function buildTargetProgress(actual: number, target: number): TargetProgress {
+  if (!Number.isFinite(target) || target <= 0) {
+    return { percent: 0, remaining: 0, over: false };
+  }
+  const safeActual = Number.isFinite(actual) && actual > 0 ? actual : 0;
+  return {
+    percent: Math.min(100, Math.round((safeActual / target) * 100)),
+    remaining: Math.max(0, Math.round(target - safeActual)),
+    over: safeActual > target,
+  };
+}
+
+/**
  * Client-side filter for saved meals search.
  * Used to filter the already-loaded list without a DB round-trip
  * when the user types in the search input.
@@ -201,10 +237,7 @@ export type MacroTrendSummary = {
  * Per-day macro totals for the last `days` calendar days (oldest → newest).
  * Days without entries are zero-filled so windows stay aligned.
  */
-export function buildMacroTrendPoints(
-  summaries: DailySummary[],
-  days: number,
-): MacroDayPoint[] {
+export function buildMacroTrendPoints(summaries: DailySummary[], days: number): MacroDayPoint[] {
   const map = new Map<string, DailySummary>();
   for (const s of summaries) {
     map.set(s.dateKey, s);
