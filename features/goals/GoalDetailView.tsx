@@ -9,6 +9,8 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
   addGoal,
   getGoal,
+  getGoalRollup,
+  listHabitsForGoal,
   listTodosForGoal,
   softDeleteGoal,
   updateGoal,
@@ -23,6 +25,9 @@ import {
 import {
   GOAL_DESCRIPTION_MAX,
   GOAL_TITLE_MAX,
+  computeGoalRollup,
+  describeGoalHorizon,
+  parseGoalProgressText,
   validateGoalInput,
 } from '@/features/goals/goals.domain';
 import { listTodos, setTodoProjectGoal } from '@/features/todos/todos.data';
@@ -32,9 +37,11 @@ import type { GoalHorizon, GoalStatus } from '@/core/db/types';
 type GoalDetailViewProps = {
   goalId: string | null;
   onBack: () => void;
+  /** Optional goal→project navigation hook (wired by the planning hub). */
+  onOpenProject?: (projectId: string) => void;
 };
 
-export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
+export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailViewProps) {
   const { tokens } = useAppTheme();
   const isCreate = goalId === null;
   const [title, setTitle] = useState('');
@@ -50,11 +57,24 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
   const [candidateTodos, setCandidateTodos] = useState<{ id: string; title: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [progressText, setProgressText] = useState('0');
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const [rollup, setRollup] = useState<{
+    todos: { total: number; done: number };
+    habits: { habitCount: number; completionsInWindow: number; windowDays: number };
+  } | null>(null);
+  const [linkedHabits, setLinkedHabits] = useState<{ id: string; name: string }[]>([]);
 
   const reloadLinks = useCallback(async () => {
     if (isCreate || !goalId) return;
-    const todos = await listTodosForGoal(goalId);
+    const [todos, habits, nextRollup] = await Promise.all([
+      listTodosForGoal(goalId),
+      listHabitsForGoal(goalId),
+      getGoalRollup(goalId),
+    ]);
     setLinkedTodos(todos.map((t) => ({ id: t.id, title: t.title })));
+    setLinkedHabits(habits);
+    setRollup(nextRollup);
     const all = await listTodos();
     const linkedIds = new Set(todos.map((t) => t.id));
     setCandidateTodos(
@@ -79,6 +99,7 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
       setHorizon(goal.horizon);
       setStatus(goal.status);
       setProgress(goal.progress_percent);
+      setProgressText(String(goal.progress_percent));
       setTargetDate(goal.target_date ?? '');
       setProjectId(goal.project_id);
       await reloadLinks();
@@ -192,6 +213,9 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
           </Pressable>
         ))}
       </View>
+      <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+        {describeGoalHorizon(horizon).cadenceHint}
+      </Text>
 
       <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
         Status
@@ -219,10 +243,56 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
 
       <View className="mt-2">
         <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-          Progress: {progress}%
+          Progress (0–100)
         </Text>
+        <View className="flex-row items-center gap-2">
+          <View className="flex-1">
+            <TextField
+              label=""
+              value={progressText}
+              onChangeText={(text) => {
+                setProgressText(text);
+                const parsed = parseGoalProgressText(text);
+                if (parsed.ok) {
+                  setProgressError(null);
+                  setProgress(parsed.value);
+                } else {
+                  setProgressError(parsed.error);
+                }
+              }}
+              keyboardType="number-pad"
+              placeholder="0"
+              accessibilityLabel="Goal progress percent, 0 to 100"
+            />
+          </View>
+          <Button
+            label="-10"
+            onPress={() => {
+              const next = Math.max(0, progress - 10);
+              setProgress(next);
+              setProgressText(String(next));
+              setProgressError(null);
+            }}
+            variant="ghost"
+          />
+          <Button
+            label="+10"
+            onPress={() => {
+              const next = Math.min(100, progress + 10);
+              setProgress(next);
+              setProgressText(String(next));
+              setProgressError(null);
+            }}
+            variant="ghost"
+          />
+        </View>
+        {progressError ? (
+          <Text className="mt-1 text-xs" style={{ color: tokens.dangerSolid }}>
+            {progressError}
+          </Text>
+        ) : null}
         <View
-          className="h-3 w-full overflow-hidden rounded-full"
+          className="mt-2 h-3 w-full overflow-hidden rounded-full"
           style={{ backgroundColor: tokens.surfaceElevated }}
         >
           <View
@@ -230,19 +300,18 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
             style={{ width: `${progress}%`, backgroundColor: SECTION_COLORS.todos }}
           />
         </View>
-        <View className="mt-2 flex-row gap-2">
-          <Button
-            label="-10"
-            onPress={() => setProgress(Math.max(0, progress - 10))}
-            variant="ghost"
-          />
-          <Button
-            label="+10"
-            onPress={() => setProgress(Math.min(100, progress + 10))}
-            variant="ghost"
-          />
-        </View>
       </View>
+
+      {!isCreate && rollup ? (
+        <GoalRollupPanel
+          rollup={rollup}
+          onApplySuggestion={async (percent) => {
+            setProgress(percent);
+            setProgressText(String(percent));
+            if (goalId) await updateGoal(goalId, { progressPercent: percent });
+          }}
+        />
+      ) : null}
 
       {projects.length > 0 ? (
         <View className="mt-2">
@@ -292,6 +361,14 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
         <Text className="text-sm" style={{ color: tokens.dangerSolid }}>
           {error}
         </Text>
+      ) : null}
+
+      {!isCreate && projectId && onOpenProject ? (
+        <Button
+          label="Open linked project"
+          variant="ghost"
+          onPress={() => onOpenProject(projectId)}
+        />
       ) : null}
 
       <Button
@@ -352,6 +429,66 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
       {!isCreate && goalId ? (
         <Button label="Delete Goal" variant="danger" onPress={handleDelete} disabled={saving} />
       ) : null}
+    </View>
+  );
+}
+
+function GoalRollupPanel({
+  rollup,
+  onApplySuggestion,
+}: {
+  rollup: {
+    todos: { total: number; done: number };
+    habits: { habitCount: number; completionsInWindow: number; windowDays: number };
+  };
+  onApplySuggestion: (percent: number) => void | Promise<void>;
+}) {
+  const { tokens } = useAppTheme();
+  const [applying, setApplying] = useState(false);
+  const summary = computeGoalRollup({
+    todos: rollup.todos,
+    habits: rollup.habits,
+  });
+
+  if (summary.isEmpty) return null;
+
+  return (
+    <View
+      className="mt-2 rounded-2xl border p-3"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+      accessibilityLabel={`Linked-entity rollup suggests ${summary.suggestedPercent} percent`}
+    >
+      <View className="flex-row items-center justify-between">
+        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          Linked progress
+        </Text>
+        <Text className="text-sm font-bold" style={{ color: tokens.text }}>
+          {summary.suggestedPercent}%
+        </Text>
+      </View>
+      <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+        {rollup.todos.total > 0
+          ? `${rollup.todos.done}/${rollup.todos.total} linked tasks done`
+          : 'No linked tasks'}
+        {rollup.habits.habitCount > 0
+          ? ` · ${rollup.habits.completionsInWindow} habit check-ins in ${rollup.habits.windowDays}d across ${rollup.habits.habitCount} habit(s)`
+          : ''}
+      </Text>
+      <View className="mt-2">
+        <Button
+          label={`Set progress to ${summary.suggestedPercent}%`}
+          variant="ghost"
+          disabled={applying}
+          onPress={async () => {
+            setApplying(true);
+            try {
+              await onApplySuggestion(summary.suggestedPercent);
+            } finally {
+              setApplying(false);
+            }
+          }}
+        />
+      </View>
     </View>
   );
 }
