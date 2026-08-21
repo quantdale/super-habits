@@ -1,16 +1,16 @@
 # ExecPlan: Complete Product Roadmap Parallel Wave V2
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
 Close the largest remaining product gaps of SuperHabits in one massively
 parallel implementation wave: deepen every feature module (planning layer,
 core domains, command center, platform shell) so the app behaves like a
-complete all-in-one productivity product. Success is ten substantial delegated
-work packets implemented, reviewed, and integrated into local main with
-minimal gates green and hardening debt explicitly recorded.
+complete all-in-one productivity product. Success was ten substantial
+delegated work packets implemented, reviewed, and integrated into local main
+with minimal gates green and hardening debt explicitly recorded.
 
 ## Context
 
@@ -29,8 +29,9 @@ minimal gates green and hardening debt explicitly recorded.
 
 ## Scope
 
-Ten delegated work packets (matrix below) plus orchestrator-owned integration,
-campaign artifacts, and minimal end validation. English only throughout.
+Eleven delegated work packets (W1–W10 plus a W5 follow-up) under strict path
+ownership, orchestrator-owned integration of shared surfaces, campaign
+artifacts, and minimal end validation. English only throughout.
 
 ## Non-Goals
 
@@ -40,48 +41,49 @@ A dedicated hardening campaign follows this wave.
 
 ## Current Checkpoint
 
-- Current milestone: Delegation phase — 10 workers spawned and running.
-- Completed: Repository recovery (fetch/prune, clean tree at 6dbbc42);
-  authoritative docs read (`AGENTS.md`, `.agent/PLANS.md`,
-  `docs/PROJECT_STRUCTURE_MAP.md`, plan discovery via `npm run agent:plans`);
-  gap audit (thin expansion modules 84–820 lines vs mature core 1.4k–6.2k;
-  command intents lack planning entities; notifications habit-only;
-  minimal PWA surface); campaign OpenSpec artifacts written and validated.
-- In progress: Ten sub-agents implementing packets W1–W10 (matrix below).
-- Important modified files: campaign OpenSpec change files only, so far.
-- Last successful validation: `npm run openspec:validate` PASS;
-  `npm run agent:plan:validate -- --plan openspec/changes/complete-product-roadmap-parallel-wave-v2/execplan.md` PASS (pre-delegation).
+- Current milestone: CAMPAIGN COMPLETE — all delegated packets implemented,
+  reviewed, integrated, validated, and pushed.
+- Completed: repository recovery at 6dbbc42; gap audit; campaign scaffolding;
+  11 delegated packets implemented and reviewed; orchestrator integration
+  (restoration of race-lost files, screen wiring, shared-surface hooks, type
+  fixes); all end gates green; main pushed.
+- In progress: None.
+- Important modified files: see Changed Files / Areas; full detail in the
+  wave commit range `6e0a262..HEAD` (124+ files, ~11.9k insertions).
+- Last successful validation: typecheck 0 errors; focused Vitest 346/346
+  across 23 wave test files including association invariants; eslint 0 errors
+  (8 pre-existing-pattern warnings against a gate of 25); openspec validate
+  36/36; agent:plan:validate:all PASS; git diff --check clean.
 - Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Monitor worker completion reports; review each returned
-  diff against owned paths; integrate accepted work serially into main.
-- Remaining definition of done: ≥10 packets attempted; every returned product
-  reviewed; accepted work on local main; shared integration applied;
-  HARDENING_HANDOFF current; typecheck/lint/openspec/execplan gates pass;
-  main pushed; tree clean; final report delivered.
+- Exact next action: None — task complete. The next session is the dedicated
+  hardening campaign, starting from HARDENING_HANDOFF.md.
+- Remaining definition of done: Complete — all conditions met and evidenced in
+  the Validation Ledger.
 
 ## SUB-AGENT ASSIGNMENT MATRIX
 
-| #   | Mission                                                                 | Owned paths (exclusive edit rights)                                                                                                                                         | Prohibited overlap                                                    | Expected deliverables                                                        | Branch/worktree                               | Status    | Result commit SHA | Integration status | Discoveries/debt |
-| --- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- | --------- | ----------------- | ------------------ | ---------------- |
-| W1  | Todos+Habits depth: search/filter/sort, bulk ops, habit history detail  | `features/todos/`, `features/habits/`, `tests/todos*.test.ts`, `tests/habits*.test.ts`, `tests/habitInsights*`                                                              | app/, core/**, features/settings/, other features                     | Domain functions + tests, list toolbar, bulk actions, detail surfaces        | shared tree, owned-path commits to local main | delegated | pending           | pending            | —                |
-| W2  | Projects+Goals depth: rollups, detail enrichment, lifecycle flows       | `features/projects/`, `features/goals/`, `tests/projects*.test.ts`, `tests/goals*.test.ts`                                                                                  | app/, core/**, other features                                         | Rollup domain + tests, enriched detail views, filter/sort                    | same                                          | delegated | pending           | pending            | —                |
-| W3  | Daily Plan + Planning Hub + Weekly Review continuity                    | `features/daily-plan/`, `features/planning-hub/`, `features/weekly-review/`, `tests/dailyPlan*.test.ts`, `tests/weeklyReview*.test.ts`                                      | app/, core/**, other features                                         | Carry-forward, history nav, adherence, review outputs                        | same                                          | delegated | pending           | pending            | —                |
-| W4  | Activity Timeline + Progress Insights + Quick Capture                   | `features/activity/`, `features/progress/`, `features/quick-capture/`, `tests/activityTimeline*.test.ts`, `tests/progress*.test.ts`, `tests/quickCapture*.test.ts`          | app/, core/**, other features                                         | Filters, 7/30/90 comparisons, capture parsing                                | same                                          | delegated | pending           | pending            | —                |
-| W5  | Overview dashboard cards + customization                                | `features/overview/`, `tests/overview*.test.ts`                                                                                                                             | app/, core/**, other features                                         | Card set/order persistence, cross-surface summaries                          | same                                          | delegated | pending           | pending            | —                |
-| W6  | Command Center planning coverage                                        | `features/command/`, `tests/command*.test.ts`, `tests/ask*.test.ts`, `tests/realCommandParser*.test.ts`                                                                     | app/, core/**, supabase/functions (report-only), other features       | New intents via canonical pipeline, ask retrieval, history/suggestions       | same                                          | delegated | pending           | pending            | —                |
-| W7  | Pomodoro depth: association, notes, presets, stats                      | `features/pomodoro/`, `tests/pomodoro*.test.ts`                                                                                                                             | app/, core/**, lib/notifications.ts, other features                   | Association + presets domain/UI, stats views                                 | same                                          | delegated | pending           | pending            | —                |
-| W8  | Workout depth: history detail, PRs, templates, rest                     | `features/workout/`, `tests/workout*.test.ts`                                                                                                                               | app/, core/**, other features                                         | PR domain + tests, history detail, duplication, volume charts                | same                                          | delegated | pending           | pending            | —                |
-| W9  | Calories depth: trends, targets, copy-day, saved meals                  | `features/calories/`, `tests/calories*.test.ts`                                                                                                                             | app/, core/**, other features                                         | Trend/target domain + UI, copy-day, saved-meal UX                            | same                                          | delegated | pending           | pending            | —                |
-| W10 | Platform: reminders beyond habits, PWA offline/update, settings entries | `core/notifications/`, `core/pwa/`, `lib/notifications.ts`, `features/settings/`, `core/ui/`, `public/sw.js`, `tests/notifications*.test.ts`, `tests/inAppNotices*.test.ts` | app/ (report INTEGRATION_NEED), core/db, core/sync, feature internals | Reminder scheduling with guards, SW update bridge, settings bucket additions | same                                          | delegated | pending           | pending            | —                |
+| #   | Mission                                                 | Owned paths                                                                                                            | Result commit SHA                                                                    | Status    | Integration status                                                                        | Discoveries / debt                                        |
+| --- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| W1  | Todos + Habits depth                                    | `features/todos/`, `features/habits/`, `tests/todos*`, `tests/habits*`                                                 | 327e426, f4b1b1f, a552c9d, a3a6079, 140c4c9, d5d6897, 5155428 (+ content in 7d87b93) | completed | accepted; HabitsScreen wiring finished by orchestrator 889bb9d                            | habit lifecycle device-local; bulk ops sequential         |
+| W2  | Projects + Goals depth                                  | `features/projects/`, `features/goals/`, `tests/projects*`, `tests/goals*`                                             | 8d85a57, fa388cb, 667d016, 2dce8ac, e1952ca                                          | completed | accepted; goal→project nav prop added by orchestrator 2a36558                             | rollup SQL needs real-SQLite integration tests            |
+| W3  | Daily Plan + Planning Hub + Weekly Review               | `features/daily-plan/`, `features/planning-hub/`, `features/weekly-review/`, `tests/dailyPlan*`, `tests/weeklyReview*` | de43679, 69086d6, bae53ae, 4aaafa9, 86ca431                                          | completed | accepted; five race-lost files restored + screens wired by orchestrator 611d755 / 1c712f7 | apply-next-week write path lacks DB-contract test         |
+| W4  | Activity Timeline + Progress Insights + Quick Capture   | `features/activity/`, `features/progress/`, `features/quick-capture/`, own tests                                       | 7d87b93, 9db4e9e, aacc17d, bcb43f2, 45d873e                                          | completed | accepted                                                                                  | workout "volume" = session count until schema adds weight |
+| W5  | Overview dashboard                                      | `features/overview/`, `tests/overview*.test.ts`                                                                        | follow-up worker agent-10: 84a2624; typing fixes ee283c7                             | completed | accepted (original report truncated; work finished by follow-up)                          | greeting static per render; no per-card secondary actions |
+| W6  | Command Center planning coverage                        | `features/command/`, command/ask tests                                                                                 | 50dbdf1, d6b5e64                                                                     | completed | accepted; sibling deletion damage repaired by orchestrator                                | remote parser prompts still needed (INTEGRATION_NEED)     |
+| W7  | Pomodoro depth                                          | `features/pomodoro/`, `tests/pomodoro*`                                                                                | 0775d7c (+ content swept into 50dbdf1 / 7d87b93)                                     | completed | accepted                                                                                  | session meta device-local; auto-start timing untested     |
+| W8  | Workout depth                                           | `features/workout/`, `tests/workout*`                                                                                  | content landed in 7d87b93 / 50dbdf1 (attribution swept by index races)               | completed | accepted                                                                                  | SCHEMA_REQUEST for weight/reps/duration recorded          |
+| W9  | Calories depth                                          | `features/calories/`, `tests/calories*`                                                                                | c1f1fee, ba1b8a2, 14cc150, 52cbc45, ddd83ea, 8a3e9d6, befbc91                        | completed | accepted                                                                                  | targets device-local; copy-day sequential inserts         |
+| W10 | Platform completion (reminders, PWA, settings, core/ui) | `core/notifications/`, `core/pwa/`, `lib/notifications.ts`, `features/settings/`, `core/ui/`, `public/sw.js`           | c1016cc, 5b267f1 (+ content in 7d87b93)                                              | completed | accepted; banner/indicator mounted by orchestrator 2a36558                                | snooze handler pending; scheduler bridges need mocks      |
 
-Orchestrator-reserved hotspots (no worker may edit): `app/index.tsx`,
-`app/_layout.tsx`, `core/providers/**`, `core/db/**`, `core/sync/**`,
-`core/backup/**`, `core/auth/**`, `core/portable/**`, `package.json`,
-`qa/impact-map.json`, campaign OpenSpec files, `features/shared/`.
+Orchestrator-reserved hotspots were never edited by workers. During
+integration the orchestrator alone changed `app/_layout.tsx`,
+`features/goals/GoalDetailView.tsx`, `features/todos/todos.data.ts`, planning
+domain/test repairs, and campaign artifacts (commits 611d755, 889bb9d,
+2a36558, ee283c7, 1c712f7, d49d4fe).
 
 ## Progress
 
@@ -90,21 +92,25 @@ Orchestrator-reserved hotspots (no worker may edit): `app/index.tsx`,
 - [x] Audit gaps and design 10 non-overlapping packets
 - [x] Write campaign proposal/design/spec/tasks/ExecPlan/HARDENING_HANDOFF
 - [x] Validate OpenSpec artifacts and ExecPlan structure
-- [ ] Spawn 10 sub-agents (W1–W10)
-- [ ] Collect and review worker reports/diffs
-- [ ] Integrate accepted work serially; apply shared integration
-- [ ] Second-pass delegation if capacity and gaps remain
-- [ ] Record SCHEMA_REQUESTs / debt in HARDENING_HANDOFF
-- [ ] Minimal end gates green
-- [ ] Reconcile ExecPlan to COMPLETED; push main; clean tree
+- [x] Spawn 10 sub-agents (W1–W10), all completed
+- [x] Collect and review worker reports/diffs
+- [x] Integrate accepted work serially; apply shared integration
+- [x] Second-pass delegation: W5 follow-up worker completed Overview wiring
+- [x] Record SCHEMA_REQUESTs / debt in HARDENING_HANDOFF
+- [x] Minimal end gates green
+- [x] Reconcile ExecPlan to COMPLETED; push main; clean tree
 
 ## Surprises & Discoveries
 
 - The "six tab" description in older docs understates reality: 17 feature
   modules exist; the productivity-expansion layer is present but thin — that
-  thinness is the wave's main target.
+  thinness was the wave's main target.
 - Schema v15 already carries project/goal associations on todos and habits, so
-  most planned depth needs no migration; schema freeze is low-cost.
+  most planned depth needed no migration; the schema freeze was low-cost.
+- lint-staged's stash-based pre-commit hook is unsafe with concurrent agents:
+  it caused lost unstaged edits, cross-worker commit attribution, deletion of
+  committed W3 files, and merge markers landing at HEAD. All damage was
+  detected and repaired; see HARDENING_HANDOFF for the recommendation.
 
 ## Decision Log
 
@@ -118,29 +124,50 @@ Orchestrator-reserved hotspots (no worker may edit): `app/index.tsx`,
 - 2026-08-20 — Workers commit directly to local main with explicit pathspecs —
   branch switching in a shared tree would destroy parallel uncommitted work;
   nothing is pushed until orchestrator review completes.
+- 2026-08-20 — W5 packet re-delegated to a follow-up worker — the original
+  worker's final report was truncated mid-run and its screen wiring had not
+  landed; a focused follow-up completed and committed it cleanly.
 
 ## Validation Ledger
 
 - 2026-08-20 — `git fetch --prune && git status` — PASS — clean tree, main == origin/main at 6dbbc42.
 - 2026-08-20 — `npm run agent:plans` — PASS — 8 COMPLETED plans, 1 ACTIVE hardening plan awaiting environment-dependent gates only.
-- 2026-08-20 — `npm run openspec:validate` — PENDING RERUN — initial run after artifact creation recorded here during integration.
-- 2026-08-20 — `npm run agent:plan:validate -- --plan <this plan>` — PENDING RERUN — rerun at each checkpoint.
+- 2026-08-20 — `npm run openspec:validate` — PASS — 36/36 items after scaffolding and again at close.
+- 2026-08-20 — `npm run agent:plan:validate -- --plan <this plan>` — PASS — ACTIVE pre-delegation; COMPLETED at close via validate:all.
+- 2026-08-20 — `npx tsc --noEmit` — PASS — 0 errors repo-wide after integration.
+- 2026-08-20 — `npx vitest run <23 wave test files>` (TZ=Asia/Manila) — PASS — 346/346 including associationInvariants.
+- 2026-08-20 — `npx eslint app/ features/ core/ lib/ tests/ --max-warnings 25` — PASS — 0 errors, 8 warnings (pre-existing patterns).
+- 2026-08-20 — `git diff --check` — PASS — no whitespace/conflict artifacts.
+- 2026-08-20 — `git push origin main` — PASS — recorded at close; local main == origin/main.
 
 ## Changed Files / Areas
 
 - `openspec/changes/complete-product-roadmap-parallel-wave-v2/**` — campaign
-  artifacts (proposal, design, spec delta, tasks, ExecPlan, handoff). Worker
-  changes are tracked per-commit by Git; the matrix above records outcomes.
+  artifacts (proposal, design, spec delta, tasks, ExecPlan, handoff).
+- Worker + integration changes: 124+ files across all 17 feature modules,
+  `core/ui`, `core/notifications`, `core/pwa`, `lib/notifications.ts`,
+  `features/settings`, `public/sw.js`, and 23 test files (~11.9k insertions).
+  Git remains the authority; the matrix above maps packets to commits.
 
 ## Recovery / Resume Instructions
 
-1. Read `AGENTS.md`, `.agent/PLANS.md`, then this ExecPlan fully.
-2. `git status --short`; `git log --oneline -30` — identify worker commits by
-   their `wave(wN):` prefixes and compare against the matrix Status column.
-3. For each completed-but-unintegrated packet: `git show --stat <sha>`, verify
-   owned-path discipline, then integrate/reject per the matrix.
-4. Resume from `Exact next action` in Current Checkpoint.
+1. This plan is COMPLETED; no implementation resume action exists.
+2. For the next campaign, read HARDENING_HANDOFF.md in this change folder and
+   `docs/testing/autonomous-qa.md`; start from its RISKs and DEFERRED lists.
 
 ## Outcomes & Retrospective
 
-- Status: Active — filled at campaign close.
+- Status: Completed.
+- Summary: eleven delegated packets delivered planning-system depth (project/
+  goal rollups, carry-forward, briefings, review outputs), dashboard
+  customization, command-center planning intents through the safe pipeline,
+  pomodoro association/presets/stats, workout PRs/templates/rest/volume,
+  calorie trends/targets/copy-day, to-do due-date and daily-plan reminders
+  behind platform guards, PWA update/offline affordances, settings entries,
+  and new shared UI primitives — integrated with all minimal gates green.
+- Follow-up: the dedicated hardening campaign owns E2E/native QA, the three
+  recorded SCHEMA_REQUESTs, remote parser prompt updates, stash cleanup, and
+  the lint-staged parallel-safety fix (see HARDENING_HANDOFF.md).
+- Lessons: shared-tree parallelism works only with per-worker pathspec
+  discipline AND a serialization-safe commit hook; lint-staged must be
+  disabled or serialized for future parallel waves.
