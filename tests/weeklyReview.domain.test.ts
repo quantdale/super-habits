@@ -7,6 +7,7 @@ import {
   validateTodoDecisions,
   validateReviewDraft,
   generateInsights,
+  buildNextWeekPlanSuggestions,
   MAX_REFLECTION_LENGTH,
 } from '@/features/weekly-review/weeklyReview.domain';
 import type {
@@ -264,5 +265,60 @@ describe('generateInsights', () => {
     };
     const { attention } = generateInsights(summary);
     expect(attention.some((a) => a.kind === 'workout_decline')).toBe(true);
+  });
+});
+
+describe('buildNextWeekPlanSuggestions', () => {
+  it('returns empty for no candidates', () => {
+    expect(
+      buildNextWeekPlanSuggestions({ candidateTodoIds: [], nextWeekStartDateKey: '2026-08-24' }),
+    ).toEqual([]);
+  });
+
+  it('distributes at most 3 candidates per day in input order', () => {
+    const suggestions = buildNextWeekPlanSuggestions({
+      candidateTodoIds: ['t1', 't2', 't3', 't4', 't5'],
+      nextWeekStartDateKey: '2026-08-24',
+    });
+    expect(suggestions).toEqual([
+      { dateKey: '2026-08-24', todoIds: ['t1', 't2', 't3'] },
+      { dateKey: '2026-08-25', todoIds: ['t4', 't5'] },
+    ]);
+  });
+
+  it('caps at 7 days and drops the remainder beyond a full week', () => {
+    const candidateTodoIds = Array.from({ length: 25 }, (_, i) => `t${i + 1}`);
+    const suggestions = buildNextWeekPlanSuggestions({
+      candidateTodoIds,
+      nextWeekStartDateKey: '2026-08-24',
+    });
+    expect(suggestions).toHaveLength(7);
+    const total = suggestions.reduce((sum, s) => sum + s.todoIds.length, 0);
+    expect(total).toBe(21); // 7 days x 3
+  });
+
+  it('deduplicates candidate ids deterministically', () => {
+    const suggestions = buildNextWeekPlanSuggestions({
+      candidateTodoIds: ['t1', 't1', 't2'],
+      nextWeekStartDateKey: '2026-08-24',
+    });
+    expect(suggestions).toEqual([{ dateKey: '2026-08-24', todoIds: ['t1', 't2'] }]);
+  });
+
+  it('returns empty for an invalid start date key', () => {
+    expect(
+      buildNextWeekPlanSuggestions({ candidateTodoIds: ['t1'], nextWeekStartDateKey: 'nope' }),
+    ).toEqual([]);
+  });
+
+  it('crosses month boundaries using local-calendar arithmetic', () => {
+    const suggestions = buildNextWeekPlanSuggestions({
+      candidateTodoIds: ['t1', 't2', 't3', 't4', 't5', 't6', 't7'],
+      nextWeekStartDateKey: '2026-08-30',
+    });
+    // The function only shifts local-calendar days, so day 3 crosses into September.
+    expect(suggestions[0].dateKey).toBe('2026-08-30');
+    expect(suggestions[1].dateKey).toBe('2026-08-31');
+    expect(suggestions[2].dateKey).toBe('2026-09-01');
   });
 });
