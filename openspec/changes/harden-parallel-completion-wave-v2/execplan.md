@@ -125,9 +125,18 @@ Authoritative artifacts:
 - 2026-08-21 — `npm run agent:plans` — PASS — this plan ACTIVE; `harden-productivity-expansion-wave-v1` ACTIVE on environment gates only (left open honestly).
 - 2026-08-21 — conflict-marker grep over tracked files — PASS — none found.
 - 2026-08-21 — delegated 12-stash audit vs HEAD — PASS — verdicts recorded in Decision Log; no stash modified during audit.
-- 2026-08-21 — `npm run typecheck` — PASS — exit 0 at 3d0b363.
-- 2026-08-21 — `npm run lint` — PASS — 0 errors, 8 warnings (within policy).
-- 2026-08-21 — `npx vitest run` (TZ=Asia/Manila) — PASS — 125 files, 1406 tests, both projects.
+- 2026-08-21 — `npm run typecheck` — PASS — exit 0 at 3d0b363 (baseline).
+- 2026-08-21 — `npm run lint` — PASS — 0 errors, 8 warnings (baseline).
+- 2026-08-21 — `npx vitest run` (TZ=Asia/Manila) — PASS — 125 files, 1406 tests (baseline).
+- 2026-08-21 — Wave A: `supabase:schema:validate` — PASS — 11 migrations incl. weekly_reviews + V5 columns + workout_session_sets closure.
+- 2026-08-21 — Wave A: delegated coder cluster verified independently — PASS — typecheck 0 errors; full suite 1422/1422; 3 timeout-flakes in concurrent double-run pass in isolation (46/46).
+- 2026-08-21 — Wave B: per-agent targeted suites — PASS — habits 151, todos green, pomodoro 111, workout green (+e2e written), calories 74 (+DST), planning 90 (incl. 15 new integration), command 189 (incl. parity contract), consistency 48, notifications 159, pwa 4/4 pwa-lane + 10/10 infrastructure.
+- 2026-08-21 — Integrator glue — PASS — ask.retrieval status exclusion + date-scoped overview counts + log_habit guard + F10 fallback; 43/43 command-area tests.
+- 2026-08-21 — Import-cycle regression found & fixed — PASS — restTimerPreferences barrel back-edge broke adapter construction at module scope; cycle removed, consumers repointed to workout.data; 42/42 affected tests.
+- 2026-08-21 — Post-integration `npm run typecheck` — PASS — 0 errors repo-wide.
+- 2026-08-21 — Post-integration `npm run lint` — PASS — 0 errors, 13 warnings (within ≤25 policy).
+- 2026-08-21 — Post-integration full `npx vitest run` (TZ=Asia/Manila) — PASS — 141 files, 1689/1689 tests.
+- 2026-08-21 — `openspec:validate` — PASS — 37/37. `agent:plan:validate:all` — PASS — all plans structurally valid.
 
 ## Changed Files / Areas
 
