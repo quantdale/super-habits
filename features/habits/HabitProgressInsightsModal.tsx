@@ -92,7 +92,9 @@ function historyStatus(day: HabitProgressInsights['recentDays'][number]): {
   }
   if (day.completed) return { label: 'Target met', color: 'success' };
   if (day.count > 0) return { label: 'In progress', color: 'warning' };
-  return { label: 'Missed', color: 'dangerText' };
+  // Neutral wording instead of danger-red: a past day without completion is
+  // information, not failure (blueprint: consistency without guilt).
+  return { label: 'Not completed', color: 'textMuted' };
 }
 
 function HistoryRow({
@@ -108,9 +110,7 @@ function HistoryRow({
       ? tokens.successText
       : status.color === 'warning'
         ? tokens.warningText
-        : status.color === 'dangerText'
-          ? tokens.dangerText
-          : tokens.textMuted;
+        : tokens.textMuted;
   const accessibleLabel = `${day.dateKey}: ${status.label}. ${
     day.scheduled ? 'Scheduled' : 'Off day'
   }. Target ${day.targetPerDay}. Actual count ${day.count}.`;

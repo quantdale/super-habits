@@ -16,6 +16,11 @@ type HabitCircleProps = {
   /** Outer ring fits around this diameter (default 56). */
   size?: number;
   scheduledToday?: boolean;
+  /**
+   * Date phrase for the accessibility label; defaults to "today". Pass e.g.
+   * "on Aug 18" when the parent is viewing a past day.
+   */
+  dayPhrase?: string;
   onIncrement: () => void;
   onDecrement: () => void;
 };
@@ -30,6 +35,7 @@ export function HabitCircle({
   showName = true,
   size = DEFAULT_SIZE,
   scheduledToday = true,
+  dayPhrase,
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
@@ -55,8 +61,8 @@ export function HabitCircle({
         accessibilityRole="button"
         accessibilityLabel={
           scheduledToday
-            ? `${habit.name}: ${todayCount} of ${habit.target_per_day} today. Tap to add one. Long press to remove one.`
-            : `${habit.name}: not scheduled today. Rest day.`
+            ? `${habit.name}: ${todayCount} of ${habit.target_per_day} ${dayPhrase ?? 'today'}. Tap to add one. Long press to remove one.`
+            : `${habit.name}: not scheduled ${dayPhrase ?? 'today'}. Rest day.`
         }
         accessibilityState={{ disabled: !scheduledToday }}
       >

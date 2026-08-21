@@ -13,8 +13,14 @@ import {
   buildDayCompletions,
   calculateCurrentStreak,
   calculateLongestStreak,
+  formatHabitSchedule,
+  getHabitRuleForDate,
   habitCreationDateKey,
 } from './habits.domain';
+import {
+  formatHabitReminderTime,
+  parseHabitReminderTime,
+} from '@/features/habits/habitReminders.domain';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { toDateKey } from '@/lib/time';
 
@@ -24,6 +30,8 @@ type Props = {
   onOpenInsights?: (habit: Habit) => void;
   onTogglePause?: () => void;
   onToggleArchive?: () => void;
+  /** Opens the existing edit flow for this habit (wired by HabitsScreen). */
+  onEdit?: (habit: Habit) => void;
 };
 
 /**
@@ -38,6 +46,7 @@ export function HabitDetailModal({
   onOpenInsights,
   onTogglePause,
   onToggleArchive,
+  onEdit,
 }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const [completions, setCompletions] = useState<HabitCompletionRow[]>([]);
@@ -95,6 +104,20 @@ export function HabitDetailModal({
   if (!habit) return null;
   const accent = habit.color || sectionAccents.habits.text;
 
+  // Schedule as of today: the rule active on the current local date drives
+  // both the label and whether a reminder line applies.
+  const todayRule = getHabitRuleForDate(
+    habit.rule_history,
+    toDateKey(),
+    habit.target_per_day,
+    habitCreationDateKey(habit.created_at),
+  );
+  const scheduleLine = todayRule
+    ? { label: formatHabitSchedule(todayRule.weekdays) }
+    : { label: 'Not scheduled' };
+  const parsedReminderTime = parseHabitReminderTime(habit.reminder_time);
+  const reminderLabel = parsedReminderTime ? formatHabitReminderTime(parsedReminderTime) : null;
+
   return (
     <Modal visible onClose={onClose} title={`${habit.name} history`} scroll>
       {!loaded ? (
@@ -137,6 +160,33 @@ export function HabitDetailModal({
           </Card>
           <Card accentColor={accent}>
             <View className="mb-2 flex-row items-center gap-2">
+              <MaterialIcons name="event-repeat" size={18} color={accent} />
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Schedule
+              </Text>
+            </View>
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              {scheduleLine.label}
+            </Text>
+            {reminderLabel ? (
+              <View
+                className="mt-1.5 flex-row items-center gap-1.5"
+                accessible
+                accessibilityLabel={`Reminder at ${reminderLabel}`}
+              >
+                <Text style={{ fontSize: 14 }}>🔔</Text>
+                <Text className="text-sm" style={{ color: tokens.text }}>
+                  {reminderLabel}
+                </Text>
+              </View>
+            ) : (
+              <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+                No reminder set.
+              </Text>
+            )}
+          </Card>
+          <Card accentColor={accent}>
+            <View className="mb-2 flex-row items-center gap-2">
               <MaterialIcons name="calendar-month" size={18} color={accent} />
               <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
                 Completion calendar
@@ -150,6 +200,9 @@ export function HabitDetailModal({
               variant="ghost"
               onPress={() => onOpenInsights(habit)}
             />
+          ) : null}
+          {onEdit ? (
+            <Button label="Edit habit" color={accent} onPress={() => onEdit(habit)} />
           ) : null}
           {onTogglePause || onToggleArchive ? (
             <Card accentColor={accent}>
