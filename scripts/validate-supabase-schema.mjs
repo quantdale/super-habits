@@ -630,6 +630,206 @@ reqAbsent(
   'TO public',
 );
 
+// ---- Hardening wave v2 (Backup Scope V5 closure) ----
+const weeklyReviewsMigrationName = migrationNames.find((name) =>
+  name.endsWith('_weekly_reviews_remote_table.sql'),
+);
+if (!weeklyReviewsMigrationName) failures.push('missing weekly_reviews remote table migration');
+const weeklyReviewsMigration = weeklyReviewsMigrationName
+  ? read(`supabase/migrations/${weeklyReviewsMigrationName}`)
+  : '';
+const hardeningColumnsMigrationName = migrationNames.find((name) =>
+  name.endsWith('_hardening_wave_v2_durable_columns.sql'),
+);
+if (!hardeningColumnsMigrationName)
+  failures.push('missing hardening wave v2 durable columns migration');
+const hardeningColumnsMigration = hardeningColumnsMigrationName
+  ? read(`supabase/migrations/${hardeningColumnsMigrationName}`)
+  : '';
+
+// weekly_reviews is a full backup-scope citizen: table + RLS + four owner
+// policies + owner index + grant hygiene, mirrored in the disposable fixture.
+req(
+  'weekly_reviews migration table',
+  weeklyReviewsMigration,
+  'CREATE TABLE public.weekly_reviews (',
+);
+req(
+  'weekly_reviews migration owner FK',
+  weeklyReviewsMigration,
+  'user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE',
+);
+req(
+  'weekly_reviews migration RLS',
+  weeklyReviewsMigration,
+  'ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY',
+);
+for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+  const suffix = operation.toLowerCase();
+  req(
+    `weekly_reviews migration ${operation} policy`,
+    weeklyReviewsMigration,
+    `CREATE POLICY sync_weekly_reviews_${suffix}_owner ON public.weekly_reviews`,
+  );
+  req(
+    `weekly_reviews migration ${operation} policy target`,
+    weeklyReviewsMigration,
+    `FOR ${operation} TO authenticated`,
+  );
+}
+req(
+  'weekly_reviews migration owner predicate',
+  weeklyReviewsMigration,
+  '(select auth.uid()) = user_id',
+);
+req(
+  'weekly_reviews migration owner index',
+  weeklyReviewsMigration,
+  'idx_weekly_reviews_user_id',
+);
+req(
+  'weekly_reviews migration owner-scoped active week uniqueness',
+  weeklyReviewsMigration,
+  'uq_weekly_reviews_owner_week_active',
+);
+req('weekly_reviews migration revoke', weeklyReviewsMigration, 'FROM anon, PUBLIC');
+req(
+  'weekly_reviews migration authenticated grant',
+  weeklyReviewsMigration,
+  'TO authenticated, service_role',
+);
+reqAbsent('weekly_reviews migration no USING true', weeklyReviewsMigration, 'USING (true)');
+reqAbsent('weekly_reviews migration no anon policy', weeklyReviewsMigration, 'TO anon');
+req('fixture weekly_reviews table', fixture, 'CREATE TABLE IF NOT EXISTS public.weekly_reviews (');
+req('fixture weekly_reviews RLS', fixture, 'ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY');
+req('fixture weekly_reviews owner index', fixture, 'idx_weekly_reviews_user_id');
+const weeklyReviewColumns = [
+  'week_key',
+  'week_start_date',
+  'week_end_date',
+  'next_week_start_date',
+  'completed_at',
+  'status',
+  'summary_payload',
+  'plan_payload',
+  'reflection',
+  'deleted_at',
+];
+for (const column of weeklyReviewColumns) {
+  req(`weekly_reviews migration ${column}`, weeklyReviewsMigration, column);
+  req(`fixture weekly_reviews ${column}`, fixture, column);
+}
+
+// Scope V5 durable columns on existing entities (local counterpart: SQLite
+// migration 20). Nullable additions keep historical remote rows valid.
+const hardeningRequiredColumns = {
+  habits: ['status', 'lifecycle_history'],
+  pomodoro_sessions: ['linked_todo_id', 'linked_todo_title', 'note'],
+  workout_logs: ['started_at', 'ended_at', 'duration_seconds'],
+};
+for (const [table, columns] of Object.entries(hardeningRequiredColumns)) {
+  for (const column of columns) {
+    req(`hardening ${table}.${column}`, hardeningColumnsMigration, column);
+    req(`fixture ${table}.${column}`, fixture, column);
+  }
+}
+req(
+  'hardening habits.status default active',
+  hardeningColumnsMigration,
+  "ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'",
+);
+
+// workout_session_sets: per-set load/reps provenance table with composite
+// owner FK, RLS, policies, grants, and fixture mirror.
+req(
+  'hardening workout_session_sets table',
+  hardeningColumnsMigration,
+  'CREATE TABLE public.workout_session_sets (',
+);
+req(
+  'hardening workout_session_sets owner FK',
+  hardeningColumnsMigration,
+  'user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE',
+);
+req(
+  'hardening workout_session_sets composite owner FK',
+  hardeningColumnsMigration,
+  'FOREIGN KEY (session_exercise_id, user_id) REFERENCES public.workout_session_exercises (id, user_id)',
+);
+req(
+  'hardening workout_session_sets parent unique index',
+  hardeningColumnsMigration,
+  'uq_workout_session_exercises_id_user',
+);
+req(
+  'hardening workout_session_sets RLS',
+  hardeningColumnsMigration,
+  'ALTER TABLE public.workout_session_sets ENABLE ROW LEVEL SECURITY',
+);
+for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+  const suffix = operation.toLowerCase();
+  req(
+    `hardening workout_session_sets ${operation} policy`,
+    hardeningColumnsMigration,
+    `CREATE POLICY sync_workout_session_sets_${suffix}_owner ON public.workout_session_sets`,
+  );
+}
+req(
+  'hardening workout_session_sets revoke',
+  hardeningColumnsMigration,
+  'REVOKE ALL PRIVILEGES ON TABLE public.workout_session_sets FROM anon, PUBLIC',
+);
+req(
+  'hardening workout_session_sets grant',
+  hardeningColumnsMigration,
+  'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.workout_session_sets TO authenticated, service_role',
+);
+reqAbsent('hardening migration no USING true', hardeningColumnsMigration, 'USING (true)');
+reqAbsent('hardening migration no anon policy', hardeningColumnsMigration, 'TO anon');
+req(
+  'fixture workout_session_sets table',
+  fixture,
+  'CREATE TABLE IF NOT EXISTS public.workout_session_sets (',
+);
+const sessionSetColumns = [
+  'session_exercise_id',
+  'set_number',
+  'weight',
+  'reps',
+  'weight_unit',
+  'completed',
+];
+for (const column of sessionSetColumns) {
+  req(`fixture workout_session_sets ${column}`, fixture, column);
+}
+
+// Disposable-lane parity: the fixture must carry the same owner-pair unique
+// indexes and composite owner FKs as production so remote-boundary journeys
+// cannot pass in sim while failing against prod.
+const fixtureParityMarkers = [
+  'uq_habits_id_user',
+  'uq_workout_routines_id_user',
+  'uq_routine_exercises_id_user',
+  'uq_workout_logs_id_user',
+  'uq_workout_session_exercises_id_user',
+  'uq_projects_id_user',
+  'uq_goals_id_user',
+  'habit_completions_habit_owner_fkey',
+  'routine_exercises_routine_owner_fkey',
+  'routine_exercise_sets_exercise_owner_fkey',
+  'workout_logs_routine_owner_fkey',
+  'workout_session_exercises_log_owner_fkey',
+  'workout_session_sets_exercise_owner_fkey',
+  'goals_project_owner_fkey',
+  'todos_project_owner_fkey',
+  'todos_goal_owner_fkey',
+  'habits_project_owner_fkey',
+  'habits_goal_owner_fkey',
+];
+for (const marker of fixtureParityMarkers) {
+  req(`fixture parity ${marker}`, fixture, marker);
+}
+
 // ---- Negative coverage: the planning checks must actually reject unsafe variants ----
 function expectPlanningRejection(badSource, label) {
   const badFailures = [];
@@ -666,6 +866,7 @@ if (failures.length > 0) {
   console.log(
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
       `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
+      'planning + weekly_reviews + workout_session_sets scope-V5 closure; ' +
       'private AI quota RPC).',
   );
 }

@@ -33,20 +33,22 @@ CREATE TABLE IF NOT EXISTS public.todos (
 );
 
 CREATE TABLE IF NOT EXISTS public.habits (
-  id             TEXT PRIMARY KEY NOT NULL,
-  user_id        UUID NOT NULL DEFAULT auth.uid(),
-  name           TEXT NOT NULL,
-  target_per_day INTEGER NOT NULL DEFAULT 1,
-  reminder_time  TEXT,
-  category       TEXT NOT NULL DEFAULT 'anytime',
-  icon           TEXT NOT NULL DEFAULT 'check-circle',
-  color          TEXT NOT NULL DEFAULT '#64748b',
-  rule_history   TEXT NOT NULL DEFAULT '[]',
-  project_id     TEXT,
-  goal_id        TEXT,
-  created_at     TEXT NOT NULL,
-  updated_at     TEXT NOT NULL,
-  deleted_at     TEXT
+  id               TEXT PRIMARY KEY NOT NULL,
+  user_id          UUID NOT NULL DEFAULT auth.uid(),
+  name             TEXT NOT NULL,
+  target_per_day   INTEGER NOT NULL DEFAULT 1,
+  reminder_time    TEXT,
+  category         TEXT NOT NULL DEFAULT 'anytime',
+  icon             TEXT NOT NULL DEFAULT 'check-circle',
+  color            TEXT NOT NULL DEFAULT '#64748b',
+  rule_history     TEXT NOT NULL DEFAULT '[]',
+  project_id       TEXT,
+  goal_id          TEXT,
+  status           TEXT NOT NULL DEFAULT 'active',
+  lifecycle_history TEXT,
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL,
+  deleted_at       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.calorie_entries (
@@ -162,13 +164,16 @@ CREATE TABLE IF NOT EXISTS public.habit_completions (
 );
 
 CREATE TABLE IF NOT EXISTS public.pomodoro_sessions (
-  id               TEXT PRIMARY KEY NOT NULL,
-  user_id          UUID NOT NULL DEFAULT auth.uid(),
-  started_at       TEXT NOT NULL,
-  ended_at         TEXT NOT NULL,
-  duration_seconds INTEGER NOT NULL,
-  session_type     TEXT NOT NULL,
-  created_at       TEXT NOT NULL
+  id                TEXT PRIMARY KEY NOT NULL,
+  user_id           UUID NOT NULL DEFAULT auth.uid(),
+  started_at        TEXT NOT NULL,
+  ended_at          TEXT NOT NULL,
+  duration_seconds  INTEGER NOT NULL,
+  session_type      TEXT NOT NULL,
+  created_at        TEXT NOT NULL,
+  linked_todo_id    TEXT,
+  linked_todo_title TEXT,
+  note              TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.routine_exercises (
@@ -195,12 +200,15 @@ CREATE TABLE IF NOT EXISTS public.routine_exercise_sets (
 );
 
 CREATE TABLE IF NOT EXISTS public.workout_logs (
-  id           TEXT PRIMARY KEY NOT NULL,
-  user_id      UUID NOT NULL DEFAULT auth.uid(),
-  routine_id   TEXT NOT NULL,
-  notes        TEXT,
-  completed_at TEXT NOT NULL,
-  created_at   TEXT NOT NULL
+  id               TEXT PRIMARY KEY NOT NULL,
+  user_id          UUID NOT NULL DEFAULT auth.uid(),
+  routine_id       TEXT NOT NULL,
+  notes            TEXT,
+  completed_at     TEXT NOT NULL,
+  created_at       TEXT NOT NULL,
+  started_at       TEXT,
+  ended_at         TEXT,
+  duration_seconds INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS public.workout_session_exercises (
@@ -217,10 +225,10 @@ CREATE TABLE IF NOT EXISTS public.saved_meals (
   user_id      UUID NOT NULL DEFAULT auth.uid(),
   food_name    TEXT NOT NULL,
   calories     INTEGER NOT NULL,
-  protein      DOUBLE PRECISION NOT NULL DEFAULT 0,
-  carbs        DOUBLE PRECISION NOT NULL DEFAULT 0,
-  fats         DOUBLE PRECISION NOT NULL DEFAULT 0,
-  fiber        DOUBLE PRECISION NOT NULL DEFAULT 0,
+  protein      REAL NOT NULL DEFAULT 0,
+  carbs        REAL NOT NULL DEFAULT 0,
+  fats         REAL NOT NULL DEFAULT 0,
+  fiber        REAL NOT NULL DEFAULT 0,
   meal_type    TEXT NOT NULL DEFAULT 'breakfast',
   use_count    INTEGER NOT NULL DEFAULT 1,
   last_used_at TEXT NOT NULL,
@@ -559,3 +567,135 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   public.goals,
   public.daily_plans
   TO authenticated, service_role;
+
+-- ============================================================================
+-- HARDENING WAVE V2: SCOPE V5 TABLES + PRODUCTION PARITY CONSTRAINTS
+-- ============================================================================
+-- Brings the disposable-lane fixture to parity with supabase/migrations/*:
+-- the weekly_reviews remote table, the workout_session_sets per-set load
+-- table, Scope V5 durable columns (added inline to the table definitions
+-- above), owner-pair uniqueness indexes, and composite (parent_id, user_id)
+-- foreign keys matching production constraint strictness.
+
+CREATE TABLE IF NOT EXISTS public.weekly_reviews (
+  id                   TEXT PRIMARY KEY NOT NULL,
+  user_id              UUID NOT NULL DEFAULT auth.uid(),
+  week_key             TEXT NOT NULL,
+  week_start_date      TEXT NOT NULL,
+  week_end_date        TEXT NOT NULL,
+  next_week_start_date TEXT NOT NULL,
+  completed_at         TEXT,
+  status               TEXT NOT NULL,
+  summary_payload      TEXT NOT NULL,
+  plan_payload         TEXT NOT NULL,
+  reflection           TEXT NOT NULL,
+  created_at           TEXT NOT NULL,
+  updated_at           TEXT NOT NULL,
+  deleted_at           TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_weekly_reviews_owner_week_active
+  ON public.weekly_reviews (user_id, week_key) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_weekly_reviews_user_id
+  ON public.weekly_reviews (user_id, created_at, id);
+
+ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "sync_weekly_reviews_select_owner" ON public.weekly_reviews
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_weekly_reviews_insert_owner" ON public.weekly_reviews
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_weekly_reviews_update_owner" ON public.weekly_reviews
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_weekly_reviews_delete_owner" ON public.weekly_reviews
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+REVOKE ALL PRIVILEGES ON TABLE public.weekly_reviews FROM anon, PUBLIC;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.weekly_reviews
+  TO authenticated, service_role;
+
+CREATE TABLE IF NOT EXISTS public.workout_session_sets (
+  id                  TEXT PRIMARY KEY NOT NULL,
+  user_id             UUID NOT NULL DEFAULT auth.uid(),
+  session_exercise_id TEXT NOT NULL,
+  set_number          INTEGER NOT NULL,
+  weight              REAL,
+  reps                INTEGER,
+  weight_unit         TEXT,
+  completed           INTEGER NOT NULL DEFAULT 1,
+  created_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workout_session_sets_user_id
+  ON public.workout_session_sets (user_id, created_at, id);
+CREATE INDEX IF NOT EXISTS idx_workout_session_sets_owner_exercise
+  ON public.workout_session_sets (user_id, session_exercise_id);
+
+ALTER TABLE public.workout_session_sets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "sync_workout_session_sets_select_owner" ON public.workout_session_sets
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_session_sets_insert_owner" ON public.workout_session_sets
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_session_sets_update_owner" ON public.workout_session_sets
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_session_sets_delete_owner" ON public.workout_session_sets
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+REVOKE ALL PRIVILEGES ON TABLE public.workout_session_sets FROM anon, PUBLIC;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.workout_session_sets
+  TO authenticated, service_role;
+
+-- Owner-pair uniqueness indexes required by composite (parent_id, user_id)
+-- foreign keys (production parity; see migrations 20260815100000 / 20260820010000).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_habits_id_user ON public.habits (id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_routines_id_user
+  ON public.workout_routines (id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_routine_exercises_id_user
+  ON public.routine_exercises (id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_logs_id_user
+  ON public.workout_logs (id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_session_exercises_id_user
+  ON public.workout_session_exercises (id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_projects_id_user ON public.projects (id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_goals_id_user ON public.goals (id, user_id);
+
+-- Composite owner FKs (parent association id + owner must agree).
+ALTER TABLE public.habit_completions
+  ADD CONSTRAINT habit_completions_habit_owner_fkey
+    FOREIGN KEY (habit_id, user_id) REFERENCES public.habits (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.routine_exercises
+  ADD CONSTRAINT routine_exercises_routine_owner_fkey
+    FOREIGN KEY (routine_id, user_id) REFERENCES public.workout_routines (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.routine_exercise_sets
+  ADD CONSTRAINT routine_exercise_sets_exercise_owner_fkey
+    FOREIGN KEY (exercise_id, user_id) REFERENCES public.routine_exercises (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.workout_logs
+  ADD CONSTRAINT workout_logs_routine_owner_fkey
+    FOREIGN KEY (routine_id, user_id) REFERENCES public.workout_routines (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.workout_session_exercises
+  ADD CONSTRAINT workout_session_exercises_log_owner_fkey
+    FOREIGN KEY (log_id, user_id) REFERENCES public.workout_logs (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.workout_session_sets
+  ADD CONSTRAINT workout_session_sets_exercise_owner_fkey
+    FOREIGN KEY (session_exercise_id, user_id) REFERENCES public.workout_session_exercises (id, user_id) ON DELETE NO ACTION;
+
+ALTER TABLE public.goals
+  ADD CONSTRAINT goals_project_owner_fkey
+    FOREIGN KEY (project_id, user_id) REFERENCES public.projects (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.todos
+  ADD CONSTRAINT todos_project_owner_fkey
+    FOREIGN KEY (project_id, user_id) REFERENCES public.projects (id, user_id) ON DELETE NO ACTION,
+  ADD CONSTRAINT todos_goal_owner_fkey
+    FOREIGN KEY (goal_id, user_id) REFERENCES public.goals (id, user_id) ON DELETE NO ACTION;
+ALTER TABLE public.habits
+  ADD CONSTRAINT habits_project_owner_fkey
+    FOREIGN KEY (project_id, user_id) REFERENCES public.projects (id, user_id) ON DELETE NO ACTION,
+  ADD CONSTRAINT habits_goal_owner_fkey
+    FOREIGN KEY (goal_id, user_id) REFERENCES public.goals (id, user_id) ON DELETE NO ACTION;
