@@ -26,7 +26,9 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
@@ -36,6 +38,7 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import type { Todo, TodoPriority, TodoViewMode } from './types';
 import { TodoItem } from './TodoItem';
+import { TodoQuickCapture } from './TodoQuickCapture';
 import { TodoListToolbar } from './TodoListToolbar';
 import { TodoBulkBar } from './TodoBulkBar';
 import {
@@ -83,6 +86,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.todos.text;
   const { showNotice } = useInAppNotices();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
+  const reducedMotion = useReducedMotion();
+  const settleDuration = useMotionDuration('feedback');
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState<string | null>(null);
@@ -104,6 +110,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const [sortMode, setSortMode] = useState<TodoSortMode>('manual');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [settlingIds, setSettlingIds] = useState<string[]>([]);
   const [projectOptions, setProjectOptions] = useState<{ id: string; name: string }[]>([]);
   const [goalOptions, setGoalOptions] = useState<{ id: string; title: string }[]>([]);
   const [editProjectId, setEditProjectId] = useState<string | null>(null);
@@ -136,7 +143,15 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     });
   }, []);
 
-  const pendingTasks = useMemo(() => items.filter((t) => t.completed === 0), [items]);
+  // Just-completed rows stay listed for the settle-animation window before the
+  // refresh-derived filter drops them from the pending list.
+  const pendingTasks = useMemo(
+    () => [
+      ...items.filter((t) => t.completed === 0),
+      ...items.filter((t) => t.completed === 1 && settlingIds.includes(t.id)),
+    ],
+    [items, settlingIds],
+  );
   const todayKey = getTodayDateKey();
   const queryActive =
     search.trim().length > 0 ||
@@ -168,9 +183,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
   }, [pendingTasks]);
 
-  const refresh = useCallback(() => {
-    void listTodos().then(setItemsIfChanged);
-  }, [setItemsIfChanged]);
+  const refresh = useCallback(() => listTodos().then(setItemsIfChanged), [setItemsIfChanged]);
 
   const loadTodosOnFocus = useCallback(async () => {
     const todayKey = getTodayDateKey();
@@ -346,9 +359,47 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
+      if (todo.completed === 0 && !reducedMotion) {
+        // Hold the just-completed row in the list while the settle animation
+        // plays, then let the normal refresh remove it.
+        setSettlingIds((prev) => (prev.includes(todo.id) ? prev : [...prev, todo.id]));
+        try {
+          await refresh();
+          await new Promise((resolve) => setTimeout(resolve, settleDuration));
+        } catch {
+          // A failed refresh surfaces on the next focus refresh; completion
+          // itself already succeeded above.
+        } finally {
+          setSettlingIds((prev) => prev.filter((id) => id !== todo.id));
+        }
+        return;
+      }
       void refresh();
     },
-    [refresh, showNotice],
+    [refresh, reducedMotion, settleDuration, showNotice],
+  );
+
+  const requestDeleteTodo = useCallback(
+    async (todo: Todo) => {
+      const confirmed = await confirm({
+        title: 'Delete task',
+        message: `Delete "${todo.title}"?`,
+        confirmLabel: 'Delete',
+        confirmVariant: 'danger',
+      });
+      if (!confirmed) return;
+      await removeTodo(todo.id);
+      void refresh();
+    },
+    [confirm, refresh],
+  );
+
+  const handleQuickAdd = useCallback(
+    async (quickTitle: string) => {
+      await addTodo({ title: quickTitle });
+      void refresh();
+    },
+    [refresh],
   );
 
   const todoKeyExtractor = useCallback((item: Todo) => item.id, []);
@@ -476,7 +527,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           onLongPress={drag}
           isActive={isActive}
           onToggle={() => handleToggleTodo(item)}
-          onDelete={() => removeTodo(item.id).then(refresh)}
+          onDelete={() => void requestDeleteTodo(item)}
           onEdit={() => {
             void startEdit(item);
           }}
@@ -485,7 +536,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         />
       </ScaleDecorator>
     ),
-    [gridCardWidth, handleToggleTodo, refresh, startEdit, viewMode],
+    [gridCardWidth, handleToggleTodo, requestDeleteTodo, startEdit, viewMode],
   );
   const todoLinkedActionSource: LinkedActionEditorSourceOption = {
     key: TODO_LINKED_ACTION_SOURCE_KEY,
@@ -517,7 +568,13 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           <ScreenSection>
             <PageHeader
               title="Todos"
-              subtitle={todosEmptyCardSubtitle ? undefined : 'Offline-first task manager.'}
+              subtitle={
+                selectionMode
+                  ? `${selectedIds.length} selected`
+                  : todosEmptyCardSubtitle
+                    ? undefined
+                    : 'Offline-first task manager.'
+              }
               actions={
                 <>
                   <IconButton
@@ -595,7 +652,12 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             </Card>
           </ScreenSection>
 
-          {totallyEmpty ? <ScreenSection>{noPendingTasksCard}</ScreenSection> : null}
+          {totallyEmpty ? (
+            <ScreenSection>
+              <TodoQuickCapture onSubmit={handleQuickAdd} />
+              {noPendingTasksCard}
+            </ScreenSection>
+          ) : null}
 
           {!totallyEmpty ? (
             <ScreenSection className="min-h-0 mb-0 flex-1">
@@ -698,7 +760,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                             onLongPress={() => {}}
                             isActive={false}
                             onToggle={() => handleToggleTodo(item)}
-                            onDelete={() => removeTodo(item.id).then(refresh)}
+                            onDelete={() => void requestDeleteTodo(item)}
                             onEdit={() => {
                               void startEdit(item);
                             }}
@@ -711,6 +773,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 </View>
               ) : (
                 <>
+                  <TodoQuickCapture onSubmit={handleQuickAdd} />
                   <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
                     <View>
                       <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -788,7 +851,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                                     onLongPress={() => {}}
                                     isActive={false}
                                     onToggle={() => handleToggleTodo(item)}
-                                    onDelete={() => removeTodo(item.id).then(refresh)}
+                                    onDelete={() => void requestDeleteTodo(item)}
                                     onEdit={() => {
                                       void startEdit(item);
                                     }}
@@ -1031,6 +1094,8 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             </View>
           </Card>
         </Modal>
+
+        {confirmationDialog}
       </Screen>
 
       <Pressable
