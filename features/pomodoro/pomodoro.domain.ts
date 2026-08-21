@@ -238,6 +238,8 @@ export function buildPomodoroHeatmapDays(
 ): HeatmapDay[] {
   const map = new Map<string, number>();
   for (const s of sessions) {
+    // Break rows never count toward the focus heatmap/streak.
+    if (!isFocusSession(s)) continue;
     const key = timestampToLocalDateKey(s.started_at);
     map.set(key, (map.get(key) ?? 0) + 1);
   }
@@ -395,6 +397,144 @@ export function findPresetById(
  */
 export function shouldAutoStartNext(completedMode: PomodoroMode, preset: PomodoroPreset): boolean {
   return completedMode === 'focus' ? preset.autoStartBreaks : preset.autoStartFocus;
+}
+
+/** First preset whose durations exactly match the given settings, or null. */
+export function matchPresetBySettings(
+  presets: PomodoroPreset[],
+  settings: PomodoroSettings,
+): PomodoroPreset | null {
+  return (
+    presets.find(
+      (p) =>
+        p.focusMinutes === settings.focusMinutes &&
+        p.shortBreakMinutes === settings.shortBreakMinutes &&
+        p.longBreakMinutes === settings.longBreakMinutes &&
+        p.sessionsBeforeLongBreak === settings.sessionsBeforeLongBreak,
+    ) ?? null
+  );
+}
+
+/**
+ * Resolve the preset that drives timer BEHAVIOR (auto-start flags): the stored
+ * selection when valid, else the preset whose durations match the current
+ * settings, else Classic. The duration-match fallback fixes the silent-Classic
+ * gap where saved durations matching e.g. Deep Work kept auto-start off.
+ */
+export function resolveActivePreset(
+  presets: PomodoroPreset[],
+  activePresetId: string | null | undefined,
+  settings: PomodoroSettings,
+): PomodoroPreset {
+  return (
+    findPresetById(presets, activePresetId) ??
+    matchPresetBySettings(presets, settings) ??
+    BUILT_IN_PRESETS[0]
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session completion planning (pure extraction of the timer's completion path)
+// ---------------------------------------------------------------------------
+
+export type CompletedFocusLogPlan = {
+  startedAtIso: string;
+  /**
+   * Active-time semantics: `started_at + duration_seconds`, NOT the wall-clock
+   * moment the JS interval observed zero. Pauses and background-tab throttling
+   * shift wall clock but never change nominal duration (see pomodoro.data.ts).
+   */
+  endedAtIso: string;
+  durationSeconds: number;
+};
+
+export type SessionCompletionPlan = {
+  /** Row to insert; null for breaks (breaks are never logged). */
+  log: CompletedFocusLogPlan | null;
+  nextMode: PomodoroMode;
+  nextDurationSeconds: number;
+  nextCompletedFocus: number;
+  autoStartNext: boolean;
+};
+
+/**
+ * Pure completion path for one finished countdown. Called by the screen when
+ * the remaining ref crosses zero; because it is pure, an accidental double
+ * invocation produces identical plans and cannot itself duplicate rows.
+ */
+export function planSessionCompletion(input: {
+  mode: PomodoroMode;
+  startedAtIso: string | null;
+  totalSeconds: number;
+  completedFocus: number;
+  settings: PomodoroSettings;
+  preset: PomodoroPreset;
+}): SessionCompletionPlan {
+  const log: CompletedFocusLogPlan | null =
+    input.mode === 'focus' && input.startedAtIso !== null
+      ? {
+          startedAtIso: input.startedAtIso,
+          endedAtIso: new Date(
+            new Date(input.startedAtIso).getTime() + input.totalSeconds * 1000,
+          ).toISOString(),
+          durationSeconds: input.totalSeconds,
+        }
+      : null;
+
+  const nextCompletedFocus =
+    input.mode === 'focus'
+      ? input.completedFocus + 1
+      : input.mode === 'long_break'
+        ? 0
+        : input.completedFocus;
+  const nextMode = getNextMode(input.mode, nextCompletedFocus, input.settings);
+
+  return {
+    log,
+    nextMode,
+    nextDurationSeconds: getModeDuration(nextMode, input.settings),
+    nextCompletedFocus,
+    autoStartNext: shouldAutoStartNext(input.mode, input.preset),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Crash/reload reconciliation planning (durable active-timer intent)
+// ---------------------------------------------------------------------------
+
+/** Durable intent persisted at start so a killed process can be reconciled. */
+export type ActiveTimerIntent = {
+  startedAtIso: string;
+  mode: PomodoroMode;
+  totalSeconds: number;
+  completedFocus: number;
+  notificationId: string | null;
+};
+
+export type ActiveTimerReconciliation =
+  | { kind: 'already-logged'; notificationId: string | null }
+  | { kind: 'complete-unlogged'; notificationId: string | null }
+  | { kind: 'interrupted'; notificationId: string | null };
+
+/**
+ * Decide what happened to a session whose process died mid-run.
+ * - Row already logged → completion survived; only cycle position needs restore.
+ * - Focus countdown passed with no row → honor the completed focus.
+ * - Anything else → interrupted mid-session; per product contract interrupted
+ *   sessions are never logged, so surface a notice and cancel the orphan OS
+ *   notification.
+ */
+export function planActiveTimerReconcile(
+  intent: ActiveTimerIntent,
+  hasLoggedRow: boolean,
+  nowMs: number,
+): ActiveTimerReconciliation {
+  if (hasLoggedRow) return { kind: 'already-logged', notificationId: intent.notificationId };
+  const endMs = new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000;
+  if (intent.mode === 'focus' && nowMs >= endMs) {
+    return { kind: 'complete-unlogged', notificationId: intent.notificationId };
+  }
+  return { kind: 'interrupted', notificationId: intent.notificationId };
 }
 
 // ---------------------------------------------------------------------------

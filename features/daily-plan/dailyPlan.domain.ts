@@ -47,7 +47,8 @@ export type DailyPlanAdherence = {
   completedStreak: number;
 };
 
-function shiftDateKey(dateKey: string, days: number): string {
+/** Shift a date key by whole local-calendar days (DST-safe via local midnight). */
+export function shiftDateKeyByDays(dateKey: string, days: number): string {
   const d = dateKeyToLocalDate(dateKey);
   d.setDate(d.getDate() + days);
   const y = d.getFullYear();
@@ -55,6 +56,8 @@ function shiftDateKey(dateKey: string, days: number): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+
+const shiftDateKey = shiftDateKeyByDays;
 
 /**
  * Count adherence streaks over a sparse set of plans (missing days break the

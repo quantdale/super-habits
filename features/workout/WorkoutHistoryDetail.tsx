@@ -5,7 +5,12 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
-import { computePersonalRecords, computeSessionTotalSets, type LoggedSet } from './workout.domain';
+import {
+  computePersonalRecords,
+  computeSessionTotalSets,
+  formatWorkoutTime,
+  type LoggedSet,
+} from './workout.domain';
 import { getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 
@@ -23,6 +28,13 @@ function formatSessionDate(iso: string): string {
   });
 }
 
+function formatSetLine(weight: number | null, reps: number | null): string {
+  if (weight === null && reps === null) return 'not recorded';
+  const weightText = weight === null ? '?' : String(weight);
+  const repsText = reps === null ? '?' : String(reps);
+  return `${weightText} × ${repsText}`;
+}
+
 type Props = {
   visible: boolean;
   logId: string | null;
@@ -30,7 +42,7 @@ type Props = {
 };
 
 /**
- * Per-session history detail: every logged exercise with its completed sets,
+ * Per-session history detail: every logged exercise with its recorded sets,
  * session totals, and any personal records recorded in the session.
  */
 export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
@@ -57,17 +69,18 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
   const totalSets = detail
     ? computeSessionTotalSets(detail.exercises.map((e) => ({ setsCompleted: e.sets_completed })))
     : 0;
-  // Weight/rep data arrives once per-set weight logging exists; until then
-  // this is empty and the PR section renders its empty state.
-  const loggedSets: LoggedSet[] = detail
-    ? detail.exercises.flatMap((ex) =>
-        Array.from({ length: ex.sets_completed }, () => ({
-          exerciseName: ex.exercise_name,
-          weight: 0,
-          reps: 0,
-        })),
-      )
-    : [];
+  // Real per-set provenance: skipped sets are excluded from PR math; sets
+  // without recorded weight/reps stay unknown (null), never zero.
+  const exerciseNameById = new Map(
+    (detail?.exercises ?? []).map((ex) => [ex.id, ex.exercise_name]),
+  );
+  const loggedSets: LoggedSet[] = (detail?.sets ?? [])
+    .filter((set) => set.completed === 1)
+    .flatMap((set) => {
+      const exerciseName = exerciseNameById.get(set.session_exercise_id);
+      if (!exerciseName) return [];
+      return [{ exerciseName, weight: set.weight, reps: set.reps }];
+    });
   const prs = computePersonalRecords(loggedSets);
 
   return (
@@ -97,6 +110,11 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
                 “{detail.log.notes}”
               </Text>
             ) : null}
+            {detail.exercises.length === 0 ? (
+              <Text className="mt-2 text-sm italic" style={{ color: tokens.textMuted }}>
+                Quick log — no exercises recorded.
+              </Text>
+            ) : null}
           </View>
 
           <View className="mb-4 flex-row gap-3">
@@ -122,29 +140,55 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
                 Total sets
               </Text>
             </View>
+            {detail.log.duration_seconds != null ? (
+              <View
+                className="flex-1 rounded-2xl border px-4 py-3"
+                style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
+              >
+                <Text className="text-xl font-semibold" style={{ color: COLOR }}>
+                  {formatWorkoutTime(detail.log.duration_seconds)}
+                </Text>
+                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  Duration
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View className="gap-3">
-            {detail.exercises.map((ex) => (
-              <Card key={ex.id} accentColor={COLOR}>
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-base font-medium" style={{ color: tokens.text }}>
-                    {ex.exercise_name}
-                  </Text>
-                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                    {ex.sets_completed} set{ex.sets_completed === 1 ? '' : 's'}
-                  </Text>
-                </View>
-                {prs.some((pr) => pr.exerciseName === ex.exercise_name) ? (
-                  <View className="mt-2 flex-row items-center gap-1">
-                    <MaterialIcons name="emoji-events" size={16} color={COLOR} />
-                    <Text className="text-xs font-semibold" style={{ color: COLOR }}>
-                      Personal record
+            {detail.exercises.map((ex) => {
+              const exerciseSets = detail.sets.filter((s) => s.session_exercise_id === ex.id);
+              return (
+                <Card key={ex.id} accentColor={COLOR}>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-base font-medium" style={{ color: tokens.text }}>
+                      {ex.exercise_name}
+                    </Text>
+                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      {ex.sets_completed} set{ex.sets_completed === 1 ? '' : 's'}
                     </Text>
                   </View>
-                ) : null}
-              </Card>
-            ))}
+                  {exerciseSets.length > 0 ? (
+                    <View className="mt-2">
+                      {exerciseSets.map((set) => (
+                        <Text key={set.id} className="text-xs" style={{ color: tokens.textMuted }}>
+                          Set {set.set_number}:{' '}
+                          {set.completed === 1 ? formatSetLine(set.weight, set.reps) : 'skipped'}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : null}
+                  {prs.some((pr) => pr.exerciseName === ex.exercise_name) ? (
+                    <View className="mt-2 flex-row items-center gap-1">
+                      <MaterialIcons name="emoji-events" size={16} color={COLOR} />
+                      <Text className="text-xs font-semibold" style={{ color: COLOR }}>
+                        Personal record
+                      </Text>
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })}
           </View>
 
           <View className="mt-5">

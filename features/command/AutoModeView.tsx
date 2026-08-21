@@ -37,7 +37,7 @@ export function AutoModeView({
     const parserContext = getParserContext();
 
     try {
-      const { route } = await classifyForAutoMode({
+      const { route, classification } = await classifyForAutoMode({
         question,
         conversationContext: [],
         now,
@@ -49,15 +49,20 @@ export function AutoModeView({
 
       if (route.route === 'ask') {
         setRoutedTo('ask');
-        const result = await askParser.ask({
-          question,
-          conversationContext: [],
-          now,
-          locale: parserContext.locale,
-          timeZone: parserContext.timeZone,
-          todayDateKey: toDateKey(now),
-          tomorrowDateKey: getTomorrowDateKey(now),
-        });
+        // Reuse the router's classification so one auto-ask costs a single
+        // classify request instead of two.
+        const result = await askParser.ask(
+          {
+            question,
+            conversationContext: [],
+            now,
+            locale: parserContext.locale,
+            timeZone: parserContext.timeZone,
+            todayDateKey: toDateKey(now),
+            tomorrowDateKey: getTomorrowDateKey(now),
+          },
+          { precomputedClassification: classification },
+        );
         setLastResult(result);
       } else {
         setRoutedTo('create');

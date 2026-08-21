@@ -26,7 +26,7 @@ export type TodayBriefing = {
   planProgress: PlanProgress | null;
   activeProjectCount: number;
   activeGoalCount: number;
-  /** Focus minutes logged yesterday across all session types. */
+  /** Focus minutes logged yesterday (focus-type sessions only; breaks never count). */
   yesterdayFocusMinutes: number;
 };
 
@@ -63,8 +63,11 @@ export async function buildTodayBriefing(todayKey: string = toDateKey()): Promis
     };
   }
 
+  // Only focus-type sessions count toward focus minutes; short/long break
+  // rows (and legacy "break" rows) would otherwise inflate the briefing.
+  const yesterdayFocusSessions = sessions.filter((s) => s.session_type === 'focus');
   const yesterdayFocusMinutes = Math.round(
-    sessions.reduce((sum, s) => sum + s.duration_seconds, 0) / 60,
+    yesterdayFocusSessions.reduce((sum, s) => sum + s.duration_seconds, 0) / 60,
   );
 
   return {

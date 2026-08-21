@@ -99,11 +99,18 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
     setTopTodoIds((current) => toggleTopTodoId(current, todoId));
   }, []);
 
+  const [carryForwardError, setCarryForwardError] = useState<string | null>(null);
+
   const handleCarryForward = useCallback(async () => {
     setCarryingForward(true);
+    setCarryForwardError(null);
     try {
       await carryForwardFromPreviousDay(today);
       await refresh();
+    } catch (e) {
+      // Surface the failure instead of leaking an unhandled rejection; the
+      // plan draft stays untouched and the user can retry.
+      setCarryForwardError(e instanceof Error ? e.message : 'Could not carry forward.');
     } finally {
       setCarryingForward(false);
     }
@@ -156,6 +163,12 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       {adherence ? (
         <Text className="text-sm" style={{ color: tokens.textMuted }}>
           Streaks: {adherence.committedStreak} committed · {adherence.completedStreak} completed
+        </Text>
+      ) : null}
+
+      {carryForwardError ? (
+        <Text className="text-sm" style={{ color: tokens.dangerText }}>
+          {carryForwardError}
         </Text>
       ) : null}
 

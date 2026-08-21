@@ -16,6 +16,8 @@ import {
 } from './command.validation';
 import type {
   AiCommandParser,
+  DraftAddTodoToDailyPlan,
+  DraftCreateProject,
   DraftLogCalorieEntry,
   DraftLogHabit,
   DraftLogWorkoutRoutine,
@@ -24,6 +26,7 @@ import type {
   DraftCreateHabit,
   DraftCreateTodo,
   DraftMissingField,
+  DraftUpdateGoalProgress,
   DraftWarning,
   ParseCommandInput,
   ParseCommandResult,
@@ -44,8 +47,12 @@ const SUPPORTED_WARNING_CODES: DraftWarning['code'][] = [
   'active_timer_conflict',
   'already_satisfied',
   'off_day',
+  'percent_clamped',
 ];
 const SUPPORTED_WARNING_CODE_SET = new Set<string>(SUPPORTED_WARNING_CODES);
+// Planning-kind bound mirrored by supabase/functions/parse-ai-command/normalize.js;
+// keep both sides in lockstep (see tests/commandRemoteParity.contract.test.ts).
+const COMMAND_MAX_ENTITY_NAME_LENGTH = 80;
 const SUPPORTED_TODO_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/g;
 const TODAY_PATTERN = /\btoday\b/gi;
 const TOMORROW_PATTERN = /\btomorrow\b/gi;
@@ -503,6 +510,100 @@ function normalizeRemoteFocusDraft(
   };
 }
 
+function normalizePlanningNameField(value: unknown, fieldName: string): string | null {
+  const normalized = normalizeEntityReferenceField(value, fieldName);
+  if (normalized && normalized.length > COMMAND_MAX_ENTITY_NAME_LENGTH) {
+    throw new Error(
+      `Model ${fieldName} must be ${COMMAND_MAX_ENTITY_NAME_LENGTH} characters or fewer.`,
+    );
+  }
+  return normalized;
+}
+
+function normalizeClampedPercent(value: unknown): { percent: number | null; clamped: boolean } {
+  if (value == null) return { percent: null, clamped: false };
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('Model percent must be a number or null.');
+  }
+  const clamped = Math.min(100, Math.max(0, value));
+  return { percent: clamped, clamped: clamped !== value };
+}
+
+function normalizeRemoteProjectDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftCreateProject {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model create_project fields must be an object.');
+  return {
+    kind: 'create_project',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: {
+      name: normalizePlanningNameField(fields.name, 'name'),
+      color: fields.color == null ? null : toNonEmptyString(fields.color),
+      targetDate: normalizeOptionalCommandDate(fields.targetDate, 'targetDate'),
+    },
+  };
+}
+
+function normalizeRemoteGoalProgressDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftUpdateGoalProgress {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model update_goal_progress fields must be an object.');
+  const percentResult = normalizeClampedPercent(fields.percent);
+  const warnings = [...normalizeWarnings(payload.warnings)];
+  if (percentResult.clamped) {
+    warnings.push({
+      code: 'percent_clamped',
+      message: 'Progress was clamped to the 0–100 range.',
+    });
+  }
+  return {
+    kind: 'update_goal_progress',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings,
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: {
+      goalTitle: normalizePlanningNameField(fields.goalTitle, 'goalTitle'),
+      percent: percentResult.percent,
+    },
+  };
+}
+
+function normalizeRemoteDailyPlanDraft(
+  payload: Record<string, unknown>,
+  rawText: string,
+): DraftAddTodoToDailyPlan {
+  const fields = isRecord(payload.fields) ? payload.fields : null;
+  if (!fields) throw new Error('Model add_todo_to_daily_plan fields must be an object.');
+  return {
+    kind: 'add_todo_to_daily_plan',
+    rawText,
+    parserKind: 'model_proxy',
+    parserVersion: normalizeParserVersion(payload.parserVersion),
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings: normalizeWarnings(payload.warnings),
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: {
+      todoTitle: normalizePlanningNameField(fields.todoTitle, 'todoTitle'),
+      dateKey: normalizeOptionalCommandDate(fields.dateKey, 'dateKey'),
+    },
+  };
+}
+
 export function normalizeRemoteParseResponse(
   payload: unknown,
   input: ParseCommandInput,
@@ -564,7 +665,13 @@ export function normalizeRemoteParseResponse(
             ? normalizeRemoteWorkoutDraft(payload, input.rawText)
             : payload.kind === 'start_focus_session'
               ? normalizeRemoteFocusDraft(payload, input.rawText)
-              : null;
+              : payload.kind === 'create_project'
+                ? normalizeRemoteProjectDraft(payload, input.rawText)
+                : payload.kind === 'update_goal_progress'
+                  ? normalizeRemoteGoalProgressDraft(payload, input.rawText)
+                  : payload.kind === 'add_todo_to_daily_plan'
+                    ? normalizeRemoteDailyPlanDraft(payload, input.rawText)
+                    : null;
 
   if (v2Draft) {
     const validationMessage = validateCommandDraftFields(v2Draft);

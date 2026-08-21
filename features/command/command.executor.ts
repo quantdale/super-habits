@@ -3,6 +3,7 @@ import { addHabit, incrementHabit, listHabits } from '@/features/habits/habits.d
 import { DEFAULT_HABIT_COLOR, DEFAULT_HABIT_ICON } from '@/features/habits/habitPresets';
 import type { HabitIcon } from '@/features/habits/types';
 import { isHabitScheduledOn, parseHabitRuleHistory } from '@/features/habits/habits.domain';
+import { isActiveHabit } from '@/features/overview/overview.domain';
 import { completeRoutine, listRoutines } from '@/features/workout/workout.data';
 import { addTodo, completeTodo, listTodos } from '@/features/todos/todos.data';
 import { addProject } from '@/features/projects/projects.data';
@@ -18,6 +19,7 @@ import {
   resolveWorkoutRoutineReference,
 } from './command.resolver';
 import { validateCommandDraftFields } from './command.validation';
+import { COMMAND_PROJECT_COLOR_HEX } from './command.v2.domain';
 import type {
   CommandExecutionResult,
   DraftAiAction,
@@ -34,6 +36,13 @@ export type CommandExecutionOptions = {
   startFocusSession?: (durationMinutes: number) => Promise<FocusStartResult>;
 };
 
+/**
+ * Process-memory double-submit guard. This is a UX guard only, not a durable
+ * exactly-once mechanism: it resets on app restart and grows by one entry per
+ * confirmed command for the session. Integrity comes from the idempotent data
+ * layer; remote parsers never supply or control the token (see
+ * DraftBase.executionToken in types.ts).
+ */
 const claimedExecutionTokens = new Set<string>();
 
 function resolveHabitDefaults(draft: DraftCreateHabit) {
@@ -178,6 +187,14 @@ async function executeLogHabit(
   if (!habit) {
     return { outcome: 'validation_error', message: 'That Habit is no longer available.' };
   }
+  // Paused/archived habits are not actionable (Area 1 F3): logging against
+  // them is refused with the same validation-error contract.
+  if (!isActiveHabit(habit)) {
+    return {
+      outcome: 'validation_error',
+      message: `"${habit.name}" is ${habit.status === 'archived' ? 'archived' : 'paused'} — resume it before logging.`,
+    };
+  }
   if (
     !isHabitScheduledOn(
       parseHabitRuleHistory(habit.rule_history),
@@ -313,22 +330,8 @@ async function executeStartFocus(
   };
 }
 
-const COMMAND_PROJECT_COLOR_HEX: Record<string, string> = {
-  blue: '#3B82F6',
-  green: '#10B981',
-  emerald: '#10B981',
-  violet: '#8B5CF6',
-  purple: '#8B5CF6',
-  orange: '#F97316',
-  amber: '#F59E0B',
-  yellow: '#F59E0B',
-  pink: '#EC4899',
-  teal: '#14B8A6',
-  red: '#EF4444',
-  indigo: '#6366F1',
-  lime: '#84CC16',
-};
-
+// Hex map keyed by the canonical color vocabulary exported from
+// command.v2.domain.ts so parser and executor share one list.
 function resolveProjectColor(colorName: string | null): string | undefined {
   if (!colorName) return undefined;
   return COMMAND_PROJECT_COLOR_HEX[colorName.trim().toLowerCase()];

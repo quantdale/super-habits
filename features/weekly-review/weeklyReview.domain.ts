@@ -271,6 +271,29 @@ export function parsePlanPayload(
   }
 }
 
+// ---------- local-calendar day-key arithmetic ----------
+
+/** Shift a date key by whole local-calendar days (DST-safe via local midnight). */
+export function shiftDateKeyByDays(dateKey: string, days: number): string {
+  const date = dateKeyToLocalDate(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+/**
+ * Local-calendar date keys for `days` consecutive days starting at
+ * `startDateKey` (index 0 = start). Extracted from the summary builder so the
+ * per-habit day iteration is unit-testable without a DB and can never regress
+ * to UTC `new Date(key)` parsing (F5).
+ */
+export function listWeekDateKeys(startDateKey: string, days = 7): string[] {
+  const keys: string[] = [];
+  for (let i = 0; i < days; i++) {
+    keys.push(shiftDateKeyByDays(startDateKey, i));
+  }
+  return keys;
+}
+
 // ---------- next-week plan suggestions ----------
 
 export type NextWeekPlanSuggestion = {
@@ -280,12 +303,6 @@ export type NextWeekPlanSuggestion = {
 
 const MAX_SUGGESTIONS_PER_DAY = 3;
 const MAX_SUGGESTION_DAYS = 7;
-
-function addDaysToDateKey(dateKey: string, days: number): string {
-  const date = dateKeyToLocalDate(dateKey);
-  date.setDate(date.getDate() + days);
-  return toDateKey(date);
-}
 
 /**
  * Distribute carry-forward candidates across next week's days (Monday-start),
@@ -308,7 +325,7 @@ export function buildNextWeekPlanSuggestions(input: {
     if (cursor >= candidateTodoIds.length) break;
     const todoIds = candidateTodoIds.slice(cursor, cursor + MAX_SUGGESTIONS_PER_DAY);
     cursor += todoIds.length;
-    suggestions.push({ dateKey: addDaysToDateKey(nextWeekStartDateKey, dayOffset), todoIds });
+    suggestions.push({ dateKey: shiftDateKeyByDays(nextWeekStartDateKey, dayOffset), todoIds });
   }
   return suggestions;
 }

@@ -14,6 +14,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import {
   DEFAULT_GOAL,
   addCalorieEntry,
+  copyCalorieEntriesFromDay,
   deleteCalorieEntry,
   getCalorieGoal,
   getCalorieSummaryByRange,
@@ -42,7 +43,6 @@ import type {
 import type { MacroTargets } from '@/features/calories/calories.domain';
 
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
-import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
@@ -137,8 +137,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [goal, setGoal] = useState<CalorieGoal>(DEFAULT_GOAL);
   const [summary364, setSummary364] = useState<DailySummary[]>([]);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
-  const [calorieActivityDays, setCalorieActivityDays] = useState<ActivityDay[]>([]);
-  const [calorieHeatmapDays, setCalorieHeatmapDays] = useState<HeatmapDay[]>([]);
   const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
   const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
@@ -148,6 +146,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
   const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [targetsSheetVisible, setTargetsSheetVisible] = useState(false);
+  // Diary day selection (findings 1/6): defaults to today; the diary
+  // navigator moves it and every entry read follows it.
+  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const startYear = new Date();
@@ -157,7 +159,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     // section appears. Start its small catalog independently of the heavier
     // entry/summary reads and publish it as soon as it is ready so an early
     // search never waits for unrelated aggregate work.
-    const entriesPromise = listCalorieEntries();
+    const entriesPromise = listCalorieEntries(selectedDateKey);
     const savedMealsPromise = Promise.all([listRecentSavedMeals(5), searchSavedMeals('')]);
     const summaryPromise = getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date()));
     const goalPromise = getCalorieGoal();
@@ -171,14 +173,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       summaryPromise,
       goalPromise,
     ]);
-    const activityDaysYear = buildCalorieActivityDays(rangeYear, savedGoal.calories, 365);
 
     setEntries(nextEntries);
     setSummary364(rangeYear);
-    setCalorieActivityDays(activityDaysYear);
-    setCalorieHeatmapDays(buildCalorieHeatmapDays(rangeYear, savedGoal.calories, 365));
     setGoal(savedGoal);
-  }, []);
+  }, [selectedDateKey]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
@@ -213,8 +212,20 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     }),
     [entries],
   );
-  const activeDateKey = entries[0]?.consumed_on ?? toDateKey();
-  const activeDateLabel = useMemo(() => formatDayContext(activeDateKey), [activeDateKey]);
+  const todayKey = toDateKey();
+  // Goal-driven chart normalization recomputes with the goal (finding 8):
+  // deriving from summary364 + goal.calories keeps intensity buckets and
+  // heatmap caps correct immediately after a goal change, not just after the
+  // next refresh trigger.
+  const calorieActivityDays = useMemo(
+    () => buildCalorieActivityDays(summary364, goal.calories, 365),
+    [summary364, goal.calories],
+  );
+  const calorieHeatmapDays = useMemo(
+    () => buildCalorieHeatmapDays(summary364, goal.calories, 365),
+    [summary364, goal.calories],
+  );
+  const selectedDateLabel = useMemo(() => formatDayContext(selectedDateKey), [selectedDateKey]);
   const dailyTrend = useMemo(() => buildDailyTrend(summary364), [summary364]);
   const goalProgress = useMemo(
     () => calculateGoalProgress(caloriesTotal(entries), goal.calories),
@@ -352,6 +363,12 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
   const setAndPersistViewMode = useCallback((nextMode: CaloriesViewMode) => {
     setViewMode(nextMode);
+    if (nextMode === 'form') {
+      // The form always logs to today: drop any diary day selection so the
+      // Today-labeled totals can never silently show a past day.
+      setSelectedDateKey(toDateKey());
+      setCopyStatus(null);
+    }
     void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
   }, []);
 
@@ -414,6 +431,40 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       [meal]: !(current[meal] ?? false),
     }));
   }, []);
+
+  const handleSelectDiaryDate = useCallback((dateKey: string) => {
+    setCopyStatus(null);
+    setSelectedDateKey(dateKey);
+  }, []);
+
+  /**
+   * Copy a previous day into the selected diary day. The structured
+   * CopyDayResult is surfaced as inline status text; refresh() then reloads
+   * the selected day so copied entries appear immediately.
+   */
+  const handleCopyFromDay = useCallback(
+    async (sourceDateKey: string) => {
+      try {
+        const result = await copyCalorieEntriesFromDay(sourceDateKey, selectedDateKey);
+        if (result.status === 'copied') {
+          setCopyStatus(
+            `Copied ${result.copiedCount} ${
+              result.copiedCount === 1 ? 'entry' : 'entries'
+            } into ${formatDayContext(selectedDateKey)}.`,
+          );
+        } else if (result.status === 'source-empty') {
+          setCopyStatus('No entries were logged on that day.');
+        } else {
+          setCopyStatus('That day cannot be copied onto the selected day.');
+        }
+      } catch {
+        // The copy is all-or-nothing: a failure left the selected day intact.
+        setCopyStatus('Copy failed. Nothing was changed.');
+      }
+      await refresh();
+    },
+    [refresh, selectedDateKey],
+  );
 
   const handleSubmit = () => {
     const entryError = validateCalorieEntry(food, protein, carbs, fats, fiber);
@@ -498,9 +549,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     <Card
       variant="header"
       accentColor={COLOR}
-      headerTitle="Today"
+      headerTitle={
+        viewMode === 'diary' && selectedDateKey !== todayKey
+          ? formatDayContext(selectedDateKey)
+          : 'Today'
+      }
       headerSubtitle={
-        viewMode === 'diary' ? activeDateLabel : 'Live totals, goal progress, and macro split.'
+        viewMode === 'diary' ? selectedDateLabel : 'Live totals, goal progress, and macro split.'
       }
       headerRight={<MaterialIcons name="pie-chart" size={22} color={tokens.textOnAccent} />}
       className="mb-0"
@@ -656,10 +711,15 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           allSavedMeals={allSavedMeals}
           groupedEntries={groupedEntries}
           collapsedMeals={collapsedMeals}
+          selectedDateKey={selectedDateKey}
+          summaries={summary364}
+          copyStatus={copyStatus}
           onSelectSavedMeal={handleSelectSavedMeal}
           onBrowseSavedMeals={() => setSearchSheetVisible(true)}
           onManualAdd={openManualAddModal}
           onToggleMealGroup={toggleMealGroup}
+          onSelectDate={handleSelectDiaryDate}
+          onCopyFromDay={handleCopyFromDay}
           onEditEntry={openEntryEditModal}
           onDeleteEntry={handleDeleteEntry}
         />

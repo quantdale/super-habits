@@ -13,19 +13,24 @@ import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors'
 import { useCommandLauncherSuppressed } from '@/features/command/commandCenterContext';
 import {
   listPomodoroSessionsForDateRange,
-  logPomodoroSession,
+  recordCompletedPomodoroSession,
   getPomodoroSettings,
   savePomodoroSettings,
+  getPomodoroActiveTimer,
+  savePomodoroActiveTimer,
+  clearPomodoroActiveTimer,
+  hasPomodoroSessionStartedAt,
+  enqueuePendingPomodoroLog,
+  retryPendingPomodoroLogs,
 } from '@/features/pomodoro/pomodoro.data';
 import { listTodos } from '@/features/todos/todos.data';
 import type { Todo } from '@/core/db/types';
-import { getActivePresetId, getPomodoroPresets, setActivePresetId } from './pomodoro.presets.store';
 import {
-  getAllSessionAssociations,
-  getAllSessionNotes,
-  setSessionAssociation,
-  type SessionAssociation,
-} from './pomodoro.sessionMeta';
+  clearActivePresetId,
+  getPomodoroPresetsState,
+  setActivePresetId,
+} from './pomodoro.presets.store';
+import type { SessionAssociation } from './pomodoro.sessionMeta';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import type { PomodoroSession } from './types';
@@ -38,13 +43,19 @@ import {
   computePomodoroStreakFromHeatmapDays,
   DEFAULT_SETTINGS,
   BUILT_IN_PRESETS,
+  findPresetById,
   getAbandonNotice,
   getModeColor,
   getModeDuration,
   getModeLabel,
   getNextMode,
   getPlantStage,
-  shouldAutoStartNext,
+  matchPresetBySettings,
+  planActiveTimerReconcile,
+  planSessionCompletion,
+  resolveActivePreset,
+  type AbandonNotice,
+  type CompletedFocusLogPlan,
   type PomodoroMode,
   type PomodoroPreset,
   type PomodoroSettings,
@@ -95,17 +106,24 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [pomodoroHeatmapDays, setPomodoroHeatmapDays] = useState<HeatmapDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
   const [presets, setPresets] = useState<PomodoroPreset[]>(BUILT_IN_PRESETS);
-  const [activePresetId, setActivePresetIdState] = useState<string | null>(BUILT_IN_PRESETS[0].id);
+  const [storedActivePresetId, setStoredActivePresetIdState] = useState<string | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [todosLoading, setTodosLoading] = useState(false);
   const [pendingAssociation, setPendingAssociation] = useState<SessionAssociation | null>(null);
-  const [associations, setAssociations] = useState<Record<string, SessionAssociation>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
   const [notePromptSessionId, setNotePromptSessionId] = useState<string | null>(null);
   const [showLinkTodo, setShowLinkTodo] = useState(false);
+  const [interruptedNotice, setInterruptedNotice] = useState<AbandonNotice | null>(null);
+  const [logSaveFailed, setLogSaveFailed] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickTime = useRef<number | null>(null);
   const startInFlightRef = useRef(false);
+  /** Mirror of `remaining` so the interval does pure math outside setState. */
+  const remainingRef = useRef(DEFAULT_SETTINGS.focusMinutes * 60);
+  /** Exactly-once guard for the completion side effects. */
+  const completionDoneRef = useRef(false);
+  /** Cancellable handle for the preset-driven auto-start timeout. */
+  const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconciledRef = useRef(false);
 
   const currentModeRef = useRef<PomodoroMode>('focus');
   const completedFocusRef = useRef(0);
@@ -126,6 +144,18 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   });
   useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
 
+  const clearAutoStartTimer = useCallback(() => {
+    if (autoStartTimerRef.current !== null) {
+      clearTimeout(autoStartTimerRef.current);
+      autoStartTimerRef.current = null;
+    }
+  }, []);
+
+  const applyRemaining = useCallback((value: number) => {
+    remainingRef.current = value;
+    setRemaining(value);
+  }, []);
+
   const loadSettings = useCallback(async () => {
     const nextSettings = await getPomodoroSettings();
     const nextTimer = applySettingsToTimerState(nextSettings, {
@@ -138,35 +168,27 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setSettings(nextTimer.settings);
     if (!isRunning && !isPaused) {
       setTotalSeconds(nextTimer.totalSeconds);
-      setRemaining(nextTimer.remaining);
+      applyRemaining(nextTimer.remaining);
       totalSecondsRef.current = nextTimer.totalSeconds;
     }
-  }, [currentMode, isPaused, isRunning, remaining, totalSeconds]);
+  }, [applyRemaining, currentMode, isPaused, isRunning, remaining, totalSeconds]);
 
   const loadHistory = useCallback(async () => {
     const start364 = new Date();
     start364.setDate(start364.getDate() - 363);
     const startKey = toDateKey(start364);
     const endKey = toDateKey(new Date());
-    const s = await listPomodoroSessionsForDateRange(startKey, endKey);
-    setSessions(s);
-    setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
-    const [assocMap, noteMap] = await Promise.all([
-      getAllSessionAssociations(),
-      getAllSessionNotes(),
-    ]);
-    setAssociations(assocMap);
-    setNotes(noteMap);
+    const rows = await listPomodoroSessionsForDateRange(startKey, endKey);
+    // Break rows never reach the focus surfaces (count card, garden, heatmap).
+    const focusOnly = rows.filter((row) => row.session_type === 'focus');
+    setSessions(focusOnly);
+    setPomodoroHeatmapDays(buildPomodoroHeatmapDays(focusOnly, 364));
   }, []);
 
   const loadPresets = useCallback(async () => {
-    const stored = await getPomodoroPresets();
-    setPresets(stored);
-    const activeId = await getActivePresetId(stored);
-    setActivePresetIdState(activeId);
-    if (activeId) {
-      activePresetRef.current = stored.find((p) => p.id === activeId) ?? BUILT_IN_PRESETS[0];
-    }
+    const state = await getPomodoroPresetsState();
+    setPresets(state.presets);
+    setStoredActivePresetIdState(state.activePresetId);
   }, []);
 
   const loadTodos = useCallback(async () => {
@@ -180,11 +202,90 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     }
   }, []);
 
+  const retryPendingLogs = useCallback(async () => {
+    try {
+      const result = await retryPendingPomodoroLogs();
+      if (result.finalFailures.length > 0) {
+        setLogSaveFailed(true);
+      }
+      if (result.succeeded > 0) {
+        void loadHistory();
+      }
+    } catch {
+      // Recovery is best-effort; the queue stays durable for the next retry.
+    }
+  }, [loadHistory]);
+
   const refresh = useCallback(async () => {
-    await Promise.all([loadHistory(), loadSettings(), loadPresets()]);
-  }, [loadHistory, loadSettings, loadPresets]);
+    await Promise.all([loadHistory(), loadSettings(), loadPresets(), retryPendingLogs()]);
+  }, [loadHistory, loadSettings, loadPresets, retryPendingLogs]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
+
+  /**
+   * Crash/reload reconciliation (runs once per mount): decide what happened
+   * to the durably-intended session, cancel the orphan OS notification, and
+   * restore the cycle position. Never blocks the screen on failure.
+   */
+  const reconcileActiveTimer = useCallback(async () => {
+    if (reconciledRef.current) return;
+    reconciledRef.current = true;
+    try {
+      const intent = await getPomodoroActiveTimer();
+      if (!intent) return;
+      const hasRow = await hasPomodoroSessionStartedAt(intent.startedAtIso);
+      const plan = planActiveTimerReconcile(intent, hasRow, Date.now());
+      // The OS notification survives JS death on native; cancel it in every
+      // outcome now that the session's fate is decided.
+      await cancelScheduledNotification(plan.notificationId);
+
+      if (plan.kind === 'already-logged') {
+        completedFocusRef.current = intent.completedFocus;
+        setCompletedFocus(intent.completedFocus);
+      } else if (plan.kind === 'complete-unlogged') {
+        // The countdown finished while the app was dead — honor the focus.
+        const endedAtIso = new Date(
+          new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000,
+        ).toISOString();
+        try {
+          const result = await recordCompletedPomodoroSession({
+            startedAtIso: intent.startedAtIso,
+            endedAtIso,
+            durationSeconds: intent.totalSeconds,
+            type: 'focus',
+          });
+          if (result.inserted) setNotePromptSessionId(result.id);
+          void loadHistory();
+        } catch {
+          await enqueuePendingPomodoroLog({
+            startedAtIso: intent.startedAtIso,
+            endedAtIso,
+            durationSeconds: intent.totalSeconds,
+            type: 'focus',
+          }).catch(() => undefined);
+          setLogSaveFailed(true);
+        }
+        const nextCompleted = intent.completedFocus + 1;
+        completedFocusRef.current = nextCompleted;
+        setCompletedFocus(nextCompleted);
+      } else {
+        const label = getModeLabel(intent.mode).toLowerCase();
+        setInterruptedNotice({
+          title: 'Previous session interrupted',
+          body: `Your ${label} didn't finish before the app closed. Interrupted sessions are never logged.`,
+        });
+        completedFocusRef.current = intent.completedFocus;
+        setCompletedFocus(intent.completedFocus);
+      }
+      await clearPomodoroActiveTimer().catch(() => undefined);
+    } catch {
+      // Best-effort reconciliation; the intent stays durable for next mount.
+    }
+  }, [loadHistory]);
+
+  useEffect(() => {
+    void reconcileActiveTimer();
+  }, [reconcileActiveTimer]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -203,102 +304,136 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     }
   }, [isRunning]);
 
+  const applyCompletedFocusLog = useCallback(
+    async (log: CompletedFocusLogPlan) => {
+      const assoc = pendingAssociationRef.current;
+      const meta = assoc
+        ? { linkedTodoId: assoc.todoId, linkedTodoTitle: assoc.todoTitle }
+        : undefined;
+      try {
+        const result = await recordCompletedPomodoroSession({
+          startedAtIso: log.startedAtIso,
+          endedAtIso: log.endedAtIso,
+          durationSeconds: log.durationSeconds,
+          type: 'focus',
+          meta,
+        });
+        if (result.inserted) {
+          // Confirmed success only: consume the armed association so it can
+          // never mis-attach to a later session, then prompt for a note.
+          setPendingAssociation(null);
+          setNotePromptSessionId(result.id);
+        }
+      } catch (err) {
+        console.error('[PomodoroScreen] logPomodoroSession failed', err);
+        // Keep the completed focus durably; retried on next foreground/mount
+        // and surfaced as a notice if every retry fails.
+        await enqueuePendingPomodoroLog({
+          startedAtIso: log.startedAtIso,
+          endedAtIso: log.endedAtIso,
+          durationSeconds: log.durationSeconds,
+          type: 'focus',
+          meta: meta ?? null,
+        }).catch(() => undefined);
+        setLogSaveFailed(true);
+      }
+      void loadHistory();
+    },
+    [loadHistory],
+  );
+
+  const runCompletionEffects = useCallback(() => {
+    // Ref-guarded exactly-once: a replayed interval callback can never
+    // double-log a session or double-schedule the auto-start.
+    if (completionDoneRef.current) return;
+    completionDoneRef.current = true;
+    clearAutoStartTimer();
+
+    const plan = planSessionCompletion({
+      mode: currentModeRef.current,
+      startedAtIso: startedAtRef.current ? startedAtRef.current.toISOString() : null,
+      totalSeconds: totalSecondsRef.current,
+      completedFocus: completedFocusRef.current,
+      settings: settingsRef.current,
+      preset: activePresetRef.current,
+    });
+
+    void clearPomodoroActiveTimer().catch(() => undefined);
+
+    setCompletedFocus(plan.nextCompletedFocus);
+    completedFocusRef.current = plan.nextCompletedFocus;
+
+    setCurrentMode(plan.nextMode);
+    currentModeRef.current = plan.nextMode;
+    setTotalSeconds(plan.nextDurationSeconds);
+    totalSecondsRef.current = plan.nextDurationSeconds;
+    applyRemaining(plan.nextDurationSeconds);
+    setStartedAt(null);
+    startedAtRef.current = null;
+    setShowWarning(false);
+
+    if (plan.log) {
+      void applyCompletedFocusLog(plan.log);
+    }
+
+    // Preset-driven auto-start: begin the suggested next mode after a short
+    // beat so the completion state is briefly visible. Held in a cancellable
+    // ref cleared by start/reset/pill presses/unmount.
+    if (plan.autoStartNext) {
+      autoStartTimerRef.current = setTimeout(() => {
+        autoStartTimerRef.current = null;
+        void startRef.current?.();
+      }, 800);
+    }
+  }, [applyCompletedFocusLog, applyRemaining, clearAutoStartTimer]);
+
   useEffect(() => {
     if (!isRunning) return;
 
     const timer = setInterval(() => {
-      setRemaining((prev) => {
-        if (lastTickTime.current == null) return prev;
-        const now = Date.now();
-        const deltaSeconds = Math.round((now - lastTickTime.current) / 1000);
-        if (deltaSeconds < 1) return prev;
-        lastTickTime.current = now;
+      if (lastTickTime.current == null) return;
+      const now = Date.now();
+      const deltaSeconds = Math.round((now - lastTickTime.current) / 1000);
+      if (deltaSeconds < 1) return;
+      lastTickTime.current = now;
 
-        const nextRemaining = prev - deltaSeconds;
-        if (nextRemaining <= 0) {
-          clearInterval(timer);
-          lastTickTime.current = null;
-          setIsRunning(false);
-          setIsPaused(false);
-          void cancelScheduledNotification(notificationIdRef.current);
-          notificationIdRef.current = null;
+      // Pure remaining-math only. React may replay state updaters, so all
+      // completion side effects live in the ref-guarded callback below.
+      const nextRemaining = remainingRef.current - deltaSeconds;
+      if (nextRemaining > 0) {
+        remainingRef.current = nextRemaining;
+        setRemaining(nextRemaining);
+        return;
+      }
 
-          const mode = currentModeRef.current;
-          const settingsNow = settingsRef.current;
-          const totalSec = totalSecondsRef.current;
-          const started = startedAtRef.current;
-
-          if (mode === 'focus' && started) {
-            const endedAt = new Date();
-            void logPomodoroSession(started.toISOString(), endedAt.toISOString(), totalSec, 'focus')
-              .then((sessionId) => {
-                const assoc = pendingAssociationRef.current;
-                if (assoc) {
-                  void setSessionAssociation(sessionId, assoc)
-                    .then(() => setPendingAssociation(null))
-                    .catch(() => undefined);
-                }
-                setNotePromptSessionId(sessionId);
-              })
-              .catch((err) => {
-                console.error('[PomodoroScreen] logPomodoroSession failed', err);
-              });
-            void loadHistory();
-            const nextCompleted = completedFocusRef.current + 1;
-            setCompletedFocus(nextCompleted);
-            completedFocusRef.current = nextCompleted;
-          }
-
-          if (mode === 'long_break') {
-            setCompletedFocus(0);
-            completedFocusRef.current = 0;
-          }
-
-          const nextMode = getNextMode(mode, completedFocusRef.current, settingsNow);
-          const nextDuration = getModeDuration(nextMode, settingsNow);
-
-          setCurrentMode(nextMode);
-          currentModeRef.current = nextMode;
-          setTotalSeconds(nextDuration);
-          totalSecondsRef.current = nextDuration;
-          setStartedAt(null);
-          startedAtRef.current = null;
-          setShowWarning(false);
-
-          // Preset-driven auto-start: begin the suggested next mode after a
-          // short beat so the completion state is briefly visible.
-          if (shouldAutoStartNext(mode, activePresetRef.current)) {
-            setTimeout(() => {
-              void startRef.current?.();
-            }, 800);
-          }
-
-          return nextDuration;
-        }
-        return nextRemaining;
-      });
+      clearInterval(timer);
+      lastTickTime.current = null;
+      remainingRef.current = 0;
+      setRemaining(0);
+      setIsRunning(false);
+      setIsPaused(false);
+      void cancelScheduledNotification(notificationIdRef.current);
+      notificationIdRef.current = null;
+      runCompletionEffects();
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isRunning, loadHistory]);
+  }, [isRunning, runCompletionEffects]);
 
-  const modeColors = getModeColor(currentMode);
-  const growthProgress = calculateGrowthProgress(remaining, totalSeconds);
-  const plantStage = getPlantStage(growthProgress);
-  const showSprout = currentMode === 'focus' && (isRunning || remaining < totalSeconds);
-
-  const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
-  const seconds = String(remaining % 60).padStart(2, '0');
-
-  const startLabel =
-    currentMode === 'focus' ? 'Start focus' : `Start ${getModeLabel(currentMode).toLowerCase()}`;
+  // A pending auto-start must not fire after the screen goes away.
+  useEffect(() => () => clearAutoStartTimer(), [clearAutoStartTimer]);
 
   const handleSaveSettings = async (newSettings: PomodoroSettings) => {
     await savePomodoroSettings(newSettings);
     setSettings(newSettings);
+    // Manual edits detach the stored preset selection so the chip highlight
+    // follows the actual durations instead of a stale selection.
+    setStoredActivePresetIdState(null);
+    void clearActivePresetId().catch(() => undefined);
     const duration = getModeDuration(currentMode, newSettings);
     setTotalSeconds(duration);
-    setRemaining(duration);
+    totalSecondsRef.current = duration;
+    applyRemaining(duration);
     lastTickTime.current = null;
     setIsRunning(false);
     setIsPaused(false);
@@ -315,6 +450,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       }
 
       startInFlightRef.current = true;
+      clearAutoStartTimer();
 
       try {
         const mode = requestedDurationMinutes === undefined ? currentMode : 'focus';
@@ -332,22 +468,32 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         const now = new Date();
         setStartedAt(now);
         startedAtRef.current = now;
-        setRemaining(duration);
+        applyRemaining(duration);
         setTotalSeconds(duration);
         totalSecondsRef.current = duration;
         const { title, body } = notifyCopy(mode);
         const id = await scheduleTimerEndNotification(duration, title, body);
         notificationIdRef.current = id;
         lastTickTime.current = Date.now();
+        completionDoneRef.current = false;
         setIsRunning(true);
         setIsPaused(false);
         setShowSettings(false);
+        // Durable intent: a crash/reload mid-session is reconciled on the
+        // next launch instead of vanishing behind an orphan notification.
+        void savePomodoroActiveTimer({
+          startedAtIso: now.toISOString(),
+          mode,
+          totalSeconds: duration,
+          completedFocus: completedFocusRef.current,
+          notificationId: id,
+        }).catch(() => undefined);
         return { outcome: 'started' };
       } finally {
         startInFlightRef.current = false;
       }
     },
-    [currentMode, isPaused, isRunning, settings],
+    [applyRemaining, clearAutoStartTimer, currentMode, isPaused, isRunning, settings],
   );
 
   const startFocusSession = useCallback(
@@ -362,7 +508,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const handleSelectPreset = useCallback(
     async (preset: PomodoroPreset) => {
       activePresetRef.current = preset;
-      setActivePresetIdState(preset.id);
+      setStoredActivePresetIdState(preset.id);
       await setActivePresetId(preset.id).catch(() => undefined);
       // Applying a preset rewrites the timer settings; a running or paused
       // session keeps its current duration and the preset applies next round.
@@ -388,10 +534,10 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       });
       setTotalSeconds(duration);
       totalSecondsRef.current = duration;
-      setRemaining(duration);
+      applyRemaining(duration);
       lastTickTime.current = null;
     },
-    [isPaused, isRunning],
+    [applyRemaining, isPaused, isRunning],
   );
 
   useEffect(
@@ -420,22 +566,50 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     lastTickTime.current = Date.now();
     setIsRunning(true);
     setIsPaused(false);
+    if (startedAtRef.current) {
+      // Keep the durable intent's notification id current across pauses.
+      void savePomodoroActiveTimer({
+        startedAtIso: startedAtRef.current.toISOString(),
+        mode: currentMode,
+        totalSeconds,
+        completedFocus: completedFocusRef.current,
+        notificationId: id,
+      }).catch(() => undefined);
+    }
   };
 
   const reset = () => {
+    clearAutoStartTimer();
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     lastTickTime.current = null;
     setIsRunning(false);
     setIsPaused(false);
     const duration = getModeDuration(currentMode, settings);
-    setRemaining(duration);
+    applyRemaining(duration);
     setTotalSeconds(duration);
     totalSecondsRef.current = duration;
     setStartedAt(null);
     startedAtRef.current = null;
     setShowWarning(false);
+    completionDoneRef.current = false;
+    // Abandoned sessions are never logged; drop the durable intent too.
+    void clearPomodoroActiveTimer().catch(() => undefined);
   };
+
+  // Behavior source for auto-start flags: stored selection, else the preset
+  // matching current durations, else Classic (never a silent default).
+  const activePreset = resolveActivePreset(presets, storedActivePresetId, settings);
+  useEffect(() => {
+    activePresetRef.current = activePreset;
+  }, [activePreset]);
+
+  // Chip highlight: the stored selection while valid, else whichever preset
+  // the current durations actually equal — manual edits move/clear it.
+  const highlightedPresetId =
+    findPresetById(presets, storedActivePresetId)?.id ??
+    matchPresetBySettings(presets, settings)?.id ??
+    null;
 
   const upNextMode = getNextMode(
     currentMode,
@@ -455,6 +629,17 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   });
   const abandonLabel = currentMode === 'focus' && elapsedSeconds >= 60 ? 'Abandon' : 'Reset';
 
+  const modeColors = getModeColor(currentMode);
+  const growthProgress = calculateGrowthProgress(remaining, totalSeconds);
+  const plantStage = getPlantStage(growthProgress);
+  const showSprout = currentMode === 'focus' && (isRunning || remaining < totalSeconds);
+
+  const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+  const seconds = String(remaining % 60).padStart(2, '0');
+
+  const startLabel =
+    currentMode === 'focus' ? 'Start focus' : `Start ${getModeLabel(currentMode).toLowerCase()}`;
+
   return (
     <Screen scroll>
       <ScreenSection>
@@ -466,6 +651,45 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 
+      {interruptedNotice || logSaveFailed ? (
+        <ScreenSection>
+          {interruptedNotice ? (
+            <View
+              className="mb-3 rounded-2xl border px-3 py-2"
+              style={{ borderColor: tokens.border }}
+            >
+              <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+                {interruptedNotice.title}
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                {interruptedNotice.body}
+              </Text>
+              <View className="mt-2 self-start">
+                <Button
+                  label="Dismiss"
+                  variant="ghost"
+                  onPress={() => setInterruptedNotice(null)}
+                />
+              </View>
+            </View>
+          ) : null}
+          {logSaveFailed ? (
+            <View className="rounded-2xl border px-3 py-2" style={{ borderColor: tokens.border }}>
+              <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+                A completed focus could not be saved
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                Storage kept failing after several retries, so that session is missing from your
+                history.
+              </Text>
+              <View className="mt-2 self-start">
+                <Button label="Dismiss" variant="ghost" onPress={() => setLogSaveFailed(false)} />
+              </View>
+            </View>
+          ) : null}
+        </ScreenSection>
+      ) : null}
+
       <ScreenSection>
         <View className="flex-row flex-wrap gap-3">
           <View className="min-w-[160px] flex-1">
@@ -475,7 +699,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
               icon="timer"
               title="Focus sessions"
               value={sessions.length}
-              subtitle="This year"
+              subtitle="Last 52 weeks"
               note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
             />
           </View>
@@ -545,7 +769,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           <View className="mb-4">
             <PomodoroPresetSelector
               presets={presets}
-              activePresetId={activePresetId}
+              activePresetId={highlightedPresetId}
               onSelect={(p) => void handleSelectPreset(p)}
               disabled={isRunning || isPaused}
             />
@@ -560,13 +784,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 color={COLOR}
                 onPress={() => {
                   if (isRunning) return;
+                  clearAutoStartTimer();
                   setIsPaused(false);
                   setCurrentMode(mode);
                   currentModeRef.current = mode;
                   const d = getModeDuration(mode, settings);
                   setTotalSeconds(d);
                   totalSecondsRef.current = d;
-                  setRemaining(d);
+                  applyRemaining(d);
                   setStartedAt(null);
                   startedAtRef.current = null;
                 }}
@@ -742,7 +967,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           headerSubtitle="Recent sessions, garden view, and the last 52 weeks of activity."
           className="mb-0"
         >
-          <RecentSessionsList sessions={sessions} associations={associations} notes={notes} />
+          <RecentSessionsList sessions={sessions} />
           <View className="mt-4">
             <GardenGrid sessions={sessions} />
           </View>

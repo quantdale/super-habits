@@ -80,17 +80,12 @@ export class CommandParserFacade implements AiCommandParser {
     const startedAt = Date.now();
     const preflight = preflightCommandDraft(input);
     if (preflight) {
-      const config = getAiCommandParseConfig();
-      const remoteCapabilityAvailable = isAiCommandInternalRolloutAvailable(config);
-      const localInternalPreference = remoteCapabilityAvailable
-        ? await getAiCommandInternalRolloutPreference()
-        : false;
-      const effectivePath: ParsePath =
-        remoteCapabilityAvailable && localInternalPreference ? 'remote' : 'mock';
+      // Report a distinct path: no parser ran, so attributing this outcome to
+      // 'remote' (or 'mock') would distort internal-rollout telemetry.
       const latencyMs = Date.now() - startedAt;
       return {
         result: preflight,
-        observation: buildObservation(preflight, effectivePath, latencyMs),
+        observation: buildObservation(preflight, 'preflight', latencyMs),
       };
     }
 

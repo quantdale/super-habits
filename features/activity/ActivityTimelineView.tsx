@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { PillChip } from '@/core/ui/PillChip';
+import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
+import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildActivityTimeline } from '@/features/activity/activityTimeline.data';
 import {
   filterTimelineByDay,
@@ -60,12 +64,21 @@ export function ActivityTimelineView() {
   const [rangeFilter, setRangeFilter] = useState<ActivityTimelineRangeFilter>('30');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // F8: the hub stays mounted across midnight — reload when the local day rolls over.
+  const dayGeneration = useDayRolloverGeneration();
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
       // Widest bounded window; narrower ranges are pure domain filtering.
       setItems(await buildActivityTimeline({ days: 90 }));
+      setLoadError(null);
+    } catch (err) {
+      // F8: no unhandled rejections; a failed load must not read as
+      // "Nothing to show yet". The error panel below offers a retry.
+      console.error('[ActivityTimelineView] load failed', err);
+      setLoadError(err instanceof Error ? err.message : 'Could not load your timeline.');
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +87,13 @@ export function ActivityTimelineView() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
     void load();
-  }, [load]);
+  }, [load, dayGeneration]);
 
+  // F8: refresh while the hub modal is open after backgrounding the app.
+  useForegroundRefresh(load);
+
+  // Hooks run unconditionally (rules-of-hooks); the loadError early return
+  // happens AFTER all hooks, using the already-computed values where needed.
   const todayKey = toDateKey();
 
   const ranged = useMemo(
@@ -88,6 +106,37 @@ export function ActivityTimelineView() {
   );
   const dayKeys = useMemo(() => getTimelineDayKeys(typed), [typed]);
   const visible = useMemo(() => filterTimelineByDay(typed, selectedDay), [typed, selectedDay]);
+
+  if (loadError && !isLoading && items.length === 0) {
+    return (
+      <View className="gap-3">
+        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+          Timeline
+        </Text>
+        <Card
+          variant="header"
+          accentColor={tokens.textMuted}
+          headerTitle="Timeline is temporarily unavailable"
+          headerSubtitle="Nothing was saved or changed."
+          className="mb-0"
+        >
+          <View className="gap-3">
+            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+              {loadError}
+            </Text>
+            <Button
+              label="Try again"
+              onPress={() => {
+                void load();
+              }}
+              color={tokens.textMuted}
+            />
+          </View>
+        </Card>
+      </View>
+    );
+  }
+
   const groups = groupTimelineByDay(visible);
 
   return (

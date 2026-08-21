@@ -13,7 +13,7 @@ import {
   MAX_PRIORITIES,
   MAX_REFLECTION_LENGTH,
 } from './weeklyReview.domain';
-import { executeWeeklyReview } from './weeklyReview.executor';
+import { executeWeeklyReview, type ExecutionResult } from './weeklyReview.executor';
 import { applyNextWeekPlanSuggestions } from './weeklyReview.applyNextWeek';
 import { getWeeklyReviewByWeekKey } from './weeklyReview.data';
 import { ReviewHistoryView } from './ReviewHistoryView';
@@ -52,6 +52,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const [newCommitments, setNewCommitments] = useState<NewTodoCommitmentDraft[]>([]);
   const [reflection, setReflection] = useState('');
   const [executing, setExecuting] = useState(false);
+  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
@@ -119,7 +120,8 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     setValidationErrors([]);
     setExecuting(true);
     try {
-      await executeWeeklyReview({ summary, draft });
+      const result = await executeWeeklyReview({ summary, draft });
+      setExecutionResult(result);
       setStep('done');
     } catch (e) {
       setValidationErrors([e instanceof Error ? e.message : 'Execution failed']);
@@ -131,6 +133,11 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const handleConfirmPress = useCallback(() => {
     void handleConfirm();
   }, [handleConfirm]);
+
+  const failedCommitmentCount = useMemo(
+    () => executionResult?.commitmentOutcomes.filter((o) => o.status === 'failed').length ?? 0,
+    [executionResult],
+  );
 
   const carryForwardTodoIds = useMemo(
     () =>
@@ -157,11 +164,23 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     try {
       const result = await applyNextWeekPlanSuggestions(nextWeekSuggestions);
       setApplyStatus('applied');
-      setApplyMessage(
-        result.addedCount === 0
-          ? 'Nothing to add — next week already covers these priorities.'
-          : `Added ${result.addedCount} priorit${result.addedCount === 1 ? 'y' : 'ies'} across ${result.appliedDateKeys.length} day${result.appliedDateKeys.length === 1 ? '' : 's'} of next week.`,
-      );
+      const parts: string[] = [];
+      if (result.addedCount === 0) {
+        parts.push('Nothing to add — next week already covers these priorities.');
+      } else {
+        parts.push(
+          `Added ${result.addedCount} priorit${result.addedCount === 1 ? 'y' : 'ies'} across ${result.appliedDateKeys.length} day${result.appliedDateKeys.length === 1 ? '' : 's'} of next week.`,
+        );
+      }
+      if (result.failed.length > 0) {
+        parts.push(`${result.failed.length} could not be applied.`);
+      }
+      if (result.truncatedCandidateCount > 0) {
+        parts.push(
+          `${result.truncatedCandidateCount} candidate${result.truncatedCandidateCount === 1 ? '' : 's'} didn't fit the weekly schedule (max 3 per day, 7 days) — plan them manually.`,
+        );
+      }
+      setApplyMessage(parts.join(' '));
     } catch (e) {
       setApplyStatus('error');
       setApplyMessage(e instanceof Error ? e.message : 'Failed to apply suggestions');
@@ -228,12 +247,19 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
             <Text className="text-base text-center mb-6" style={{ color: tokens.textMuted }}>
               Your weekly review for {week.startDateKey} – {week.endDateKey} has been saved.
             </Text>
+            {failedCommitmentCount > 0 ? (
+              <Text className="mb-4 text-center text-sm" style={{ color: tokens.dangerText }}>
+                {failedCommitmentCount} new commitment
+                {failedCommitmentCount === 1 ? '' : 's'} could not be created. Re-confirming the
+                review will retry only those.
+              </Text>
+            ) : null}
             {nextWeekSuggestions.length > 0 && applyStatus !== 'applied' ? (
               <View className="mb-6 w-full items-center gap-2">
                 <Text className="text-center text-sm" style={{ color: tokens.textMuted }}>
                   {carryForwardTodoIds.length} carry-forward candidate
                   {carryForwardTodoIds.length === 1 ? '' : 's'} can seed next week&apos;s daily
-                  plans.
+                  plans (up to 3 per day over the first 7 days).
                 </Text>
                 <Button
                   label={

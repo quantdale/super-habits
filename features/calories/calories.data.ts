@@ -2,8 +2,9 @@ import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/
 import { getDatabase } from '@/core/db/client';
 import { CalorieEntry, SavedMeal } from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createId } from '@/lib/id';
-import { nowIso, toDateKey } from '@/lib/time';
+import { isValidDateKey, nowIso, toDateKey } from '@/lib/time';
 import {
   runBackupMutation,
   runSyncedMutation,
@@ -14,7 +15,10 @@ import {
   DEFAULT_CALORIE_GOAL,
   kcalFromMacros,
   normalizeCalorieGoal,
+  normalizeMacroTargets,
 } from '@/features/calories/calories.domain';
+import { CALORIES_TARGETS_STORAGE_KEY } from '@/features/calories/caloriesTargets';
+import type { MacroTargets } from '@/features/calories/calories.domain';
 import type { CalorieGoal, DailySummary } from '@/features/calories/types';
 
 export type { CalorieGoal, DailySummary } from '@/features/calories/types';
@@ -294,12 +298,19 @@ function escapeSqliteLikePattern(fragment: string): string {
   return fragment.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
+/** Cap for the unfiltered saved-meal catalog load (`searchSavedMeals('')`). */
+const SAVED_MEAL_CATALOG_LIMIT = 500;
+
 export async function searchSavedMeals(query: string): Promise<SavedMeal[]> {
   const db = await getDatabase();
   if (!query.trim()) {
+    // Unfiltered catalog load: capped so years of saved meals cannot grow the
+    // per-refresh payload without bound. Specific searches stay uncapped.
     return db.getAllAsync<SavedMeal>(
       `SELECT * FROM saved_meals
-       ORDER BY use_count DESC, last_used_at DESC`,
+       ORDER BY use_count DESC, last_used_at DESC
+       LIMIT ?`,
+      [SAVED_MEAL_CATALOG_LIMIT],
     );
   }
   const trimmed = query.trim();
@@ -329,32 +340,61 @@ export async function deleteSavedMeal(id: string): Promise<void> {
 }
 
 /**
+ * Structured copy-day outcome. `invalid-range` carries the reason so callers
+ * can give precise feedback: a malformed date key, copying a day onto itself,
+ * or a source day later than the target day.
+ */
+export type CopyDayResult =
+  | { status: 'copied'; copiedCount: number }
+  | { status: 'source-empty' }
+  | { status: 'invalid-range'; reason: 'malformed-date-key' | 'same-day' | 'source-after-target' };
+
+/**
  * Copy-day: duplicate every entry logged on `sourceDateKey` into
  * `targetDateKey` (default today). Each copy gets a fresh id and its own
  * synced create record. Saved-meal maintenance is deliberately skipped so
  * copying does not inflate use_count.
- * Returns the number of entries copied.
+ *
+ * The whole batch is ONE transaction (`runBackupMutation`): the source read,
+ * every insert, and every outbox intent happen inside the same SQLite
+ * transaction, so a mid-batch failure rolls back all copies and their backup
+ * intents — never a silent partial copy. The result is returned only on
+ * commit.
  */
 export async function copyCalorieEntriesFromDay(
   sourceDateKey: string,
   targetDateKey: string = toDateKey(),
-): Promise<number> {
-  const db = await getDatabase();
-  const sourceEntries = await db.getAllAsync<CalorieEntry>(
-    `SELECT * FROM calorie_entries
-     WHERE deleted_at IS NULL AND consumed_on = ?
-     ORDER BY created_at ASC`,
-    [sourceDateKey],
-  );
+): Promise<CopyDayResult> {
+  if (!isValidDateKey(sourceDateKey) || !isValidDateKey(targetDateKey)) {
+    return { status: 'invalid-range', reason: 'malformed-date-key' };
+  }
+  if (sourceDateKey === targetDateKey) {
+    return { status: 'invalid-range', reason: 'same-day' };
+  }
+  if (sourceDateKey > targetDateKey) {
+    return { status: 'invalid-range', reason: 'source-after-target' };
+  }
 
-  let copied = 0;
-  for (const entry of sourceEntries) {
-    const id = createId('cal');
-    const now = nowIso();
-    const result = await runSyncedMutation({
-      db,
-      record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'create' },
-      mutate: async (transactionDb) => {
+  const db = await getDatabase();
+  const now = nowIso();
+  const outcome = await runBackupMutation<CopyDayResult>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      // Read the source inside the transaction so the batch is a consistent
+      // read-modify-write against concurrent edits.
+      const sourceEntries = await transactionDb.getAllAsync<CalorieEntry>(
+        `SELECT * FROM calorie_entries
+         WHERE deleted_at IS NULL AND consumed_on = ?
+         ORDER BY created_at ASC`,
+        [sourceDateKey],
+      );
+      if (sourceEntries.length === 0) {
+        return { changed: false, value: { status: 'source-empty' } };
+      }
+
+      let copiedCount = 0;
+      for (const entry of sourceEntries) {
+        const id = createId('cal');
         await transactionDb.runAsync(
           'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
           [
@@ -371,12 +411,13 @@ export async function copyCalorieEntriesFromDay(
             now,
           ],
         );
-        return { changed: true, value: undefined };
-      },
-    });
-    if (result.changed) copied += 1;
-  }
-  return copied;
+        enqueue({ entity: 'calorie_entries', id, updatedAt: now, operation: 'create' });
+        copiedCount += 1;
+      }
+      return { changed: true, value: { status: 'copied', copiedCount } };
+    },
+  });
+  return outcome.value;
 }
 
 export async function deleteCalorieEntry(id: string): Promise<'deleted' | 'not_found'> {
@@ -572,4 +613,90 @@ export async function applyRemoteSavedMeals(
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Macro targets (recoverable Settings V3 source: app_meta `calorie_targets`).
+// Lives in the data layer because it touches SQLite directly; the thin
+// re-export in caloriesTargets.ts keeps consumer import sites stable.
+// ---------------------------------------------------------------------------
+
+/**
+ * Load the stored macro targets, or null when unset/malformed (the UI then
+ * falls back to the calorie goal). Same normalize-on-read contract as the
+ * other app_meta-backed preference stores.
+ */
+export async function loadMacroTargetsData(): Promise<MacroTargets | null> {
+  const db = await getDatabase();
+  const stored = await getAppMetaJsonOrDefault<MacroTargets | null>(
+    db,
+    appMetaKeys.calorieTargets,
+    null,
+    normalizeMacroTargets,
+  );
+  if (stored) return stored;
+  return importLegacyAsyncStorageTargets(db);
+}
+
+/**
+ * One-time idempotent legacy import: devices that saved targets under the old
+ * AsyncStorage key keep them. Runs only while app_meta has no value; app_meta
+ * is written BEFORE the legacy key is removed, so a failed removal at worst
+ * re-imports the same value on the next load.
+ */
+async function importLegacyAsyncStorageTargets(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+): Promise<MacroTargets | null> {
+  let raw: string | null = null;
+  try {
+    raw = await AsyncStorage.getItem(CALORIES_TARGETS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  const normalized = normalizeMacroTargets(parsed);
+  if (!normalized) {
+    // Malformed legacy value: drop the key so we stop re-parsing it each load.
+    try {
+      await AsyncStorage.removeItem(CALORIES_TARGETS_STORAGE_KEY);
+    } catch {
+      // Best-effort cleanup.
+    }
+    return null;
+  }
+
+  try {
+    await setAppMetaJson(db, appMetaKeys.calorieTargets, normalized);
+  } catch {
+    // Keep the legacy key: the value is not durably imported yet.
+    return null;
+  }
+  // Best-effort cleanup; app_meta already wins on every later load.
+  try {
+    await AsyncStorage.removeItem(CALORIES_TARGETS_STORAGE_KEY);
+  } catch {
+    // Ignore removal failures.
+  }
+  return normalized;
+}
+
+/**
+ * Persist normalized targets to app_meta `calorie_targets` and re-capture the
+ * recoverable-settings snapshot so the new value rides the backup outbox.
+ */
+export async function saveMacroTargetsData(targets: MacroTargets): Promise<void> {
+  const normalized = normalizeMacroTargets(targets);
+  if (!normalized) {
+    throw new Error('Invalid macro targets payload.');
+  }
+  const db = await getDatabase();
+  await setAppMetaJson(db, appMetaKeys.calorieTargets, normalized);
+  await enqueueBackupSettingsRecord(db);
 }

@@ -125,6 +125,39 @@ async function countTodoCompletions(
   return row?.count ?? 0;
 }
 
+/**
+ * Count todos completed inside a half-open UTC window [startUtcIso,
+ * endUtcExclusiveIso) — the same predicate Progress uses internally.
+ *
+ * F4: this is the canonical date-bounded completed-Todo counter. Intended
+ * consumer: `retrieveDailyOverview(dateKey)` in features/command/
+ * ask.retrieval.ts (command agent's file), which today reports the LIFETIME
+ * total from `countCompletedTodos()` (features/todos/todos.data.ts — no date
+ * bound) as a per-date fact. Integration spec for that call site:
+ *   const { startUtcIso, endUtcExclusiveIso } =
+ *     getUtcIsoRangeForLocalDateKeys(dateKey, dateKey);
+ *   const completedCount = await countTodosCompletedBetween(startUtcIso, endUtcExclusiveIso);
+ * i.e. derive the bounds from lib/time so any historical dateKey gets that
+ * local calendar day's completions, matching overdueCount's date scoping.
+ */
+export async function countTodosCompletedBetween(
+  startUtcIso: string,
+  endUtcExclusiveIso: string,
+): Promise<number> {
+  const db = await getDatabase();
+  return countTodoCompletions(db, startUtcIso, endUtcExclusiveIso);
+}
+
+/**
+ * F3 decision (canonical history rule, shared with activityTimeline.data.ts):
+ * completions are counted regardless of whether the habit was later
+ * soft-deleted — no join to `habits` here, deliberately. History is preserved:
+ * "a completion happened in this window" stays true after deletion, and the
+ * Activity Timeline keeps rendering those past events via LEFT JOIN. Paused /
+ * archived habits are also NOT excluded: these windows are historical facts,
+ * not "today's obligations" (only current-state summaries like Overview's
+ * shapeHabitsSummary filter on habits.status).
+ */
 async function countHabitCompletions(
   db: Awaited<ReturnType<typeof getDatabase>>,
   startDateKey: string,

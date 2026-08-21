@@ -1,5 +1,5 @@
 import { getDatabase } from '@/core/db/client';
-import { toDateKey, timestampToLocalDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import type {
   ActivityTimelineItem,
   ActivityTimelineSource,
@@ -11,6 +11,8 @@ const DEFAULT_WINDOW_DAYS = 30;
 export type BuildTimelineOptions = {
   /** Look-back window in local days. Defaults to 30 (bounded to keep the feed responsive). */
   days?: number;
+  /** Injectable clock for deterministic tests; defaults to now. */
+  now?: Date;
 };
 
 function makeItem(
@@ -19,11 +21,14 @@ function makeItem(
   occurredAt: string,
   title: string,
   subtitle?: string,
+  dateKeyOverride?: string,
 ): ActivityTimelineItem {
   return {
     id: `${source}:${id}`,
     occurredAt,
-    dateKey: occurredAt ? timestampToLocalDateKey(occurredAt) : toDateKey(),
+    // F5: an explicit local fact (e.g. habit_completions.date_key) wins over
+    // the event timestamp so backdated edits land on the right day bucket.
+    dateKey: dateKeyOverride ?? (occurredAt ? timestampToLocalDateKey(occurredAt) : toDateKey()),
     category: categoryOf(source),
     source,
     title,
@@ -42,7 +47,14 @@ export async function buildActivityTimeline(
 ): Promise<ActivityTimelineItem[]> {
   const days = Math.max(1, Math.min(90, options.days ?? DEFAULT_WINDOW_DAYS));
   const db = await getDatabase();
-  const windowStart = new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000);
+  // F6: anchor the fetch window to local midnight of today − (days − 1) via
+  // DST-safe setDate arithmetic, not to the current time-of-day. This keeps
+  // the SQL window aligned with the domain range filter's local-midnight
+  // cutoff (an event at 00:10 local `days−1` ago is fetched AND kept).
+  const now = options.now ?? new Date();
+  const todayKey = toDateKey(now);
+  const windowStart = dateKeyToLocalDate(todayKey);
+  windowStart.setDate(windowStart.getDate() - (days - 1));
   const sinceDateKey = toDateKey(windowStart);
   const sinceIso = windowStart.toISOString();
   const items: ActivityTimelineItem[] = [];
@@ -62,28 +74,40 @@ export async function buildActivityTimeline(
   }
 
   // Habits: completions with authoritative date/time facts.
+  // F3 (canonical history rule): preserve history — a LEFT JOIN keeps
+  // completions of soft-deleted habits visible with a fallback label instead
+  // of erasing past events via an INNER JOIN + `deleted_at IS NULL` filter.
+  // Progress (progress.data.ts) counts these same rows unjoined; both surfaces
+  // therefore agree that "a completion happened on date X" survives deletion.
+  // F5: bucket by the row's authoritative `date_key` (not `updated_at`, which
+  // also moves on decrements/backdated corrections) and label neutrally.
   const habitCompletions = await db.getAllAsync<{
     id: string;
     habit_id: string;
     date_key: string;
+    count: number;
     updated_at: string;
-    name: string;
+    name: string | null;
   }>(
-    `SELECT hc.id, hc.habit_id, hc.date_key, hc.updated_at, h.name
+    `SELECT hc.id, hc.habit_id, hc.date_key, hc.count, hc.updated_at, h.name
      FROM habit_completions hc
-     JOIN habits h ON h.id = hc.habit_id
-     WHERE hc.updated_at >= ? AND h.deleted_at IS NULL
+     LEFT JOIN habits h ON h.id = hc.habit_id
+     WHERE hc.updated_at >= ?
      ORDER BY hc.updated_at DESC LIMIT 300`,
     [sinceIso],
   );
   for (const hc of habitCompletions) {
+    const label = hc.name ?? 'a deleted habit';
     items.push(
       makeItem(
         'habit',
         hc.id,
         hc.updated_at,
-        `Completed "${truncate(hc.name)}"`,
-        `Habit · ${hc.date_key}`,
+        `Completed "${truncate(label)}"`,
+        `Habit · ${hc.date_key}${hc.count > 1 ? ` · ${hc.count}×` : ''}`,
+        // Authoritative local day wins over updated_at so backdated edits and
+        // decrement touches stay in the completion's own day bucket.
+        hc.date_key,
       ),
     );
   }

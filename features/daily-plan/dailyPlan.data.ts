@@ -1,5 +1,7 @@
+import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
-import { runLocalMutation } from '@/core/db/localMutation';
+import { runBackupMutation } from '@/core/sync/syncedMutation';
+import type { SyncRecord } from '@/core/sync/sync.engine';
 import { createId } from '@/lib/id';
 import { isValidDateKey, nowIso, toDateKey } from '@/lib/time';
 import type { DailyPlan } from '@/core/db/types';
@@ -11,6 +13,7 @@ import {
   normalizeEnergyScore,
   parseTopTodoIds,
   serializeTopTodoIds,
+  shiftDateKeyByDays,
 } from '@/features/daily-plan/dailyPlan.domain';
 import { INTENTION_MAX, NOTES_MAX, REFLECTION_MAX } from '@/features/daily-plan/dailyPlan.types';
 import type { DailyPlanAdherence } from '@/features/daily-plan/dailyPlan.domain';
@@ -48,12 +51,16 @@ export type DailyPlanUpdate = {
 /**
  * Prune topTodoIds to existing Todo ids at save time (H10 referential
  * validation). Dropped stale/deleted ids are silent; ordering is preserved.
+ * Takes the caller's connection so the read stays inside the write
+ * transaction.
  */
-async function filterExistingTodoIds(ids: string[]): Promise<string[]> {
+async function filterExistingTodoIdsInTx(
+  tx: SQLite.SQLiteDatabase,
+  ids: string[],
+): Promise<string[]> {
   if (ids.length === 0) return ids;
-  const db = await getDatabase();
   const placeholders = ids.map(() => '?').join(',');
-  const rows = await db.getAllAsync<{ id: string }>(
+  const rows = await tx.getAllAsync<{ id: string }>(
     `SELECT id FROM todos WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
     ids,
   );
@@ -61,31 +68,65 @@ async function filterExistingTodoIds(ids: string[]): Promise<string[]> {
   return ids.filter((id) => existingSet.has(id));
 }
 
-export async function upsertDailyPlan(
+function readActivePlanByDateKey(
+  tx: SQLite.SQLiteDatabase,
+  dateKey: string,
+): Promise<DailyPlan | null> {
+  return tx.getFirstAsync<DailyPlan>(
+    `SELECT ${DAILY_PLAN_SELECT} FROM daily_plans WHERE date_key = ? AND deleted_at IS NULL`,
+    [dateKey],
+  );
+}
+
+/**
+ * Recognize the unique-violation raised by idx_daily_plans_date_key_active so
+ * a lost create race can fall back to the UPDATE path instead of surfacing a
+ * raw SQLITE_CONSTRAINT error. Covers better-sqlite3 (code property), Expo
+ * native, and web WASM error shapes.
+ */
+function isUniqueConstraintError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && code.startsWith('SQLITE_CONSTRAINT') && code.includes('UNIQUE')) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed/i.test(message);
+}
+
+/**
+ * Transaction-scoped create-or-update for one day's plan. The existence read,
+ * Todo-id validation, and write all run on the caller's transaction so the
+ * create-vs-update decision and completed_at transitions key off
+ * in-transaction state — never a pre-transaction snapshot (F6). When `enqueue`
+ * is provided, the matching owner-scoped outbox record is created in the SAME
+ * transaction (F1). A create that loses a race against a concurrent active row
+ * for the same date_key falls back to the UPDATE path; the partial unique
+ * index guarantees at most one active row per date_key.
+ *
+ * Exported for canonical-boundary callers that must apply several days (or a
+ * read-modify-write merge) inside ONE transaction: weekly-review next-week
+ * application and daily-plan carry-forward.
+ */
+export async function upsertDailyPlanInTx(
+  tx: SQLite.SQLiteDatabase,
   dateKey: string,
   updates: DailyPlanUpdate,
+  enqueue?: (record: SyncRecord) => void,
 ): Promise<DailyPlan> {
   if (!isValidDateKey(dateKey)) {
     throw new Error('Invalid date key.');
   }
-  const db = await getDatabase();
   const now = nowIso();
-  const existing = await getDailyPlan(dateKey);
-  const rawNextTopTodoIds = updates.topTodoIds
-    ? serializeTopTodoIds(updates.topTodoIds)
-    : (existing?.top_todo_ids ?? '[]');
-  const nextTopTodoIds = updates.topTodoIds
-    ? serializeTopTodoIds(await filterExistingTodoIds(parseTopTodoIds(rawNextTopTodoIds)))
-    : rawNextTopTodoIds;
-
-  const nextStatus = updates.status ?? existing?.status ?? 'draft';
-  const willComplete = nextStatus === 'completed';
-  const wasCompleted = existing?.status === 'completed';
+  let existing = await readActivePlanByDateKey(tx, dateKey);
 
   if (!existing) {
     const id = createId('dplan');
-    const completedAt = willComplete ? now : null;
-    await runLocalMutation(db, async (tx) => {
+    const nextTopTodoIds = updates.topTodoIds
+      ? serializeTopTodoIds(await filterExistingTodoIdsInTx(tx, updates.topTodoIds))
+      : '[]';
+    const nextStatus = updates.status ?? 'draft';
+    const completedAt = nextStatus === 'completed' ? now : null;
+    try {
       await tx.runAsync(
         `INSERT INTO daily_plans
            (id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at)
@@ -105,9 +146,27 @@ export async function upsertDailyPlan(
           now,
         ],
       );
-    });
-    return (await getDailyPlan(dateKey)) as DailyPlan;
+      enqueue?.({ entity: 'daily_plans', id, updatedAt: now, operation: 'create' });
+      return (await readActivePlanByDateKey(tx, dateKey)) as DailyPlan;
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+      // Lost a create race: an active row for this date_key committed after
+      // our in-tx existence read. Fall through to the UPDATE path.
+      existing = await readActivePlanByDateKey(tx, dateKey);
+      if (!existing) throw error;
+    }
   }
+
+  let nextTopTodoIds = existing.top_todo_ids ?? '[]';
+  if (updates.topTodoIds !== undefined) {
+    nextTopTodoIds = serializeTopTodoIds(
+      await filterExistingTodoIdsInTx(tx, parseTopTodoIds(serializeTopTodoIds(updates.topTodoIds))),
+    );
+  }
+
+  const nextStatus = updates.status ?? existing.status;
+  const willComplete = nextStatus === 'completed';
+  const wasCompleted = existing.status === 'completed';
 
   const fields: string[] = ['updated_at = ?'];
   const values: (string | number | null)[] = [now];
@@ -138,6 +197,7 @@ export async function upsertDailyPlan(
   if (updates.status !== undefined) {
     fields.push('status = ?');
     values.push(nextStatus);
+    // Stable completion fact: set on entering completed, clear on leaving.
     if (!wasCompleted && willComplete) {
       fields.push('completed_at = ?');
       values.push(now);
@@ -148,8 +208,25 @@ export async function upsertDailyPlan(
   }
   values.push(existing.id);
 
-  await runLocalMutation(db, async (tx) => {
-    await tx.runAsync(`UPDATE daily_plans SET ${fields.join(', ')} WHERE id = ?`, values);
+  await tx.runAsync(`UPDATE daily_plans SET ${fields.join(', ')} WHERE id = ?`, values);
+  enqueue?.({ entity: 'daily_plans', id: existing.id, updatedAt: now, operation: 'update' });
+  return (await readActivePlanByDateKey(tx, dateKey)) as DailyPlan;
+}
+
+export async function upsertDailyPlan(
+  dateKey: string,
+  updates: DailyPlanUpdate,
+): Promise<DailyPlan> {
+  if (!isValidDateKey(dateKey)) {
+    throw new Error('Invalid date key.');
+  }
+  const db = await getDatabase();
+  await runBackupMutation<DailyPlan>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const plan = await upsertDailyPlanInTx(transactionDb, dateKey, updates, enqueue);
+      return { value: plan, changed: true };
+    },
   });
   return (await getDailyPlan(dateKey)) as DailyPlan;
 }
@@ -176,11 +253,18 @@ export async function completeDailyPlan(
 export async function softDeleteDailyPlan(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await runLocalMutation(db, async (tx) => {
-    await tx.runAsync(
-      'UPDATE daily_plans SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-      [now, now, id],
-    );
+  await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const result = await transactionDb.runAsync(
+        'UPDATE daily_plans SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, id],
+      );
+      if (result.changes > 0) {
+        enqueue({ entity: 'daily_plans', id, updatedAt: now, operation: 'delete' });
+      }
+      return { value: undefined, changed: result.changes > 0 };
+    },
   });
 }
 
@@ -207,41 +291,53 @@ export async function listDailyPlansInRange(
   );
 }
 
-function shiftDateKeyByDays(dateKey: string, days: number): string {
-  const d = toDateKey(new Date(`${dateKey}T00:00:00`));
-  const date = new Date(`${d}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  return toDateKey(date);
-}
-
 /**
  * Carry unfinished priority todos from the previous day's plan into the plan
  * for `dateKey`. Idempotent: already-selected or completed todos are skipped,
  * so repeated invocations add nothing new. Returns the updated plan, or null
  * when there is no previous-day plan (nothing to pull from).
+ *
+ * The merge runs inside the write transaction and re-reads BOTH plans there
+ * (F7): candidates are computed against fresh current selections, so a
+ * concurrent plan edit between the outer reads and the write is never
+ * reverted. The outbox record rides the same transaction (F1).
  */
 export async function carryForwardFromPreviousDay(dateKey: string): Promise<DailyPlan | null> {
   const previousKey = shiftDateKeyByDays(dateKey, -1);
-  const [previousPlan, currentPlan, pendingTodos] = await Promise.all([
+  const [previousPlan, pendingTodos] = await Promise.all([
     getDailyPlan(previousKey),
-    getDailyPlan(dateKey),
     listPendingTodos(),
   ]);
   if (!previousPlan) return null;
 
-  const unfinishedById = new Map(pendingTodos.map((t) => [t.id, t]));
-  const candidates = computeCarryForwardIds({
-    previousPlanTopTodoIds: parseTopTodoIds(previousPlan.top_todo_ids),
-    currentPlanTopTodoIds: parseTopTodoIds(currentPlan?.top_todo_ids ?? '[]'),
-    isTodoUnfinished: (todoId) => unfinishedById.has(todoId),
+  const db = await getDatabase();
+  const outcome = await runBackupMutation<DailyPlan | null>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const freshPrevious = await readActivePlanByDateKey(transactionDb, previousKey);
+      if (!freshPrevious) return { value: null, changed: false };
+      const freshCurrent = await readActivePlanByDateKey(transactionDb, dateKey);
+
+      const unfinishedById = new Map(pendingTodos.map((t) => [t.id, t]));
+      const candidates = computeCarryForwardIds({
+        previousPlanTopTodoIds: parseTopTodoIds(freshPrevious.top_todo_ids),
+        currentPlanTopTodoIds: parseTopTodoIds(freshCurrent?.top_todo_ids ?? '[]'),
+        isTodoUnfinished: (todoId) => unfinishedById.has(todoId),
+      });
+      if (candidates.length === 0) {
+        return { value: freshCurrent, changed: false };
+      }
+      const merged = [...parseTopTodoIds(freshCurrent?.top_todo_ids ?? '[]'), ...candidates];
+      const plan = await upsertDailyPlanInTx(
+        transactionDb,
+        dateKey,
+        { topTodoIds: merged },
+        enqueue,
+      );
+      return { value: plan, changed: true };
+    },
   });
-  if (candidates.length === 0) {
-    return currentPlan;
-  }
-  return setDailyPlanTopTodos(dateKey, [
-    ...parseTopTodoIds(currentPlan?.top_todo_ids ?? '[]'),
-    ...candidates,
-  ]);
+  return outcome.value;
 }
 
 /** Adherence streaks over the trailing `days` window ending today. */

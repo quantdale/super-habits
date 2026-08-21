@@ -10,8 +10,9 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { SavedMealChips } from './SavedMealChips';
 import { EntryMacroShareLine } from './EntryMacroShareLine';
+import { CopyDayModal, DiaryDayNavigator } from './DiaryDayNavigator';
 import { filterSavedMeals } from './calories.domain';
-import type { CalorieEntry, MealType, SavedMeal } from './types';
+import type { CalorieEntry, DailySummary, MealType, SavedMeal } from './types';
 
 export type MealSection = {
   mealType: MealType;
@@ -178,10 +179,18 @@ type CaloriesDiaryViewProps = {
   allSavedMeals: SavedMeal[];
   groupedEntries: MealSection[];
   collapsedMeals: Partial<Record<MealType, boolean>>;
+  /** Diary day selection owned by CaloriesScreen; entries follow it. */
+  selectedDateKey: string;
+  /** Daily summaries (ASC by dateKey) feeding the navigator's logged dots. */
+  summaries: DailySummary[];
+  /** Last copy-day outcome, surfaced as inline status text. */
+  copyStatus: string | null;
   onSelectSavedMeal: (meal: SavedMeal) => void;
   onBrowseSavedMeals: () => void;
   onManualAdd: (query: string) => void;
   onToggleMealGroup: (mealType: MealType) => void;
+  onSelectDate: (dateKey: string) => void;
+  onCopyFromDay: (sourceDateKey: string) => void;
   onEditEntry: (entry: CalorieEntry) => void;
   onDeleteEntry: (entry: CalorieEntry) => void;
 };
@@ -348,14 +357,20 @@ export function CaloriesDiaryView({
   allSavedMeals,
   groupedEntries,
   collapsedMeals,
+  selectedDateKey,
+  summaries,
+  copyStatus,
   onSelectSavedMeal,
   onBrowseSavedMeals,
   onManualAdd,
   onToggleMealGroup,
+  onSelectDate,
+  onCopyFromDay,
   onEditEntry,
   onDeleteEntry,
 }: CaloriesDiaryViewProps) {
   const { tokens } = useAppTheme();
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
 
   return (
     <>
@@ -371,13 +386,30 @@ export function CaloriesDiaryView({
       />
 
       <ScreenSection>
+        <View className="mb-3">
+          <DiaryDayNavigator
+            selectedDateKey={selectedDateKey}
+            summaries={summaries}
+            onSelectDate={onSelectDate}
+            onCopyDay={() => setCopyModalVisible(true)}
+          />
+          {copyStatus ? (
+            <Text
+              className="mt-2 px-1 text-xs"
+              style={{ color: tokens.textMuted }}
+              accessibilityLabel="Copy day status"
+            >
+              {copyStatus}
+            </Text>
+          ) : null}
+        </View>
         {groupedEntries.length === 0 ? (
           <EmptyStateCard
             accentColor={accentColor}
             className="mb-0"
             icon={<MaterialIcons name="menu-book" size={22} color={colorText} />}
-            title="No meals logged today"
-            description="Use quick add or manual add to start your diary."
+            title="No meals logged on this day"
+            description="Use quick add, manual add, or copy a previous day to start it."
           />
         ) : (
           <>
@@ -402,6 +434,14 @@ export function CaloriesDiaryView({
           </>
         )}
       </ScreenSection>
+
+      <CopyDayModal
+        visible={copyModalVisible}
+        summaries={summaries}
+        targetDateKey={selectedDateKey}
+        onCopy={onCopyFromDay}
+        onClose={() => setCopyModalVisible(false)}
+      />
     </>
   );
 }

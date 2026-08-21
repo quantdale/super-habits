@@ -3,6 +3,11 @@ import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
+import { upsertDailyPlanInTx } from '@/features/daily-plan/dailyPlan.data';
+import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
+import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
+import { isValidDateKey } from '@/lib/time';
+import type { NextWeekPlanSuggestion } from './weeklyReview.domain';
 import type { WeeklyReview } from './weeklyReview.types';
 
 /** List recent completed reviews, newest first. */
@@ -177,4 +182,104 @@ export async function applyRemoteWeeklyReviews(
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Next-week plan application (moved here from weeklyReview.applyNextWeek.ts:
+// it touches SQLite directly; that module is now a pure re-export barrel).
+// ---------------------------------------------------------------------------
+
+export type ApplyNextWeekSkippedReason = 'already_selected' | 'capacity_full';
+
+export type ApplyNextWeekSkipped = {
+  dateKey: string;
+  todoId: string;
+  reason: ApplyNextWeekSkippedReason;
+};
+
+export type ApplyNextWeekFailed = {
+  dateKey: string;
+  todoId: string;
+  error: string;
+};
+
+export type ApplyNextWeekSuggestionsResult = {
+  /** Date keys whose plans were updated. */
+  appliedDateKeys: string[];
+  /** Total todo ids actually added (deduped against existing selections). */
+  addedCount: number;
+  /** Ids not added, with the reason (already selected or day capacity full). */
+  skipped: ApplyNextWeekSkipped[];
+  /** Ids that could not be applied at all (e.g. invalid date key). */
+  failed: ApplyNextWeekFailed[];
+  /**
+   * Candidates dropped by buildNextWeekPlanSuggestions' 3/day × 7-day cap —
+   * they were never scheduled and need manual placement.
+   */
+  truncatedCandidateCount: number;
+};
+
+export async function applyNextWeekPlanSuggestions(
+  suggestions: NextWeekPlanSuggestion[],
+): Promise<ApplyNextWeekSuggestionsResult> {
+  // Candidates beyond the suggestion cap never appear in `suggestions`; report
+  // them so the UI can tell the user how many were left out.
+  const uniqueCandidateCount = new Set(suggestions.flatMap((s) => s.todoIds)).size;
+  const scheduledCandidateCount = suggestions.reduce((sum, s) => sum + s.todoIds.length, 0);
+  const truncatedCandidateCount = Math.max(0, uniqueCandidateCount - scheduledCandidateCount);
+
+  const appliedDateKeys: string[] = [];
+  const skipped: ApplyNextWeekSkipped[] = [];
+  const failed: ApplyNextWeekFailed[] = [];
+  let addedCount = 0;
+
+  const db = await getDatabase();
+  await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      for (const suggestion of suggestions) {
+        if (suggestion.todoIds.length === 0) continue;
+
+        if (!isValidDateKey(suggestion.dateKey)) {
+          for (const todoId of suggestion.todoIds) {
+            failed.push({ dateKey: suggestion.dateKey, todoId, error: 'Invalid date key.' });
+          }
+          continue;
+        }
+
+        // In-transaction read of current selections: all days share one
+        // transaction, so every merge sees transactionally consistent state.
+        const existing = await transactionDb.getFirstAsync<{ top_todo_ids: string | null }>(
+          `SELECT top_todo_ids FROM daily_plans WHERE date_key = ? AND deleted_at IS NULL`,
+          [suggestion.dateKey],
+        );
+        const merged = [...parseTopTodoIds(existing?.top_todo_ids ?? '[]')];
+        let dayChanged = false;
+        for (const todoId of suggestion.todoIds) {
+          if (merged.includes(todoId)) {
+            skipped.push({ dateKey: suggestion.dateKey, todoId, reason: 'already_selected' });
+            continue;
+          }
+          if (merged.length >= MAX_TOP_PRIORITIES) {
+            skipped.push({ dateKey: suggestion.dateKey, todoId, reason: 'capacity_full' });
+            continue;
+          }
+          merged.push(todoId);
+          addedCount++;
+          dayChanged = true;
+        }
+        if (!dayChanged) continue;
+        await upsertDailyPlanInTx(
+          transactionDb,
+          suggestion.dateKey,
+          { topTodoIds: merged },
+          enqueue,
+        );
+        appliedDateKeys.push(suggestion.dateKey);
+      }
+      return { value: undefined, changed: appliedDateKeys.length > 0 };
+    },
+  });
+
+  return { appliedDateKeys, addedCount, skipped, failed, truncatedCandidateCount };
 }

@@ -16,8 +16,12 @@ import type {
   CalorieSummary,
   RoutineFrequencyItem,
 } from './weeklyReview.types';
-import { getReviewWeek, generateInsights } from './weeklyReview.domain';
-import { toDateKey } from '@/lib/time';
+import {
+  getReviewWeek,
+  generateInsights,
+  listWeekDateKeys,
+  shiftDateKeyByDays,
+} from './weeklyReview.domain';
 import { listTodos } from '@/features/todos/todos.data';
 import { listHabits, getAllHabitCompletionsForRange } from '@/features/habits/habits.data';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
@@ -105,10 +109,9 @@ async function summarizeHabits(week: ReviewWeek): Promise<HabitSummary> {
     totalScheduled += daysInWeek;
     const habitCompletions = completionMap.get(habit.id);
     let completedDays = 0;
-    for (let i = 0; i < daysInWeek; i++) {
-      const d = new Date(week.startDateKey);
-      d.setDate(d.getDate() + i);
-      const dateKey = toDateKey(d);
+    // Local-calendar day keys (F5): parsing the key as UTC midnight shifted
+    // the whole window a day off for users west of UTC.
+    for (const dateKey of listWeekDateKeys(week.startDateKey, daysInWeek)) {
       const count = habitCompletions?.get(dateKey) ?? 0;
       if (count >= habit.target_per_day) completedDays++;
     }
@@ -143,13 +146,9 @@ async function summarizeFocus(week: ReviewWeek): Promise<FocusSummary> {
   const focusSessions = weekSessions.filter((s) => s.session_type === 'focus');
   const minutes = focusSessions.reduce((sum, s) => sum + Math.round(s.duration_seconds / 60), 0);
 
-  const priorStart = new Date(week.startDateKey);
-  priorStart.setDate(priorStart.getDate() - 7);
-  const priorEnd = new Date(week.endDateKey);
-  priorEnd.setDate(priorEnd.getDate() - 7);
   const priorSessions = await listPomodoroSessionsForDateRange(
-    toDateKey(priorStart),
-    toDateKey(priorEnd),
+    shiftDateKeyByDays(week.startDateKey, -7),
+    shiftDateKeyByDays(week.endDateKey, -7),
   );
   const priorFocus = priorSessions.filter((s) => s.session_type === 'focus');
   const priorMinutes = priorFocus.reduce((sum, s) => sum + Math.round(s.duration_seconds / 60), 0);
@@ -166,11 +165,10 @@ async function summarizeFocus(week: ReviewWeek): Promise<FocusSummary> {
 async function summarizeWorkouts(week: ReviewWeek): Promise<WorkoutSummary> {
   const weekLogs = await listWorkoutLogsForRange(week.startDateKey, week.endDateKey);
 
-  const priorStart = new Date(week.startDateKey);
-  priorStart.setDate(priorStart.getDate() - 7);
-  const priorEnd = new Date(week.endDateKey);
-  priorEnd.setDate(priorEnd.getDate() - 7);
-  const priorLogs = await listWorkoutLogsForRange(toDateKey(priorStart), toDateKey(priorEnd));
+  const priorLogs = await listWorkoutLogsForRange(
+    shiftDateKeyByDays(week.startDateKey, -7),
+    shiftDateKeyByDays(week.endDateKey, -7),
+  );
 
   const routineMap = new Map<string, number>();
   for (const log of weekLogs) {

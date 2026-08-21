@@ -17,6 +17,13 @@ const MULTI_ACTION_PATTERN =
   /\b(?:and|then|also)\b\s+(?:to\s+)?(?:add|create|make|remind|call|pay|send|email|text|buy|book|schedule|do|write|read|finish|complete|submit|review|clean|fix|update)\b|;\s*(?:add|create|make|remind|call|pay|send|email|text|buy|book|schedule|do|write|read|finish|complete|submit|review|clean|fix|update)\b/i;
 const UNSUPPORTED_ROOT_VERB_PATTERN =
   /^(?:delete|remove|clear|destroy|erase|edit|update|change|rename)\b/i;
+// "update goal <title> to <n>%" is a supported update_goal_progress draft
+// (parseGoalProgressUpdate), so exempt exactly that phrasing from the root-verb
+// rejection before it runs. Anything else starting with "update" stays
+// unsupported. Chosen over dropping "update" from the draft regex so the
+// natural phrasing keeps working end-to-end.
+const GOAL_PROGRESS_UPDATE_ALLOWLIST_PATTERN =
+  /^update\s+goal\s+.+\s+(?:to|at)\s+\d{1,3}\s*%[.!]?$/i;
 const POLITE_PREFIX_PATTERN = /^(?:please|kindly)\s+/i;
 const QUESTION_PREFIX_PATTERN = /^(?:can|could|would)\s+you\s+/i;
 const TODO_KEYWORD_PATTERN = /\b(?:todo|task)\b/i;
@@ -425,7 +432,10 @@ export function preflightCommandDraft(
     POLITE_PREFIX_PATTERN,
     QUESTION_PREFIX_PATTERN,
   ]);
-  if (UNSUPPORTED_ROOT_VERB_PATTERN.test(rootCheckText)) {
+  if (
+    !GOAL_PROGRESS_UPDATE_ALLOWLIST_PATTERN.test(rootCheckText) &&
+    UNSUPPORTED_ROOT_VERB_PATTERN.test(rootCheckText)
+  ) {
     return {
       outcome: 'unsupported',
       rawText,

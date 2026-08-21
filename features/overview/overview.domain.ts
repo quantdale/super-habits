@@ -3,13 +3,14 @@
  * No DB, no React, no side effects — fully unit-testable.
  */
 
-import type { DailyPlan } from '@/core/db/types';
+import type { DailyPlan, HabitLifecycleStatus } from '@/core/db/types';
 import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import { isHabitScheduledOn } from '@/features/habits/habits.domain';
 import type { Goal } from '@/features/goals/goals.types';
 import type { Project } from '@/features/projects/projects.types';
 import type { Todo } from '@/features/todos/types';
 import { caloriesTotal } from '@/features/calories/calories.domain';
+import { timestampToLocalDateKey } from '@/lib/time';
 
 // ---------------------------------------------------------------------------
 // Card registry (ids + default layout)
@@ -191,10 +192,17 @@ export function shapePlanProgressSummary(
 export type HabitsSummary = {
   scheduledToday: number;
   completedToday: number;
-  /** Ratio 0–1 of completed targets across scheduled habits today. */
-  progressRatio: number;
   rings: { id: string; name: string; color: string; count: number; target: number }[];
 };
+
+/**
+ * Durable habit lifecycle (migration 20): only `active` habits count toward
+ * "today" obligations. Legacy rows without `status` are active. Paused means
+ * excluded from today progress; archived is retired but not deleted.
+ */
+export function isActiveHabit(habit: { status?: HabitLifecycleStatus }): boolean {
+  return habit.status !== 'paused' && habit.status !== 'archived';
+}
 
 export function shapeHabitsSummary(
   habits: readonly {
@@ -203,6 +211,7 @@ export function shapeHabitsSummary(
     color: string;
     target_per_day: number;
     rule_history?: string | null;
+    status?: HabitLifecycleStatus;
   }[],
   completions: readonly { habit_id: string; date_key: string; count: number }[],
   todayKey: string,
@@ -213,26 +222,24 @@ export function shapeHabitsSummary(
       countByHabit.set(row.habit_id, (countByHabit.get(row.habit_id) ?? 0) + row.count);
     }
   }
-  const scheduled = habits.filter((habit) =>
-    isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day),
-  );
-  const rings = scheduled.slice(0, 6).map((habit) => ({
-    id: habit.id,
-    name: habit.name,
-    color: habit.color,
-    count: Math.min(countByHabit.get(habit.id) ?? 0, habit.target_per_day),
-    target: habit.target_per_day,
-  }));
-  const completedToday = rings.filter((ring) => ring.count >= ring.target).length;
+  // F1: paused/archived habits never render rings or inflate today's counts.
+  const scheduled = habits
+    .filter((habit) => isActiveHabit(habit))
+    .filter((habit) => isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day));
+  const isComplete = (habit: (typeof scheduled)[number]): boolean =>
+    Math.min(countByHabit.get(habit.id) ?? 0, habit.target_per_day) >= habit.target_per_day;
   return {
     scheduledToday: scheduled.length,
-    completedToday,
-    progressRatio:
-      rings.length === 0
-        ? 0
-        : rings.reduce((sum, ring) => sum + ring.count / Math.max(1, ring.target), 0) /
-          rings.length,
-    rings,
+    // F2: numerator spans ALL scheduled habits; `rings` below stays a capped
+    // display sample so the card never undercounts with more than 6 habits.
+    completedToday: scheduled.filter(isComplete).length,
+    rings: scheduled.slice(0, 6).map((habit) => ({
+      id: habit.id,
+      name: habit.name,
+      color: habit.color,
+      count: Math.min(countByHabit.get(habit.id) ?? 0, habit.target_per_day),
+      target: habit.target_per_day,
+    })),
   };
 }
 
@@ -251,7 +258,9 @@ export function shapeFocusWeekSummary(
   let sessionCount = 0;
   for (const session of sessions) {
     if (session.session_type !== 'focus') continue;
-    const key = toDateKeyFromIso(session.started_at);
+    const key = safeTimestampToLocalDateKey(session.started_at);
+    // Corrupt timestamps have no local day; skip instead of poisoning buckets.
+    if (!key) continue;
     minutesByKey.set(key, (minutesByKey.get(key) ?? 0) + session.duration_seconds / 60);
     sessionCount += 1;
   }
@@ -266,12 +275,14 @@ export function shapeFocusWeekSummary(
   };
 }
 
-/** Local-calendar date key from an ISO timestamp without importing lib/time side effects. */
-function toDateKeyFromIso(timestamp: string): string {
-  const date = new Date(timestamp);
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+/**
+ * Local-calendar date key from an ISO timestamp via the shared lib/time
+ * helper. Returns null for corrupt input instead of a "NaN-NaN-NaN" key that
+ * would poison date-key comparisons (mirrors habits.data's safe wrapper).
+ */
+function safeTimestampToLocalDateKey(timestamp: string): string | null {
+  const parsed = new Date(timestamp);
+  return Number.isNaN(parsed.getTime()) ? null : timestampToLocalDateKey(timestamp);
 }
 
 export type WorkoutSummary = {
@@ -287,12 +298,13 @@ export function shapeWorkoutSummary(
 ): WorkoutSummary {
   const weekKeys = new Set(weekDateKeys);
   const inWeek = logs.filter((log) => {
-    const key = log.date_key ?? (log.created_at ? toDateKeyFromIso(log.created_at) : null);
+    const key =
+      log.date_key ?? (log.created_at ? safeTimestampToLocalDateKey(log.created_at) : null);
     return key !== null && weekKeys.has(key);
   });
   const last = [...logs]
     .map((log) => ({
-      key: log.date_key ?? (log.created_at ? toDateKeyFromIso(log.created_at) : null),
+      key: log.date_key ?? (log.created_at ? safeTimestampToLocalDateKey(log.created_at) : null),
       name: log.routine_id ? (routineNames.get(log.routine_id) ?? null) : null,
     }))
     .filter((entry): entry is { key: string; name: string | null } => entry.key !== null)
@@ -355,4 +367,62 @@ export function shapeGoalsSummary(goals: readonly Goal[]): GoalsSummary {
       .slice(0, 3)
       .map((g) => ({ id: g.id, title: g.title, progressPercent: g.progress_percent })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Empty-state CTA (F9)
+// ---------------------------------------------------------------------------
+
+export type EmptyStateCta = {
+  label: string;
+  destination:
+    | { kind: 'section'; section: 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories' }
+    | { kind: 'planning'; view: 'today' | 'projects' | 'goals' };
+};
+
+/**
+ * Pick the dashboard empty-state CTA from the first non-empty domain in card
+ * order (plan → todos → habits → focus → workout → calories → projects →
+ * goals). Falls back to the Todos tab when nothing is tracked at all. Keeps
+ * the CTA honest even if the "nothing tracked" gate and the summaries ever
+ * drift apart.
+ */
+export function pickEmptyStateCta(summaries: {
+  plan: Pick<PlanProgressSummary, 'hasPlan'>;
+  todos: Pick<TodosSummary, 'pendingCount'>;
+  habits: Pick<HabitsSummary, 'scheduledToday'>;
+  focus: Pick<FocusWeekSummary, 'sessionCount'>;
+  workout: Pick<WorkoutSummary, 'sessionsThisWeek'>;
+  calories: Pick<CaloriesSummary, 'consumed'>;
+  projects: Pick<ProjectsSummary, 'activeCount'>;
+  goals: Pick<GoalsSummary, 'activeCount'>;
+}): EmptyStateCta {
+  if (summaries.plan.hasPlan) {
+    return { label: 'Review your plan', destination: { kind: 'planning', view: 'today' } };
+  }
+  if (summaries.todos.pendingCount > 0) {
+    return { label: 'Finish your tasks', destination: { kind: 'section', section: 'todos' } };
+  }
+  if (summaries.habits.scheduledToday > 0) {
+    return { label: 'Check on your habits', destination: { kind: 'section', section: 'habits' } };
+  }
+  if (summaries.focus.sessionCount > 0) {
+    return {
+      label: 'Start a focus session',
+      destination: { kind: 'section', section: 'pomodoro' },
+    };
+  }
+  if (summaries.workout.sessionsThisWeek > 0) {
+    return { label: 'Log a workout', destination: { kind: 'section', section: 'workout' } };
+  }
+  if (summaries.calories.consumed > 0) {
+    return { label: 'Log a meal', destination: { kind: 'section', section: 'calories' } };
+  }
+  if (summaries.projects.activeCount > 0) {
+    return { label: 'Open your projects', destination: { kind: 'planning', view: 'projects' } };
+  }
+  if (summaries.goals.activeCount > 0) {
+    return { label: 'Review your goals', destination: { kind: 'planning', view: 'goals' } };
+  }
+  return { label: 'Add your first task', destination: { kind: 'section', section: 'todos' } };
 }

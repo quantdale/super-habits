@@ -21,7 +21,7 @@ export type DraftKind =
   | 'create_project'
   | 'update_goal_progress'
   | 'add_todo_to_daily_plan';
-export type ParsePath = 'mock' | 'remote' | 'remote_with_fallback';
+export type ParsePath = 'mock' | 'remote' | 'remote_with_fallback' | 'preflight';
 export type ParseLatencyBucket = 'fast' | 'noticeable' | 'frustrating';
 export type ParseUnsupportedReasonCode = 'unsupported';
 export type ParseUnavailableReasonCode =

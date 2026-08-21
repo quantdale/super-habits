@@ -4,11 +4,19 @@ import {
   retrieveCalorieSummary,
   retrieveDailyOverview,
   retrieveFocusSummary,
+  retrieveGoalProgressSummary,
   retrieveHabitProgress,
   retrieveHabitStreak,
   retrievePendingTodos,
+  retrieveProjectStatus,
+  retrieveTodayFocus,
   retrieveWorkoutSummary,
 } from './ask.retrieval';
+import {
+  formatGoalProgressAnswer,
+  formatProjectStatusAnswer,
+  formatTodayFocusAnswer,
+} from './planningAsk.domain';
 import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
 import { isValidCommandDateKey, normalizeReference } from './command.validation';
 import type {
@@ -183,6 +191,12 @@ function normalizeHabitName(value: unknown): string | null {
   return normalizeReference(value);
 }
 
+function normalizePlanningReference(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== 'string') throw new Error('References must be strings or null.');
+  return normalizeReference(value);
+}
+
 export function normalizeClassifyPayload(
   payload: unknown,
   input?: Pick<AskParseInput, 'todayDateKey'>,
@@ -209,6 +223,9 @@ export function normalizeClassifyPayload(
     'focus_summary',
     'daily_overview',
     'habit_streak',
+    'project_status',
+    'goal_progress',
+    'today_focus',
   ];
   if (typeof payload.intent !== 'string' || !supported.includes(intent)) {
     throw new Error('Classify response intent is invalid.');
@@ -253,6 +270,30 @@ export function normalizeClassifyPayload(
       intent,
       params: { habitName: normalizeHabitName(params.habitName) },
     };
+  }
+
+  if (intent === 'project_status') {
+    return {
+      outcome: 'classified',
+      intent: 'project_status',
+      params: { projectName: normalizePlanningReference(params.projectName) },
+    };
+  }
+
+  if (intent === 'goal_progress') {
+    return {
+      outcome: 'classified',
+      intent: 'goal_progress',
+      params: { goalTitle: normalizePlanningReference(params.goalTitle) },
+    };
+  }
+
+  if (intent === 'today_focus') {
+    const dateKey = params.dateKey ?? input?.todayDateKey;
+    if (typeof dateKey !== 'string' || !isValidCommandDateKey(dateKey)) {
+      throw new Error('Classify today_focus dateKey is invalid.');
+    }
+    return { outcome: 'classified', intent: 'today_focus', params: { dateKey } };
   }
 
   if (intent === 'habit_progress') {
@@ -341,6 +382,21 @@ async function retrieveFactsForIntent(
         intent: classified.intent,
         facts: await retrieveDailyOverview(classified.params.dateKey),
       };
+    case 'project_status':
+      return {
+        intent: classified.intent,
+        facts: await retrieveProjectStatus(classified.params.projectName),
+      };
+    case 'goal_progress':
+      return {
+        intent: classified.intent,
+        facts: await retrieveGoalProgressSummary(classified.params.goalTitle),
+      };
+    case 'today_focus':
+      return {
+        intent: classified.intent,
+        facts: await retrieveTodayFocus(classified.params.dateKey),
+      };
   }
 }
 
@@ -360,8 +416,20 @@ function deterministicAnswer(retrievedFacts: RetrievedFacts): string {
       return `${facts.startDateKey === facts.endDateKey ? facts.startDateKey : `${facts.startDateKey} to ${facts.endDateKey}`}: ${facts.totalCalories} calories, ${facts.totalProtein} g protein, ${facts.totalCarbs} g carbs, ${facts.totalFats} g fats, and ${facts.totalFiber} g fiber across ${facts.entryCount} entries.`;
     }
     case 'habit_progress': {
-      const first = retrievedFacts.facts.habits[0];
-      if (!first) return 'No active Habits matched that progress request.';
+      const habits = retrievedFacts.facts.habits;
+      if (habits.length === 0) return 'No active Habits matched that progress request.';
+      // Overall scope with multiple habits: summarize the set instead of
+      // answering with one arbitrary habit (Area 8 F10).
+      if (retrievedFacts.facts.scope === 'overall' && habits.length > 1) {
+        const bestStreak = Math.max(...habits.map((habit) => habit.currentStreak));
+        const names = habits
+          .slice(0, 3)
+          .map((habit) => habit.habitName)
+          .join(', ');
+        const remaining = habits.length - Math.min(3, habits.length);
+        return `${habits.length} Habits tracked (best current streak ${bestStreak} day${bestStreak === 1 ? '' : 's'}): ${names}${remaining > 0 ? ` and ${remaining} more` : ''}.`;
+      }
+      const first = habits[0];
       return `${first.habitName}: ${first.currentStreak}-day current streak, ${first.last30Percentage ?? 0}% completion over the recent window, and ${first.currentActual}/${first.currentTarget} today.`;
     }
     case 'habit_streak': {
@@ -382,33 +450,60 @@ function deterministicAnswer(retrievedFacts: RetrievedFacts): string {
       const facts = retrievedFacts.facts;
       return `${facts.dateKey}: ${facts.todos.pendingCount} pending Todos, ${facts.habits.completedCount} of ${facts.habits.scheduledCount} scheduled Habits complete, ${facts.calories.totalCalories} calories, ${facts.focus.totalFocusedMinutes} focus minutes, and ${facts.workout.sessionCount} workout sessions.`;
     }
+    case 'project_status':
+      return formatProjectStatusAnswer(retrievedFacts.facts);
+    case 'goal_progress':
+      return formatGoalProgressAnswer(retrievedFacts.facts);
+    case 'today_focus':
+      return formatTodayFocusAnswer(retrievedFacts.facts);
   }
 }
 
+/**
+ * Planning intents are answered deterministically from local facts; their
+ * phrase stage is skipped so project/goal names never leave the device.
+ */
+function isPlanningIntent(intent: AskIntent): boolean {
+  return intent === 'project_status' || intent === 'goal_progress' || intent === 'today_focus';
+}
+
+export type AskOptions = {
+  /**
+   * A ClassifyResult already obtained for this question (e.g. by the Auto-mode
+   * router). When provided, the classify network call is skipped entirely so
+   * one auto-ask costs a single classify request.
+   */
+  precomputedClassification?: ClassifyResult;
+};
+
 export class AskParser implements AiAskParser {
-  async ask(input: AskParseInput): Promise<AskResult> {
-    const classifyCall = await callAskFunction({
-      stage: 'classify',
-      question: input.question,
-      conversationContext: input.conversationContext,
-      nowIso: input.now.toISOString(),
-      locale: input.locale,
-      timeZone: input.timeZone,
-      todayDateKey: input.todayDateKey,
-      tomorrowDateKey: input.tomorrowDateKey,
-    });
-
-    if (!classifyCall.ok) return classifyCall.result;
-
+  async ask(input: AskParseInput, options?: AskOptions): Promise<AskResult> {
     let classifyResult: ClassifyResult;
-    try {
-      classifyResult = normalizeClassifyPayload(classifyCall.payload, input);
-    } catch (error) {
-      return buildUnavailableResult(
-        input.question,
-        error instanceof Error ? error.message : 'Ask returned an invalid response.',
-        'response_validation_failed',
-      );
+    if (options?.precomputedClassification) {
+      classifyResult = options.precomputedClassification;
+    } else {
+      const classifyCall = await callAskFunction({
+        stage: 'classify',
+        question: input.question,
+        conversationContext: input.conversationContext,
+        nowIso: input.now.toISOString(),
+        locale: input.locale,
+        timeZone: input.timeZone,
+        todayDateKey: input.todayDateKey,
+        tomorrowDateKey: input.tomorrowDateKey,
+      });
+
+      if (!classifyCall.ok) return classifyCall.result;
+
+      try {
+        classifyResult = normalizeClassifyPayload(classifyCall.payload, input);
+      } catch (error) {
+        return buildUnavailableResult(
+          input.question,
+          error instanceof Error ? error.message : 'Ask returned an invalid response.',
+          'response_validation_failed',
+        );
+      }
     }
 
     if (classifyResult.outcome === 'unsupported') {
@@ -437,6 +532,17 @@ export class AskParser implements AiAskParser {
         'Ask could not read local facts.',
         'request_failed',
       );
+    }
+
+    // Planning answers stay on-device: format deterministically and skip the
+    // phrase round-trip so project/goal names are never sent upstream.
+    if (isPlanningIntent(classifyResult.intent)) {
+      return {
+        outcome: 'answer',
+        question: input.question,
+        answer: deterministicAnswer(retrievedFacts),
+        intent: classifyResult.intent,
+      };
     }
 
     const phraseCall = await callAskFunction({

@@ -13,6 +13,7 @@ const SUPPORTED_WARNING_CODES = new Set([
   "active_timer_conflict",
   "already_satisfied",
   "off_day",
+  "percent_clamped",
 ]);
 const SUPPORTED_TODO_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/g;
 const TODAY_PATTERN = /\btoday\b/gi;
@@ -20,6 +21,9 @@ const TOMORROW_PATTERN = /\btomorrow\b/gi;
 const MAX_CALORIES = 9999;
 const MAX_MACRO_GRAMS = 999;
 const MAX_FOCUS_MINUTES = 120;
+// Planning-kind bounds mirrored by features/command/realCommandParser.ts; keep
+// both sides in lockstep (see tests/commandRemoteParity.contract.test.ts).
+const MAX_ENTITY_NAME_LENGTH = 80;
 
 export function isRecord(value) {
   return typeof value === "object" && value !== null;
@@ -406,6 +410,78 @@ function normalizeFocusDraft(payload, parserVersion, rawText) {
   };
 }
 
+function normalizePlanningName(value, fieldName) {
+  const normalized = normalizeEntityReference(value, fieldName);
+  if (normalized && normalized.length > MAX_ENTITY_NAME_LENGTH) {
+    throw new Error(`${fieldName} must be ${MAX_ENTITY_NAME_LENGTH} characters or fewer.`);
+  }
+  return normalized;
+}
+
+function normalizeClampedPercent(value) {
+  if (value == null) return { percent: null, clamped: false };
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("percent must be a number or null.");
+  }
+  const clamped = Math.min(100, Math.max(0, value));
+  return { percent: clamped, clamped: clamped !== value };
+}
+
+function normalizeProjectDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "create_project");
+  return {
+    outcome: "draft",
+    kind: "create_project",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      name: normalizePlanningName(fields.name, "name"),
+      color: fields.color == null ? null : toNonEmptyString(fields.color),
+      targetDate: normalizeOptionalCommandDate(fields.targetDate, "targetDate"),
+    },
+    rawText,
+  };
+}
+
+function normalizeGoalProgressDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "update_goal_progress");
+  const percentResult = normalizeClampedPercent(fields.percent);
+  const warnings = [...normalizeWarnings(payload.warnings)];
+  if (percentResult.clamped) {
+    warnings.push({
+      code: "percent_clamped",
+      message: "Progress was clamped to the 0–100 range.",
+    });
+  }
+  return {
+    outcome: "draft",
+    kind: "update_goal_progress",
+    parserVersion,
+    confidence: normalizeConfidence(payload.confidence),
+    status: normalizeCommandStatus(payload.status),
+    warnings,
+    missingFields: normalizeMissingFields(payload.missingFields),
+    fields: {
+      goalTitle: normalizePlanningName(fields.goalTitle, "goalTitle"),
+      percent: percentResult.percent,
+    },
+    rawText,
+  };
+}
+
+function normalizeDailyPlanDraft(payload, parserVersion, rawText) {
+  const fields = normalizeV2Fields(payload, "add_todo_to_daily_plan");
+  return {
+    outcome: "draft",
+    kind: "add_todo_to_daily_plan",
+    ...normalizeV2Metadata(payload, parserVersion),
+    fields: {
+      todoTitle: normalizePlanningName(fields.todoTitle, "todoTitle"),
+      dateKey: normalizeOptionalCommandDate(fields.dateKey, "dateKey"),
+    },
+    rawText,
+  };
+}
+
 export function normalizeModelResponse(payload, parserVersion, input) {
   if (!isRecord(payload)) {
     throw new Error("Model output must be an object.");
@@ -454,6 +530,18 @@ export function normalizeModelResponse(payload, parserVersion, input) {
 
   if (payload.kind === "start_focus_session") {
     return normalizeFocusDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "create_project") {
+    return normalizeProjectDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "update_goal_progress") {
+    return normalizeGoalProgressDraft(payload, parserVersion, input.rawText);
+  }
+
+  if (payload.kind === "add_todo_to_daily_plan") {
+    return normalizeDailyPlanDraft(payload, parserVersion, input.rawText);
   }
 
   throw new Error("Model output kind is invalid.");

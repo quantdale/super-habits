@@ -47,29 +47,6 @@ export function computeWorkoutStreakFromHeatmapDays(heatmapDays: HeatmapDay[]): 
 }
 
 /**
- * Build workout frequency data for bar chart.
- * Returns sessions per day for last N days, today first.
- */
-export function buildWorkoutFrequency(
-  logs: WorkoutLog[],
-  days: number = 30,
-): { dateKey: string; label: string; value: number }[] {
-  const map = new Map<string, number>();
-  for (const log of logs) {
-    const key = timestampToLocalDateKey(log.completed_at);
-    map.set(key, (map.get(key) ?? 0) + 1);
-  }
-  return buildDateRange(days).map((dateKey) => {
-    const d = dateKeyToLocalDate(dateKey);
-    return {
-      dateKey,
-      label: d.toLocaleDateString('en', { weekday: 'short' }),
-      value: map.get(dateKey) ?? 0,
-    };
-  });
-}
-
-/**
  * Format seconds into MM:SS display string.
  * e.g. 90 → "1:30", 45 → "0:45"
  */
@@ -77,38 +54,6 @@ export function formatWorkoutTime(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-/**
- * Parse "MM:SS" or plain seconds string into total seconds.
- * Returns 0 for invalid input.
- */
-export function parseWorkoutTime(input: string): number {
-  if (input == null) return 0;
-  if (input.includes(':')) {
-    const [m, s] = input.split(':').map(Number);
-    if (Number.isFinite(m) && Number.isFinite(s)) {
-      return m * 60 + s;
-    }
-    return 0;
-  }
-  const n = Number(input);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/**
- * Calculate total session duration in seconds.
- * Sum of (active_seconds + rest_seconds) for every set
- * across all exercises — gives an estimate before starting.
- */
-export function calculateSessionDuration(
-  exercises: {
-    sets: { active_seconds: number; rest_seconds: number }[];
-  }[],
-): number {
-  return exercises.reduce((total, ex) => {
-    return total + ex.sets.reduce((s, set) => s + set.active_seconds + set.rest_seconds, 0);
-  }, 0);
 }
 
 /**
@@ -165,11 +110,12 @@ export function buildTimerSequence(
 
 // --- Personal records ---
 
-/** A single weighted set performed in a session (weight in the user's unit). */
+/** A single weighted set performed in a session (weight in the user's unit).
+ * weight/reps are null when they were not recorded — unknown, never zero. */
 export type LoggedSet = {
   exerciseName: string;
-  weight: number;
-  reps: number;
+  weight: number | null;
+  reps: number | null;
 };
 
 /** Best lifts found for one exercise across a set history. */
@@ -195,8 +141,24 @@ export function estimate1RM(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
 }
 
+/** A LoggedSet whose weight/reps are recorded and valid for 1RM math. */
+export type ValidLoggedSet = LoggedSet & { weight: number; reps: number };
+
+/** True when both values are recorded, finite, and positive — null means
+ * "not recorded" and is never treated as a zero measurement. */
+export function isValidLoggedSet(set: LoggedSet): set is ValidLoggedSet {
+  return (
+    set.weight !== null &&
+    set.reps !== null &&
+    Number.isFinite(set.weight) &&
+    Number.isFinite(set.reps) &&
+    set.weight > 0 &&
+    set.reps > 0
+  );
+}
+
 /** Prefer higher estimated 1RM; break ties by heavier weight, then more reps. */
-function isFirstSetBetter(a: LoggedSet, b: LoggedSet): boolean {
+function isFirstSetBetter(a: ValidLoggedSet, b: ValidLoggedSet): boolean {
   const a1rm = estimate1RM(a.weight, a.reps);
   const b1rm = estimate1RM(b.weight, b.reps);
   if (a1rm !== b1rm) return a1rm > b1rm;
@@ -206,13 +168,13 @@ function isFirstSetBetter(a: LoggedSet, b: LoggedSet): boolean {
 
 /**
  * Compute personal records per exercise from a flat set history.
- * Exercises with no valid weighted sets are omitted.
+ * Sets without recorded weight/reps (null) are skipped; exercises with no
+ * valid weighted sets are omitted.
  */
 export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
-  const byExercise = new Map<string, LoggedSet[]>();
+  const byExercise = new Map<string, ValidLoggedSet[]>();
   for (const set of sets) {
-    if (!Number.isFinite(set.weight) || !Number.isFinite(set.reps)) continue;
-    if (set.weight <= 0 || set.reps <= 0) continue;
+    if (!isValidLoggedSet(set)) continue;
     const list = byExercise.get(set.exerciseName) ?? [];
     list.push(set);
     byExercise.set(set.exerciseName, list);
@@ -220,8 +182,8 @@ export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
 
   const records: PersonalRecord[] = [];
   for (const [exerciseName, exerciseSets] of byExercise) {
-    let best1RMSet: LoggedSet | null = null;
-    let bestTopSet: LoggedSet | null = null;
+    let best1RMSet: ValidLoggedSet | null = null;
+    let bestTopSet: ValidLoggedSet | null = null;
     for (const set of exerciseSets) {
       if (!best1RMSet || isFirstSetBetter(set, best1RMSet)) best1RMSet = set;
       if (!bestTopSet || set.weight > bestTopSet.weight) bestTopSet = set;
@@ -353,21 +315,130 @@ export function applyRestDefault(
 }
 
 /**
- * Summarize which exercises were completed and how many sets
- * each had — used when logging the session.
+ * Whether a timer phase was performed to its natural end ('completed') or
+ * advanced past via Skip ('skipped'). Skipped active phases are not counted
+ * as completed work when the session is logged.
+ */
+export type PhaseDisposition = 'completed' | 'skipped';
+
+/** Free-text weight/reps entry captured per active phase (raw input strings). */
+export type EnteredSetValues = { weight: string; reps: string };
+
+/** One recorded active phase, ready to persist as a workout_session_sets row. */
+export type SessionSetRecord = {
+  exerciseName: string;
+  setNumber: number;
+  /** null = not recorded (unknown), never a measured zero. */
+  weight: number | null;
+  /** null = not recorded (unknown). */
+  reps: number | null;
+  completed: boolean;
+};
+
+/**
+ * Summarize which exercises were completed and how many sets each had — used
+ * when logging the session. Active phases marked 'skipped' in `dispositions`
+ * do not count toward setsCompleted; phases without a disposition count as
+ * completed (natural timeout).
  */
 export function summarizeCompletedSets(
   sequence: TimerPhase[],
   completedUpToIndex: number,
+  dispositions?: Readonly<Record<number, PhaseDisposition>>,
 ): { exerciseName: string; setsCompleted: number }[] {
   const map = new Map<string, number>();
   for (let i = 0; i <= completedUpToIndex; i++) {
     const phase = sequence[i];
     if (!phase || phase.phase !== 'active') continue;
+    if (dispositions?.[i] === 'skipped') continue;
     map.set(phase.exerciseName, (map.get(phase.exerciseName) ?? 0) + 1);
   }
   return Array.from(map.entries()).map(([exerciseName, setsCompleted]) => ({
     exerciseName,
     setsCompleted,
   }));
+}
+
+/** Parse optional free-text numeric entry; empty/invalid/negative → null. */
+function parseOptionalMeasurement(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  const trimmed = raw.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+/**
+ * Collect one record per active phase up to `completedUpToIndex`, pairing the
+ * phase's disposition with whatever weight/reps the user entered for it.
+ * This is the provenance source for workout_session_sets rows.
+ */
+export function collectSessionSetRecords(
+  sequence: TimerPhase[],
+  completedUpToIndex: number,
+  dispositions: Readonly<Record<number, PhaseDisposition>>,
+  enteredValues: Readonly<Record<number, EnteredSetValues>>,
+): SessionSetRecord[] {
+  const records: SessionSetRecord[] = [];
+  for (let i = 0; i <= completedUpToIndex; i++) {
+    const phase = sequence[i];
+    if (!phase || phase.phase !== 'active') continue;
+    const entered = enteredValues[i];
+    records.push({
+      exerciseName: phase.exerciseName,
+      setNumber: phase.setNumber,
+      weight: parseOptionalMeasurement(entered?.weight),
+      reps: parseOptionalMeasurement(entered?.reps),
+      completed: dispositions[i] !== 'skipped',
+    });
+  }
+  return records;
+}
+
+// --- Previous-session set lookup (per-set entry defaults) ---
+
+/** A recorded weighted set from an earlier session (newest-first ordering). */
+export type PreviousSetRow = {
+  exerciseName: string;
+  setNumber: number;
+  weight: number;
+  reps: number;
+};
+
+export type PreviousSetLookup = {
+  /** Most recent value for an exact exercise name + set number. */
+  byExerciseSet: Map<string, PreviousSetRow>;
+  /** Most recent value for the exercise name at any set number. */
+  byExercise: Map<string, PreviousSetRow>;
+};
+
+/**
+ * Index previous-session rows for default seeding. Rows must be ordered
+ * newest-first; the first occurrence of each key wins.
+ */
+export function buildPreviousSetLookup(rows: PreviousSetRow[]): PreviousSetLookup {
+  const byExerciseSet = new Map<string, PreviousSetRow>();
+  const byExercise = new Map<string, PreviousSetRow>();
+  for (const row of rows) {
+    const exactKey = `${row.exerciseName}::${row.setNumber}`;
+    if (!byExerciseSet.has(exactKey)) byExerciseSet.set(exactKey, row);
+    if (!byExercise.has(row.exerciseName)) byExercise.set(row.exerciseName, row);
+  }
+  return { byExerciseSet, byExercise };
+}
+
+/** Previous-session values for a set, falling back from exact set number to
+ * the exercise's most recent set of any number. Returns null when unknown. */
+export function lookupPreviousSet(
+  lookup: PreviousSetLookup | null,
+  exerciseName: string,
+  setNumber: number,
+): PreviousSetRow | null {
+  if (!lookup) return null;
+  return (
+    lookup.byExerciseSet.get(`${exerciseName}::${setNumber}`) ??
+    lookup.byExercise.get(exerciseName) ??
+    null
+  );
 }

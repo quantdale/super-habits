@@ -67,6 +67,9 @@ const VALID_INTENTS = [
   "focus_summary",
   "daily_overview",
   "habit_streak",
+  "project_status",
+  "goal_progress",
+  "today_focus",
 ];
 const MAX_DATE_RANGE_DAYS = 366;
 
@@ -144,7 +147,14 @@ function normalizeClassifyParams(intent, rawParams, input) {
   if (intent === "habit_streak") {
     return { habitName: normalizeName(params.habitName, "habitName") };
   }
+  if (intent === "project_status") {
+    return { projectName: normalizeName(params.projectName, "projectName") };
+  }
+  if (intent === "goal_progress") {
+    return { goalTitle: normalizeName(params.goalTitle, "goalTitle") };
+  }
 
+  // daily_overview and today_focus share the single-dateKey shape.
   const dateKey = params.dateKey ?? input.todayDateKey;
   if (!isValidDateKey(dateKey)) throw new Error("daily_overview dateKey is invalid.");
   return { dateKey };
@@ -164,6 +174,9 @@ function buildClassifyPrompt(input) {
     '  "focus_summary"   — completed focus sessions or focused minutes',
     '  "daily_overview"  — a bounded cross-feature summary for one local date',
     '  "habit_streak"    — legacy alias accepted only for simple streak questions',
+    '  "project_status"  — status, target date, or open Todos for one or more Projects',
+    '  "goal_progress"   — progress percent or status for one or more Goals',
+    '  "today_focus"     — the plan intention, top priorities, and remaining load for one day',
     "",
     "If the question matches one of the intents, return EXACTLY this JSON shape:",
     '  { "outcome": "classified", "intent": "<one of the intent values>", "params": { ... } }',
@@ -179,6 +192,9 @@ function buildClassifyPrompt(input) {
     "  - workout_summary: include routineName only when the question names one routine.",
     "  - daily_overview: include one dateKey, defaulting to todayDateKey.",
     "  - habit_streak: include habitName only when the question names one habit.",
+    "  - project_status: include projectName only when the question names one project.",
+    "  - goal_progress: include goalTitle only when the question names one goal.",
+    "  - today_focus: include one dateKey, defaulting to todayDateKey.",
     "Never return query code, database fields, raw rows, or arbitrary parameters.",
     "",
     "The client-provided todayDateKey and tomorrowDateKey are authoritative for",

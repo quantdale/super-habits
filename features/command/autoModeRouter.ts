@@ -5,8 +5,9 @@ import type { AskParseInput, AskResult, ClassifyResult } from './ask.types';
  * Auto-mode classifier: given a natural-language input, calls the edge
  * function's classify stage to decide whether the user's question routes to
  * the Ask pipeline (pending_todos / calorie_summary / habit_progress /
- * workout_summary / focus_summary / daily_overview) or the Create pipeline (everything else, including unrecognized input that the
- * classify stage marks unsupported).
+ * workout_summary / focus_summary / daily_overview / project_status /
+ * goal_progress / today_focus) or the Create pipeline (everything else,
+ * including unrecognized input that the classify stage marks unsupported).
  *
  * The edge function's classify result determines the route:
  *   - "classified"  → route: 'ask', intent carried through
@@ -31,10 +32,13 @@ export interface AutoModeResult<T = unknown> {
  * Classifies the raw input and returns a route decision. Does NOT execute
  * the full pipeline — the caller dispatches to askParser.ask or
  * commandParser.parse based on the route, then attaches the result to the
- * returned AutoModeResult via `withResult`.
+ * returned AutoModeResult via `withResult`. When the route is 'ask' the
+ * classification itself is returned too, so the caller can hand it to
+ * `askParser.ask` as `precomputedClassification` instead of classifying twice.
  */
 export async function classifyForAutoMode(input: AskParseInput): Promise<{
   route: AutoRoute;
+  classification?: ClassifyResult;
 }> {
   const classifyCall = await callAskFunction({
     stage: 'classify',
@@ -84,6 +88,7 @@ export async function classifyForAutoMode(input: AskParseInput): Promise<{
       route: 'ask',
       intent: classifyResult.intent,
     },
+    classification: classifyResult,
   };
 }
 

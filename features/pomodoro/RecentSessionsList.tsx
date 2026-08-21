@@ -3,21 +3,18 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type { PomodoroSession } from './types';
 import { formatSessionDuration, formatSessionTime } from './pomodoro.domain';
-import type { SessionAssociation } from './pomodoro.sessionMeta';
 
 type Props = {
   sessions: PomodoroSession[];
-  associations: Record<string, SessionAssociation>;
-  notes: Record<string, string>;
 };
 
 const MAX_ROWS = 10;
 
 /**
- * Recent completed-session history with local-only metadata (linked todo,
- * completion note) surfaced next to each row.
+ * Recent completed-session history with durable per-row metadata (linked
+ * todo snapshot, completion note) surfaced next to each row.
  */
-export function RecentSessionsList({ sessions, associations, notes }: Props) {
+export function RecentSessionsList({ sessions }: Props) {
   const { tokens } = useAppTheme();
   const rows = sessions.filter((s) => s.session_type === 'focus').slice(0, MAX_ROWS);
 
@@ -32,8 +29,8 @@ export function RecentSessionsList({ sessions, associations, notes }: Props) {
   return (
     <View className="gap-2">
       {rows.map((session) => {
-        const association = associations[session.id];
-        const note = notes[session.id];
+        const linkedTodoTitle = session.linked_todo_title ?? null;
+        const note = session.note ?? null;
         return (
           <View
             key={session.id}
@@ -46,7 +43,7 @@ export function RecentSessionsList({ sessions, associations, notes }: Props) {
                 style={{ color: tokens.text }}
                 numberOfLines={1}
               >
-                {association ? association.todoTitle : 'Focus session'}
+                {linkedTodoTitle ?? 'Focus session'}
               </Text>
               <Text className="ml-2 text-sm" style={{ color: tokens.textMuted }}>
                 {formatSessionDuration(session.duration_seconds)}

@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { PillChip } from '@/core/ui/PillChip';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildProgressSummary } from '@/features/progress/progress.summary';
 import { pctDelta, PROGRESS_WINDOW_OPTIONS, trendOf } from '@/features/progress/progress.domain';
 import type { ProgressSummary } from '@/features/progress/progress.types';
@@ -29,12 +32,21 @@ export function ProgressInsightsView() {
   const { tokens } = useAppTheme();
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [windowDays, setWindowDays] = useState<number>(7);
+  // F8: the hub stays mounted across midnight — reload when the local day rolls over.
+  const dayGeneration = useDayRolloverGeneration();
 
   const load = useCallback(async (days: number) => {
     setIsLoading(true);
     try {
       setSummary(await buildProgressSummary(days));
+      setLoadError(null);
+    } catch (err) {
+      // F8: no unhandled rejections; a failed load must not read as
+      // "No progress data yet". The error panel below offers a retry.
+      console.error('[ProgressInsightsView] load failed', err);
+      setLoadError(err instanceof Error ? err.message : 'Could not load progress insights.');
     } finally {
       setIsLoading(false);
     }
@@ -43,7 +55,44 @@ export function ProgressInsightsView() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
     void load(windowDays);
-  }, [load, windowDays]);
+  }, [load, windowDays, dayGeneration]);
+
+  // F8: refresh while the hub modal is open after backgrounding the app.
+  useForegroundRefresh(
+    useCallback(() => {
+      void load(windowDays);
+    }, [load, windowDays]),
+  );
+
+  if (loadError && !isLoading && !summary) {
+    return (
+      <View className="gap-3">
+        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+          Progress
+        </Text>
+        <Card
+          variant="header"
+          accentColor={tokens.textMuted}
+          headerTitle="Progress is temporarily unavailable"
+          headerSubtitle="Nothing was saved or changed."
+          className="mb-0"
+        >
+          <View className="gap-3">
+            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+              {loadError}
+            </Text>
+            <Button
+              label="Try again"
+              onPress={() => {
+                void load(windowDays);
+              }}
+              color={tokens.textMuted}
+            />
+          </View>
+        </Card>
+      </View>
+    );
+  }
 
   if (!isLoading && !summary) {
     return (

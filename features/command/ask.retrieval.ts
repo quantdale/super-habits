@@ -18,9 +18,9 @@ import {
 import { calculateHabitProgressInsights } from '@/features/habits/habitInsights.domain';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
 import {
-  countCompletedTodos,
   countPendingTodos,
   listPendingTodos,
+  listTodos,
   type PendingTodoFilters,
 } from '@/features/todos/todos.data';
 import { listProjects, listTodosForProject } from '@/features/projects/projects.data';
@@ -29,7 +29,14 @@ import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
 import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
 import { listRoutines, listWorkoutLogsForRange } from '@/features/workout/workout.data';
-import { timestampToLocalDateKey, dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import {
+  timestampToLocalDateKey,
+  dateKeyToLocalDate,
+  toDateKey,
+  getUtcIsoRangeForLocalDateKeys,
+} from '@/lib/time';
+import { countTodosCompletedBetween } from '@/features/progress/progress.data';
+import { isActiveHabit } from '@/features/overview/overview.domain';
 import { isValidCommandDateKey, normalizeReference } from './command.validation';
 import { resolveHabitReference, resolveWorkoutRoutineReference } from './command.resolver';
 import type {
@@ -152,7 +159,9 @@ async function computeHabitStreaks(habitId: string, targetPerDay: number, ruleHi
 
 /** Backward-compatible V1 retrieval retained for pre-V2 Ask fixtures. */
 export async function retrieveHabitStreak(habitName: string | null): Promise<HabitStreakFacts> {
-  const habits = await listHabits();
+  // Paused/archived habits are not current obligations; current-streak
+  // framing covers active habits only (Area 8 F1 site 5).
+  const habits = (await listHabits()).filter(isActiveHabit);
 
   if (!habitName) {
     const habitSummaries = await Promise.all(
@@ -224,7 +233,9 @@ export async function retrieveHabitProgress(
   endDateKey: string,
 ): Promise<HabitProgressFacts> {
   const range = validateRange(startDateKey, endDateKey);
-  const habits = await listHabits();
+  // Current-progress metrics cover active habits only (Area 8 F1 site 6);
+  // paused/archived habits resolve to habit_not_found for named lookups.
+  const habits = (await listHabits()).filter(isActiveHabit);
   let selected = habits;
   if (habitName) {
     const resolution = resolveHabitReference(habitName, habits, habits);
@@ -328,6 +339,9 @@ export async function retrieveDailyOverview(dateKey: string): Promise<DailyOverv
   if (!isValidCommandDateKey(dateKey)) {
     throw new AskRetrievalError('invalid_range', 'Overview date is invalid.');
   }
+  // Date-scoped completions (Area 8 F4): a per-date overview must report that
+  // day's completed count, not the lifetime total.
+  const dayBounds = getUtcIsoRangeForLocalDateKeys(dateKey, dateKey);
   const [
     pendingCount,
     todoCompletedCount,
@@ -339,7 +353,7 @@ export async function retrieveDailyOverview(dateKey: string): Promise<DailyOverv
     workout,
   ] = await Promise.all([
     countPendingTodos(),
-    countCompletedTodos(),
+    countTodosCompletedBetween(dayBounds.startUtcIso, dayBounds.endUtcExclusiveIso),
     countPendingTodos({ due: 'overdue', todayDateKey: dateKey }),
     listHabits(),
     getAllHabitCompletionsForRange(dateKey, dateKey),
@@ -351,6 +365,8 @@ export async function retrieveDailyOverview(dateKey: string): Promise<DailyOverv
   let scheduledCount = 0;
   let habitCompletedCount = 0;
   for (const habit of habits) {
+    // Paused/archived habits are not current obligations (Area 8 F1 site 7).
+    if (!isActiveHabit(habit)) continue;
     const creationDateKey = timestampToLocalDateKey(habit.created_at);
     const scheduled = isHabitScheduledOn(
       parseHabitRuleHistory(habit.rule_history),
@@ -399,8 +415,9 @@ export async function retrieveDailyOverview(dateKey: string): Promise<DailyOverv
 export { defaultRange, validateRange, MAX_ASK_RANGE_DAYS };
 
 // ---------------------------------------------------------------------------
-// Planning Ask retrieval (W6): projects / goals / daily plan. These are local
-// deterministic lookups with bounded results; they are not remote intents yet.
+// Planning Ask retrieval (W6): projects / goals / daily plan. Local
+// deterministic lookups with bounded results, classified remotely as the
+// project_status / goal_progress / today_focus intents and answered on-device.
 // ---------------------------------------------------------------------------
 
 function normalizeNameReference(value: string | null): string {
@@ -498,22 +515,55 @@ export async function retrieveTodayFocus(dateKey: string): Promise<TodayFocusFac
   if (!isValidCommandDateKey(dateKey)) {
     throw new AskRetrievalError('invalid_range', 'Focus date is invalid.');
   }
-  const [plan, pendingTodos] = await Promise.all([
+  const [plan, pendingCount, todos, habits, completions] = await Promise.all([
     getDailyPlan(dateKey),
-    listPendingTodos({ todayDateKey: dateKey, limit: MAX_FACT_ITEMS }),
+    countPendingTodos({ due: 'today', todayDateKey: dateKey }),
+    // Resolve top priorities against ALL todos so completed ones keep their
+    // place (and their real completed flag) instead of vanishing.
+    listTodos(),
+    listHabits(),
+    getAllHabitCompletionsForRange(dateKey, dateKey),
   ]);
   const topTodoIds = plan ? parseTopTodoIds(plan.top_todo_ids) : [];
-  const titleById = new Map(pendingTodos.map((todo) => [todo.id, todo.title]));
+  type TodoRow = Awaited<ReturnType<typeof listTodos>>[number];
+  const todoById = new Map(todos.map((todo) => [todo.id, todo]));
   const topTodos = topTodoIds
-    .map((id) => titleById.get(id))
-    .filter((title): title is string => title !== null)
-    .slice(0, MAX_TOP_PRIORITIES);
+    .map((id) => todoById.get(id))
+    .filter((todo): todo is TodoRow => todo !== undefined)
+    .slice(0, MAX_TOP_PRIORITIES)
+    .map((todo) => ({ title: todo.title, completed: todo.completed === 1 }));
+
+  // Remaining-habit load for the day mirrors the daily-overview schedule math.
+  const completionByHabit = new Map(completions.map((row) => [row.habit_id, row.count]));
+  let scheduledCount = 0;
+  let habitCompletedCount = 0;
+  for (const habit of habits) {
+    const creationDateKey = timestampToLocalDateKey(habit.created_at);
+    if (
+      !isHabitScheduledOn(
+        parseHabitRuleHistory(habit.rule_history),
+        dateKey,
+        habit.target_per_day,
+        creationDateKey,
+      )
+    ) {
+      continue;
+    }
+    scheduledCount += 1;
+    const target = getHabitTargetForDate(
+      parseHabitRuleHistory(habit.rule_history),
+      dateKey,
+      habit.target_per_day,
+      creationDateKey,
+    );
+    if ((completionByHabit.get(habit.id) ?? 0) >= target) habitCompletedCount += 1;
+  }
 
   return {
     dateKey,
     planIntention: plan?.intention?.trim() ? plan.intention.trim() : null,
-    topTodos: topTodos.map((title) => ({ title, completed: false })),
-    pendingTodoCount: pendingTodos.length,
-    habitsRemainingCount: null,
+    topTodos,
+    pendingTodoCount: pendingCount,
+    habitsRemainingCount: Math.max(0, scheduledCount - habitCompletedCount),
   };
 }

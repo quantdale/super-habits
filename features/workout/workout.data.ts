@@ -1,4 +1,6 @@
 import { getDatabase } from '@/core/db/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
 import {
   RoutineExercise,
   RoutineExerciseSet,
@@ -17,6 +19,13 @@ import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import { validateSetTiming } from '@/lib/validation';
+import {
+  clampRestSeconds,
+  DEFAULT_REST_SECONDS,
+  LEGACY_REST_SECONDS_STORAGE_KEY,
+  normalizeStoredRestSeconds,
+  readLegacyStoredRestSeconds,
+} from './restTimerPreferences';
 
 /** Nested configuration changes bump the synced parent so remotes refetch the full routine. */
 async function touchWorkoutRoutine(
@@ -31,6 +40,19 @@ async function touchWorkoutRoutine(
   return result.changes === 1;
 }
 
+/** Wall-clock session duration in whole seconds; null unless both timestamps
+ * parse — unknown stays null, never a fabricated zero-length session. */
+function deriveDurationSeconds(
+  startedAtIso: string | null,
+  endedAtIso: string | null,
+): number | null {
+  if (!startedAtIso || !endedAtIso) return null;
+  const startMs = Date.parse(startedAtIso);
+  const endMs = Date.parse(endedAtIso);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+  return Math.max(0, Math.round((endMs - startMs) / 1000));
+}
+
 async function insertWorkoutLogRecord(input: {
   db: Awaited<ReturnType<typeof getDatabase>>;
   logId: string;
@@ -38,6 +60,9 @@ async function insertWorkoutLogRecord(input: {
   notes: string | null;
   completedAtIso: string;
   createdAtIso: string;
+  startedAtIso: string | null;
+  endedAtIso: string | null;
+  durationSeconds: number | null;
   requireActiveRoutine: boolean;
   enqueue: (record: SyncRecord) => void;
 }): Promise<{
@@ -69,9 +94,19 @@ async function insertWorkoutLogRecord(input: {
 
   if (!existing) {
     await input.db.runAsync(
-      `INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [input.logId, input.routineId, input.notes, input.completedAtIso, input.createdAtIso],
+      `INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at,
+         started_at, ended_at, duration_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.logId,
+        input.routineId,
+        input.notes,
+        input.completedAtIso,
+        input.createdAtIso,
+        input.startedAtIso,
+        input.endedAtIso,
+        input.durationSeconds,
+      ],
     );
     input.enqueue({
       entity: 'workout_logs',
@@ -139,6 +174,10 @@ export async function completeRoutine(
         notes: notes ?? null,
         completedAtIso: now,
         createdAtIso: now,
+        // Quick-complete records no timed session: unknown stays NULL.
+        startedAtIso: null,
+        endedAtIso: null,
+        durationSeconds: null,
         requireActiveRoutine: true,
         enqueue,
       });
@@ -587,11 +626,14 @@ export async function addDefaultSet(exerciseId: string): Promise<void> {
     [exerciseId],
   );
   const nextNumber = (countRow?.count ?? 0) + 1;
+  // The rest preference seeds newly created sets; per-set values are
+  // authoritative thereafter (applyRestDefault only covers legacy zero rows).
+  const restSeconds = await loadRestSecondsDefault();
   await addSet({
     exerciseId,
     setNumber: nextNumber,
     activeSeconds: 40,
-    restSeconds: 20,
+    restSeconds,
   });
 }
 
@@ -633,14 +675,34 @@ export async function getRoutineWithExercises(
   return { ...routine, exercises: exercisesWithSets };
 }
 
+/** One recorded set captured during a timed session. */
+export type LoggedSessionSetInput = {
+  setNumber: number;
+  /** null = not recorded (unknown), never a measured zero. */
+  weight: number | null;
+  /** null = not recorded (unknown). */
+  reps: number | null;
+  completed: boolean;
+};
+
 export async function logWorkoutSession(input: {
   routineId: string;
   notes?: string;
-  exercises: { exerciseName: string; setsCompleted: number }[];
+  exercises: {
+    exerciseName: string;
+    setsCompleted: number;
+    /** Per-set provenance rows persisted as workout_session_sets; omitted
+     * when the caller has no per-set data (legacy shape still supported). */
+    sets?: LoggedSessionSetInput[];
+  }[];
+  /** Wall-clock session start/end (ISO). NULL = untimed session. */
+  startedAt?: string | null;
+  endedAt?: string | null;
 }): Promise<void> {
   const db = await getDatabase();
   const logId = createId('wrk');
   const now = nowIso();
+  const durationSeconds = deriveDurationSeconds(input.startedAt ?? null, input.endedAt ?? null);
 
   await runBackupMutation({
     db,
@@ -652,6 +714,9 @@ export async function logWorkoutSession(input: {
         notes: input.notes ?? null,
         completedAtIso: now,
         createdAtIso: now,
+        startedAtIso: input.startedAt ?? null,
+        endedAtIso: input.endedAt ?? null,
+        durationSeconds,
         requireActiveRoutine: true,
         enqueue,
       });
@@ -672,6 +737,21 @@ export async function logWorkoutSession(input: {
           updatedAt: now,
           operation: 'create',
         });
+        for (const set of ex.sets ?? []) {
+          const setId = createId('sset');
+          await transactionDb.runAsync(
+            `INSERT INTO workout_session_sets
+               (id, session_exercise_id, set_number, weight, reps, weight_unit, completed, created_at)
+             VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+            [setId, exId, set.setNumber, set.weight, set.reps, set.completed ? 1 : 0, now],
+          );
+          enqueue({
+            entity: 'workout_session_sets',
+            id: setId,
+            updatedAt: now,
+            operation: 'create',
+          });
+        }
       }
       return { changed: true, value: undefined };
     },
@@ -695,6 +775,10 @@ export async function logWorkoutFromLinkedAction(input: {
         notes: input.notes ?? null,
         completedAtIso: now,
         createdAtIso: now,
+        // Linked-action completions record no timed session.
+        startedAtIso: null,
+        endedAtIso: null,
+        durationSeconds: null,
         requireActiveRoutine: true,
         enqueue,
       });
@@ -859,9 +943,12 @@ export type WorkoutLogDetail = {
   log: WorkoutLog;
   routineName: string | null;
   exercises: WorkoutSessionExercise[];
+  /** Real per-set rows for this log; empty for quick-complete/legacy logs. */
+  sets: WorkoutSessionSet[];
 };
 
-/** Full per-session detail: log header plus its workout_session_exercises rows. */
+/** Full per-session detail: log header plus its workout_session_exercises and
+ * workout_session_sets rows (legacy logs without set rows read as `sets: []`). */
 export async function getWorkoutLogDetail(logId: string): Promise<WorkoutLogDetail | null> {
   const db = await getDatabase();
   const log = await db.getFirstAsync<WorkoutLog>(`SELECT * FROM workout_logs WHERE id = ?`, [
@@ -878,7 +965,69 @@ export async function getWorkoutLogDetail(logId: string): Promise<WorkoutLogDeta
      ORDER BY created_at ASC, id ASC`,
     [logId],
   );
-  return { log, routineName: routine?.name ?? null, exercises };
+  const sets =
+    exercises.length > 0
+      ? await db.getAllAsync<WorkoutSessionSet>(
+          `SELECT s.* FROM workout_session_sets s
+           INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+           WHERE e.log_id = ?
+           ORDER BY e.created_at ASC, e.id ASC, s.set_number ASC`,
+          [logId],
+        )
+      : [];
+  return { log, routineName: routine?.name ?? null, exercises, sets };
+}
+
+/**
+ * Newest-first recorded weighted sets across all sessions — the seeding
+ * source for per-set weight/reps entry defaults during a new session.
+ * Bounded; only completed sets with both values recorded qualify.
+ */
+export async function listRecentLoggedSets(): Promise<
+  {
+    exerciseName: string;
+    setNumber: number;
+    weight: number;
+    reps: number;
+  }[]
+> {
+  const db = await getDatabase();
+  return db.getAllAsync(
+    `SELECT e.exercise_name AS exerciseName,
+            s.set_number AS setNumber,
+            s.weight AS weight,
+            s.reps AS reps
+     FROM workout_session_sets s
+     INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+     WHERE s.completed = 1 AND s.weight IS NOT NULL AND s.reps IS NOT NULL
+     ORDER BY s.created_at DESC, s.id DESC
+     LIMIT 500`,
+  );
+}
+
+/**
+ * Recorded weighted sets for the given exercise names across prior sessions —
+ * the history side of new-PR comparison. Only completed sets with both values
+ * recorded qualify; call BEFORE inserting the current session's log so it is
+ * excluded by construction.
+ */
+export async function listLoggedSetsForExerciseNames(
+  exerciseNames: string[],
+): Promise<{ exerciseName: string; weight: number; reps: number }[]> {
+  if (exerciseNames.length === 0) return [];
+  const db = await getDatabase();
+  const placeholders = exerciseNames.map(() => '?').join(', ');
+  return db.getAllAsync(
+    `SELECT e.exercise_name AS exerciseName,
+            s.weight AS weight,
+            s.reps AS reps
+     FROM workout_session_sets s
+     INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+     WHERE s.completed = 1 AND s.weight IS NOT NULL AND s.reps IS NOT NULL
+       AND e.exercise_name IN (${placeholders})
+     ORDER BY s.created_at DESC, s.id DESC`,
+    exerciseNames,
+  );
 }
 
 /**
@@ -952,4 +1101,55 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
     }
   }
   return newId;
+}
+
+// ---------------------------------------------------------------------------
+// Default rest preference (recoverable Settings V3 source: app_meta
+// `workout_rest_seconds`). Lives in the data layer because it touches SQLite;
+// restTimerPreferences.ts re-exports these to keep consumer imports stable.
+// ---------------------------------------------------------------------------
+
+export async function loadRestSecondsDefault(): Promise<number> {
+  try {
+    const db = await getDatabase();
+    const stored = await getAppMetaJsonOrDefault<number | null>(
+      db,
+      appMetaKeys.workoutRestSeconds,
+      null,
+      normalizeStoredRestSeconds,
+    );
+    if (stored !== null) return stored;
+
+    // One-time legacy import: carry the pre-app_meta preference over, then
+    // remove the AsyncStorage key so a later app_meta loss cannot resurrect
+    // a stale value (the import stays idempotent either way).
+    const legacy = await readLegacyStoredRestSeconds();
+    const value = legacy ?? DEFAULT_REST_SECONDS;
+    try {
+      await setAppMetaJson(db, appMetaKeys.workoutRestSeconds, value);
+    } catch {
+      // Seeding app_meta is best-effort; the loaded value still applies.
+    }
+    if (legacy !== null) {
+      try {
+        await AsyncStorage.removeItem(LEGACY_REST_SECONDS_STORAGE_KEY);
+      } catch {
+        // Removal is best-effort; app_meta now wins on every future load.
+      }
+    }
+    return value;
+  } catch {
+    // Database unavailable: fall back to the legacy value or default.
+    const legacy = await readLegacyStoredRestSeconds();
+    return legacy ?? DEFAULT_REST_SECONDS;
+  }
+}
+
+export async function saveRestSecondsDefault(seconds: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await setAppMetaJson(db, appMetaKeys.workoutRestSeconds, clampRestSeconds(seconds));
+  } catch {
+    // Preference persistence is best-effort; the session keeps working.
+  }
 }

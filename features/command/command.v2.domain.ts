@@ -19,6 +19,32 @@ const CALORIE_PATTERN = /(\d+(?:\.\d+)?)\s*(?:kcal|cal(?:ories)?|cals?)\b/i;
 const MACRO_PATTERN =
   /(\d+(?:\.\d+)?)\s*(?:g|grams?)\s*(protein|carbs?|carbohydrates|fat|fats|fiber)\b/gi;
 
+/**
+ * Canonical project-color vocabulary shared by the rule parser regex, the
+ * executor hex map, and (via prompt guidance) the remote parser. One list so
+ * the three surfaces cannot drift apart again.
+ */
+export const COMMAND_PROJECT_COLOR_HEX: Record<string, string> = {
+  blue: '#3B82F6',
+  green: '#10B981',
+  emerald: '#10B981',
+  violet: '#8B5CF6',
+  purple: '#8B5CF6',
+  orange: '#F97316',
+  amber: '#F59E0B',
+  yellow: '#F59E0B',
+  pink: '#EC4899',
+  teal: '#14B8A6',
+  red: '#EF4444',
+  indigo: '#6366F1',
+  lime: '#84CC16',
+};
+
+const COMMAND_PROJECT_COLOR_PATTERN = new RegExp(
+  `\\b(${Object.keys(COMMAND_PROJECT_COLOR_HEX).join('|')})\\b`,
+  'i',
+);
+
 function clean(value: string): string | null {
   const result = value
     .replace(/\s+/g, ' ')
@@ -220,13 +246,14 @@ function parseProjectCreation(input: ParseCommandInput): DraftCreateProject | nu
   }
   workingText = workingText.replace(/\b(?:due|by|target(?:\s+date)?)\b/gi, ' ');
 
-  const colorMatch = workingText.match(
-    /\b(blue|green|violet|orange|amber|pink|teal|red|indigo|lime)\b/i,
-  );
+  const colorMatch = workingText.match(COMMAND_PROJECT_COLOR_PATTERN);
   let color: string | null = null;
   if (colorMatch) {
     color = colorMatch[1].toLowerCase();
     workingText = workingText.replace(colorMatch[0], ' ');
+    // Removing the color word can strand its leading preposition
+    // ("Apollo due 2026-05-01 in blue" → "Apollo in"); strip it.
+    workingText = workingText.replace(/\s+\b(?:in|with)\b\s*$/i, ' ');
   }
 
   const name = clean(workingText.replace(/[.,!?;:]+$/g, ''));

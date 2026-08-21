@@ -1,9 +1,10 @@
 import { getDatabase } from '@/core/db/client';
-import { runLocalMutation } from '@/core/db/localMutation';
+import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
-import { nowIso } from '@/lib/time';
+import { nowIso, toDateKey } from '@/lib/time';
 import {
   clampProgressPercent,
+  GOAL_HORIZON_WINDOW_DAYS,
   normalizeGoalHorizon,
   normalizeGoalProgress,
   normalizeGoalStatus,
@@ -37,25 +38,30 @@ export async function addGoal(input: GoalInput): Promise<string> {
   const now = nowIso();
 
   const completedAt = normalizeGoalStatus(input.status) === 'completed' ? now : null;
-  await runLocalMutation(db, async (tx) => {
-    await tx.runAsync(
-      `INSERT INTO goals
-         (id, project_id, title, description, horizon, target_date, status, completed_at, progress_percent, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      [
-        id,
-        input.projectId ?? null,
-        input.title.trim(),
-        input.description ?? null,
-        normalizeGoalHorizon(input.horizon),
-        validateGoalTargetDate(input.targetDate),
-        normalizeGoalStatus(input.status),
-        completedAt,
-        normalizeGoalProgress(input.progressPercent),
-        now,
-        now,
-      ],
-    );
+  await runBackupMutation<string>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      await transactionDb.runAsync(
+        `INSERT INTO goals
+           (id, project_id, title, description, horizon, target_date, status, completed_at, progress_percent, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [
+          id,
+          input.projectId ?? null,
+          input.title.trim(),
+          input.description ?? null,
+          normalizeGoalHorizon(input.horizon),
+          validateGoalTargetDate(input.targetDate),
+          normalizeGoalStatus(input.status),
+          completedAt,
+          normalizeGoalProgress(input.progressPercent),
+          now,
+          now,
+        ],
+      );
+      enqueue({ entity: 'goals', id, updatedAt: now, operation: 'create' });
+      return { value: id, changed: true };
+    },
   });
   return id;
 }
@@ -74,84 +80,111 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
   const db = await getDatabase();
   const now = nowIso();
 
-  const existing = await db.getFirstAsync<Pick<Goal, 'status' | 'completed_at'>>(
-    `SELECT status, completed_at FROM goals WHERE id = ? AND deleted_at IS NULL`,
-    [id],
-  );
-  const nextStatus =
-    updates.status !== undefined ? normalizeGoalStatus(updates.status) : existing?.status;
+  await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      // In-transaction status read (F6): completed_at enter/leave transitions
+      // key off transactional state, not a pre-transaction snapshot.
+      const existing = await transactionDb.getFirstAsync<Pick<Goal, 'status' | 'completed_at'>>(
+        `SELECT status, completed_at FROM goals WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      const nextStatus =
+        updates.status !== undefined ? normalizeGoalStatus(updates.status) : existing?.status;
 
-  const fields: string[] = ['updated_at = ?'];
-  const values: (string | number | null)[] = [now];
-  if (updates.title !== undefined) {
-    fields.push('title = ?');
-    values.push(updates.title.trim());
-  }
-  if (updates.description !== undefined) {
-    fields.push('description = ?');
-    values.push(updates.description);
-  }
-  if (updates.horizon !== undefined) {
-    fields.push('horizon = ?');
-    values.push(normalizeGoalHorizon(updates.horizon));
-  }
-  if (updates.targetDate !== undefined) {
-    fields.push('target_date = ?');
-    values.push(validateGoalTargetDate(updates.targetDate));
-  }
-  if (updates.status !== undefined) {
-    fields.push('status = ?');
-    values.push(nextStatus!);
-    const wasCompleted = existing?.status === 'completed';
-    const willBeCompleted = nextStatus === 'completed';
-    if (!wasCompleted && willBeCompleted) {
-      fields.push('completed_at = ?');
-      values.push(now);
-    } else if (wasCompleted && !willBeCompleted) {
-      fields.push('completed_at = ?');
-      values.push(null);
-    }
-  }
-  if (updates.progressPercent !== undefined) {
-    fields.push('progress_percent = ?');
-    values.push(clampProgressPercent(updates.progressPercent));
-  }
-  await runLocalMutation(db, async (tx) => {
-    // H9: validate the target Project and reconcile linked children atomically.
-    if (updates.projectId !== undefined) {
-      const nextProjectId = updates.projectId;
-      if (nextProjectId !== null) {
-        const project = await tx.getFirstAsync<{ id: string }>(
-          `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
-          [nextProjectId],
-        );
-        if (!project) throw new Error('Project not found.');
+      const fields: string[] = ['updated_at = ?'];
+      const values: (string | number | null)[] = [now];
+      if (updates.title !== undefined) {
+        fields.push('title = ?');
+        values.push(updates.title.trim());
       }
-      // Hierarchical consistency: Todos/Habits that reference this Goal follow
-      // its Project (including becoming unassigned when the goal is detached).
-      await tx.runAsync(
-        `UPDATE todos SET project_id = ?, updated_at = ?
-         WHERE goal_id = ? AND deleted_at IS NULL`,
-        [nextProjectId, now, id],
+      if (updates.description !== undefined) {
+        fields.push('description = ?');
+        values.push(updates.description);
+      }
+      if (updates.horizon !== undefined) {
+        fields.push('horizon = ?');
+        values.push(normalizeGoalHorizon(updates.horizon));
+      }
+      if (updates.targetDate !== undefined) {
+        fields.push('target_date = ?');
+        values.push(validateGoalTargetDate(updates.targetDate));
+      }
+      if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(nextStatus!);
+        // Stable completion fact: set on entering completed, clear on leaving.
+        const wasCompleted = existing?.status === 'completed';
+        const willBeCompleted = nextStatus === 'completed';
+        if (!wasCompleted && willBeCompleted) {
+          fields.push('completed_at = ?');
+          values.push(now);
+        } else if (wasCompleted && !willBeCompleted) {
+          fields.push('completed_at = ?');
+          values.push(null);
+        }
+      }
+      if (updates.progressPercent !== undefined) {
+        fields.push('progress_percent = ?');
+        values.push(clampProgressPercent(updates.progressPercent));
+      }
+
+      let changed = false;
+      // H9: validate the target Project and reconcile linked children atomically.
+      if (updates.projectId !== undefined) {
+        const nextProjectId = updates.projectId;
+        if (nextProjectId !== null) {
+          const project = await transactionDb.getFirstAsync<{ id: string }>(
+            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+            [nextProjectId],
+          );
+          if (!project) throw new Error('Project not found.');
+        }
+        // Hierarchical consistency: Todos/Habits that reference this Goal follow
+        // its Project (including becoming unassigned when the goal is detached).
+        const todoRows = await transactionDb.getAllAsync<{ id: string }>(
+          `SELECT id FROM todos WHERE goal_id = ? AND deleted_at IS NULL`,
+          [id],
+        );
+        await transactionDb.runAsync(
+          `UPDATE todos SET project_id = ?, updated_at = ?
+           WHERE goal_id = ? AND deleted_at IS NULL`,
+          [nextProjectId, now, id],
+        );
+        const habitRows = await transactionDb.getAllAsync<{ id: string }>(
+          `SELECT id FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
+          [id],
+        );
+        await transactionDb.runAsync(
+          `UPDATE habits SET project_id = ?, updated_at = ?
+           WHERE goal_id = ? AND deleted_at IS NULL`,
+          [nextProjectId, now, id],
+        );
+        fields.push('project_id = ?');
+        values.push(nextProjectId);
+
+        // Outbox coherence (F1): every reconciled child rides this same
+        // transaction's outbox so backup stays consistent with the row state.
+        for (const row of todoRows) {
+          enqueue({ entity: 'todos', id: row.id, updatedAt: now, operation: 'update' });
+        }
+        for (const row of habitRows) {
+          enqueue({ entity: 'habits', id: row.id, updatedAt: now, operation: 'update' });
+        }
+        changed = changed || todoRows.length > 0 || habitRows.length > 0;
+      }
+
+      values.push(id);
+      const result = await transactionDb.runAsync(
+        `UPDATE goals SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
+        values,
       );
-      await tx.runAsync(
-        `UPDATE habits SET project_id = ?, updated_at = ?
-         WHERE goal_id = ? AND deleted_at IS NULL`,
-        [nextProjectId, now, id],
-      );
-      fields.push('project_id = ?');
-      values.push(nextProjectId);
-    }
-    values.push(id);
-    await tx.runAsync(
-      `UPDATE goals SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
-      values,
-    );
-    // Outbox coherence (pending remote integration): Projects/Goals/Daily Plans
-    // remain local-only this wave, so no outbox records are enqueued here. Once
-    // these entities gain a Supabase contract, the goal update and every
-    // reconciled child above must enqueue coherent owner-scoped outbox records
-    // in this same transaction.
+      if (result.changes > 0) {
+        changed = true;
+        enqueue({ entity: 'goals', id, updatedAt: now, operation: 'update' });
+      }
+      return { value: undefined, changed };
+    },
   });
 }
 
@@ -166,28 +199,51 @@ export async function setGoalProgress(id: string, percent: number): Promise<void
 export async function softDeleteGoal(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await runLocalMutation(db, async (tx) => {
-    // H9 reconciliation: clear goal_id from linked Todos/Habits so no item keeps
-    // a dangling reference to the deleted Goal. The item's current project_id
-    // (if any) is preserved, including one auto-aligned to this goal's project.
-    await tx.runAsync(
-      `UPDATE todos SET goal_id = NULL, updated_at = ?
-       WHERE goal_id = ? AND deleted_at IS NULL`,
-      [now, id],
-    );
-    await tx.runAsync(
-      `UPDATE habits SET goal_id = NULL, updated_at = ?
-       WHERE goal_id = ? AND deleted_at IS NULL`,
-      [now, id],
-    );
-    await tx.runAsync(
-      'UPDATE goals SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-      [now, now, id],
-    );
-    // Outbox coherence (pending remote integration): Projects/Goals/Daily Plans
-    // remain local-only this wave. Once these entities gain a Supabase contract,
-    // the goal tombstone and each cleared child above must enqueue coherent
-    // owner-scoped outbox records in this same transaction.
+  await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      // H9 reconciliation: clear goal_id from linked Todos/Habits so no item keeps
+      // a dangling reference to the deleted Goal. The item's current project_id
+      // (if any) is preserved, including one auto-aligned to this goal's project.
+      const todoRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM todos WHERE goal_id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      await transactionDb.runAsync(
+        `UPDATE todos SET goal_id = NULL, updated_at = ?
+         WHERE goal_id = ? AND deleted_at IS NULL`,
+        [now, id],
+      );
+      const habitRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      await transactionDb.runAsync(
+        `UPDATE habits SET goal_id = NULL, updated_at = ?
+         WHERE goal_id = ? AND deleted_at IS NULL`,
+        [now, id],
+      );
+      const result = await transactionDb.runAsync(
+        'UPDATE goals SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, id],
+      );
+
+      // Outbox coherence (F1): the goal tombstone and each cleared child enqueue
+      // coherent owner-scoped records in this same transaction.
+      if (result.changes > 0) {
+        enqueue({ entity: 'goals', id, updatedAt: now, operation: 'delete' });
+      }
+      for (const row of todoRows) {
+        enqueue({ entity: 'todos', id: row.id, updatedAt: now, operation: 'update' });
+      }
+      for (const row of habitRows) {
+        enqueue({ entity: 'habits', id: row.id, updatedAt: now, operation: 'update' });
+      }
+      return {
+        value: undefined,
+        changed: result.changes > 0 || todoRows.length > 0 || habitRows.length > 0,
+      };
+    },
   });
 }
 
@@ -250,4 +306,64 @@ export async function applyRemoteGoals(
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Linked-entity rollups (bounded aggregate queries)
+// ---------------------------------------------------------------------------
+
+export type GoalRollupData = {
+  todos: { total: number; done: number };
+  habits: { habitCount: number; completionsInWindow: number; windowDays: number };
+};
+
+/**
+ * Bounded rollup inputs for one goal: linked-todo done/total and linked-habit
+ * completion counts over the goal's horizon window (custom horizons fall back
+ * to 30 days). Small aggregate queries, no row loads.
+ */
+export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
+  const db = await getDatabase();
+  const goal = await db.getFirstAsync<Pick<Goal, 'horizon'>>(
+    `SELECT horizon FROM goals WHERE id = ? AND deleted_at IS NULL`,
+    [goalId],
+  );
+  const effectiveDays = GOAL_HORIZON_WINDOW_DAYS[goal?.horizon ?? 'month'] ?? 30;
+  const windowStart = toDateKey(new Date(Date.now() - (effectiveDays - 1) * 86_400_000));
+
+  const todoRow = await db.getFirstAsync<{ total: number; done: number }>(
+    `SELECT COUNT(*) AS total, COALESCE(SUM(completed), 0) AS done
+     FROM todos WHERE goal_id = ? AND deleted_at IS NULL`,
+    [goalId],
+  );
+  const habitCountRow = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
+    [goalId],
+  );
+  const completionRow = await db.getFirstAsync<{ completions: number }>(
+    `SELECT COUNT(*) AS completions
+     FROM habit_completions hc
+     JOIN habits h ON h.id = hc.habit_id
+     WHERE h.goal_id = ? AND h.deleted_at IS NULL AND hc.date_key >= ?
+       AND hc.count > 0`,
+    [goalId, windowStart],
+  );
+
+  return {
+    todos: { total: todoRow?.total ?? 0, done: todoRow?.done ?? 0 },
+    habits: {
+      habitCount: habitCountRow?.count ?? 0,
+      completionsInWindow: completionRow?.completions ?? 0,
+      windowDays: effectiveDays,
+    },
+  };
+}
+
+/** Habits linked to a goal (for the goal detail rollup section). */
+export async function listHabitsForGoal(goalId: string): Promise<{ id: string; name: string }[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<{ id: string; name: string }>(
+    `SELECT id, name FROM habits WHERE goal_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`,
+    [goalId],
+  );
 }

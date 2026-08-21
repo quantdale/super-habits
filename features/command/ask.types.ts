@@ -6,7 +6,18 @@ export type AskIntent =
   | 'focus_summary'
   | 'daily_overview'
   /** Accepted only as a backwards-compatible alias for pre-V2 responses. */
-  | 'habit_streak';
+  | 'habit_streak'
+  | 'project_status'
+  | 'goal_progress'
+  | 'today_focus';
+
+/**
+ * Shared client/server contract: the edge function rejects classify requests
+ * with more conversation turns than this (user-ai-ask/normalize.js
+ * MAX_CONVERSATION_TURNS). The client caps its history at the same bound so a
+ * long session never sends a guaranteed-400 request.
+ */
+export const ASK_MAX_CONVERSATION_TURNS = 20;
 
 export type AskConversationTurn = {
   question: string;
@@ -31,6 +42,9 @@ export type ClassifyParams = {
   focus_summary: AskDateRange;
   daily_overview: { dateKey: string };
   habit_streak: { habitName: string | null };
+  project_status: { projectName: string | null };
+  goal_progress: { goalTitle: string | null };
+  today_focus: { dateKey: string };
 };
 
 export type ClassifyResult =
@@ -41,6 +55,9 @@ export type ClassifyResult =
   | { outcome: 'classified'; intent: 'focus_summary'; params: ClassifyParams['focus_summary'] }
   | { outcome: 'classified'; intent: 'daily_overview'; params: ClassifyParams['daily_overview'] }
   | { outcome: 'classified'; intent: 'habit_streak'; params: ClassifyParams['habit_streak'] }
+  | { outcome: 'classified'; intent: 'project_status'; params: ClassifyParams['project_status'] }
+  | { outcome: 'classified'; intent: 'goal_progress'; params: ClassifyParams['goal_progress'] }
+  | { outcome: 'classified'; intent: 'today_focus'; params: ClassifyParams['today_focus'] }
   | {
       outcome: 'unsupported';
       reason: string;
@@ -129,7 +146,10 @@ export type RetrievedFacts =
   | { intent: 'habit_streak'; facts: HabitStreakFacts }
   | { intent: 'workout_summary'; facts: WorkoutSummaryFacts }
   | { intent: 'focus_summary'; facts: FocusSummaryFacts }
-  | { intent: 'daily_overview'; facts: DailyOverviewFacts };
+  | { intent: 'daily_overview'; facts: DailyOverviewFacts }
+  | { intent: 'project_status'; facts: ProjectStatusFacts }
+  | { intent: 'goal_progress'; facts: GoalProgressFacts }
+  | { intent: 'today_focus'; facts: TodayFocusFacts };
 
 export type AskUnsupportedReasonCode =
   | 'unsupported'
@@ -182,8 +202,9 @@ export type AskParseInput = {
 };
 
 /**
- * Planning Ask facts (W6). These are retrieved locally and formatted
- * deterministically; they are not yet remote-classified intents.
+ * Planning Ask facts (W6). Retrieved locally and formatted deterministically
+ * on the client (planningAsk.domain.ts) — these intents never round-trip
+ * project/goal names through the phrase stage.
  */
 export type ProjectStatusFacts = {
   scope: 'single' | 'overall';

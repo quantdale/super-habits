@@ -9,6 +9,10 @@
 const MAX_QUESTION_LENGTH = 280;
 const MAX_CONVERSATION_TURNS = 20;
 const MAX_RETRIEVED_FACTS_BYTES = 24_000;
+// Planning intents (project_status / goal_progress / today_focus) are
+// deliberately absent here: their answers are formatted deterministically on
+// the client so project/goal names never round-trip through the model. A
+// phrase request carrying planning facts is rejected below.
 const VALID_FACT_INTENTS = new Set([
   "pending_todos",
   "calorie_summary",

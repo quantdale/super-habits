@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
-import { setSessionNote } from './pomodoro.sessionMeta';
+import { setPomodoroSessionMeta } from './pomodoro.data';
 
 type Props = {
   sessionId: string;
@@ -14,7 +14,7 @@ const MAX_NOTE_LENGTH = 500;
 
 /**
  * Post-completion prompt: capture a short note about the focus session that
- * just finished. Notes are local-only metadata keyed by session id.
+ * just finished. Notes are durable row metadata (`pomodoro_sessions.note`).
  */
 export function SessionNotePrompt({ sessionId, onSaved, onDismiss }: Props) {
   const { tokens } = useAppTheme();
@@ -24,7 +24,7 @@ export function SessionNotePrompt({ sessionId, onSaved, onDismiss }: Props) {
   const save = async () => {
     setSaving(true);
     try {
-      await setSessionNote(sessionId, note);
+      await setPomodoroSessionMeta({ sessionId, note });
       onSaved();
     } finally {
       setSaving(false);

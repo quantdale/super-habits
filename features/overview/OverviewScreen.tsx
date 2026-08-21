@@ -30,6 +30,7 @@ import { CustomizeCardsPanel } from './CustomizeCardsPanel';
 import { loadCardLayout, saveCardLayout } from './cardLayout.storage';
 import {
   getGreeting,
+  pickEmptyStateCta,
   shapeCaloriesSummary,
   shapeFocusWeekSummary,
   shapeGoalsSummary,
@@ -69,7 +70,7 @@ const EMPTY_SUMMARIES: OverviewSummaries = {
     completedPriorities: 0,
   },
   todos: { overdueCount: 0, dueTodayCount: 0, pendingCount: 0, preview: [] },
-  habits: { scheduledToday: 0, completedToday: 0, progressRatio: 0, rings: [] },
+  habits: { scheduledToday: 0, completedToday: 0, rings: [] },
   focus: { focusMinutes: 0, sessionCount: 0, perDayMinutes: [] },
   workout: { sessionsThisWeek: 0, lastWorkoutName: null, lastWorkoutDateKey: null },
   calories: { consumed: 0, goal: 0, remaining: 0, ratio: 0 },
@@ -131,6 +132,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<OverviewSummaries>(EMPTY_SUMMARIES);
 
   const refresh = useCallback(async () => {
@@ -139,8 +141,12 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       const [nextLayout, nextSummaries] = await Promise.all([loadCardLayout(), loadSummaries()]);
       setLayout(nextLayout);
       setSummaries(nextSummaries);
+      setLoadError(null);
     } catch (err) {
+      // F7: a failed load must stay visible — per-card empty copy would read
+      // as fake "all clear" data. The error panel below offers a retry.
       console.error('[OverviewScreen] refresh failed', err);
+      setLoadError(err instanceof Error ? err.message : 'Could not load your dashboard.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -202,7 +208,9 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   );
 
   const greeting = getGreeting(new Date().getHours());
+  // F9: a committed daily plan counts as tracked data.
   const hasAnyData =
+    summaries.plan.hasPlan ||
     summaries.todos.pendingCount > 0 ||
     summaries.habits.scheduledToday > 0 ||
     summaries.focus.sessionCount > 0 ||
@@ -210,6 +218,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     summaries.calories.consumed > 0 ||
     summaries.projects.activeCount > 0 ||
     summaries.goals.activeCount > 0;
+  const emptyCta = pickEmptyStateCta(summaries);
 
   return (
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
@@ -296,6 +305,37 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
             <View className="mt-5 min-h-[220px] items-center justify-center">
               <ActivityIndicator size="large" color={sectionAccents[POMODORO_SECTION_KEY].text} />
             </View>
+          ) : loadError ? (
+            <View
+              className="mt-5 items-center rounded-2xl border border-dashed py-8"
+              style={{ borderColor: tokens.border }}
+            >
+              <MaterialIcons name="error-outline" size={24} color={tokens.dangerSolid} />
+              <Text className="mt-2 text-base font-semibold" style={{ color: tokens.text }}>
+                Your dashboard couldn&apos;t load
+              </Text>
+              <Text className="mt-1 px-8 text-center text-sm" style={{ color: tokens.textMuted }}>
+                {loadError}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading the dashboard"
+                onPress={() => {
+                  void refresh();
+                }}
+                className="mt-4 rounded-xl px-4 py-2.5 active:opacity-80"
+                style={{
+                  backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
+                }}
+              >
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                >
+                  Try again
+                </Text>
+              </Pressable>
+            </View>
           ) : (
             <View className="mt-5 gap-4">
               {layout.map((id) => (
@@ -322,8 +362,14 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Go to overview sections"
-                    onPress={() => setActiveSection('todos')}
+                    accessibilityLabel={emptyCta.label}
+                    onPress={() => {
+                      if (emptyCta.destination.kind === 'planning') {
+                        openPlanningHub(emptyCta.destination.view);
+                      } else {
+                        setActiveSection(emptyCta.destination.section);
+                      }
+                    }}
                     className="mt-4 rounded-xl px-4 py-2.5 active:opacity-80"
                     style={{
                       backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
@@ -333,7 +379,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                       className="text-sm font-semibold"
                       style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
                     >
-                      Add your first task
+                      {emptyCta.label}
                     </Text>
                   </Pressable>
                 </View>

@@ -13,8 +13,12 @@ type Props = {
   onClose: () => void;
 };
 
-const FIELDS: readonly { key: keyof MacroTargets; label: string; unit: string }[] = [
-  { key: 'calories', label: 'Daily calories', unit: 'kcal' },
+/**
+ * Only protein/carbs/fats are editable here: these targets drive the three
+ * macro bars, while daily calories stay owned by the goal modal (the
+ * `calories` value is carried through unchanged).
+ */
+const FIELDS: readonly { key: 'protein' | 'carbs' | 'fats'; label: string; unit: string }[] = [
   { key: 'protein', label: 'Protein', unit: 'g' },
   { key: 'carbs', label: 'Carbs', unit: 'g' },
   { key: 'fats', label: 'Fats', unit: 'g' },
@@ -23,8 +27,7 @@ const FIELDS: readonly { key: keyof MacroTargets; label: string; unit: string }[
 /** Editable daily macro targets. Informational planning aid only. */
 export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: Props) {
   const { tokens } = useAppTheme();
-  const [values, setValues] = useState<Record<keyof MacroTargets, string>>({
-    calories: String(currentTargets.calories),
+  const [values, setValues] = useState<Record<'protein' | 'carbs' | 'fats', string>>({
     protein: String(currentTargets.protein),
     carbs: String(currentTargets.carbs),
     fats: String(currentTargets.fats),
@@ -38,7 +41,6 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
     setWasVisible(visible);
     if (visible) {
       setValues({
-        calories: String(currentTargets.calories),
         protein: String(currentTargets.protein),
         carbs: String(currentTargets.carbs),
         fats: String(currentTargets.fats),
@@ -53,19 +55,15 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
       setError('Enter non-negative numbers for every field.');
       return;
     }
-    if (parsed[0].value < 500 || parsed[0].value > 6000) {
-      setError('Daily calories must be between 500 and 6000.');
-      return;
-    }
-    if (parsed.slice(1).some(({ value }) => value > 999)) {
+    if (parsed.some(({ value }) => value > 999)) {
       setError('Macro grams must be 999 or less.');
       return;
     }
     onSave({
-      calories: Math.round(parsed[0].value),
-      protein: Math.round(parsed[1].value),
-      carbs: Math.round(parsed[2].value),
-      fats: Math.round(parsed[3].value),
+      calories: currentTargets.calories,
+      protein: Math.round(parsed[0].value),
+      carbs: Math.round(parsed[1].value),
+      fats: Math.round(parsed[2].value),
     });
     onClose();
   };
@@ -73,7 +71,7 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
   return (
     <Modal title="Daily targets" visible={visible} onClose={onClose}>
       <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
-        Optional per-day targets for calories and macros. Informational only.
+        Optional per-day protein/carb/fat targets for the macro bars. Informational only.
       </Text>
       <View className="gap-3">
         {FIELDS.map(({ key, label, unit }) => (

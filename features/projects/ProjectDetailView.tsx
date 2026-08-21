@@ -8,6 +8,7 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
   addProject,
   getProject,
+  getProjectRollup,
   listGoalsForProject,
   listHabitsForProject,
   listTodosForProject,
@@ -26,10 +27,15 @@ import {
   PROJECT_DESCRIPTION_MAX,
   PROJECT_NAME_MAX,
   validateProjectInput,
+  computeProjectProgress,
+  computeTargetDateCountdown,
 } from '@/features/projects/projects.domain';
 
 import { updateGoal } from '@/features/goals/goals.data';
 import type { ProjectStatus } from '@/core/db/types';
+
+import type { ProjectRollup } from '@/features/projects/projects.data';
+import { toDateKey } from '@/lib/time';
 
 type ProjectDetailViewProps = {
   projectId: string | null;
@@ -50,17 +56,20 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
   const [linkedHabits, setLinkedHabits] = useState<{ id: string; name: string }[]>([]);
   const [linkedGoals, setLinkedGoals] = useState<{ id: string; title: string }[]>([]);
+  const [rollup, setRollup] = useState<ProjectRollup | null>(null);
   const [candidateTodos, setCandidateTodos] = useState<{ id: string; title: string }[]>([]);
   const [candidateHabits, setCandidateHabits] = useState<{ id: string; name: string }[]>([]);
   const [candidateGoals, setCandidateGoals] = useState<{ id: string; title: string }[]>([]);
 
   const reloadLinks = useCallback(async () => {
     if (isCreate || !projectId) return;
-    const [todos, habits, goals] = await Promise.all([
+    const [todos, habits, goals, nextRollup] = await Promise.all([
       listTodosForProject(projectId),
       listHabitsForProject(projectId),
       listGoalsForProject(projectId),
+      getProjectRollup(projectId),
     ]);
+    setRollup(nextRollup);
     setLinkedTodos(todos.map((t) => ({ id: t.id, title: t.title })));
     setLinkedHabits(habits.map((h) => ({ id: h.id, name: h.name })));
     setLinkedGoals(goals.map((g) => ({ id: g.id, title: g.title })));
@@ -237,6 +246,22 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       />
 
       {!isCreate && projectId ? (
+        <ProjectProgressPanel rollup={rollup} targetDate={targetDate || null} />
+      ) : null}
+
+      {!isCreate && projectId ? (
+        <ProjectLifecycleActions
+          status={status}
+          onStatusChange={async (next) => {
+            setStatus(next);
+            await updateProject(projectId, { status: next });
+            const refreshed = await getProject(projectId);
+            if (refreshed) setStatus(refreshed.status);
+          }}
+        />
+      ) : null}
+
+      {!isCreate && projectId ? (
         <AssociationSection
           title="Linked Tasks"
           linked={linkedTodos}
@@ -341,6 +366,149 @@ function AssociationSection({
           </Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+function ProjectProgressPanel({
+  rollup,
+  targetDate,
+}: {
+  rollup: ProjectRollup | null;
+  targetDate: string | null;
+}) {
+  const { tokens } = useAppTheme();
+  const progress = rollup
+    ? computeProjectProgress({
+        todos: rollup.todos,
+        goals: rollup.goals,
+        habits: rollup.habits,
+      })
+    : null;
+  const countdown = computeTargetDateCountdown(targetDate, toDateKey(new Date()));
+
+  if (!progress) return null;
+
+  return (
+    <View
+      className="mt-2 rounded-2xl border p-3"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+      accessibilityLabel={`Project progress ${progress.percent} percent`}
+    >
+      <View className="flex-row items-center justify-between">
+        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          Progress
+        </Text>
+        <Text className="text-sm font-bold" style={{ color: tokens.text }}>
+          {progress.percent}%
+        </Text>
+      </View>
+      <View
+        className="mt-2 h-3 w-full overflow-hidden rounded-full"
+        style={{ backgroundColor: tokens.surface }}
+      >
+        <View
+          className="h-3 rounded-full"
+          style={{ width: `${progress.percent}%`, backgroundColor: SECTION_COLORS.todos }}
+        />
+      </View>
+
+      <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+        {rollup?.todos.total
+          ? `${rollup.todos.done}/${rollup.todos.total} tasks done`
+          : 'No linked tasks'}
+        {rollup && rollup.goals.count > 0
+          ? ` · goals avg ${Math.round(rollup.goals.averageProgressPercent)}%`
+          : ''}
+        {rollup && rollup.habits.habitCount > 0
+          ? ` · ${rollup.habits.recentCompletions} habit check-ins in ${rollup.habits.windowDays}d`
+          : ''}
+      </Text>
+
+      {countdown ? (
+        <Text
+          className="mt-1 text-xs font-medium"
+          style={{ color: countdown.isOverdue ? tokens.dangerSolid : tokens.textMuted }}
+        >
+          Target: {countdown.label} ({countdown.targetDate})
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const LIFECYCLE_ACTIONS: { status: ProjectStatus; label: string }[] = [
+  { status: 'completed', label: 'Complete' },
+  { status: 'paused', label: 'Pause' },
+  { status: 'archived', label: 'Archive' },
+];
+
+function ProjectLifecycleActions({
+  status,
+  onStatusChange,
+}: {
+  status: ProjectStatus;
+  onStatusChange: (next: ProjectStatus) => Promise<void>;
+}) {
+  const { tokens } = useAppTheme();
+  const [confirming, setConfirming] = useState<ProjectStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (status === 'archived') return null;
+
+  return (
+    <View className="mt-1">
+      {!confirming ? (
+        <View className="flex-row flex-wrap gap-2">
+          {LIFECYCLE_ACTIONS.filter((a) => a.status !== status).map((action) => (
+            <Pressable
+              key={action.status}
+              accessibilityRole="button"
+              accessibilityLabel={`${action.label} project`}
+              className="rounded-full border px-4 py-2"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              onPress={() => setConfirming(action.status)}
+            >
+              <Text style={{ color: tokens.textMuted }}>{action.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View
+          className="rounded-xl border p-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+        >
+          <Text className="text-sm" style={{ color: tokens.text }}>
+            {confirming === 'completed'
+              ? 'Mark this project as completed?'
+              : confirming === 'paused'
+                ? 'Pause this project? You can resume it later.'
+                : 'Archive this project? It stays in your data but leaves active lists.'}
+          </Text>
+          <View className="mt-2 flex-row gap-2">
+            <Button
+              label="Confirm"
+              color={SECTION_COLORS.todos}
+              disabled={busy}
+              onPress={async () => {
+                setBusy(true);
+                try {
+                  await onStatusChange(confirming);
+                } finally {
+                  setBusy(false);
+                  setConfirming(null);
+                }
+              }}
+            />
+            <Button
+              label="Cancel"
+              variant="ghost"
+              disabled={busy}
+              onPress={() => setConfirming(null)}
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
