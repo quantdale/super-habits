@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `superhabits-shell-${CACHE_VERSION}`;
 
 self.addEventListener('install', (event) => {
@@ -18,7 +18,15 @@ self.addEventListener('install', (event) => {
           .catch(() => Promise.resolve()),
       ),
   );
-  self.skipWaiting();
+  // Do NOT skipWaiting here: a waiting worker is the update signal for the
+  // in-app "Update available" banner (core/pwa/registerServiceWorker.ts).
+  // The user applies it explicitly via SKIP_WAITING below.
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {

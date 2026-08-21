@@ -29,8 +29,13 @@ export function formatTimeOfDay(time: TimeOfDay): string {
 
 /** Normalizes loose user input ("9:5", "09:05 ") into canonical `HH:mm`, or null. */
 export function normalizeTimeOfDayInput(value: string): string | null {
-  const parsed = parseTimeOfDay(value);
-  return parsed ? formatTimeOfDay(parsed) : null;
+  const trimmed = value.trim();
+  const lenient = /^(\d{1,2}):(\d{1,2})$/.exec(trimmed);
+  if (!lenient) return null;
+  const hour = Number(lenient[1]);
+  const minute = Number(lenient[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return formatTimeOfDay({ hour, minute });
 }
 
 /** Stable scheduled-notification identifier for one todo's due reminder. */
