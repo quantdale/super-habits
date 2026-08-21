@@ -57,6 +57,26 @@ export function formatWorkoutTime(totalSeconds: number): string {
 }
 
 /**
+ * Compact relative label for a routine's last performance:
+ * Today / Yesterday / "N days ago" / short date (year added once it is stale
+ * enough to be ambiguous). Returns null for unparseable input.
+ */
+export function formatLastPerformedLabel(iso: string, now: Date = new Date()): string | null {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return null;
+  const startOfDayMs = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayGap = Math.round((startOfDayMs(now) - startOfDayMs(then)) / (24 * 60 * 60 * 1000));
+  if (dayGap <= 0) return 'Today';
+  if (dayGap === 1) return 'Yesterday';
+  if (dayGap < 30) return `${dayGap} days ago`;
+  const options: Intl.DateTimeFormatOptions =
+    then.getFullYear() === now.getFullYear()
+      ? { month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' };
+  return then.toLocaleDateString('en', options);
+}
+
+/**
  * Build the flat sequence of timer phases for a session.
  * Returns an ordered array that the session screen steps through.
  */
@@ -231,6 +251,22 @@ export function computeSessionTotalSets(sessionExercises: { setsCompleted: numbe
   return sessionExercises.reduce((total, ex) => total + ex.setsCompleted, 0);
 }
 
+/**
+ * Σ weight×reps across completed sets. Sets without recorded weight/reps are
+ * skipped — unknown contributes nothing rather than fabricating volume.
+ */
+export function computeSessionTotalVolume(
+  sets: { weight: number | null; reps: number | null; completed: boolean }[],
+): number {
+  let total = 0;
+  for (const set of sets) {
+    if (!set.completed || set.weight === null || set.reps === null) continue;
+    if (!Number.isFinite(set.weight) || !Number.isFinite(set.reps)) continue;
+    total += set.weight * set.reps;
+  }
+  return total;
+}
+
 export type WeeklyVolumePoint = {
   /** Local date key of the week's Monday. */
   weekStartKey: string;
@@ -360,7 +396,7 @@ export function summarizeCompletedSets(
 }
 
 /** Parse optional free-text numeric entry; empty/invalid/negative → null. */
-function parseOptionalMeasurement(raw: string | undefined): number | null {
+export function parseOptionalMeasurement(raw: string | undefined): number | null {
   if (raw === undefined) return null;
   const trimmed = raw.trim();
   if (trimmed === '') return null;

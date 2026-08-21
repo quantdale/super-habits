@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, Pressable, Alert, TextInput } from 'react-native';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import { Animated, View, Text, Pressable, Alert, TextInput } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Screen } from '@/core/ui/Screen';
 import { Button } from '@/core/ui/Button';
@@ -8,15 +9,19 @@ import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { useMotionDuration } from '@/core/theme/motion';
 import {
   applyRestDefault,
   buildPreviousSetLookup,
   buildTimerSequence,
   collectSessionSetRecords,
   computeSessionTotalSets,
+  computeSessionTotalVolume,
+  estimate1RM,
   findNewPersonalRecords,
   formatWorkoutTime,
   lookupPreviousSet,
+  parseOptionalMeasurement,
   summarizeCompletedSets,
   type EnteredSetValues,
   type LoggedSet,
@@ -25,11 +30,13 @@ import {
   type TimerPhase,
 } from './workout.domain';
 import {
+  clearWorkoutSessionDraft,
   listLoggedSetsForExerciseNames,
   listRecentLoggedSets,
   logWorkoutSession,
   loadRestSecondsDefault,
   saveRestSecondsDefault,
+  saveWorkoutSessionDraft,
 } from './workout.data';
 import {
   DEFAULT_REST_SECONDS,
@@ -43,13 +50,37 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 
 const WORKOUT_COLOR = SECTION_COLORS.workout;
 
+/** How long the live PR celebration stays on screen before auto-dismissing. */
+const PR_NOTICE_VISIBLE_MS = 4000;
+
+/** Whole numbers stay bare; fractional estimates keep one decimal. */
+function formatMetricNumber(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/** Keep a restored phase cursor inside the (possibly edited) sequence. */
+function clampPhaseIndex(index: number, length: number): number {
+  if (length <= 0) return 0;
+  return Math.min(Math.max(0, Math.trunc(index)), length - 1);
+}
+
+/** Draft state replayed into a resumed session. */
+export type SessionResume = {
+  phaseIndex: number;
+  startedAtMs: number;
+  elapsedSeconds: number;
+};
+
 type Props = {
   routine: RoutineWithExercises;
   onFinish: () => void;
   onCancel: () => void;
+  /** Present when the session was resumed from a persisted draft. */
+  resume?: SessionResume;
 };
 
-export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
+export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Props) {
   const { tokens } = useAppTheme();
   // Loaded from app_meta; zero-rest sets inherit this default. Adjustments
   // during the session stay session-local until explicitly saved (the
@@ -107,13 +138,22 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
     void saveRestSecondsDefault(restDefault).then(() => setPersistedRestDefault(restDefault));
   };
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [remaining, setRemaining] = useState(() => sequence[0]?.durationSeconds ?? 0);
+  // A resumed session restarts paused at the saved phase cursor; prior phases
+  // count as completed with their measurements unrecorded (the minimal draft
+  // does not carry entered values or skip flags).
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    resume ? clampPhaseIndex(resume.phaseIndex, sequence.length) : 0,
+  );
+  const [remaining, setRemaining] = useState(
+    () => sequence[clampPhaseIndex(resume?.phaseIndex ?? 0, sequence.length)]?.durationSeconds ?? 0,
+  );
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   // Display-only tick counter; the persisted duration is derived from real
   // wall-clock timestamps (startedAtMsRef → handleFinish), not from ticks.
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(() =>
+    Math.max(0, Math.round(resume?.elapsedSeconds ?? 0)),
+  );
   // Per-phase outcome: natural timeout marks 'completed', Skip marks
   // 'skipped'. Skipped active phases are never counted as completed work.
   const [dispositions, setDispositions] = useState<Record<number, PhaseDisposition>>({});
@@ -124,8 +164,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   const [savedOutcome, setSavedOutcome] = useState<{ newRecords: string[] } | null>(null);
   const [previousLookup, setPreviousLookup] = useState<PreviousSetLookup | null>(null);
   // Wall-clock start captured on the FIRST Start press (not mount — users
-  // idle before starting); null when the timer never ran.
-  const startedAtMsRef = useRef<number | null>(null);
+  // idle before starting); null when the timer never ran. A resumed session
+  // replays the draft's original start so logged duration stays truthful.
+  const startedAtMsRef = useRef<number | null>(resume?.startedAtMs ?? null);
 
   const currentPhase: TimerPhase | undefined = sequence[currentIndex];
 
@@ -134,11 +175,53 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
     currentIndexRef.current = currentIndex;
   });
 
+  const elapsedSecondsRef = useRef(elapsedSeconds);
+  useEffect(() => {
+    elapsedSecondsRef.current = elapsedSeconds;
+  });
+
+  const enteredSetsRef = useRef(enteredSets);
+  useEffect(() => {
+    enteredSetsRef.current = enteredSets;
+  });
+
+  // Draft persistence: written on Start and on every phase transition so an
+  // app restart can offer to resume; cleared on finish/abandon/discard.
+  const persistDraft = useCallback(
+    (phaseIndex: number) => {
+      const startedAtMs = startedAtMsRef.current;
+      if (startedAtMs === null) return;
+      void saveWorkoutSessionDraft({
+        routineId: routine.id,
+        startedAtIso: new Date(startedAtMs).toISOString(),
+        phaseIndex,
+        elapsedAdjustSeconds: elapsedSecondsRef.current,
+      }).catch(() => {
+        // Best-effort: the live session never depends on the draft.
+      });
+    },
+    [routine.id],
+  );
+
+  const clearDraft = useCallback(() => {
+    void clearWorkoutSessionDraft().catch(() => {
+      // A stale draft only offers a resume that re-validates the routine.
+    });
+  }, []);
+
+  // Keep the draft's phase cursor in step with every transition once the
+  // timer has started (no-op before Start; harmless rewrite on resume mount).
+  useEffect(() => {
+    if (startedAtMsRef.current === null) return;
+    persistDraft(currentIndex);
+  }, [currentIndex, persistDraft]);
+
   // Seed the entry fields for a newly-current active phase from the most
   // recent recorded values for that exercise (exact set number first).
   useEffect(() => {
     const phase = sequence[currentIndex];
     if (!phase || phase.phase !== 'active') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEnteredSets((prev) => {
       if (prev[currentIndex]) return prev;
       const prior = lookupPreviousSet(previousLookup, phase.exerciseName, phase.setNumber);
@@ -148,8 +231,104 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
         [currentIndex]: { weight: String(prior.weight), reps: String(prior.reps) },
       };
     });
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [currentIndex, sequence, previousLookup]);
+
+  // --- Live PR feedback -----------------------------------------------------
+  // History per exercise is fetched once per session and cached; each
+  // completed set is compared against prior sessions plus earlier sets of
+  // this session so only genuine improvements are celebrated.
+
+  const celebrationDurationMs = useMotionDuration('celebration');
+  const [prNotice, setPrNotice] = useState<{ exerciseName: string; estimated1RM: number } | null>(
+    null,
+  );
+  const prNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prHistoryCacheRef = useRef<Map<string, LoggedSet[]>>(new Map());
+  const sessionWeightedSetsRef = useRef<LoggedSet[]>([]);
+  // Stable across renders without touching `.current` during render.
+  const [prNoticeOpacity] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (!prNotice) {
+      prNoticeOpacity.setValue(0);
+      return;
+    }
+    if (celebrationDurationMs === 0) {
+      prNoticeOpacity.setValue(1);
+      return;
+    }
+    Animated.timing(prNoticeOpacity, {
+      toValue: 1,
+      duration: celebrationDurationMs,
+      useNativeDriver: true,
+    }).start();
+  }, [prNotice, celebrationDurationMs, prNoticeOpacity]);
+
+  useEffect(() => {
+    return () => {
+      if (prNoticeTimerRef.current) clearTimeout(prNoticeTimerRef.current);
+    };
+  }, []);
+
+  const showPrNotice = useCallback((exerciseName: string, estimated1RM: number) => {
+    if (prNoticeTimerRef.current) clearTimeout(prNoticeTimerRef.current);
+    setPrNotice({ exerciseName, estimated1RM });
+    prNoticeTimerRef.current = setTimeout(() => setPrNotice(null), PR_NOTICE_VISIBLE_MS);
+  }, []);
+
+  const dismissPrNotice = useCallback(() => {
+    if (prNoticeTimerRef.current) {
+      clearTimeout(prNoticeTimerRef.current);
+      prNoticeTimerRef.current = null;
+    }
+    setPrNotice(null);
+  }, []);
+
+  const flagPersonalRecordForSet = useCallback(
+    async (index: number) => {
+      const phase = sequence[index];
+      if (!phase || phase.phase !== 'active') return;
+      const entered = enteredSetsRef.current[index];
+      const weight = parseOptionalMeasurement(entered?.weight);
+      const reps = parseOptionalMeasurement(entered?.reps);
+      if (weight === null || reps === null || weight <= 0 || reps <= 0) return;
+
+      let history = prHistoryCacheRef.current.get(phase.exerciseName);
+      if (!history) {
+        try {
+          history = await listLoggedSetsForExerciseNames([phase.exerciseName]);
+        } catch {
+          history = [];
+        }
+        prHistoryCacheRef.current.set(phase.exerciseName, history);
+      }
+
+      const records = findNewPersonalRecords(
+        [{ exerciseName: phase.exerciseName, weight, reps }],
+        [...history, ...sessionWeightedSetsRef.current],
+      );
+      sessionWeightedSetsRef.current.push({ exerciseName: phase.exerciseName, weight, reps });
+      if (records.length === 0) return;
+      showPrNotice(phase.exerciseName, estimate1RM(weight, reps));
+    },
+    [sequence, showPrNotice],
+  );
+
+  // Fire the live PR check when the cursor advances past a naturally
+  // completed active phase (Skip marks 'skipped' before advancing).
+  const lastAdvancedFromRef = useRef<number | null>(null);
+  useEffect(() => {
+    const from = lastAdvancedFromRef.current;
+    lastAdvancedFromRef.current = currentIndex;
+    if (from === null || currentIndex !== from + 1) return;
+    if (dispositions[from] === 'skipped') return;
+    void flagPersonalRecordForSet(from);
+  }, [currentIndex, dispositions, flagPersonalRecordForSet]);
+
+  // Reaching the summary ends the draft — there is no phase left to resume.
+  useEffect(() => {
+    if (isComplete) clearDraft();
+  }, [isComplete, clearDraft]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
     setEnteredSets((prev) => {
@@ -185,6 +364,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
 
   const handleStart = () => {
     if (startedAtMsRef.current === null) startedAtMsRef.current = Date.now();
+    persistDraft(currentIndexRef.current);
     setIsRunning(true);
   };
 
@@ -248,6 +428,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,
         endedAt: new Date(endedAtMs).toISOString(),
       });
+      clearDraft();
       setSavedOutcome({ newRecords });
     } finally {
       setIsSaving(false);
@@ -266,6 +447,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
         style: 'destructive',
         onPress: () => {
           setIsRunning(false);
+          clearDraft();
           onCancel();
         },
       },
@@ -275,6 +457,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   if (isComplete && savedOutcome) {
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
     const totalSets = computeSessionTotalSets(summary);
+    const totalVolume = computeSessionTotalVolume(
+      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets),
+    );
     return (
       <Screen>
         <View className="flex-1 justify-center">
@@ -312,6 +497,14 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
                     Exercises
                   </Text>
                 </View>
+                <View className="items-center">
+                  <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                    {formatMetricNumber(totalVolume)}
+                  </Text>
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    Volume
+                  </Text>
+                </View>
               </View>
               {savedOutcome.newRecords.length > 0 ? (
                 <View
@@ -344,6 +537,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   if (isComplete) {
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
     const totalSets = computeSessionTotalSets(summary);
+    const totalVolume = computeSessionTotalVolume(
+      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets),
+    );
     return (
       <Screen>
         <View className="flex-1 justify-center">
@@ -379,6 +575,14 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
                   </Text>
                   <Text className="text-xs" style={{ color: tokens.textMuted }}>
                     Exercises
+                  </Text>
+                </View>
+                <View className="items-center">
+                  <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                    {formatMetricNumber(totalVolume)}
+                  </Text>
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    Volume
                   </Text>
                 </View>
               </View>
@@ -425,6 +629,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   const isActive = currentPhase.phase === 'active';
   const denom = currentPhase.durationSeconds > 0 ? currentPhase.durationSeconds : 1;
   const progress = 1 - remaining / denom;
+  // Visible previous performance at the point of entry; the same values
+  // silently pre-seed the inputs below.
+  const previousForCurrentSet = isActive
+    ? lookupPreviousSet(previousLookup, currentPhase.exerciseName, currentPhase.setNumber)
+    : null;
 
   return (
     <Screen>
@@ -445,6 +654,39 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
           {currentIndex + 1}/{sequence.length}
         </Text>
       </View>
+
+      {prNotice ? (
+        <Animated.View
+          className="mb-3"
+          style={{ opacity: prNoticeOpacity }}
+          accessibilityLiveRegion="polite"
+        >
+          <View
+            className="flex-row items-center gap-3 rounded-2xl border px-4 py-3"
+            style={{
+              backgroundColor: tokens.successBackground,
+              borderColor: tokens.successBorder,
+            }}
+          >
+            <MaterialIcons name="emoji-events" size={20} color={tokens.successText} />
+            <Text
+              className="min-w-0 flex-1 text-sm font-semibold"
+              style={{ color: tokens.successText }}
+              numberOfLines={2}
+            >
+              {`PR! ${prNotice.exerciseName} · est. ${formatMetricNumber(prNotice.estimated1RM)} kg`}
+            </Text>
+            <Pressable
+              onPress={dismissPrNotice}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss personal record notice"
+              hitSlop={8}
+            >
+              <MaterialIcons name="close" size={18} color={tokens.successText} />
+            </Pressable>
+          </View>
+        </Animated.View>
+      ) : null}
 
       <Card accentColor={WORKOUT_COLOR}>
         <View
@@ -486,6 +728,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
           <View className="mb-5">
             <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
               Log this set (optional)
+            </Text>
+            <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+              {previousForCurrentSet
+                ? `Last: ${previousForCurrentSet.weight}×${previousForCurrentSet.reps}`
+                : 'Last: —'}
             </Text>
             <View className="mt-2 flex-row items-end gap-3">
               <View className="min-w-0 flex-1">

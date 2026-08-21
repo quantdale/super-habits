@@ -1,6 +1,11 @@
 import { getDatabase } from '@/core/db/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/appMeta';
+import {
+  appMetaKeys,
+  deleteAppMetaKey,
+  getAppMetaJsonOrDefault,
+  setAppMetaJson,
+} from '@/core/db/appMeta';
 import {
   RoutineExercise,
   RoutineExerciseSet,
@@ -1101,6 +1106,87 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
     }
   }
   return newId;
+}
+
+// ---------------------------------------------------------------------------
+// Active session draft (app_meta `workout.active_session_draft`). Local
+// operational state only — deliberately not part of the backup allowlist
+// (a restored device has no live workout to resume).
+// ---------------------------------------------------------------------------
+
+/** Minimal in-progress session state persisted for resume after an app
+ *  restart. Entered weight/reps and skip flags stay session-local by design;
+ *  a resumed session reconstructs at the saved phase cursor with prior phases
+ *  counted as completed and their measurements unrecorded. */
+export type WorkoutSessionDraft = {
+  routineId: string;
+  /** ISO timestamp of the session's first Start press. */
+  startedAtIso: string;
+  /** Index into the routine's timer-phase sequence. */
+  phaseIndex: number;
+  /** Display-clock seconds already elapsed when the draft was written. */
+  elapsedAdjustSeconds?: number;
+};
+
+function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.routineId !== 'string' || candidate.routineId.length === 0) return null;
+  if (typeof candidate.startedAtIso !== 'string') return null;
+  if (Number.isNaN(new Date(candidate.startedAtIso).getTime())) return null;
+  if (
+    typeof candidate.phaseIndex !== 'number' ||
+    !Number.isInteger(candidate.phaseIndex) ||
+    candidate.phaseIndex < 0
+  ) {
+    return null;
+  }
+  const elapsed = candidate.elapsedAdjustSeconds;
+  return {
+    routineId: candidate.routineId,
+    startedAtIso: candidate.startedAtIso,
+    phaseIndex: candidate.phaseIndex,
+    ...(typeof elapsed === 'number' && Number.isFinite(elapsed) && elapsed >= 0
+      ? { elapsedAdjustSeconds: Math.round(elapsed) }
+      : {}),
+  };
+}
+
+/** Read the resumable workout draft, or null when no session is in flight. */
+export async function getWorkoutSessionDraft(): Promise<WorkoutSessionDraft | null> {
+  const db = await getDatabase();
+  return getAppMetaJsonOrDefault<WorkoutSessionDraft | null>(
+    db,
+    appMetaKeys.workoutActiveSessionDraft,
+    null,
+    normalizeWorkoutSessionDraft,
+  );
+}
+
+/** Persist the in-progress workout draft; invalid drafts are rejected silently. */
+export async function saveWorkoutSessionDraft(draft: WorkoutSessionDraft): Promise<void> {
+  const normalized = normalizeWorkoutSessionDraft(draft);
+  if (!normalized) return;
+  const db = await getDatabase();
+  await setAppMetaJson(db, appMetaKeys.workoutActiveSessionDraft, normalized);
+}
+
+/** Clear the draft on finish, abandon, or discard. */
+export async function clearWorkoutSessionDraft(): Promise<void> {
+  const db = await getDatabase();
+  await deleteAppMetaKey(db, appMetaKeys.workoutActiveSessionDraft);
+}
+
+/**
+ * Most recent completed_at per routine id — the "Last performed" context on
+ * routine cards. Unbounded across history, unlike the 364-day landing queries.
+ */
+export async function getLastPerformedByRoutine(): Promise<Map<string, string>> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ routine_id: string; last_at: string }>(
+    'SELECT routine_id, MAX(completed_at) AS last_at FROM workout_logs GROUP BY routine_id',
+  );
+  return new Map(rows.map((row) => [row.routine_id, row.last_at]));
 }
 
 // ---------------------------------------------------------------------------

@@ -52,6 +52,9 @@ export const appMetaKeys = {
   pomodoroPendingLogs: defineJsonKey('pomodoro.pending_logs', 'pomodoro'),
   /** Default workout rest seconds (recoverable-settings V3 source). */
   workoutRestSeconds: defineJsonKey('workout_rest_seconds', 'workout'),
+  /** Durable in-progress workout session draft for resume after restart.
+   *  Local operational state — never backed up. */
+  workoutActiveSessionDraft: defineJsonKey('workout.active_session_draft', 'workout'),
   /** Todo/daily-plan reminder preferences (recoverable-settings V3 source). */
   notificationPreferences: defineJsonKey('notification_preferences', 'notifications'),
   backupScopeVersion: defineTextKey('backup.scope_version', 'sync'),

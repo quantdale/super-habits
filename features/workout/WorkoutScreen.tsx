@@ -13,29 +13,35 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
+import { MenuSheet } from '@/core/ui/MenuSheet';
 import type { WorkoutRoutine, RoutineWithExercises, WorkoutLog } from './types';
 import {
   addRoutine,
+  clearWorkoutSessionDraft,
   completeRoutine,
   deleteRoutine,
   getRoutineWithExercises,
+  getWorkoutSessionDraft,
+  getLastPerformedByRoutine,
   listRoutines,
   listSessionTotalsForRange,
   listWorkoutLogsForRange,
   duplicateRoutine,
+  type WorkoutSessionDraft,
 } from '@/features/workout/workout.data';
 import {
   buildVolumePerWeek,
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
+  formatLastPerformedLabel,
 } from '@/features/workout/workout.domain';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
-import { WorkoutSessionScreen } from './WorkoutSessionScreen';
+import { WorkoutSessionScreen, type SessionResume } from './WorkoutSessionScreen';
 import { WorkoutHistoryDetailModal } from './WorkoutHistoryDetail';
 import { WeeklyVolumeChart } from './WeeklyVolumeChart';
 
@@ -47,7 +53,8 @@ import { validateRoutineName } from '@/lib/validation';
 
 const COLOR = SECTION_COLORS.workout;
 
-type ViewState = { type: 'list' } | { type: 'session'; routine: RoutineWithExercises };
+type ViewState =
+  { type: 'list' } | { type: 'session'; routine: RoutineWithExercises; resume?: SessionResume };
 
 type RoutineModalState = { routineId: string; routineName: string };
 
@@ -57,14 +64,18 @@ function RoutineSwipeRow({
   onCompleteWorkout,
   onRequestDelete,
   accentColor,
+  lastPerformedAt,
 }: {
   routine: WorkoutRoutine;
   onOpenDetail: () => void;
   onCompleteWorkout: () => void;
   onRequestDelete: () => void | Promise<void>;
   accentColor: string;
+  /** ISO completed_at of the routine's most recent session, if any. */
+  lastPerformedAt: string | null;
 }) {
   const { tokens } = useAppTheme();
+  const lastPerformedLabel = lastPerformedAt ? formatLastPerformedLabel(lastPerformedAt) : null;
   return (
     <SwipeableCard
       accentColor={accentColor}
@@ -84,6 +95,11 @@ function RoutineSwipeRow({
         {routine.description ? (
           <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
             {routine.description}
+          </Text>
+        ) : null}
+        {lastPerformedLabel ? (
+          <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+            Last: {lastPerformedLabel}
           </Text>
         ) : null}
       </RectButton>
@@ -110,6 +126,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [currentView, setCurrentView] = useState<ViewState>({ type: 'list' });
   const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<WorkoutSessionDraft | null>(null);
+  const [chooserVisible, setChooserVisible] = useState(false);
+  const [lastPerformed, setLastPerformed] = useState<Map<string, string>>(new Map());
   useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
 
   const refresh = useCallback(async () => {
@@ -129,6 +148,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     volumeStart.setDate(volumeStart.getDate() - 7 * 7 - ((volumeStart.getDay() + 6) % 7));
     const totals = await listSessionTotalsForRange(toDateKey(volumeStart), endKey);
     setWeeklyVolume(buildVolumePerWeek(totals, 8));
+
+    setLastPerformed(await getLastPerformedByRoutine());
+    setDraft(await getWorkoutSessionDraft());
   }, []);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
@@ -169,6 +191,64 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     [confirm, refresh, routineModal],
   );
 
+  const startRoutineById = useCallback(async (routineId: string) => {
+    const full = await getRoutineWithExercises(routineId);
+    if (!full || full.exercises.length === 0) {
+      Alert.alert('No exercises', 'Add exercises to this routine before starting.');
+      return;
+    }
+    setCurrentView({ type: 'session', routine: full });
+  }, []);
+
+  const handleResumeDraft = useCallback(async () => {
+    if (!draft) return;
+    const full = await getRoutineWithExercises(draft.routineId);
+    if (!full || full.exercises.length === 0) {
+      Alert.alert(
+        'Workout unavailable',
+        'The routine for this saved session no longer has any exercises.',
+        [
+          { text: 'Keep it', style: 'cancel' },
+          {
+            text: 'Discard draft',
+            style: 'destructive',
+            onPress: () => {
+              void clearWorkoutSessionDraft().catch(() => {});
+              setDraft(null);
+            },
+          },
+        ],
+      );
+      return;
+    }
+    const startedAtMs = Date.parse(draft.startedAtIso);
+    setCurrentView({
+      type: 'session',
+      routine: full,
+      resume: {
+        phaseIndex: draft.phaseIndex,
+        startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
+        elapsedSeconds: draft.elapsedAdjustSeconds ?? 0,
+      },
+    });
+  }, [draft]);
+
+  const handleDiscardDraft = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Discard workout?',
+      message: 'Saved progress for this session will be removed.',
+      confirmLabel: 'Discard',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    await clearWorkoutSessionDraft();
+    setDraft(null);
+  }, [confirm]);
+
+  const draftRoutineName = draft
+    ? (routines.find((r) => r.id === draft.routineId)?.name ?? 'Workout')
+    : null;
+
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
   const workoutDaysCount = workoutActivityDays.filter((d) => d.active).length;
@@ -177,6 +257,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     return (
       <WorkoutSessionScreen
         routine={currentView.routine}
+        resume={currentView.resume}
         onFinish={() => {
           setCurrentView({ type: 'list' });
           void refresh();
@@ -187,6 +268,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             routineId: currentView.routine.id,
             routineName: currentView.routine.name,
           });
+          void refresh();
         }}
       />
     );
@@ -205,21 +287,29 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           setRoutineModal(null);
           void refresh();
         }}
-        onStartWorkout={async () => {
+        onStartWorkout={() => {
           if (!routineModal) return;
-          const full = await getRoutineWithExercises(routineModal.routineId);
-          if (!full || full.exercises.length === 0) {
-            Alert.alert('No exercises', 'Add exercises to this routine before starting.');
-            return;
-          }
+          const routineId = routineModal.routineId;
           setRoutineModal(null);
-          setCurrentView({ type: 'session', routine: full });
+          void startRoutineById(routineId);
         }}
       />
       <WorkoutHistoryDetailModal
         visible={detailLogId !== null}
         logId={detailLogId}
         onClose={() => setDetailLogId(null)}
+      />
+      <MenuSheet
+        visible={chooserVisible}
+        onClose={() => setChooserVisible(false)}
+        title="Start workout — choose a routine"
+        items={routines.map((routine) => ({
+          icon: 'fitness-center' as const,
+          label: routine.name,
+          onPress: () => {
+            void startRoutineById(routine.id);
+          },
+        }))}
       />
       {confirmationDialog}
       <Screen scroll>
@@ -232,6 +322,61 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 : 'Create simple routines and mark completions.'
             }
           />
+        </ScreenSection>
+
+        <ScreenSection>
+          <Card accentColor={COLOR} className="mb-0">
+            {draft && draftRoutineName ? (
+              <>
+                <Text
+                  className="text-xs font-semibold uppercase"
+                  style={{ color: tokens.textMuted }}
+                >
+                  Session in progress
+                </Text>
+                <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
+                  {draftRoutineName}
+                </Text>
+                <View className="mt-4 gap-3">
+                  <Button
+                    label={`Resume workout · ${draftRoutineName}`}
+                    onPress={() => void handleResumeDraft()}
+                    color={COLOR}
+                  />
+                  <Button
+                    label="Discard"
+                    variant="ghost"
+                    onPress={() => void handleDiscardDraft()}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                  Ready to train?
+                </Text>
+                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  Pick a routine and the guided timer walks you through every set.
+                </Text>
+                <View className="mt-4">
+                  <Button
+                    label="Start workout"
+                    onPress={() => {
+                      if (routines.length === 0) {
+                        Alert.alert(
+                          'No routines yet',
+                          'Create a routine first, then start your workout.',
+                        );
+                        return;
+                      }
+                      setChooserVisible(true);
+                    }}
+                    color={COLOR}
+                  />
+                </View>
+              </>
+            )}
+          </Card>
         </ScreenSection>
 
         <ScreenSection>
@@ -326,6 +471,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 key={routine.id}
                 routine={routine}
                 accentColor={COLOR}
+                lastPerformedAt={lastPerformed.get(routine.id) ?? null}
                 onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
                 onCompleteWorkout={() => {
                   void (async () => {
@@ -340,25 +486,6 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             ))}
           </ScreenSection>
         ) : null}
-
-        <ScreenSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Weekly volume"
-            headerSubtitle="Completed sets per week over the last 8 weeks."
-            headerRight={<MaterialIcons name="bar-chart" size={22} color={tokens.textOnAccent} />}
-            className="mb-0"
-          >
-            {weeklyVolume.some((w) => w.totalSets > 0) ? (
-              <WeeklyVolumeChart data={weeklyVolume} />
-            ) : (
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                Complete a session to start filling your weekly volume chart.
-              </Text>
-            )}
-          </Card>
-        </ScreenSection>
 
         {recentLogs.length > 0 ? (
           <ScreenSection>
@@ -397,6 +524,25 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             })}
           </ScreenSection>
         ) : null}
+
+        <ScreenSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Weekly volume"
+            headerSubtitle="Completed sets per week over the last 8 weeks."
+            headerRight={<MaterialIcons name="bar-chart" size={22} color={tokens.textOnAccent} />}
+            className="mb-0"
+          >
+            {weeklyVolume.some((w) => w.totalSets > 0) ? (
+              <WeeklyVolumeChart data={weeklyVolume} />
+            ) : (
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                Complete a session to start filling your weekly volume chart.
+              </Text>
+            )}
+          </Card>
+        </ScreenSection>
 
         <ScreenSection className="mb-0">
           <Card

@@ -44,4 +44,3 @@ export async function readLegacyStoredRestSeconds(): Promise<number | null> {
 // `core/backup/backupSettings` imports this module and a data-layer back-edge
 // would create an adapter → settings → workout.data → sync.engine → adapter
 // import cycle that breaks `new SupabaseSyncAdapter()` at module scope.
-

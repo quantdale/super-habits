@@ -8,6 +8,7 @@ import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import {
   computePersonalRecords,
   computeSessionTotalSets,
+  computeSessionTotalVolume,
   formatWorkoutTime,
   type LoggedSet,
 } from './workout.domain';
@@ -33,6 +34,12 @@ function formatSetLine(weight: number | null, reps: number | null): string {
   const weightText = weight === null ? '?' : String(weight);
   const repsText = reps === null ? '?' : String(reps);
   return `${weightText} × ${repsText}`;
+}
+
+/** Whole numbers stay bare; fractional totals keep one decimal. */
+function formatMetricNumber(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 type Props = {
@@ -82,6 +89,13 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
       return [{ exerciseName, weight: set.weight, reps: set.reps }];
     });
   const prs = computePersonalRecords(loggedSets);
+  const totalVolume = computeSessionTotalVolume(
+    (detail?.sets ?? []).map((set) => ({
+      weight: set.weight,
+      reps: set.reps,
+      completed: set.completed === 1,
+    })),
+  );
 
   return (
     <Modal visible={visible} onClose={onClose} title="Session detail" scroll>
@@ -138,6 +152,17 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
               </Text>
               <Text className="text-xs" style={{ color: tokens.textMuted }}>
                 Total sets
+              </Text>
+            </View>
+            <View
+              className="flex-1 rounded-2xl border px-4 py-3"
+              style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
+            >
+              <Text className="text-xl font-semibold" style={{ color: COLOR }}>
+                {formatMetricNumber(totalVolume)}
+              </Text>
+              <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                Volume
               </Text>
             </View>
             {detail.log.duration_seconds != null ? (
