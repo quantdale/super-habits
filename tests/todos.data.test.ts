@@ -633,8 +633,7 @@ describe('bulk todo operations', () => {
     await bulkRemoveTodos(['todo_1', 'todo_2']);
 
     const deleteCalls = db.runAsync.mock.calls.filter(
-      (call) =>
-        String(call[0]).includes('SET deleted_at = ?') && String(call[0]).includes('todos'),
+      (call) => String(call[0]).includes('SET deleted_at = ?') && String(call[0]).includes('todos'),
     );
     expect(deleteCalls).toHaveLength(2);
   });

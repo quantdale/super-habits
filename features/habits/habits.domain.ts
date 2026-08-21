@@ -477,3 +477,88 @@ export function buildHabitActivityDays(grid: HabitGridRow[], days: number = 30):
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// List filtering / sorting
+// ---------------------------------------------------------------------------
+
+export type HabitStatusFilter = 'all' | 'active' | 'paused' | 'archived';
+
+export type HabitListFilters = {
+  category?: string | 'all';
+  status?: HabitStatusFilter;
+};
+
+export type HabitSortMode = 'default' | 'name' | 'streak';
+
+/**
+ * Filter habits by category and lifecycle status. Paused/archived are local
+ * (AsyncStorage-backed) id sets, so they are passed in rather than derived.
+ */
+export function filterHabits<T extends { id: string; category?: string | null }>(
+  habits: T[],
+  filters: HabitListFilters,
+  pausedIds: readonly string[] = [],
+  archivedIds: readonly string[] = [],
+): T[] {
+  const paused = new Set(pausedIds);
+  const archived = new Set(archivedIds);
+  const status = filters.status ?? 'active';
+  return habits.filter((habit) => {
+    if (filters.category && filters.category !== 'all') {
+      if ((habit.category ?? 'anytime') !== filters.category) return false;
+    }
+    if (status === 'active' && (paused.has(habit.id) || archived.has(habit.id))) return false;
+    if (status === 'paused' && !paused.has(habit.id)) return false;
+    if (status === 'archived' && !archived.has(habit.id)) return false;
+    return true;
+  });
+}
+
+/** Sort habits; 'default' preserves the data-layer order (category, created). */
+export function sortHabits<T extends { id: string; name: string }>(
+  habits: T[],
+  mode: HabitSortMode,
+  streaks?: Record<string, number>,
+): T[] {
+  const copy = [...habits];
+  if (mode === 'name') {
+    copy.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (mode === 'streak') {
+    copy.sort((a, b) => (streaks?.[b.id] ?? 0) - (streaks?.[a.id] ?? 0));
+  }
+  return copy;
+}
+
+// ---------------------------------------------------------------------------
+// Pause / archive lifecycle (local preference sets)
+// ---------------------------------------------------------------------------
+
+/** Toggle an id inside a lifecycle set, returning a new array. */
+export function toggleHabitLifecycleId(ids: readonly string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id];
+}
+
+export type HabitLifecycleSummary = {
+  activeCount: number;
+  pausedCount: number;
+  archivedCount: number;
+};
+
+export function summarizeHabitLifecycle(
+  habits: { id: string }[],
+  pausedIds: readonly string[],
+  archivedIds: readonly string[],
+): HabitLifecycleSummary {
+  const paused = new Set(pausedIds);
+  const archived = new Set(archivedIds);
+  let activeCount = 0;
+  let pausedCount = 0;
+  let archivedCount = 0;
+  for (const habit of habits) {
+    if (archived.has(habit.id)) archivedCount += 1;
+    else if (paused.has(habit.id)) pausedCount += 1;
+    else activeCount += 1;
+  }
+  return { activeCount, pausedCount, archivedCount };
+}

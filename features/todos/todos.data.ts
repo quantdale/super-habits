@@ -682,10 +682,7 @@ export async function bulkSetTodoCompletion(ids: string[], completed: 0 | 1): Pr
   }
 }
 
-export async function bulkUpdateTodoPriority(
-  ids: string[],
-  priority: TodoPriority,
-): Promise<void> {
+export async function bulkUpdateTodoPriority(ids: string[], priority: TodoPriority): Promise<void> {
   for (const id of ids) {
     await updateTodo(id, { priority });
   }

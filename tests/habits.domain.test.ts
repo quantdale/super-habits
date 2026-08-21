@@ -16,6 +16,10 @@ import {
   isHabitScheduledOn,
   parseHabitRuleHistory,
   type DayCompletion,
+  filterHabits,
+  sortHabits,
+  toggleHabitLifecycleId,
+  summarizeHabitLifecycle,
 } from '@/features/habits/habits.domain';
 import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
 
@@ -385,5 +389,60 @@ describe('date boundaries', () => {
     expect(getHabitRuleForDate(history, '2024-02-29')).not.toBeNull();
     expect(getHabitRuleForDate(history, '2025-01-01')).not.toBeNull();
     expect(dateKeyToLocalDate('2024-02-29').getDate()).toBe(29);
+  });
+});
+
+describe('habit list filtering / sorting', () => {
+  const habits = [
+    { id: 'h1', name: 'Read', category: 'morning' },
+    { id: 'h2', name: 'Walk', category: 'evening' },
+    { id: 'h3', name: 'Meditate', category: 'anytime' },
+  ];
+
+  it('filterHabits filters by category', () => {
+    expect(filterHabits(habits, { category: 'morning' }).map((h) => h.id)).toEqual(['h1']);
+    expect(filterHabits(habits, { category: 'all' })).toHaveLength(3);
+  });
+
+  it('filterHabits defaults to active only', () => {
+    const result = filterHabits(habits, {}, ['h2'], ['h3']);
+    expect(result.map((h) => h.id)).toEqual(['h1']);
+  });
+
+  it('filterHabits selects paused and archived sets', () => {
+    expect(filterHabits(habits, { status: 'paused' }, ['h2'], []).map((h) => h.id)).toEqual(['h2']);
+    expect(filterHabits(habits, { status: 'archived' }, [], ['h3']).map((h) => h.id)).toEqual(['h3']);
+    expect(filterHabits(habits, { status: 'all' }, ['h2'], ['h3'])).toHaveLength(3);
+  });
+
+  it('sortHabits sorts by name without mutating input', () => {
+    const sorted = sortHabits(habits, 'name');
+    expect(sorted.map((h) => h.name)).toEqual(['Meditate', 'Read', 'Walk']);
+    expect(habits[0].name).toBe('Read');
+  });
+
+  it('sortHabits sorts by streak descending with missing streaks last', () => {
+    const sorted = sortHabits(habits, 'streak', { h3: 4, h1: 2 });
+    expect(sorted.map((h) => h.id)).toEqual(['h3', 'h1', 'h2']);
+  });
+
+  it('sortHabits default preserves order', () => {
+    expect(sortHabits(habits, 'default').map((h) => h.id)).toEqual(['h1', 'h2', 'h3']);
+  });
+});
+
+describe('habit lifecycle sets', () => {
+  it('toggleHabitLifecycleId adds and removes ids immutably', () => {
+    expect(toggleHabitLifecycleId([], 'h1')).toEqual(['h1']);
+    expect(toggleHabitLifecycleId(['h1', 'h2'], 'h1')).toEqual(['h2']);
+  });
+
+  it('summarizeHabitLifecycle counts each bucket once', () => {
+    const habits = [{ id: 'h1' }, { id: 'h2' }, { id: 'h3' }, { id: 'h4' }];
+    expect(summarizeHabitLifecycle(habits, ['h2'], ['h3'])).toEqual({
+      activeCount: 2,
+      pausedCount: 1,
+      archivedCount: 1,
+    });
   });
 });
