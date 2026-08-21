@@ -408,7 +408,7 @@ describe('sortSavedMealsForSearch', () => {
       mk('Oat milk', 2, '2026-05-01T00:00:00Z'),
     ];
     const sorted = sortSavedMealsForSearch(meals, 'oat');
-    expect(sorted.map((m) => m.food_name)).toEqual(['Oat cookies', 'Oat milk', 'Oats']);
+    expect(sorted.map((m) => m.food_name)).toEqual(['Oat cookies', 'Oat milk', 'Oats', 'Toast']);
     const noQuery = sortSavedMealsForSearch(meals);
     expect(noQuery[0].food_name).toBe('Toast');
   });
