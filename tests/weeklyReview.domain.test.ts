@@ -8,6 +8,8 @@ import {
   validateReviewDraft,
   generateInsights,
   buildNextWeekPlanSuggestions,
+  listWeekDateKeys,
+  shiftDateKeyByDays,
   MAX_REFLECTION_LENGTH,
 } from '@/features/weekly-review/weeklyReview.domain';
 import type {
@@ -265,6 +267,34 @@ describe('generateInsights', () => {
     };
     const { attention } = generateInsights(summary);
     expect(attention.some((a) => a.kind === 'workout_decline')).toBe(true);
+  });
+});
+
+describe('listWeekDateKeys / shiftDateKeyByDays (F5 local-calendar arithmetic)', () => {
+  it('lists seven consecutive local date keys starting at the week start', () => {
+    expect(listWeekDateKeys('2026-08-17')).toEqual([
+      '2026-08-17',
+      '2026-08-18',
+      '2026-08-19',
+      '2026-08-20',
+      '2026-08-21',
+      '2026-08-22',
+      '2026-08-23',
+    ]);
+  });
+
+  it('honors a custom day count', () => {
+    expect(listWeekDateKeys('2026-08-17', 3)).toEqual(['2026-08-17', '2026-08-18', '2026-08-19']);
+  });
+
+  it('crosses month and year boundaries on the local calendar', () => {
+    expect(listWeekDateKeys('2026-08-30', 3)).toEqual(['2026-08-30', '2026-08-31', '2026-09-01']);
+    expect(shiftDateKeyByDays('2025-12-29', 7)).toBe('2026-01-05');
+  });
+
+  it('shifts backwards across month boundaries', () => {
+    expect(shiftDateKeyByDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(shiftDateKeyByDays('2026-08-17', -7)).toBe('2026-08-10');
   });
 });
 

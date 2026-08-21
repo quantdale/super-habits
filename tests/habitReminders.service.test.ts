@@ -5,6 +5,8 @@ import {
 } from '@/features/habits/habitReminders.service';
 import {
   buildHabitReminderPlan,
+  getHabitReminderSnoozeIdentifier,
+  HABIT_REMINDER_DATA_VERSION,
   type HabitReminderHabit,
 } from '@/features/habits/habitReminders.domain';
 import { createHabitRule } from '@/features/habits/habits.domain';
@@ -196,5 +198,43 @@ describe('reconcileHabitReminders', () => {
     ).resolves.toMatchObject({
       status: 'unsupported',
     });
+  });
+
+  it('cancels a snoozed reminder whose habit is paused or archived (F3)', async () => {
+    const snoozeRequest: NotificationRequest = {
+      identifier: getHabitReminderSnoozeIdentifier('gym', '2026-08-10'),
+      content: {
+        title: 'Gym',
+        body: 'Time to complete your habit.',
+        subtitle: null,
+        categoryIdentifier: null,
+        sound: 'default',
+        data: {
+          kind: 'habit-reminder',
+          version: HABIT_REMINDER_DATA_VERSION,
+          habitId: 'gym',
+          dateKey: '2026-08-10',
+          occurrenceId: getHabitReminderSnoozeIdentifier('gym', '2026-08-10'),
+          time: '18:00',
+          snoozed: true,
+        },
+      },
+      trigger: {
+        type: 'date',
+        date: new Date(2026, 7, 10, 18, 15).getTime(),
+      } as NotificationRequest['trigger'],
+    };
+
+    for (const status of ['paused', 'archived'] as const) {
+      const fake = fakeAdapter([snoozeRequest]);
+      const result = await reconcileHabitReminders({
+        habits: [{ ...habit('gym'), status }],
+        completions: [],
+        now: NOW,
+        adapter: fake.adapter,
+      });
+      expect(result.desired).toBe(0);
+      expect(fake.cancelled).toContain(snoozeRequest.identifier);
+    }
   });
 });

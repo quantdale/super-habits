@@ -85,7 +85,23 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], serviceWorkers: 'block' },
       // Journey specs must not run in the default E2E suite (they have their
       // own project, longer timeouts, and are serial/continuity-based).
-      testIgnore: '**/e2e/journeys/**',
+      // pwa-update.spec.ts has its own lane (real workers required).
+      testIgnore: ['**/e2e/journeys/**', '**/e2e/pwa-update.spec.ts'],
+    },
+    {
+      // Dedicated PWA update-lifecycle lane (audit AREA 9): registration,
+      // waiting-worker detection, SKIP_WAITING apply + single gated reload,
+      // connectivity indicator. Needs REAL service workers, so it cannot
+      // share the chromium project (which blocks them for the DB harness).
+      // Opt-in via --project=pwa; serial because every test registers a
+      // worker against the shared localhost origin.
+      name: 'pwa',
+      testMatch: /pwa-update\.spec\.ts/,
+      timeout: 90_000,
+      expect: { timeout: 10_000 },
+      workers: 1,
+      fullyParallel: false,
+      use: { ...devices['Desktop Chrome'], serviceWorkers: 'allow' },
     },
     {
       name: 'journeys',

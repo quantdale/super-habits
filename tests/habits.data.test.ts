@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { incrementHabit, incrementHabitFromLinkedAction } from '@/features/habits/habits.data';
+import {
+  archiveHabit,
+  incrementHabit,
+  incrementHabitFromLinkedAction,
+  pauseHabit,
+  resumeHabit,
+  completeHabitFromNotification,
+} from '@/features/habits/habits.data';
 
 const { getDatabase } = vi.hoisted(() => ({
   getDatabase: vi.fn(),
@@ -11,12 +18,25 @@ const { linkedActionsEngine } = vi.hoisted(() => ({
   },
 }));
 
+const { notificationActions } = vi.hoisted(() => ({
+  notificationActions: {
+    claimNotificationActionInTransaction: vi.fn(),
+    setNotificationActionLinkedRequiredInTransaction: vi.fn(),
+  },
+}));
+
 vi.mock('@/core/db/client', () => ({
   getDatabase,
 }));
 
 vi.mock('@/core/linked-actions/linkedActions.engine', () => ({
   linkedActionsEngine,
+}));
+
+vi.mock('@/features/habits/notificationActions.data', () => ({
+  claimNotificationActionInTransaction: notificationActions.claimNotificationActionInTransaction,
+  setNotificationActionLinkedRequiredInTransaction:
+    notificationActions.setNotificationActionLinkedRequiredInTransaction,
 }));
 
 describe('features/habits/habits.data', () => {
@@ -316,5 +336,236 @@ describe('features/habits/habits.data', () => {
       ],
     );
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+  });
+});
+
+describe('features/habits/habits.data — durable lifecycle transitions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function lifecycleDb(
+    current: { status: string | null; lifecycle_history: string | null } | null,
+  ) {
+    return {
+      getFirstAsync: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM habits')) return current;
+        // sync_outbox owner reads and app_meta reads resolve to "absent".
+        return null;
+      }),
+      runAsync: vi.fn(async (_sql: string, _params?: unknown[]) => ({
+        changes: 1,
+        lastInsertRowId: 1,
+      })),
+    };
+  }
+
+  function statusUpdateCall(db: ReturnType<typeof lifecycleDb>) {
+    const call = db.runAsync.mock.calls.find(([sql]) => sql.includes('UPDATE habits SET status'));
+    return call as unknown as [string, unknown[]] | undefined;
+  }
+
+  it('pauseHabit writes the durable status, opens an ongoing interval, and enqueues a backup update', async () => {
+    const db = lifecycleDb({ status: 'active', lifecycle_history: null });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(pauseHabit('habit_1', '2026-08-10')).resolves.toBe(true);
+
+    const update = statusUpdateCall(db);
+    expect(update).toBeDefined();
+    const [status, historyJson] = update![1];
+    expect(status).toBe('paused');
+    expect(JSON.parse(historyJson as string)).toEqual([
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: null },
+    ]);
+
+    // The outbox intent rides the same transaction (entity + operation).
+    const outboxWrite = db.runAsync.mock.calls.find(([sql]) => sql.includes('sync_outbox'));
+    expect(outboxWrite).toBeDefined();
+    expect(JSON.stringify(outboxWrite![1])).toContain('"habits"');
+    expect(JSON.stringify(outboxWrite![1])).toContain('"update"');
+  });
+
+  it('resumeHabit closes the open pause interval', async () => {
+    const db = lifecycleDb({
+      status: 'paused',
+      lifecycle_history: JSON.stringify([
+        { status: 'paused', from_date_key: '2026-08-01', to_date_key: null },
+      ]),
+    });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(resumeHabit('habit_1', '2026-08-10')).resolves.toBe(true);
+
+    const update = statusUpdateCall(db);
+    expect(update).toBeDefined();
+    const [status, historyJson] = update![1];
+    expect(status).toBe('active');
+    expect(JSON.parse(historyJson as string)).toEqual([
+      { status: 'paused', from_date_key: '2026-08-01', to_date_key: '2026-08-10' },
+    ]);
+  });
+
+  it('archiveHabit closes an open pause and opens the archive interval', async () => {
+    const db = lifecycleDb({
+      status: 'paused',
+      lifecycle_history: JSON.stringify([
+        { status: 'paused', from_date_key: '2026-08-01', to_date_key: null },
+      ]),
+    });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(archiveHabit('habit_1', '2026-08-10')).resolves.toBe(true);
+
+    const update = statusUpdateCall(db);
+    expect(update).toBeDefined();
+    const [status, historyJson] = update![1];
+    expect(status).toBe('archived');
+    expect(JSON.parse(historyJson as string)).toEqual([
+      { status: 'paused', from_date_key: '2026-08-01', to_date_key: '2026-08-10' },
+      { status: 'archived', from_date_key: '2026-08-10', to_date_key: null },
+    ]);
+  });
+
+  it('re-entering the current state is an idempotent no-op', async () => {
+    const db = lifecycleDb({
+      status: 'paused',
+      lifecycle_history: JSON.stringify([
+        { status: 'paused', from_date_key: '2026-08-01', to_date_key: null },
+      ]),
+    });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(pauseHabit('habit_1')).resolves.toBe(false);
+
+    expect(statusUpdateCall(db)).toBeUndefined();
+    expect(db.runAsync.mock.calls.some(([sql]) => sql.includes('sync_outbox'))).toBe(false);
+  });
+
+  it('does not write when the habit is missing or soft-deleted', async () => {
+    const db = lifecycleDb(null);
+    getDatabase.mockResolvedValue(db);
+
+    await expect(archiveHabit('habit_gone')).resolves.toBe(false);
+    expect(db.runAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('features/habits/habits.data — notification completion lifecycle guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    linkedActionsEngine.processSourceAction.mockResolvedValue({
+      matchedRuleCount: 0,
+      notices: [],
+    });
+  });
+
+  const ACTION_INPUT = {
+    habitId: 'habit_1',
+    dateKey: '2026-08-10',
+    actionKey: 'action_key_1',
+    occurrenceId: 'occurrence_1',
+    now: new Date(2026, 7, 10, 9, 0, 0, 0),
+  };
+
+  function guardDb(habitRow: Record<string, unknown> | null) {
+    return {
+      getFirstAsync: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM habits')) return habitRow;
+        if (sql.includes('FROM habit_completions')) return null;
+        return null;
+      }),
+      runAsync: vi.fn(async () => ({ changes: 1, lastInsertRowId: 1 })),
+      withTransactionAsync: vi.fn(async (task: () => Promise<void>) => {
+        await task();
+      }),
+    };
+  }
+
+  it.each(['paused', 'archived'] as const)(
+    'refuses a %s habit as a noop and clears the linked-action requirement',
+    async (status) => {
+      const db = guardDb({
+        id: 'habit_1',
+        name: 'Hydrate',
+        target_per_day: 1,
+        created_at: '2026-08-01T00:00:00.000Z',
+        rule_history: JSON.stringify([
+          { effective_from_date: '2026-08-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 1 },
+        ]),
+        status,
+      });
+      getDatabase.mockResolvedValue(db);
+      notificationActions.claimNotificationActionInTransaction.mockResolvedValue({
+        claimed: true,
+        linkedEventId: 'levt_1',
+        linkedActionRequired: true,
+      });
+
+      await expect(completeHabitFromNotification(ACTION_INPUT)).resolves.toEqual({
+        status: 'noop',
+        count: 0,
+        linkedActions: { matchedRuleCount: 0, notices: [] },
+      });
+
+      expect(
+        notificationActions.setNotificationActionLinkedRequiredInTransaction,
+      ).toHaveBeenCalledWith(db, 'action_key_1', false);
+      expect(
+        db.getFirstAsync.mock.calls.some(([sql]) => sql.includes('INSERT INTO habit_completions')),
+      ).toBe(false);
+      expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still applies completions for active scheduled habits', async () => {
+    const db = guardDb({
+      id: 'habit_1',
+      name: 'Hydrate',
+      target_per_day: 1,
+      created_at: '2026-08-01T00:00:00.000Z',
+      rule_history: JSON.stringify([
+        { effective_from_date: '2026-08-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 1 },
+      ]),
+      status: 'active',
+    });
+    getDatabase.mockResolvedValue(db);
+    notificationActions.claimNotificationActionInTransaction.mockResolvedValue({
+      claimed: true,
+      linkedEventId: 'levt_active',
+      linkedActionRequired: false,
+    });
+    db.getFirstAsync.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM habits')) {
+        return {
+          id: 'habit_1',
+          name: 'Hydrate',
+          target_per_day: 1,
+          created_at: '2026-08-01T00:00:00.000Z',
+          rule_history: JSON.stringify([
+            {
+              effective_from_date: '2026-08-01',
+              weekdays: [1, 2, 3, 4, 5, 6, 7],
+              target_per_day: 1,
+            },
+          ]),
+          status: 'active',
+        };
+      }
+      if (sql.includes('INSERT INTO habit_completions')) return { id: 'hcmp_1', count: 1 };
+      return null;
+    });
+
+    await expect(completeHabitFromNotification(ACTION_INPUT)).resolves.toMatchObject({
+      status: 'applied',
+      count: 1,
+    });
+
+    expect(
+      db.getFirstAsync.mock.calls.some(([sql]) => sql.includes('INSERT INTO habit_completions')),
+    ).toBe(true);
+    expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'habit_1', eventId: 'levt_active' }),
+    );
   });
 });

@@ -39,6 +39,42 @@ if (!Number.isInteger(args.port) || args.port <= 0 || !args.dist) {
 const PORT = args.port;
 const DIST = path.resolve(__dirname, '..', args.dist);
 
+// Audit AREA 9 F5: product sw.js bypasses localhost in its fetch handler
+// (never cache Metro/dev responses), which also makes the cache-serving path
+// untestable against this E2E server. The worker ships a marked constant; we
+// serve /sw.js with it flipped so Playwright exercises the REAL fetch
+// handler. Product builds are untouched. A stale dist/ (marker missing)
+// fails loudly instead of silently testing the old semantics.
+const SW_BYPASS_MARKER = 'const E2E_DISABLE_DEV_BYPASS = false;';
+const SW_BYPASS_PATCHED = 'const E2E_DISABLE_DEV_BYPASS = true;';
+
+// Test support for SW update flows: Playwright cannot intercept service-
+// worker script fetches with page.route, so specs need the SERVER to change
+// the served /sw.js bytes on demand. POST /__e2e__/sw-variant/<marker> sets
+// an in-memory marker appended as a trailing comment to the served worker;
+// POST /__e2e__/sw-variant/ (empty) restores the plain patched bytes. The
+// marker lives only for this server process and defaults to ''.
+let swVariantMarker = '';
+
+async function readPatchedSwSource() {
+  let source;
+  try {
+    source = await fs.readFile(path.join(DIST, 'sw.js'), 'utf8');
+  } catch {
+    throw new Error(
+      `serve-e2e: ${path.join(DIST, 'sw.js')} not found — run \`npm run build:web\` first.`,
+    );
+  }
+  if (!source.includes(SW_BYPASS_MARKER)) {
+    throw new Error(
+      'serve-e2e: served sw.js is missing the E2E_DISABLE_DEV_BYPASS marker — ' +
+        'the export is stale relative to public/sw.js. Run `npm run build:web`.',
+    );
+  }
+  const patched = source.replace(SW_BYPASS_MARKER, SW_BYPASS_PATCHED);
+  return swVariantMarker ? `${patched}\n// pwa-e2e variant: ${swVariantMarker}\n` : patched;
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -90,6 +126,32 @@ const server = http.createServer(async (req, res) => {
     if (!isInsideDist(filePath)) {
       res.writeHead(403, coopCoepHeaders());
       res.end('Forbidden');
+      return;
+    }
+
+    if (pathname.startsWith('/__e2e__/sw-variant/')) {
+      swVariantMarker = decodeURIComponent(pathname.slice('/__e2e__/sw-variant/'.length));
+      res.writeHead(200, coopCoepHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }));
+      res.end(`sw variant set to: ${JSON.stringify(swVariantMarker)}`);
+      return;
+    }
+
+    if (pathname === '/sw.js') {
+      try {
+        const body = await readPatchedSwSource();
+        // no-store so worker update checks always see the current bytes.
+        res.writeHead(
+          200,
+          coopCoepHeaders({
+            'Content-Type': MIME['.js'],
+            'Cache-Control': 'no-store',
+          }),
+        );
+        res.end(body);
+      } catch (error) {
+        res.writeHead(500, coopCoepHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }));
+        res.end(String(error && error.message ? error.message : error));
+      }
       return;
     }
 

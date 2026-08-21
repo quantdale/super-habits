@@ -352,4 +352,128 @@ describe('features/command/realCommandParser normalization', () => {
       ),
     ).toThrow();
   });
+
+  describe('planning kinds', () => {
+    it.each([
+      {
+        kind: 'create_project',
+        fields: { name: 'Apollo', color: 'blue', targetDate: '2026-05-01' },
+        expected: { name: 'Apollo', color: 'blue', targetDate: '2026-05-01' },
+      },
+      {
+        kind: 'update_goal_progress',
+        fields: { goalTitle: 'Read more', percent: 50 },
+        expected: { goalTitle: 'Read more', percent: 50 },
+      },
+      {
+        kind: 'add_todo_to_daily_plan',
+        fields: { todoTitle: 'Buy groceries', dateKey: null },
+        expected: { todoTitle: 'Buy groceries', dateKey: null },
+      },
+    ])(
+      'normalizes remote $kind drafts with model_proxy parser kind',
+      ({ kind, fields, expected }) => {
+        const result = normalizeRemoteParseResponse(
+          {
+            outcome: 'draft',
+            kind,
+            status: 'ready',
+            confidence: 0.9,
+            parserVersion: 'v2-test',
+            warnings: [],
+            missingFields: [],
+            fields,
+          },
+          PARSE_INPUT_BASE,
+        );
+
+        expect(result).toMatchObject({
+          outcome: 'draft',
+          draft: {
+            kind,
+            parserKind: 'model_proxy',
+            parserVersion: 'v2-test',
+            fields: expected,
+          },
+        });
+      },
+    );
+
+    it('clamps a remote out-of-range percent and keeps the percent_clamped warning', () => {
+      const result = normalizeRemoteParseResponse(
+        {
+          outcome: 'draft',
+          kind: 'update_goal_progress',
+          status: 'ready',
+          confidence: 0.9,
+          parserVersion: 'v2-test',
+          warnings: [],
+          missingFields: [],
+          fields: { goalTitle: 'Read more', percent: 150 },
+        },
+        PARSE_INPUT_BASE,
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'draft',
+        draft: {
+          fields: { goalTitle: 'Read more', percent: 100 },
+          warnings: [
+            { code: 'percent_clamped', message: 'Progress was clamped to the 0–100 range.' },
+          ],
+        },
+      });
+    });
+
+    it('rejects an invalid project targetDate from a remote response', () => {
+      expect(() =>
+        normalizeRemoteParseResponse(
+          {
+            outcome: 'draft',
+            kind: 'create_project',
+            status: 'ready',
+            confidence: 0.9,
+            warnings: [],
+            missingFields: [],
+            fields: { name: 'Apollo', color: null, targetDate: '2026-13-40' },
+          },
+          PARSE_INPUT_BASE,
+        ),
+      ).toThrow(/targetDate must be a valid YYYY-MM-DD date or null/);
+    });
+
+    it('rejects an over-long planning name from a remote response', () => {
+      expect(() =>
+        normalizeRemoteParseResponse(
+          {
+            outcome: 'draft',
+            kind: 'add_todo_to_daily_plan',
+            status: 'ready',
+            confidence: 0.9,
+            warnings: [],
+            missingFields: [],
+            fields: { todoTitle: 'T'.repeat(81), dateKey: null },
+          },
+          PARSE_INPUT_BASE,
+        ),
+      ).toThrow(/todoTitle must be 80 characters or fewer/);
+    });
+
+    it('fails closed on an unknown future kind instead of mis-normalizing', () => {
+      expect(() =>
+        normalizeRemoteParseResponse(
+          {
+            outcome: 'draft',
+            kind: 'archive_project',
+            status: 'ready',
+            confidence: 0.9,
+            warnings: [],
+            missingFields: [],
+            fields: {},
+          },
+          PARSE_INPUT_BASE,
+        ),
+      ).toThrow('Model parser response kind is invalid.');
+    });
+  });
 });

@@ -17,6 +17,9 @@ const {
   retrieveWorkoutSummary,
   retrieveFocusSummary,
   retrieveDailyOverview,
+  retrieveProjectStatus,
+  retrieveGoalProgressSummary,
+  retrieveTodayFocus,
   AskRetrievalError,
 } = vi.hoisted(() => {
   class AskRetrievalErrorImpl extends Error {
@@ -34,6 +37,9 @@ const {
     retrieveWorkoutSummary: vi.fn(),
     retrieveFocusSummary: vi.fn(),
     retrieveDailyOverview: vi.fn(),
+    retrieveProjectStatus: vi.fn(),
+    retrieveGoalProgressSummary: vi.fn(),
+    retrieveTodayFocus: vi.fn(),
     AskRetrievalError: AskRetrievalErrorImpl,
   };
 });
@@ -52,6 +58,9 @@ vi.mock('@/features/command/ask.retrieval', () => ({
   retrieveWorkoutSummary,
   retrieveFocusSummary,
   retrieveDailyOverview,
+  retrieveProjectStatus,
+  retrieveGoalProgressSummary,
+  retrieveTodayFocus,
   AskRetrievalError,
 }));
 
@@ -373,5 +382,119 @@ describe('features/command/askParser', () => {
     if (result.outcome !== 'answer') return;
     expect(result.answer).toContain('Gym');
     expect(result.answer).toContain('3-day current streak');
+  });
+
+  it('answers planning intents deterministically without a phrase round-trip', async () => {
+    retrieveProjectStatus.mockResolvedValue({
+      scope: 'single',
+      projects: [{ name: 'Apollo', status: 'active', targetDate: null, openTodoCount: 2 }],
+    });
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse(200, {
+        outcome: 'classified',
+        intent: 'project_status',
+        params: { projectName: 'Apollo' },
+      }),
+    );
+    global.fetch = fetchMock;
+
+    const result = await new AskParser().ask({
+      ...BASE_INPUT,
+      question: 'how is my Apollo project doing?',
+    });
+
+    // Only the classify call ran; project names never reach the phrase stage.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(retrieveProjectStatus).toHaveBeenCalledWith('Apollo');
+    expect(result).toEqual({
+      outcome: 'answer',
+      question: 'how is my Apollo project doing?',
+      answer: 'Apollo is active with 2 open Todos.',
+      intent: 'project_status',
+    });
+  });
+
+  it('skips the classify request when a precomputed classification is supplied', async () => {
+    retrieveCalorieSummary.mockResolvedValue({
+      totalCalories: 1800,
+      totalProtein: 0,
+      totalCarbs: 0,
+      totalFats: 0,
+      totalFiber: 0,
+      entryCount: 2,
+      startDateKey: '2026-04-21',
+      endDateKey: '2026-04-21',
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { answer: '1800 kcal today.' }));
+    global.fetch = fetchMock;
+
+    const result = await new AskParser().ask(BASE_INPUT, {
+      precomputedClassification: {
+        outcome: 'classified',
+        intent: 'calorie_summary',
+        params: { startDateKey: '2026-04-21', endDateKey: '2026-04-21' },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).stage).toBe('phrase');
+    expect(retrieveCalorieSummary).toHaveBeenCalledWith('2026-04-21', '2026-04-21');
+    expect(result).toMatchObject({ outcome: 'answer', intent: 'calorie_summary' });
+  });
+
+  it('routes goal_progress and today_focus to their planning retrievers', async () => {
+    retrieveGoalProgressSummary.mockResolvedValue({
+      scope: 'single',
+      goals: [{ title: 'Read more', progressPercent: 50, status: 'active' }],
+    });
+    global.fetch = vi.fn().mockResolvedValueOnce(
+      jsonResponse(200, {
+        outcome: 'classified',
+        intent: 'goal_progress',
+        params: { goalTitle: 'Read more' },
+      }),
+    );
+
+    const goalResult = await new AskParser().ask({
+      ...BASE_INPUT,
+      question: 'how far along is Read more?',
+    });
+
+    expect(retrieveGoalProgressSummary).toHaveBeenCalledWith('Read more');
+    expect(goalResult).toEqual({
+      outcome: 'answer',
+      question: 'how far along is Read more?',
+      answer: 'Read more: 50% complete (active).',
+      intent: 'goal_progress',
+    });
+
+    vi.clearAllMocks();
+    retrieveTodayFocus.mockResolvedValue({
+      dateKey: '2026-04-21',
+      planIntention: null,
+      topTodos: [],
+      pendingTodoCount: 1,
+      habitsRemainingCount: 2,
+    });
+    global.fetch = vi.fn().mockResolvedValueOnce(
+      jsonResponse(200, {
+        outcome: 'classified',
+        intent: 'today_focus',
+        params: { dateKey: '2026-04-21' },
+      }),
+    );
+
+    const focusResult = await new AskParser().ask({
+      ...BASE_INPUT,
+      question: "what's my focus today?",
+    });
+
+    expect(retrieveTodayFocus).toHaveBeenCalledWith('2026-04-21');
+    expect(focusResult).toMatchObject({ outcome: 'answer', intent: 'today_focus' });
+    if (focusResult.outcome !== 'answer') return;
+    expect(focusResult.answer).toContain('No top priorities are set for today yet.');
+    expect(focusResult.answer).toContain('1 pending Todo today.');
   });
 });

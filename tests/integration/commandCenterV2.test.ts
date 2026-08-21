@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { freshDatabase, type TestDatabase } from './helpers/db';
-import type { DraftLogCalorieEntry } from '@/features/command/types';
+import type {
+  DraftAddTodoToDailyPlan,
+  DraftCreateProject,
+  DraftLogCalorieEntry,
+  DraftUpdateGoalProgress,
+} from '@/features/command/types';
 
 describe('Command Center V2 canonical SQLite execution', () => {
   it('keeps supplied-nutrition rules while allowing a missing calorie correction', async () => {
@@ -307,6 +312,108 @@ describe('Command Center V2 canonical SQLite execution', () => {
       ).toEqual({
         count: 1,
       });
+    } finally {
+      await closeDatabase(db);
+    }
+  });
+
+  it('reviews, gates, and executes model_proxy planning drafts end-to-end', async () => {
+    const db = await freshDatabase();
+
+    try {
+      const commandReview = await import('@/features/command/command.review');
+      const commandExecutor = await import('@/features/command/command.executor');
+      const todos = await import('@/features/todos/todos.data');
+      const goals = await import('@/features/goals/goals.data');
+      const projects = await import('@/features/projects/projects.data');
+      const dailyPlan = await import('@/features/daily-plan/dailyPlan.data');
+
+      const todoId = await todos.addTodo({ title: 'Buy groceries' });
+      const goalId = await goals.addGoal({ title: 'Read more' });
+
+      // Remote-shaped drafts carry parserKind 'model_proxy'; reviews must still
+      // issue local execution tokens and gate on readiness.
+      const projectDraft: DraftCreateProject = {
+        kind: 'create_project',
+        rawText: 'create project Apollo',
+        parserKind: 'model_proxy',
+        parserVersion: 'edge-test',
+        confidence: 0.9,
+        status: 'ready',
+        warnings: [],
+        missingFields: [],
+        fields: { name: 'Apollo', color: 'blue', targetDate: null },
+      };
+      const projectReview = await commandReview.prepareCommandReview(projectDraft);
+      expect(projectReview.status).toBe('ready');
+      expect(projectReview.executionToken).toMatch(/^cmd_/);
+
+      const projectResult = await commandExecutor.executeDraftAction(projectReview.draft, {
+        executionToken: projectReview.executionToken,
+      });
+      expect(projectResult).toMatchObject({ outcome: 'success', kind: 'create_project' });
+      const createdProject = (await projects.listProjects()).find(
+        (project) => project.name === 'Apollo',
+      );
+      expect(createdProject).toBeDefined();
+
+      const goalDraft: DraftUpdateGoalProgress = {
+        kind: 'update_goal_progress',
+        rawText: 'set goal Read more to 50%',
+        parserKind: 'model_proxy',
+        parserVersion: 'edge-test',
+        confidence: 0.9,
+        status: 'ready',
+        warnings: [],
+        missingFields: [],
+        fields: { goalTitle: 'Read more', percent: 50 },
+      };
+      const goalReview = await commandReview.prepareCommandReview(goalDraft);
+      expect(goalReview.status).toBe('ready');
+      expect(goalReview.executionToken).toMatch(/^cmd_/);
+      const goalResult = await commandExecutor.executeDraftAction(goalReview.draft, {
+        executionToken: goalReview.executionToken,
+      });
+      expect(goalResult).toMatchObject({
+        outcome: 'success',
+        kind: 'update_goal_progress',
+        entityId: goalId,
+      });
+      expect((await goals.getGoal(goalId))?.progress_percent).toBe(50);
+
+      const planDraft: DraftAddTodoToDailyPlan = {
+        kind: 'add_todo_to_daily_plan',
+        rawText: 'add Buy groceries to my plan',
+        parserKind: 'model_proxy',
+        parserVersion: 'edge-test',
+        confidence: 0.9,
+        status: 'ready',
+        warnings: [],
+        missingFields: [],
+        fields: { todoTitle: 'Buy groceries', dateKey: '2026-08-14' },
+      };
+      const planReview = await commandReview.prepareCommandReview(planDraft);
+      expect(planReview.status).toBe('ready');
+      const planResult = await commandExecutor.executeDraftAction(planReview.draft, {
+        executionToken: planReview.executionToken,
+      });
+      expect(planResult).toMatchObject({ outcome: 'success', kind: 'add_todo_to_daily_plan' });
+      const plan = await dailyPlan.getDailyPlan('2026-08-14');
+      expect(plan?.top_todo_ids ? dailyPlan.parseTopTodoIds(plan.top_todo_ids) : []).toContain(
+        todoId,
+      );
+
+      // A remote needs_input draft never reaches execution.
+      const incompleteGoalReview = await commandReview.prepareCommandReview({
+        ...goalDraft,
+        fields: { goalTitle: 'Read more', percent: null },
+      });
+      expect(incompleteGoalReview.status).toBe('needs_input');
+      const blocked = await commandExecutor.executeDraftAction(incompleteGoalReview.draft, {
+        executionToken: incompleteGoalReview.executionToken,
+      });
+      expect(blocked).toMatchObject({ outcome: 'validation_error' });
+      expect((await goals.getGoal(goalId))?.progress_percent).toBe(50);
     } finally {
       await closeDatabase(db);
     }

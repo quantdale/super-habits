@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain';
+import {
+  MAX_RECENT_CAPTURES,
+  pushRecentCapture,
+  removeRecentCapture,
+  undoRecentCapture,
+  type RecentCapture,
+} from '@/features/quick-capture/recentCaptures';
 
 const NOW = new Date('2026-08-20T10:00:00'); // Thursday
 const PROJECTS = [
@@ -136,5 +143,46 @@ describe('parseQuickCapture — project/goal mentions', () => {
     expect(r.priority).toBe('urgent');
     expect(r.dueDateKey).toBe('2026-08-21');
     expect(r.title).toBe('ship release');
+  });
+});
+
+describe('recent captures undo list', () => {
+  function entry(key: string, undo: () => Promise<void> = async () => {}): RecentCapture {
+    return { key, label: `label ${key}`, undo };
+  }
+
+  it('keeps only the most recent captures, newest first', () => {
+    let list: RecentCapture[] = [];
+    for (let i = 1; i <= MAX_RECENT_CAPTURES + 2; i++) {
+      list = pushRecentCapture(list, entry(`k${i}`));
+    }
+    expect(list).toHaveLength(MAX_RECENT_CAPTURES);
+    expect(list.map((e) => e.key)).toEqual(['k7', 'k6', 'k5', 'k4', 'k3']);
+  });
+
+  it('removes an undone entry by key and leaves others intact', () => {
+    const list = [entry('a'), entry('b'), entry('c')];
+    expect(removeRecentCapture(list, 'b').map((e) => e.key)).toEqual(['a', 'c']);
+  });
+
+  it('runs the undo for a known key and reports it as removed', async () => {
+    const undo = vi.fn().mockResolvedValue(undefined);
+    const list = [entry('todo_1', undo)];
+    await expect(undoRecentCapture(list, 'todo_1')).resolves.toEqual({ removed: true });
+    expect(undo).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates undo failures so the caller keeps the entry visible', async () => {
+    const undo = vi.fn().mockRejectedValue(new Error('delete failed'));
+    const list = [entry('habit_1', undo)];
+    await expect(undoRecentCapture(list, 'habit_1')).rejects.toThrow('delete failed');
+  });
+
+  it('reports no removal for an unknown key without running any undo', async () => {
+    const undo = vi.fn();
+    await expect(undoRecentCapture([entry('a', undo)], 'missing')).resolves.toEqual({
+      removed: false,
+    });
+    expect(undo).not.toHaveBeenCalled();
   });
 });

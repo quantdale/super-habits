@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setTodoProjectGoal, updateTodo } from '@/features/todos/todos.data';
+import {
+  bulkAssignTodosProject,
+  setTodoProjectGoal,
+  updateTodo,
+} from '@/features/todos/todos.data';
 import { setHabitProjectGoal } from '@/features/habits/habits.data';
 import { softDeleteProject } from '@/features/projects/projects.data';
 import { softDeleteGoal, updateGoal } from '@/features/goals/goals.data';
@@ -52,7 +56,7 @@ vi.mock('@/lib/time', async () => {
 });
 
 function makeDb(getFirstAsync: ReturnType<typeof vi.fn>, runAsync: ReturnType<typeof vi.fn>) {
-  return { getFirstAsync, runAsync };
+  return { getFirstAsync, runAsync, getAllAsync: vi.fn().mockResolvedValue([]) };
 }
 
 describe('H9: Project/Goal association invariants', () => {
@@ -273,6 +277,107 @@ describe('H9: Project/Goal association invariants', () => {
 
       await expect(updateGoal('goal_1', { projectId: 'ghost' })).rejects.toThrow(
         'Project not found.',
+      );
+    });
+  });
+
+  describe('F12: clearing the project resolves goal alignment', () => {
+    it('setTodoProjectGoal clears a goal that belongs to a project when clearing the project', async () => {
+      const db = makeDb(
+        vi
+          .fn()
+          .mockResolvedValueOnce({ project_id: 'proj_1', goal_id: 'goal_1' })
+          .mockResolvedValueOnce({ project_id: 'proj_1' }),
+        vi.fn().mockResolvedValue({ changes: 1 }),
+      );
+      getDatabase.mockResolvedValue(db);
+
+      await setTodoProjectGoal('todo_1', { projectId: null });
+
+      expect(db.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?'),
+        [null, null, '2026-04-16T10:00:00.000Z', 'todo_1'],
+      );
+    });
+
+    it('keeps a goal without a project when clearing the project', async () => {
+      const db = makeDb(
+        vi
+          .fn()
+          .mockResolvedValueOnce({ project_id: null, goal_id: 'goal_free' })
+          .mockResolvedValueOnce({ project_id: null }),
+        vi.fn().mockResolvedValue({ changes: 1 }),
+      );
+      getDatabase.mockResolvedValue(db);
+
+      await setTodoProjectGoal('todo_1', { projectId: null });
+
+      expect(db.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?'),
+        [null, 'goal_free', '2026-04-16T10:00:00.000Z', 'todo_1'],
+      );
+    });
+
+    it('bulkAssignTodosProject inherits the clear-goal rule', async () => {
+      const db = makeDb(
+        vi
+          .fn()
+          .mockResolvedValueOnce({ project_id: 'proj_1', goal_id: 'goal_1' })
+          .mockResolvedValueOnce({ project_id: 'proj_1' })
+          .mockResolvedValueOnce({ project_id: 'proj_2', goal_id: 'goal_2' })
+          .mockResolvedValueOnce({ project_id: 'proj_2' }),
+        vi.fn().mockResolvedValue({ changes: 1 }),
+      );
+      getDatabase.mockResolvedValue(db);
+
+      await expect(bulkAssignTodosProject(['todo_1', 'todo_2'], null)).resolves.toEqual({
+        changed: 2,
+        skipped: 0,
+      });
+      const assignCalls = db.runAsync.mock.calls.filter((call) =>
+        String(call[0]).includes('project_id = ?, goal_id = ?'),
+      );
+      expect(assignCalls).toHaveLength(2);
+      expect(assignCalls[0][1]).toEqual([null, null, expect.any(String), 'todo_1']);
+      expect(assignCalls[1][1]).toEqual([null, null, expect.any(String), 'todo_2']);
+    });
+
+    it('updateTodo clears a project-bound goal when only the project is cleared', async () => {
+      const db = makeDb(
+        vi
+          .fn()
+          .mockResolvedValueOnce({ project_id: 'proj_1', goal_id: 'goal_1' })
+          .mockResolvedValueOnce({ project_id: 'proj_1' })
+          .mockResolvedValueOnce(undefined), // post-mutation reminder re-read
+        vi.fn().mockResolvedValue({ changes: 1 }),
+      );
+      getDatabase.mockResolvedValue(db);
+
+      await updateTodo('todo_1', { projectId: null });
+
+      const updateCall = db.runAsync.mock.calls.find((call) =>
+        String(call[0]).startsWith('UPDATE todos'),
+      );
+      expect(updateCall![0]).toContain('project_id = ?');
+      expect(updateCall![0]).toContain('goal_id = ?');
+      expect(updateCall![1].filter((value: unknown) => value === null)).toHaveLength(2);
+    });
+
+    it('still re-aligns an explicitly assigned goal over a cleared project (modal combo)', async () => {
+      const db = makeDb(
+        vi
+          .fn()
+          .mockResolvedValueOnce({ project_id: 'proj_old', goal_id: null })
+          .mockResolvedValueOnce({ id: 'goal_1', project_id: 'proj_1' }),
+        vi.fn().mockResolvedValue({ changes: 1 }),
+      );
+      getDatabase.mockResolvedValue(db);
+
+      await setTodoProjectGoal('todo_1', { projectId: null, goalId: 'goal_1' });
+
+      expect(db.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?'),
+        ['proj_1', 'goal_1', '2026-04-16T10:00:00.000Z', 'todo_1'],
       );
     });
   });

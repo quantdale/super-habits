@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_HABIT_WEEKDAYS,
+  applyHabitLifecycleTransition,
   buildAggregatedHabitHeatmap,
   buildDayCompletions,
   buildHabitActivityDays,
@@ -10,18 +11,21 @@ import {
   calculateLongestStreak,
   calculateOverallConsistency,
   createHabitRule,
+  filterHabits,
   formatHabitSchedule,
   getHabitRuleForDate,
   getHabitSchedulePreset,
+  habitCreationDateKey,
+  isHabitLifecycleMaskedOn,
   isHabitScheduledOn,
+  parseHabitLifecycleHistory,
   parseHabitRuleHistory,
-  type DayCompletion,
-  filterHabits,
+  serializeHabitLifecycleHistory,
   sortHabits,
-  toggleHabitLifecycleId,
   summarizeHabitLifecycle,
+  type DayCompletion,
 } from '@/features/habits/habits.domain';
-import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 
 function day(
   dateKey: string,
@@ -395,26 +399,23 @@ describe('date boundaries', () => {
 describe('habit list filtering / sorting', () => {
   const habits = [
     { id: 'h1', name: 'Read', category: 'morning' },
-    { id: 'h2', name: 'Walk', category: 'evening' },
-    { id: 'h3', name: 'Meditate', category: 'anytime' },
+    { id: 'h2', name: 'Walk', category: 'evening', status: 'paused' as const },
+    { id: 'h3', name: 'Meditate', category: 'anytime', status: 'archived' as const },
   ];
 
   it('filterHabits filters by category', () => {
     expect(filterHabits(habits, { category: 'morning' }).map((h) => h.id)).toEqual(['h1']);
-    expect(filterHabits(habits, { category: 'all' })).toHaveLength(3);
+    expect(filterHabits(habits, { category: 'all', status: 'all' })).toHaveLength(3);
   });
 
-  it('filterHabits defaults to active only', () => {
-    const result = filterHabits(habits, {}, ['h2'], ['h3']);
-    expect(result.map((h) => h.id)).toEqual(['h1']);
+  it('filterHabits defaults to durable active rows only (missing status = active)', () => {
+    expect(filterHabits(habits, {}).map((h) => h.id)).toEqual(['h1']);
   });
 
-  it('filterHabits selects paused and archived sets', () => {
-    expect(filterHabits(habits, { status: 'paused' }, ['h2'], []).map((h) => h.id)).toEqual(['h2']);
-    expect(filterHabits(habits, { status: 'archived' }, [], ['h3']).map((h) => h.id)).toEqual([
-      'h3',
-    ]);
-    expect(filterHabits(habits, { status: 'all' }, ['h2'], ['h3'])).toHaveLength(3);
+  it('filterHabits selects paused and archived rows by status', () => {
+    expect(filterHabits(habits, { status: 'paused' }).map((h) => h.id)).toEqual(['h2']);
+    expect(filterHabits(habits, { status: 'archived' }).map((h) => h.id)).toEqual(['h3']);
+    expect(filterHabits(habits, { status: 'all' })).toHaveLength(3);
   });
 
   it('sortHabits sorts by name without mutating input', () => {
@@ -433,15 +434,248 @@ describe('habit list filtering / sorting', () => {
   });
 });
 
-describe('habit lifecycle sets', () => {
-  it('toggleHabitLifecycleId adds and removes ids immutably', () => {
-    expect(toggleHabitLifecycleId([], 'h1')).toEqual(['h1']);
-    expect(toggleHabitLifecycleId(['h1', 'h2'], 'h1')).toEqual(['h2']);
+describe('durable lifecycle interval history', () => {
+  it('parses and serializes valid intervals, dropping malformed entries', () => {
+    const raw = JSON.stringify([
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-14' },
+      { status: 'nope', from_date_key: '2026-08-01', to_date_key: null },
+      { status: 'archived', from_date_key: 'bad-key', to_date_key: null },
+      null,
+      { status: 'paused', from_date_key: '2026-08-20', to_date_key: 'not-a-date' },
+      { status: 'archived', from_date_key: '2026-08-01', to_date_key: null },
+    ]);
+    expect(parseHabitLifecycleHistory(raw)).toEqual([
+      { status: 'archived', from_date_key: '2026-08-01', to_date_key: null },
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-14' },
+    ]);
+    expect(serializeHabitLifecycleHistory(raw)).toBe(
+      JSON.stringify([
+        { status: 'archived', from_date_key: '2026-08-01', to_date_key: null },
+        { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-14' },
+      ]),
+    );
+    expect(parseHabitLifecycleHistory(null)).toEqual([]);
+    expect(parseHabitLifecycleHistory('not json')).toEqual([]);
   });
 
-  it('summarizeHabitLifecycle counts each bucket once', () => {
-    const habits = [{ id: 'h1' }, { id: 'h2' }, { id: 'h3' }, { id: 'h4' }];
-    expect(summarizeHabitLifecycle(habits, ['h2'], ['h3'])).toEqual({
+  it('applyHabitLifecycleTransition opens an ongoing interval on pause and is idempotent', () => {
+    expect(applyHabitLifecycleTransition([], 'paused', '2026-08-10')).toEqual([
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: null },
+    ]);
+    const paused = applyHabitLifecycleTransition([], 'paused', '2026-08-10');
+    expect(applyHabitLifecycleTransition(paused, 'paused', '2026-08-12')).toEqual(paused);
+  });
+
+  it('applyHabitLifecycleTransition closes the open interval on resume/unarchive', () => {
+    const paused = [{ status: 'paused' as const, from_date_key: '2026-08-10', to_date_key: null }];
+    expect(applyHabitLifecycleTransition(paused, 'active', '2026-08-15')).toEqual([
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-15' },
+    ]);
+    // Resuming with no open interval is a harmless no-op.
+    expect(
+      applyHabitLifecycleTransition(
+        [{ status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-12' }],
+        'active',
+        '2026-08-15',
+      ),
+    ).toEqual([{ status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-12' }]);
+  });
+
+  it('applyHabitLifecycleTransition archiving closes an open pause first', () => {
+    const paused = [{ status: 'paused' as const, from_date_key: '2026-08-10', to_date_key: null }];
+    expect(applyHabitLifecycleTransition(paused, 'archived', '2026-08-13')).toEqual([
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-13' },
+      { status: 'archived', from_date_key: '2026-08-13', to_date_key: null },
+    ]);
+    const archived = applyHabitLifecycleTransition([], 'archived', '2026-08-13');
+    expect(applyHabitLifecycleTransition(archived, 'archived', '2026-08-14')).toEqual(archived);
+  });
+
+  it('isHabitLifecycleMaskedOn treats bounds inclusively and open intervals indefinitely', () => {
+    const history = [
+      { status: 'paused' as const, from_date_key: '2026-08-10', to_date_key: '2026-08-14' },
+      { status: 'archived' as const, from_date_key: '2026-08-20', to_date_key: null },
+    ];
+    expect(isHabitLifecycleMaskedOn(history, '2026-08-09')).toBe(false);
+    expect(isHabitLifecycleMaskedOn(history, '2026-08-10')).toBe(true);
+    expect(isHabitLifecycleMaskedOn(history, '2026-08-14')).toBe(true);
+    expect(isHabitLifecycleMaskedOn(history, '2026-08-15')).toBe(false);
+    expect(isHabitLifecycleMaskedOn(history, '2026-08-20')).toBe(true);
+    expect(isHabitLifecycleMaskedOn(history, '2027-01-01')).toBe(true);
+    expect(isHabitLifecycleMaskedOn([], '2026-08-10')).toBe(false);
+  });
+
+  it('exposes a uniform creation-date fallback for empty rule histories', () => {
+    // All streak/grid/insights surfaces resolve the same boundary value.
+    expect(habitCreationDateKey('2026-08-05T10:00:00.000Z')).toBe(
+      timestampToLocalDateKey('2026-08-05T10:00:00.000Z'),
+    );
+    expect(habitCreationDateKey(undefined)).toBeUndefined();
+    expect(habitCreationDateKey('not-a-timestamp')).toBeUndefined();
+  });
+});
+
+describe('paused-interval masking (F1)', () => {
+  const mwf = [1, 3, 5] as const;
+  const history = [createHabitRule('2026-08-03', mwf, 1)];
+  // M/W/F dates: Aug 3, 5, 7, 10, 12, 14 in 2026.
+  const pauseOverWednesday = [
+    { status: 'paused' as const, from_date_key: '2026-08-11', to_date_key: '2026-08-13' },
+  ];
+
+  function completionsFor(dateKeys: string[]) {
+    return dateKeys.map((dateKey) => ({
+      id: `hcmp_${dateKey}`,
+      habit_id: 'habit_1',
+      date_key: dateKey,
+      count: 1,
+      created_at: `${dateKey}T12:00:00.000Z`,
+      updated_at: `${dateKey}T12:00:00.000Z`,
+    }));
+  }
+
+  it('masks dates inside a paused interval as unscheduled', () => {
+    const days = buildDayCompletions(
+      [],
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-14',
+      pauseOverWednesday,
+    );
+    const wednesday = days.find((day) => day.dateKey === '2026-08-12')!;
+    expect(wednesday).toMatchObject({ scheduled: false, eligible: false, completed: false });
+    // The denominator shrinks instead of counting a miss.
+    expect(days.filter((day) => day.eligible)).toHaveLength(5);
+  });
+
+  it('bridges the current streak across a closed pause', () => {
+    const completions = completionsFor(['2026-08-07', '2026-08-10', '2026-08-14']);
+    const masked = buildDayCompletions(
+      completions,
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-14',
+      pauseOverWednesday,
+    );
+    expect(calculateCurrentStreak(masked, '2026-08-14')).toBe(3);
+
+    // Without the mask the same history breaks at the uncompleted Wednesday.
+    const unmasked = buildDayCompletions(
+      completions,
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-14',
+    );
+    expect(calculateCurrentStreak(unmasked, '2026-08-14')).toBe(1);
+  });
+
+  it('bridges the longest streak across a closed pause', () => {
+    const completions = completionsFor([
+      '2026-08-03',
+      '2026-08-05',
+      '2026-08-07',
+      '2026-08-10',
+      '2026-08-14',
+    ]);
+    const masked = buildDayCompletions(
+      completions,
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-14',
+      pauseOverWednesday,
+    );
+    expect(calculateLongestStreak(masked)).toBe(5);
+    expect(calculateCurrentStreak(masked, '2026-08-14')).toBe(5);
+
+    const unmasked = buildDayCompletions(
+      completions,
+      1,
+      undefined,
+      history,
+      undefined,
+      '2026-08-14',
+    );
+    expect(calculateLongestStreak(unmasked)).toBe(4);
+  });
+
+  it('masks grid cells via lifecycle_history and drops them from consistency/heatmap denominators', () => {
+    const habit = {
+      id: 'h1',
+      name: 'Run',
+      color: '#4f79ff',
+      target_per_day: 1,
+      created_at: '2026-08-03T00:00:00.000Z',
+      lifecycle_history: serializeHabitLifecycleHistory(pauseOverWednesday),
+    };
+    const grid = buildHabitGrid([habit], [], 30, '2026-08-14');
+    const wednesday = grid[0].cells.find((cell) => cell.dateKey === '2026-08-12')!;
+    expect(wednesday.scheduled).toBe(false);
+
+    // Every scheduled M/W/F cell before today except the masked one is
+    // eligible; consistency counts only eligible cells.
+    const eligibleCells = grid[0].cells.filter((cell) => cell.eligible);
+    expect(eligibleCells.length).toBeGreaterThan(0);
+    expect(eligibleCells.some((cell) => cell.dateKey === '2026-08-12')).toBe(false);
+
+    // An ongoing pause covering today removes today from every aggregate.
+    const pausedToday = buildHabitGrid(
+      [
+        {
+          ...habit,
+          lifecycle_history: serializeHabitLifecycleHistory([
+            { status: 'paused', from_date_key: '2026-08-14', to_date_key: null },
+          ]),
+        },
+      ],
+      [],
+      30,
+      '2026-08-14',
+    );
+    expect(calculateOverallConsistency(pausedToday)).toBe(0);
+    expect(buildAggregatedHabitHeatmap(pausedToday, 30).at(-1)?.value).toBe(0);
+    expect(buildHabitActivityDays(pausedToday, 30).at(-1)).toMatchObject({
+      active: false,
+      value: 0,
+    });
+  });
+
+  it('anchors the grid window on the injected todayKey (F7)', () => {
+    const grid = buildHabitGrid(
+      [{ id: 'h1', name: 'Run', color: '#4f79ff', target_per_day: 1 }],
+      [{ habit_id: 'h1', date_key: '2026-08-11', count: 1 }],
+      30,
+      '2026-08-10',
+    );
+    expect(grid[0].cells).toHaveLength(30);
+    expect(grid[0].cells.at(-1)?.dateKey).toBe('2026-08-10');
+    expect(grid[0].cells.every((cell) => cell.dateKey <= '2026-08-10')).toBe(true);
+    // A completion dated after the synthetic today falls outside the window.
+    expect(grid[0].cells.some((cell) => cell.dateKey === '2026-08-11' && cell.count === 1)).toBe(
+      false,
+    );
+
+    // The aggregated heatmap follows the same synthetic axis.
+    const heatmap = buildAggregatedHabitHeatmap(grid, 30);
+    expect(heatmap).toHaveLength(30);
+    expect(heatmap.at(-1)?.dateKey).toBe('2026-08-10');
+  });
+
+  it('summarizeHabitLifecycle counts durable status buckets', () => {
+    const habits = [
+      { id: 'h1' },
+      { id: 'h2', status: 'paused' as const },
+      { id: 'h3', status: 'archived' as const },
+      { id: 'h4' },
+    ];
+    expect(summarizeHabitLifecycle(habits)).toEqual({
       activeCount: 2,
       pausedCount: 1,
       archivedCount: 1,

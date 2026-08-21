@@ -5,9 +5,12 @@ import {
   retrieveCalorieSummary,
   retrieveDailyOverview,
   retrieveFocusSummary,
+  retrieveGoalProgressSummary,
   retrieveHabitProgress,
   retrieveHabitStreak,
   retrievePendingTodos,
+  retrieveProjectStatus,
+  retrieveTodayFocus,
   retrieveWorkoutSummary,
 } from '@/features/command/ask.retrieval';
 
@@ -20,10 +23,14 @@ const { listHabits, getCompletionHistory, getAllHabitCompletionsForRange } = vi.
   getCompletionHistory: vi.fn(),
   getAllHabitCompletionsForRange: vi.fn(),
 }));
-const { countCompletedTodos, countPendingTodos, listPendingTodos } = vi.hoisted(() => ({
+const { countCompletedTodos, countPendingTodos, listPendingTodos, listTodos } = vi.hoisted(() => ({
   countCompletedTodos: vi.fn(),
   countPendingTodos: vi.fn(),
   listPendingTodos: vi.fn(),
+  listTodos: vi.fn(),
+}));
+const { countTodosCompletedBetween } = vi.hoisted(() => ({
+  countTodosCompletedBetween: vi.fn(),
 }));
 const { listRoutines, listWorkoutLogsForRange } = vi.hoisted(() => ({
   listRoutines: vi.fn(),
@@ -31,6 +38,16 @@ const { listRoutines, listWorkoutLogsForRange } = vi.hoisted(() => ({
 }));
 const { listPomodoroSessionsForDateRange } = vi.hoisted(() => ({
   listPomodoroSessionsForDateRange: vi.fn(),
+}));
+const { listProjects, listTodosForProject } = vi.hoisted(() => ({
+  listProjects: vi.fn(),
+  listTodosForProject: vi.fn(),
+}));
+const { listGoals } = vi.hoisted(() => ({
+  listGoals: vi.fn(),
+}));
+const { getDailyPlan } = vi.hoisted(() => ({
+  getDailyPlan: vi.fn(),
 }));
 
 vi.mock('@/features/calories/calories.data', () => ({
@@ -46,9 +63,14 @@ vi.mock('@/features/todos/todos.data', () => ({
   countCompletedTodos,
   countPendingTodos,
   listPendingTodos,
+  listTodos,
 }));
+vi.mock('@/features/progress/progress.data', () => ({ countTodosCompletedBetween }));
 vi.mock('@/features/workout/workout.data', () => ({ listRoutines, listWorkoutLogsForRange }));
 vi.mock('@/features/pomodoro/pomodoro.data', () => ({ listPomodoroSessionsForDateRange }));
+vi.mock('@/features/projects/projects.data', () => ({ listProjects, listTodosForProject }));
+vi.mock('@/features/goals/goals.data', () => ({ listGoals }));
+vi.mock('@/features/daily-plan/dailyPlan.data', () => ({ getDailyPlan }));
 
 describe('features/command/ask.retrieval', () => {
   beforeEach(() => {
@@ -252,7 +274,9 @@ describe('features/command/ask.retrieval', () => {
 
   it('builds a bounded daily overview without exposing raw rows', async () => {
     countPendingTodos.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
-    countCompletedTodos.mockResolvedValue(1);
+    // Date-scoped completions (Area 8 F4): the overview reports that day's
+    // completed count, not the lifetime total.
+    countTodosCompletedBetween.mockResolvedValue(1);
     listHabits.mockResolvedValue([]);
     getAllHabitCompletionsForRange.mockResolvedValue([]);
     getCalorieSummaryByRange.mockResolvedValue([
@@ -277,7 +301,14 @@ describe('features/command/ask.retrieval', () => {
       due: 'overdue',
       todayDateKey: '2026-04-17',
     });
-    expect(countCompletedTodos).toHaveBeenCalledWith();
+    expect(countTodosCompletedBetween).toHaveBeenCalledTimes(1);
+    const [startUtcIso, endUtcExclusiveIso] = countTodosCompletedBetween.mock.calls[0];
+    // Bounds must be the requested local calendar day, half-open (TZ-neutral:
+    // derived the same way dateKeyToLocalDate anchors local midnight).
+    expect(startUtcIso).toBe(new Date('2026-04-17T00:00:00').toISOString());
+    expect(new Date(endUtcExclusiveIso).getTime() - new Date(startUtcIso).getTime()).toBe(
+      24 * 60 * 60 * 1000,
+    );
 
     expect(facts).toEqual({
       dateKey: '2026-04-17',
@@ -293,6 +324,160 @@ describe('features/command/ask.retrieval', () => {
       },
       focus: { completedSessionCount: 0, totalFocusedMinutes: 0 },
       workout: { sessionCount: 0 },
+    });
+  });
+
+  describe('retrieveProjectStatus', () => {
+    it('resolves a named project with its open Todo count', async () => {
+      listProjects.mockResolvedValue([
+        { id: 'p1', name: 'Apollo', status: 'active', target_date: '2026-05-01' },
+      ]);
+      listTodosForProject.mockResolvedValue([{ completed: 0 }, { completed: 0 }, { completed: 1 }]);
+
+      await expect(retrieveProjectStatus('apollo')).resolves.toEqual({
+        scope: 'single',
+        projects: [
+          { name: 'Apollo', status: 'active', targetDate: '2026-05-01', openTodoCount: 2 },
+        ],
+      });
+    });
+
+    it('throws project_not_found when no project matches', async () => {
+      listProjects.mockResolvedValue([
+        { id: 'p1', name: 'Apollo', status: 'active', target_date: null },
+      ]);
+
+      await expect(retrieveProjectStatus('Zen')).rejects.toMatchObject({
+        reasonCode: 'project_not_found',
+      });
+      await expect(retrieveProjectStatus('Zen')).rejects.toBeInstanceOf(AskRetrievalError);
+    });
+
+    it('throws project_ambiguous when several projects share the name', async () => {
+      listProjects.mockResolvedValue([
+        { id: 'p1', name: 'Apollo', status: 'active', target_date: null },
+        { id: 'p2', name: 'apollo', status: 'paused', target_date: null },
+      ]);
+
+      await expect(retrieveProjectStatus('Apollo')).rejects.toMatchObject({
+        reasonCode: 'project_ambiguous',
+      });
+    });
+
+    it('returns a bounded overall summary when no name is given', async () => {
+      listProjects.mockResolvedValue([
+        { id: 'p1', name: 'Apollo', status: 'active', target_date: null },
+        { id: 'p2', name: 'Zen', status: 'paused', target_date: null },
+      ]);
+      listTodosForProject.mockResolvedValue([]);
+
+      const facts = await retrieveProjectStatus(null);
+
+      expect(facts.scope).toBe('overall');
+      expect(facts.projects).toHaveLength(2);
+      expect(facts.projects.every((project) => project.openTodoCount === 0)).toBe(true);
+    });
+  });
+
+  describe('retrieveGoalProgressSummary', () => {
+    it('resolves a named goal with its progress percent', async () => {
+      listGoals.mockResolvedValue([{ title: 'Read more', progress_percent: 50, status: 'active' }]);
+
+      await expect(retrieveGoalProgressSummary('read more')).resolves.toEqual({
+        scope: 'single',
+        goals: [{ title: 'Read more', progressPercent: 50, status: 'active' }],
+      });
+    });
+
+    it('throws goal_not_found when no goal matches', async () => {
+      listGoals.mockResolvedValue([{ title: 'Read more', progress_percent: 50, status: 'active' }]);
+
+      await expect(retrieveGoalProgressSummary('Run 5k')).rejects.toMatchObject({
+        reasonCode: 'goal_not_found',
+      });
+      await expect(retrieveGoalProgressSummary('Run 5k')).rejects.toBeInstanceOf(AskRetrievalError);
+    });
+
+    it('throws goal_ambiguous when several goals share the title', async () => {
+      listGoals.mockResolvedValue([
+        { title: 'Read more', progress_percent: 50, status: 'active' },
+        { title: 'read more', progress_percent: 10, status: 'active' },
+      ]);
+
+      await expect(retrieveGoalProgressSummary('Read more')).rejects.toMatchObject({
+        reasonCode: 'goal_ambiguous',
+      });
+    });
+  });
+
+  describe('retrieveTodayFocus', () => {
+    it('keeps completed top priorities with their real completed flag and counts remaining Habits', async () => {
+      getDailyPlan.mockResolvedValue({
+        intention: 'Deep work',
+        top_todo_ids: JSON.stringify(['todo_1', 'todo_2', 'todo_missing']),
+      });
+      countPendingTodos.mockResolvedValue(3);
+      listTodos.mockResolvedValue([
+        { id: 'todo_1', title: 'Done task', completed: 1 },
+        { id: 'todo_2', title: 'Open task', completed: 0 },
+      ]);
+      listHabits.mockResolvedValue([
+        {
+          id: 'habit_1',
+          name: 'Read',
+          target_per_day: 1,
+          rule_history: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+      getAllHabitCompletionsForRange.mockResolvedValue([
+        { habit_id: 'habit_1', date_key: '2026-04-21', count: 1 },
+      ]);
+
+      const facts = await retrieveTodayFocus('2026-04-21');
+
+      expect(countPendingTodos).toHaveBeenCalledWith({ due: 'today', todayDateKey: '2026-04-21' });
+      expect(getAllHabitCompletionsForRange).toHaveBeenCalledWith('2026-04-21', '2026-04-21');
+      expect(facts).toEqual({
+        dateKey: '2026-04-21',
+        planIntention: 'Deep work',
+        // A completed top priority stays visible and is reported as completed;
+        // unknown ids are dropped instead of vanishing silently.
+        topTodos: [
+          { title: 'Done task', completed: true },
+          { title: 'Open task', completed: false },
+        ],
+        pendingTodoCount: 3,
+        habitsRemainingCount: 0,
+      });
+    });
+
+    it('reports remaining Habits when none are complete yet', async () => {
+      getDailyPlan.mockResolvedValue(null);
+      countPendingTodos.mockResolvedValue(0);
+      listTodos.mockResolvedValue([]);
+      listHabits.mockResolvedValue([
+        {
+          id: 'habit_1',
+          name: 'Read',
+          target_per_day: 1,
+          rule_history: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+      getAllHabitCompletionsForRange.mockResolvedValue([]);
+
+      const facts = await retrieveTodayFocus('2026-04-21');
+
+      expect(facts.planIntention).toBeNull();
+      expect(facts.topTodos).toEqual([]);
+      expect(facts.habitsRemainingCount).toBe(1);
+    });
+
+    it('throws invalid_range for a malformed date key', async () => {
+      await expect(retrieveTodayFocus('2026-13-40')).rejects.toMatchObject({
+        reasonCode: 'invalid_range',
+      });
     });
   });
 });

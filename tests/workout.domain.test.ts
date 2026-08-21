@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  formatWorkoutTime,
-  parseWorkoutTime,
-  calculateSessionDuration,
   buildTimerSequence,
+  buildPreviousSetLookup,
+  collectSessionSetRecords,
+  formatWorkoutTime,
+  lookupPreviousSet,
   summarizeCompletedSets,
   buildWorkoutActivityDays,
-  buildWorkoutFrequency,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
 } from '@/features/workout/workout.domain';
@@ -36,42 +36,6 @@ describe('formatWorkoutTime', () => {
   });
   it('pads single-digit seconds', () => {
     expect(formatWorkoutTime(65)).toBe('1:05');
-  });
-});
-
-describe('parseWorkoutTime', () => {
-  it('returns 0 for malformed/undefined/null input', () => {
-    expect(parseWorkoutTime('abc')).toBe(0);
-    expect(parseWorkoutTime(undefined as unknown as string)).toBe(0);
-    expect(parseWorkoutTime(null as unknown as string)).toBe(0);
-  });
-  it('parses MM:SS string', () => {
-    expect(parseWorkoutTime('1:30')).toBe(90);
-  });
-  it('parses plain seconds string', () => {
-    expect(parseWorkoutTime('45')).toBe(45);
-  });
-  it('returns 0 for invalid input', () => {
-    expect(parseWorkoutTime('abc')).toBe(0);
-  });
-});
-
-describe('calculateSessionDuration', () => {
-  it('sums active + rest across all sets and exercises', () => {
-    const exercises = [
-      { sets: [{ active_seconds: 40, rest_seconds: 20 }] },
-      {
-        sets: [
-          { active_seconds: 30, rest_seconds: 15 },
-          { active_seconds: 30, rest_seconds: 15 },
-        ],
-      },
-    ];
-    expect(calculateSessionDuration(exercises)).toBe(150);
-  });
-
-  it('returns 0 for empty exercises', () => {
-    expect(calculateSessionDuration([])).toBe(0);
   });
 });
 
@@ -115,20 +79,6 @@ describe('buildWorkoutActivityDays', () => {
     const todayKey = `${y}-${m}-${d}`;
     const todayEntry = days.find((x) => x.dateKey === todayKey);
     expect(todayEntry?.active).toBe(true);
-  });
-});
-
-describe('buildWorkoutFrequency', () => {
-  it('returns zero sessions per day when logs are empty', () => {
-    const freq = buildWorkoutFrequency([], 14);
-    expect(freq).toHaveLength(14);
-    expect(freq.every((f) => f.value === 0)).toBe(true);
-  });
-
-  it('counts multiple sessions on the same day', () => {
-    const iso = new Date().toISOString();
-    const freq = buildWorkoutFrequency([workoutLog(iso), workoutLog(iso)], 7);
-    expect(freq[0].value).toBe(2);
   });
 });
 
@@ -198,6 +148,7 @@ describe('computeWorkoutStreakFromHeatmapDays', () => {
 });
 
 describe('summarizeCompletedSets', () => {
+  // Sequence: Rows active(0), Rows rest(1), Rows active(2).
   const exercises = [
     {
       name: 'Rows',
@@ -207,10 +158,114 @@ describe('summarizeCompletedSets', () => {
       ],
     },
   ];
+  const seq = buildTimerSequence(exercises);
 
-  it('counts completed active phases per exercise', () => {
-    const seq = buildTimerSequence(exercises);
+  it('counts naturally-timed-out active phases per exercise', () => {
     const summary = summarizeCompletedSets(seq, 0);
     expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 1 }]);
+  });
+
+  it('does not count an active phase skipped via Skip (F1 fixed semantics)', () => {
+    // Skip pressed on phase 0 marks it skipped; session advanced to rest.
+    const summary = summarizeCompletedSets(seq, 1, { 0: 'skipped' });
+    expect(summary).toEqual([]);
+  });
+
+  it('counts partial progress: skipped first set, timed-out second set', () => {
+    const summary = summarizeCompletedSets(seq, 2, { 0: 'skipped', 2: 'completed' });
+    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 1 }]);
+  });
+
+  it('counts a skipped final phase as not completed (skip completes without advancing)', () => {
+    const summary = summarizeCompletedSets(seq, 2, { 0: 'completed', 2: 'skipped' });
+    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 1 }]);
+  });
+
+  it('treats missing dispositions as completed for legacy callers', () => {
+    const summary = summarizeCompletedSets(seq, 2);
+    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 2 }]);
+  });
+});
+
+describe('collectSessionSetRecords', () => {
+  const exercises = [
+    {
+      name: 'Bench',
+      sets: [
+        { set_number: 1, active_seconds: 30, rest_seconds: 10 },
+        { set_number: 2, active_seconds: 30, rest_seconds: 10 },
+      ],
+    },
+  ];
+  const seq = buildTimerSequence(exercises);
+
+  it('pairs each active phase with its disposition and entered values', () => {
+    const records = collectSessionSetRecords(
+      seq,
+      2,
+      { 0: 'completed', 2: 'skipped' },
+      { 0: { weight: '80', reps: '8' }, 2: { weight: '82.5', reps: '6' } },
+    );
+    expect(records).toEqual([
+      { exerciseName: 'Bench', setNumber: 1, weight: 80, reps: 8, completed: true },
+      { exerciseName: 'Bench', setNumber: 2, weight: 82.5, reps: 6, completed: false },
+    ]);
+  });
+
+  it('treats empty and invalid entries as unknown (null), never zero', () => {
+    const records = collectSessionSetRecords(
+      seq,
+      0,
+      { 0: 'completed' },
+      { 0: { weight: '', reps: 'abc' } },
+    );
+    expect(records[0]).toEqual({
+      exerciseName: 'Bench',
+      setNumber: 1,
+      weight: null,
+      reps: null,
+      completed: true,
+    });
+  });
+
+  it('maps negative entries to null instead of persisting garbage', () => {
+    const records = collectSessionSetRecords(seq, 0, {}, { 0: { weight: '-5', reps: '-1' } });
+    expect(records[0].weight).toBeNull();
+    expect(records[0].reps).toBeNull();
+  });
+});
+
+describe('buildPreviousSetLookup / lookupPreviousSet', () => {
+  const rows = [
+    { exerciseName: 'Bench', setNumber: 2, weight: 82.5, reps: 6 },
+    { exerciseName: 'Bench', setNumber: 1, weight: 80, reps: 8 },
+    { exerciseName: 'Squat', setNumber: 1, weight: 120, reps: 5 },
+  ];
+
+  it('prefers the exact exercise+set number, newest first', () => {
+    const lookup = buildPreviousSetLookup(rows);
+    expect(lookupPreviousSet(lookup, 'Bench', 1)).toEqual({
+      exerciseName: 'Bench',
+      setNumber: 1,
+      weight: 80,
+      reps: 8,
+    });
+    expect(lookupPreviousSet(lookup, 'Bench', 2)?.weight).toBe(82.5);
+  });
+
+  it('falls back to the exercise most recent set for unseen set numbers', () => {
+    const lookup = buildPreviousSetLookup(rows);
+    expect(lookupPreviousSet(lookup, 'Bench', 3)).toEqual({
+      exerciseName: 'Bench',
+      setNumber: 2,
+      weight: 82.5,
+      reps: 6,
+    });
+  });
+
+  it('returns null for unknown exercises or a null lookup', () => {
+    const lookup = buildPreviousSetLookup(rows);
+    expect(lookupPreviousSet(lookup, 'Row', 1)).toBeNull();
+    expect(lookupPreviousSet(null, 'Bench', 1)).toBeNull();
   });
 });

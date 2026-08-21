@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   kcalFromMacros,
   caloriesTotal,
@@ -433,5 +433,84 @@ describe('macroKcalShares', () => {
     const shares = macroKcalShares(0, 5, 0, 10);
     expect(shares.carbs).toBe(0);
     expect(shares.fiber).toBe(100);
+  });
+});
+
+/**
+ * CI runs under TZ=Asia/Manila (no DST), which can never exercise the
+ * spring-forward boundary. Force a DST timezone and pin the window math:
+ * date keys stay one local calendar day apart and labels anchor at local
+ * noon, so the 23-hour day renders its own date (regression guard for the
+ * UTC-drift bug class).
+ */
+describe('DST boundary (forced America/New_York)', () => {
+  const previousTz = process.env.TZ;
+
+  beforeEach(() => {
+    process.env.TZ = 'America/New_York';
+    vi.useFakeTimers();
+    // US spring-forward: 2026-03-08 02:00 EST → EDT. Noon local on Mar 8 is
+    // already EDT; the 7-day window [Mar 2 .. Mar 8] crosses the transition.
+    vi.setSystemTime(new Date('2026-03-08T12:00:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    process.env.TZ = previousTz;
+  });
+
+  it('buildMacroTrendPoints keeps one-calendar-day steps across the transition', () => {
+    const points = buildMacroTrendPoints([], 7);
+    expect(points.map((p) => p.dateKey)).toEqual([
+      '2026-03-02',
+      '2026-03-03',
+      '2026-03-04',
+      '2026-03-05',
+      '2026-03-06',
+      '2026-03-07',
+      '2026-03-08',
+    ]);
+    expect(points[5].label).toBe('Mar 7');
+    expect(points[6].label).toBe('Mar 8');
+  });
+
+  it('buildMacroTrendPoints maps summaries onto the correct side of the transition', () => {
+    const points = buildMacroTrendPoints(
+      [
+        {
+          dateKey: '2026-03-07',
+          totalCalories: 1500,
+          totalProtein: 100,
+          totalCarbs: 120,
+          totalFats: 50,
+          totalFiber: 10,
+        },
+      ],
+      7,
+    );
+    expect(points[5].calories).toBe(1500);
+    expect(points[5].protein).toBe(100);
+    expect(points[6].calories).toBe(0);
+  });
+
+  it('buildDailyTrend stays noon-anchored across the transition', () => {
+    const trend = buildDailyTrend(
+      [
+        {
+          dateKey: '2026-03-08',
+          totalCalories: 2100,
+          totalProtein: 0,
+          totalCarbs: 0,
+          totalFats: 0,
+          totalFiber: 0,
+        },
+      ],
+      7,
+    );
+    expect(trend).toHaveLength(7);
+    expect(trend[6].dateKey).toBe('2026-03-08');
+    expect(trend[6].value).toBe(2100);
+    expect(trend[6].label).toBe('Mar 8');
+    expect(trend[5].label).toBe('Mar 7');
   });
 });

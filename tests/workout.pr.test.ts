@@ -60,6 +60,23 @@ describe('computePersonalRecords', () => {
     expect(records).toEqual([]);
   });
 
+  it('skips sets with unrecorded (null) weight/reps instead of treating them as zero', () => {
+    const records = computePersonalRecords([
+      { exerciseName: 'Row', weight: null, reps: null },
+      { exerciseName: 'Row', weight: 60, reps: null },
+      { exerciseName: 'Row', weight: null, reps: 10 },
+      { exerciseName: 'Row', weight: 70, reps: 5 },
+    ]);
+    // Only the fully-recorded set produces a record.
+    expect(records).toHaveLength(1);
+    expect(records[0].best1RMSet).toEqual({ exerciseName: 'Row', weight: 70, reps: 5 });
+    expect(records[0].bestTopSetWeight).toBe(70);
+  });
+
+  it('returns empty when every set has unknown values (legacy sessions)', () => {
+    expect(computePersonalRecords([{ exerciseName: 'Row', weight: null, reps: null }])).toEqual([]);
+  });
+
   it('breaks 1RM ties by heavier weight then more reps', () => {
     const records = computePersonalRecords([
       { exerciseName: 'Curl', weight: 40, reps: 12 },
@@ -88,6 +105,26 @@ describe('findNewPersonalRecords', () => {
     expect(
       findNewPersonalRecords([{ exerciseName: 'Bench Press', weight: 90, reps: 1 }], history),
     ).toEqual([]);
+  });
+
+  it('ignores unrecorded (null) session sets — unknown values never set records', () => {
+    const history: LoggedSet[] = [{ exerciseName: 'Bench Press', weight: 100, reps: 1 }];
+    expect(
+      findNewPersonalRecords(
+        [
+          { exerciseName: 'Bench Press', weight: null, reps: null },
+          { exerciseName: 'Bench Press', weight: 140, reps: null },
+        ],
+        history,
+      ),
+    ).toEqual([]);
+  });
+
+  it('flags a first recorded value as a record even when history is all-unknown', () => {
+    const history: LoggedSet[] = [{ exerciseName: 'Row', weight: null, reps: null }];
+    expect(findNewPersonalRecords([{ exerciseName: 'Row', weight: 50, reps: 8 }], history)).toEqual(
+      ['Row'],
+    );
   });
 });
 
@@ -128,6 +165,9 @@ describe('computeSessionTotalSets', () => {
 });
 
 describe('applyRestDefault', () => {
+  // Documented role after the F3 precedence change: per-set rest_seconds
+  // values are authoritative (addDefaultSet seeds them from the preference);
+  // this merge is only a legacy fallback for pre-existing 0 rows.
   it('fills zero-rest sets with the default and keeps explicit rest', () => {
     const input = [
       {

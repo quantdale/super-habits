@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommandDraft } from '@/features/command/command.domain';
+import { parseCommandDraft, preflightCommandDraft } from '@/features/command/command.domain';
 
 const PARSE_INPUT_BASE = {
   now: new Date(2026, 3, 21, 9, 0, 0),
@@ -37,7 +37,21 @@ describe('features/command planning draft parsing (W6)', () => {
       const draft = result.draft;
       expect(draft.fields.targetDate).toBe('2026-05-01');
       expect(draft.fields.color).toBe('blue');
-      expect(draft.fields.name).toBe('Apollo in');
+      // The dangling preposition left by the color word is stripped.
+      expect(draft.fields.name).toBe('Apollo');
+    });
+
+    it('parses alias colors from the canonical vocabulary', () => {
+      const result = parseCommandDraft({
+        ...PARSE_INPUT_BASE,
+        rawText: 'create project Apollo in emerald',
+      });
+      expect(result.outcome).toBe('draft');
+      if (result.outcome !== 'draft' || result.draft.kind !== 'create_project') {
+        throw new Error('Expected a create_project draft.');
+      }
+      expect(result.draft.fields.color).toBe('emerald');
+      expect(result.draft.fields.name).toBe('Apollo');
     });
 
     it('needs input when the project name is missing', () => {
@@ -60,6 +74,28 @@ describe('features/command planning draft parsing (W6)', () => {
       expect(draft.fields.goalTitle).toBe('Read more');
       expect(draft.fields.percent).toBe(50);
       expect(draft.warnings).toEqual([]);
+    });
+
+    it('lets the "update goal … to n%" phrasing through the root-verb preflight', () => {
+      // Narrow allowlist: exactly this phrasing is exempt from the leading-
+      // "update" rejection; other update verbs stay unsupported.
+      expect(
+        preflightCommandDraft({ ...PARSE_INPUT_BASE, rawText: 'update goal Read more to 50%' }),
+      ).toBeNull();
+      expect(
+        preflightCommandDraft({ ...PARSE_INPUT_BASE, rawText: 'update project Apollo' }),
+      ).toMatchObject({ outcome: 'unsupported' });
+
+      const result = parseCommandDraft({
+        ...PARSE_INPUT_BASE,
+        rawText: 'update goal Read more to 50%',
+      });
+      expect(result.outcome).toBe('draft');
+      if (result.outcome !== 'draft' || result.draft.kind !== 'update_goal_progress') {
+        throw new Error('Expected an update_goal_progress draft.');
+      }
+      expect(result.draft.fields.goalTitle).toBe('Read more');
+      expect(result.draft.fields.percent).toBe(50);
     });
 
     it('clamps percents above 100 and records a warning', () => {

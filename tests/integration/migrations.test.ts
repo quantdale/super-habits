@@ -161,6 +161,33 @@ describe('tests/integration/migrations', () => {
     await db.closeAsync();
   });
 
+  it('adds the v20 habit lifecycle columns append-only with an active default', async () => {
+    const db = await openDb();
+
+    const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(habits)');
+    const names = columns.map((column) => column.name);
+    expect(names).toContain('status');
+    expect(names).toContain('lifecycle_history');
+
+    // The legacy insert path (no lifecycle columns) still lands as active.
+    await db.runAsync(
+      `INSERT INTO habits (
+         id, name, target_per_day, reminder_time, category, icon, color,
+         rule_history, project_id, goal_id, created_at, updated_at, deleted_at
+       ) VALUES (
+         'habit_default', 'Default', 1, NULL, 'anytime', 'check-circle', '#64748b',
+         '[]', NULL, NULL, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL
+       )`,
+    );
+    const row = await db.getFirstAsync<{ status: string; lifecycle_history: string | null }>(
+      'SELECT status, lifecycle_history FROM habits WHERE id = ?',
+      ['habit_default'],
+    );
+    expect(row?.status).toBe('active');
+    expect(row?.lifecycle_history).toBeNull();
+    await db.closeAsync();
+  });
+
   it('keeps the reference schema snapshot aligned through migration 15', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-reference-schema-'));
     const file = path.join(dir, 'schema.db');

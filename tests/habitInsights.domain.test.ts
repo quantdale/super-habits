@@ -173,6 +173,28 @@ describe('calculateHabitProgressInsights', () => {
     expect(result!.last7).toMatchObject({ eligibleOccurrences: 1, completedOccurrences: 1 });
   });
 
+  it('excludes paused dates from insight windows spanning a pause', () => {
+    const result = calculateHabitProgressInsights(
+      habit('2026-08-01', undefined, {
+        lifecycle_history: JSON.stringify([
+          { status: 'paused', from_date_key: '2026-08-04', to_date_key: '2026-08-06' },
+        ]),
+      }),
+      datesWithCount('2026-08-07', '2026-08-10', 1),
+      '2026-08-10',
+    );
+
+    // The last-7 window (Aug 4–10) contains three paused days: they leave the
+    // denominator entirely instead of counting as misses.
+    expect(result!.last7).toMatchObject({
+      eligibleOccurrences: 4,
+      completedOccurrences: 4,
+      percentage: 100,
+    });
+    expect(day(result!, '2026-08-05')).toMatchObject({ scheduled: false, eligible: false });
+    expect(result!.currentStreak).toBe(4);
+  });
+
   it('reports an empty rate when no scheduled date exists in a window', () => {
     const result = calculateHabitProgressInsights(
       habit('2026-08-10', [createHabitRule('2026-08-10', [6, 7], 1)]),

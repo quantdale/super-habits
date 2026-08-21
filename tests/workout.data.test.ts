@@ -46,12 +46,17 @@ describe('features/workout/workout.data', () => {
 
     await completeRoutine('routine_1', 'Solid session');
 
+    // Quick-complete records no timed session: started/ended/duration stay NULL
+    // (unknown), never a fabricated zero-length workout.
     expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO workout_logs'), [
       expect.stringMatching(/^wrk_/),
       'routine_1',
       'Solid session',
       expect.any(String),
       expect.any(String),
+      null,
+      null,
+      null,
     ]);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
   });
@@ -85,6 +90,9 @@ describe('features/workout/workout.data', () => {
       'Felt strong',
       expect.any(String),
       expect.any(String),
+      null,
+      null,
+      null,
     ]);
     expect(db.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO workout_session_exercises'),
@@ -97,6 +105,89 @@ describe('features/workout/workout.data', () => {
       ],
     );
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+  });
+
+  it('persists wall-clock timing and per-set rows for a timed session', async () => {
+    const db = {
+      getFirstAsync: vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: 'routine_4',
+          name: 'Push day',
+          deleted_at: null,
+        })
+        .mockResolvedValueOnce(null),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    const startedAt = '2026-08-20T10:00:00.000Z';
+    const endedAt = '2026-08-20T10:05:30.000Z';
+    await logWorkoutSession({
+      routineId: 'routine_4',
+      exercises: [
+        {
+          exerciseName: 'Bench Press',
+          setsCompleted: 2,
+          sets: [
+            { setNumber: 1, weight: 80, reps: 8, completed: true },
+            { setNumber: 2, weight: 82.5, reps: 6, completed: false },
+          ],
+        },
+        {
+          exerciseName: 'Row',
+          setsCompleted: 1,
+          sets: [{ setNumber: 1, weight: null, reps: null, completed: true }],
+        },
+      ],
+      startedAt,
+      endedAt,
+    });
+
+    // duration_seconds is derived from the wall-clock delta (330s), not ticks.
+    expect(db.runAsync).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO workout_logs'), [
+      expect.stringMatching(/^wrk_/),
+      'routine_4',
+      null,
+      expect.any(String),
+      expect.any(String),
+      startedAt,
+      endedAt,
+      330,
+    ]);
+    // One workout_session_sets row per active phase, parented to its
+    // workout_session_exercises row, with unknown values as NULL.
+    const setCalls = db.runAsync.mock.calls.filter(([sql]) =>
+      String(sql).includes('INSERT INTO workout_session_sets'),
+    );
+    expect(setCalls).toHaveLength(3);
+    expect(setCalls[0][1]).toEqual([
+      expect.stringMatching(/^sset_/),
+      expect.stringMatching(/^wsex_/),
+      1,
+      80,
+      8,
+      1,
+      expect.any(String),
+    ]);
+    expect(setCalls[1][1]).toEqual([
+      expect.stringMatching(/^sset_/),
+      expect.stringMatching(/^wsex_/),
+      2,
+      82.5,
+      6,
+      0,
+      expect.any(String),
+    ]);
+    expect(setCalls[2][1]).toEqual([
+      expect.stringMatching(/^sset_/),
+      expect.stringMatching(/^wsex_/),
+      1,
+      null,
+      null,
+      1,
+      expect.any(String),
+    ]);
   });
 
   it('applies linked-action workout log writes without source re-dispatch', async () => {

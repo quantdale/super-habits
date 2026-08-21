@@ -274,3 +274,134 @@ describe('normalizeModelResponse (parse-ai-command edge function)', () => {
     expect(result.reason).toMatch(/at most one due date/);
   });
 });
+
+describe('normalizeModelResponse planning kinds (create_project / update_goal_progress / add_todo_to_daily_plan)', () => {
+  it('normalizes a ready create_project draft with color and targetDate', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload('create_project', {
+        name: 'Apollo',
+        color: 'blue',
+        targetDate: '2026-07-20',
+      }),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.outcome).toBe('draft');
+    expect(result.kind).toBe('create_project');
+    expect(result.fields).toEqual({ name: 'Apollo', color: 'blue', targetDate: '2026-07-20' });
+  });
+
+  it('keeps an empty project name null for needs_input instead of inventing one', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload(
+        'create_project',
+        { name: '   ', color: null, targetDate: null },
+        {
+          status: 'needs_input',
+          missingFields: [{ field: 'name', message: 'What should the project be called?' }],
+        },
+      ),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.status).toBe('needs_input');
+    expect(result.fields.name).toBeNull();
+  });
+
+  it('rejects an invalid project targetDate', () => {
+    expect(() =>
+      normalizeModelResponse(
+        buildV2Payload('create_project', { name: 'Apollo', color: null, targetDate: '2026-13-40' }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toThrow(/targetDate must be a valid YYYY-MM-DD date or null/);
+  });
+
+  it('rejects an over-long project name', () => {
+    expect(() =>
+      normalizeModelResponse(
+        buildV2Payload('create_project', { name: 'A'.repeat(81), color: null, targetDate: null }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toThrow(/name must be 80 characters or fewer/);
+  });
+
+  it('normalizes goal progress and preserves an in-range percent without warnings', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload('update_goal_progress', { goalTitle: 'Read more', percent: 50 }),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.kind).toBe('update_goal_progress');
+    expect(result.fields).toEqual({ goalTitle: 'Read more', percent: 50 });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('clamps out-of-range percents into 0–100 and adds a percent_clamped warning', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload('update_goal_progress', { goalTitle: 'Read more', percent: 150 }),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.fields.percent).toBe(100);
+    expect(result.warnings).toEqual([
+      { code: 'percent_clamped', message: 'Progress was clamped to the 0–100 range.' },
+    ]);
+  });
+
+  it('clamps negative percents to zero with the same warning code', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload('update_goal_progress', { goalTitle: 'Read more', percent: -5 }),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.fields.percent).toBe(0);
+    expect(result.warnings.map((warning: { code: string }) => warning.code)).toContain(
+      'percent_clamped',
+    );
+  });
+
+  it('rejects a non-numeric percent', () => {
+    expect(() =>
+      normalizeModelResponse(
+        buildV2Payload('update_goal_progress', { goalTitle: 'Read more', percent: 'half' }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toThrow(/percent must be a number or null/);
+  });
+
+  it('normalizes an add_todo_to_daily_plan draft with an optional dateKey', () => {
+    const result = normalizeModelResponse(
+      buildV2Payload('add_todo_to_daily_plan', { todoTitle: 'Buy groceries', dateKey: null }),
+      'test-model',
+      BASE_INPUT,
+    );
+
+    expect(result.kind).toBe('add_todo_to_daily_plan');
+    expect(result.fields).toEqual({ todoTitle: 'Buy groceries', dateKey: null });
+  });
+
+  it('rejects an invalid daily-plan dateKey', () => {
+    expect(() =>
+      normalizeModelResponse(
+        buildV2Payload('add_todo_to_daily_plan', { todoTitle: 'Buy groceries', dateKey: 'nope' }),
+        'test-model',
+        BASE_INPUT,
+      ),
+    ).toThrow();
+  });
+
+  it('fails closed on an unknown future kind instead of mis-normalizing', () => {
+    expect(() =>
+      normalizeModelResponse(buildV2Payload('delete_everything', {}), 'test-model', BASE_INPUT),
+    ).toThrow(/kind is invalid/);
+  });
+});

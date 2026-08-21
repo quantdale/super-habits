@@ -884,7 +884,8 @@ describe('backup completeness v2 restore', () => {
     await orphanTarget.closeAsync();
   });
 
-  it('blocks when local content appears after the preview (complete emptiness)', async () => {    const recording = buildRecordingSupabase();
+  it('blocks when local content appears after the preview (complete emptiness)', async () => {
+    const recording = buildRecordingSupabase();
     installSupabaseMock(recording.supabase);
     const sourceDb = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
@@ -966,10 +967,12 @@ describe('backup completeness v2 restore', () => {
     expect(result.importedCounts.workout_session_sets).toBe(2);
 
     // The restored todo's project_id resolves to the IMPORTED project row.
-    const todoRow = await targetDb.getFirstAsync<{ project_id: string | null; goal_id: string | null }>(
-      'SELECT project_id, goal_id FROM todos WHERE title = ? AND deleted_at IS NULL',
-      ['Ship backup v2'],
-    );
+    const todoRow = await targetDb.getFirstAsync<{
+      project_id: string | null;
+      goal_id: string | null;
+    }>('SELECT project_id, goal_id FROM todos WHERE title = ? AND deleted_at IS NULL', [
+      'Ship backup v2',
+    ]);
     expect(todoRow?.project_id).toBeTruthy();
     const projectRow = await targetDb.getFirstAsync<{ name: string; deleted_at: string | null }>(
       'SELECT name, deleted_at FROM projects WHERE id = ?',

@@ -714,13 +714,16 @@ describe('core/sync/restore.coordinator', () => {
         workout_routines: 0,
       },
       remoteRowsByEntity: {
-        todos: [validTodoRow(), validTodoRow({
-          id: 'todo_2',
-          title: 'Deleted todo',
-          updated_at: '2026-04-20T13:00:00.000Z',
-          created_at: '2026-04-19T13:00:00.000Z',
-          deleted_at: '2026-04-20T14:00:00.000Z',
-        })],
+        todos: [
+          validTodoRow(),
+          validTodoRow({
+            id: 'todo_2',
+            title: 'Deleted todo',
+            updated_at: '2026-04-20T13:00:00.000Z',
+            created_at: '2026-04-19T13:00:00.000Z',
+            deleted_at: '2026-04-20T14:00:00.000Z',
+          }),
+        ],
         habits: [validHabitRow()],
         calorie_entries: [validCalorieRow()],
         workout_routines: [

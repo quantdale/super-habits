@@ -11,9 +11,15 @@ import {
   getModeColor,
   parseMinutesSeconds,
   DEFAULT_SETTINGS,
+  BUILT_IN_PRESETS,
   buildPomodoroHeatmapDays,
   applySettingsToTimerState,
   computePomodoroStreakFromHeatmapDays,
+  matchPresetBySettings,
+  planActiveTimerReconcile,
+  planSessionCompletion,
+  resolveActivePreset,
+  type ActiveTimerIntent,
 } from '@/features/pomodoro/pomodoro.domain';
 import type { PomodoroSession } from '@/core/db/types';
 import { toDateKey } from '@/lib/time';
@@ -303,5 +309,150 @@ describe('computePomodoroStreakFromHeatmapDays', () => {
         { dateKey: '2025-01-02', value: 0 },
       ]),
     ).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session completion planning (pure extraction of the timer completion path)
+// ---------------------------------------------------------------------------
+
+describe('planSessionCompletion', () => {
+  const base = {
+    mode: 'focus' as const,
+    startedAtIso: '2026-04-16T10:00:00.000Z',
+    totalSeconds: 1500,
+    completedFocus: 0,
+    settings: DEFAULT_SETTINGS,
+    preset: BUILT_IN_PRESETS[0],
+  };
+
+  it('plans a focus log with active-time ended_at = started_at + duration', () => {
+    const plan = planSessionCompletion(base);
+    expect(plan.log).not.toBeNull();
+    expect(plan.log?.startedAtIso).toBe('2026-04-16T10:00:00.000Z');
+    // Active-time semantics: nominal deadline, not wall-clock completion.
+    expect(plan.log?.endedAtIso).toBe('2026-04-16T10:25:00.000Z');
+    expect(plan.log?.durationSeconds).toBe(1500);
+    expect(plan.nextCompletedFocus).toBe(1);
+    expect(plan.nextMode).toBe('short_break');
+    expect(plan.nextDurationSeconds).toBe(DEFAULT_SETTINGS.shortBreakMinutes * 60);
+    expect(plan.autoStartNext).toBe(false); // Classic preset
+  });
+
+  it('never logs breaks and resets the cycle after a long break', () => {
+    const breakPlan = planSessionCompletion({ ...base, mode: 'short_break' });
+    expect(breakPlan.log).toBeNull();
+    expect(breakPlan.nextCompletedFocus).toBe(0);
+
+    const longBreakPlan = planSessionCompletion({
+      ...base,
+      mode: 'long_break',
+      completedFocus: 4,
+    });
+    expect(longBreakPlan.log).toBeNull();
+    expect(longBreakPlan.nextCompletedFocus).toBe(0);
+    expect(longBreakPlan.nextMode).toBe('focus');
+  });
+
+  it('suggests a long break once the cycle count is reached', () => {
+    const plan = planSessionCompletion({
+      ...base,
+      completedFocus: DEFAULT_SETTINGS.sessionsBeforeLongBreak - 1,
+    });
+    expect(plan.nextCompletedFocus).toBe(DEFAULT_SETTINGS.sessionsBeforeLongBreak);
+    expect(plan.nextMode).toBe('long_break');
+  });
+
+  it('honors preset auto-start flags per completed mode', () => {
+    const sprint = BUILT_IN_PRESETS[2];
+    expect(planSessionCompletion({ ...base, preset: sprint }).autoStartNext).toBe(true);
+    expect(
+      planSessionCompletion({ ...base, mode: 'short_break', preset: sprint }).autoStartNext,
+    ).toBe(true);
+  });
+
+  it('is deterministic: a replayed invocation produces an identical plan', () => {
+    // Regression guard for the duplicate-row vector: because the planner is
+    // pure, a double-fired completion computes the same log twice instead of
+    // minting two different session rows.
+    expect(planSessionCompletion(base)).toEqual(planSessionCompletion(base));
+  });
+
+  it('skips the log when no start time survived (defensive)', () => {
+    const plan = planSessionCompletion({ ...base, startedAtIso: null });
+    expect(plan.log).toBeNull();
+    expect(plan.nextCompletedFocus).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Crash/reload reconciliation planning
+// ---------------------------------------------------------------------------
+
+describe('planActiveTimerReconcile', () => {
+  const intent: ActiveTimerIntent = {
+    startedAtIso: '2026-04-16T10:00:00.000Z',
+    mode: 'focus',
+    totalSeconds: 1500,
+    completedFocus: 2,
+    notificationId: 'notif-1',
+  };
+  const endMs = new Date('2026-04-16T10:25:00.000Z').getTime();
+
+  it('reports already-logged when the row survived the crash', () => {
+    expect(planActiveTimerReconcile(intent, true, endMs - 1)).toEqual({
+      kind: 'already-logged',
+      notificationId: 'notif-1',
+    });
+  });
+
+  it('honors a focus whose countdown passed with no row', () => {
+    expect(planActiveTimerReconcile(intent, false, endMs)).toEqual({
+      kind: 'complete-unlogged',
+      notificationId: 'notif-1',
+    });
+    expect(planActiveTimerReconcile(intent, false, endMs + 86_400_000).kind).toBe(
+      'complete-unlogged',
+    );
+  });
+
+  it('treats a mid-countdown death as interrupted (never logged)', () => {
+    expect(planActiveTimerReconcile(intent, false, endMs - 1000)).toEqual({
+      kind: 'interrupted',
+      notificationId: 'notif-1',
+    });
+  });
+
+  it('never logs a break even after its countdown passed', () => {
+    const breakIntent: ActiveTimerIntent = { ...intent, mode: 'short_break' };
+    expect(planActiveTimerReconcile(breakIntent, false, endMs).kind).toBe('interrupted');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preset resolution (highlight + behavior fallbacks)
+// ---------------------------------------------------------------------------
+
+describe('matchPresetBySettings / resolveActivePreset', () => {
+  const deepSettings = {
+    focusMinutes: 50,
+    shortBreakMinutes: 10,
+    longBreakMinutes: 30,
+    sessionsBeforeLongBreak: 2,
+  };
+
+  it('matches a preset by exact durations', () => {
+    expect(matchPresetBySettings(BUILT_IN_PRESETS, deepSettings)?.id).toBe('deep');
+    expect(
+      matchPresetBySettings(BUILT_IN_PRESETS, { ...deepSettings, focusMinutes: 51 }),
+    ).toBeNull();
+  });
+
+  it('prefers the stored selection for behavior, then duration match, then Classic', () => {
+    expect(resolveActivePreset(BUILT_IN_PRESETS, 'sprint', deepSettings).id).toBe('sprint');
+    // Silent-Classic fix: saved Deep Work durations resolve to Deep Work.
+    expect(resolveActivePreset(BUILT_IN_PRESETS, null, deepSettings).id).toBe('deep');
+    expect(resolveActivePreset(BUILT_IN_PRESETS, null, DEFAULT_SETTINGS).id).toBe('classic');
+    expect(resolveActivePreset(BUILT_IN_PRESETS, 'bogus', deepSettings).id).toBe('deep');
   });
 });

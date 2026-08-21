@@ -6,8 +6,10 @@ import {
   formatDueDateLabel,
   getGreeting,
   isCardVisible,
+  isActiveHabit,
   moveCard,
   parseCardLayout,
+  pickEmptyStateCta,
   serializeCardLayout,
   shapeCaloriesSummary,
   shapeFocusWeekSummary,
@@ -207,7 +209,6 @@ describe('shapeHabitsSummary', () => {
       { id: 'h2', name: 'Read', color: '#0f0', count: 0, target: 1 },
     ]);
     expect(summary.completedToday).toBe(1);
-    expect(summary.progressRatio).toBeCloseTo((1 + 0) / 2, 5);
   });
 
   it('excludes unscheduled habits', () => {
@@ -221,6 +222,81 @@ describe('shapeHabitsSummary', () => {
     );
     expect(summary.scheduledToday).toBe(0);
     expect(summary.rings).toEqual([]);
+  });
+
+  // F2: the numerator must span ALL scheduled habits; rings stay a capped
+  // display sample so completions beyond the first 6 are still counted.
+  it('counts completedToday over all scheduled habits when more than 6 are scheduled', () => {
+    const habits = Array.from({ length: 8 }, (_, i) => ({
+      id: `h${i + 1}`,
+      name: `Habit ${i + 1}`,
+      color: '#00f',
+      target_per_day: 1,
+      rule_history: everyDayHistory,
+    }));
+    const completions = [
+      { habit_id: 'h7', date_key: today, count: 1 },
+      { habit_id: 'h8', date_key: today, count: 1 },
+    ];
+    const summary = shapeHabitsSummary(habits, completions, today);
+    expect(summary.scheduledToday).toBe(8);
+    expect(summary.completedToday).toBe(2);
+    // Rings remain a display sample of the first six scheduled habits.
+    expect(summary.rings.map((ring) => ring.id)).toEqual(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+  });
+
+  // F1: durable lifecycle (migration 20) — paused/archived habits never
+  // render rings or inflate today's counts; legacy rows (no status) are active.
+  it('excludes paused and archived habits from today summary', () => {
+    const habits = [
+      {
+        id: 'active',
+        name: 'Active',
+        color: '#00f',
+        target_per_day: 1,
+        rule_history: everyDayHistory,
+        status: 'active' as const,
+      },
+      {
+        id: 'paused',
+        name: 'Paused',
+        color: '#0f0',
+        target_per_day: 1,
+        rule_history: everyDayHistory,
+        status: 'paused' as const,
+      },
+      {
+        id: 'archived',
+        name: 'Archived',
+        color: '#f00',
+        target_per_day: 1,
+        rule_history: everyDayHistory,
+        status: 'archived' as const,
+      },
+      {
+        id: 'legacy',
+        name: 'Legacy',
+        color: '#000',
+        target_per_day: 1,
+        rule_history: everyDayHistory,
+      },
+    ];
+    // Completions for paused/archived on today must not count as completed.
+    const completions = [
+      { habit_id: 'paused', date_key: today, count: 1 },
+      { habit_id: 'archived', date_key: today, count: 1 },
+    ];
+    const summary = shapeHabitsSummary(habits, completions, today);
+    expect(summary.scheduledToday).toBe(2);
+    expect(summary.completedToday).toBe(0);
+    expect(summary.rings.map((ring) => ring.id)).toEqual(['active', 'legacy']);
+  });
+
+  it('isActiveHabit treats undefined status as active and only paused/archived as inactive', () => {
+    expect(isActiveHabit({})).toBe(true);
+    expect(isActiveHabit({ status: 'active' })).toBe(true);
+    expect(isActiveHabit({ status: 'paused' })).toBe(false);
+    expect(isActiveHabit({ status: 'archived' })).toBe(false);
   });
 });
 
@@ -247,6 +323,21 @@ describe('shapeFocusWeekSummary', () => {
     expect(summary.sessionCount).toBe(0);
     expect(summary.perDayMinutes).toEqual([{ dateKey: '2026-03-09', minutes: 0 }]);
   });
+
+  // F12: corrupt timestamps are skipped instead of poisoning buckets with
+  // a "NaN-NaN-NaN" date key.
+  it('skips sessions with corrupt started_at instead of bucketing NaN keys', () => {
+    const summary = shapeFocusWeekSummary(
+      [
+        { started_at: 'not-a-timestamp', duration_seconds: 600, session_type: 'focus' },
+        { started_at: '2026-03-09T09:00:00', duration_seconds: 1500, session_type: 'focus' },
+      ],
+      ['2026-03-09'],
+    );
+    expect(summary.sessionCount).toBe(1);
+    expect(summary.focusMinutes).toBe(25);
+    expect(summary.perDayMinutes).toEqual([{ dateKey: '2026-03-09', minutes: 25 }]);
+  });
 });
 
 describe('shapeWorkoutSummary', () => {
@@ -271,6 +362,18 @@ describe('shapeWorkoutSummary', () => {
     );
     expect(summary.sessionsThisWeek).toBe(1);
     expect(summary.lastWorkoutName).toBe('Legs');
+  });
+
+  // F12: a corrupt created_at yields no date key instead of "NaN-NaN-NaN".
+  it('ignores logs with corrupt created_at when date_key is absent', () => {
+    const summary = shapeWorkoutSummary(
+      [{ created_at: 'garbage', routine_id: 'r1' }],
+      new Map([['r1', 'Legs']]),
+      ['2026-03-09'],
+    );
+    expect(summary.sessionsThisWeek).toBe(0);
+    expect(summary.lastWorkoutDateKey).toBeNull();
+    expect(summary.lastWorkoutName).toBeNull();
   });
 });
 
@@ -316,5 +419,55 @@ describe('shapeProjectsSummary / shapeGoalsSummary', () => {
   it('handles empty inputs', () => {
     expect(shapeProjectsSummary([])).toEqual({ activeCount: 0, preview: [] });
     expect(shapeGoalsSummary([])).toEqual({ activeCount: 0, averageProgress: 0, preview: [] });
+  });
+});
+
+describe('pickEmptyStateCta', () => {
+  const empty = {
+    plan: { hasPlan: false },
+    todos: { pendingCount: 0 },
+    habits: { scheduledToday: 0 },
+    focus: { sessionCount: 0 },
+    workout: { sessionsThisWeek: 0 },
+    calories: { consumed: 0 },
+    projects: { activeCount: 0 },
+    goals: { activeCount: 0 },
+  };
+
+  it('defaults to the Todos tab when nothing is tracked', () => {
+    expect(pickEmptyStateCta(empty)).toEqual({
+      label: 'Add your first task',
+      destination: { kind: 'section', section: 'todos' },
+    });
+  });
+
+  // F9: a committed plan with no other data is tracked data.
+  it('points at the planning hub when only a plan exists', () => {
+    expect(pickEmptyStateCta({ ...empty, plan: { hasPlan: true } })).toEqual({
+      label: 'Review your plan',
+      destination: { kind: 'planning', view: 'today' },
+    });
+  });
+
+  it('walks domains in card order and returns the first non-empty one', () => {
+    expect(pickEmptyStateCta({ ...empty, habits: { scheduledToday: 2 } })).toEqual({
+      label: 'Check on your habits',
+      destination: { kind: 'section', section: 'habits' },
+    });
+    expect(pickEmptyStateCta({ ...empty, focus: { sessionCount: 3 } })).toEqual({
+      label: 'Start a focus session',
+      destination: { kind: 'section', section: 'pomodoro' },
+    });
+    expect(pickEmptyStateCta({ ...empty, projects: { activeCount: 1 } })).toEqual({
+      label: 'Open your projects',
+      destination: { kind: 'planning', view: 'projects' },
+    });
+    expect(
+      pickEmptyStateCta({
+        ...empty,
+        goals: { activeCount: 1 },
+        calories: { consumed: 200 },
+      }),
+    ).toEqual({ label: 'Log a meal', destination: { kind: 'section', section: 'calories' } });
   });
 });

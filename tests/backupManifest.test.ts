@@ -86,9 +86,7 @@ describe('backup manifest parsing with settings integrity metadata', () => {
 
 describe('resolveBackupScope epoch matrix', () => {
   const metadataFor = (entities: readonly string[]) =>
-    Object.fromEntries(
-      entities.map((entity) => [entity, { count: 0, checksum: 'a'.repeat(64) }]),
-    );
+    Object.fromEntries(entities.map((entity) => [entity, { count: 0, checksum: 'a'.repeat(64) }]));
 
   it('resolves the current explicit scope version to the live entity set', () => {
     const scope = resolveBackupScope({
@@ -148,7 +146,10 @@ describe('resolveBackupScope epoch matrix', () => {
       [3, KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET],
       [2, KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET],
     ] as const) {
-      const scope = resolveBackupScope({ backupScopeVersion: null, entityMetadata: metadataFor(set) });
+      const scope = resolveBackupScope({
+        backupScopeVersion: null,
+        entityMetadata: metadataFor(set),
+      });
       expect(scope?.scope).toBe(expected);
     }
   });

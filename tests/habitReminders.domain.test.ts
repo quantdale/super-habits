@@ -212,6 +212,18 @@ describe('buildHabitReminderPlan', () => {
     expect(new Set(plan.map((item) => item.habitId))).toEqual(new Set(['enabled']));
   });
 
+  it('plans nothing for paused or archived habits (F3)', () => {
+    const plan = buildHabitReminderPlan({
+      habits: [
+        habit('active'),
+        { ...habit('paused'), status: 'paused' },
+        { ...habit('archived'), status: 'archived' },
+      ],
+      now: NOW,
+    });
+    expect(new Set(plan.map((item) => item.habitId))).toEqual(new Set(['active']));
+  });
+
   it('uses historical targets and schedules for each future date', () => {
     const habitWithHistory = {
       ...habit('history', [1, 2, 3, 4, 5, 6, 7], 1),

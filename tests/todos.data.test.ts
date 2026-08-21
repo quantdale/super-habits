@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  addTodo,
   bulkAssignTodosProject,
   bulkRemoveTodos,
   bulkSetTodoCompletion,
@@ -8,10 +9,12 @@ import {
   completeTodoFromLinkedAction,
   countPendingTodos,
   createRecurringInstance,
+  createRecurringInstances,
   listPendingTodos,
   removeTodo,
   saveTodoLinkedActionRules,
   toggleTodo,
+  updateTodoOrder,
 } from '@/features/todos/todos.data';
 
 const { getDatabase } = vi.hoisted(() => ({
@@ -341,6 +344,7 @@ describe('features/todos/todos.data', () => {
         deleted_at: null,
       }),
       runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+      getAllAsync: vi.fn().mockResolvedValue([]),
     };
     getDatabase.mockResolvedValue(db);
 
@@ -560,32 +564,106 @@ describe('features/todos/todos.data', () => {
 });
 
 describe('bulk todo operations', () => {
-  const todoRow = {
-    id: 'todo_1',
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const TODO_DEFAULTS = {
+    id: '',
     title: 'Bulk todo',
-    notes: null,
-    completed: 0,
-    due_date: null,
-    priority: 'normal',
-    sort_order: 1,
-    recurrence: null,
-    recurrence_id: null,
-    project_id: null,
-    goal_id: null,
+    notes: null as string | null,
+    completed: 0 as 0 | 1,
+    due_date: null as string | null,
+    priority: 'normal' as string,
+    sort_order: 1 as number,
+    recurrence: null as string | null,
+    recurrence_id: null as string | null,
+    project_id: null as string | null,
+    goal_id: null as string | null,
     created_at: '2026-04-16T09:00:00.000Z',
     updated_at: '2026-04-16T09:00:00.000Z',
-    deleted_at: null,
+    deleted_at: null as string | null,
   };
 
   function makeDb() {
     return {
       getFirstAsync: vi.fn().mockImplementation(async (sql: string) => {
-        if (/FROM todos/.test(sql)) return { ...todoRow };
+        if (/COALESCE\(MAX\(sort_order\)/.test(sql)) return { maxOrder: 0 };
+        if (/FROM todos/.test(sql)) return { ...TODO_DEFAULTS, id: 'todo_1' };
         if (/FROM projects/.test(sql)) return { id: 'proj_1' };
         return null;
       }),
       runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+      getAllAsync: vi.fn().mockResolvedValue([]),
     };
+  }
+
+  type SeedRow = Partial<typeof TODO_DEFAULTS>;
+  type PlanRow = { id: string; top_todo_ids: string };
+
+  /**
+   * A stateful in-memory double: UPDATE handlers mutate the seeded rows so
+   * retry-idempotency and skip counting behave like real SQLite.
+   */
+  function makeStatefulDb(seed: Record<string, SeedRow> = {}, plans: PlanRow[] = []) {
+    const rows = new Map<string, typeof TODO_DEFAULTS>();
+    for (const [id, row] of Object.entries(seed)) {
+      rows.set(id, { ...TODO_DEFAULTS, id, ...row });
+    }
+    let transactionCount = 0;
+    const db = {
+      getFirstAsync: vi.fn(async (sql: string, args: unknown[]) => {
+        const queryArgs = args ?? [];
+        if (/COALESCE\(MAX\(sort_order\)/.test(sql)) return { maxOrder: 0 };
+        if (/FROM todos/.test(sql)) return rows.get(queryArgs[0] as string) ?? null;
+        if (/FROM projects/.test(sql)) return { id: 'proj_1' };
+        return null;
+      }),
+      getAllAsync: vi.fn(async () => plans.map((plan) => ({ ...plan }))),
+      runAsync: vi.fn(async (sql: string, args: unknown[]) => {
+        const queryArgs = args ?? [];
+        if (/UPDATE todos SET completed/.test(sql)) {
+          // [next, completedAt, updatedAt, id, previous]
+          const [completed, , , id, previous] = queryArgs as [
+            number,
+            unknown,
+            unknown,
+            string,
+            number,
+          ];
+          const row = rows.get(id);
+          if (!row || row.deleted_at !== null || row.completed !== previous) return { changes: 0 };
+          row.completed = completed as 0 | 1;
+          return { changes: 1 };
+        }
+        if (/UPDATE todos SET deleted_at/.test(sql)) {
+          const row = rows.get(queryArgs[2] as string);
+          if (!row || row.deleted_at !== null) return { changes: 0 };
+          row.deleted_at = '2026-04-16T10:00:00.000Z';
+          return { changes: 1 };
+        }
+        if (/UPDATE todos SET priority/.test(sql)) {
+          const [priority, , id] = queryArgs as [string, unknown, string];
+          const row = rows.get(id);
+          if (!row || row.deleted_at !== null || row.priority === priority) return { changes: 0 };
+          row.priority = priority;
+          return { changes: 1 };
+        }
+        if (/UPDATE todos SET sort_order/.test(sql)) {
+          const [sortOrder, , id] = queryArgs as [number, unknown, string];
+          const row = rows.get(id);
+          if (!row || row.deleted_at !== null) return { changes: 0 };
+          row.sort_order = sortOrder;
+          return { changes: 1 };
+        }
+        return { changes: 1 };
+      }),
+      withTransactionAsync: vi.fn(async (fn: () => Promise<void>) => {
+        transactionCount += 1;
+        await fn();
+      }),
+    };
+    return { db, rows, getTransactionCount: () => transactionCount };
   }
 
   it('bulkSetTodoCompletion completes each id exactly once', async () => {
@@ -636,5 +714,229 @@ describe('bulk todo operations', () => {
       (call) => String(call[0]).includes('SET deleted_at = ?') && String(call[0]).includes('todos'),
     );
     expect(deleteCalls).toHaveLength(2);
+  });
+
+  it('reports structured counts and tolerates a missing id mid-batch', async () => {
+    const { db } = makeStatefulDb({ todo_a: {}, todo_b: {} });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(bulkSetTodoCompletion(['todo_a', 'todo_missing', 'todo_b'], 1)).resolves.toEqual({
+      changed: 2,
+      skipped: 1,
+    });
+  });
+
+  it('is idempotent on retry after a successful bulk completion', async () => {
+    const { db } = makeStatefulDb({ todo_a: {}, todo_b: {} });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(bulkSetTodoCompletion(['todo_a', 'todo_b'], 1)).resolves.toEqual({
+      changed: 2,
+      skipped: 0,
+    });
+    await expect(bulkSetTodoCompletion(['todo_a', 'todo_b'], 1)).resolves.toEqual({
+      changed: 0,
+      skipped: 2,
+    });
+  });
+
+  it('commits a bulk completion in exactly one transaction with per-row backup intents', async () => {
+    const { db, getTransactionCount } = makeStatefulDb({ todo_a: {}, todo_b: {} });
+    getDatabase.mockResolvedValue(db);
+
+    await bulkSetTodoCompletion(['todo_a', 'todo_b'], 1);
+
+    expect(getTransactionCount()).toBe(1);
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates a mid-batch failure instead of silently swallowing it', async () => {
+    const { db } = makeStatefulDb({ todo_a: {}, todo_b: {} });
+    const baseRun = db.runAsync.getMockImplementation()!;
+    db.runAsync.mockImplementation(async (sql: string, args: unknown[] = []) => {
+      if (/UPDATE todos SET completed/.test(sql) && args[3] === 'todo_b') {
+        throw new Error('disk I/O error');
+      }
+      return baseRun(sql, args);
+    });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(bulkSetTodoCompletion(['todo_a', 'todo_b'], 1)).rejects.toThrow('disk I/O error');
+  });
+
+  it('counts already-deleted and unknown ids as skipped for bulk removal', async () => {
+    const { db } = makeStatefulDb({
+      todo_a: {},
+      todo_gone: { deleted_at: '2026-04-16T08:00:00.000Z' },
+    });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(bulkRemoveTodos(['todo_a', 'todo_gone', 'todo_never'])).resolves.toEqual({
+      changed: 1,
+      skipped: 2,
+    });
+  });
+
+  it('skips rows already at the target priority without rewriting them', async () => {
+    const { db } = makeStatefulDb({ todo_a: {}, todo_done: { priority: 'urgent' } });
+    getDatabase.mockResolvedValue(db);
+
+    await expect(bulkUpdateTodoPriority(['todo_a', 'todo_done'], 'urgent')).resolves.toEqual({
+      changed: 1,
+      skipped: 1,
+    });
+    const priorityCalls = db.runAsync.mock.calls.filter((call) =>
+      String(call[0]).includes('priority = ?'),
+    );
+    expect(priorityCalls).toHaveLength(2); // attempted per id, no-op for the matching row
+  });
+
+  describe('updateTodoOrder (F10)', () => {
+    it('persists absolute sort orders in ONE transaction with per-row intents', async () => {
+      const { db, getTransactionCount } = makeStatefulDb({ t1: {}, t2: {}, t3: {} });
+      getDatabase.mockResolvedValue(db);
+
+      await updateTodoOrder(['t1', 't2', 't3']);
+
+      expect(getTransactionCount()).toBe(1);
+      const orderCalls = db.runAsync.mock.calls.filter((call) =>
+        String(call[0]).includes('SET sort_order'),
+      );
+      expect(orderCalls).toHaveLength(3);
+      expect(orderCalls.map((call) => call[1][0])).toEqual([1, 2, 3]);
+      expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(3);
+    });
+
+    it('re-persists the same ordering on retry', async () => {
+      const { db, rows } = makeStatefulDb({ t1: {}, t2: {} });
+      getDatabase.mockResolvedValue(db);
+
+      await updateTodoOrder(['t2', 't1']);
+      await updateTodoOrder(['t2', 't1']);
+
+      expect(rows.get('t2')!.sort_order).toBe(1);
+      expect(rows.get('t1')!.sort_order).toBe(2);
+    });
+
+    it('is a no-op for an empty list', async () => {
+      const { db, getTransactionCount } = makeStatefulDb({});
+      getDatabase.mockResolvedValue(db);
+
+      await updateTodoOrder([]);
+
+      expect(getTransactionCount()).toBe(0);
+      expect(syncEngine.enqueuePrepared).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sort_order allocation (F9)', () => {
+    it('allocates addTodo sort_order inside the mutation transaction', async () => {
+      const events: string[] = [];
+      const db = {
+        getFirstAsync: vi.fn(async (sql: string) => {
+          if (/COALESCE\(MAX\(sort_order\)/.test(sql)) {
+            events.push('max-read');
+            return { maxOrder: 7 };
+          }
+          return null;
+        }),
+        runAsync: vi.fn(async (sql: string, args: unknown[]) => {
+          void args;
+          events.push('insert');
+          return { changes: 1 };
+        }),
+        withTransactionAsync: vi.fn(async (fn: () => Promise<void>) => {
+          events.push('tx-start');
+          await fn();
+        }),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      await addTodo({ title: 'Racy add' });
+
+      expect(events.indexOf('tx-start')).toBeLessThan(events.indexOf('max-read'));
+      expect(events.indexOf('max-read')).toBeLessThan(events.indexOf('insert'));
+      const insertCall = db.runAsync.mock.calls.find((call) =>
+        String(call[0]).includes('INSERT INTO todos'),
+      );
+      // [id, title, notes, dueDate, priority, sortOrder, ...]
+      expect(insertCall![1][5]).toBe(8);
+    });
+
+    it('assigns consecutive sort orders to a recurring batch inside one transaction', async () => {
+      const db = {
+        getFirstAsync: vi.fn(async (sql: string) =>
+          /COALESCE\(MAX\(sort_order\)/.test(sql) ? { maxOrder: 5 } : null,
+        ),
+        runAsync: vi.fn(async (sql: string, args: unknown[]) => {
+          void sql;
+          void args;
+          return { changes: 1 };
+        }),
+        withTransactionAsync: vi.fn(async (fn: () => Promise<void>) => {
+          await fn();
+        }),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      await createRecurringInstances([
+        {
+          title: 'A',
+          notes: null,
+          priority: 'normal',
+          recurrenceId: 'rec_1',
+          dueDate: '2026-04-17',
+        },
+        {
+          title: 'B',
+          notes: null,
+          priority: 'normal',
+          recurrenceId: 'rec_2',
+          dueDate: '2026-04-17',
+        },
+        {
+          title: 'C',
+          notes: null,
+          priority: 'normal',
+          recurrenceId: 'rec_3',
+          dueDate: '2026-04-17',
+        },
+      ]);
+
+      expect(db.withTransactionAsync).toHaveBeenCalledTimes(1);
+      const inserts = db.runAsync.mock.calls.filter((call) =>
+        String(call[0]).includes('INSERT INTO todos'),
+      );
+      expect(inserts).toHaveLength(3);
+      expect(inserts.map((call) => call[1][5])).toEqual([6, 7, 8]);
+      expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('daily plan pruning on remove (F11)', () => {
+    it('prunes the removed id from plan top_todo_ids inside the same transaction', async () => {
+      const { db, getTransactionCount } = makeStatefulDb({ todo_1: {} }, [
+        { id: 'dplan_1', top_todo_ids: JSON.stringify(['todo_1', 'todo_9']) },
+        { id: 'dplan_2', top_todo_ids: JSON.stringify(['todo_9']) },
+      ]);
+      getDatabase.mockResolvedValue(db);
+
+      await removeTodo('todo_1');
+
+      expect(getTransactionCount()).toBe(1);
+      const planUpdates = db.runAsync.mock.calls.filter((call) =>
+        String(call[0]).includes('UPDATE daily_plans'),
+      );
+      expect(planUpdates).toHaveLength(1);
+      expect(planUpdates[0][1]).toEqual([
+        JSON.stringify(['todo_9']),
+        expect.any(String),
+        'dplan_1',
+      ]);
+      expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+        expect.objectContaining({ entity: 'daily_plans', id: 'dplan_1', operation: 'update' }),
+        { durablyPersisted: true },
+      );
+    });
   });
 });
