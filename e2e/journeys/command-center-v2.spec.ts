@@ -77,9 +77,15 @@ test.describe('Command Center V2 journeys', () => {
     const confirm = page.getByRole('button', { name: 'Confirm and save' });
     await expect(confirm).toHaveCount(0);
 
-    const choice = page.getByRole('dialog').getByRole('button', { name: 'Buy groceries' }).first();
+    // exact:true — the dialog also renders "Reuse recent command: complete
+    // Buy groceries", whose accessible name contains the todo title as a
+    // substring; only the two disambiguation chips must be counted.
+    const choice = page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Buy groceries', exact: true })
+      .first();
     await expect(
-      page.getByRole('dialog').getByRole('button', { name: 'Buy groceries' }),
+      page.getByRole('dialog').getByRole('button', { name: 'Buy groceries', exact: true }),
     ).toHaveCount(2);
     await choice.scrollIntoViewIfNeeded();
     await choice.click({ force: true });
