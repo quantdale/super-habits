@@ -36,6 +36,11 @@ describe('recoverable settings allowlist', () => {
         sessionsBeforeLongBreak: 3,
       },
       theme: { mode: 'dark', slots: { lightThemeId: 'ocean', darkThemeId: 'midnight' } },
+      // V3 keys default to null when not supplied.
+      macroTargets: null,
+      pomodoroPresets: null,
+      workoutRestSeconds: null,
+      notificationPreferences: null,
     });
   });
 
@@ -76,7 +81,55 @@ describe('recoverable settings allowlist', () => {
       },
       theme: { mode: 'light', slots: { lightThemeId: 'ocean' } },
     };
-    expect(normalizeRecoverableSettings(input)).toEqual(input);
+    expect(normalizeRecoverableSettings(input)).toEqual({
+      ...input,
+      // V2-shaped input normalizes into the V3 contract with null V3 keys.
+      macroTargets: null,
+      pomodoroPresets: null,
+      workoutRestSeconds: null,
+      notificationPreferences: null,
+    });
+  });
+
+  it('normalizes V3 keys and drops malformed ones', () => {
+    const normalized = normalizeRecoverableSettings({
+      macroTargets: { calories: 2000, protein: 150, carbs: 200, fats: 70 },
+      pomodoroPresets: {
+        presets: [
+          {
+            id: 'preset_custom',
+            name: 'Custom',
+            focusMinutes: 30,
+            shortBreakMinutes: 5,
+            longBreakMinutes: 15,
+            sessionsBeforeLongBreak: 4,
+            autoStartBreaks: true,
+            autoStartFocus: false,
+          },
+        ],
+        activePresetId: 'preset_custom',
+      },
+      workoutRestSeconds: 90,
+      notificationPreferences: {
+        todoRemindersEnabled: true,
+        dailyPlanReminderTime: '7:30',
+      },
+      // Malformed V3 values fall back to null rather than poisoning.
+      badMacroTargets: { protein: 'lots' },
+    });
+    expect(normalized.macroTargets).toEqual({
+      calories: 2000,
+      protein: 150,
+      carbs: 200,
+      fats: 70,
+    });
+    expect(normalized.pomodoroPresets?.activePresetId).toBe('preset_custom');
+    expect(normalized.workoutRestSeconds).toBe(90);
+    expect(normalized.notificationPreferences).toEqual({
+      todoRemindersEnabled: true,
+      dailyPlanReminderTime: { hour: 7, minute: 30 },
+    });
+    expect('badMacroTargets' in normalized).toBe(false);
   });
 });
 
@@ -110,6 +163,24 @@ describe('canonicalizeSettingsPayload (settings integrity)', () => {
       calorieGoal: { fats: 70, carbs: 200, protein: 150, calories: 2000 },
     };
     expect(canonicalizeSettingsPayload(reordered)).toBe(canonicalizeSettingsPayload(sample));
+  });
+
+  it('freezes the V2 canonical text against V3 field additions', () => {
+    // A historical V2 payload (three original fields) must hash identically
+    // under explicit V2 canonicalization regardless of the current version.
+    const v2Payload = {
+      calorieGoal: sample.calorieGoal,
+      pomodoroSettings: sample.pomodoroSettings,
+      theme: sample.theme,
+    };
+    const v2Digest = canonicalizeSettingsPayload(v2Payload, { settingsVersion: 2 });
+    expect(v2Digest).toMatch(/^[0-9a-f]{64}$/);
+    // The V2 text covers ONLY the three original fields: adding V3 keys to
+    // the payload must not change the V2 canonicalization.
+    const withV3Keys = { ...v2Payload, macroTargets: null, workoutRestSeconds: 90 };
+    expect(canonicalizeSettingsPayload(withV3Keys, { settingsVersion: 2 })).toBe(v2Digest);
+    // And the current-version digest differs once V3 keys carry values.
+    expect(canonicalizeSettingsPayload(withV3Keys)).not.toBe(v2Digest);
   });
 
   it('drops unknown/poisoned keys before hashing', () => {

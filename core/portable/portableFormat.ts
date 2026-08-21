@@ -4,8 +4,10 @@ import {
   BACKUP_SCHEMA_VERSION,
   BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
+  BACKUP_SCOPE_V4_ENTITY_COLUMNS,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
   PORTABLE_V1_ENTITY_COLUMNS,
   type BackupEntity,
 } from '@/core/backup/backup.types';
@@ -85,10 +87,12 @@ export function canonicalPortablePayloadText(
   options?: {
     entities?: readonly BackupEntity[];
     columns?: Record<BackupEntity, readonly string[]>;
+    settingsVersion?: number;
   },
 ): string {
   const entities = options?.entities ?? BACKUP_ENTITIES;
   const columns = options?.columns ?? BACKUP_ENTITY_COLUMNS;
+  const settingsVersion = options?.settingsVersion ?? BACKUP_SETTINGS_VERSION;
   const lines: string[] = [
     `format:${PORTABLE_BACKUP_FORMAT}`,
     `formatVersion:${file.formatVersion}`,
@@ -107,7 +111,7 @@ export function canonicalPortablePayloadText(
     }
   }
   lines.push('settings:');
-  lines.push(canonicalSettingsPayloadText(file.settings));
+  lines.push(canonicalSettingsPayloadText(file.settings, { settingsVersion }));
   return lines.join('\n');
 }
 
@@ -116,6 +120,7 @@ export function computePortablePayloadChecksum(
   options?: {
     entities?: readonly BackupEntity[];
     columns?: Record<BackupEntity, readonly string[]>;
+    settingsVersion?: number;
   },
 ): string {
   return sha256Hex(canonicalPortablePayloadText(file, options));
@@ -254,10 +259,13 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   const entityKeys = Object.keys(entities);
 
   // Resolve the exact recoverable scope this file claims. Historical V1 files
-  // (formatVersion 1) are identified by their EXACT entity set; the two known
-  // historical epochs are the 12-entity pre-Weekly-Review scope and the
-  // 13-entity Weekly-Review scope. Any other/partial set is rejected — scope
-  // is never inferred permissively ("missing table = empty").
+  // (formatVersion 1) are identified by their EXACT entity set; the known
+  // historical epochs are the 12-entity pre-Weekly-Review scope, the 13-entity
+  // Weekly-Review scope, and the 16-entity planning scope. FormatVersion-2
+  // files carry an explicit scope version and may be scope 4 (frozen V4
+  // columns) or the current scope — a future scope is rejected as requiring a
+  // newer app. Any other/partial set is rejected — scope is never inferred
+  // permissively ("missing table = empty").
   let scopeEntities: readonly BackupEntity[];
   let scopeColumns: Record<BackupEntity, readonly string[]>;
   if (input.formatVersion === 1) {
@@ -272,20 +280,29 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       return { ok: false, errors: errors.slice(0, 50) };
     }
   } else {
-    // Current portable envelope: explicit scope version + exact current set.
+    const explicitScope = input.backupScopeVersion;
+    const isCurrentScope =
+      typeof explicitScope === 'number' &&
+      Number.isInteger(explicitScope) &&
+      explicitScope === BACKUP_SCOPE_VERSION;
+    const isHistoricalScope4 =
+      typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 4;
     if (
-      typeof input.backupScopeVersion !== 'number' ||
-      !Number.isInteger(input.backupScopeVersion) ||
-      input.backupScopeVersion !== BACKUP_SCOPE_VERSION
+      typeof explicitScope !== 'number' ||
+      !Number.isInteger(explicitScope) ||
+      (!isCurrentScope && !isHistoricalScope4)
     ) {
       errors.push(
         `This file uses backup scope version ${String(input.backupScopeVersion)}, which this app cannot import.`,
       );
       return { ok: false, errors: errors.slice(0, 50) };
     }
-    const missing = [...BACKUP_ENTITIES].filter((entity) => !(entity in entities));
+    const expectedEntities: readonly BackupEntity[] = isCurrentScope
+      ? BACKUP_ENTITIES
+      : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
+    const missing = [...expectedEntities].filter((entity) => !(entity in entities));
     const unknown = entityKeys.filter(
-      (key) => !(BACKUP_ENTITIES as readonly string[]).includes(key),
+      (key) => !(expectedEntities as readonly string[]).includes(key),
     );
     if (missing.length > 0) {
       errors.push(`The file is missing the complete backup scope: ${missing.join(', ')}.`);
@@ -296,8 +313,10 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     if (missing.length > 0 || unknown.length > 0) {
       return { ok: false, errors: errors.slice(0, 50) };
     }
-    scopeEntities = BACKUP_ENTITIES;
-    scopeColumns = BACKUP_ENTITY_COLUMNS;
+    scopeEntities = expectedEntities;
+    scopeColumns = isCurrentScope
+      ? BACKUP_ENTITY_COLUMNS
+      : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
   }
 
   for (const entity of scopeEntities) {
@@ -366,8 +385,13 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   }
 
   // Settings: runtime validation, contract version, canonical checksum.
+  // Historical V2 payloads verify against the frozen V2 canonical text; the
+  // current version canonicalizes with the V3 field set.
   const settings = integrity.settings as Record<string, unknown>;
-  if (settings.version !== BACKUP_SETTINGS_VERSION) {
+  const settingsVersion = settings.version;
+  const isCurrentSettingsVersion = settingsVersion === BACKUP_SETTINGS_VERSION;
+  const isHistoricalSettingsV2 = settingsVersion === 2;
+  if (!isCurrentSettingsVersion && !isHistoricalSettingsV2) {
     errors.push(`The file carries an unsupported settings version ${String(settings.version)}.`);
   }
   if (typeof settings.checksum !== 'string' || !HEX64.test(settings.checksum)) {
@@ -377,7 +401,9 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     errors.push('The file\u2019s settings payload is malformed.');
   } else {
     const normalizedSettings = normalizeRecoverableSettings(input.settings);
-    const actualSettingsChecksum = canonicalizeSettingsPayload(normalizedSettings);
+    const actualSettingsChecksum = canonicalizeSettingsPayload(normalizedSettings, {
+      settingsVersion: isHistoricalSettingsV2 ? 2 : BACKUP_SETTINGS_VERSION,
+    });
     if (typeof settings.checksum === 'string' && settings.checksum !== actualSettingsChecksum) {
       errors.push('The file\u2019s settings failed integrity verification.');
     }
@@ -397,6 +423,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     const actualPayloadChecksum = computePortablePayloadChecksum(candidate, {
       entities: scopeEntities,
       columns: scopeColumns,
+      settingsVersion: isHistoricalSettingsV2 ? 2 : BACKUP_SETTINGS_VERSION,
     });
     if (actualPayloadChecksum !== integrity.payloadChecksum) {
       errors.push(

@@ -34,6 +34,8 @@ const STRING_LIMITS: Record<string, number> = {
   source_label: 500,
   color: 50,
   icon: 50,
+  linked_todo_title: 200,
+  note: 500,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -132,6 +134,47 @@ export function parseEffectPayloadJson(
     return { ok: false, error: 'effect_payload must be a JSON object' };
   }
   return { ok: true, payload: parsed };
+}
+
+/**
+ * Normalize habits.lifecycle_history JSON (migration 20): nullable bounded
+ * array of closed/ongoing lifecycle intervals. NULL means "no recorded
+ * intervals" and is valid for legacy rows.
+ */
+export function parseHabitLifecycleHistoryJson(
+  value: unknown,
+): { ok: true; history: unknown[] } | { ok: false; error: string } {
+  if (value === null) return { ok: true, history: [] };
+  if (typeof value !== 'string' || value.length > 50_000) {
+    return { ok: false, error: 'lifecycle_history must be a bounded JSON string or null' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { ok: false, error: 'lifecycle_history is not valid JSON' };
+  }
+  if (!Array.isArray(parsed)) {
+    return { ok: false, error: 'lifecycle_history must be an array' };
+  }
+  for (const interval of parsed) {
+    if (!isRecord(interval)) {
+      return { ok: false, error: 'lifecycle_history entries must be objects' };
+    }
+    if (!isEnum(interval.status, ['paused', 'archived'])) {
+      return { ok: false, error: 'lifecycle_history status must be paused or archived' };
+    }
+    if (!isDateKey(interval.from_date_key)) {
+      return { ok: false, error: 'lifecycle_history from_date_key must be a date key' };
+    }
+    if (interval.to_date_key !== null && !isDateKey(interval.to_date_key)) {
+      return {
+        ok: false,
+        error: 'lifecycle_history to_date_key must be a date key or null',
+      };
+    }
+  }
+  return { ok: true, history: parsed };
 }
 
 type FieldRule = {
@@ -297,6 +340,19 @@ const HABIT_RULES: FieldRule[] = [
   nullableIsoRule('deleted_at'),
   optionalColumnRule('project_id', isNullableIdText),
   optionalColumnRule('goal_id', isNullableIdText),
+  optionalColumnRule('status', (v) => isEnum(v, ['active', 'paused', 'archived'])),
+  {
+    required: () => null,
+    optional: (row) =>
+      'lifecycle_history' in row
+        ? checkField(
+            row,
+            'lifecycle_history',
+            (v) => parseHabitLifecycleHistoryJson(v).ok,
+            'lifecycle_history',
+          )
+        : null,
+  },
 ];
 
 const HABIT_COMPLETION_RULES: FieldRule[] = [
@@ -391,6 +447,13 @@ const WORKOUT_LOG_RULES: FieldRule[] = [
   nullableTextRule('notes'),
   isoRule('completed_at', true),
   isoRule('created_at', true),
+  // V5 timing columns: optional so historical manifests without them validate.
+  optionalColumnRule('started_at', isNullableIso),
+  optionalColumnRule('ended_at', isNullableIso),
+  optionalColumnRule(
+    'duration_seconds',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 0),
+  ),
 ];
 
 const WORKOUT_SESSION_EXERCISE_RULES: FieldRule[] = [
@@ -401,6 +464,33 @@ const WORKOUT_SESSION_EXERCISE_RULES: FieldRule[] = [
   isoRule('created_at', true),
 ];
 
+const WORKOUT_SESSION_SET_RULES: FieldRule[] = [
+  idRule('id'),
+  idRule('session_exercise_id'),
+  intRule('set_number', true, 1),
+  // NULL weight/reps mean "not recorded" (unknown) — never a measured zero.
+  {
+    required: () => null,
+    optional: (row) =>
+      checkField(
+        row,
+        'weight',
+        (v) => v === null || (typeof v === 'number' && Number.isFinite(v) && Number(v) >= 0),
+        'weight',
+      ),
+  },
+  {
+    required: () => null,
+    optional: (row) =>
+      checkField(row, 'reps', (v) => v === null || (Number.isInteger(v) && Number(v) >= 0), 'reps'),
+  },
+  nullableEnumRule('weight_unit', ['kg', 'lb']),
+  {
+    required: (row) => checkField(row, 'completed', (v) => v === 0 || v === 1, 'completed'),
+  },
+  isoRule('created_at', true),
+];
+
 const POMODORO_SESSION_RULES: FieldRule[] = [
   idRule('id'),
   isoRule('started_at', true),
@@ -408,6 +498,10 @@ const POMODORO_SESSION_RULES: FieldRule[] = [
   intRule('duration_seconds', true, 0),
   enumRule('session_type', ['focus', 'break', 'short_break', 'long_break']),
   isoRule('created_at', true),
+  // V5 session metadata columns: optional for historical rows.
+  optionalColumnRule('linked_todo_id', isNullableIdText),
+  optionalColumnRule('linked_todo_title', isNullableString),
+  optionalColumnRule('note', isNullableString),
 ];
 
 const LINKED_ACTION_RULE_RULES: FieldRule[] = [
@@ -552,6 +646,7 @@ const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   routine_exercise_sets: ROUTINE_EXERCISE_SET_RULES,
   workout_logs: WORKOUT_LOG_RULES,
   workout_session_exercises: WORKOUT_SESSION_EXERCISE_RULES,
+  workout_session_sets: WORKOUT_SESSION_SET_RULES,
   pomodoro_sessions: POMODORO_SESSION_RULES,
   linked_action_rules: LINKED_ACTION_RULE_RULES,
   weekly_reviews: WEEKLY_REVIEW_RULES,
@@ -654,6 +749,76 @@ export function validateBackupGraph(
   for (const row of rowsByEntity.workout_session_exercises ?? []) {
     if (typeof row.log_id !== 'string' || !logIds.has(row.log_id)) {
       errors.push(`workout_session_exercises references missing log: ${String(row.log_id)}`);
+    }
+  }
+
+  // Session sets -> session exercises.
+  const sessionExerciseIds = ids('workout_session_exercises');
+  for (const row of rowsByEntity.workout_session_sets ?? []) {
+    if (
+      typeof row.session_exercise_id !== 'string' ||
+      !sessionExerciseIds.has(row.session_exercise_id)
+    ) {
+      errors.push(
+        `workout_session_sets references missing session exercise: ${String(row.session_exercise_id)}`,
+      );
+    }
+  }
+
+  // Planning relationships (Scope V4+): parents must exist; tombstoned
+  // parents are allowed because history must survive soft deletes.
+  const todoIds = ids('todos');
+  const projectIds = ids('projects');
+  const goalIds = ids('goals');
+
+  for (const row of rowsByEntity.todos ?? []) {
+    if (
+      typeof row.project_id === 'string' &&
+      row.project_id.length > 0 &&
+      !projectIds.has(row.project_id)
+    ) {
+      errors.push(`todos references missing project: ${row.project_id}`);
+    }
+    if (typeof row.goal_id === 'string' && row.goal_id.length > 0 && !goalIds.has(row.goal_id)) {
+      errors.push(`todos references missing goal: ${row.goal_id}`);
+    }
+  }
+
+  for (const row of rowsByEntity.goals ?? []) {
+    if (
+      typeof row.project_id === 'string' &&
+      row.project_id.length > 0 &&
+      !projectIds.has(row.project_id)
+    ) {
+      errors.push(`goals references missing project: ${row.project_id}`);
+    }
+  }
+
+  for (const row of rowsByEntity.habits ?? []) {
+    if (
+      typeof row.project_id === 'string' &&
+      row.project_id.length > 0 &&
+      !projectIds.has(row.project_id)
+    ) {
+      errors.push(`habits references missing project: ${row.project_id}`);
+    }
+    if (typeof row.goal_id === 'string' && row.goal_id.length > 0 && !goalIds.has(row.goal_id)) {
+      errors.push(`habits references missing goal: ${row.goal_id}`);
+    }
+  }
+
+  for (const row of rowsByEntity.daily_plans ?? []) {
+    let topTodoIds: unknown;
+    try {
+      topTodoIds = typeof row.top_todo_ids === 'string' ? JSON.parse(row.top_todo_ids) : null;
+    } catch {
+      topTodoIds = null;
+    }
+    if (!Array.isArray(topTodoIds)) continue;
+    for (const todoId of topTodoIds) {
+      if (typeof todoId === 'string' && !todoIds.has(todoId)) {
+        errors.push(`daily_plans top_todo_ids references missing todo: ${todoId}`);
+      }
     }
   }
 

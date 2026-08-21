@@ -52,6 +52,18 @@ export type Goal = BaseEntity & {
 
 export type HabitCategory = 'anytime' | 'morning' | 'afternoon' | 'evening';
 
+/** Durable lifecycle state for a habit (migration 20). Archived is not deleted:
+ * historical completions remain; only `active` habits are currently actionable. */
+export type HabitLifecycleStatus = 'active' | 'paused' | 'archived';
+
+/** One recorded lifecycle interval inside habits.lifecycle_history JSON.
+ * to_date_key is null while the interval is ongoing (matches current status). */
+export type HabitLifecycleInterval = {
+  status: Exclude<HabitLifecycleStatus, 'active'>;
+  from_date_key: string;
+  to_date_key: string | null;
+};
+
 export type HabitIcon =
   | 'check-circle'
   | 'favorite'
@@ -78,6 +90,10 @@ export type Habit = BaseEntity & {
   rule_history?: string;
   project_id: string | null;
   goal_id: string | null;
+  /** Durable lifecycle state (migration 20); absent in legacy rows = 'active'. */
+  status?: HabitLifecycleStatus;
+  /** JSON-serialized HabitLifecycleInterval[] (migration 20); optional for legacy rows. */
+  lifecycle_history?: string | null;
 };
 
 export type HabitCompletion = {
@@ -98,6 +114,11 @@ export type PomodoroSession = {
   /** Legacy rows may use "break"; new logs use focus / short_break / long_break as needed */
   session_type: 'focus' | 'break' | 'short_break' | 'long_break';
   created_at: string;
+  /** Durable session metadata (migration 20); optional for legacy rows.
+   * linked_todo_title is a display snapshot that survives todo rename/delete. */
+  linked_todo_id?: string | null;
+  linked_todo_title?: string | null;
+  note?: string | null;
 };
 
 export type WorkoutRoutine = BaseEntity & {
@@ -111,6 +132,11 @@ export type WorkoutLog = {
   notes: string | null;
   completed_at: string;
   created_at: string;
+  /** Real wall-clock session timing (migration 20). NULL = untimed quick-complete
+   * or legacy row — unknown, never a fabricated zero-length session. */
+  started_at?: string | null;
+  ended_at?: string | null;
+  duration_seconds?: number | null;
 };
 
 export type RoutineExercise = BaseEntity & {
@@ -131,6 +157,20 @@ export type WorkoutSessionExercise = {
   log_id: string;
   exercise_name: string;
   sets_completed: number;
+  created_at: string;
+};
+
+/** Per-set load/reps actually performed in a session (migration 20).
+ * weight/reps NULL = not recorded (unknown) — never a measured zero.
+ * completed = 0 marks a skipped set. Insert-only immutable history rows. */
+export type WorkoutSessionSet = {
+  id: string;
+  session_exercise_id: string;
+  set_number: number;
+  weight: number | null;
+  reps: number | null;
+  weight_unit: 'kg' | 'lb' | null;
+  completed: 0 | 1;
   created_at: string;
 };
 

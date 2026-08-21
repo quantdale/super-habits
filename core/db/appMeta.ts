@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
-export type AppMetaOwner = 'system' | 'auth' | 'calories' | 'pomodoro' | 'sync';
+export type AppMetaOwner =
+  'system' | 'auth' | 'calories' | 'pomodoro' | 'sync' | 'workout' | 'notifications';
 
 type AppMetaStorage = 'text' | 'json';
 
@@ -38,7 +39,15 @@ export const appMetaKeys = {
   syncOutbox: defineJsonKey('sync_outbox', 'sync'),
   syncStatus: defineJsonKey('sync_status', 'sync'),
   calorieGoal: defineJsonKey('calorie_goal', 'calories'),
+  /** Daily macro targets (hardening wave v2; recoverable-settings V3 source). */
+  calorieTargets: defineJsonKey('calorie_targets', 'calories'),
   pomodoroSettings: defineJsonKey('pomodoro_settings', 'pomodoro'),
+  /** Pomodoro presets + active preset id (recoverable-settings V3 source). */
+  pomodoroPresets: defineJsonKey('pomodoro_presets', 'pomodoro'),
+  /** Default workout rest seconds (recoverable-settings V3 source). */
+  workoutRestSeconds: defineJsonKey('workout_rest_seconds', 'workout'),
+  /** Todo/daily-plan reminder preferences (recoverable-settings V3 source). */
+  notificationPreferences: defineJsonKey('notification_preferences', 'notifications'),
   backupScopeVersion: defineTextKey('backup.scope_version', 'sync'),
   backupBackfillStatus: defineTextKey('backup.backfill_status', 'sync'),
   backupBackfillDoneEntities: defineJsonKey('backup.backfill_done_entities', 'sync'),

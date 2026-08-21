@@ -209,6 +209,16 @@ function makeRow(
       deleted_at: null,
       completed_at: null,
     },
+    workout_session_sets: {
+      id: 'sset_1',
+      session_exercise_id: 'wsex_1',
+      set_number: 1,
+      weight: null,
+      reps: null,
+      weight_unit: null,
+      completed: 1,
+      created_at: ISO,
+    },
   } as const;
   return { ...(base[entity] as Record<string, unknown>), ...overrides };
 }

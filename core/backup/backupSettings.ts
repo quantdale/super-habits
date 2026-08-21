@@ -9,29 +9,64 @@ import {
 import { getDatabase } from '@/core/db/client';
 import {
   DEFAULT_SETTINGS as DEFAULT_POMODORO_SETTINGS,
+  findPresetById,
+  normalizePomodoroPresets,
   normalizePomodoroSettings,
+  type PomodoroPreset,
   type PomodoroSettings,
 } from '@/features/pomodoro/pomodoro.domain';
-import { DEFAULT_CALORIE_GOAL, normalizeCalorieGoal } from '@/features/calories/calories.domain';
+import {
+  DEFAULT_CALORIE_GOAL,
+  normalizeCalorieGoal,
+  normalizeMacroTargets,
+} from '@/features/calories/calories.domain';
 import type { CalorieGoal } from '@/features/calories/types';
+import { clampRestSeconds } from '@/features/workout/restTimerPreferences';
+import {
+  DEFAULT_DAILY_PLAN_REMINDER_TIME,
+  DEFAULT_TODO_REMINDERS_ENABLED,
+} from '@/core/notifications/notificationPreferences';
+import { parseTimeOfDay, type TimeOfDay } from '@/core/notifications/reminderPlanning';
 import { sha256Hex } from '@/lib/checksum';
-import { type RecoverableSettingsV2 } from '@/core/backup/backup.types';
+import {
+  BACKUP_SETTINGS_VERSION,
+  type RecoverableSettingsV2,
+  type RecoverableSettingsV3,
+} from '@/core/backup/backup.types';
 
 const THEME_MODE_STORAGE_KEY = 'superhabits.theme.mode';
 const THEME_SLOTS_STORAGE_KEY = 'superhabits.theme.slots.v2';
 
 export const THEME_MODES = ['light', 'dark', 'system'] as const;
 
+/** Pomodoro presets + active preset id as carried in the recoverable payload. */
+export type RecoverablePomodoroPresets = {
+  presets: PomodoroPreset[];
+  activePresetId: string | null;
+};
+
+/** Todo/daily-plan reminder preferences as carried in the recoverable payload. */
+export type RecoverableNotificationPreferences = {
+  todoRemindersEnabled: boolean;
+  dailyPlanReminderTime: TimeOfDay;
+};
+
 /**
  * The recoverable settings allowlist. Only these keys are ever backed up or
- * restored; auth/sync/system/device state never enters the payload.
+ * restored; auth/sync/system/device state never enters the payload. The V3
+ * additions are SQLite-backed (app_meta) so they join the restore import
+ * transaction; theme remains AsyncStorage-backed and stages separately.
  */
 export function buildRecoverableSettings(input: {
   calorieGoal: CalorieGoal | null;
   pomodoroSettings: PomodoroSettings | null;
   themeMode: string | null;
   themeSlots: Record<string, string> | null;
-}): RecoverableSettingsV2 {
+  macroTargets?: CalorieGoal | null;
+  pomodoroPresets?: RecoverablePomodoroPresets | null;
+  workoutRestSeconds?: number | null;
+  notificationPreferences?: RecoverableNotificationPreferences | null;
+}): RecoverableSettingsV3 {
   return {
     calorieGoal: input.calorieGoal,
     pomodoroSettings: input.pomodoroSettings,
@@ -39,15 +74,49 @@ export function buildRecoverableSettings(input: {
       mode: input.themeMode,
       slots: input.themeSlots,
     },
+    macroTargets: input.macroTargets ?? null,
+    pomodoroPresets: input.pomodoroPresets ?? null,
+    workoutRestSeconds: input.workoutRestSeconds ?? null,
+    notificationPreferences: input.notificationPreferences ?? null,
   };
+}
+
+function normalizeRecoverablePomodoroPresets(value: unknown): RecoverablePomodoroPresets | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  if (!Array.isArray(candidate.presets)) return null;
+  const presets = normalizePomodoroPresets(candidate.presets);
+  const rawActiveId =
+    typeof candidate.activePresetId === 'string' && candidate.activePresetId.length > 0
+      ? candidate.activePresetId
+      : null;
+  return {
+    presets,
+    // The active id must resolve against the normalized preset list.
+    activePresetId: rawActiveId ? (findPresetById(presets, rawActiveId)?.id ?? null) : null,
+  };
+}
+
+function normalizeRecoverableNotificationPreferences(
+  value: unknown,
+): RecoverableNotificationPreferences | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const todoRemindersEnabled = candidate.todoRemindersEnabled === true;
+  const dailyPlanReminderTime =
+    typeof candidate.dailyPlanReminderTime === 'string'
+      ? (parseTimeOfDay(candidate.dailyPlanReminderTime) ?? DEFAULT_DAILY_PLAN_REMINDER_TIME)
+      : DEFAULT_DAILY_PLAN_REMINDER_TIME;
+  return { todoRemindersEnabled, dailyPlanReminderTime };
 }
 
 /**
  * Validate and normalize an untrusted settings payload. Unknown keys are
  * dropped; malformed known keys fall back to defaults via the feature
- * normalizers so a poisoned payload cannot corrupt local settings.
+ * normalizers so a poisoned payload cannot corrupt local settings. V2
+ * payloads (without the V3 keys) normalize cleanly — absent keys become null.
  */
-export function normalizeRecoverableSettings(input: unknown): RecoverableSettingsV2 {
+export function normalizeRecoverableSettings(input: unknown): RecoverableSettingsV3 {
   const candidate = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
   const calorieGoal =
     candidate.calorieGoal === null || candidate.calorieGoal === undefined
@@ -76,14 +145,34 @@ export function normalizeRecoverableSettings(input: unknown): RecoverableSetting
     }
     if (Object.keys(cleaned).length > 0) slots = cleaned;
   }
+  const macroTargets =
+    candidate.macroTargets === null || candidate.macroTargets === undefined
+      ? null
+      : normalizeMacroTargets(candidate.macroTargets);
+  const pomodoroPresets =
+    candidate.pomodoroPresets === null || candidate.pomodoroPresets === undefined
+      ? null
+      : normalizeRecoverablePomodoroPresets(candidate.pomodoroPresets);
+  const workoutRestSeconds =
+    typeof candidate.workoutRestSeconds === 'number'
+      ? clampRestSeconds(candidate.workoutRestSeconds)
+      : null;
+  const notificationPreferences =
+    candidate.notificationPreferences === null || candidate.notificationPreferences === undefined
+      ? null
+      : normalizeRecoverableNotificationPreferences(candidate.notificationPreferences);
   return {
     calorieGoal,
     pomodoroSettings,
     theme: { mode, slots },
+    macroTargets,
+    pomodoroPresets,
+    workoutRestSeconds,
+    notificationPreferences,
   };
 }
 
-export function isValidRecoverableSettings(input: unknown): input is RecoverableSettingsV2 {
+export function isValidRecoverableSettings(input: unknown): input is RecoverableSettingsV3 {
   if (!input || typeof input !== 'object') return false;
   const candidate = input as Record<string, unknown>;
   if (
@@ -125,8 +214,11 @@ function sortedEntries(record: Record<string, string>): [string, string][] {
  * The hash is byte-identical across node (tests), web (WASM SQLite), and
  * native (Hermes) because it uses the pure-TS SHA-256 in `lib/checksum.ts`.
  */
-export function canonicalizeSettingsPayload(payload: unknown): string {
-  return sha256Hex(canonicalSettingsPayloadText(payload));
+export function canonicalizeSettingsPayload(
+  payload: unknown,
+  options?: { settingsVersion?: number },
+): string {
+  return sha256Hex(canonicalSettingsPayloadText(payload, options));
 }
 
 /**
@@ -134,8 +226,16 @@ export function canonicalizeSettingsPayload(payload: unknown): string {
  * that `canonicalizeSettingsPayload` hashes). Exported so the portable
  * backup envelope can cover the same canonical settings text in its payload
  * checksum; the checksum itself is byte-identical either way.
+ *
+ * Versioned canonicalization: `settingsVersion: 2` reproduces the frozen V2
+ * text (three original fields only) so historical payloads verify byte-stably
+ * after the V3 keys were appended; the current version appends the V3 fields
+ * at the END of the canonical object, keeping the V2 prefix stable.
  */
-export function canonicalSettingsPayloadText(payload: unknown): string {
+export function canonicalSettingsPayloadText(
+  payload: unknown,
+  options?: { settingsVersion?: number },
+): string {
   const normalized = normalizeRecoverableSettings(payload);
   const canonical: Record<string, unknown> = {
     calorieGoal: normalized.calorieGoal
@@ -161,6 +261,47 @@ export function canonicalSettingsPayloadText(payload: unknown): string {
         : null,
     },
   };
+  const requestedVersion = options?.settingsVersion ?? BACKUP_SETTINGS_VERSION;
+  if (requestedVersion < 3) {
+    // Frozen V2 canonical text — must stay byte-identical to the pre-V3 form.
+    return JSON.stringify(canonical);
+  }
+  canonical.macroTargets = normalized.macroTargets
+    ? {
+        calories: normalized.macroTargets.calories,
+        protein: normalized.macroTargets.protein,
+        carbs: normalized.macroTargets.carbs,
+        fats: normalized.macroTargets.fats,
+      }
+    : null;
+  canonical.pomodoroPresets = normalized.pomodoroPresets
+    ? {
+        presets: [...normalized.pomodoroPresets.presets]
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+          .map((preset) => ({
+            id: preset.id,
+            name: preset.name,
+            focusMinutes: preset.focusMinutes,
+            shortBreakMinutes: preset.shortBreakMinutes,
+            longBreakMinutes: preset.longBreakMinutes,
+            sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
+            autoStartBreaks: preset.autoStartBreaks,
+            autoStartFocus: preset.autoStartFocus,
+          })),
+        activePresetId: normalized.pomodoroPresets.activePresetId ?? null,
+      }
+    : null;
+  canonical.workoutRestSeconds =
+    normalized.workoutRestSeconds === null ? null : normalized.workoutRestSeconds;
+  canonical.notificationPreferences = normalized.notificationPreferences
+    ? {
+        todoRemindersEnabled: normalized.notificationPreferences.todoRemindersEnabled,
+        dailyPlanReminderTime: {
+          hour: normalized.notificationPreferences.dailyPlanReminderTime.hour,
+          minute: normalized.notificationPreferences.dailyPlanReminderTime.minute,
+        },
+      }
+    : null;
   return JSON.stringify(canonical);
 }
 
@@ -197,8 +338,16 @@ async function readThemeSnapshot(): Promise<{
 /** Read the current allowlisted settings snapshot (used at push time). */
 export async function readRecoverableSettings(
   db: SQLite.SQLiteDatabase,
-): Promise<RecoverableSettingsV2> {
-  const [calorieGoal, pomodoroSettings, theme] = await Promise.all([
+): Promise<RecoverableSettingsV3> {
+  const [
+    calorieGoal,
+    pomodoroSettings,
+    macroTargets,
+    pomodoroPresets,
+    workoutRestSeconds,
+    notificationPreferences,
+    theme,
+  ] = await Promise.all([
     getAppMetaJsonOrDefault<CalorieGoal>(
       db,
       appMetaKeys.calorieGoal,
@@ -211,6 +360,27 @@ export async function readRecoverableSettings(
       DEFAULT_POMODORO_SETTINGS,
       normalizePomodoroSettings,
     ),
+    getAppMetaJsonOrDefault<CalorieGoal | null>(
+      db,
+      appMetaKeys.calorieTargets,
+      null,
+      normalizeMacroTargets,
+    ),
+    getAppMetaJsonOrDefault<RecoverablePomodoroPresets | null>(
+      db,
+      appMetaKeys.pomodoroPresets,
+      null,
+      normalizeRecoverablePomodoroPresets,
+    ),
+    getAppMetaJsonOrDefault<number | null>(db, appMetaKeys.workoutRestSeconds, null, (value) =>
+      typeof value === 'number' && Number.isFinite(value) ? clampRestSeconds(value) : null,
+    ),
+    getAppMetaJsonOrDefault<RecoverableNotificationPreferences | null>(
+      db,
+      appMetaKeys.notificationPreferences,
+      null,
+      normalizeRecoverableNotificationPreferences,
+    ),
     readThemeSnapshot(),
   ]);
   return buildRecoverableSettings({
@@ -218,26 +388,48 @@ export async function readRecoverableSettings(
     pomodoroSettings,
     themeMode: theme.mode,
     themeSlots: theme.slots,
+    macroTargets,
+    pomodoroPresets,
+    workoutRestSeconds,
+    notificationPreferences,
   });
 }
 
 /**
- * Apply the SQLite-backed recoverable settings (calorie goal + pomodoro
- * defaults) to app_meta — restore import path, called INSIDE the import
- * transaction. Theme settings live in AsyncStorage and cannot join the SQLite
- * transaction; stage them with `stagePendingThemeApplication` in the same
- * transaction and apply after commit with restart reconciliation.
+ * Apply the SQLite-backed recoverable settings to app_meta — restore import
+ * path, called INSIDE the import transaction. Theme settings live in
+ * AsyncStorage and cannot join the SQLite transaction; stage them with
+ * `stagePendingThemeApplication` in the same transaction and apply after
+ * commit with restart reconciliation. V3 keys are only written when present
+ * in the payload, so restoring a legacy V2 payload never clears local V3
+ * preferences.
  */
 export async function applyRecoverableSettingsToSqlite(
   db: SQLite.SQLiteDatabase,
   payload: unknown,
-): Promise<RecoverableSettingsV2> {
+): Promise<RecoverableSettingsV3> {
   const normalized = normalizeRecoverableSettings(payload);
   if (normalized.calorieGoal) {
     await setAppMetaJson(db, appMetaKeys.calorieGoal, normalized.calorieGoal);
   }
   if (normalized.pomodoroSettings) {
     await setAppMetaJson(db, appMetaKeys.pomodoroSettings, normalized.pomodoroSettings);
+  }
+  if (normalized.macroTargets) {
+    await setAppMetaJson(db, appMetaKeys.calorieTargets, normalized.macroTargets);
+  }
+  if (normalized.pomodoroPresets) {
+    await setAppMetaJson(db, appMetaKeys.pomodoroPresets, normalized.pomodoroPresets);
+  }
+  if (normalized.workoutRestSeconds !== null) {
+    await setAppMetaJson(db, appMetaKeys.workoutRestSeconds, normalized.workoutRestSeconds);
+  }
+  if (normalized.notificationPreferences) {
+    await setAppMetaJson(
+      db,
+      appMetaKeys.notificationPreferences,
+      normalized.notificationPreferences,
+    );
   }
   return normalized;
 }

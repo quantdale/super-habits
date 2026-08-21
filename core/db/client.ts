@@ -520,11 +520,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     });
   }
 
-  // Migration 17: Productivity Expansion Wave V1 — local-only planning entities.
-  // Projects, Goals, and Daily Plans are authoritative local state only; they are
-  // NOT registered in the remote backup/sync/restore/portable contracts during
-  // this wave (see design.md section 16). They DO participate in account
-  // local-data ownership/emptiness safety (account.types.ts ACCOUNT_USER_TABLES).
+  // Migration 17: Productivity Expansion Wave V1 — planning entities.
+  // Projects, Goals, and Daily Plans later joined Backup Scope V4 (see
+  // core/backup/backup.types.ts); this block only establishes local schema.
+  // They DO participate in account local-data ownership/emptiness safety
+  // (account.types.ts ACCOUNT_USER_TABLES).
   if (version < 17) {
     await applyMigration(db, 17, async () => {
       await db.execAsync(`
@@ -591,13 +591,7 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 
   // Migration 18: Harden daily_plans active-only date uniqueness (H2) and
-  // ensure partial unique index matches soft-delete semantics. Also reserves
-  // version bump for any subsequent hardening agents sharing v18.
-  // TODO(hardening-parallel): If another agent also claims version 18, reconcile
-  // to sequential version numbers before merging to main; keep migrations append-only
-  // and bump ids monotonically.
-  // H5+H7+H8 agent: added v19 below for stable completed_at + calendar validation.
-  // If another agent also claims v19, bump sequentially (v19 -> v20 etc.).
+  // ensure partial unique index matches soft-delete semantics.
   if (version < 18) {
     await applyMigration(db, 18, async () => {
       // Detect whether the global UNIQUE(date_key) constraint is present on the
@@ -661,8 +655,6 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 
   // Migration 19: Stable completion timestamps (H5/H7) + calendar-safe date keys (H8).
-  // Append-only; TODO(hardening-parallel): if v19 is already claimed by another
-  // hardening agent, bump this block to the next free version sequentially.
   if (version < 19) {
     await applyMigration(db, 19, async () => {
       await addColumnIfMissing(db, 'todos', 'completed_at', 'TEXT');
@@ -682,6 +674,52 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
       await db.runAsync(
         `UPDATE daily_plans SET completed_at = updated_at WHERE status = 'completed' AND (completed_at IS NULL OR completed_at = '')`,
+      );
+    });
+  }
+
+  // Migration 20: Hardening wave v2 durable-state promotion
+  // (openspec/changes/harden-parallel-completion-wave-v2).
+  // - habits.status / habits.lifecycle_history: durable pause/archive lifecycle
+  //   (previously AsyncStorage-only and lost on restore/reinstall). The history
+  //   JSON records {status, from_date_key, to_date_key|null} intervals so paused
+  //   spans never create false missed occurrences in streak/consistency math.
+  // - pomodoro_sessions linked-todo snapshot + note (previously AsyncStorage-only).
+  // - workout_session_sets: per-set load/reps provenance for PR/volume features.
+  //   NULL weight/reps means "not recorded" (unknown), never a measured zero;
+  //   legacy sessions simply have no child rows.
+  // - workout_logs started/ended/duration: real wall-clock session timing.
+  //   NULL = untimed quick-complete or legacy row — never fabricated values.
+  // - calorie_entries consumed_on index for hot range/list queries.
+  if (version < 20) {
+    await applyMigration(db, 20, async () => {
+      await addColumnIfMissing(db, 'habits', 'status', "TEXT NOT NULL DEFAULT 'active'");
+      await addColumnIfMissing(db, 'habits', 'lifecycle_history', 'TEXT');
+      await addColumnIfMissing(db, 'pomodoro_sessions', 'linked_todo_id', 'TEXT');
+      await addColumnIfMissing(db, 'pomodoro_sessions', 'linked_todo_title', 'TEXT');
+      await addColumnIfMissing(db, 'pomodoro_sessions', 'note', 'TEXT');
+      await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS workout_session_sets (
+        id                   TEXT PRIMARY KEY NOT NULL,
+        session_exercise_id  TEXT NOT NULL,
+        set_number           INTEGER NOT NULL,
+        weight               REAL,
+        reps                 INTEGER,
+        weight_unit          TEXT,
+        completed            INTEGER NOT NULL DEFAULT 1,
+        created_at           TEXT NOT NULL
+      );
+    `);
+      await db.execAsync(
+        `CREATE INDEX IF NOT EXISTS idx_workout_session_sets_exercise
+         ON workout_session_sets (session_exercise_id);`,
+      );
+      await addColumnIfMissing(db, 'workout_logs', 'started_at', 'TEXT');
+      await addColumnIfMissing(db, 'workout_logs', 'ended_at', 'TEXT');
+      await addColumnIfMissing(db, 'workout_logs', 'duration_seconds', 'INTEGER');
+      await db.execAsync(
+        `CREATE INDEX IF NOT EXISTS idx_calorie_entries_consumed_on
+         ON calorie_entries (consumed_on);`,
       );
     });
   }

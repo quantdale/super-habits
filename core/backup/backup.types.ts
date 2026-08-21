@@ -1,15 +1,19 @@
 import type { CalorieGoal } from '@/features/calories/types';
-import type { PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
+import type { PomodoroPreset, PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
+import type { TimeOfDay } from '@/core/notifications/reminderPlanning';
 
 /** Versioned backup contract. Bump only with a coordinated schema migration. */
 export const BACKUP_SCHEMA_VERSION = 2;
 /** Version of the recoverable-settings payload contract. */
-export const BACKUP_SETTINGS_VERSION = 2;
+export const BACKUP_SETTINGS_VERSION = 3;
 /**
  * Versioned *recoverable scope* marker — the exact set of entities covered by
  * a backup. Bumped from 3 → 4 when Projects/Goals/Daily Plans (and the new
  * Todo/Habit `project_id`/`goal_id`/`completed_at` columns) joined the
  * recoverable scope during the Productivity Expansion Wave V1 hardening.
+ * Bumped from 4 → 5 when the hardening wave v2 promoted durable user-domain
+ * state: habit lifecycle columns, Pomodoro session metadata, per-set workout
+ * load/reps (`workout_session_sets`), and real workout session timing.
  *
  * Scope is deliberately distinct from `BACKUP_SCHEMA_VERSION`: the row *shape*
  * stayed compatible (new columns are nullable), so the schema version did not
@@ -17,7 +21,7 @@ export const BACKUP_SETTINGS_VERSION = 2;
  *
  * Local marker: when `backup.scope_version` is below this, backfill runs.
  */
-export const BACKUP_SCOPE_VERSION = 4;
+export const BACKUP_SCOPE_VERSION = 5;
 
 /**
  * Every locally durable, user-owned table in the recoverable backup scope,
@@ -46,6 +50,7 @@ export const BACKUP_ENTITIES = [
   'projects',
   'goals',
   'daily_plans',
+  'workout_session_sets',
 ] as const;
 
 export type BackupEntity = (typeof BACKUP_ENTITIES)[number];
@@ -68,6 +73,339 @@ export const BACKUP_MANIFEST_RECORD_ID = 'manifest';
 
 /** Fixed canonical column order per entity (local schema order; user_id excluded). */
 export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
+  todos: [
+    'id',
+    'title',
+    'notes',
+    'completed',
+    'due_date',
+    'priority',
+    'sort_order',
+    'recurrence',
+    'recurrence_id',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'project_id',
+    'goal_id',
+    'completed_at',
+  ],
+  habits: [
+    'id',
+    'name',
+    'target_per_day',
+    'reminder_time',
+    'category',
+    'icon',
+    'color',
+    'rule_history',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'project_id',
+    'goal_id',
+    'status',
+    'lifecycle_history',
+  ],
+  habit_completions: ['id', 'habit_id', 'date_key', 'count', 'created_at', 'updated_at'],
+  calorie_entries: [
+    'id',
+    'food_name',
+    'calories',
+    'protein',
+    'carbs',
+    'fats',
+    'fiber',
+    'meal_type',
+    'consumed_on',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  saved_meals: [
+    'id',
+    'food_name',
+    'calories',
+    'protein',
+    'carbs',
+    'fats',
+    'fiber',
+    'meal_type',
+    'use_count',
+    'last_used_at',
+    'created_at',
+  ],
+  workout_routines: ['id', 'name', 'description', 'created_at', 'updated_at', 'deleted_at'],
+  routine_exercises: [
+    'id',
+    'routine_id',
+    'name',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  routine_exercise_sets: [
+    'id',
+    'exercise_id',
+    'set_number',
+    'active_seconds',
+    'rest_seconds',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  workout_logs: [
+    'id',
+    'routine_id',
+    'notes',
+    'completed_at',
+    'created_at',
+    'started_at',
+    'ended_at',
+    'duration_seconds',
+  ],
+  workout_session_exercises: ['id', 'log_id', 'exercise_name', 'sets_completed', 'created_at'],
+  pomodoro_sessions: [
+    'id',
+    'started_at',
+    'ended_at',
+    'duration_seconds',
+    'session_type',
+    'created_at',
+    'linked_todo_id',
+    'linked_todo_title',
+    'note',
+  ],
+  linked_action_rules: [
+    'id',
+    'status',
+    'direction_policy',
+    'bidirectional_group_id',
+    'source_feature',
+    'source_entity_type',
+    'source_entity_id',
+    'trigger_type',
+    'target_feature',
+    'target_entity_type',
+    'target_entity_id',
+    'effect_type',
+    'effect_payload',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  weekly_reviews: [
+    'id',
+    'week_key',
+    'week_start_date',
+    'week_end_date',
+    'next_week_start_date',
+    'completed_at',
+    'status',
+    'summary_payload',
+    'plan_payload',
+    'reflection',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  projects: [
+    'id',
+    'name',
+    'description',
+    'color',
+    'status',
+    'target_date',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'completed_at',
+  ],
+  goals: [
+    'id',
+    'project_id',
+    'title',
+    'description',
+    'horizon',
+    'target_date',
+    'status',
+    'progress_percent',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'completed_at',
+  ],
+  daily_plans: [
+    'id',
+    'date_key',
+    'intention',
+    'top_todo_ids',
+    'focus_target_minutes',
+    'notes',
+    'reflection',
+    'energy_score',
+    'status',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'completed_at',
+  ],
+  workout_session_sets: [
+    'id',
+    'session_exercise_id',
+    'set_number',
+    'weight',
+    'reps',
+    'weight_unit',
+    'completed',
+    'created_at',
+  ],
+};
+
+/**
+ * Historical Portable V1 canonical columns, snapshotted exactly as they were
+ * when V1 files (formatVersion 1) were exported. V1 files must canonicalize
+ * and verify with these columns so their stored checksums still match — the
+ * current `BACKUP_ENTITY_COLUMNS` adds `project_id`/`goal_id`/`completed_at`
+ * to `todos` and adds the three planning entities, which would otherwise
+ * change the V1 payload checksum. Habits are ongoing scheduled entities and
+ * have no terminal completion state, so `completed_at` is intentionally
+ * excluded from the Habit canonical columns (only Todos/Projects/Goals/Daily
+ * Plans carry it). Only entities present in the V1 scope are listed.
+ */
+export const PORTABLE_V1_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
+  todos: [
+    'id',
+    'title',
+    'notes',
+    'completed',
+    'due_date',
+    'priority',
+    'sort_order',
+    'recurrence',
+    'recurrence_id',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  habits: [
+    'id',
+    'name',
+    'target_per_day',
+    'reminder_time',
+    'category',
+    'icon',
+    'color',
+    'rule_history',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  habit_completions: ['id', 'habit_id', 'date_key', 'count', 'created_at', 'updated_at'],
+  calorie_entries: [
+    'id',
+    'food_name',
+    'calories',
+    'protein',
+    'carbs',
+    'fats',
+    'fiber',
+    'meal_type',
+    'consumed_on',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  saved_meals: [
+    'id',
+    'food_name',
+    'calories',
+    'protein',
+    'carbs',
+    'fats',
+    'fiber',
+    'meal_type',
+    'use_count',
+    'last_used_at',
+    'created_at',
+  ],
+  workout_routines: ['id', 'name', 'description', 'created_at', 'updated_at', 'deleted_at'],
+  routine_exercises: [
+    'id',
+    'routine_id',
+    'name',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  routine_exercise_sets: [
+    'id',
+    'exercise_id',
+    'set_number',
+    'active_seconds',
+    'rest_seconds',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  workout_logs: ['id', 'routine_id', 'notes', 'completed_at', 'created_at'],
+  workout_session_exercises: ['id', 'log_id', 'exercise_name', 'sets_completed', 'created_at'],
+  pomodoro_sessions: [
+    'id',
+    'started_at',
+    'ended_at',
+    'duration_seconds',
+    'session_type',
+    'created_at',
+  ],
+  linked_action_rules: [
+    'id',
+    'status',
+    'direction_policy',
+    'bidirectional_group_id',
+    'source_feature',
+    'source_entity_type',
+    'source_entity_id',
+    'trigger_type',
+    'target_feature',
+    'target_entity_type',
+    'target_entity_id',
+    'effect_type',
+    'effect_payload',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  weekly_reviews: [
+    'id',
+    'week_key',
+    'week_start_date',
+    'week_end_date',
+    'next_week_start_date',
+    'completed_at',
+    'status',
+    'summary_payload',
+    'plan_payload',
+    'reflection',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+};
+
+/**
+ * Scope V4 canonical columns, snapshotted exactly as they were when scope 4
+ * was current (before the hardening wave v2 V5 bump). Scope-4 manifests and
+ * Portable formatVersion-2/scope-4 files must canonicalize and verify against
+ * these columns so their stored checksums still match — the current
+ * `BACKUP_ENTITY_COLUMNS` appends habit lifecycle columns, Pomodoro session
+ * metadata columns, workout timing columns, and the `workout_session_sets`
+ * entity, which would otherwise change stored checksums.
+ */
+export const BACKUP_SCOPE_V4_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
   todos: [
     'id',
     'title',
@@ -236,138 +574,6 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
 };
 
 /**
- * Historical Portable V1 canonical columns, snapshotted exactly as they were
- * when V1 files (formatVersion 1) were exported. V1 files must canonicalize
- * and verify with these columns so their stored checksums still match — the
- * current `BACKUP_ENTITY_COLUMNS` adds `project_id`/`goal_id`/`completed_at`
- * to `todos` and adds the three planning entities, which would otherwise
- * change the V1 payload checksum. Habits are ongoing scheduled entities and
- * have no terminal completion state, so `completed_at` is intentionally
- * excluded from the Habit canonical columns (only Todos/Projects/Goals/Daily
- * Plans carry it). Only entities present in the V1 scope are listed.
- */
-export const PORTABLE_V1_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
-  todos: [
-    'id',
-    'title',
-    'notes',
-    'completed',
-    'due_date',
-    'priority',
-    'sort_order',
-    'recurrence',
-    'recurrence_id',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-  habits: [
-    'id',
-    'name',
-    'target_per_day',
-    'reminder_time',
-    'category',
-    'icon',
-    'color',
-    'rule_history',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-  habit_completions: ['id', 'habit_id', 'date_key', 'count', 'created_at', 'updated_at'],
-  calorie_entries: [
-    'id',
-    'food_name',
-    'calories',
-    'protein',
-    'carbs',
-    'fats',
-    'fiber',
-    'meal_type',
-    'consumed_on',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-  saved_meals: [
-    'id',
-    'food_name',
-    'calories',
-    'protein',
-    'carbs',
-    'fats',
-    'fiber',
-    'meal_type',
-    'use_count',
-    'last_used_at',
-    'created_at',
-  ],
-  workout_routines: ['id', 'name', 'description', 'created_at', 'updated_at', 'deleted_at'],
-  routine_exercises: [
-    'id',
-    'routine_id',
-    'name',
-    'sort_order',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-  routine_exercise_sets: [
-    'id',
-    'exercise_id',
-    'set_number',
-    'active_seconds',
-    'rest_seconds',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-  workout_logs: ['id', 'routine_id', 'notes', 'completed_at', 'created_at'],
-  workout_session_exercises: ['id', 'log_id', 'exercise_name', 'sets_completed', 'created_at'],
-  pomodoro_sessions: [
-    'id',
-    'started_at',
-    'ended_at',
-    'duration_seconds',
-    'session_type',
-    'created_at',
-  ],
-  linked_action_rules: [
-    'id',
-    'status',
-    'direction_policy',
-    'bidirectional_group_id',
-    'source_feature',
-    'source_entity_type',
-    'source_entity_id',
-    'trigger_type',
-    'target_feature',
-    'target_entity_type',
-    'target_entity_id',
-    'effect_type',
-    'effect_payload',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-  weekly_reviews: [
-    'id',
-    'week_key',
-    'week_start_date',
-    'week_end_date',
-    'next_week_start_date',
-    'completed_at',
-    'status',
-    'summary_payload',
-    'plan_payload',
-    'reflection',
-    'created_at',
-    'updated_at',
-    'deleted_at',
-  ],
-};
-
-/**
  * Known historical recoverable-scope epochs, recorded EXACTLY. A manifest or
  * portable file is restorable only when its entity set matches one of these
  * (or the current scope) exactly — never via permissive "missing table =
@@ -393,7 +599,14 @@ export const KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET = [
   'weekly_reviews',
 ] as const;
 
-/** Current (hardened planning) recoverable scope epoch. */
+export const KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET = [
+  ...KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
+  'projects',
+  'goals',
+  'daily_plans',
+] as const;
+
+/** Current (hardened wave v2) recoverable scope epoch. */
 export const CURRENT_BACKUP_SCOPE_ENTITY_SET = BACKUP_ENTITIES;
 
 function sortedEquals(a: readonly string[], b: readonly string[]): boolean {
@@ -406,7 +619,9 @@ function sortedEquals(a: readonly string[], b: readonly string[]): boolean {
 /**
  * Resolve a manifest/file's recoverable scope from its explicit scope version
  * (new manifests) or its exact entity set (historical manifests that predate
- * scope versioning). Returns null when the entity set matches none of the
+ * scope versioning). Returns null when the scope is unknown or NEWER than this
+ * app understands (a newer scope must surface as `unsupported_version`, never
+ * silently verify as "current"), and when the entity set matches none of the
  * known epochs — partial/unknown scopes are never inferred permissively ("a
  * missing table is just empty").
  */
@@ -414,13 +629,26 @@ export function resolveBackupScope(input: {
   backupScopeVersion?: number | null;
   entityMetadata: Partial<Record<BackupEntity, unknown>>;
 }): { scope: number; entitySet: readonly BackupEntity[] } | null {
-  if (
-    typeof input.backupScopeVersion === 'number' &&
-    input.backupScopeVersion >= BACKUP_SCOPE_VERSION
-  ) {
-    return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
+  if (typeof input.backupScopeVersion === 'number') {
+    if (input.backupScopeVersion === BACKUP_SCOPE_VERSION) {
+      return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
+    }
+    if (input.backupScopeVersion === 4) {
+      return { scope: 4, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET };
+    }
+    // Older explicit versions (2/3) and anything newer fall through to exact
+    // entity-set matching below; a future scope must not resolve as current.
+    if (input.backupScopeVersion > BACKUP_SCOPE_VERSION) {
+      return null;
+    }
   }
   const keys = Object.keys(input.entityMetadata);
+  if (sortedEquals(keys, [...BACKUP_ENTITIES])) {
+    return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
+  }
+  if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET])) {
+    return { scope: 4, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET };
+  }
   if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET])) {
     return { scope: 3, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET };
   }
@@ -432,10 +660,9 @@ export function resolveBackupScope(input: {
 
 /**
  * Canonical columns to use when verifying a manifest/file of the given scope.
- * Historical scopes use the V1 snapshot columns (the new `project_id`/
- * `goal_id`/`completed_at` todo/habit columns and the three planning entities
- * did not exist yet), so their stored checksums verify exactly against the
- * columns that produced them.
+ * Each epoch verifies against the frozen column snapshot that produced its
+ * stored checksums: scopes below 4 use the Portable V1 snapshot, scope 4 uses
+ * the V4 snapshot, and only the current scope uses the live columns.
  */
 export function backupEntityColumnsForScope(
   scope: number,
@@ -446,9 +673,13 @@ export function backupEntityColumnsForScope(
   const historical: Record<BackupEntity, readonly string[]> = {
     ...BACKUP_ENTITY_COLUMNS,
   };
+  const snapshot =
+    scope === 4
+      ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
+      : (PORTABLE_V1_ENTITY_COLUMNS as Partial<Record<BackupEntity, readonly string[]>>);
   for (const entity of Object.keys(historical) as BackupEntity[]) {
-    const v1 = PORTABLE_V1_ENTITY_COLUMNS[entity];
-    if (v1) historical[entity] = v1;
+    const frozen = snapshot[entity];
+    if (frozen) historical[entity] = frozen;
   }
   return historical;
 }
@@ -533,13 +764,13 @@ export type RemoteBackupManifestRow = {
 export type RemoteUserBackupSettingsRow = {
   user_id: string;
   settings_version: number;
-  payload: RecoverableSettingsV2;
+  payload: RecoverableSettingsV2 | RecoverableSettingsV3;
   updated_at: string;
 };
 
 /**
- * Allowlisted recoverable settings contract. Keys are runtime-validated and
- * bounded; auth/sync/system/device state never appears here.
+ * Allowlisted recoverable settings contract (V2). Keys are runtime-validated
+ * and bounded; auth/sync/system/device state never appears here.
  */
 export type RecoverableSettingsV2 = {
   calorieGoal: CalorieGoal | null;
@@ -548,6 +779,30 @@ export type RecoverableSettingsV2 = {
     mode: string | null;
     slots: Record<string, string> | null;
   };
+};
+
+/**
+ * Allowlisted recoverable settings contract (V3, hardening wave v2). Extends
+ * V2 with SQLite-backed user preferences that must survive restore; new keys
+ * are appended so the V2 canonical text stays byte-stable for historical
+ * payloads. Absent keys normalize to null and unknown keys are dropped, so a
+ * V2 payload normalizes cleanly into this shape.
+ */
+export type RecoverableSettingsV3 = RecoverableSettingsV2 & {
+  /** Daily macro targets (protein/carbs/fats grams); falls back to calorieGoal at runtime. */
+  macroTargets: CalorieGoal | null;
+  /** Pomodoro timer presets plus the active preset id. */
+  pomodoroPresets: {
+    presets: PomodoroPreset[];
+    activePresetId: string | null;
+  } | null;
+  /** Default rest between workout sets, in seconds (clamped 5–600). */
+  workoutRestSeconds: number | null;
+  /** Todo/daily-plan reminder preferences. */
+  notificationPreferences: {
+    todoRemindersEnabled: boolean;
+    dailyPlanReminderTime: TimeOfDay;
+  } | null;
 };
 
 export type BackupBackfillStatus = 'idle' | 'running' | 'complete';
