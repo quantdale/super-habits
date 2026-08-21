@@ -95,7 +95,10 @@ test.describe('Workout', () => {
       .first()
       .click();
     await expect(page.getByText('Session detail')).toBeVisible();
-    await expect(page.getByText('Bench Press')).toBeVisible();
+    // The detail dialog shows the exercise twice by design: once as the
+    // exercise row and once under "Session personal records".
+    const detail = page.getByRole('dialog');
+    await expect(detail.getByText('Bench Press').first()).toBeVisible();
     await expect(page.getByText(/80 × 8/)).toBeVisible();
     await expect(page.getByText(/est\. 1RM 101/)).toBeVisible();
     await expect(page.getByText('Duration')).toBeVisible();
@@ -112,7 +115,11 @@ test.describe('Workout', () => {
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
     await dialog.getByText('Add', { exact: true }).click({ force: true });
-    await dialog.getByLabel('Close').click({ force: true });
+    // Close without force: the Add handler re-renders the dialog async, and a
+    // forced click during that window is silently dropped, leaving the modal
+    // open. Wait for the close to actually land before touching the page.
+    await dialog.getByLabel('Close').click();
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 
     await fillRoutineName(page, 'Quick day');
     await page.getByText('Add routine', { exact: true }).click();
