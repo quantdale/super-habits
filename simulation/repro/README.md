@@ -31,32 +31,32 @@ see below).
 
 The web export stores the app database in the browser's OPFS (per-origin, not a
 single file on disk), so a capture cannot copy a `*.sqlite` file. The DB harness
-(`e2e/helpers/dbHarness.ts`) opens the *same* database the app uses, so the
+(`e2e/helpers/dbHarness.ts`) opens the _same_ database the app uses, so the
 writer dumps every app table's rows and replay re-inserts them after the app has
 bootstrapped the real schema. This is a deliberate, documented deviation from
 the design's `db.sqlite` name.
 
 ## API (`simulation/repro/bundle.ts`)
 
-| Export | Purpose |
-| --- | --- |
+| Export                                                                                     | Purpose                                                                            |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | `captureBundle({ page, report, runId, steps, consoleLines?, networkEvents?, outputDir? })` | Capture a bundle from a live page + run report. Returns `{ bundleDir, metadata }`. |
-| `getCurrentCommit()` | Git HEAD short sha via `child_process`, `null` when unavailable. |
-| `detectTimezone()` / `makeBundleId()` | Capture-time host timezone / stable bundle id. |
-| `serializeActionsJsonl` / `parseActionsJsonl` | One semantic step per line ⟷ `SemanticStep[]`. |
-| `serializeSqliteDump` / `parseSqliteDump` | ⟷ `{ tables }` row dump. |
-| `buildRestoreSql(dump)` | `DELETE FROM` + `INSERT` per table in dependency-safe order. |
-| `sqlLiteral(v)` | SQLite literal escaping for restore SQL. |
-| `buildHar(events)` | HAR-lite log from captured network events. |
-| `buildNarrativeTemplate(meta)` | The `narrative.md` template. |
-| `validateBundleMetadata` / `parseBundleMetadata` | `bundle.json` validation (pure, unit-tested). |
-| `dumpSqliteRows(page)` / `dumpStorage(page)` | Browser-side dumps. |
+| `getCurrentCommit()`                                                                       | Git HEAD short sha via `child_process`, `null` when unavailable.                   |
+| `detectTimezone()` / `makeBundleId()`                                                      | Capture-time host timezone / stable bundle id.                                     |
+| `serializeActionsJsonl` / `parseActionsJsonl`                                              | One semantic step per line ⟷ `SemanticStep[]`.                                     |
+| `serializeSqliteDump` / `parseSqliteDump`                                                  | ⟷ `{ tables }` row dump.                                                           |
+| `buildRestoreSql(dump)`                                                                    | `DELETE FROM` + `INSERT` per table in dependency-safe order.                       |
+| `sqlLiteral(v)`                                                                            | SQLite literal escaping for restore SQL.                                           |
+| `buildHar(events)`                                                                         | HAR-lite log from captured network events.                                         |
+| `buildNarrativeTemplate(meta)`                                                             | The `narrative.md` template.                                                       |
+| `validateBundleMetadata` / `parseBundleMetadata`                                           | `bundle.json` validation (pure, unit-tested).                                      |
+| `dumpSqliteRows(page)` / `dumpStorage(page)`                                               | Browser-side dumps.                                                                |
 
 ## Capture wiring (task 5.2)
 
 `simulation/runner/execute.ts` owns failure handling. The minimal hook added:
-**`executeScenario({ ..., onFailure })`** — called *after* a scenario failure is
-recorded but *before* context teardown, with the page/context still alive so the
+**`executeScenario({ ..., onFailure })`** — called _after_ a scenario failure is
+recorded but _before_ context teardown, with the page/context still alive so the
 bundle can dump the DB + storage. It also records console lines and (only when
 `onFailure` is registered) network events. Capture failures are best-effort and
 never mask the original scenario failure.
@@ -104,7 +104,7 @@ the result; the build must already be served at the base URL (default
 
 The bundle captures the DB state **at the failure point**, and replay re-executes
 the full action log from that state. Failures at pure verification steps
-(`expectOracle`, `expectAcrossSurfaces`) reproduce bit-for-bit. If the *failing*
+(`expectOracle`, `expectAcrossSurfaces`) reproduce bit-for-bit. If the _failing_
 step itself mutates the DB, re-running the log re-applies earlier mutations —
 the divergence report surfaces this, and the reproducible pattern is to capture
 a bundle whose failing step is verification-only (or trim `actions.jsonl` to the

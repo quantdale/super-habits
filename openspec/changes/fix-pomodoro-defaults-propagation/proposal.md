@@ -7,7 +7,7 @@
 ## What Changes
 
 - **Propagate a pomodoro-defaults change to an already-mounted Focus section** without unmounting: re-read `pomodoro_settings` when the section becomes active (its `isActive` foreground-refresh path), or subscribe to a settings/app_meta change signal that `PomodoroScreen` already consumes, so a save in Settings bumps the value the section holds.
-- **Do not disturb a running or paused session**: J10 step 5 asserts that a paused session's remaining time and paused state are untouched by a defaults change, and that no session is logged from the interruption. The propagation must update the *default* durations (what a fresh idle timer shows) while leaving the in-flight session's retained state alone.
+- **Do not disturb a running or paused session**: J10 step 5 asserts that a paused session's remaining time and paused state are untouched by a defaults change, and that no session is logged from the interruption. The propagation must update the _default_ durations (what a fresh idle timer shows) while leaving the in-flight session's retained state alone.
 - **Persist unchanged**: the save path in Settings already writes `app_meta.pomodoro_settings` correctly; that is not the defect. Only the live-section propagation is missing.
 
 ## Capabilities

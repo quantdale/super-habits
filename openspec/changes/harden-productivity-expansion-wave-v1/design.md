@@ -337,7 +337,7 @@ A completed or historical Daily Plan should remain understandable if a reference
 Preferred model: store a versioned snapshot alongside IDs, for example:
 
 ```ts
-topTodoSnapshot: Array<{ id: string; title: string }>
+topTodoSnapshot: Array<{ id: string; title: string }>;
 ```
 
 Exact storage can be normalized child rows or validated JSON. Keep it bounded to three records.

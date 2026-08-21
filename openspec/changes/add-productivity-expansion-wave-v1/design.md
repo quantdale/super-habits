@@ -303,7 +303,16 @@ type ActivityTimelineItem = {
   occurredAt: string;
   dateKey: string;
   category: 'productivity' | 'health' | 'planning';
-  source: 'todo' | 'habit' | 'focus' | 'workout' | 'calories' | 'weekly_review' | 'daily_plan' | 'project' | 'goal';
+  source:
+    | 'todo'
+    | 'habit'
+    | 'focus'
+    | 'workout'
+    | 'calories'
+    | 'weekly_review'
+    | 'daily_plan'
+    | 'project'
+    | 'goal';
   title: string;
   subtitle?: string;
   icon: string;

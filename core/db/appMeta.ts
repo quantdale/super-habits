@@ -44,6 +44,12 @@ export const appMetaKeys = {
   pomodoroSettings: defineJsonKey('pomodoro_settings', 'pomodoro'),
   /** Pomodoro presets + active preset id (recoverable-settings V3 source). */
   pomodoroPresets: defineJsonKey('pomodoro_presets', 'pomodoro'),
+  /** Durable in-progress timer intent for crash/reload reconciliation
+   *  (hardening wave v2). Local operational state — never backed up. */
+  pomodoroActiveTimer: defineJsonKey('pomodoro.active_timer', 'pomodoro'),
+  /** Durable retry queue for completed-focus logs whose insert failed
+   *  (hardening wave v2). Local operational state — never backed up. */
+  pomodoroPendingLogs: defineJsonKey('pomodoro.pending_logs', 'pomodoro'),
   /** Default workout rest seconds (recoverable-settings V3 source). */
   workoutRestSeconds: defineJsonKey('workout_rest_seconds', 'workout'),
   /** Todo/daily-plan reminder preferences (recoverable-settings V3 source). */

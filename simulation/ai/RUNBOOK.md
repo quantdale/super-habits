@@ -26,7 +26,7 @@ schedule.
   browser tooling, or an equivalent that can drive Chromium and evaluate in the
   page).
 - The Chrome/Chromium browser Playwright uses (`npx playwright install
-  chromium` if not already present).
+chromium` if not already present).
 
 ## Running a mission
 
@@ -121,7 +121,7 @@ from the parent's findings convention, D7). An anomaly never evaporates.
 
 1. **`defect-change`** — a reproducible defect. File it as a separate change
    (the platform never fixes defects in-repo), set `triage.outcome =
-   'defect-change'`, `triage.reference` = the change id, attach the run's
+'defect-change'`, `triage.reference` = the change id, attach the run's
    repro evidence.
 2. **`deterministic-scenario`** — new deterministic behaviour worth locking
    in, or an anomaly that reproduces cleanly. Add it to the scenario library /

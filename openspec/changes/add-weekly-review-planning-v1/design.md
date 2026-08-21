@@ -80,9 +80,9 @@ Suggested logical representation:
 
 ```ts
 type ReviewWeek = {
-  weekKey: string;       // canonical local week identifier
-  startDateKey: string;  // YYYY-MM-DD local
-  endDateKey: string;    // inclusive local date key
+  weekKey: string; // canonical local week identifier
+  startDateKey: string; // YYYY-MM-DD local
+  endDateKey: string; // inclusive local date key
   nextWeekStartDateKey: string;
   nextWeekEndDateKey: string;
 };

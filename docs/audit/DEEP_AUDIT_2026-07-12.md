@@ -543,35 +543,35 @@ Apply the same `ON CONFLICT` pattern to `upsertSavedMeal` (keyed on `food_name C
 
 ## 5. Prioritized backlog
 
-| #   | ID          | Title                                                                        | Sev  | Effort     | Depends on            |
-| --- | ----------- | ---------------------------------------------------------------------------- | ---- | ---------- | --------------------- |
-| 1   | SEC-001     | Fix edge-fn argument bug (todo parses 502)                                   | High | Quick      | —                     |
-| 2   | DEP-001/002 | Remove unused deps (`uuid` +4 expo pkgs), audit-fix dev chain, CI audit gate | High | Quick      | —                     |
-| 3   | SEC-004     | Untrack `supabase/.temp`, debug logs; fix `.gitignore`                       | Med  | Quick      | —                     |
-| 4   | ERR-002     | Error boundary + rewrite destructive bootstrap message                       | Med  | Quick      | —                     |
-| 5   | TST-002     | Add ESLint (+hooks, floating-promises) & CI lint step                        | Med  | Quick      | — **done**             |
-| 6   | OPS-002     | CI: cache Playwright, scope e2e triggers, TZ env, audit step                 | Med  | Quick      | 5                     |
-| 7   | DATA-001    | Transactional migrations + narrow duplicate-column catch                     | Med  | Quick-Med  | —                     |
-| 8   | COR-001     | `ON CONFLICT` upserts for habit completions & saved meals; guard-first       | Med  | Quick      | —                     |
-| 9   | COR-003     | Stop swallowing workout validation errors                                    | Med  | Quick      | —                     |
-| 10  | COR-002     | Recurring-todo delete semantics ("skip today" vs "end series")               | Med  | Quick-Med  | —                     |
-| 11  | COR-004     | Pomodoro timestamp-based timer, start guard, dots fix                        | Med  | Quick-Med  | —                     |
-| 12  | DATA-002    | Index migration, FK pragma, transactions on reorders, N+1 fix                | Med  | Quick      | 7                     |
-| 13  | DATA-003    | Skip zero-rule event writes + retention sweep                                | Med  | Quick-Med  | 7                     |
-| 14  | ERR-001     | Durable outbox, failure isolation, backoff, Settings surface                 | High | Med        | 7, 12                 |
-| 15  | CON-001     | Flush in-flight guard + queue dedupe                                         | Med  | Quick      | 14                    |
-| 16  | ARC-001     | Define delete/`operation` semantics in adapter                               | Med  | Quick      | 14                    |
+| #   | ID          | Title                                                                                       | Sev  | Effort     | Depends on            |
+| --- | ----------- | ------------------------------------------------------------------------------------------- | ---- | ---------- | --------------------- |
+| 1   | SEC-001     | Fix edge-fn argument bug (todo parses 502)                                                  | High | Quick      | —                     |
+| 2   | DEP-001/002 | Remove unused deps (`uuid` +4 expo pkgs), audit-fix dev chain, CI audit gate                | High | Quick      | —                     |
+| 3   | SEC-004     | Untrack `supabase/.temp`, debug logs; fix `.gitignore`                                      | Med  | Quick      | —                     |
+| 4   | ERR-002     | Error boundary + rewrite destructive bootstrap message                                      | Med  | Quick      | —                     |
+| 5   | TST-002     | Add ESLint (+hooks, floating-promises) & CI lint step                                       | Med  | Quick      | — **done**            |
+| 6   | OPS-002     | CI: cache Playwright, scope e2e triggers, TZ env, audit step                                | Med  | Quick      | 5                     |
+| 7   | DATA-001    | Transactional migrations + narrow duplicate-column catch                                    | Med  | Quick-Med  | —                     |
+| 8   | COR-001     | `ON CONFLICT` upserts for habit completions & saved meals; guard-first                      | Med  | Quick      | —                     |
+| 9   | COR-003     | Stop swallowing workout validation errors                                                   | Med  | Quick      | —                     |
+| 10  | COR-002     | Recurring-todo delete semantics ("skip today" vs "end series")                              | Med  | Quick-Med  | —                     |
+| 11  | COR-004     | Pomodoro timestamp-based timer, start guard, dots fix                                       | Med  | Quick-Med  | —                     |
+| 12  | DATA-002    | Index migration, FK pragma, transactions on reorders, N+1 fix                               | Med  | Quick      | 7                     |
+| 13  | DATA-003    | Skip zero-rule event writes + retention sweep                                               | Med  | Quick-Med  | 7                     |
+| 14  | ERR-001     | Durable outbox, failure isolation, backoff, Settings surface                                | High | Med        | 7, 12                 |
+| 15  | CON-001     | Flush in-flight guard + queue dedupe                                                        | Med  | Quick      | 14                    |
+| 16  | ARC-001     | Define delete/`operation` semantics in adapter                                              | Med  | Quick      | 14                    |
 | 17  | SEC-003     | Commit remote schema+RLS, explicit column lists, isolation test (ID entropy already CSPRNG) | High | Med        | — (before 14 ideally) |
-| 18  | SEC-002     | Edge fn auth hardening, rate limit, max_tokens, CORS, config.toml            | High | Med        | 1                     |
-| 19  | OPS-001     | Build-derived SW versioning, cache headers, eviction                         | High | Med        | —                     |
-| 20  | OPS-003     | vercel.json security/caching headers                                         | Low  | Quick      | with 19               |
-| 21  | TST-001     | TZ matrix + fake timers + DST cases                                          | Med  | Quick-Med  | 6                     |
-| 22  | PERF-001    | Memoize rows/charts, hoist callbacks                                         | Med  | Quick      | 5                     |
-| 23  | UX-002      | A11y roles/labels/targets on shared primitives → rows → charts               | Med  | Med        | —                     |
-| 24  | UX-001      | Execute multi-theme design; remove light lock; migrate hardcoded colors      | High | Large      | 5, 22, 23             |
-| 25  | DEP-002(b)  | React Query — resolved: no longer installed; keep it removed                  | Med  | Large      | 14                    |
-| 26  | DOC-001/002 | Docs consolidation; delete/generate schema.sql                               | Med  | Quick      | after 17              |
-| 27  | Low items   | COR-005..008, SEC-005, ERR-003, QUA-001/002, UX-003/004                      | Low  | Quick each | opportunistic         |
+| 18  | SEC-002     | Edge fn auth hardening, rate limit, max_tokens, CORS, config.toml                           | High | Med        | 1                     |
+| 19  | OPS-001     | Build-derived SW versioning, cache headers, eviction                                        | High | Med        | —                     |
+| 20  | OPS-003     | vercel.json security/caching headers                                                        | Low  | Quick      | with 19               |
+| 21  | TST-001     | TZ matrix + fake timers + DST cases                                                         | Med  | Quick-Med  | 6                     |
+| 22  | PERF-001    | Memoize rows/charts, hoist callbacks                                                        | Med  | Quick      | 5                     |
+| 23  | UX-002      | A11y roles/labels/targets on shared primitives → rows → charts                              | Med  | Med        | —                     |
+| 24  | UX-001      | Execute multi-theme design; remove light lock; migrate hardcoded colors                     | High | Large      | 5, 22, 23             |
+| 25  | DEP-002(b)  | React Query — resolved: no longer installed; keep it removed                                | Med  | Large      | 14                    |
+| 26  | DOC-001/002 | Docs consolidation; delete/generate schema.sql                                              | Med  | Quick      | after 17              |
+| 27  | Low items   | COR-005..008, SEC-005, ERR-003, QUA-001/002, UX-003/004                                     | Low  | Quick each | opportunistic         |
 
 ---
 

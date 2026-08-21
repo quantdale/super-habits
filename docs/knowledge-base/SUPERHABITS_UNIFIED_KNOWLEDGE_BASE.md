@@ -323,11 +323,11 @@ No other features call `toDateKey()` directly.
 
 #### `syncEngine.enqueue()` usage
 
-| File                                 | Entity string      | Operations                                                       | Notes                                   |
-| ------------------------------------ | ------------------ | ---------------------------------------------------------------- | --------------------------------------- |
-| `features/todos/todos.data.ts`       | `todos`            | create, update, delete                                           | After every mutating write              |
-| `features/habits/habits.data.ts`     | `habits`           | create, update, delete                                           | Completions **not** enqueued            |
-| `features/calories/calories.data.ts` | `calorie_entries`  | create, update, delete                                           |                                         |
+| File                                 | Entity string      | Operations                                                       | Notes                                                                                           |
+| ------------------------------------ | ------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `features/todos/todos.data.ts`       | `todos`            | create, update, delete                                           | After every mutating write                                                                      |
+| `features/habits/habits.data.ts`     | `habits`           | create, update, delete                                           | Completions **not** enqueued                                                                    |
+| `features/calories/calories.data.ts` | `calorie_entries`  | create, update, delete                                           |                                                                                                 |
 | `features/workout/workout.data.ts`   | `workout_routines` | create, delete; `markWorkoutRoutineUpdated` after nested changes | `workout_logs` inserts ARE enqueued (all creation paths route through `insertWorkoutLogRecord`) |
 
 **Intentionally not synced:** `linked_action_events`, `linked_action_executions`, `processed_notification_actions`. Everything else in `BACKUP_ENTITIES` — including `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `workout_session_exercises`, `workout_session_sets`, and the planning entities — rides the durable outbox (see `core/backup/backup.types.ts`).

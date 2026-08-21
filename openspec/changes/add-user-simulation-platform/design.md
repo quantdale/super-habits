@@ -8,12 +8,12 @@ The test pyramid today: 427 Vitest unit tests (41 files, all `expo-sqlite` calls
 
 ### The gap this design fills
 
-The parent's journeys are *fixed scripts*. Nothing in the tree lets a developer:
+The parent's journeys are _fixed scripts_. Nothing in the tree lets a developer:
 
 - define "a power user with three months of data who makes occasional mistakes" once and reuse that definition across features, lanes, and tools;
 - run a complete business process (e.g., "migrate to a new phone", "a week of habit tracking with a commute") as a composable, configurable unit rather than a bespoke spec file;
 - capture and re-run the exact state + action sequence that produced a bug;
-- get realistic *variability* (timing, decision, mistake diversity) without losing reproducibility;
+- get realistic _variability_ (timing, decision, mistake diversity) without losing reproducibility;
 - have an agent explore the app the way a curious human would, and report what surprised it;
 - verify the sync/restore contract against a real Supabase project instead of injected fakes.
 
@@ -74,7 +74,7 @@ simulation/
 
 Personas, scenarios, and workflows are typed TS modules (`definePersona(...)`, `defineScenario(...)`, `defineWorkflow(...)`) checked by `tsc` and importable by runners and by Vitest. Schemas are validated at load by a small `validateSimulationModel()` in `simulation/runner/` (pure function, unit-tested).
 
-**Alternatives considered:** YAML/JSON + Zod — rejected: adds a parsing/dependency layer, loses type inference against app types (entity shapes, section names), and makes refactoring personas as brittle as the strings in the parent's spec files. JSON remains the interchange format only for *artifacts* (run reports, repro bundles, anomaly reports), where portability matters.
+**Alternatives considered:** YAML/JSON + Zod — rejected: adds a parsing/dependency layer, loses type inference against app types (entity shapes, section names), and makes refactoring personas as brittle as the strings in the parent's spec files. JSON remains the interchange format only for _artifacts_ (run reports, repro bundles, anomaly reports), where portability matters.
 
 ### D3 — Scenario = persona × goal × workflow graph; steps are semantic, not selector-level
 
@@ -86,7 +86,7 @@ A scenario is an ordered graph of **semantic steps** (`createTodo`, `tickHabit`,
 
 `simulation/behavior/` provides: think-time sampling (log-normal per persona trait, clamped), action pacing, and injectors for realistic imperfection (double-taps, typos + correction, mid-form abandonment, offline toggling, tab-hide during timers) — all driven by one seeded RNG. Run modes: `deterministic` (seed fixed in the scenario, all injectors off — used in any gating context), `seeded` (seed recorded in the run report — used locally/nightly; a failure report includes the seed for exact replay), `exploratory` (AI lane, no seed guarantee).
 
-**Alternatives considered:** always-on randomness (flake factory, rejected); wall-clock sleeps (slow and still fake, rejected — the parent's `clock.ts` controls app-visible time, while think time only delays the *driver*).
+**Alternatives considered:** always-on randomness (flake factory, rejected); wall-clock sleeps (slow and still fake, rejected — the parent's `clock.ts` controls app-visible time, while think time only delays the _driver_).
 
 ### D5 — Bug-repro bundle: directory format, replayable, synthetic-data-only
 
@@ -116,14 +116,14 @@ Headless scenario legs (setup/teardown/backend oracles) call the real `*.data.ts
 
 ### D10 — Environment matrix and lane taxonomy
 
-| Lane | Backend | Variability | Trigger | Gates? |
-|---|---|---|---|---|
-| Deterministic journeys (parent's) | none (fakes via routing) | off | PR + main | **yes** |
-| Scenario library | none (fakes) | `deterministic` | PR (subset ≤10 min) / main (full) | **yes** (subset) |
-| Scenario library, seeded | none (fakes) | `seeded` | nightly, local | no |
-| Repro replay | none or disposable | n/a (replay) | on-demand | no |
-| AI exploratory | none (fakes) | `exploratory` | on-demand, nightly | no |
-| Disposable-backend round trips | disposable Supabase | `deterministic` | main/nightly | no (report-only; promotion to gating is a later decision) |
+| Lane                              | Backend                  | Variability     | Trigger                           | Gates?                                                    |
+| --------------------------------- | ------------------------ | --------------- | --------------------------------- | --------------------------------------------------------- |
+| Deterministic journeys (parent's) | none (fakes via routing) | off             | PR + main                         | **yes**                                                   |
+| Scenario library                  | none (fakes)             | `deterministic` | PR (subset ≤10 min) / main (full) | **yes** (subset)                                          |
+| Scenario library, seeded          | none (fakes)             | `seeded`        | nightly, local                    | no                                                        |
+| Repro replay                      | none or disposable       | n/a (replay)    | on-demand                         | no                                                        |
+| AI exploratory                    | none (fakes)             | `exploratory`   | on-demand, nightly                | no                                                        |
+| Disposable-backend round trips    | disposable Supabase      | `deterministic` | main/nightly                      | no (report-only; promotion to gating is a later decision) |
 
 Gating lanes must be deterministic, fast, and fake-backed. Everything realistic-but-slow or non-deterministic is report-only until promoted by an explicit later change.
 

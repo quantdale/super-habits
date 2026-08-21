@@ -1,17 +1,27 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
-import { TextField } from '@/core/ui/TextField';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
-import { addTodo } from '@/features/todos/todos.data';
-import { addHabit } from '@/features/habits/habits.data';
-import { addCalorieEntry } from '@/features/calories/calories.data';
-import { addProject, listProjects } from '@/features/projects/projects.data';
-import { addGoal, listGoals } from '@/features/goals/goals.data';
+import { addTodo, removeTodo } from '@/features/todos/todos.data';
+import { addHabit, deleteHabit } from '@/features/habits/habits.data';
+import {
+  addCalorieEntry,
+  deleteCalorieEntry,
+  listCalorieEntries,
+} from '@/features/calories/calories.data';
+import { addProject, listProjects, softDeleteProject } from '@/features/projects/projects.data';
+import { addGoal, listGoals, softDeleteGoal } from '@/features/goals/goals.data';
 import { PROJECT_COLORS } from '@/features/projects/projects.types';
+import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain';
+import {
+  pushRecentCapture,
+  removeRecentCapture,
+  undoRecentCapture,
+  type RecentCapture,
+} from '@/features/quick-capture/recentCaptures';
 import type { TodoPriority } from '@/core/db/types';
 
 type CaptureMode = 'todo' | 'habit' | 'calorie' | 'project' | 'goal' | 'focus';
@@ -37,12 +47,15 @@ export function QuickCaptureOverlay() {
 
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<TodoPriority>('normal');
+  const [priorityTouched, setPriorityTouched] = useState(false);
   const [mealType, setMealType] = useState<(typeof MEAL_TYPES)[number]>('breakfast');
   const [calories, setCalories] = useState('');
   const [projectLink, setProjectLink] = useState<string | null>(null);
   const [goalLink, setGoalLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [recent, setRecent] = useState<RecentCapture[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const refreshOptions = useCallback(async () => {
     const [ps, gs] = await Promise.all([listProjects(), listGoals()]);
@@ -55,10 +68,21 @@ export function QuickCaptureOverlay() {
     void refreshOptions();
   }, [refreshOptions]);
 
+  // Live natural-language parse preview for todo mode (parser stays pure;
+  // the loaded lists are passed in here).
+  const parsed = useMemo(() => {
+    if (mode !== 'todo') return null;
+    return parseQuickCapture(title, {
+      projects,
+      goals: goals.map((g) => ({ id: g.id, name: g.title })),
+    });
+  }, [mode, title, projects, goals]);
+
   const resetForm = useCallback(() => {
     setTitle('');
     setCalories('');
     setPriority('normal');
+    setPriorityTouched(false);
     setProjectLink(null);
     setGoalLink(null);
     setError(null);
@@ -73,21 +97,52 @@ export function QuickCaptureOverlay() {
     [resetForm],
   );
 
+  const pushRecent = useCallback((entry: RecentCapture) => {
+    setRecent((prev) => pushRecentCapture(prev, entry));
+  }, []);
+
+  const handleUndo = useCallback(
+    async (key: string) => {
+      try {
+        const { removed } = await undoRecentCapture(recent, key);
+        if (removed) {
+          setRecent((prev) => removeRecentCapture(prev, key));
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Undo failed.');
+      }
+    },
+    [recent],
+  );
+
   const handleSubmit = useCallback(async () => {
+    if (submitting) return;
     setError(null);
+    setSubmitting(true);
     try {
       if (mode === 'todo') {
-        if (!title.trim()) {
+        if (!parsed || !parsed.title) {
           setError('Task title is required.');
           return;
         }
-        await addTodo({ title: title.trim(), priority, projectId: projectLink });
+        const id = await addTodo({
+          title: parsed.title,
+          priority: priorityTouched ? priority : parsed.priority,
+          dueDate: parsed.dueDateKey,
+          projectId: parsed.projectId ?? projectLink,
+          goalId: parsed.goalId,
+        });
+        pushRecent({
+          key: `todo:${id}`,
+          label: `Task · ${parsed.title}`,
+          undo: () => removeTodo(id),
+        });
       } else if (mode === 'habit') {
         if (!title.trim()) {
           setError('Habit name is required.');
           return;
         }
-        await addHabit(
+        const id = await addHabit(
           title.trim(),
           1,
           'anytime',
@@ -97,25 +152,58 @@ export function QuickCaptureOverlay() {
           null,
           projectLink,
         );
+        pushRecent({
+          key: `habit:${id}`,
+          label: `Habit · ${title.trim()}`,
+          undo: () => deleteHabit(id),
+        });
       } else if (mode === 'calorie') {
         const cal = Number(calories);
         if (!title.trim() || !Number.isFinite(cal) || cal <= 0) {
           setError('Food name and a positive calorie amount are required.');
           return;
         }
-        await addCalorieEntry({ foodName: title.trim(), calories: cal, mealType });
+        const capturedFood = title.trim();
+        await addCalorieEntry({ foodName: capturedFood, calories: cal, mealType });
+        pushRecent({
+          key: `calorie:${Date.now()}`,
+          label: `${capturedFood} · ${cal} kcal`,
+          undo: async () => {
+            // addCalorieEntry does not return the row id; resolve the
+            // just-added entry from today's newest-first list before deleting.
+            const entries = await listCalorieEntries();
+            const match = entries.find(
+              (entry) =>
+                entry.food_name === capturedFood &&
+                entry.calories === cal &&
+                entry.meal_type === mealType,
+            );
+            if (!match) return;
+            await deleteCalorieEntry(match.id);
+          },
+        });
       } else if (mode === 'project') {
         if (!title.trim()) {
           setError('Project name is required.');
           return;
         }
-        await addProject({ name: title.trim(), color: PROJECT_COLORS[0] });
+        const id = await addProject({ name: title.trim(), color: PROJECT_COLORS[0] });
+        pushRecent({
+          key: `project:${id}`,
+          label: `Project · ${title.trim()}`,
+          undo: () => softDeleteProject(id),
+        });
       } else if (mode === 'goal') {
         if (!title.trim()) {
           setError('Goal title is required.');
           return;
         }
-        await addGoal({ title: title.trim(), horizon: 'month', projectId: goalLink });
+        const id = await addGoal({ title: title.trim(), horizon: 'month', projectId: goalLink });
+        pushRecent({
+          key: `goal:${id}`,
+          label: `Goal · ${title.trim()}`,
+          undo: () => softDeleteGoal(id),
+        });
       } else if (mode === 'focus') {
         setActiveSection('pomodoro');
         closeQuickCapture();
@@ -126,19 +214,25 @@ export function QuickCaptureOverlay() {
       await refreshOptions();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not capture.');
+    } finally {
+      setSubmitting(false);
     }
   }, [
+    submitting,
     mode,
-    title,
+    parsed,
+    priorityTouched,
     priority,
     projectLink,
+    goalLink,
+    title,
     calories,
     mealType,
-    goalLink,
     setActiveSection,
     closeQuickCapture,
     resetForm,
     refreshOptions,
+    pushRecent,
   ]);
 
   return (
@@ -168,12 +262,68 @@ export function QuickCaptureOverlay() {
         </View>
       ) : (
         <>
-          <TextField
+          <CaptureInput
             label={mode === 'calorie' ? 'Food name' : mode === 'habit' ? 'Habit name' : 'Title'}
             value={title}
             onChangeText={setTitle}
-            placeholder={mode === 'calorie' ? 'e.g. Chicken breast' : 'Name'}
+            placeholder={
+              mode === 'todo'
+                ? 'e.g. Pay rent tomorrow !urgent #home'
+                : mode === 'calorie'
+                  ? 'e.g. Chicken breast'
+                  : 'Name'
+            }
+            onSubmitEditing={handleSubmit}
           />
+
+          {parsed &&
+          (parsed.dueDateKey ||
+            parsed.priority !== 'normal' ||
+            parsed.projectId ||
+            parsed.goalId) ? (
+            <View className="flex-row flex-wrap gap-2">
+              {parsed.dueDateKey ? (
+                <View
+                  className="rounded-full border px-3 py-1"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    Due {parsed.dueDateKey}
+                  </Text>
+                </View>
+              ) : null}
+              {parsed.priority !== 'normal' && !priorityTouched ? (
+                <View
+                  className="rounded-full border px-3 py-1"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    {parsed.priority}
+                  </Text>
+                </View>
+              ) : null}
+              {parsed.matchedProjectName ? (
+                <View
+                  className="rounded-full border px-3 py-1"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <Text className="text-xs" style={{ color: tokens.textMuted }} numberOfLines={1}>
+                    #{parsed.matchedProjectName}
+                  </Text>
+                </View>
+              ) : null}
+              {parsed.matchedGoalName ? (
+                <View
+                  className="rounded-full border px-3 py-1"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <Text className="text-xs" style={{ color: tokens.textMuted }} numberOfLines={1}>
+                    @{parsed.matchedGoalName}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           {mode === 'todo' ? (
             <View className="flex-row flex-wrap gap-2">
@@ -181,9 +331,12 @@ export function QuickCaptureOverlay() {
                 <PillChip
                   key={p}
                   label={p}
-                  active={priority === p}
+                  active={priorityTouched ? priority === p : p === (parsed?.priority ?? 'normal')}
                   color={SECTION_COLORS.todos}
-                  onPress={() => setPriority(p)}
+                  onPress={() => {
+                    setPriority(p);
+                    setPriorityTouched(true);
+                  }}
                 />
               ))}
             </View>
@@ -191,12 +344,13 @@ export function QuickCaptureOverlay() {
 
           {mode === 'calorie' ? (
             <>
-              <TextField
+              <CaptureInput
                 label="Calories"
                 value={calories}
                 onChangeText={setCalories}
                 keyboardType="numeric"
                 placeholder="0"
+                onSubmitEditing={handleSubmit}
               />
               <View className="flex-row flex-wrap gap-2">
                 {MEAL_TYPES.map((mt) => (
@@ -240,10 +394,89 @@ export function QuickCaptureOverlay() {
             </Text>
           ) : null}
 
-          <Button label="Capture" onPress={handleSubmit} color={SECTION_COLORS.todos} />
+          <Button
+            label={submitting ? 'Capturing…' : 'Capture'}
+            onPress={handleSubmit}
+            color={SECTION_COLORS.todos}
+          />
+
+          {recent.length > 0 ? (
+            <View className="gap-2">
+              <Text className="text-sm font-medium" style={{ color: tokens.textMuted }}>
+                Recent captures
+              </Text>
+              {recent.map((r) => (
+                <View
+                  key={r.key}
+                  className="flex-row items-center justify-between gap-3 rounded-xl border px-3 py-2"
+                  style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+                >
+                  <Text className="flex-1 text-xs" style={{ color: tokens.text }} numberOfLines={1}>
+                    {r.label}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Undo ${r.label}`}
+                    onPress={() => void handleUndo(r.key)}
+                    hitSlop={8}
+                  >
+                    <Text className="text-xs font-semibold" style={{ color: tokens.dangerSolid }}>
+                      Undo
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <Button label="Done" variant="ghost" onPress={closeQuickCapture} />
         </>
       )}
+    </View>
+  );
+}
+
+/** Local text field with Enter-to-submit (core/ui TextField has no submit hook). */
+function CaptureInput({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType = 'default',
+  onSubmitEditing,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  keyboardType?: 'default' | 'numeric';
+  onSubmitEditing: () => void;
+}) {
+  const { tokens } = useAppTheme();
+  return (
+    <View className="mb-3">
+      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+        {label}
+      </Text>
+      <TextInput
+        accessibilityLabel={label}
+        className="rounded-2xl border px-4 py-3 text-base"
+        style={{
+          minHeight: 48,
+          borderColor: tokens.border,
+          backgroundColor: tokens.surfaceElevated,
+          color: tokens.text,
+        }}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={tokens.textMuted}
+        keyboardType={keyboardType}
+        returnKeyType="done"
+        submitBehavior="submit"
+        blurOnSubmit={false}
+        onSubmitEditing={onSubmitEditing}
+      />
     </View>
   );
 }

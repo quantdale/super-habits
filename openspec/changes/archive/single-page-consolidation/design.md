@@ -7,6 +7,7 @@ The app's primary navigation used Expo Router's tab API: every section (`/overvi
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Replace route-based tab navigation with a single root screen that renders all six feature screens, showing only the active section.
 - Preserve each section's React state across switches (timers, scroll position, form input, list state).
 - Keep sections lazy-mounted on first activation so startup cost is not penalized by all six screens.
@@ -14,6 +15,7 @@ The app's primary navigation used Expo Router's tab API: every section (`/overvi
 - Preserve the top tab rail and the horizontal swipe gesture (including the 40px edge dead zones) as in-page mechanics.
 
 **Non-Goals:**
+
 - No deep-link redirects from old routes (`/habits`, `/todos`, `/settings`, `/command`).
 - No changes to feature data layers, domain logic, entity types, or sync behavior.
 - No new animation or navigation dependency.

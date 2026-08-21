@@ -5,10 +5,7 @@
 Super Habits' account coordinator intentionally derives temporary-account remote-footprint evidence from the complete backup contract:
 
 ```ts
-const ACCOUNT_REMOTE_BACKUP_ENTITIES = [
-  ...BACKUP_ENTITIES,
-  ...BACKUP_SYNTHETIC_ENTITIES,
-] as const;
+const ACCOUNT_REMOTE_BACKUP_ENTITIES = [...BACKUP_ENTITIES, ...BACKUP_SYNTHETIC_ENTITIES] as const;
 ```
 
 For each entity it performs an owner-scoped count/head query. This is a safety gate: when a temporary anonymous identity already owns meaningful recoverable state, Super Habits must not silently abandon that identity while authenticating another account.
@@ -59,10 +56,7 @@ The test boundary must not maintain an unguarded, manually copied subset of back
 Preferred implementation:
 
 ```ts
-import {
-  BACKUP_ENTITIES,
-  BACKUP_SYNTHETIC_ENTITIES,
-} from '@/core/backup/backup.types';
+import { BACKUP_ENTITIES, BACKUP_SYNTHETIC_ENTITIES } from '@/core/backup/backup.types';
 ```
 
 If path alias/module compatibility makes direct import from E2E helpers undesirable, create one explicit E2E constant and a drift-guard test that asserts exact equality with production constants. The drift guard is mandatory in that fallback design.

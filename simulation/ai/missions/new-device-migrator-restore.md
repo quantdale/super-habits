@@ -39,7 +39,7 @@ persona and stops at the budget. Any surprise is recorded as an
   - **Usability friction** — wording that promises more than a restore
     delivers (restore v1 brings back `todos`, `habits`, `calorie_entries`
     only); no way to understand what "restore" would overwrite; a
-    local-data-present message that does not explain *why* restore is blocked.
+    local-data-present message that does not explain _why_ restore is blocked.
   - **Console error** — any unhandled error/warning during the flow, quoted
     verbatim.
   - **Data inconsistency across surfaces** — after any import, counts that

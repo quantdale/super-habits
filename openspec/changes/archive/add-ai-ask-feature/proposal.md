@@ -15,9 +15,11 @@
 ## Capabilities
 
 ### New Capabilities
+
 - `ai-ask`: Natural-language, read-only question answering over the user's own local data (pending todos, calorie summaries, habit streaks), via a local-retrieval-then-remote-phrasing pipeline, surfaced through a new Ask mode in the command center.
 
 ### Modified Capabilities
+
 - None. `features/command/`'s existing create-draft pipeline has no prior spec of record in this repo (confirmed: no `openspec/specs/` directory exists, and `single-page-consolidation` only touched command's routing/wiring, not its capabilities) — this proposal does not retroactively spec it. Only the new Ask capability gets a spec.
 
 ## Impact

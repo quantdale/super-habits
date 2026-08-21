@@ -22,17 +22,10 @@ import {
 } from '@/features/calories/calories.domain';
 import type { CalorieGoal } from '@/features/calories/types';
 import { clampRestSeconds } from '@/features/workout/restTimerPreferences';
-import {
-  DEFAULT_DAILY_PLAN_REMINDER_TIME,
-  DEFAULT_TODO_REMINDERS_ENABLED,
-} from '@/core/notifications/notificationPreferences';
+import { DEFAULT_DAILY_PLAN_REMINDER_TIME } from '@/core/notifications/notificationPreferences';
 import { parseTimeOfDay, type TimeOfDay } from '@/core/notifications/reminderPlanning';
 import { sha256Hex } from '@/lib/checksum';
-import {
-  BACKUP_SETTINGS_VERSION,
-  type RecoverableSettingsV2,
-  type RecoverableSettingsV3,
-} from '@/core/backup/backup.types';
+import { BACKUP_SETTINGS_VERSION, type RecoverableSettingsV3 } from '@/core/backup/backup.types';
 
 const THEME_MODE_STORAGE_KEY = 'superhabits.theme.mode';
 const THEME_SLOTS_STORAGE_KEY = 'superhabits.theme.slots.v2';

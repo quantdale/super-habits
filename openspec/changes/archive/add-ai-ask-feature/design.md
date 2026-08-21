@@ -9,12 +9,14 @@ This change adds a second, parallel capability — Ask — that answers natural-
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Answer v1 questions about pending todos, calorie summaries (today + range), and habit streaks (per-habit and overall), entirely from local data.
 - Guarantee the model never computes a number from raw rows — all arithmetic happens in existing/new TypeScript `.domain.ts` functions; the model only classifies intent and phrases the final answer.
 - Reuse existing patterns wherever one already fits: the `CommandCenterContext` state-management shape, the `commandInternalRollout.ts` AsyncStorage precedent, and the existing Supabase client-to-edge-function auth/invocation helpers. The model-call mechanism itself is a deliberate exception to "reuse `parse-ai-command`'s convention" — see Decisions below.
 - Make the privacy shift (real user data leaving the device for the first time) visible in the proposal and in code structure, not buried.
 
 **Non-Goals:**
+
 - No agentic/multi-step tool-use — the model does not decide which local functions to call or loop through multiple tool invocations. A single forced tool-call per model invocation (used only as Bedrock/Claude's structured-output mechanism, functionally equivalent to OpenAI's `json_schema` response mode) is in scope and is how both the classify and phrase calls achieve structured output. The classify → local-dispatch → phrase shape stays a fixed two-call pattern decided entirely by client code, not something the model branches through itself.
 - No vector search / embeddings. The retrievable surface is a small, fixed set of structured aggregate queries, not an open corpus.
 - No disk-persisted or cross-session chat history. In-memory only, cleared on cold start.
@@ -28,13 +30,15 @@ This change adds a second, parallel capability — Ask — that answers natural-
 **Two-call structured-output pipeline, not agentic tool-use.** Call 1 (`classify`): `{question, conversationContext?}` → model returns `{intent, params}` as structured output. Client code deterministically dispatches on `intent` to local data/domain calls. Call 2 (`phrase`): `{question, retrievedFacts}` → model returns `{answer: string}`, also structured output. Rejected alternative: a single call that receives raw rows and both classifies and answers — rejected because it reintroduces the exact hallucination/miscounting risk this design exists to avoid, and collapses the auditable boundary between "what the model decided to look up" and "what it said about it." (How structured output is actually obtained from the model differs by provider — see the Bedrock decision below; the two-call shape and the client-owned dispatch between them are provider-independent.)
 
 **`user-ai-ask` calls AWS Bedrock (Claude Haiku), not OpenAI — a deliberate per-feature divergence, not an oversight.** `parse-ai-command` (Create) stays on OpenAI, completely unmodified. This is the user's own infrastructure choice for Ask specifically, not something inferred from Create's precedent, and the two functions are intentionally allowed to use different providers. Two mechanisms differ as a result, both scoped to `user-ai-ask` only:
+
 - **Auth to the model provider.** OpenAI uses a bearer API key (`OPENAI_API_KEY`), as `parse-ai-command` does today. Bedrock uses AWS SigV4 request signing with IAM credentials (access key + secret, or an assumed role) — a materially different auth flow, not a drop-in secret swap. `user-ai-ask`'s request-signing code will look nothing like `parse-ai-command`'s bearer-token header. This is separate from — and must not be confused with — the client-to-edge-function auth leg (see below), which is unaffected.
 - **Structured-output mechanism.** OpenAI's `response_format: { type: "json_schema", ... }` has no direct Bedrock/Claude equivalent. Structured output from Claude on Bedrock is obtained via Claude's tool-use mechanism: defining a single tool matching the desired output schema and forcing the model to call it (`tool_choice` forced to that one tool), then reading the tool-call input as the result. This is a single forced-tool-call per invocation, used purely as a structured-output mechanism — not an agentic loop (see the reworded Non-Goal above). Both the `classify` and `phrase` calls use this same forced-single-tool pattern.
 
 **New edge function `user-ai-ask`, not an extension of `parse-ai-command`.** Keeps Create's request/response contract completely stable (zero risk of regressing the shipped create-draft flow). Two distinct auth legs, not to be conflated:
+
 - **Client → edge function**: unaffected by the provider change. Reuses the same Supabase auth shape as `realCommandParser.ts` — `getSupabaseAccessToken()` for the bearer token, `getSupabaseAnonKey()` for the `apikey` header.
 - **Edge function → model provider**: this is the leg that changes. `parse-ai-command` sends an OpenAI bearer key; `user-ai-ask` performs AWS SigV4 signing against Bedrock, per the decision above.
-Duplicated boilerplate between the two functions is now smaller than a same-provider extension would have produced — CORS headers and request validation are still duplicated, but the model-invocation code is not shared boilerplate at all, since the two functions talk to entirely different providers with entirely different auth and structured-output mechanisms.
+  Duplicated boilerplate between the two functions is now smaller than a same-provider extension would have produced — CORS headers and request validation are still duplicated, but the model-invocation code is not shared boilerplate at all, since the two functions talk to entirely different providers with entirely different auth and structured-output mechanisms.
 
 **Intent → retrieval mapping is a hand-written table, not a mega-query.** `pending_todos` → new `listPendingTodos()`/`countPendingTodos()` on `features/todos/todos.data.ts` (today, "pending" filtering only exists ad hoc inside `TodosScreen.tsx`/`OverviewScreen.tsx` component code — this promotes it to the data layer, matching this repo's layering rule that `*.data.ts` owns all reads). `calorie_summary` → `getCalorieSummaryByRange(startDateKey, endDateKey)` + `caloriesTotal()` (both already exist and are stable; "today" is just `startDateKey === endDateKey === toDateKey()`). `habit_streak` → `listHabits()` to resolve a name to a habit id, `getCompletionHistory(habitId, days)` + `buildDayCompletions(completions, targetPerDay, days)` + `calculateCurrentStreak`/`calculateLongestStreak` (all already exist, unchanged). A new thin orchestration module in `features/command/` owns this dispatch table — it is the only new "retrieval" code; everything it calls already exists except the two new todo functions.
 
@@ -58,6 +62,7 @@ Duplicated boilerplate between the two functions is now smaller than a same-prov
 ## Migration Plan
 
 No data migration — no new SQLite tables or schema version bump. Rollout is purely additive:
+
 1. Ship `listPendingTodos()`/`countPendingTodos()` on the existing `todos` data layer (safe, additive, no behavior change to existing callers).
 2. Provision the AWS Bedrock credentials/model-ID secrets (per Open Questions) in Supabase, then ship the `user-ai-ask` edge function (inert until called).
 3. Ship the classify/retrieve/phrase orchestration and `AskConversationContext`, gated behind the same kind of feature flag already used for Create (`COMMAND_EXPERIMENT_ENABLED`-style gating), so it can ship dark and be enabled per the existing internal-rollout mechanism.

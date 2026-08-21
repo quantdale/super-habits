@@ -111,7 +111,7 @@ Sections and screens are named as they appear in the app: **Overview, Todos, Hab
 
 ## M7 — Heavy-data feel on a low-end device
 
-- **Objective:** Judge the *felt* performance of the app with a heavy dataset on a low-end device, matching the user-perceptible thresholds the journeys assert (cold Overview ≤ 5s, section switch ≤ 800ms, list input ≤ 500ms).
+- **Objective:** Judge the _felt_ performance of the app with a heavy dataset on a low-end device, matching the user-perceptible thresholds the journeys assert (cold Overview ≤ 5s, section switch ≤ 800ms, list input ≤ 500ms).
 - **Area:** All sections with a `HEAVY`-shaped dataset (≥200 todos, ≥600 calorie entries, ≥120 pomodoro sessions, ≥40 workout logs, ≥15 saved meals).
 - **Persona:** P2 — Tom, the Weekend Returner.
 - **Starting state:** A low-end physical device (or an emulated throttled device) loaded with a `HEAVY` seed. Cold start.
@@ -174,10 +174,10 @@ Sections and screens are named as they appear in the app: **Overview, Todos, Hab
 A mission result is only useful if it becomes a durable artifact. Follow this convention so nothing a mission finds evaporates into a conversation or a scratch note.
 
 1. **Every finding is classified into exactly one of two outcomes:**
-   - **An automated regression test** — if the finding is a reproducible, deterministic behaviour (including a *correct* behaviour worth locking in), file a regression test in the appropriate level: a pure-logic case goes to `tests/`, a real-SQLite constraint case to `tests/integration/**`, a cross-section/reload/offline case to `e2e/journeys/**`. Write the test against the *desired* behaviour.
+   - **An automated regression test** — if the finding is a reproducible, deterministic behaviour (including a _correct_ behaviour worth locking in), file a regression test in the appropriate level: a pure-logic case goes to `tests/`, a real-SQLite constraint case to `tests/integration/**`, a cross-section/reload/offline case to `e2e/journeys/**`. Write the test against the _desired_ behaviour.
    - **A filed defect** — if the finding is a reproducible defect (or a decided-contract gap the application does not yet satisfy), file it as a defect. If it is a decided contract gap, follow the [contract-gap protocol](known-gaps.md#contract-gaps): write the test against the decided contract, quarantine it with a comment naming the companion change, and add it to the known-gap register.
 2. **Record enough reproduction detail to re-run it.** The record must let a developer re-create the exact state and actions: the mission and step, the starting state, the exact taps, the observed result, and — where it matters — the underlying SQLite rows or network traffic. A finding that cannot be reproduced is not a finding; it is a note.
 3. **A "no findings" result is still recorded** — as a one-line note in the findings log for that mission, so it is clear the area was explored and not merely skipped.
 4. **Never weaken an assertion to make a finding pass.** If the behaviour does not match the decided contract, the resolution is a filed defect and a quarantined test — never an assertion loosened to match current behaviour. (This is the standing rule in the [known-gap register](known-gaps.md#standing-rule).)
 
-The findings log itself can live in the change's follow-up notes, a defect tracker, or the mission's own file — the convention is that the finding *becomes* a test or a defect, not that it is merely described in prose.
+The findings log itself can live in the change's follow-up notes, a defect tracker, or the mission's own file — the convention is that the finding _becomes_ a test or a defect, not that it is merely described in prose.

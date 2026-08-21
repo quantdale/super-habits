@@ -673,10 +673,7 @@ export function backupEntityColumnsForScope(
   const historical: Record<BackupEntity, readonly string[]> = {
     ...BACKUP_ENTITY_COLUMNS,
   };
-  const snapshot =
-    scope === 4
-      ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
-      : (PORTABLE_V1_ENTITY_COLUMNS as Partial<Record<BackupEntity, readonly string[]>>);
+  const snapshot = scope === 4 ? BACKUP_SCOPE_V4_ENTITY_COLUMNS : PORTABLE_V1_ENTITY_COLUMNS;
   for (const entity of Object.keys(historical) as BackupEntity[]) {
     const frozen = snapshot[entity];
     if (frozen) historical[entity] = frozen;

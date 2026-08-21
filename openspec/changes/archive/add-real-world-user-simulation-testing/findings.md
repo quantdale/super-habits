@@ -167,23 +167,23 @@ Disposition keys:
 
 ## Register summary
 
-| # | Journey | Finding | Severity | Disposition |
-|---|---------|---------|----------|-------------|
-| 1 | J5 | SW breaks cross-origin restore GETs | High | Filed → `fix-restore-service-worker` |
-| 2 | J6 | `habit.increment` linked-action re-entry | Medium | Filed → `fix-linked-action-habit-increment-reentry` |
-| 2a | J6 | `target_missing` unreachable via pure UI | — | Documented non-issue |
-| 2b | J6 | Skipped-execution row growth | — | Product note |
-| 3 | J7 | Add-todo double-submit → two rows | High | Filed → `fix-todo-add-double-submit` (CG-3) |
-| 4 | J8 | Recurring-todo expansion non-idempotent | Medium | Filed → `fix-recurring-todo-expansion-idempotency` |
-| 4a | J8 | `seed.ts` HEAVY UNIQUE/NOCASE collisions | High | **Harness fix, done here** |
-| 5 | J10 | Pomodoro defaults don't propagate live | Medium | Filed → `fix-pomodoro-defaults-propagation` |
-| 6 | J1 | Focus stat one-render lag | Minor | Documented non-issue |
-| 7 | J2b | Day-rollover freshness (CG-1) | Contract gap | Companion `fix-day-rollover-refresh` (already filed) |
-| 8 | J3/J4 | Env/harness notes (NetInfo event, legacy spec) | — | Documented |
+| #   | Journey | Finding                                        | Severity     | Disposition                                          |
+| --- | ------- | ---------------------------------------------- | ------------ | ---------------------------------------------------- |
+| 1   | J5      | SW breaks cross-origin restore GETs            | High         | Filed → `fix-restore-service-worker`                 |
+| 2   | J6      | `habit.increment` linked-action re-entry       | Medium       | Filed → `fix-linked-action-habit-increment-reentry`  |
+| 2a  | J6      | `target_missing` unreachable via pure UI       | —            | Documented non-issue                                 |
+| 2b  | J6      | Skipped-execution row growth                   | —            | Product note                                         |
+| 3   | J7      | Add-todo double-submit → two rows              | High         | Filed → `fix-todo-add-double-submit` (CG-3)          |
+| 4   | J8      | Recurring-todo expansion non-idempotent        | Medium       | Filed → `fix-recurring-todo-expansion-idempotency`   |
+| 4a  | J8      | `seed.ts` HEAVY UNIQUE/NOCASE collisions       | High         | **Harness fix, done here**                           |
+| 5   | J10     | Pomodoro defaults don't propagate live         | Medium       | Filed → `fix-pomodoro-defaults-propagation`          |
+| 6   | J1      | Focus stat one-render lag                      | Minor        | Documented non-issue                                 |
+| 7   | J2b     | Day-rollover freshness (CG-1)                  | Contract gap | Companion `fix-day-rollover-refresh` (already filed) |
+| 8   | J3/J4   | Env/harness notes (NetInfo event, legacy spec) | —            | Documented                                           |
 
 ### 2026-08-04 post-green-run additions (full-suite verification pass)
 
-| # | Journey | Finding | Severity | Disposition |
-|---|---------|---------|----------|-------------|
-| 9 | J1 | Hardcoded today-completion counts (`toBe(2)`) broke when the reworked TYPICAL fixture began seeding a completion on the journey's "today" (the fixture's last history day) — two assertions (step 2 count + step 8 reload oracle) and the step-2 row oracle were made seed-drift-proof (baseline-relative, scoped to the ticked habits) | — | Test fix, done here |
-| 10 | J4 | On a standard `npm run build:web` (local-only, no `EXPO_PUBLIC_SUPABASE_*` baked) every flush no-ops and DRAINS the outbox, so the failure scenarios are meaningless there — steps 2–6 are now runtime-gated on a detected Supabase boundary (`test.fixme` naming task 6.1a/Q5, mirroring J3/J5); they run for real against the future `dist-sync/` lane. Also added a service-worker stub so requests can't bypass `page.route` on a boundary-capable build | — | Test fix, done here |
+| #   | Journey | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Severity | Disposition         |
+| --- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------------------- |
+| 9   | J1      | Hardcoded today-completion counts (`toBe(2)`) broke when the reworked TYPICAL fixture began seeding a completion on the journey's "today" (the fixture's last history day) — two assertions (step 2 count + step 8 reload oracle) and the step-2 row oracle were made seed-drift-proof (baseline-relative, scoped to the ticked habits)                                                                                                                      | —        | Test fix, done here |
+| 10  | J4      | On a standard `npm run build:web` (local-only, no `EXPO_PUBLIC_SUPABASE_*` baked) every flush no-ops and DRAINS the outbox, so the failure scenarios are meaningless there — steps 2–6 are now runtime-gated on a detected Supabase boundary (`test.fixme` naming task 6.1a/Q5, mirroring J3/J5); they run for real against the future `dist-sync/` lane. Also added a service-worker stub so requests can't bypass `page.route` on a boundary-capable build | —        | Test fix, done here |

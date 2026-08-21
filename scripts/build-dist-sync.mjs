@@ -66,8 +66,8 @@ const isWindows = process.platform === 'win32';
 const child = spawn(
   isWindows ? (process.env.ComSpec ?? 'cmd.exe') : 'npx',
   isWindows
-        ? ['/d', '/s', '/c', 'npx expo export -p web --clear --output-dir dist-sync']
-        : ['expo', 'export', '-p', 'web', '--clear', '--output-dir', 'dist-sync'],
+    ? ['/d', '/s', '/c', 'npx expo export -p web --clear --output-dir dist-sync']
+    : ['expo', 'export', '-p', 'web', '--clear', '--output-dir', 'dist-sync'],
   {
     stdio: 'inherit',
     env: {

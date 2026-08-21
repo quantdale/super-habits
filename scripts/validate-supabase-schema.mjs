@@ -682,11 +682,7 @@ req(
   weeklyReviewsMigration,
   '(select auth.uid()) = user_id',
 );
-req(
-  'weekly_reviews migration owner index',
-  weeklyReviewsMigration,
-  'idx_weekly_reviews_user_id',
-);
+req('weekly_reviews migration owner index', weeklyReviewsMigration, 'idx_weekly_reviews_user_id');
 req(
   'weekly_reviews migration owner-scoped active week uniqueness',
   weeklyReviewsMigration,
@@ -701,7 +697,11 @@ req(
 reqAbsent('weekly_reviews migration no USING true', weeklyReviewsMigration, 'USING (true)');
 reqAbsent('weekly_reviews migration no anon policy', weeklyReviewsMigration, 'TO anon');
 req('fixture weekly_reviews table', fixture, 'CREATE TABLE IF NOT EXISTS public.weekly_reviews (');
-req('fixture weekly_reviews RLS', fixture, 'ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY');
+req(
+  'fixture weekly_reviews RLS',
+  fixture,
+  'ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY',
+);
 req('fixture weekly_reviews owner index', fixture, 'idx_weekly_reviews_user_id');
 const weeklyReviewColumns = [
   'week_key',

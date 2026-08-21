@@ -93,8 +93,7 @@ function readPersistedWindowsUserPath() {
 
 function findCommand(command) {
   for (const candidate of commandCandidates(command)) {
-    const useWindowsBatchShell =
-      process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(candidate);
+    const useWindowsBatchShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(candidate);
     for (const versionArgs of [['--version'], ['-v']]) {
       const spawnCommand = useWindowsBatchShell
         ? [quoteWindowsShellArg(candidate), ...versionArgs].join(' ')
@@ -116,8 +115,7 @@ function quoteWindowsShellArg(value) {
 }
 
 function run(command, args, options = {}) {
-  const useWindowsBatchShell =
-    process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+  const useWindowsBatchShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
   const spawnCommand = useWindowsBatchShell
     ? [command, ...args].map(quoteWindowsShellArg).join(' ')
     : command;

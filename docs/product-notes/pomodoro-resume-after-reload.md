@@ -8,7 +8,7 @@
 
 The Pomodoro timer is intentionally in-memory: mode, remaining time, `startedAt`, and the completed-focus count are plain React state in `features/pomodoro/PomodoroScreen.tsx`, driven by a `Date.now()`-delta tick. **Nothing about a running session is persisted.** A reload (or a browser/section restart) yields a clean idle state at the configured duration.
 
-Notably, that is *safe*: `pomodoro_sessions` rows are written only when a countdown reaches zero, so an interrupted session produces no row, no duplicate, and no half-counted day. The binding guarantee is that **no partial session is ever logged** — that guarantee is asserted as a regression guard in the journey suite (J7, task 4.7).
+Notably, that is _safe_: `pomodoro_sessions` rows are written only when a countdown reaches zero, so an interrupted session produces no row, no duplicate, and no half-counted day. The binding guarantee is that **no partial session is ever logged** — that guarantee is asserted as a regression guard in the journey suite (J7, task 4.7).
 
 ## The cost
 
