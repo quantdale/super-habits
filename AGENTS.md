@@ -141,7 +141,7 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **15** (`app_meta.db_schema_version`), including durable processed-notification-action state, the SQLite sync outbox, and its durable owner binding. Next migration: add a new `if (version < 16) { ... }` block.
+- Current stored schema version: **20** (`app_meta.db_schema_version`), including durable processed-notification-action state, the SQLite sync outbox and its durable owner binding, the planning entities (16–19), and the hardening-wave-v2 durable-state promotion (20: habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns). Next migration: add a new `if (version < 21) { ... }` block.
 - `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v14 outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 
@@ -181,7 +181,7 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 ### PWA / Web
 
 - Static web export to `dist/` via `npx expo export -p web`.
-- `public/sw.js` uses cache name `superhabits-shell-v3`.
+- `public/sw.js` uses a versioned cache name `superhabits-shell-<CACHE_VERSION>` (see `CACHE_VERSION` in the file; bump it on every shell-changing deploy).
 - `crossOriginIsolated` is required for SQLite WASM; enforced by COOP/COEP headers in Metro dev, `app.json`, and `vercel.json`.
 
 ## Layering Rules
@@ -211,7 +211,7 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 Violating these can cause silent data corruption or break the app on cold start.
 
 1. **Soft delete only** for main entities. Use `UPDATE ... SET deleted_at = datetime('now')` and `WHERE deleted_at IS NULL`. Do not use `DELETE FROM` on synced entity tables.
-2. **Sync enqueue on every applicable write.** Call `syncEngine.enqueue(...)` immediately after `INSERT`/`UPDATE` on `todos`, `habits`, `calorie_entries`, and `workout_routines`. Not synced: `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `linked_action_rules`, `linked_action_events`, `linked_action_executions`, nested workout tables.
+2. **Sync enqueue on every applicable write.** All 17 `BACKUP_ENTITIES` (see `core/backup/backup.types.ts`) ride the durable outbox through `runSyncedMutation`/`runBackupMutation` — including `pomodoro_sessions`, `workout_logs`, the nested workout tables, `saved_meals`, `linked_action_rules`, and the planning entities. Only local operational state stays unsynced: `linked_action_events`, `linked_action_executions`, and `processed_notification_actions`.
 3. **DB singleton.** `getDatabase()` in `core/db/client.ts` is the only entrypoint. Never open a second SQLite connection or access the DB before initialization.
 4. **IDs via `createId(prefix)` from `lib/id.ts`.** Format: `{prefix}_{timestamp_ms}_{8_random_chars}`. Never use `Math.random()`, `crypto.randomUUID()`, or `Date.now()` alone.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
