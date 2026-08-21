@@ -9,6 +9,7 @@ import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { SavedMealChips } from './SavedMealChips';
+import { EntryMacroShareLine } from './EntryMacroShareLine';
 import { filterSavedMeals } from './calories.domain';
 import type { CalorieEntry, MealType, SavedMeal } from './types';
 
@@ -134,6 +135,12 @@ function DiaryMealGroupCard({
                   <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
                     P {entry.protein}g · C {entry.carbs}g · F {entry.fats}g · Fiber {entry.fiber}g
                   </Text>
+                  <EntryMacroShareLine
+                    protein={entry.protein}
+                    carbs={entry.carbs}
+                    fats={entry.fats}
+                    fiber={entry.fiber}
+                  />
                   <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
                     Logged {formatEntryTimestamp(entry.created_at)}
                   </Text>

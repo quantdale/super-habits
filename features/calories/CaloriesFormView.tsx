@@ -10,6 +10,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import type { ActivityDay } from '@/features/shared/activityTypes';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
+import { EntryMacroShareLine } from './EntryMacroShareLine';
 import { SavedMealChips } from './SavedMealChips';
 import type { CalorieEntry, MealType, SavedMeal } from './types';
 
@@ -41,6 +42,12 @@ const CalorieEntrySwipeRow = memo(
           {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{' '}
           {entry.fiber}g
         </Text>
+        <EntryMacroShareLine
+          protein={entry.protein}
+          carbs={entry.carbs}
+          fats={entry.fats}
+          fiber={entry.fiber}
+        />
       </SwipeableCard>
     );
   },

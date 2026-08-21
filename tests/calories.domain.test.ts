@@ -15,6 +15,7 @@ import {
   parseMealCategory,
   listSavedMealCategories,
   sortSavedMealsForSearch,
+  macroKcalShares,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
 import type { SavedMeal } from '@/core/db/types';
@@ -411,5 +412,26 @@ describe('sortSavedMealsForSearch', () => {
     expect(sorted.map((m) => m.food_name)).toEqual(['Oat cookies', 'Oat milk', 'Oats', 'Toast']);
     const noQuery = sortSavedMealsForSearch(meals);
     expect(noQuery[0].food_name).toBe('Toast');
+  });
+});
+
+describe('macroKcalShares', () => {
+  it('returns all zeros when every macro is zero', () => {
+    expect(macroKcalShares(0, 0, 0, 0)).toEqual({ protein: 0, carbs: 0, fats: 0, fiber: 0 });
+  });
+
+  it('computes energy shares with digestible carbs only (4P/4C/2Fi/9F)', () => {
+    // P 20g=80, C 30g with Fi 10g → digestible 20g=80, Fi 10g=20, F 10g=90; total 270
+    const shares = macroKcalShares(20, 30, 10, 10);
+    expect(shares.protein).toBe(30); // 80/270 ≈ 29.6
+    expect(shares.carbs).toBe(30); // 80/270 ≈ 29.6
+    expect(shares.fats).toBe(33); // 90/270 ≈ 33.3
+    expect(shares.fiber).toBe(7); // 20/270 ≈ 7.4
+  });
+
+  it('clamps carbs below fiber so the carb share never goes negative', () => {
+    const shares = macroKcalShares(0, 5, 0, 10);
+    expect(shares.carbs).toBe(0);
+    expect(shares.fiber).toBe(100);
   });
 });

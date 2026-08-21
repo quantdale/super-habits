@@ -241,6 +241,39 @@ export function sortSavedMealsForSearch(meals: SavedMeal[], query: string = ''):
   });
 }
 
+export type MacroShare = {
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+};
+
+/**
+ * Percentage of total macro kcal per macro (carbs use total carbs × 4 so
+ * fiber is not double-counted into the carb share). All zeros → all zeros.
+ * Informational only.
+ */
+export function macroKcalShares(
+  proteinG: number,
+  carbsG: number,
+  fatsG: number,
+  fiberG: number,
+): MacroShare {
+  const proteinKcal = proteinG * 4;
+  const carbsKcal = Math.max(0, carbsG - fiberG) * 4;
+  const fiberKcal = fiberG * 2;
+  const fatsKcal = fatsG * 9;
+  const total = proteinKcal + carbsKcal + fiberKcal + fatsKcal;
+  if (total <= 0) return { protein: 0, carbs: 0, fats: 0, fiber: 0 };
+  const pct = (kcal: number) => Math.round((kcal / total) * 100);
+  return {
+    protein: pct(proteinKcal),
+    carbs: pct(carbsKcal),
+    fats: pct(fatsKcal),
+    fiber: pct(fiberKcal),
+  };
+}
+
 /**
  * Build ActivityDay array from daily summaries.
  * A day is "active" if any calories were logged.
