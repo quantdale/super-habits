@@ -93,9 +93,11 @@ test.describe
     await returnToApp(page);
     await switchSection(page, 'habits');
 
-    const ring = page
-      .getByText(HABIT_NAME, { exact: true })
-      .locator('xpath=preceding-sibling::*[1]');
+    // Role-scoped ring locator: the mounted-but-inactive Overview preview card
+    // also renders the habit name, and the old preceding-sibling walk resolved
+    // to that inert copy. The count-agnostic label survives re-resolution
+    // between the two ticks.
+    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 1 today`) });
 
     await ring.click();
     // The ring's accessible name reflects the fresh count — waiting on it
@@ -131,9 +133,8 @@ test.describe
     // correctness. The authoritative signal is the post-tick label below,
     // which can only turn green once the NEW day's row exists.
 
-    const ring = page
-      .getByText(HABIT_NAME, { exact: true })
-      .locator('xpath=preceding-sibling::*[1]');
+    // Same role-scoped ring locator as step 2 (Overview preview copy is inert).
+    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 1 today`) });
     await ring.click();
 
     // The label flips to the NEW day's count (1) after the write + refresh —

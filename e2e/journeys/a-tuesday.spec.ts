@@ -93,17 +93,26 @@ defineJourney({
         await returnToApp(page);
         await switchTab(page, 'overview');
         await expect(page.getByText('8 pending', { exact: true })).toBeVisible();
+        // The redesigned Overview Focus card is WEEK-scoped (last 7 local
+        // days) and counts only session_type='focus'. TYPICAL seeds 8
+        // sessions over daysAgo 0..7 with type i%3, so exactly i=0,3,6 are
+        // focus rows inside the week window → 3 sessions.
+        setActingStore('weekFocusBase', 3);
+        await expect(page.getByText('min · 3 sessions this week')).toBeVisible();
+        // The redesigned Calories card renders the consumed number and the
+        // "/ <goal> kcal" label as sibling nodes.
         await expect(
           page
-            .getByText('sessions this year', { exact: true })
+            .getByText('/ 2000 kcal', { exact: true })
             .locator('..')
-            .getByText('8', { exact: true }),
+            .getByText('600', { exact: true }),
         ).toBeVisible();
-        await expect(page.getByText('600 / 2000 kcal', { exact: true })).toBeVisible();
 
-        // Second, independent surface: the Focus section's own stat card.
+        // Second, independent surface: the Focus section's own stat card. The
+        // reworked Pomodoro screen counts only session_type='focus' — TYPICAL
+        // seeds 3 focus rows (i=0,3,6 of the 8 sessions).
         await switchTab(page, 'pomodoro');
-        await expectFocusStat(page, 'Focus sessions', '8');
+        await expectFocusStat(page, 'Focus sessions', '3');
       },
     },
     {
@@ -159,11 +168,9 @@ defineJourney({
         await returnToApp(page);
         await switchTab(page, 'overview');
         await expect(page.getByText('8 pending', { exact: true })).toBeVisible();
+        // Negative oracle: the week-scoped focus aggregate is unchanged.
         await expect(
-          page
-            .getByText('sessions this year', { exact: true })
-            .locator('..')
-            .getByText('8', { exact: true }),
+          page.getByText(`min · ${getActingStore<number>('weekFocusBase')} sessions this week`),
         ).toBeVisible();
       },
     },
@@ -284,12 +291,15 @@ defineJourney({
         await expect(page.getByText('Scrambled eggs 🍳 - 124 kcal', { exact: true })).toBeVisible();
         await expect(page.getByText('Today: 724 kcal', { exact: true })).toBeVisible();
 
-        // Second surface: Overview daily total = seeded + 124 logged.
+        // Second surface: Overview daily total = seeded + 124 logged. The
+        // redesigned Calories card renders the consumed number and the
+        // "/ <goal> kcal" label as sibling nodes.
         await switchTab(page, 'overview');
         await expect(
-          page.getByText(`${getActingStore<number>('calTodayBaseSum') + 124} / 2000 kcal`, {
-            exact: true,
-          }),
+          page
+            .getByText('/ 2000 kcal', { exact: true })
+            .locator('..')
+            .getByText(String(getActingStore<number>('calTodayBaseSum') + 124), { exact: true }),
         ).toBeVisible();
       },
     },
@@ -415,14 +425,12 @@ defineJourney({
           (rows) => setActingStore('todosPendingAfterFocus', Number(rows[0]?.n)),
         );
 
-        // Second surface: Overview's focus card reflects the completed session.
+        // Second surface: Overview's week-scoped focus card reflects the
+        // completed session (it landed today, inside the 7-day window).
         await returnToApp(page);
         await switchTab(page, 'overview');
         await expect(
-          page
-            .getByText('sessions this year', { exact: true })
-            .locator('..')
-            .getByText(String(getActingStore<number>('pomodoroBase') + 1), { exact: true }),
+          page.getByText(`min · ${getActingStore<number>('weekFocusBase') + 1} sessions this week`),
         ).toBeVisible();
       },
     },
@@ -441,18 +449,23 @@ defineJourney({
           }),
         ).toBeVisible();
         await expect(
-          page
-            .getByText('sessions this year', { exact: true })
-            .locator('..')
-            .getByText(String(sessionsExpected), { exact: true }),
+          page.getByText(`min · ${getActingStore<number>('weekFocusBase') + 1} sessions this week`),
         ).toBeVisible();
         await expect(
-          page.getByText(`${calTodayExpected} / 2000 kcal`, { exact: true }),
+          page
+            .getByText('/ 2000 kcal', { exact: true })
+            .locator('..')
+            .getByText(String(calTodayExpected), { exact: true }),
         ).toBeVisible();
 
-        // Second surfaces after reload.
+        // Second surfaces after reload. The Focus stat counts focus-type
+        // sessions only: the week base plus the session completed in-journey.
         await switchTab(page, 'pomodoro');
-        await expectFocusStat(page, 'Focus sessions', String(sessionsExpected));
+        await expectFocusStat(
+          page,
+          'Focus sessions',
+          String(getActingStore<number>('weekFocusBase') + 1),
+        );
         await switchTab(page, 'habits');
         await expect(
           page.getByText('4 habits across your daily routine', { exact: true }),
@@ -550,14 +563,14 @@ async function tickHabit(page: Page, name: string): Promise<void> {
 
 /** Assert a FeatureStatCard's value (scoped so hidden Overview cards don't collide). */
 async function expectFocusStat(page: Page, title: string, value: string): Promise<void> {
-  await expect(
-    page
-      .getByText(title, { exact: true })
-      .locator('..')
-      .locator('..')
-      .locator('..')
-      .getByText(value, { exact: true }),
-  ).toBeVisible();
+  // The restructured FeatureStatCard renders the value as a sibling of the
+  // title subtree, so match the innermost element containing both texts.
+  const statCard = page
+    .locator('div')
+    .filter({ has: page.getByText(title, { exact: true }) })
+    .filter({ has: page.getByText(value, { exact: true }) })
+    .last();
+  await expect(statCard).toBeVisible();
 }
 
 /** Read the Focus timer's `mm:ss` display. */
@@ -577,9 +590,9 @@ function parseTime(txt: string, strict = true): number {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-/** The Overview To-Do card text for a pending count. */
+/** The Overview To-Do card text for a pending count (TodosCard renders "N pending"). */
 function pendingText(n: number): string {
-  return `${n} pending ${n === 1 ? 'task' : 'tasks'}`;
+  return `${n} pending`;
 }
 
 // Module-scoped scratch pad so steps can carry values across the serial journey.

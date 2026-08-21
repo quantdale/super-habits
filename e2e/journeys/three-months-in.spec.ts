@@ -127,6 +127,22 @@ defineJourney({
         );
         const workoutDays = await distinctWorkoutDays(page);
 
+        // The redesigned Overview Focus/Workout cards are WEEK-scoped (last
+        // 7 local days; focus counts only session_type='focus'), so derive
+        // the expected card numbers from the same rows and window.
+        const weekKeys = new Set<string>();
+        for (let i = 0; i < 7; i++) weekKeys.add(offsetKey(anchor, -i));
+        const weekFocusSessions = await countRowsWithLocalKeyIn(
+          page,
+          "SELECT started_at AS ts FROM pomodoro_sessions WHERE session_type = 'focus'",
+          weekKeys,
+        );
+        const weekWorkouts = await countRowsWithLocalKeyIn(
+          page,
+          'SELECT completed_at AS ts FROM workout_logs',
+          weekKeys,
+        );
+
         store('calToday', calToday);
         store('focusSessions', focusSessions);
         store('workoutDays', workoutDays);
@@ -146,25 +162,28 @@ defineJourney({
         ).toBeLessThanOrEqual(5000);
 
         // The rest of the Overview aggregates, each checked against the same
-        // SQL the row oracle computed.
+        // SQL the row oracle computed (week-scoped cards → week-scoped oracle).
+        await expect(page.getByText(`min · ${weekFocusSessions} sessions this week`)).toBeVisible();
+        // The redesigned Calories card renders the consumed number and the
+        // "/ <goal> kcal" label as sibling nodes.
         await expect(
           page
-            .getByText('sessions this year', { exact: true })
+            .getByText('/ 2000 kcal', { exact: true })
             .locator('..')
-            .getByText(String(focusSessions), { exact: true }),
+            .getByText(String(calToday), { exact: true }),
         ).toBeVisible();
-        await expect(page.getByText(`${calToday} / 2000 kcal`, { exact: true })).toBeVisible();
         await expect(
           page
-            .getByText('workout days', { exact: true })
+            .getByText('sessions this week', { exact: true })
             .locator('..')
-            .getByText(String(workoutDays), { exact: true }),
+            .getByText(String(weekWorkouts), { exact: true }),
         ).toBeVisible();
 
-        // Habit consistency % — captured for the cross-surface check on Habits.
-        const pctEl = page.getByText(/% consistent/).first();
-        await expect(pctEl).toBeVisible();
-        store('overviewPctText', ((await pctEl.textContent()) ?? '').trim());
+        // Habit progress — the redesigned Overview Habits card states today's
+        // progress as "<completed> of <scheduled> complete" (no percentage).
+        const habitsLine = page.getByText(/\d+ of \d+ complete/).first();
+        await expect(habitsLine).toBeVisible();
+        store('overviewHabitsLine', ((await habitsLine.textContent()) ?? '').trim());
       },
     },
     {
@@ -302,15 +321,16 @@ defineJourney({
           })
           .toBe(expectedWeeks);
 
-        // Cross-surface: the consistency % is the same number Overview shows.
-        const overviewPctText = storeOf<string>('overviewPctText');
-        const pct = parseInt(overviewPctText, 10);
+        // Cross-surface: the Habits screen's Today stat must agree with the
+        // Overview habits card captured earlier (same completed/scheduled
+        // counts), and the year Consistency stat must still render.
+        const overviewLine = storeOf<string>('overviewHabitsLine');
+        const counts = /(\d+) of (\d+) complete/.exec(overviewLine);
+        expect(counts, `overview habits line: "${overviewLine}"`).not.toBeNull();
         await expect(
-          page
-            .getByText('Consistency', { exact: true })
-            .locator('..')
-            .getByText(`${pct}%`, { exact: true }),
+          page.getByText(`${counts![1]} of ${counts![2]} scheduled`, { exact: true }),
         ).toBeVisible();
+        await expect(page.getByText('Consistency', { exact: true })).toBeVisible();
       },
     },
     {
@@ -501,8 +521,8 @@ const TAB_LABELS_NAMES: Record<SectionName, string> = {
 
 /** Unique, always-rendered content marker per section (used for switch completion). */
 const SECTION_MARKERS: Record<SectionName, string> = {
-  overview: 'A compact snapshot of focus, habits, calories, todos, and workouts.',
-  todos: "Today's queue",
+  overview: 'Your day at a glance across plans, habits, focus, and health.',
+  todos: 'Offline-first task manager.',
   habits: "Today's rhythm",
   pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',
   workout:
@@ -604,6 +624,21 @@ async function distinctWorkoutDays(page: Page): Promise<number> {
   return keys.size;
 }
 
+/** Count rows of `sql` (first column aliased `ts`) whose local calendar key is in `keys`. */
+async function countRowsWithLocalKeyIn(
+  page: Page,
+  sql: string,
+  keys: Set<string>,
+): Promise<number> {
+  const rows = await queryRows(page, sql);
+  let n = 0;
+  for (const r of rows) {
+    const d = new Date(String(r.ts));
+    if (keys.has(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)) n += 1;
+  }
+  return n;
+}
+
 async function outboxRecords(
   page: Page,
 ): Promise<{ entity: string; id: string; updatedAt: string; operation: string }[]> {
@@ -619,24 +654,17 @@ async function outboxRecords(
 /**
  * Drive the todos list to reveal `targetText` with real wheel input inside the
  * list body. The list is a virtualized DraggableFlatList: only a window of rows
- * exists in the DOM, and it grows as the inner scroll container moves.
+ * exists in the DOM, and it grows as the list scrolls. Hover a mounted row so
+ * wheel events target the list scroller (same proven pattern as
+ * boundary.spec.ts) — container sniffing is unreliable while the section's
+ * mount/opacity transition is still settling.
  */
 async function scrollTodosListUntilVisible(page: Page, targetText: string): Promise<void> {
-  const box = await page.evaluate(() => {
-    const all = Array.from(document.querySelectorAll('*'));
-    // The innermost scrollable that already holds rows ("Task N" text).
-    const candidates = all.filter(
-      (e) => e.scrollHeight > e.clientHeight + 100 && /Task \d+/.test(e.textContent ?? ''),
-    );
-    const list = candidates[candidates.length - 1];
-    if (!list) return null;
-    const r = list.getBoundingClientRect();
-    return { x: r.left + Math.max(r.width / 2, 100), y: r.top + 120, bottom: r.bottom - 10 };
-  });
-  if (!box || box.y >= box.bottom) {
-    throw new Error('todos list scroll container not found');
-  }
-  await page.mouse.move(box.x, box.y);
+  // Anchor on the LAST 'Task 4' in the DOM: earlier copies can live in inert
+  // preview cards, while the real list row sits inside the scrollable body
+  // (same .last() anchoring as boundary.spec.ts).
+  const anchorRow = page.getByText('Task 4', { exact: true }).last();
+  await anchorRow.hover();
   for (let i = 0; i < 100; i++) {
     if ((await page.getByText(targetText, { exact: true }).count()) > 0) return;
     await page.mouse.wheel(0, 700);

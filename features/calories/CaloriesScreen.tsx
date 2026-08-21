@@ -149,6 +149,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   // Diary day selection (findings 1/6): defaults to today; the diary
   // navigator moves it and every entry read follows it.
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
+  /** True while the diary selection tracks the current local day. An explicit
+   * past-day navigation detaches it so a midnight tick never yanks the user
+   * away from the day they deliberately opened (decided contract D9b). */
+  const [followsToday, setFollowsToday] = useState(true);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -180,6 +184,16 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   }, [selectedDateKey]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
+
+  useEffect(() => {
+    // D9b: when the local day rolls over, a selection that pointed at
+    // "today" must follow the new day so the active section never renders
+    // yesterday's totals under the Today header. An explicitly selected
+    // past day stays put.
+    if (followsToday) {
+      setSelectedDateKey(toDateKey());
+    }
+  }, [dayGeneration, followsToday]);
 
   useEffect(() => {
     let active = true;
@@ -366,6 +380,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     if (nextMode === 'form') {
       // The form always logs to today: drop any diary day selection so the
       // Today-labeled totals can never silently show a past day.
+      setFollowsToday(true);
       setSelectedDateKey(toDateKey());
       setCopyStatus(null);
     }
@@ -434,6 +449,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
   const handleSelectDiaryDate = useCallback((dateKey: string) => {
     setCopyStatus(null);
+    setFollowsToday(dateKey === toDateKey());
     setSelectedDateKey(dateKey);
   }, []);
 
@@ -572,7 +588,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       <View className="mb-4">
         <View className="mb-1 flex-row items-center justify-center gap-8">
           <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            Today: {caloriesTotal(entries)} kcal
+            {selectedDateKey === todayKey ? 'Today' : formatDayContext(selectedDateKey)}:{' '}
+            {caloriesTotal(entries)} kcal
           </Text>
           <Pressable onPress={() => setGoalSheetVisible(true)}>
             <Text className="text-sm font-medium" style={{ color: colorText }}>

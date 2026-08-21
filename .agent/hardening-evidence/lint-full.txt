@@ -1,0 +1,207 @@
+
+C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\fat-fingers.spec.ts
+  5:9  error  Replace `·expectRows,·expectUnchanged,·switchSection,·ACTIVE_SECTION_SELECTOR·` with `⏎··expectRows,⏎··expectUnchanged,⏎··switchSection,⏎··ACTIVE_SECTION_SELECTOR,⏎`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\settings-ripple.spec.ts
+  311:19  error  Replace `⏎··········.getByRole('button',·{·name:·/^(?:Reset|Abandon)·\(not·logged\)$/·})⏎··········` with `.getByRole('button',·{·name:·/^(?:Reset|Abandon)·\(not·logged\)$/·})`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts
+  72:95  error  Replace `·timeout:·10_000` with `␍⏎······timeout:·10_000,␍⏎···`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\features\calories\CaloriesScreen.tsx
+  194:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\calories\CaloriesScreen.tsx:194:7
+  192 |     // past day stays put.
+  193 |     if (followsToday) {
+> 194 |       setSelectedDateKey(toDateKey());
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  195 |     }
+  196 |   }, [dayGeneration, followsToday]);
+  197 |  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanHistoryView.tsx
+  41:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanHistoryView.tsx:41:10
+  39 |
+  40 |   useEffect(() => {
+> 41 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  42 |   }, [refresh]);
+  43 |
+  44 |   if (loading) {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanView.tsx
+  95:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanView.tsx:95:10
+  93 |
+  94 |   useEffect(() => {
+> 95 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  96 |   }, [refresh]);
+  97 |
+  98 |   const toggleTodo = useCallback((todoId: string) => {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\goals\GoalListView.tsx
+  76:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\goals\GoalListView.tsx:76:10
+  74 |
+  75 |   useEffect(() => {
+> 76 |     void load();
+     |          ^^^^ Avoid calling setState() directly within an effect
+  77 |   }, [load]);
+  78 |
+  79 |   const visible = useMemo(  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\habits\HabitDetailModal.tsx
+  48:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\habits\HabitDetailModal.tsx:48:7
+  46 |   useEffect(() => {
+  47 |     if (!habit) {
+> 48 |       setCompletions([]);
+     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  49 |       setLoaded(false);
+  50 |       return;
+  51 |     }  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\planning-hub\TodayBriefingView.tsx
+  53:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\planning-hub\TodayBriefingView.tsx:53:10
+  51 |
+  52 |   useEffect(() => {
+> 53 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  54 |   }, [refresh]);
+  55 |
+  56 |   if (loading && !briefing) {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\pomodoro\PomodoroScreen.tsx
+  287:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\pomodoro\PomodoroScreen.tsx:287:10
+  285 |
+  286 |   useEffect(() => {
+> 287 |     void reconcileActiveTimer();
+      |          ^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  288 |   }, [reconcileActiveTimer]);
+  289 |
+  290 |   useEffect(() => {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\projects\ProjectListView.tsx
+  72:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\projects\ProjectListView.tsx:72:10
+  70 |
+  71 |   useEffect(() => {
+> 72 |     void load();
+     |          ^^^^ Avoid calling setState() directly within an effect
+  73 |   }, [load]);
+  74 |
+  75 |   const visible = useMemo(  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\weekly-review\ReviewHistoryView.tsx
+  31:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\weekly-review\ReviewHistoryView.tsx:31:10
+  29 |
+  30 |   useEffect(() => {
+> 31 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  32 |   }, [refresh]);
+  33 |
+  34 |   if (loading) {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\weekly-review\weeklyReview.data.ts
+  5:24  warning  'C:\Users\Michael Roy\Documents\super-habits\lib\time.ts' imported multiple times  import/no-duplicates
+  9:32  warning  'C:\Users\Michael Roy\Documents\super-habits\lib\time.ts' imported multiple times  import/no-duplicates
+
+C:\Users\Michael Roy\Documents\super-habits\features\workout\WorkoutSessionScreen.tsx
+  142:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\workout\WorkoutSessionScreen.tsx:142:5
+  140 |     const phase = sequence[currentIndex];
+  141 |     if (!phase || phase.phase !== 'active') return;
+> 142 |     setEnteredSets((prev) => {
+      |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  143 |       if (prev[currentIndex]) return prev;
+  144 |       const prior = lookupPreviousSet(previousLookup, phase.exerciseName, phase.setNumber);
+  145 |       if (!prior) return prev;  react-hooks/set-state-in-effect
+  151:5  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+
+C:\Users\Michael Roy\Documents\super-habits\features\workout\restTimerPreferences.ts
+  47:1  error  Delete `⏎`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\tests\integration\backupPerformance.test.ts
+  123:3  warning  Unexpected console statement. Only these console methods are allowed: error, warn  no-console
+
+C:\Users\Michael Roy\Documents\super-habits\tests\workout.restPreferences.test.ts
+  12:9  error  Replace `⏎··loadRestSecondsDefault,⏎··saveRestSecondsDefault,⏎` with `·loadRestSecondsDefault,·saveRestSecondsDefault·`  prettier/prettier
+
+✖ 19 problems (5 errors, 14 warnings)
+  5 errors and 2 warnings potentially fixable with the `--fix` option.
+

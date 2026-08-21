@@ -1,0 +1,68 @@
+
+Running 15 tests using 1 worker
+
+[1A[2K(node:109068) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:109068) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 1. Open on Overview: seeded aggregates match the persisted rows @p0
+[1A[2K[2/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 2. Tick two habits on Habits; row oracle + negative oracle + Overview unchanged @p0
+[1A[2K[3/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 3. Add a todo on Todos; Overview pending count rises (stale-aggregate catch) @p0
+[1A[2K[4/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 4. Log breakfast in Calories; Overview daily total reflects it @p0
+[1A[2K[5/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 5. Start a 25-minute focus session on Focus; timer is running @p0
+[1A[2K[6/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 6. Timer survives a detour through Todos; complete a todo mid-focus @p0
+[1A[2K[7/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 7. Complete the focus session via the clock; exactly one session is logged @p0
+[1A[2K[8/15] [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 8. Reload: every aggregate survives on its section and rows persist @p0
+[1A[2K[9/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 1. Seed HEAVY and verify volumes @p2
+[1A[2K[10/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 2. COLD START ≤ 5s: Overview interactive and populated at HEAVY, aggregates match the rows @p2
+[1A[2K[11/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 3. Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches) @p2
+[1A[2K  1) [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 3. Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches) @p2 
+
+    Error: section switch workout→calories 947ms > D14 ceiling 800ms
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThanOrEqual[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: <= [32m800[39m
+    Received:    [31m947[39m
+
+       at journeys\three-months-in.spec.ts:224
+
+      222 |           const ms = await measureSwitch(page, s.tab, s.marker);
+      223 |           measured.push({ label: s.label, ms });
+    > 224 |           expect(ms, `section switch ${s.label} ${ms}ms > D14 ceiling 800ms`).toBeLessThanOrEqual(
+          |                                                                               ^
+      225 |             800,
+      226 |           );
+      227 |         }
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\three-months-in.spec.ts:224:79)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-9ffe1-x-of-6-measured-switches-p2-journeys\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-9ffe1-x-of-6-measured-switches-p2-journeys\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-9ffe1-x-of-6-measured-switches-p2-journeys\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-9ffe1-x-of-6-measured-switches-p2-journeys\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-9ffe1-x-of-6-measured-switches-p2-journeys\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[1A[2K[12/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 4. Todos: 200+ rows rendered, list scrolls to the end, Show/Hide-completed filter @p2
+[1A[2K[13/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 5. Habits: 364-day heatmap renders exactly 52 weeks (boundary), consistency matches Overview @p2
+[1A[2K[14/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 6. Calories diary: meal groups, expand/collapse, persistence, filter-input response ≤ 500ms @p2
+[1A[2K[15/15] [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 7. Row-level oracles: only the documented todo expansion was written; the walk changed nothing else @p2
+[1A[2K  1 failed
+    [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 3. Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches) @p2 
+  4 did not run
+  10 passed (56.0s)

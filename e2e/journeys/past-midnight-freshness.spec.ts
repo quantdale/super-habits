@@ -52,9 +52,10 @@ test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no
 
     // Habits: tick the seeded habit once → "1 of 1 today" (boundary day).
     await switchSection(page, 'habits');
-    const ring = page
-      .getByText(HABIT_NAME, { exact: true })
-      .locator('xpath=preceding-sibling::*[1]');
+    // Role-scoped: the mounted-but-inactive Overview preview card also renders
+    // the habit name, and the old preceding-sibling walk resolved to that
+    // inert copy. The ring is the only button labelled "<habit>: n of 1 today".
+    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 1 today`) });
     await ring.click();
     await expect(page.getByRole('button', { name: ringLabel(1) })).toBeVisible();
 
