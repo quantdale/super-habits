@@ -1,702 +1,347 @@
-import { type ReactNode, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
-import { POMODORO_SECTION_KEY, SECTION_COLORS, type SectionKey } from '@/constants/sectionColors';
-import { useAppTheme } from '@/core/providers/themeContext';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Card } from '@/core/ui/Card';
-import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
-import { IconButton } from '@/core/ui/IconButton';
-import { PageHeader } from '@/core/ui/PageHeader';
-import { Screen } from '@/core/ui/Screen';
-import { ScreenSection } from '@/core/ui/ScreenSection';
-import {
-  getCalorieGoal,
-  hasAnyCalorieEntries,
-  listCalorieEntries,
-} from '@/features/calories/calories.data';
-import { caloriesTotal } from '@/features/calories/calories.domain';
-import {
-  getAllHabitCompletionsForRange,
-  getCompletionHistory,
-  listHabits,
-} from '@/features/habits/habits.data';
-import {
-  buildDayCompletions,
-  buildHabitGrid,
-  calculateCurrentStreak,
-  calculateOverallConsistency,
-  isHabitScheduledOn,
-} from '@/features/habits/habits.domain';
-import {
-  listPomodoroSessions,
-  listPomodoroSessionsForDateRange,
-} from '@/features/pomodoro/pomodoro.data';
-import {
-  buildPomodoroHeatmapDays,
-  computePomodoroStreakFromHeatmapDays,
-} from '@/features/pomodoro/pomodoro.domain';
-import { listTodos } from '@/features/todos/todos.data';
-import type { Todo } from '@/features/todos/types';
-import {
-  listRoutines,
-  listWorkoutLogs,
-  listWorkoutLogsForRange,
-} from '@/features/workout/workout.data';
-import {
-  buildWorkoutActivityDays,
-  buildWorkoutHeatmapDays,
-  computeWorkoutStreakFromHeatmapDays,
-} from '@/features/workout/workout.domain';
-import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
+import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
 
-type ViewMode = 'grid' | 'column' | 'list';
-type OverviewCardKey = 'pomodoro' | 'habits' | 'calories' | 'todos' | 'workout';
-type OverviewCardTone = {
-  title: string;
-  subtitle: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-  accentColor: string;
+import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import { getCalorieGoal, listCalorieEntries } from '@/features/calories/calories.data';
+import { getAllHabitCompletionsForRange, listHabits } from '@/features/habits/habits.data';
+import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
+import { listProjects } from '@/features/projects/projects.data';
+import { listGoals } from '@/features/goals/goals.data';
+import { listTodos } from '@/features/todos/todos.data';
+import { listRoutines, listWorkoutLogsForRange } from '@/features/workout/workout.data';
+
+import { CaloriesCard } from './cards/CaloriesCard';
+import { FocusCard } from './cards/FocusCard';
+import { GoalsCard } from './cards/GoalsCard';
+import { HabitsCard } from './cards/HabitsCard';
+import { ProjectsCard } from './cards/ProjectsCard';
+import { TodosCard } from './cards/TodosCard';
+import { TodayPlanCard } from './cards/TodayPlanCard';
+import { WorkoutCard } from './cards/WorkoutCard';
+import { CustomizeCardsPanel } from './CustomizeCardsPanel';
+import { loadCardLayout, saveCardLayout } from './cardLayout.storage';
+import {
+  getGreeting,
+  shapeCaloriesSummary,
+  shapeFocusWeekSummary,
+  shapeGoalsSummary,
+  shapeHabitsSummary,
+  shapePlanProgressSummary,
+  shapeProjectsSummary,
+  shapeTodosSummary,
+  shapeWorkoutSummary,
+  type CaloriesSummary,
+  type FocusWeekSummary,
+  type GoalsSummary,
+  type HabitsSummary,
+  type OverviewCardId,
+  type PlanProgressSummary,
+  type ProjectsSummary,
+  type TodosSummary,
+  type WorkoutSummary,
+} from './overview.domain';
+
+type OverviewSummaries = {
+  plan: PlanProgressSummary;
+  todos: TodosSummary;
+  habits: HabitsSummary;
+  focus: FocusWeekSummary;
+  workout: WorkoutSummary;
+  calories: CaloriesSummary;
+  projects: ProjectsSummary;
+  goals: GoalsSummary;
 };
 
-const VIEW_MODE_OPTIONS: { mode: ViewMode; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-  { mode: 'grid', icon: 'grid-view' },
-  { mode: 'column', icon: 'view-agenda' },
-  { mode: 'list', icon: 'view-list' },
-];
-const OVERVIEW_CARD_META: Record<OverviewCardKey, OverviewCardTone> = {
-  pomodoro: {
-    title: 'Focus',
-    subtitle: 'This year',
-    icon: 'timer',
-    accentColor: SECTION_COLORS[POMODORO_SECTION_KEY],
+const EMPTY_SUMMARIES: OverviewSummaries = {
+  plan: {
+    hasPlan: false,
+    status: null,
+    intention: null,
+    totalPriorities: 0,
+    completedPriorities: 0,
   },
-  habits: {
-    title: 'Habits',
-    subtitle: 'Current streak',
-    icon: 'track-changes',
-    accentColor: SECTION_COLORS.habits,
-  },
-  calories: {
-    title: 'Calories',
-    subtitle: 'Daily goal',
-    icon: 'restaurant-menu',
-    accentColor: SECTION_COLORS.calories,
-  },
-  todos: {
-    title: 'To-Do',
-    subtitle: 'Top priorities',
-    icon: 'checklist',
-    accentColor: SECTION_COLORS.todos,
-  },
-  workout: {
-    title: 'Workout',
-    subtitle: 'Last 52 weeks',
-    icon: 'fitness-center',
-    accentColor: SECTION_COLORS.workout,
-  },
+  todos: { overdueCount: 0, dueTodayCount: 0, pendingCount: 0, preview: [] },
+  habits: { scheduledToday: 0, completedToday: 0, progressRatio: 0, rings: [] },
+  focus: { focusMinutes: 0, sessionCount: 0, perDayMinutes: [] },
+  workout: { sessionsThisWeek: 0, lastWorkoutName: null, lastWorkoutDateKey: null },
+  calories: { consumed: 0, goal: 0, remaining: 0, ratio: 0 },
+  projects: { activeCount: 0, preview: [] },
+  goals: { activeCount: 0, averageProgress: 0, preview: [] },
 };
-const OVERVIEW_CARD_SECTION_KEY: Record<OverviewCardKey, SectionKey> = {
-  pomodoro: POMODORO_SECTION_KEY,
-  habits: 'habits',
-  calories: 'calories',
-  todos: 'todos',
-  workout: 'workout',
-};
-const GRID_ROWS: OverviewCardKey[][] = [
-  ['pomodoro', 'habits'],
-  ['calories', 'todos', 'workout'],
-];
-const GRID_TOP_ROW_CARD_CLASS = 'min-h-[248px]';
-const GRID_BOTTOM_ROW_CARD_CLASS = 'min-h-[214px]';
-const OVERVIEW_CARD_ORDER: OverviewCardKey[] = [
-  'pomodoro',
-  'habits',
-  'calories',
-  'todos',
-  'workout',
-];
 
-function OverviewMetricCard({
-  cardKey,
-  viewMode,
-  className,
-  children,
-}: {
-  cardKey: OverviewCardKey;
-  viewMode: ViewMode;
-  className?: string;
-  children: ReactNode;
-}) {
-  const { tokens, sectionAccents } = useAppTheme();
-  const meta = OVERVIEW_CARD_META[cardKey];
-  const textColor = sectionAccents[OVERVIEW_CARD_SECTION_KEY[cardKey]].text;
-  const isDetailedView = viewMode !== 'list';
+async function loadSummaries(): Promise<OverviewSummaries> {
+  const today = toDateKey();
+  const weekKeys = buildDateRangeOldestFirst(7);
+  const weekStart = weekKeys[0];
 
-  return (
-    <Card
-      accentColor={meta.accentColor}
-      className={['mb-0', className].filter(Boolean).join(' ')}
-      innerClassName="p-0"
-    >
-      <View className="flex-1 p-4">
-        <View className="flex-row items-center gap-3">
-          <View
-            className="h-11 w-11 items-center justify-center rounded-xl"
-            style={{ backgroundColor: `${meta.accentColor}18` }}
-          >
-            <MaterialIcons name={meta.icon} size={22} color={textColor} />
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-              {meta.title}
-            </Text>
-            <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
-              {meta.subtitle}
-            </Text>
-          </View>
-        </View>
-        <View className={['mt-4', isDetailedView ? 'flex-1 justify-between' : ''].join(' ').trim()}>
-          {children}
-        </View>
-      </View>
-    </Card>
-  );
+  const [
+    todos,
+    plan,
+    habits,
+    completionsToday,
+    weekSessions,
+    weekLogs,
+    routines,
+    calorieEntries,
+    calorieGoal,
+    projects,
+    goals,
+  ] = await Promise.all([
+    listTodos(),
+    getDailyPlan(today),
+    listHabits(),
+    getAllHabitCompletionsForRange(today, today),
+    listPomodoroSessionsForDateRange(weekStart, today),
+    listWorkoutLogsForRange(weekStart, today),
+    listRoutines(),
+    listCalorieEntries(today),
+    getCalorieGoal(),
+    listProjects(),
+    listGoals(),
+  ]);
+
+  const routineNames = new Map(routines.map((routine) => [routine.id, routine.name]));
+
+  return {
+    plan: shapePlanProgressSummary(plan, todos),
+    todos: shapeTodosSummary(todos, today),
+    habits: shapeHabitsSummary(habits, completionsToday, today),
+    focus: shapeFocusWeekSummary(weekSessions, weekKeys),
+    workout: shapeWorkoutSummary(weekLogs, routineNames, weekKeys),
+    calories: shapeCaloriesSummary(calorieEntries, calorieGoal.calories),
+    projects: shapeProjectsSummary(projects),
+    goals: shapeGoalsSummary(goals),
+  };
 }
 
 export function OverviewScreen({ isActive }: { isActive: boolean }) {
-  const { openSettings, setActiveSection, openWeeklyReview, openPlanningHub } = useAppNavigation();
+  const { openPlanningHub, setActiveSection } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
-  const { width } = useWindowDimensions();
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  const [layout, setLayout] = useState<OverviewCardId[]>([]);
+  const [isCustomizing, setIsCustomizing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingTodosCount, setPendingTodosCount] = useState(0);
-  const [topPendingTodos, setTopPendingTodos] = useState<Todo[]>([]);
-  const [bestHabitStreak, setBestHabitStreak] = useState(0);
-  const [habitConsistency, setHabitConsistency] = useState(0);
-  const [todayScheduledHabits, setTodayScheduledHabits] = useState(0);
-  const [pomodoroSessions, setPomodoroSessions] = useState(0);
-  const [pomodoroStreak, setPomodoroStreak] = useState(0);
-  const [caloriesConsumed, setCaloriesConsumed] = useState(0);
-  const [calorieGoal, setCalorieGoal] = useState(2000);
-  const [hasAnyTrackedData, setHasAnyTrackedData] = useState(false);
-  const [workoutDays, setWorkoutDays] = useState(0);
-  const [workoutStreak, setWorkoutStreak] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [summaries, setSummaries] = useState<OverviewSummaries>(EMPTY_SUMMARIES);
 
-  const loadDashboardData = useCallback(async () => {
-    setIsLoading(true);
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
     try {
-      const today = toDateKey();
-      const yearRange = buildDateRangeOldestFirst(364);
-      const startDate = yearRange[0];
-
-      const [
-        todos,
-        calorieEntries,
-        hasCalorieEntries,
-        goal,
-        recentPomodoroSessions,
-        pomodoroSessions,
-        routines,
-        recentWorkoutLogs,
-        workoutLogs,
-        habits,
-        allHabitCompletions,
-      ] = await Promise.all([
-        listTodos(),
-        listCalorieEntries(today),
-        hasAnyCalorieEntries(),
-        getCalorieGoal(),
-        listPomodoroSessions(1),
-        listPomodoroSessionsForDateRange(startDate, today),
-        listRoutines(),
-        listWorkoutLogs(1),
-        listWorkoutLogsForRange(startDate, today),
-        listHabits(),
-        getAllHabitCompletionsForRange(startDate, today),
-      ]);
-
-      const pending = todos.filter((t) => t.completed === 0);
-      setPendingTodosCount(pending.length);
-      setTopPendingTodos(pending.slice(0, 3));
-
-      setCaloriesConsumed(caloriesTotal(calorieEntries));
-      setCalorieGoal(goal.calories);
-      setHasAnyTrackedData(
-        todos.length > 0 ||
-          habits.length > 0 ||
-          hasCalorieEntries ||
-          recentPomodoroSessions.length > 0 ||
-          recentWorkoutLogs.length > 0 ||
-          routines.length > 0,
-      );
-      setTodayScheduledHabits(
-        habits.filter((habit) =>
-          isHabitScheduledOn(habit.rule_history, today, habit.target_per_day),
-        ).length,
-      );
-
-      const pomHeatmap = buildPomodoroHeatmapDays(pomodoroSessions, 364);
-      setPomodoroSessions(pomodoroSessions.length);
-      setPomodoroStreak(computePomodoroStreakFromHeatmapDays(pomHeatmap));
-
-      const workoutActivity = buildWorkoutActivityDays(workoutLogs, 364);
-      const workoutHeatmap = buildWorkoutHeatmapDays(workoutLogs, 364);
-      setWorkoutDays(workoutActivity.filter((d) => d.active).length);
-      setWorkoutStreak(computeWorkoutStreakFromHeatmapDays(workoutHeatmap));
-
-      const gridBuilt = buildHabitGrid(
-        habits.map((h) => ({
-          id: h.id,
-          name: h.name,
-          color: h.color,
-          target_per_day: h.target_per_day,
-          rule_history: h.rule_history,
-          created_at: h.created_at,
-        })),
-        allHabitCompletions,
-        364,
-      );
-      setHabitConsistency(calculateOverallConsistency(gridBuilt));
-
-      const streakEntries = await Promise.all(
-        habits.map(async (habit) => {
-          const completions = await getCompletionHistory(habit.id);
-          const dayCompletions = buildDayCompletions(
-            completions,
-            habit.target_per_day,
-            undefined,
-            habit.rule_history,
-          );
-          return calculateCurrentStreak(dayCompletions);
-        }),
-      );
-      setBestHabitStreak(streakEntries.length === 0 ? 0 : Math.max(0, ...streakEntries));
+      const [nextLayout, nextSummaries] = await Promise.all([loadCardLayout(), loadSummaries()]);
+      setLayout(nextLayout);
+      setSummaries(nextSummaries);
     } catch (err) {
-      console.error('[OverviewScreen] loadDashboardData failed', err);
+      console.error('[OverviewScreen] refresh failed', err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   useActiveForegroundRefresh(
     isActive,
     useCallback(() => {
-      void loadDashboardData();
-    }, [loadDashboardData]),
+      void refresh();
+    }, [refresh]),
     dayGeneration,
   );
 
-  const isListView = viewMode === 'list';
-  const useSingleColumnGrid = width < 960;
+  const handleLayoutChange = useCallback((next: OverviewCardId[]) => {
+    setLayout(next);
+    saveCardLayout(next).catch((err) =>
+      console.error('[OverviewScreen] saveCardLayout failed', err),
+    );
+  }, []);
 
   const renderCard = useCallback(
-    (cardKey: OverviewCardKey, className?: string) => {
-      switch (cardKey) {
-        case 'pomodoro':
-          return (
-            <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
-              {isListView ? (
-                <View className="flex-row items-center justify-between gap-3">
-                  <View className="min-w-0 flex-1">
-                    <Text
-                      className="text-2xl font-bold tabular-nums tracking-tight"
-                      style={{ color: tokens.text }}
-                    >
-                      {pomodoroSessions} sessions
-                    </Text>
-                    <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                      {pomodoroStreak} day streak
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Start focus session"
-                    className="rounded-xl px-3.5 py-2.5 active:opacity-80"
-                    style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
-                    onPress={() => setActiveSection('pomodoro')}
-                  >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: sectionAccents.focus.text }}
-                    >
-                      Start
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <>
-                  <View className="items-center">
-                    <Text
-                      className="text-center text-5xl font-bold tabular-nums tracking-tight"
-                      style={{ color: tokens.text }}
-                    >
-                      {pomodoroSessions}
-                    </Text>
-                    <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
-                      sessions this year
-                    </Text>
-                    <Text className="mt-2 text-sm" style={{ color: tokens.textMuted }}>
-                      {pomodoroStreak} day streak
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Start focus session"
-                    className="mt-5 w-full items-center rounded-xl px-4 py-3.5 active:opacity-80"
-                    style={{ backgroundColor: `${SECTION_COLORS.focus}26` }}
-                    onPress={() => setActiveSection('pomodoro')}
-                  >
-                    <Text
-                      className="text-base font-semibold"
-                      style={{ color: sectionAccents.focus.text }}
-                    >
-                      Start Focus
-                    </Text>
-                  </Pressable>
-                </>
-              )}
-            </OverviewMetricCard>
-          );
-        case 'habits':
-          return (
-            <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
-              {isListView ? (
-                todayScheduledHabits === 0 ? (
-                  <View>
-                    <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
-                      Rest day
-                    </Text>
-                    <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                      No habits scheduled today
-                    </Text>
-                  </View>
-                ) : (
-                  <View className="flex-row items-center justify-between gap-3">
-                    <View className="min-w-0 flex-1">
-                      <Text
-                        className="text-lg font-semibold tabular-nums"
-                        style={{ color: tokens.text }}
-                      >
-                        {bestHabitStreak} day streak
-                      </Text>
-                    </View>
-                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                      {habitConsistency}% consistent
-                    </Text>
-                  </View>
-                )
-              ) : todayScheduledHabits === 0 ? (
-                <View className="items-start">
-                  <Text className="text-2xl font-bold" style={{ color: tokens.text }}>
-                    Rest day
-                  </Text>
-                  <Text className="mt-2 text-sm" style={{ color: tokens.textMuted }}>
-                    No habits scheduled today
-                  </Text>
-                </View>
-              ) : (
-                <View className="items-start">
-                  <Text className="text-3xl font-bold tabular-nums" style={{ color: tokens.text }}>
-                    {bestHabitStreak}
-                  </Text>
-                  <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
-                    days streak
-                  </Text>
-                  <Text className="mt-2 text-sm" style={{ color: tokens.textMuted }}>
-                    {habitConsistency}% consistent
-                  </Text>
-                </View>
-              )}
-            </OverviewMetricCard>
-          );
-        case 'calories':
-          return (
-            <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
-              {isListView ? (
-                <View className="flex-row items-center justify-between gap-3">
-                  <View className="min-w-0 flex-1">
-                    <Text
-                      className="text-lg font-semibold tabular-nums"
-                      style={{ color: tokens.text }}
-                    >
-                      {caloriesConsumed} / {calorieGoal} kcal
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Add calorie entry"
-                    className="rounded-xl border-2 px-3.5 py-2.5 active:opacity-80"
-                    style={{ borderColor: SECTION_COLORS.calories }}
-                    onPress={() => setActiveSection('calories')}
-                  >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: sectionAccents.calories.text }}
-                    >
-                      Add
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <>
-                  <Text
-                    className="text-lg font-semibold tabular-nums"
-                    style={{ color: tokens.text }}
-                  >
-                    {caloriesConsumed} / {calorieGoal} kcal
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Add calorie entry"
-                    className="mt-4 self-start rounded-xl border-2 px-4 py-3 active:opacity-80"
-                    style={{ borderColor: SECTION_COLORS.calories }}
-                    onPress={() => setActiveSection('calories')}
-                  >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: sectionAccents.calories.text }}
-                    >
-                      Add entry
-                    </Text>
-                  </Pressable>
-                </>
-              )}
-            </OverviewMetricCard>
-          );
+    (id: OverviewCardId) => {
+      switch (id) {
+        case 'plan':
+          return <TodayPlanCard summary={summaries.plan} loading={isLoading} />;
         case 'todos':
+          return <TodosCard summary={summaries.todos} loading={isLoading} />;
+        case 'habits':
+          return <HabitsCard summary={summaries.habits} loading={isLoading} />;
+        case 'focus':
           return (
-            <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
-              {isListView ? (
-                <View className="gap-2">
-                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                    {pendingTodosCount} pending {pendingTodosCount === 1 ? 'task' : 'tasks'}
-                  </Text>
-                  {topPendingTodos.length === 0 ? (
-                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                      No pending tasks
-                    </Text>
-                  ) : (
-                    topPendingTodos.slice(0, 2).map((todo) => (
-                      <View key={todo.id} className="flex-row items-center gap-3">
-                        <View
-                          className="h-4 w-4 rounded border-2"
-                          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                        />
-                        <Text
-                          className="flex-1 text-sm"
-                          style={{ color: tokens.text }}
-                          numberOfLines={2}
-                        >
-                          {todo.title}
-                        </Text>
-                      </View>
-                    ))
-                  )}
-                </View>
-              ) : (
-                <View className="gap-3">
-                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                    {pendingTodosCount} pending {pendingTodosCount === 1 ? 'task' : 'tasks'}
-                  </Text>
-                  {topPendingTodos.length === 0 ? (
-                    <Text className="text-base" style={{ color: tokens.textMuted }}>
-                      No pending tasks
-                    </Text>
-                  ) : (
-                    topPendingTodos.map((todo) => (
-                      <View key={todo.id} className="flex-row items-center gap-3">
-                        <View
-                          className="h-5 w-5 rounded border-2"
-                          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                        />
-                        <Text
-                          className="flex-1 text-base"
-                          style={{ color: tokens.text }}
-                          numberOfLines={2}
-                        >
-                          {todo.title}
-                        </Text>
-                      </View>
-                    ))
-                  )}
-                </View>
-              )}
-            </OverviewMetricCard>
+            <FocusCard
+              summary={
+                summaries.focus.perDayMinutes.length > 0
+                  ? summaries.focus
+                  : {
+                      ...summaries.focus,
+                      perDayMinutes: buildDateRangeOldestFirst(7).map((dateKey) => ({
+                        dateKey,
+                        minutes: 0,
+                      })),
+                    }
+              }
+              loading={isLoading}
+            />
           );
         case 'workout':
-          return (
-            <OverviewMetricCard cardKey={cardKey} viewMode={viewMode} className={className}>
-              {isListView ? (
-                <View className="flex-row items-center justify-between gap-3">
-                  <View className="min-w-0 flex-1">
-                    <Text
-                      className="text-lg font-semibold tabular-nums"
-                      style={{ color: tokens.text }}
-                    >
-                      {workoutDays} workout days
-                    </Text>
-                  </View>
-                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                    {workoutStreak} day streak
-                  </Text>
-                </View>
-              ) : (
-                <View className="w-full flex-row justify-between gap-4">
-                  <View className="min-w-0 flex-1">
-                    <Text
-                      className="text-2xl font-bold tabular-nums"
-                      style={{ color: tokens.text }}
-                    >
-                      {workoutDays}
-                    </Text>
-                    <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
-                      workout days
-                    </Text>
-                  </View>
-                  <View className="min-w-0 flex-1 items-end">
-                    <Text
-                      className="text-2xl font-bold tabular-nums"
-                      style={{ color: tokens.text }}
-                    >
-                      {workoutStreak}
-                    </Text>
-                    <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
-                      day streak
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </OverviewMetricCard>
-          );
+          return <WorkoutCard summary={summaries.workout} loading={isLoading} />;
+        case 'calories':
+          return <CaloriesCard summary={summaries.calories} loading={isLoading} />;
+        case 'projects':
+          return <ProjectsCard summary={summaries.projects} loading={isLoading} />;
+        case 'goals':
+          return <GoalsCard summary={summaries.goals} loading={isLoading} />;
       }
     },
-    [
-      bestHabitStreak,
-      calorieGoal,
-      caloriesConsumed,
-      pomodoroSessions,
-      pomodoroStreak,
-      habitConsistency,
-      todayScheduledHabits,
-      isListView,
-      pendingTodosCount,
-      topPendingTodos,
-      viewMode,
-      workoutDays,
-      workoutStreak,
-      setActiveSection,
-      tokens.border,
-      tokens.surface,
-      tokens.text,
-      tokens.textMuted,
-      sectionAccents.focus.text,
-      sectionAccents.calories.text,
-    ],
+    [isLoading, summaries],
   );
 
+  const greeting = getGreeting(new Date().getHours());
+  const hasAnyData =
+    summaries.todos.pendingCount > 0 ||
+    summaries.habits.scheduledToday > 0 ||
+    summaries.focus.sessionCount > 0 ||
+    summaries.workout.sessionsThisWeek > 0 ||
+    summaries.calories.consumed > 0 ||
+    summaries.projects.activeCount > 0 ||
+    summaries.goals.activeCount > 0;
+
   return (
-    <Screen scroll>
-      <ScreenSection>
-        <PageHeader
-          title="Overview"
-          subtitle="A compact snapshot of focus, habits, calories, todos, and workouts."
-          actions={
-            <>
-              <IconButton
-                icon="today"
-                onPress={() => openPlanningHub('today')}
-                accessibilityLabel="Plan today"
-                accentColor={sectionAccents.focus.text}
-              />
-              <IconButton
-                icon="insights"
-                onPress={() => openPlanningHub('progress')}
-                accessibilityLabel="Open progress insights"
-                accentColor={sectionAccents.focus.text}
-              />
-              <IconButton
-                icon="date-range"
-                onPress={openWeeklyReview}
-                accessibilityLabel="Open weekly review"
-                accentColor={sectionAccents.focus.text}
-              />
-              <IconButton
-                icon="settings"
-                onPress={openSettings}
-                accessibilityLabel="Open settings"
-                accentColor={sectionAccents.focus.text}
-              />
-              {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                <IconButton
-                  key={mode}
-                  icon={icon}
-                  onPress={() => setViewMode(mode)}
-                  accessibilityLabel={`${mode} overview layout`}
-                  selected={viewMode === mode}
-                  accentColor={sectionAccents.focus.text}
+    <View className="flex-1" style={{ backgroundColor: tokens.background }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 36 }}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              void refresh();
+            }}
+            tintColor={sectionAccents[POMODORO_SECTION_KEY].text}
+            colors={[sectionAccents[POMODORO_SECTION_KEY].text]}
+          />
+        }
+      >
+        <View className="mx-auto w-full max-w-[1180px]">
+          <View className="flex-row flex-wrap items-start justify-between gap-4">
+            <View className="min-w-0 flex-1">
+              <Text className="text-2xl font-bold leading-tight" style={{ color: tokens.text }}>
+                {greeting}
+              </Text>
+              <Text className="mt-1.5 text-sm leading-6" style={{ color: tokens.textMuted }}>
+                Your day at a glance across plans, habits, focus, and health.
+              </Text>
+            </View>
+            <View className="shrink-0 flex-row flex-wrap items-center justify-end gap-2 pt-0.5">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isCustomizing ? 'Done customizing' : 'Customize dashboard'}
+                accessibilityState={{ selected: isCustomizing }}
+                onPress={() => setIsCustomizing((prev) => !prev)}
+                className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
+                style={{
+                  backgroundColor: isCustomizing
+                    ? `${sectionAccents[POMODORO_SECTION_KEY].text}1f`
+                    : tokens.surfaceElevated,
+                }}
+              >
+                <MaterialIcons
+                  name="tune"
+                  size={18}
+                  color={sectionAccents[POMODORO_SECTION_KEY].text}
                 />
-              ))}
-            </>
-          }
-        />
-      </ScreenSection>
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                >
+                  {isCustomizing ? 'Done' : 'Customize'}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Plan today"
+                onPress={() => openPlanningHub('today')}
+                className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
+                style={{ backgroundColor: tokens.surfaceElevated }}
+              >
+                <MaterialIcons
+                  name="event-note"
+                  size={18}
+                  color={sectionAccents[POMODORO_SECTION_KEY].text}
+                />
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                >
+                  Plan
+                </Text>
+              </Pressable>
+            </View>
+          </View>
 
-      {isLoading ? (
-        <ScreenSection className="min-h-[220px] items-center justify-center py-14">
-          <ActivityIndicator size="large" color={sectionAccents.focus.text} />
-        </ScreenSection>
-      ) : (
-        <ScreenSection>
-          {viewMode === 'grid' ? (
-            <View className="gap-4">
-              {useSingleColumnGrid ? (
-                <View className="gap-4">
-                  {OVERVIEW_CARD_ORDER.map((cardKey) => renderCard(cardKey))}
-                </View>
-              ) : (
-                <>
-                  <View className="flex-row gap-4">
-                    {GRID_ROWS[0].map((cardKey) => (
-                      <View key={cardKey} className="flex-1">
-                        {renderCard(cardKey, GRID_TOP_ROW_CARD_CLASS)}
-                      </View>
-                    ))}
-                  </View>
+          {isCustomizing ? (
+            <View className="mt-5">
+              <CustomizeCardsPanel layout={layout} onChange={handleLayoutChange} />
+            </View>
+          ) : null}
 
-                  <View className="flex-row gap-4">
-                    {GRID_ROWS[1].map((cardKey) => (
-                      <View key={cardKey} className="flex-1">
-                        {renderCard(cardKey, GRID_BOTTOM_ROW_CARD_CLASS)}
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
+          {isLoading && !isRefreshing ? (
+            <View className="mt-5 min-h-[220px] items-center justify-center">
+              <ActivityIndicator size="large" color={sectionAccents[POMODORO_SECTION_KEY].text} />
             </View>
           ) : (
-            <View className="flex-col gap-4">
-              {OVERVIEW_CARD_ORDER.map((cardKey) => renderCard(cardKey))}
+            <View className="mt-5 gap-4">
+              {layout.map((id) => (
+                <View key={id}>{renderCard(id)}</View>
+              ))}
+              {!isCustomizing && !hasAnyData ? (
+                <View
+                  className="items-center rounded-2xl border border-dashed py-8"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <MaterialIcons
+                    name="auto-graph"
+                    size={24}
+                    color={sectionAccents[POMODORO_SECTION_KEY].text}
+                  />
+                  <Text className="mt-2 text-base font-semibold" style={{ color: tokens.text }}>
+                    Nothing tracked yet
+                  </Text>
+                  <Text
+                    className="mt-1 px-8 text-center text-sm"
+                    style={{ color: tokens.textMuted }}
+                  >
+                    Start with any feature and this dashboard will begin filling in automatically.
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Go to overview sections"
+                    onPress={() => setActiveSection('todos')}
+                    className="mt-4 rounded-xl px-4 py-2.5 active:opacity-80"
+                    style={{
+                      backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
+                    }}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                    >
+                      Add your first task
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           )}
-        </ScreenSection>
-      )}
-
-      {!isLoading && !hasAnyTrackedData ? (
-        <ScreenSection className="mb-0 mt-1">
-          <EmptyStateCard
-            accentColor={SECTION_COLORS.focus}
-            className="mb-0"
-            title="Nothing tracked yet"
-            description="Start with any feature and this dashboard will begin filling in automatically."
-            icon={<MaterialIcons name="auto-graph" size={24} color={sectionAccents.focus.text} />}
-          />
-        </ScreenSection>
-      ) : null}
-    </Screen>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
