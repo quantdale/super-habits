@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { resetAll } from '../helpers/reset';
 import { returnToApp } from '../helpers/dbHarness';
-import { expectRows, expectUnchanged, switchSection } from '../helpers/oracles';
+import { expectRows, expectUnchanged, switchSection, ACTIVE_SECTION_SELECTOR } from '../helpers/oracles';
 import { openNewTodoModal, submitTodoModal } from '../helpers/navigation';
 import { swipeLeftToRevealRowActions } from '../helpers/gestures';
 
@@ -148,8 +148,11 @@ async function toggleTodoCompletion(page: Page, title: string): Promise<void> {
 async function enterHabitEditAndDelete(page: Page, habitName: string): Promise<void> {
   await page.getByLabel('Enter habit edit mode').click({ force: true });
   await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
-  // Scope to the habit card that contains the named habit.
+  // Scope to the ACTIVE section container: the mounted-but-inactive Overview
+  // dashboard also renders the habit name in its preview card, which made the
+  // unscoped ancestor walk resolve two Delete buttons (strict violation).
   const card = page
+    .locator(ACTIVE_SECTION_SELECTOR)
     .getByText(habitName, { exact: true })
     .locator('xpath=ancestor::*[.//div[normalize-space(text())="Delete"]][1]');
   await card.getByText('Delete', { exact: true }).click({ force: true });
@@ -329,9 +332,12 @@ defineJourney({
         await createHabitViaUi(page, 'Neighbour habit');
         await enterHabitEditAndDelete(page, 'Double-tap habit');
         await confirmConfirmationDialog(page, 'Delete habit');
-        await expect(page.getByText('Double-tap habit', { exact: true }).first()).not.toBeVisible({
-          timeout: 15_000,
-        });
+        // Scope to the ACTIVE habits section: the mounted-but-inactive
+        // Overview preview card keeps rendering the (now soft-deleted) habit
+        // name until its next activation refresh — by-design staleness.
+        await expect(
+          page.locator(ACTIVE_SECTION_SELECTOR).getByText('Double-tap habit', { exact: true }),
+        ).not.toBeVisible({ timeout: 15_000 });
 
         // Target is soft-deleted (still one row, deleted_at set — never hard-deleted).
         await expectRows(
