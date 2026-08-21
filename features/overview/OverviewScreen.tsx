@@ -7,12 +7,19 @@ import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
-import { buildDateRangeOldestFirst, toDateKey } from '@/lib/time';
+import { buildDateRangeOldestFirst, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
-import { getCalorieGoal, listCalorieEntries } from '@/features/calories/calories.data';
+import {
+  getCalorieGoal,
+  listCalorieEntries,
+  listCalorieEntriesInRange,
+} from '@/features/calories/calories.data';
 import { getAllHabitCompletionsForRange, listHabits } from '@/features/habits/habits.data';
-import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
+import {
+  getPomodoroActiveTimer,
+  listPomodoroSessionsForDateRange,
+} from '@/features/pomodoro/pomodoro.data';
 import { listProjects } from '@/features/projects/projects.data';
 import { listGoals } from '@/features/goals/goals.data';
 import { listTodos } from '@/features/todos/todos.data';
@@ -27,10 +34,14 @@ import { TodosCard } from './cards/TodosCard';
 import { TodayPlanCard } from './cards/TodayPlanCard';
 import { WorkoutCard } from './cards/WorkoutCard';
 import { CustomizeCardsPanel } from './CustomizeCardsPanel';
+import { NextBestActionHero } from './NextBestActionHero';
+import { TodayProgressStrip } from './TodayProgressStrip';
 import { loadCardLayout, saveCardLayout } from './cardLayout.storage';
 import {
+  formatTodayHeading,
   getGreeting,
-  pickEmptyStateCta,
+  listEmptyStateCtas,
+  pickNextBestAction,
   shapeCaloriesSummary,
   shapeFocusWeekSummary,
   shapeGoalsSummary,
@@ -40,9 +51,11 @@ import {
   shapeTodosSummary,
   shapeWorkoutSummary,
   type CaloriesSummary,
+  type EmptyStateCta,
   type FocusWeekSummary,
   type GoalsSummary,
   type HabitsSummary,
+  type NextBestAction,
   type OverviewCardId,
   type PlanProgressSummary,
   type ProjectsSummary,
@@ -69,7 +82,13 @@ const EMPTY_SUMMARIES: OverviewSummaries = {
     totalPriorities: 0,
     completedPriorities: 0,
   },
-  todos: { overdueCount: 0, dueTodayCount: 0, pendingCount: 0, preview: [] },
+  todos: {
+    overdueCount: 0,
+    dueTodayCount: 0,
+    pendingCount: 0,
+    completedTodayCount: 0,
+    preview: [],
+  },
   habits: { scheduledToday: 0, completedToday: 0, rings: [] },
   focus: { focusMinutes: 0, sessionCount: 0, perDayMinutes: [] },
   workout: { sessionsThisWeek: 0, lastWorkoutName: null, lastWorkoutDateKey: null },
@@ -78,7 +97,12 @@ const EMPTY_SUMMARIES: OverviewSummaries = {
   goals: { activeCount: 0, averageProgress: 0, preview: [] },
 };
 
-async function loadSummaries(): Promise<OverviewSummaries> {
+type OverviewLoadResult = {
+  summaries: OverviewSummaries;
+  nextBestAction: NextBestAction | null;
+};
+
+async function loadSummaries(): Promise<OverviewLoadResult> {
   const today = toDateKey();
   const weekKeys = buildDateRangeOldestFirst(7);
   const weekStart = weekKeys[0];
@@ -93,8 +117,10 @@ async function loadSummaries(): Promise<OverviewSummaries> {
     routines,
     calorieEntries,
     calorieGoal,
+    weekCalorieEntries,
     projects,
     goals,
+    focusTimerIntent,
   ] = await Promise.all([
     listTodos(),
     getDailyPlan(today),
@@ -105,13 +131,15 @@ async function loadSummaries(): Promise<OverviewSummaries> {
     listRoutines(),
     listCalorieEntries(today),
     getCalorieGoal(),
+    listCalorieEntriesInRange(weekStart, today),
     listProjects(),
     listGoals(),
+    getPomodoroActiveTimer(),
   ]);
 
   const routineNames = new Map(routines.map((routine) => [routine.id, routine.name]));
 
-  return {
+  const summaries: OverviewSummaries = {
     plan: shapePlanProgressSummary(plan, todos),
     todos: shapeTodosSummary(todos, today),
     habits: shapeHabitsSummary(habits, completionsToday, today),
@@ -120,6 +148,28 @@ async function loadSummaries(): Promise<OverviewSummaries> {
     calories: shapeCaloriesSummary(calorieEntries, calorieGoal.calories),
     projects: shapeProjectsSummary(projects),
     goals: shapeGoalsSummary(goals),
+  };
+
+  // A persisted timer intent only counts as running/pausable when it belongs
+  // to today; stale intents from previous days are ignored.
+  const focusTimerActive =
+    focusTimerIntent !== null &&
+    !Number.isNaN(new Date(focusTimerIntent.startedAtIso).getTime()) &&
+    timestampToLocalDateKey(focusTimerIntent.startedAtIso) === today;
+
+  return {
+    summaries,
+    nextBestAction: pickNextBestAction({
+      todayKey: today,
+      todos: summaries.todos,
+      habits: summaries.habits,
+      focus: summaries.focus,
+      focusTimerActive,
+      workout: summaries.workout,
+      workoutRoutineCount: routines.length,
+      calories: summaries.calories,
+      caloriesInUse: weekCalorieEntries.length > 0,
+    }),
   };
 }
 
@@ -134,13 +184,15 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<OverviewSummaries>(EMPTY_SUMMARIES);
+  const [nextBestAction, setNextBestAction] = useState<NextBestAction | null>(null);
 
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [nextLayout, nextSummaries] = await Promise.all([loadCardLayout(), loadSummaries()]);
+      const [nextLayout, nextLoad] = await Promise.all([loadCardLayout(), loadSummaries()]);
       setLayout(nextLayout);
-      setSummaries(nextSummaries);
+      setSummaries(nextLoad.summaries);
+      setNextBestAction(nextLoad.nextBestAction);
       setLoadError(null);
     } catch (err) {
       // F7: a failed load must stay visible — per-card empty copy would read
@@ -208,6 +260,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   );
 
   const greeting = getGreeting(new Date().getHours());
+  const todayHeading = formatTodayHeading(new Date());
+  const todayKey = toDateKey();
   // F9: a committed daily plan counts as tracked data.
   const hasAnyData =
     summaries.plan.hasPlan ||
@@ -218,7 +272,19 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     summaries.calories.consumed > 0 ||
     summaries.projects.activeCount > 0 ||
     summaries.goals.activeCount > 0;
-  const emptyCta = pickEmptyStateCta(summaries);
+  // Guided starter: primary CTA from the existing chain plus up to two
+  // follow-up options (rendered only in the zero-data panel below).
+  const starterCtas = listEmptyStateCtas(summaries);
+  const openCtaDestination = useCallback(
+    (cta: EmptyStateCta) => {
+      if (cta.destination.kind === 'planning') {
+        openPlanningHub(cta.destination.view);
+      } else {
+        setActiveSection(cta.destination.section);
+      }
+    },
+    [openPlanningHub, setActiveSection],
+  );
 
   return (
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
@@ -245,7 +311,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 {greeting}
               </Text>
               <Text className="mt-1.5 text-sm leading-6" style={{ color: tokens.textMuted }}>
-                Your day at a glance across plans, habits, focus, and health.
+                {todayHeading}
               </Text>
             </View>
             <View className="shrink-0 flex-row flex-wrap items-center justify-end gap-2 pt-0.5">
@@ -320,6 +386,23 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
             </View>
           ) : null}
 
+          {/* Pinned daily orientation: Next Best Action hero + Today progress
+              strip. Always rendered regardless of customization — they are
+              NOT part of the removable card registry. */}
+          {!isLoading && !loadError ? (
+            <View className="mt-5 gap-4">
+              {nextBestAction ? <NextBestActionHero action={nextBestAction} /> : null}
+              <TodayProgressStrip
+                todayKey={todayKey}
+                todos={summaries.todos}
+                habits={summaries.habits}
+                focus={summaries.focus}
+                workout={summaries.workout}
+                calories={summaries.calories}
+              />
+            </View>
+          ) : null}
+
           {isLoading && !isRefreshing ? (
             <View className="mt-5 min-h-[220px] items-center justify-center">
               <ActivityIndicator size="large" color={sectionAccents[POMODORO_SECTION_KEY].text} />
@@ -379,28 +462,38 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                   >
                     Start with any feature and this dashboard will begin filling in automatically.
                   </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={emptyCta.label}
-                    onPress={() => {
-                      if (emptyCta.destination.kind === 'planning') {
-                        openPlanningHub(emptyCta.destination.view);
-                      } else {
-                        setActiveSection(emptyCta.destination.section);
-                      }
-                    }}
-                    className="mt-4 rounded-xl px-4 py-2.5 active:opacity-80"
-                    style={{
-                      backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
-                    }}
-                  >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
-                    >
-                      {emptyCta.label}
-                    </Text>
-                  </Pressable>
+                  <View className="mt-4 flex-row flex-wrap items-center justify-center gap-2">
+                    {starterCtas.map((cta, index) => (
+                      <Pressable
+                        key={cta.label}
+                        accessibilityRole="button"
+                        accessibilityLabel={cta.label}
+                        onPress={() => openCtaDestination(cta)}
+                        className="min-h-[44px] justify-center rounded-xl px-4 py-2.5 active:opacity-80"
+                        style={
+                          index === 0
+                            ? {
+                                backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
+                              }
+                            : {
+                                backgroundColor: tokens.surfaceElevated,
+                                borderWidth: 1,
+                                borderColor: tokens.border,
+                              }
+                        }
+                      >
+                        <Text
+                          className="text-sm font-semibold"
+                          style={{
+                            color:
+                              index === 0 ? sectionAccents[POMODORO_SECTION_KEY].text : tokens.text,
+                          }}
+                        >
+                          {cta.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
               ) : null}
             </View>

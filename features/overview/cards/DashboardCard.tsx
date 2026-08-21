@@ -17,6 +17,29 @@ const APP_SECTION_BY_CARD_SECTION: Record<string, AppSection> = {
   calories: 'calories',
 };
 
+type CardNavigation = ReturnType<typeof useAppNavigation>;
+
+/**
+ * Deep-link a card/hero target exactly like DashboardCard does on press —
+ * shared by the customizable cards, the Next Best Action hero, and the
+ * Today progress strip so all entry points navigate identically.
+ */
+export function openCardTarget(
+  navigation: CardNavigation,
+  meta: Pick<OverviewCardMeta, 'section' | 'planningHubView'>,
+) {
+  if (meta.section) {
+    const appSection = APP_SECTION_BY_CARD_SECTION[meta.section];
+    if (appSection) {
+      navigation.setActiveSection(appSection);
+    } else if (meta.planningHubView) {
+      navigation.openPlanningHub(meta.planningHubView);
+    }
+  } else if (meta.planningHubView) {
+    navigation.openPlanningHub(meta.planningHubView);
+  }
+}
+
 type DashboardCardProps = {
   meta: OverviewCardMeta;
   /** When true, renders a skeleton instead of content. */
@@ -56,16 +79,7 @@ export function DashboardCard({ meta, loading = false, empty, children }: Dashbo
   const textColor = sectionAccents[meta.section ?? 'focus'].text;
 
   const handlePress = () => {
-    if (meta.section) {
-      const appSection = APP_SECTION_BY_CARD_SECTION[meta.section];
-      if (appSection) {
-        navigation.setActiveSection(appSection);
-      } else if (meta.planningHubView) {
-        navigation.openPlanningHub(meta.planningHubView);
-      }
-    } else if (meta.planningHubView) {
-      navigation.openPlanningHub(meta.planningHubView);
-    }
+    openCardTarget(navigation, meta);
   };
 
   return (

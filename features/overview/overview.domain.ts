@@ -57,7 +57,10 @@ export function parseCardLayout(raw: string | null | undefined): OverviewCardId[
       result.push(item as OverviewCardId);
     }
   }
-  // An explicitly empty array means "hide everything" and is honored.
+  // Orientation stability: customization may reorder or hide individual
+  // cards, but an empty/all-hidden layout must not erase all daily
+  // orientation — fall back to the default order instead of zero cards.
+  if (result.length === 0) return [...DEFAULT_CARD_LAYOUT];
   return result;
 }
 
@@ -124,6 +127,18 @@ export function getGreeting(hour: number): string {
   return 'Good evening';
 }
 
+/**
+ * Long local date label for the Today header (e.g. "Thursday, August 21").
+ * Uses Intl with the device locale — no new dependencies.
+ */
+export function formatTodayHeading(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(date);
+}
+
 /** Human label for a due date relative to today's local date key. */
 export function formatDueDateLabel(dueDate: string, todayKey: string): string {
   if (dueDate < todayKey) return 'Overdue';
@@ -139,6 +154,8 @@ export type TodosSummary = {
   overdueCount: number;
   dueTodayCount: number;
   pendingCount: number;
+  /** Tasks completed today (by `completed_at` local date) for the progress strip. */
+  completedTodayCount: number;
   /** Bounded preview list: overdue first, then due today, then top pending. */
   preview: Todo[];
 };
@@ -148,10 +165,17 @@ export function shapeTodosSummary(todos: readonly Todo[], todayKey: string): Tod
   const overdue = pending.filter((t) => t.due_date !== null && t.due_date < todayKey);
   const dueToday = pending.filter((t) => t.due_date === todayKey);
   const rest = pending.filter((t) => t.due_date === null || t.due_date > todayKey);
+  const completedTodayCount = todos.filter(
+    (t) =>
+      t.completed === 1 &&
+      typeof t.completed_at === 'string' &&
+      timestampToLocalDateKey(t.completed_at) === todayKey,
+  ).length;
   return {
     overdueCount: overdue.length,
     dueTodayCount: dueToday.length,
     pendingCount: pending.length,
+    completedTodayCount,
     preview: [...overdue, ...dueToday, ...rest].slice(0, 4),
   };
 }
@@ -380,14 +404,8 @@ export type EmptyStateCta = {
     | { kind: 'planning'; view: 'today' | 'projects' | 'goals' };
 };
 
-/**
- * Pick the dashboard empty-state CTA from the first non-empty domain in card
- * order (plan → todos → habits → focus → workout → calories → projects →
- * goals). Falls back to the Todos tab when nothing is tracked at all. Keeps
- * the CTA honest even if the "nothing tracked" gate and the summaries ever
- * drift apart.
- */
-export function pickEmptyStateCta(summaries: {
+/** Minimal per-module signals the empty-state chain needs. */
+type EmptyStateSummaries = {
   plan: Pick<PlanProgressSummary, 'hasPlan'>;
   todos: Pick<TodosSummary, 'pendingCount'>;
   habits: Pick<HabitsSummary, 'scheduledToday'>;
@@ -396,33 +414,199 @@ export function pickEmptyStateCta(summaries: {
   calories: Pick<CaloriesSummary, 'consumed'>;
   projects: Pick<ProjectsSummary, 'activeCount'>;
   goals: Pick<GoalsSummary, 'activeCount'>;
-}): EmptyStateCta {
-  if (summaries.plan.hasPlan) {
-    return { label: 'Review your plan', destination: { kind: 'planning', view: 'today' } };
+};
+
+/**
+ * Ordered candidate list mirroring the domain chain in card order (plan →
+ * todos → habits → focus → workout → calories → projects → goals). Kept in
+ * one place so `pickEmptyStateCta` and `listEmptyStateCtas` never drift.
+ */
+const EMPTY_STATE_CHAIN: { when: (s: EmptyStateSummaries) => boolean; cta: EmptyStateCta }[] = [
+  {
+    when: (s) => s.plan.hasPlan,
+    cta: { label: 'Review your plan', destination: { kind: 'planning', view: 'today' } },
+  },
+  {
+    when: (s) => s.todos.pendingCount > 0,
+    cta: { label: 'Finish your tasks', destination: { kind: 'section', section: 'todos' } },
+  },
+  {
+    when: (s) => s.habits.scheduledToday > 0,
+    cta: { label: 'Check on your habits', destination: { kind: 'section', section: 'habits' } },
+  },
+  {
+    when: (s) => s.focus.sessionCount > 0,
+    cta: { label: 'Start a focus session', destination: { kind: 'section', section: 'pomodoro' } },
+  },
+  {
+    when: (s) => s.workout.sessionsThisWeek > 0,
+    cta: { label: 'Log a workout', destination: { kind: 'section', section: 'workout' } },
+  },
+  {
+    when: (s) => s.calories.consumed > 0,
+    cta: { label: 'Log a meal', destination: { kind: 'section', section: 'calories' } },
+  },
+  {
+    when: (s) => s.projects.activeCount > 0,
+    cta: { label: 'Open your projects', destination: { kind: 'planning', view: 'projects' } },
+  },
+  {
+    when: (s) => s.goals.activeCount > 0,
+    cta: { label: 'Review your goals', destination: { kind: 'planning', view: 'goals' } },
+  },
+];
+
+/** Fixed first-run starters appended when the chain has no match yet. */
+const EMPTY_STATE_STARTERS: EmptyStateCta[] = [
+  { label: 'Add your first task', destination: { kind: 'section', section: 'todos' } },
+  { label: 'Track a habit', destination: { kind: 'section', section: 'habits' } },
+  { label: 'Start a focus session', destination: { kind: 'section', section: 'pomodoro' } },
+];
+
+function pickChainMatch(summaries: EmptyStateSummaries): EmptyStateCta | null {
+  for (const candidate of EMPTY_STATE_CHAIN) {
+    if (candidate.when(summaries)) return candidate.cta;
   }
-  if (summaries.todos.pendingCount > 0) {
-    return { label: 'Finish your tasks', destination: { kind: 'section', section: 'todos' } };
+  return null;
+}
+
+/**
+ * Pick the dashboard empty-state CTA from the first non-empty domain in card
+ * order (plan → todos → habits → focus → workout → calories → projects →
+ * goals). Falls back to the Todos tab when nothing is tracked at all. Keeps
+ * the CTA honest even if the "nothing tracked" gate and the summaries ever
+ * drift apart.
+ */
+export function pickEmptyStateCta(summaries: EmptyStateSummaries): EmptyStateCta {
+  return pickChainMatch(summaries) ?? EMPTY_STATE_STARTERS[0];
+}
+
+/**
+ * Guided-starter CTA list for the zero-data panel: the primary CTA from the
+ * existing chain plus up to two follow-up options (next chain matches, then
+ * fixed first-run starters). Still one panel — no wizard.
+ */
+export function listEmptyStateCtas(summaries: EmptyStateSummaries): EmptyStateCta[] {
+  const result: EmptyStateCta[] = [];
+  const add = (cta: EmptyStateCta) => {
+    if (result.length < 3 && !result.some((existing) => existing.label === cta.label)) {
+      result.push(cta);
+    }
+  };
+  for (const candidate of EMPTY_STATE_CHAIN) {
+    if (candidate.when(summaries)) add(candidate.cta);
   }
-  if (summaries.habits.scheduledToday > 0) {
-    return { label: 'Check on your habits', destination: { kind: 'section', section: 'habits' } };
-  }
-  if (summaries.focus.sessionCount > 0) {
+  for (const starter of EMPTY_STATE_STARTERS) add(starter);
+  return result.slice(0, 3);
+}
+
+// ---------------------------------------------------------------------------
+// Next Best Action (docs/ui-ux/04-roadmap-and-acceptance.md Phase 4.1)
+// ---------------------------------------------------------------------------
+
+/** Section the Next Best Action deep-links to (DashboardCard-style keys). */
+export type NextBestActionSectionKey = 'todos' | 'habits' | 'focus' | 'workout' | 'calories';
+
+export type NextBestAction = {
+  sectionKey: NextBestActionSectionKey;
+  /** Concrete action title (e.g. the task title or "{n} habits left today"). */
+  title: string;
+  /** Transparent, human-readable reason this action is surfaced. */
+  reason: string;
+};
+
+export type NextBestActionInput = {
+  todayKey: string;
+  todos: Pick<TodosSummary, 'overdueCount' | 'dueTodayCount' | 'preview'>;
+  habits: Pick<HabitsSummary, 'scheduledToday' | 'completedToday'>;
+  focus: Pick<FocusWeekSummary, 'sessionCount' | 'perDayMinutes'>;
+  /** True when a Pomodoro timer intent exists for today (running/pausable). */
+  focusTimerActive: boolean;
+  workout: Pick<WorkoutSummary, 'lastWorkoutDateKey'>;
+  /** Saved routines count — a routine counts as the user's planned workout. */
+  workoutRoutineCount: number;
+  calories: Pick<CaloriesSummary, 'consumed'>;
+  /** True when calories have any recent entries (module actively used). */
+  caloriesInUse: boolean;
+};
+
+/**
+ * Deterministic cross-feature Next Best Action, ranked strictly:
+ * overdue task → due-today task → incomplete scheduled habits → running/
+ * pausable focus session (or start one when none today) → planned-but-not-
+ * started workout today → calories not yet logged today. Each step only
+ * fires for modules that actually have data; returns null when nothing
+ * qualifies so the hero stays hidden instead of guessing. No opaque score —
+ * every action carries an explicit reason string.
+ */
+export function pickNextBestAction(input: NextBestActionInput): NextBestAction | null {
+  const { todayKey } = input;
+
+  // 1–2. Overdue, then due-today tasks (`preview` is ordered overdue-first).
+  if (input.todos.overdueCount > 0) {
+    const todo = input.todos.preview.find(
+      (t) => t.completed === 0 && t.due_date !== null && t.due_date < todayKey,
+    );
     return {
-      label: 'Start a focus session',
-      destination: { kind: 'section', section: 'pomodoro' },
+      sectionKey: 'todos',
+      title: todo ? todo.title : 'Handle your overdue tasks',
+      reason: 'Overdue',
     };
   }
-  if (summaries.workout.sessionsThisWeek > 0) {
-    return { label: 'Log a workout', destination: { kind: 'section', section: 'workout' } };
+  if (input.todos.dueTodayCount > 0) {
+    const todo = input.todos.preview.find((t) => t.completed === 0 && t.due_date === todayKey);
+    return {
+      sectionKey: 'todos',
+      title: todo ? todo.title : 'Finish your tasks due today',
+      reason: 'Due today',
+    };
   }
-  if (summaries.calories.consumed > 0) {
-    return { label: 'Log a meal', destination: { kind: 'section', section: 'calories' } };
+
+  // 3. Incomplete scheduled habits.
+  const habitsLeft = input.habits.scheduledToday - input.habits.completedToday;
+  if (input.habits.scheduledToday > 0 && habitsLeft > 0) {
+    return {
+      sectionKey: 'habits',
+      title: `${habitsLeft} ${habitsLeft === 1 ? 'habit' : 'habits'} left today`,
+      reason: `${habitsLeft} scheduled left`,
+    };
   }
-  if (summaries.projects.activeCount > 0) {
-    return { label: 'Open your projects', destination: { kind: 'planning', view: 'projects' } };
+
+  // 4. Focus: resume a live session before suggesting a fresh one.
+  if (input.focusTimerActive) {
+    return {
+      sectionKey: 'focus',
+      title: 'Resume your focus session',
+      reason: 'Session in progress',
+    };
   }
-  if (summaries.goals.activeCount > 0) {
-    return { label: 'Review your goals', destination: { kind: 'planning', view: 'goals' } };
+  const focusMinutesToday =
+    input.focus.perDayMinutes.find((day) => day.dateKey === todayKey)?.minutes ?? 0;
+  if (input.focus.sessionCount > 0 && focusMinutesToday === 0) {
+    return {
+      sectionKey: 'focus',
+      title: 'Start a focus session',
+      reason: 'No focus yet today',
+    };
   }
-  return { label: 'Add your first task', destination: { kind: 'section', section: 'todos' } };
+
+  // 5. Planned-but-not-started workout today (routines exist, none logged today).
+  if (input.workoutRoutineCount > 0 && input.workout.lastWorkoutDateKey !== todayKey) {
+    return {
+      sectionKey: 'workout',
+      title: "Start today's workout",
+      reason: 'Planned for today',
+    };
+  }
+
+  // 6. Calories not yet logged today — only for modules actually in use.
+  if (input.caloriesInUse && input.calories.consumed === 0) {
+    return {
+      sectionKey: 'calories',
+      title: 'Log your first meal',
+      reason: 'Nothing logged today',
+    };
+  }
+
+  return null;
 }

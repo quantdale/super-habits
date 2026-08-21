@@ -59,8 +59,8 @@ describe('card layout persistence helpers', () => {
     expect(parseCardLayout(raw)).toEqual<OverviewCardId[]>(['todos', 'habits']);
   });
 
-  it('honors an explicitly empty layout (hide everything)', () => {
-    expect(parseCardLayout('[]')).toEqual([]);
+  it('falls back to the default layout for an explicitly empty layout (orientation stability)', () => {
+    expect(parseCardLayout('[]')).toEqual(DEFAULT_CARD_LAYOUT);
   });
 
   it('serializes and round-trips', () => {
