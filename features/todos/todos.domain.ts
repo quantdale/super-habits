@@ -67,6 +67,7 @@ export type TodoListFilters = {
   dueWindow?: TodoDueWindow;
   projectId?: string | null;
   goalId?: string | null;
+  todayKey?: string;
 };
 
 export type TodoListQuery = TodoListFilters & {

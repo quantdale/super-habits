@@ -82,8 +82,9 @@ export function TodoBulkBar({
               label={project.name}
               active={false}
               color={accentColor}
-              disabled={disabled}
-              onPress={() => onAssignProject(project.id)}
+              onPress={() => {
+                if (!disabled) onAssignProject(project.id);
+              }}
             />
           ))}
         </View>

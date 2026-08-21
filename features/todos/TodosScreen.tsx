@@ -35,9 +35,23 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import type { Todo, TodoPriority, TodoViewMode } from './types';
 import { TodoItem } from './TodoItem';
-import { createSubmitGuard, findMissingRecurrenceIds, getTodayDateKey } from './todos.domain';
+import { TodoListToolbar } from './TodoListToolbar';
+import { TodoBulkBar } from './TodoBulkBar';
+import {
+  applyTodoListQuery,
+  createSubmitGuard,
+  findMissingRecurrenceIds,
+  getTodayDateKey,
+  groupTodosByDueWindow,
+  type TodoListFilters,
+  type TodoSortMode,
+} from './todos.domain';
 import {
   addTodo,
+  bulkAssignTodosProject,
+  bulkRemoveTodos,
+  bulkSetTodoCompletion,
+  bulkUpdateTodoPriority,
   createRecurringInstances,
   getRecurringTodosByIds,
   listTodoLinkedActionRules,
@@ -49,6 +63,8 @@ import {
   updateTodo,
   updateTodoOrder,
 } from '@/features/todos/todos.data';
+import { listProjects } from '@/features/projects/projects.data';
+import { listGoals } from '@/features/goals/goals.data';
 
 const COLOR = SECTION_COLORS.todos;
 const TODO_LINKED_ACTION_SOURCE_KEY = 'todo-linked-actions-source';
@@ -82,6 +98,15 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<TodoViewMode>('content');
+  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<TodoListFilters>({ priority: 'all', dueWindow: 'all' });
+  const [sortMode, setSortMode] = useState<TodoSortMode>('manual');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [projectOptions, setProjectOptions] = useState<{ id: string; name: string }[]>([]);
+  const [goalOptions, setGoalOptions] = useState<{ id: string; title: string }[]>([]);
+  const [editProjectId, setEditProjectId] = useState<string | null>(null);
+  const [editGoalId, setEditGoalId] = useState<string | null>(null);
   const { width: screenWidth } = useWindowDimensions();
   const submitGuardRef = useRef(createSubmitGuard());
   const lastRecurrenceExpansionDateKeyRef = useRef<string | null>(null);
@@ -111,6 +136,20 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   }, []);
 
   const pendingTasks = useMemo(() => items.filter((t) => t.completed === 0), [items]);
+  const todayKey = getTodayDateKey();
+  const queryActive =
+    search.trim().length > 0 ||
+    (filters.priority && filters.priority !== 'all') === true ||
+    (filters.dueWindow && filters.dueWindow !== 'all') === true ||
+    sortMode !== 'manual';
+  const visiblePending = useMemo(
+    () => applyTodoListQuery(pendingTasks, { search, ...filters, sort: sortMode, todayKey }),
+    [pendingTasks, search, filters, sortMode, todayKey],
+  );
+  const dueGroups = useMemo(
+    () => groupTodosByDueWindow(visiblePending, todayKey),
+    [visiblePending, todayKey],
+  );
   const completedTasks = useMemo(() => items.filter((t) => t.completed === 1), [items]);
   const hasCompleted = useMemo(() => completedTasks.length > 0, [completedTasks]);
   const recurringTasksCount = useMemo(
@@ -173,6 +212,8 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     setPriority('normal');
     setIsRecurring(false);
     setEditingId(null);
+    setEditProjectId(null);
+    setEditGoalId(null);
     setShowDatePicker(false);
     setTodoError(null);
     setLinkedActionRows([]);
@@ -188,6 +229,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const openNewTodoModal = () => {
     resetForm();
+    void loadAssociationOptions();
     setModalVisible(true);
   };
 
@@ -224,6 +266,8 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           notes: notes.trim() || undefined,
           dueDate: dueDate ?? null,
           priority,
+          projectId: editProjectId,
+          goalId: editGoalId,
         });
         if (!isRecurringLinkedActionSource) {
           await saveTodoLinkedActionRules(editingId, linkedActionRules);
@@ -249,34 +293,51 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     }
   };
 
-  const startEdit = useCallback(async (todo: Todo) => {
-    setEditingId(todo.id);
-    setTitle(todo.title);
-    setNotes(todo.notes ?? '');
-    setDueDate(todo.due_date);
-    setPriority(todo.priority);
-    setTodoError(null);
-    setLinkedActionsError(null);
-    setLinkedActionRows([]);
-    setLinkedActionsLoading(todo.recurrence !== 'daily');
-    setModalVisible(true);
-
-    if (todo.recurrence === 'daily') {
-      setLinkedActionsLoading(false);
-      return;
-    }
-
+  const loadAssociationOptions = useCallback(async () => {
     try {
-      const rules = await listTodoLinkedActionRules(todo.id);
-      setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
-    } catch (error) {
-      setLinkedActionsError(
-        error instanceof Error ? error.message : 'Could not load linked actions for this task.',
-      );
-    } finally {
-      setLinkedActionsLoading(false);
+      const [projects, goals] = await Promise.all([listProjects(), listGoals()]);
+      setProjectOptions(projects.map((p) => ({ id: p.id, name: p.name })));
+      setGoalOptions(goals.map((g) => ({ id: g.id, title: g.title })));
+    } catch {
+      setProjectOptions([]);
+      setGoalOptions([]);
     }
   }, []);
+
+  const startEdit = useCallback(
+    async (todo: Todo) => {
+      setEditingId(todo.id);
+      setTitle(todo.title);
+      setNotes(todo.notes ?? '');
+      setDueDate(todo.due_date);
+      setPriority(todo.priority);
+      setEditProjectId(todo.project_id);
+      setEditGoalId(todo.goal_id);
+      void loadAssociationOptions();
+      setTodoError(null);
+      setLinkedActionsError(null);
+      setLinkedActionRows([]);
+      setLinkedActionsLoading(todo.recurrence !== 'daily');
+      setModalVisible(true);
+
+      if (todo.recurrence === 'daily') {
+        setLinkedActionsLoading(false);
+        return;
+      }
+
+      try {
+        const rules = await listTodoLinkedActionRules(todo.id);
+        setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
+      } catch (error) {
+        setLinkedActionsError(
+          error instanceof Error ? error.message : 'Could not load linked actions for this task.',
+        );
+      } finally {
+        setLinkedActionsLoading(false);
+      }
+    },
+    [loadAssociationOptions],
+  );
 
   const handleToggleTodo = useCallback(
     async (todo: Todo) => {
@@ -290,6 +351,93 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   );
 
   const todoKeyExtractor = useCallback((item: Todo) => item.id, []);
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+    );
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds([]);
+  }, []);
+
+  const runBulkAction = useCallback(
+    async (action: () => Promise<unknown>) => {
+      await action();
+      exitSelectionMode();
+      void refresh();
+    },
+    [exitSelectionMode, refresh],
+  );
+
+  const handleBulkComplete = useCallback(
+    () => runBulkAction(() => bulkSetTodoCompletion(selectedIds, 1)),
+    [runBulkAction, selectedIds],
+  );
+  const handleBulkReopen = useCallback(
+    () => runBulkAction(() => bulkSetTodoCompletion(selectedIds, 0)),
+    [runBulkAction, selectedIds],
+  );
+  const handleBulkDelete = useCallback(
+    () => runBulkAction(() => bulkRemoveTodos(selectedIds)),
+    [runBulkAction, selectedIds],
+  );
+  const handleBulkPriority = useCallback(
+    (priority: TodoPriority) => runBulkAction(() => bulkUpdateTodoPriority(selectedIds, priority)),
+    [runBulkAction, selectedIds],
+  );
+  const handleBulkAssignProject = useCallback(
+    (projectId: string | null) =>
+      runBulkAction(() => bulkAssignTodosProject(selectedIds, projectId)),
+    [runBulkAction, selectedIds],
+  );
+
+  const renderSelectableRow = useCallback(
+    (todo: Todo) => {
+      const selected = selectedIds.includes(todo.id);
+      return (
+        <Pressable
+          key={todo.id}
+          onPress={() => toggleSelected(todo.id)}
+          accessibilityRole="checkbox"
+          accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${todo.title}`}
+          accessibilityState={{ checked: selected }}
+          className="mb-2 flex-row items-center gap-3 rounded-2xl border px-4 py-3"
+          style={{
+            borderColor: selected ? COLOR : tokens.border,
+            backgroundColor: tokens.surfaceElevated,
+          }}
+        >
+          <View
+            className={`h-5 w-5 items-center justify-center rounded border-2 ${
+              selected ? 'border-todos bg-todos' : ''
+            }`}
+            style={
+              !selected
+                ? { borderColor: tokens.border, backgroundColor: tokens.surface }
+                : undefined
+            }
+          >
+            {selected ? <MaterialIcons name="check" size={14} color={tokens.textOnAccent} /> : null}
+          </View>
+          <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={2}>
+            {todo.title}
+          </Text>
+        </Pressable>
+      );
+    },
+    [
+      selectedIds,
+      tokens.border,
+      tokens.surface,
+      tokens.surfaceElevated,
+      tokens.text,
+      tokens.textOnAccent,
+      toggleSelected,
+    ],
+  );
   const handleDragBegin = useCallback(() => {}, []);
   const handleDragEnd = useCallback(
     async ({ data }: { data: Todo[] }) => {
@@ -356,6 +504,18 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
               subtitle={todosEmptyCardSubtitle ? undefined : 'Offline-first task manager.'}
               actions={
                 <>
+                  <IconButton
+                    icon={selectionMode ? 'close' : 'playlist-add-check'}
+                    onPress={() => {
+                      if (selectionMode) exitSelectionMode();
+                      else setSelectionMode(true);
+                    }}
+                    accessibilityLabel={
+                      selectionMode ? 'Exit multi-select mode' : 'Enter multi-select mode'
+                    }
+                    selected={selectionMode}
+                    accentColor={colorText}
+                  />
                   {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
                     <IconButton
                       key={mode}
@@ -423,98 +583,212 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
           {!totallyEmpty ? (
             <ScreenSection className="min-h-0 mb-0 flex-1">
-              <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
-                <View>
-                  <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                    Pending
-                  </Text>
-                  <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
-                    Swipe to edit or delete. Drag to reorder.
-                  </Text>
-                </View>
-                {hasCompleted ? (
-                  <Pressable
-                    onPress={() => setShowCompleted((v) => !v)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
-                    accessibilityState={{ expanded: showCompleted }}
-                    aria-expanded={showCompleted}
-                    className="rounded-full border px-3 py-2.5"
-                    style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                  >
-                    <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
-                      {showCompleted ? 'Hide' : 'Show'} completed ({completedTasks.length})
+              <TodoListToolbar
+                search={search}
+                onSearchChange={setSearch}
+                filters={filters}
+                onFiltersChange={setFilters}
+                sort={sortMode}
+                onSortChange={setSortMode}
+                accentColor={colorText}
+              />
+              {selectionMode ? (
+                <View className="mb-3">
+                  {dueGroups.overdue.length > 0 ? (
+                    <Text
+                      className="mb-2 px-1 text-xs font-semibold"
+                      style={{ color: tokens.dangerText }}
+                    >
+                      Overdue ({dueGroups.overdue.length})
                     </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              <DraggableFlatList
-                key={viewMode}
-                data={pendingTasks}
-                keyExtractor={todoKeyExtractor}
-                containerStyle={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
-                activationDistance={10}
-                numColumns={viewMode === 'grid' ? gridColumns : 1}
-                onDragBegin={handleDragBegin}
-                onDragEnd={handleDragEnd}
-                ListEmptyComponent={
-                  hasCompleted ? (
-                    <View className="mb-3">{noPendingTasksCard}</View>
-                  ) : (
+                  ) : null}
+                  {dueGroups.overdue.map(renderSelectableRow)}
+                  {dueGroups.today.length > 0 ? (
+                    <Text
+                      className="mb-2 px-1 text-xs font-semibold"
+                      style={{ color: tokens.text }}
+                    >
+                      Today ({dueGroups.today.length})
+                    </Text>
+                  ) : null}
+                  {dueGroups.today.map(renderSelectableRow)}
+                  {dueGroups.upcoming.length > 0 ? (
+                    <Text
+                      className="mb-2 px-1 text-xs font-semibold"
+                      style={{ color: tokens.textMuted }}
+                    >
+                      Upcoming ({dueGroups.upcoming.length})
+                    </Text>
+                  ) : null}
+                  {dueGroups.upcoming.map(renderSelectableRow)}
+                  {dueGroups.noDue.length > 0 ? (
+                    <Text
+                      className="mb-2 px-1 text-xs font-semibold"
+                      style={{ color: tokens.textMuted }}
+                    >
+                      No date ({dueGroups.noDue.length})
+                    </Text>
+                  ) : null}
+                  {dueGroups.noDue.map(renderSelectableRow)}
+                  <View className="mt-2">
+                    <TodoBulkBar
+                      selectedCount={selectedIds.length}
+                      onComplete={() => void handleBulkComplete()}
+                      onReopen={() => void handleBulkReopen()}
+                      onDelete={() => void handleBulkDelete()}
+                      onPriorityChange={(priority) => void handleBulkPriority(priority)}
+                      projects={projectOptions}
+                      onAssignProject={(projectId) => void handleBulkAssignProject(projectId)}
+                      onExit={exitSelectionMode}
+                      accentColor={colorText}
+                    />
+                  </View>
+                </View>
+              ) : queryActive ? (
+                <View className="mb-4">
+                  {visiblePending.length === 0 ? (
                     <EmptyStateCard
                       accentColor={SECTION_COLORS.todos}
                       className="mb-0"
-                      title="Nothing to show here"
+                      icon={<MaterialIcons name="search-off" size={22} color={colorText} />}
+                      title="No matching tasks"
+                      description="Try a different search or reset the filters."
                     />
-                  )
-                }
-                ListFooterComponent={
-                  hasCompleted ? (
-                    <View className="pt-3">
-                      {showCompleted
-                        ? [
-                            <View
-                              key="completed-header"
-                              className="mb-4 flex-row items-center justify-between gap-3 px-1"
-                            >
-                              <View>
-                                <Text
-                                  className="text-base font-semibold"
-                                  style={{ color: tokens.text }}
-                                >
-                                  Completed
-                                </Text>
-                                <Text
-                                  className="mt-0.5 text-xs"
-                                  style={{ color: tokens.textMuted }}
-                                >
-                                  Completed tasks stay here until you toggle them back.
-                                </Text>
-                              </View>
-                            </View>,
-                            ...completedTasks.map((item) => (
-                              <TodoItem
-                                key={item.id}
-                                todo={item}
-                                onLongPress={() => {}}
-                                isActive={false}
-                                onToggle={() => handleToggleTodo(item)}
-                                onDelete={() => removeTodo(item.id).then(refresh)}
-                                onEdit={() => {
-                                  void startEdit(item);
-                                }}
-                                viewMode={viewMode}
-                                cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
-                              />
-                            )),
-                          ]
-                        : null}
+                  ) : null}
+                  {(['overdue', 'today', 'upcoming', 'noDue'] as const).map((groupKey) => {
+                    const groupItems = dueGroups[groupKey];
+                    if (groupItems.length === 0) return null;
+                    const labels = {
+                      overdue: 'Overdue',
+                      today: 'Today',
+                      upcoming: 'Upcoming',
+                      noDue: 'No date',
+                    } as const;
+                    return (
+                      <View key={groupKey} className="mb-4">
+                        <Text
+                          className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide"
+                          style={{
+                            color: groupKey === 'overdue' ? tokens.dangerText : tokens.textMuted,
+                          }}
+                          accessibilityLabel={`${labels[groupKey]} group, ${groupItems.length} tasks`}
+                        >
+                          {labels[groupKey]} ({groupItems.length})
+                        </Text>
+                        {groupItems.map((item) => (
+                          <TodoItem
+                            key={item.id}
+                            todo={item}
+                            onLongPress={() => {}}
+                            isActive={false}
+                            onToggle={() => handleToggleTodo(item)}
+                            onDelete={() => removeTodo(item.id).then(refresh)}
+                            onEdit={() => {
+                              void startEdit(item);
+                            }}
+                            viewMode={viewMode === 'grid' ? 'list' : viewMode}
+                          />
+                        ))}
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <>
+                  <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
+                    <View>
+                      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                        Pending
+                      </Text>
+                      <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                        Swipe to edit or delete. Drag to reorder.
+                      </Text>
                     </View>
-                  ) : null
-                }
-                renderItem={renderTodoItem}
-              />
+                    {hasCompleted ? (
+                      <Pressable
+                        onPress={() => setShowCompleted((v) => !v)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
+                        accessibilityState={{ expanded: showCompleted }}
+                        aria-expanded={showCompleted}
+                        className="rounded-full border px-3 py-2.5"
+                        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+                      >
+                        <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
+                          {showCompleted ? 'Hide' : 'Show'} completed ({completedTasks.length})
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <DraggableFlatList
+                    key={viewMode}
+                    data={visiblePending}
+                    keyExtractor={todoKeyExtractor}
+                    containerStyle={{ flex: 1 }}
+                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
+                    activationDistance={10}
+                    numColumns={viewMode === 'grid' ? gridColumns : 1}
+                    onDragBegin={handleDragBegin}
+                    onDragEnd={handleDragEnd}
+                    ListEmptyComponent={
+                      hasCompleted ? (
+                        <View className="mb-3">{noPendingTasksCard}</View>
+                      ) : (
+                        <EmptyStateCard
+                          accentColor={SECTION_COLORS.todos}
+                          className="mb-0"
+                          title="Nothing to show here"
+                        />
+                      )
+                    }
+                    ListFooterComponent={
+                      hasCompleted ? (
+                        <View className="pt-3">
+                          {showCompleted
+                            ? [
+                                <View
+                                  key="completed-header"
+                                  className="mb-4 flex-row items-center justify-between gap-3 px-1"
+                                >
+                                  <View>
+                                    <Text
+                                      className="text-base font-semibold"
+                                      style={{ color: tokens.text }}
+                                    >
+                                      Completed
+                                    </Text>
+                                    <Text
+                                      className="mt-0.5 text-xs"
+                                      style={{ color: tokens.textMuted }}
+                                    >
+                                      Completed tasks stay here until you toggle them back.
+                                    </Text>
+                                  </View>
+                                </View>,
+                                ...completedTasks.map((item) => (
+                                  <TodoItem
+                                    key={item.id}
+                                    todo={item}
+                                    onLongPress={() => {}}
+                                    isActive={false}
+                                    onToggle={() => handleToggleTodo(item)}
+                                    onDelete={() => removeTodo(item.id).then(refresh)}
+                                    onEdit={() => {
+                                      void startEdit(item);
+                                    }}
+                                    viewMode={viewMode}
+                                    cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
+                                  />
+                                )),
+                              ]
+                            : null}
+                        </View>
+                      ) : null
+                    }
+                    renderItem={renderTodoItem}
+                  />
+                </>
+              )}
             </ScreenSection>
           ) : null}
         </View>
@@ -557,6 +831,54 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 />
               ))}
             </View>
+            {projectOptions.length > 0 ? (
+              <View className="mb-3">
+                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+                  Project
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  <PillChip
+                    label="None"
+                    active={editProjectId === null}
+                    color={COLOR}
+                    onPress={() => setEditProjectId(null)}
+                  />
+                  {projectOptions.map((project) => (
+                    <PillChip
+                      key={project.id}
+                      label={project.name}
+                      active={editProjectId === project.id}
+                      color={COLOR}
+                      onPress={() => setEditProjectId(project.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {goalOptions.length > 0 ? (
+              <View className="mb-3">
+                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+                  Goal
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  <PillChip
+                    label="None"
+                    active={editGoalId === null}
+                    color={COLOR}
+                    onPress={() => setEditGoalId(null)}
+                  />
+                  {goalOptions.map((goal) => (
+                    <PillChip
+                      key={goal.id}
+                      label={goal.title}
+                      active={editGoalId === goal.id}
+                      color={COLOR}
+                      onPress={() => setEditGoalId(goal.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
             {!editingId ? (
               <Pressable
                 onPress={() => {
