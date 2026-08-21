@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -50,18 +50,29 @@ import {
   buildHabitGrid,
   calculateCurrentStreak,
   calculateOverallConsistency,
+  filterHabits,
   formatHabitSchedule,
   getHabitRuleForDate,
   getHabitSchedulePreset,
   isHabitScheduledOn,
   normalizeHabitWeekdays,
+  sortHabits,
+  toggleHabitLifecycleId,
   type HabitSchedulePreset,
+  type HabitSortMode,
+  type HabitStatusFilter,
   type HabitWeekday,
 } from '@/features/habits/habits.domain';
+import {
+  loadHabitLifecycleSets,
+  saveHabitArchivedIds,
+  saveHabitPausedIds,
+} from '@/features/habits/habitLifecycle.store';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { HabitCircle } from '@/features/habits/HabitCircle';
 import { HabitsOverviewGrid } from '@/features/habits/HabitsOverviewGrid';
 import { HabitProgressInsightsModal } from '@/features/habits/HabitProgressInsightsModal';
+import { HabitDetailModal } from '@/features/habits/HabitDetailModal';
 import {
   DEFAULT_HABIT_COLOR,
   DEFAULT_HABIT_ICON,
@@ -161,11 +172,55 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [linkedActionRows, setLinkedActionRows] = useState<LinkedActionEditorRowDraft[]>([]);
   const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
+  const [pausedHabitIds, setPausedHabitIds] = useState<string[]>([]);
+  const [archivedHabitIds, setArchivedHabitIds] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<HabitStatusFilter>('active');
+  const [sortMode, setSortMode] = useState<HabitSortMode>('default');
+  const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
+
+  const displayedHabits = useMemo(
+    () =>
+      sortHabits(
+        filterHabits(habits, { status: statusFilter }, pausedHabitIds, archivedHabitIds),
+        sortMode,
+        streakMap,
+      ),
+    [habits, statusFilter, pausedHabitIds, archivedHabitIds, sortMode, streakMap],
+  );
+
+  const handleTogglePause = useCallback(
+    async (habitId: string) => {
+      const next = toggleHabitLifecycleId(pausedHabitIds, habitId);
+      setPausedHabitIds(next);
+      await saveHabitPausedIds(next);
+    },
+    [pausedHabitIds],
+  );
+
+  const handleToggleArchive = useCallback(
+    async (habitId: string) => {
+      const nextArchived = toggleHabitLifecycleId(archivedHabitIds, habitId);
+      setArchivedHabitIds(nextArchived);
+      await saveHabitArchivedIds(nextArchived);
+      // Archiving also clears an active pause so the states stay exclusive.
+      if (nextArchived.includes(habitId) && pausedHabitIds.includes(habitId)) {
+        const nextPaused = pausedHabitIds.filter((id) => id !== habitId);
+        setPausedHabitIds(nextPaused);
+        await saveHabitPausedIds(nextPaused);
+      }
+    },
+    [archivedHabitIds, pausedHabitIds],
+  );
 
   const refresh = useCallback(async () => {
-    const list = await listHabits();
+    const [list, lifecycle] = await Promise.all([
+      listHabits(),
+      loadHabitLifecycleSets().catch(() => ({ pausedIds: [], archivedIds: [] })),
+    ]);
     setHabits(list);
     setHabitsLoaded(true);
+    setPausedHabitIds(lifecycle.pausedIds);
+    setArchivedHabitIds(lifecycle.archivedIds);
     const todayKey = toDateKey();
     const allHabitCompletions = await getAllHabitCompletions();
     const completionsByHabit = new Map<string, typeof allHabitCompletions>();
@@ -655,6 +710,76 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         </Card>
       </ScreenSection>
 
+      <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
+        <View className="flex-row flex-wrap gap-2">
+          {(
+            [
+              { key: 'active', label: 'Active' },
+              { key: 'paused', label: 'Paused' },
+              { key: 'archived', label: 'Archived' },
+              { key: 'all', label: 'All' },
+            ] as { key: HabitStatusFilter; label: string }[]
+          ).map((option) => {
+            const active = statusFilter === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter habits: ${option.label}`}
+                accessibilityState={{ selected: active }}
+                className="rounded-full border px-3 py-1.5"
+                style={
+                  active
+                    ? { backgroundColor: COLOR, borderColor: COLOR }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setStatusFilter(option.key)}
+              >
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: active ? tokens.textOnAccent : tokens.textMuted }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View className="flex-row flex-wrap gap-2">
+          {(
+            [
+              { key: 'default', label: 'Default order' },
+              { key: 'name', label: 'Name' },
+              { key: 'streak', label: 'Streak' },
+            ] as { key: HabitSortMode; label: string }[]
+          ).map((option) => {
+            const active = sortMode === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort habits by ${option.label}`}
+                accessibilityState={{ selected: active }}
+                className="rounded-full border px-3 py-1.5"
+                style={
+                  active
+                    ? { backgroundColor: tokens.textMuted, borderColor: tokens.textMuted }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setSortMode(option.key)}
+              >
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: active ? (tokens.surface ?? '#fff') : tokens.textMuted }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScreenSection>
+
       <ScreenSection className="gap-4 pb-2" accessibilityLabel="Habit groups">
         {habits.length === 0 ? (
           <EmptyStateCard
@@ -670,7 +795,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         ) : null}
 
         {TIME_GROUPS.map((group) => {
-          const groupHabits = habits.filter((h) => (h.category ?? 'anytime') === group.key);
+          const groupHabits = displayedHabits.filter(
+            (h) => (h.category ?? 'anytime') === group.key,
+          );
 
           return (
             <Card
@@ -789,13 +916,20 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                               onIncrement={() => handleIncrement(habit.id)}
                               onDecrement={() => handleDecrement(habit.id)}
                             />
-                            <Text
-                              className="mt-2 w-[84px] text-center text-[11px] font-medium leading-4"
-                              style={{ color: tokens.textMuted }}
-                              numberOfLines={2}
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`Open ${habit.name} history`}
+                              className="mt-2 w-[84px] items-center"
+                              onPress={() => setDetailHabit(habit)}
                             >
-                              {habit.name}
-                            </Text>
+                              <Text
+                                className="text-center text-[11px] font-medium leading-4"
+                                style={{ color: tokens.textMuted }}
+                                numberOfLines={2}
+                              >
+                                {habit.name}
+                              </Text>
+                            </Pressable>
                             <Text
                               className="mt-0.5 w-[84px] text-center text-[10px] leading-4"
                               style={{ color: tokens.textMuted }}
@@ -1243,6 +1377,39 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           onClose={() => setInsightsHabit(null)}
         />
       ) : null}
+      <HabitDetailModal
+        habit={detailHabit}
+        onClose={() => setDetailHabit(null)}
+        onOpenInsights={(habit) => {
+          setDetailHabit(null);
+          setInsightsHabit(habit);
+        }}
+        lifecycleState={
+          detailHabit === null
+            ? 'active'
+            : archivedHabitIds.includes(detailHabit.id)
+              ? 'archived'
+              : pausedHabitIds.includes(detailHabit.id)
+                ? 'paused'
+                : 'active'
+        }
+        onTogglePause={
+          detailHabit
+            ? () => {
+                void handleTogglePause(detailHabit.id);
+                setDetailHabit(null);
+              }
+            : undefined
+        }
+        onToggleArchive={
+          detailHabit
+            ? () => {
+                void handleToggleArchive(detailHabit.id);
+                setDetailHabit(null);
+              }
+            : undefined
+        }
+      />
       {confirmationDialog}
     </Screen>
   );

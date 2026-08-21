@@ -21,6 +21,10 @@ type Props = {
   habit: Habit | null;
   onClose: () => void;
   onOpenInsights?: (habit: Habit) => void;
+  /** Current local lifecycle state of the habit (device-local preference). */
+  lifecycleState?: 'active' | 'paused' | 'archived';
+  onTogglePause?: () => void;
+  onToggleArchive?: () => void;
 };
 
 /**
@@ -28,7 +32,14 @@ type Props = {
  * 30-day consistency. Read-only; all computation is delegated to the pure
  * domain helpers in habits.domain.ts.
  */
-export function HabitDetailModal({ habit, onClose, onOpenInsights }: Props) {
+export function HabitDetailModal({
+  habit,
+  onClose,
+  onOpenInsights,
+  lifecycleState = 'active',
+  onTogglePause,
+  onToggleArchive,
+}: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const [completions, setCompletions] = useState<HabitCompletionRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -137,6 +148,33 @@ export function HabitDetailModal({ habit, onClose, onOpenInsights }: Props) {
               variant="ghost"
               onPress={() => onOpenInsights(habit)}
             />
+          ) : null}
+          {onTogglePause || onToggleArchive ? (
+            <Card accentColor={accent}>
+              <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
+                Lifecycle
+              </Text>
+              <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
+                Paused habits keep their history but are hidden from the active list. Archived
+                habits are kept out of sight until restored. These states are stored on this device.
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {onTogglePause ? (
+                  <Button
+                    label={lifecycleState === 'paused' ? 'Resume' : 'Pause'}
+                    variant={lifecycleState === 'paused' ? 'primary' : 'ghost'}
+                    onPress={onTogglePause}
+                  />
+                ) : null}
+                {onToggleArchive ? (
+                  <Button
+                    label={lifecycleState === 'archived' ? 'Restore' : 'Archive'}
+                    variant={lifecycleState === 'archived' ? 'primary' : 'ghost'}
+                    onPress={onToggleArchive}
+                  />
+                ) : null}
+              </View>
+            </Card>
           ) : null}
         </>
       )}
