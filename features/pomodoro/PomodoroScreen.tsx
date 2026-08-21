@@ -9,6 +9,7 @@ import { PillChip } from '@/core/ui/PillChip';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
+import { typography } from '@/core/theme/designTokens';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useCommandLauncherSuppressed } from '@/features/command/commandCenterContext';
 import {
@@ -111,6 +112,12 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [todosLoading, setTodosLoading] = useState(false);
   const [pendingAssociation, setPendingAssociation] = useState<SessionAssociation | null>(null);
   const [notePromptSessionId, setNotePromptSessionId] = useState<string | null>(null);
+  /** Presentational snapshot of the focus session that just completed naturally. */
+  const [completionSummary, setCompletionSummary] = useState<{
+    minutes: number;
+    startedAtIso: string;
+    linkedTodoTitle: string | null;
+  } | null>(null);
   const [showLinkTodo, setShowLinkTodo] = useState(false);
   const [interruptedNotice, setInterruptedNotice] = useState<AbandonNotice | null>(null);
   const [logSaveFailed, setLogSaveFailed] = useState(false);
@@ -374,6 +381,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
     if (plan.log) {
       void applyCompletedFocusLog(plan.log);
+      // Presentational only: the log above already recorded the session
+      // exactly once; this snapshot just feeds the completion summary UI.
+      setCompletionSummary({
+        minutes: Math.round(plan.log.durationSeconds / 60),
+        startedAtIso: plan.log.startedAtIso,
+        linkedTodoTitle: pendingAssociationRef.current?.todoTitle ?? null,
+      });
     }
 
     // Preset-driven auto-start: begin the suggested next mode after a short
@@ -426,6 +440,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const handleSaveSettings = async (newSettings: PomodoroSettings) => {
     await savePomodoroSettings(newSettings);
     setSettings(newSettings);
+    setCompletionSummary(null);
     // Manual edits detach the stored preset selection so the chip highlight
     // follows the actual durations instead of a stale selection.
     setStoredActivePresetIdState(null);
@@ -479,6 +494,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         setIsRunning(true);
         setIsPaused(false);
         setShowSettings(false);
+        setCompletionSummary(null);
         // Durable intent: a crash/reload mid-session is reconciled on the
         // next launch instead of vanishing behind an orphan notification.
         void savePomodoroActiveTimer({
@@ -509,6 +525,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     async (preset: PomodoroPreset) => {
       activePresetRef.current = preset;
       setStoredActivePresetIdState(preset.id);
+      setCompletionSummary(null);
       await setActivePresetId(preset.id).catch(() => undefined);
       // Applying a preset rewrites the timer settings; a running or paused
       // session keeps its current duration and the preset applies next round.
@@ -597,6 +614,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     void clearPomodoroActiveTimer().catch(() => undefined);
   };
 
+  const dismissCompletionSummary = () => setCompletionSummary(null);
+
+  const startBreakFromSummary = () => {
+    setCompletionSummary(null);
+    // Existing flow: `start()` launches the already-advanced next mode.
+    void start();
+  };
+
   // Behavior source for auto-start flags: stored selection, else the preset
   // matching current durations, else Classic (never a silent default).
   const activePreset = resolveActivePreset(presets, storedActivePresetId, settings);
@@ -633,6 +658,19 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const growthProgress = calculateGrowthProgress(remaining, totalSeconds);
   const plantStage = getPlantStage(growthProgress);
   const showSprout = currentMode === 'focus' && (isRunning || remaining < totalSeconds);
+
+  // Reduced-chrome active sessions and the completion-summary overlay.
+  const activeSession = isRunning || isPaused;
+  const summaryVisible = completionSummary !== null && !activeSession;
+  // Today's total including the just-finished session even before the history
+  // reload lands (exact started_at match against the loaded rows).
+  const summarySessionLogged =
+    completionSummary !== null &&
+    sessions.some((session) => session.started_at === completionSummary.startedAtIso);
+  const summaryTodayMinutes =
+    completionSummary !== null
+      ? focusStats.todayMinutes + (summarySessionLogged ? 0 : completionSummary.minutes)
+      : 0;
 
   const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
   const seconds = String(remaining % 60).padStart(2, '0');
@@ -690,73 +728,77 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         </ScreenSection>
       ) : null}
 
-      <ScreenSection>
-        <View className="flex-row flex-wrap gap-3">
-          <View className="min-w-[160px] flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={textColor}
-              icon="timer"
-              title="Focus sessions"
-              value={sessions.length}
-              subtitle="Last 52 weeks"
-              note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
-            />
+      {!activeSession ? (
+        <ScreenSection>
+          <View className="flex-row flex-wrap gap-3">
+            <View className="min-w-[160px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="timer"
+                title="Focus sessions"
+                value={sessions.length}
+                subtitle="Last 52 weeks"
+                note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
+              />
+            </View>
+            <View className="min-w-[160px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="local-fire-department"
+                title="Current streak"
+                value={pomodoroStreak}
+                subtitle="Consecutive focus days"
+                note={
+                  pomodoroStreak > 0
+                    ? 'Keep the streak alive'
+                    : 'Your next session starts the streak'
+                }
+              />
+            </View>
           </View>
-          <View className="min-w-[160px] flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={textColor}
-              icon="local-fire-department"
-              title="Current streak"
-              value={pomodoroStreak}
-              subtitle="Consecutive focus days"
-              note={
-                pomodoroStreak > 0 ? 'Keep the streak alive' : 'Your next session starts the streak'
-              }
-            />
+          <View className="mt-3 flex-row flex-wrap gap-3">
+            <View className="min-w-[110px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="today"
+                title="Today"
+                value={`${focusStats.todayMinutes}m`}
+                subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
+                note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
+              />
+            </View>
+            <View className="min-w-[110px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="date-range"
+                title="This week"
+                value={`${focusStats.weekMinutes}m`}
+                subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
+                note="Last 7 days"
+              />
+            </View>
+            <View className="min-w-[110px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="insights"
+                title="30 days"
+                value={`${focusStats.thirtyDayMinutes}m`}
+                subtitle={
+                  focusStats.bestDay
+                    ? `Best day ${focusStats.bestDay.minutes}m`
+                    : `${focusStats.thirtyDaySessions} sessions`
+                }
+                note={focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'}
+              />
+            </View>
           </View>
-        </View>
-        <View className="mt-3 flex-row flex-wrap gap-3">
-          <View className="min-w-[110px] flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={textColor}
-              icon="today"
-              title="Today"
-              value={`${focusStats.todayMinutes}m`}
-              subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
-              note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
-            />
-          </View>
-          <View className="min-w-[110px] flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={textColor}
-              icon="date-range"
-              title="This week"
-              value={`${focusStats.weekMinutes}m`}
-              subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
-              note="Last 7 days"
-            />
-          </View>
-          <View className="min-w-[110px] flex-1">
-            <FeatureStatCard
-              accentColor={COLOR}
-              textColor={textColor}
-              icon="insights"
-              title="30 days"
-              value={`${focusStats.thirtyDayMinutes}m`}
-              subtitle={
-                focusStats.bestDay
-                  ? `Best day ${focusStats.bestDay.minutes}m`
-                  : `${focusStats.thirtyDaySessions} sessions`
-              }
-              note={focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'}
-            />
-          </View>
-        </View>
-      </ScreenSection>
+        </ScreenSection>
+      ) : null}
 
       <ScreenSection>
         <Card
@@ -766,15 +808,6 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           headerSubtitle="Classic focus and break sequence with live progress."
           className="mb-0"
         >
-          <View className="mb-4">
-            <PomodoroPresetSelector
-              presets={presets}
-              activePresetId={highlightedPresetId}
-              onSelect={(p) => void handleSelectPreset(p)}
-              disabled={isRunning || isPaused}
-            />
-          </View>
-
           <View className="mb-4 flex-row flex-wrap justify-center">
             {(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => (
               <PillChip
@@ -785,6 +818,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 onPress={() => {
                   if (isRunning) return;
                   clearAutoStartTimer();
+                  setCompletionSummary(null);
                   setIsPaused(false);
                   setCurrentMode(mode);
                   currentModeRef.current = mode;
@@ -840,6 +874,16 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             ))}
           </View>
 
+          {activeSession && pendingAssociation ? (
+            <Text
+              className="mt-3 text-center text-xs"
+              style={{ color: tokens.textMuted }}
+              numberOfLines={1}
+            >
+              Focusing on “{pendingAssociation.todoTitle}”
+            </Text>
+          ) : null}
+
           <View className="mt-4 gap-3">
             {abandonNotice ? (
               <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
@@ -847,38 +891,102 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
               </Text>
             ) : null}
 
-            {!isRunning && !isPaused && remaining === totalSeconds ? (
-              <Button label={startLabel} onPress={() => void start()} color={COLOR} />
-            ) : null}
-
-            {isRunning ? (
-              <View className="flex-row gap-3">
-                <View className="flex-1">
-                  <Button label="Pause" variant="ghost" onPress={pause} />
+            {summaryVisible && completionSummary ? (
+              <View className="gap-3">
+                <View className="items-center">
+                  <Text
+                    className="text-center"
+                    style={{
+                      fontSize: typography.metric.fontSize,
+                      fontWeight: typography.metric.fontWeight,
+                      color: tokens.text,
+                    }}
+                  >
+                    Focused {completionSummary.minutes} min
+                  </Text>
+                  {completionSummary.linkedTodoTitle ? (
+                    <Text
+                      className="mt-1 text-center text-sm"
+                      style={{ color: tokens.textMuted }}
+                      numberOfLines={1}
+                    >
+                      {completionSummary.linkedTodoTitle}
+                    </Text>
+                  ) : null}
+                  <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
+                    {summaryTodayMinutes} min focused today
+                  </Text>
                 </View>
-                <View className="flex-1">
-                  <Button label={`${abandonLabel} (not logged)`} variant="ghost" onPress={reset} />
+                {notePromptSessionId ? (
+                  <SessionNotePrompt
+                    sessionId={notePromptSessionId}
+                    onSaved={() => {
+                      setNotePromptSessionId(null);
+                      void loadHistory();
+                    }}
+                    onDismiss={() => setNotePromptSessionId(null)}
+                  />
+                ) : null}
+                <View className="flex-row gap-3">
+                  <View className="flex-1">
+                    <Button
+                      label={`Start ${getModeLabel(currentMode).toLowerCase()}`}
+                      onPress={startBreakFromSummary}
+                      color={COLOR}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Button label="Done" variant="ghost" onPress={dismissCompletionSummary} />
+                  </View>
                 </View>
               </View>
-            ) : null}
+            ) : (
+              <>
+                {!isRunning && !isPaused && remaining === totalSeconds ? (
+                  <Button label={startLabel} onPress={() => void start()} color={COLOR} />
+                ) : null}
 
-            {isPaused && !isRunning ? (
-              <View className="flex-row gap-3">
-                <View className="flex-1">
-                  <Button label="Resume" onPress={resume} color={COLOR} />
-                </View>
-                <View className="flex-1">
-                  <Button label={`${abandonLabel} (not logged)`} variant="ghost" onPress={reset} />
-                </View>
-              </View>
-            ) : null}
+                {isRunning ? (
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Button label="Pause" variant="ghost" onPress={pause} />
+                    </View>
+                    <View className="flex-1">
+                      <Button
+                        label={`${abandonLabel} (not logged)`}
+                        variant="ghost"
+                        onPress={reset}
+                      />
+                    </View>
+                  </View>
+                ) : null}
 
-            {remaining === 0 && !isRunning && !isPaused ? (
-              <Button label={startLabel} onPress={() => void start()} color={COLOR} />
-            ) : null}
+                {isPaused && !isRunning ? (
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Button label="Resume" onPress={resume} color={COLOR} />
+                    </View>
+                    <View className="flex-1">
+                      <Button
+                        label={`${abandonLabel} (not logged)`}
+                        variant="ghost"
+                        onPress={reset}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+
+                {remaining === 0 && !isRunning && !isPaused ? (
+                  <Button label={startLabel} onPress={() => void start()} color={COLOR} />
+                ) : null}
+              </>
+            )}
           </View>
 
-          {!isRunning && !isPaused && remaining === getModeDuration(currentMode, settings) ? (
+          {!summaryVisible &&
+          !isRunning &&
+          !isPaused &&
+          remaining === getModeDuration(currentMode, settings) ? (
             <Text className="mt-3 text-center text-xs" style={{ color: tokens.textMuted }}>
               Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
             </Text>
@@ -886,17 +994,28 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         </Card>
       </ScreenSection>
 
-      {showSettings ? (
+      {notePromptSessionId && !activeSession && !summaryVisible ? (
         <ScreenSection>
-          <PomodoroSettingsInline
-            settings={settings}
-            onSave={handleSaveSettings}
-            onCancel={() => setShowSettings(false)}
-          />
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Session complete"
+            headerSubtitle="Add an optional note to remember what this session was for."
+            className="mb-0"
+          >
+            <SessionNotePrompt
+              sessionId={notePromptSessionId}
+              onSaved={() => {
+                setNotePromptSessionId(null);
+                void loadHistory();
+              }}
+              onDismiss={() => setNotePromptSessionId(null)}
+            />
+          </Card>
         </ScreenSection>
       ) : null}
 
-      {!isRunning && !isPaused && currentMode === 'focus' ? (
+      {!activeSession && currentMode === 'focus' ? (
         <ScreenSection>
           <Card
             variant="header"
@@ -938,44 +1057,54 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         </ScreenSection>
       ) : null}
 
-      {notePromptSessionId ? (
+      {!activeSession ? (
         <ScreenSection>
           <Card
             variant="header"
             accentColor={COLOR}
-            headerTitle="Session complete"
-            headerSubtitle="Add an optional note to remember what this session was for."
+            headerTitle="Presets"
+            headerSubtitle="Switch the rhythm; tap the timer to edit exact durations."
             className="mb-0"
           >
-            <SessionNotePrompt
-              sessionId={notePromptSessionId}
-              onSaved={() => {
-                setNotePromptSessionId(null);
-                void loadHistory();
-              }}
-              onDismiss={() => setNotePromptSessionId(null)}
+            <PomodoroPresetSelector
+              presets={presets}
+              activePresetId={highlightedPresetId}
+              onSelect={(p) => void handleSelectPreset(p)}
+              disabled={isRunning || isPaused}
             />
           </Card>
         </ScreenSection>
       ) : null}
 
-      <ScreenSection className="mb-0">
-        <Card
-          variant="header"
-          accentColor={COLOR}
-          headerTitle="Focus history"
-          headerSubtitle="Recent sessions, garden view, and the last 52 weeks of activity."
-          className="mb-0"
-        >
-          <RecentSessionsList sessions={sessions} />
-          <View className="mt-4">
-            <GardenGrid sessions={sessions} />
-          </View>
-          <View className="mt-6 w-full min-w-0 items-center justify-center">
-            <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
-          </View>
-        </Card>
-      </ScreenSection>
+      {showSettings ? (
+        <ScreenSection>
+          <PomodoroSettingsInline
+            settings={settings}
+            onSave={handleSaveSettings}
+            onCancel={() => setShowSettings(false)}
+          />
+        </ScreenSection>
+      ) : null}
+
+      {!activeSession ? (
+        <ScreenSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Focus history"
+            headerSubtitle="Recent sessions, garden view, and the last 52 weeks of activity."
+            className="mb-0"
+          >
+            <RecentSessionsList sessions={sessions} />
+            <View className="mt-4">
+              <GardenGrid sessions={sessions} />
+            </View>
+            <View className="mt-6 w-full min-w-0 items-center justify-center">
+              <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
+            </View>
+          </Card>
+        </ScreenSection>
+      ) : null}
     </Screen>
   );
 }

@@ -1,6 +1,7 @@
-import React from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, Easing, Platform, View } from 'react-native';
 import Svg, { Circle, Ellipse, Line, Path } from 'react-native-svg';
+import { MOTION_DURATION, useReducedMotion } from '@/core/theme/motion';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import type { PlantStage } from './pomodoro.domain';
 
@@ -27,7 +28,7 @@ function areFocusSproutPropsEqual(prev: Props, next: Props): boolean {
 }
 
 /**
- * SVG sprout that grows through 5 stages.
+ * Pure SVG art for one sprout stage.
  * Each stage adds visual elements on top of previous ones.
  *
  * Layout (160×160 viewBox):
@@ -36,7 +37,7 @@ function areFocusSproutPropsEqual(prev: Props, next: Props): boolean {
  *   - Leaves: added at seedling+ stages
  *   - Crown: added at grown stage
  */
-function FocusSproutInner({
+function SproutArt({
   progress,
   stage,
   accentColor = SECTION_COLORS[POMODORO_SECTION_KEY],
@@ -123,6 +124,91 @@ function FocusSproutInner({
           </>
         )}
       </Svg>
+    </View>
+  );
+}
+
+/**
+ * Sprout with a short opacity/scale crossfade between growth stages, so stage
+ * boundaries blend instead of jumping per second. The stem itself still grows
+ * continuously with progress; only the discrete leaf/crown additions fade.
+ * Under reduced motion the current stage renders statically.
+ */
+function FocusSproutInner({
+  progress,
+  stage,
+  accentColor = SECTION_COLORS[POMODORO_SECTION_KEY],
+  size = 160,
+}: Props) {
+  const reducedMotion = useReducedMotion();
+  // The outgoing stage stays mounted underneath while the incoming one fades in.
+  const [layers, setLayers] = useState<{ prev: PlantStage | null; curr: PlantStage }>({
+    prev: null,
+    curr: stage,
+  });
+  const [renderedStage, setRenderedStage] = useState(stage);
+  const [crossfade] = useState(() => new Animated.Value(1));
+
+  // Adjust crossfade state during render when the stage prop advances or the
+  // motion preference changes (React's alternative to syncing state in effects).
+  if (reducedMotion && layers.prev) {
+    setLayers({ prev: null, curr: layers.curr });
+  }
+  if (stage !== renderedStage) {
+    setRenderedStage(stage);
+    setLayers(
+      reducedMotion
+        ? { prev: null, curr: stage }
+        : (current) => (current.curr === stage ? current : { prev: current.curr, curr: stage }),
+    );
+  }
+
+  useEffect(() => {
+    if (!layers.prev || reducedMotion) return;
+    crossfade.setValue(0);
+    const animation = Animated.timing(crossfade, {
+      toValue: 1,
+      duration: MOTION_DURATION.feedback,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    animation.start();
+    const settle = setTimeout(() => {
+      setLayers((current) => (current.prev ? { prev: null, curr: current.curr } : current));
+    }, MOTION_DURATION.feedback);
+    return () => {
+      animation.stop();
+      clearTimeout(settle);
+    };
+  }, [crossfade, layers.prev, reducedMotion]);
+
+  const incomingStyle = layers.prev
+    ? {
+        opacity: crossfade,
+        transform: [
+          { scale: crossfade.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) },
+        ],
+      }
+    : undefined;
+
+  return (
+    <View style={{ width: size, height: size }}>
+      {layers.prev ? (
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <SproutArt
+            progress={progress}
+            stage={layers.prev}
+            accentColor={accentColor}
+            size={size}
+          />
+        </View>
+      ) : null}
+      <Animated.View style={incomingStyle}>
+        <SproutArt progress={progress} stage={layers.curr} accentColor={accentColor} size={size} />
+      </Animated.View>
     </View>
   );
 }
