@@ -8,7 +8,10 @@ import {
 import { TAB_LABELS } from './navigation';
 
 const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
-  overview: 'Overview',
+  // The redesigned Overview dashboard renders no "Overview" heading; its
+  // always-present hero subtitle is the stable per-section marker (the
+  // greeting varies by time of day and cards are user-customizable).
+  overview: 'Your day at a glance across plans, habits, focus, and health.',
   todos: 'Todos',
   habits: 'Habits',
   pomodoro: 'Pomodoro',
