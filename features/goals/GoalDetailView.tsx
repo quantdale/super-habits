@@ -32,9 +32,11 @@ import type { GoalHorizon, GoalStatus } from '@/core/db/types';
 type GoalDetailViewProps = {
   goalId: string | null;
   onBack: () => void;
+  /** Optional hook to open the linked project's detail view (Planning Hub). */
+  onOpenProject?: (projectId: string) => void;
 };
 
-export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
+export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailViewProps) {
   const { tokens } = useAppTheme();
   const isCreate = goalId === null;
   const [title, setTitle] = useState('');
@@ -285,6 +287,19 @@ export function GoalDetailView({ goalId, onBack }: GoalDetailViewProps) {
               </Pressable>
             ))}
           </View>
+          {projectId !== null && onOpenProject ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open linked project"
+              className="mt-2 self-start rounded-full border px-3 py-1.5"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              onPress={() => onOpenProject(projectId)}
+            >
+              <Text className="text-sm" style={{ color: tokens.text }}>
+                Open project →
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 

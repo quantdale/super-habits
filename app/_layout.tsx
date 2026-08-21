@@ -10,6 +10,8 @@ import { NavigationProvider } from '@/core/providers/NavigationProvider';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
+import { UpdateAvailableBanner } from '@/core/ui/UpdateAvailableBanner';
+import { ConnectivityIndicator } from '@/core/ui/ConnectivityIndicator';
 import {
   CommandCenterProvider,
   GlobalCommandCenterHost,
@@ -99,6 +101,8 @@ function ThemedRoot() {
       <Stack screenOptions={{ headerShown: false }} />
       <GlobalCommandCenterHost />
       <InAppNoticeBanner />
+      <UpdateAvailableBanner />
+      <ConnectivityIndicator />
       <HabitReminderResponseHost />
     </>
   );

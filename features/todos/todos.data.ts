@@ -15,6 +15,11 @@ import { createId } from '@/lib/id';
 import { nowIso, toDateKey } from '@/lib/time';
 import { runSyncedMutation } from '@/core/sync/syncedMutation';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
+import {
+  cancelTodoDueReminder,
+  syncTodoDueReminder,
+  type TodoReminderSnapshot,
+} from '@/core/notifications/todoReminderScheduler';
 import { getTomorrowDateKey } from './todos.domain';
 
 export type TodoLinkedActionsDispatchResult = Pick<
@@ -41,6 +46,27 @@ const EMPTY_LINKED_ACTIONS_RESULT: TodoLinkedActionsDispatchResult = {
   matchedRuleCount: 0,
   notices: [],
 };
+
+/**
+ * Device-local due-date reminder sync. Reminder failures must never break a
+ * data write, so every call is best-effort; the scheduler itself is a no-op on
+ * web and respects the notifications preference.
+ */
+async function syncReminderSafely(todo: TodoReminderSnapshot): Promise<void> {
+  try {
+    await syncTodoDueReminder(todo);
+  } catch {
+    // Ignore reminder scheduling failures.
+  }
+}
+
+async function cancelReminderSafely(todoId: string): Promise<void> {
+  try {
+    await cancelTodoDueReminder(todoId);
+  } catch {
+    // Ignore reminder cancellation failures.
+  }
+}
 
 export async function listTodos(): Promise<Todo[]> {
   const db = await getDatabase();
@@ -187,6 +213,10 @@ export async function addTodo(input: {
       return { changed: true, value: undefined };
     },
   });
+
+  if (dueDate) {
+    await syncReminderSafely({ id, title: input.title, dueDate, completedAt: null });
+  }
 
   return id;
 }
@@ -412,6 +442,22 @@ export async function updateTodo(
       return { changed: result.changes === 1, value: undefined };
     },
   });
+
+  // Re-read the row so the reminder reflects the final title/due/completed state.
+  const updated = await db.getFirstAsync<{
+    title: string;
+    due_date: string | null;
+    completed: 0 | 1;
+  }>(`SELECT title, due_date, completed FROM todos WHERE id = ? AND deleted_at IS NULL`, [id]);
+  if (updated) {
+    if (updated.completed === 1) {
+      await cancelReminderSafely(id);
+    } else if (updated.due_date) {
+      await syncReminderSafely({ id, title: updated.title, dueDate: updated.due_date });
+    } else {
+      await cancelReminderSafely(id);
+    }
+  }
 }
 
 export async function listTodoLinkedActionRules(
@@ -597,6 +643,13 @@ async function setTodoCompletion(
     };
   }
 
+  // Keep the device-local due-date reminder in sync with completion state.
+  if (next === 1) {
+    await cancelReminderSafely(current.id);
+  } else if (previous === 1 && current.due_date) {
+    await syncReminderSafely({ id: current.id, title: current.title, dueDate: current.due_date });
+  }
+
   if (next === 1 && current.recurrence === 'daily' && current.recurrence_id) {
     const tomorrow = getTomorrowDateKey();
     const existing = await db.getFirstAsync<{ id: string }>(
@@ -736,6 +789,8 @@ export async function removeTodo(id: string): Promise<void> {
     },
   });
   if (!result.changed) return;
+
+  await cancelReminderSafely(id);
 }
 
 export async function completeTodoFromLinkedAction(
