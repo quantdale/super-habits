@@ -92,7 +92,7 @@ defineJourney({
         // Assert the Overview surfaces reflect those rows.
         await returnToApp(page);
         await switchTab(page, 'overview');
-        await expect(page.getByText('8 pending tasks', { exact: true })).toBeVisible();
+        await expect(page.getByText('8 pending', { exact: true })).toBeVisible();
         await expect(
           page
             .getByText('sessions this year', { exact: true })
@@ -158,7 +158,7 @@ defineJourney({
         // leaked the habit ticks into other cards.
         await returnToApp(page);
         await switchTab(page, 'overview');
-        await expect(page.getByText('8 pending tasks', { exact: true })).toBeVisible();
+        await expect(page.getByText('8 pending', { exact: true })).toBeVisible();
         await expect(
           page
             .getByText('sessions this year', { exact: true })

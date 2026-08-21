@@ -134,7 +134,7 @@ defineJourney({
         // Cold start: fresh navigation, timer starts before the request.
         const t0 = Date.now();
         await page.goto('/', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByText(`${pending} pending tasks`, { exact: true })).toBeVisible({
+        await expect(page.getByText(`${pending} pending`, { exact: true })).toBeVisible({
           timeout: 25_000,
         });
         const coldStartMs = Date.now() - t0;
