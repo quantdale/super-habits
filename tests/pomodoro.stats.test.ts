@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  computeFocusStats,
-  getAbandonNotice,
-} from '@/features/pomodoro/pomodoro.domain';
+import { computeFocusStats, getAbandonNotice } from '@/features/pomodoro/pomodoro.domain';
 import type { PomodoroSession } from '@/core/db/types';
 
 function session(input: {
