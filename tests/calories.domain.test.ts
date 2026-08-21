@@ -333,7 +333,7 @@ describe('normalizeMacroTargets', () => {
       carbs: 200,
       fats: 65,
     });
-    expect(normalizeMacroTargets({ calories: 10_000_000 }).calories).toBe(2000);
+    expect(normalizeMacroTargets({ calories: 10_000_000 })?.calories).toBe(2000);
   });
 });
 
