@@ -476,7 +476,10 @@ export async function retrieveGoalProgressSummary(
       );
     }
     if (matches.length === 0) {
-      throw new AskRetrievalError('goal_not_found', `No active Goal titled "${goalTitle}" was found.`);
+      throw new AskRetrievalError(
+        'goal_not_found',
+        `No active Goal titled "${goalTitle}" was found.`,
+      );
     }
     selected = matches;
   }

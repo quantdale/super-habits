@@ -1,14 +1,18 @@
 import type {
   DraftAiAction,
+  DraftAddTodoToDailyPlan,
   DraftCompleteTodo,
+  DraftCreateProject,
   DraftLogCalorieEntry,
   DraftLogHabit,
   DraftLogWorkoutRoutine,
   DraftStartFocusSession,
+  DraftUpdateGoalProgress,
   DraftWarning,
   ParseCommandInput,
   ParseCommandResult,
 } from './types';
+import { toDateKey } from '@/lib/time';
 
 const DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const CALORIE_PATTERN = /(\d+(?:\.\d+)?)\s*(?:kcal|cal(?:ories)?|cals?)\b/i;
@@ -266,7 +270,7 @@ function parseGoalProgressUpdate(input: ParseCommandInput): DraftUpdateGoalProgr
 function parseDailyPlanAddition(input: ParseCommandInput): DraftAddTodoToDailyPlan | null {
   const text = input.rawText.trim();
   const match = text.match(
-    /^(?:please\s+)?add\s+(.+?)\s+to\s+(?:my\s+)?plan(?:\s+for\s+(today|tomorrow))?$/i,
+    /^(?:please\s+)?add\s+(.+?)\s+to\s+(?:my\s+)?plan(?:\s+(?:for\s+)?(today|tomorrow))?$/i,
   );
   if (!match) return null;
 

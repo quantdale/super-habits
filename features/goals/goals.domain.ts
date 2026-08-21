@@ -191,7 +191,9 @@ export function computeGoalRollup(input: {
 // Progress editing validation
 // ---------------------------------------------------------------------------
 
-export type ProgressParseResult = { ok: true; value: number } | { ok: false; error: string };
+export type ProgressParseResult =
+  | { ok: true; value: number }
+  | { ok: false; error: string };
 
 /** Parse free-text progress input ("42", "42%", " 7 ") into a clamped 0-100 int. */
 export function parseGoalProgressText(text: string): ProgressParseResult {

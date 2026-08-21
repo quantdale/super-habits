@@ -9,10 +9,7 @@ import { type AppSection } from '@/core/providers/navigationContext';
 import { toDateKey } from '@/lib/time';
 import { executeDraftAction } from './command.executor';
 import { commandParser } from './commandParser';
-import {
-  getCommandHistory,
-  recordCommandInvocation,
-} from './commandHistory';
+import { getCommandHistory, recordCommandInvocation } from './commandHistory';
 import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from './commandConfig';
 import { getAiCommandInternalRolloutPreference } from './commandInternalRollout';
 import {

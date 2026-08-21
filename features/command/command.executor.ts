@@ -5,9 +5,18 @@ import type { HabitIcon } from '@/features/habits/types';
 import { isHabitScheduledOn, parseHabitRuleHistory } from '@/features/habits/habits.domain';
 import { completeRoutine, listRoutines } from '@/features/workout/workout.data';
 import { addTodo, completeTodo, listTodos } from '@/features/todos/todos.data';
+import { addProject } from '@/features/projects/projects.data';
+import { listGoals, setGoalProgress } from '@/features/goals/goals.data';
+import { getDailyPlan, setDailyPlanTopTodos } from '@/features/daily-plan/dailyPlan.data';
+import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
+import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
 import { validateHabit, validateTodo } from '@/lib/validation';
 import { timestampToLocalDateKey, toDateKey } from '@/lib/time';
-import { resolveTodoReference, resolveWorkoutRoutineReference } from './command.resolver';
+import {
+  resolveGoalReference,
+  resolveTodoReference,
+  resolveWorkoutRoutineReference,
+} from './command.resolver';
 import { validateCommandDraftFields } from './command.validation';
 import type {
   CommandExecutionResult,

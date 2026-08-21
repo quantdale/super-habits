@@ -1,5 +1,5 @@
-import { Text, View } from 'react-native';
-import { Pressable } from 'react-native';
+import { Text, View, Pressable } from 'react-native';
+
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { TextField } from '@/core/ui/TextField';

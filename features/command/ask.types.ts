@@ -110,7 +110,8 @@ export type DailyOverviewFacts = {
 };
 
 /** Backward-compatible V1 fact shape for legacy tests/clients. */
-export type HabitStreakFacts =  | {
+export type HabitStreakFacts =
+  | {
       scope: 'single';
       habitName: string;
       currentStreak: number;

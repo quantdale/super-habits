@@ -1,8 +1,4 @@
-import type {
-  GoalProgressFacts,
-  ProjectStatusFacts,
-  TodayFocusFacts,
-} from './ask.types';
+import type { GoalProgressFacts, ProjectStatusFacts, TodayFocusFacts } from './ask.types';
 
 /**
  * Deterministic answer formatting for planning Ask questions. Pure functions:
@@ -40,6 +36,8 @@ export function formatTodayFocusAnswer(facts: TodayFocusFacts): string {
   } else {
     parts.push('No top priorities are set for today yet.');
   }
-  parts.push(`${facts.pendingTodoCount} pending Todo${facts.pendingTodoCount === 1 ? '' : 's'} today.`);
+  parts.push(
+    `${facts.pendingTodoCount} pending Todo${facts.pendingTodoCount === 1 ? '' : 's'} today.`,
+  );
   return parts.join(' ');
 }

@@ -46,10 +46,7 @@ describe('features/command/commandHistory (pure reducer)', () => {
     expect(normalizeStoredHistory(null)).toEqual([]);
     expect(normalizedOf([{ rawText: 'x' }, { rawText: 5, at: 'a' }, 'nope'])).toEqual([]);
     expect(
-      normalizedOf([
-        { rawText: 'keep me', at: '2026-04-21T00:00:00Z' },
-        { rawText: 'drop me' },
-      ]),
+      normalizedOf([{ rawText: 'keep me', at: '2026-04-21T00:00:00Z' }, { rawText: 'drop me' }]),
     ).toEqual([{ rawText: 'keep me', at: '2026-04-21T00:00:00Z' }]);
   });
 });

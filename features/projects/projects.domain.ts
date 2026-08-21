@@ -136,7 +136,9 @@ export function computeProjectProgress(input: {
       ? ratio(input.habits.recentCompletions, expectedSlots)
       : null;
 
-  const parts = [todoRatio, goalRatio, habitRatio].filter((r): r is number => r !== null);
+  const parts = [todoRatio, goalRatio, habitRatio].filter(
+    (r): r is number => r !== null,
+  );
   const percent =
     parts.length > 0
       ? clampProgressPercent((parts.reduce((a, b) => a + b, 0) / parts.length) * 100)
@@ -201,7 +203,10 @@ export function filterProjectRows(
   return rows.filter((row) => row.project.status === statusFilter);
 }
 
-export function sortProjectRows(rows: ProjectListRow[], sortKey: ProjectSortKey): ProjectListRow[] {
+export function sortProjectRows(
+  rows: ProjectListRow[],
+  sortKey: ProjectSortKey,
+): ProjectListRow[] {
   const copy = [...rows];
   switch (sortKey) {
     case 'target_date':

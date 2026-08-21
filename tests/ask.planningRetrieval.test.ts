@@ -9,9 +9,7 @@ describe('features/command/planningAsk.domain formatters', () => {
   it('formats a single project status answer', () => {
     const answer = formatProjectStatusAnswer({
       scope: 'single',
-      projects: [
-        { name: 'Apollo', status: 'active', targetDate: '2026-05-01', openTodoCount: 2 },
-      ],
+      projects: [{ name: 'Apollo', status: 'active', targetDate: '2026-05-01', openTodoCount: 2 }],
     });
     expect(answer).toBe('Apollo is active with 2 open Todos. Target date is 2026-05-01.');
   });
@@ -28,9 +26,9 @@ describe('features/command/planningAsk.domain formatters', () => {
   });
 
   it('handles the empty project list', () => {
-    expect(
-      formatProjectStatusAnswer({ scope: 'overall', projects: [] }),
-    ).toBe('No active Projects were found.');
+    expect(formatProjectStatusAnswer({ scope: 'overall', projects: [] })).toBe(
+      'No active Projects were found.',
+    );
   });
 
   it('formats a single goal progress answer', () => {

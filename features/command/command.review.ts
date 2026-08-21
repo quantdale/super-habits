@@ -6,6 +6,7 @@ import {
   parseHabitRuleHistory,
 } from '@/features/habits/habits.domain';
 import { listRoutines } from '@/features/workout/workout.data';
+import { listGoals } from '@/features/goals/goals.data';
 import { listTodos } from '@/features/todos/todos.data';
 import { createId } from '@/lib/id';
 import { timestampToLocalDateKey, toDateKey } from '@/lib/time';
@@ -35,7 +36,11 @@ export type CommandPreview = {
 };
 
 export type CommandReviewResolution =
-  EntityResolution<Todo> | EntityResolution<Habit> | EntityResolution<WorkoutRoutine> | null;
+  | EntityResolution<Todo>
+  | EntityResolution<Habit>
+  | EntityResolution<Goal>
+  | EntityResolution<WorkoutRoutine>
+  | null;
 
 export type CommandReview = {
   draft: DraftAiAction;
@@ -415,7 +420,10 @@ function selectGoalResolution(
 ): EntityResolution<Goal> {
   if (!selectedEntityId || !reference) return resolution;
   const selected = goals.find((goal) => goal.id === selectedEntityId);
-  if (!selected || normalizeEntityReference(selected.title) !== normalizeEntityReference(reference)) {
+  if (
+    !selected ||
+    normalizeEntityReference(selected.title) !== normalizeEntityReference(reference)
+  ) {
     return resolution;
   }
   return { status: 'exact', entity: selected };

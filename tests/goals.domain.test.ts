@@ -121,10 +121,16 @@ describe('filterGoalRows / sortGoalRows', () => {
     expect(
       filterGoalRows(rows, { status: 'active', horizon: 'all' }).map((r) => r.goal.id),
     ).toEqual(['a', 'c']);
+<<<<<<< Updated upstream
+    expect(
+      filterGoalRows(rows, { status: 'all', horizon: 'year' }).map((r) => r.goal.id),
+    ).toEqual(['b', 'c']);
+=======
     expect(filterGoalRows(rows, { status: 'all', horizon: 'year' }).map((r) => r.goal.id)).toEqual([
       'b',
       'c',
     ]);
+>>>>>>> Stashed changes
     expect(
       filterGoalRows(rows, { status: 'completed', horizon: 'year' }).map((r) => r.goal.id),
     ).toEqual(['b']);
@@ -137,12 +143,27 @@ describe('filterGoalRows / sortGoalRows', () => {
       makeRow({ id: 'y', target_date: null }),
       makeRow({ id: 'z', target_date: '2026-06-01' }),
     ];
+<<<<<<< Updated upstream
+    expect(sortGoalRows(dated, 'target_date').map((r) => r.goal.id)).toEqual([
+      'z',
+      'x',
+      'y',
+    ]);
+=======
     expect(sortGoalRows(dated, 'target_date').map((r) => r.goal.id)).toEqual(['z', 'x', 'y']);
+>>>>>>> Stashed changes
   });
 
   it('sorts by title and preserves created order for the created key', () => {
     const titled = [makeRow({ id: '1', title: 'Beta' }), makeRow({ id: '2', title: 'Alpha' })];
+<<<<<<< Updated upstream
+    expect(sortGoalRows(titled, 'title').map((r) => r.goal.title)).toEqual([
+      'Alpha',
+      'Beta',
+    ]);
+=======
     expect(sortGoalRows(titled, 'title').map((r) => r.goal.title)).toEqual(['Alpha', 'Beta']);
+>>>>>>> Stashed changes
     expect(sortGoalRows(titled, 'created').map((r) => r.goal.id)).toEqual(['1', '2']);
   });
 });

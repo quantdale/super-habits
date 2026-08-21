@@ -52,7 +52,10 @@ export async function getCommandHistory(): Promise<CommandHistoryEntry[]> {
   }
 }
 
-export async function recordCommandInvocation(rawText: string, now: Date = new Date()): Promise<void> {
+export async function recordCommandInvocation(
+  rawText: string,
+  now: Date = new Date(),
+): Promise<void> {
   try {
     const current = await getCommandHistory();
     const next = pushCommandHistoryEntry(current, rawText, now.toISOString());
