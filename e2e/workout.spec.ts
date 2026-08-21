@@ -67,9 +67,9 @@ test.describe('Workout', () => {
     await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
     await dialog.getByText('Add', { exact: true }).click({ force: true });
     await expect(dialog.getByText('Start workout', { exact: true })).toBeVisible();
-    await dialog.getByLabel('Active (seconds)').fill('8');
+    await dialog.getByRole('textbox', { name: 'Active (seconds)' }).fill('8');
     // Wait until the shorter timing is committed and reflected back.
-    await expect(dialog.getByLabel('Active (seconds)')).toHaveValue('8', { timeout: 10_000 });
+    await expect(dialog.getByRole('textbox', { name: 'Active (seconds)' })).toHaveValue('8', { timeout: 10_000 });
 
     await dialog.getByText('Start workout', { exact: true }).click({ force: true });
 
@@ -77,8 +77,8 @@ test.describe('Workout', () => {
     // let it time out naturally (Skip would mark the set skipped).
     await expect(page.getByText('Log this set (optional)')).toBeVisible();
     await page.getByText('Start', { exact: true }).first().click();
-    await page.getByLabel('Weight').fill('80');
-    await page.getByLabel('Reps').fill('8');
+    await page.getByRole('textbox', { name: 'Weight' }).fill('80');
+    await page.getByRole('textbox', { name: 'Reps' }).fill('8');
     await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 20_000 });
 
     await page.getByLabel('Notes (optional)').fill('Felt strong');
