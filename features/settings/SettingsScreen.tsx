@@ -31,6 +31,7 @@ import { SettingsCaloriesSection } from '@/features/settings/SettingsCaloriesSec
 import { SettingsCommandSection } from '@/features/settings/SettingsCommandSection';
 import { SettingsDeveloperSection } from '@/features/settings/SettingsDeveloperSection';
 import { SettingsPomodoroSection } from '@/features/settings/SettingsPomodoroSection';
+import { SettingsNotificationsSection } from '@/features/settings/SettingsNotificationsSection';
 import {
   buildCalorieGoalForm,
   buildPomodoroForm,
@@ -372,6 +373,8 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         commandRolloutLoading={commandRolloutLoading}
         onOpenCommandCenter={() => openCommandCenter('overview')}
       />
+
+      <SettingsNotificationsSection />
 
       <SettingsPomodoroSection
         pomodoroSettings={pomodoroSettings}
