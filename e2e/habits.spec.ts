@@ -77,10 +77,10 @@ test.describe('Habits', () => {
     await page.getByLabel('Habit name').fill('Meditate');
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('Meditate').first()).toBeVisible();
-    // Ring is the preceding sibling of the label row (Pressable has no role="button" on RN Web).
+    // Increment via the habit circle's accessible button (stable contract).
     await page
-      .getByText('Meditate', { exact: true })
-      .locator('xpath=preceding-sibling::*[1]')
+      .getByRole('button', { name: /Meditate: \d+ of \d+ today\. Tap to add one/ })
+      .first()
       .click();
     await expect(page.getByText('Meditate').first()).toBeVisible();
   });
@@ -171,17 +171,17 @@ test.describe('Scheduled habits', () => {
     await page.getByText('Weekdays', { exact: true }).click();
     await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
     await page.getByLabel('Exit habit edit mode').click();
-    const habitCard = page.getByText('Study weekdays', { exact: true }).locator('..');
-    await expect(habitCard.getByText('Weekdays', { exact: true })).toBeVisible();
+    // Scope to the Habit groups region: only one habit exists here, so the
+    // schedule label is unambiguous (card DOM nests name and schedule as
+    // siblings since the wave-v2 row redesign).
+    const groupsRegion = page.getByLabel('Habit groups');
+    await expect(groupsRegion.getByText('Weekdays', { exact: true })).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'habits');
     await expect(
-      page
-        .getByText('Study weekdays', { exact: true })
-        .locator('..')
-        .getByText('Weekdays', { exact: true }),
+      page.getByLabel('Habit groups').getByText('Weekdays', { exact: true }),
     ).toBeVisible();
   });
 
@@ -243,7 +243,11 @@ test.describe('Scheduled habits', () => {
     await expect(page.getByText('Save changes', { exact: true })).toBeHidden({
       timeout: 10_000,
     });
-    await expect(page.getByText('Read target history', { exact: true })).toBeVisible();
+    // Scope to the Habit groups region: the Overview habits card link shares
+    // the same text and would trip strict mode.
+    await expect(
+      page.getByLabel('Habit groups').getByText('Read target history', { exact: true }),
+    ).toBeVisible();
 
     await expectRows(page, "SELECT count FROM habit_completions WHERE date_key = '2026-08-10'", [
       { count: 1 },

@@ -124,7 +124,7 @@ async function loadSummaries(): Promise<OverviewSummaries> {
 }
 
 export function OverviewScreen({ isActive }: { isActive: boolean }) {
-  const { openPlanningHub, setActiveSection } = useAppNavigation();
+  const { openPlanningHub, setActiveSection, openSettings } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
 
@@ -271,6 +271,25 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                   style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
                 >
                   {isCustomizing ? 'Done' : 'Customize'}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open settings"
+                onPress={openSettings}
+                className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
+                style={{ backgroundColor: tokens.surfaceElevated }}
+              >
+                <MaterialIcons
+                  name="settings"
+                  size={18}
+                  color={sectionAccents[POMODORO_SECTION_KEY].text}
+                />
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                >
+                  Settings
                 </Text>
               </Pressable>
               <Pressable

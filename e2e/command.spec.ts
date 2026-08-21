@@ -101,7 +101,9 @@ test.describe('Command shell', () => {
     }
     await expect(launcher).toHaveCount(0);
 
-    await page.getByText('Reset', { exact: true }).click({ force: true });
+    // The reset control's label is 'Reset (not logged)' while the focus
+    // session is under a minute (wave-v2 abandon/rename semantics).
+    await page.getByRole('button', { name: /^Reset \(not logged\)$/ }).click({ force: true });
     await expect(page.getByText('Start focus', { exact: true })).toBeVisible();
     await expect(launcher).toBeVisible();
   });
