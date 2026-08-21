@@ -9,6 +9,9 @@ export type TimeOfDay = { hour: number; minute: number };
 
 export const TODO_REMINDER_DEFAULT_LEAD_MINUTES = 0;
 
+/** Fixed (non-cumulative) snooze delay for todo due-date reminders. */
+export const TODO_REMINDER_SNOOZE_MINUTES = 15;
+
 /** Parses a strict local `HH:mm` (24h) string. Returns null when malformed. */
 export function parseTimeOfDay(value: string | null | undefined): TimeOfDay | null {
   if (!value) return null;
@@ -41,6 +44,27 @@ export function normalizeTimeOfDayInput(value: string): string | null {
 /** Stable scheduled-notification identifier for one todo's due reminder. */
 export function todoReminderIdentifier(todoId: string): string {
   return `todo-reminder:${todoId}`;
+}
+
+/**
+ * Stable identifier for a todo's snooze replacement. Unlike the base
+ * identifier it is not occurrence-scoped: at most one live snooze per todo.
+ */
+export function getTodoReminderSnoozeIdentifier(todoId: string): string {
+  return `todo-reminder-snooze:${todoId}`;
+}
+
+/**
+ * Dedupe key for one delivered todo reminder action. `occurrenceId` embeds the
+ * fire time (`todo-reminder:{todoId}:{fireAtMs}`), so every reschedule opens a
+ * fresh claim namespace and a completed-then-reopened todo can be marked done
+ * again from its next reminder.
+ */
+export function getTodoReminderActionKey(
+  occurrenceId: string,
+  action: 'todo_reminder_mark_done' | 'todo_reminder_snooze',
+): string {
+  return `${occurrenceId}:${action}`;
 }
 
 /** Stable identifier for the single repeating daily-plan reminder. */

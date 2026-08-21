@@ -149,6 +149,9 @@ async function runSnooze(
     const valid = Boolean(
       habit &&
       parsedTime &&
+      // Paused/archived habits have no obligations; a snooze would only
+      // re-arm a reminder the planner excludes.
+      (habit.status ?? 'active') === 'active' &&
       input.dateKey === currentDateKey &&
       toDateKey(fireAt) === input.dateKey &&
       isHabitScheduledOn(

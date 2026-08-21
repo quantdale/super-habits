@@ -1,4 +1,5 @@
 import { dateKeyToLocalDate, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import type { HabitLifecycleStatus } from '@/core/db/types';
 import {
   getHabitTargetForDate,
   isHabitScheduledOn,
@@ -42,6 +43,8 @@ export type HabitReminderHabit = {
   created_at: string;
   deleted_at: string | null;
   rule_history?: HabitRuleHistoryInput;
+  /** Durable lifecycle status (migration 20); absent in legacy rows = 'active'. */
+  status?: HabitLifecycleStatus;
 };
 
 export type HabitReminderCompletion = {
@@ -164,6 +167,8 @@ export function buildHabitReminderPlan({
 
   for (const habit of habits) {
     if (habit.deleted_at !== null) continue;
+    // A paused/archived habit has no obligations: no reminders for any date.
+    if ((habit.status ?? 'active') !== 'active') continue;
     const parsedTime = parseHabitReminderTime(habit.reminder_time);
     if (!parsedTime) continue;
 

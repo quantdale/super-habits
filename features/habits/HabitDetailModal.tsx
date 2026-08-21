@@ -13,6 +13,7 @@ import {
   buildDayCompletions,
   calculateCurrentStreak,
   calculateLongestStreak,
+  habitCreationDateKey,
 } from './habits.domain';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { toDateKey } from '@/lib/time';
@@ -21,8 +22,6 @@ type Props = {
   habit: Habit | null;
   onClose: () => void;
   onOpenInsights?: (habit: Habit) => void;
-  /** Current local lifecycle state of the habit (device-local preference). */
-  lifecycleState?: 'active' | 'paused' | 'archived';
   onTogglePause?: () => void;
   onToggleArchive?: () => void;
 };
@@ -30,13 +29,13 @@ type Props = {
 /**
  * Per-habit history surface: completion heatmap plus current/best streak and
  * 30-day consistency. Read-only; all computation is delegated to the pure
- * domain helpers in habits.domain.ts.
+ * domain helpers in habits.domain.ts. Lifecycle state comes from the durable
+ * row (`habits.status`, migration 20).
  */
 export function HabitDetailModal({
   habit,
   onClose,
   onOpenInsights,
-  lifecycleState = 'active',
   onTogglePause,
   onToggleArchive,
 }: Props) {
@@ -67,6 +66,8 @@ export function HabitDetailModal({
     };
   }, [habit]);
 
+  const lifecycleState = habit?.status ?? 'active';
+
   const stats = useMemo(() => {
     if (!habit) return null;
     const todayKey = toDateKey();
@@ -75,8 +76,9 @@ export function HabitDetailModal({
       habit.target_per_day,
       undefined,
       habit.rule_history,
-      undefined,
+      habitCreationDateKey(habit.created_at),
       todayKey,
+      habit.lifecycle_history,
     );
     const currentStreak = calculateCurrentStreak(dayCompletions, todayKey);
     const bestStreak = calculateLongestStreak(dayCompletions);
@@ -156,7 +158,7 @@ export function HabitDetailModal({
               </Text>
               <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
                 Paused habits keep their history but are hidden from the active list. Archived
-                habits are kept out of sight until restored. These states are stored on this device.
+                habits are kept out of sight until restored. This state is saved with your backup.
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {onTogglePause ? (

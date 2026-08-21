@@ -84,11 +84,15 @@ async function loadTodoCandidates(): Promise<LinkedActionTargetPickerCandidate[]
 
 async function loadHabitCandidates(): Promise<LinkedActionTargetPickerCandidate[]> {
   const habits = await listHabits();
-  return habits.map((habit) => ({
-    id: habit.id,
-    title: habit.name,
-    subtitle: `${capitalizeLabel(habit.category)} · target ${habit.target_per_day}/day`,
-  }));
+  // Paused/archived habits are not actionable targets: effects would increment
+  // a habit the user explicitly benched.
+  return habits
+    .filter((habit) => (habit.status ?? 'active') === 'active')
+    .map((habit) => ({
+      id: habit.id,
+      title: habit.name,
+      subtitle: `${capitalizeLabel(habit.category)} · target ${habit.target_per_day}/day`,
+    }));
 }
 
 async function loadWorkoutRoutineCandidates(): Promise<LinkedActionTargetPickerCandidate[]> {

@@ -1,6 +1,12 @@
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
-import { Habit, HabitCategory, HabitCompletion, HabitIcon } from '@/core/db/types';
+import {
+  Habit,
+  HabitCategory,
+  HabitCompletion,
+  HabitIcon,
+  HabitLifecycleStatus,
+} from '@/core/db/types';
 import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type {
   LinkedActionEffectAdapterResult,
@@ -30,12 +36,14 @@ import {
 } from '@/features/habits/notificationActions.data';
 import {
   ALL_HABIT_WEEKDAYS,
+  applyHabitLifecycleTransition,
   buildInitialHabitRule,
   createHabitRule,
   getHabitRuleForDate,
   getHabitTargetForDate,
   isHabitScheduledOn,
   parseHabitRuleHistory,
+  serializeHabitLifecycleHistory,
   serializeHabitRuleHistory,
   upsertHabitRule,
   type HabitRule,
@@ -304,8 +312,9 @@ async function runCompleteHabitFromNotification(input: {
       target_per_day: number;
       created_at: string;
       rule_history: string | null;
+      status: string | null;
     }>(
-      `SELECT id, name, target_per_day, created_at, rule_history
+      `SELECT id, name, target_per_day, created_at, rule_history, status
        FROM habits
        WHERE id = ?
          AND deleted_at IS NULL`,
@@ -329,7 +338,9 @@ async function runCompleteHabitFromNotification(input: {
     }
 
     const todayKey = toDateKey(now);
-    if (!habit || input.dateKey !== todayKey) {
+    // A paused/archived habit must not be completed from a stale reminder:
+    // consume the claim as a no-op and clear the linked-action requirement.
+    if (!habit || input.dateKey !== todayKey || (habit.status ?? 'active') !== 'active') {
       await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
       return;
     }
@@ -715,6 +726,79 @@ export async function setHabitProjectGoal(
       return { changed: result.changes === 1, value: undefined };
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Durable lifecycle transitions (migration 20: habits.status + lifecycle_history)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared write path for pause/resume/archive/unarchive. The status column is
+ * authoritative; every transition also appends/closes intervals in the
+ * lifecycle_history JSON so historical paused/archived dates can be masked in
+ * streak/consistency math. The row update and its backup outbox intent land in
+ * one transaction via runBackupMutation.
+ */
+async function setHabitLifecycleStatus(
+  habitId: string,
+  nextStatus: HabitLifecycleStatus,
+  dateKey: string,
+): Promise<boolean> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const result = await runBackupMutation<boolean>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const current = await transactionDb.getFirstAsync<{
+        status: string | null;
+        lifecycle_history: string | null;
+      }>('SELECT status, lifecycle_history FROM habits WHERE id = ? AND deleted_at IS NULL', [
+        habitId,
+      ]);
+      if (!current) return { changed: false, value: false };
+
+      const currentStatus = (current.status ?? 'active') as HabitLifecycleStatus;
+      if (currentStatus === nextStatus) return { changed: false, value: false };
+
+      const nextHistory = applyHabitLifecycleTransition(
+        current.lifecycle_history,
+        nextStatus,
+        dateKey,
+      );
+      const mutation = await transactionDb.runAsync(
+        'UPDATE habits SET status = ?, lifecycle_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [nextStatus, serializeHabitLifecycleHistory(nextHistory), now, habitId],
+      );
+      if (mutation.changes !== 1) return { changed: false, value: false };
+      enqueue({ entity: 'habits', id: habitId, updatedAt: now, operation: 'update' });
+      return { changed: true, value: true };
+    },
+  });
+  if (result.value) requestHabitReminderReconciliation();
+  return result.value;
+}
+
+/** Pause from today (inclusive): the habit owes nothing until resumed. */
+export async function pauseHabit(habitId: string, dateKey = toDateKey()): Promise<boolean> {
+  return setHabitLifecycleStatus(habitId, 'paused', dateKey);
+}
+
+/** Resume a paused habit from today (inclusive); closes the open pause interval. */
+export async function resumeHabit(habitId: string, dateKey = toDateKey()): Promise<boolean> {
+  return setHabitLifecycleStatus(habitId, 'active', dateKey);
+}
+
+/**
+ * Archive from today (inclusive). Any open pause interval is closed first so
+ * paused/archived states stay exclusive.
+ */
+export async function archiveHabit(habitId: string, dateKey = toDateKey()): Promise<boolean> {
+  return setHabitLifecycleStatus(habitId, 'archived', dateKey);
+}
+
+/** Restore an archived habit to active; closes the open archive interval. */
+export async function unarchiveHabit(habitId: string, dateKey = toDateKey()): Promise<boolean> {
+  return setHabitLifecycleStatus(habitId, 'active', dateKey);
 }
 
 export async function listHabitLinkedActionRules(

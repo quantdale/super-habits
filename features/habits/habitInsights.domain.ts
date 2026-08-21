@@ -3,9 +3,10 @@ import {
   buildDayCompletions,
   calculateCurrentStreak,
   calculateLongestStreak,
+  habitCreationDateKey,
   type DayCompletion,
 } from './habits.domain';
-import { dateKeyToLocalDate, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
 
 export type HabitInsightWindowDays = 7 | 30 | 90;
 
@@ -45,11 +46,6 @@ export type HabitProgressInsights = {
 const TREND_WINDOW_DAYS = 7;
 const TREND_MINIMUM_OCCURRENCES = 2;
 const TREND_DELTA_THRESHOLD = 10;
-
-function creationDateKeyFromTimestamp(timestamp: string | undefined): string | undefined {
-  if (!timestamp || Number.isNaN(new Date(timestamp).getTime())) return undefined;
-  return timestampToLocalDateKey(timestamp);
-}
 
 function startDateKeyForWindow(endDateKey: string, windowDays: number): string {
   const start = dateKeyToLocalDate(endDateKey);
@@ -138,7 +134,7 @@ export function calculateHabitProgressInsights(
 ): HabitProgressInsights | null {
   if (habit.deleted_at !== null) return null;
 
-  const creationDateKey = creationDateKeyFromTimestamp(habit.created_at);
+  const creationDateKey = habitCreationDateKey(habit.created_at);
   const days = buildDayCompletions(
     completions,
     habit.target_per_day,
@@ -146,6 +142,8 @@ export function calculateHabitProgressInsights(
     habit.rule_history,
     creationDateKey,
     todayKey,
+    // Paused/archived intervals leave insight denominators entirely.
+    habit.lifecycle_history,
   );
   const last7Days = daysForTrailingWindow(days, todayKey, 7);
   const last30Days = daysForTrailingWindow(days, todayKey, 30);

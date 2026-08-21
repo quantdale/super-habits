@@ -27,6 +27,11 @@ import {
   completeHabitReminderAction,
   snoozeHabitReminderAction,
 } from '@/features/habits/habitReminderActions';
+import {
+  completeTodoReminderAction,
+  snoozeTodoReminderAction,
+} from '@/core/notifications/todoReminderActions';
+import { TodoReminderHost } from '@/core/notifications/TodoReminderHost';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 
 /**
@@ -103,14 +108,20 @@ function ThemedRoot() {
       <InAppNoticeBanner />
       <UpdateAvailableBanner />
       <ConnectivityIndicator />
-      <HabitReminderResponseHost />
+      <NotificationResponseHost />
+      <TodoReminderHost />
     </>
   );
 }
 
-function HabitReminderResponseHost() {
+/**
+ * Single app-level response entrypoint for BOTH reminder kinds. Every
+ * classified response runs inside one serialized queue; unknown responses are
+ * fingerprint-recorded and cleared without action.
+ */
+function NotificationResponseHost() {
   const { authBootstrapReady } = useAppBootstrapState();
-  const { openHabit } = useAppNavigation();
+  const { openHabit, setActiveSection } = useAppNavigation();
   const { showNotice } = useInAppNotices();
   const handledFingerprints = useRef<string[]>([]);
   const responseQueue = useRef(Promise.resolve());
@@ -136,6 +147,16 @@ function HabitReminderResponseHost() {
               await snoozeHabitReminderAction(input);
               openHabit(input.habitId);
             },
+            openTodo: () => setActiveSection('todos'),
+            markDone: async (input) => {
+              const result = await completeTodoReminderAction(input);
+              for (const notice of result.linkedActions.notices) showNotice(notice);
+              setActiveSection('todos');
+            },
+            snoozeTodo: async (input) => {
+              await snoozeTodoReminderAction(input);
+              setActiveSection('todos');
+            },
           });
         } catch (error) {
           console.error('[notifications] response dispatch failed', error);
@@ -149,7 +170,7 @@ function HabitReminderResponseHost() {
       });
       responseQueue.current = task.catch(() => undefined);
     },
-    [openHabit, showNotice],
+    [openHabit, setActiveSection, showNotice],
   );
 
   useEffect(() => {

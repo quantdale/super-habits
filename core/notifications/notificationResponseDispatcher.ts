@@ -8,6 +8,12 @@ import {
   getHabitReminderIdentifier,
   isHabitReminderDateKey,
 } from '@/features/habits/habitReminders.domain';
+import {
+  TODO_REMINDER_DATA_KIND,
+  TODO_REMINDER_MARK_DONE_ACTION,
+  TODO_REMINDER_SNOOZE_ACTION,
+} from '@/lib/notificationConstants';
+import { getTodoReminderActionKey, todoReminderIdentifier } from './reminderPlanning';
 
 const DEFAULT_ACTION_IDENTIFIER = 'expo.modules.notifications.actions.DEFAULT';
 
@@ -24,8 +30,21 @@ export type HabitReminderResponse = {
   snoozed: boolean;
 };
 
+export type TodoReminderResponseAction = 'open' | 'mark_done' | 'snooze';
+
+export type TodoReminderResponse = {
+  kind: 'todo-reminder';
+  action: TodoReminderResponseAction;
+  actionIdentifier: string;
+  todoId: string;
+  /** Fire-time-scoped claim namespace; falls back to the legacy per-todo id. */
+  occurrenceId: string;
+  notificationIdentifier: string;
+  snoozed: boolean;
+};
+
 export type ClassifiedNotificationResponse =
-  HabitReminderResponse | { kind: 'pomodoro' | 'unknown'; actionIdentifier: string };
+  HabitReminderResponse | TodoReminderResponse | { kind: 'unknown'; actionIdentifier: string };
 
 export type NotificationResponseHandlers = {
   openHabit: (habitId: string) => void;
@@ -41,6 +60,9 @@ export type NotificationResponseHandlers = {
     actionKey: string;
     occurrenceId: string;
   }) => Promise<void>;
+  openTodo: (todoId: string) => void;
+  markDone: (input: { todoId: string; actionKey: string; occurrenceId: string }) => Promise<void>;
+  snoozeTodo: (input: { todoId: string; actionKey: string; occurrenceId: string }) => Promise<void>;
 };
 
 export function classifyNotificationResponse(
@@ -49,11 +71,43 @@ export function classifyNotificationResponse(
   const data = getNotificationResponseData(response);
   const actionIdentifier = response?.actionIdentifier ?? '';
 
-  if (data?.kind !== HABIT_REMINDER_DATA_KIND) {
+  if (data?.kind === TODO_REMINDER_DATA_KIND) {
+    const todoId = data.todoId;
+    if (typeof todoId !== 'string' || todoId.length === 0) {
+      return { kind: 'unknown', actionIdentifier };
+    }
+
+    // Unknown actions are not treated as body taps. This prevents a future or
+    // malformed action from opening the app or mutating a todo by accident.
+    const action: TodoReminderResponseAction | null =
+      actionIdentifier === TODO_REMINDER_MARK_DONE_ACTION
+        ? 'mark_done'
+        : actionIdentifier === TODO_REMINDER_SNOOZE_ACTION
+          ? 'snooze'
+          : actionIdentifier === DEFAULT_ACTION_IDENTIFIER || actionIdentifier.length === 0
+            ? 'open'
+            : null;
+    if (action === null) return { kind: 'unknown', actionIdentifier };
+
     return {
-      kind: data?.kind === 'pomodoro' ? 'pomodoro' : 'unknown',
+      kind: 'todo-reminder',
+      action,
       actionIdentifier,
+      todoId,
+      occurrenceId:
+        typeof data.occurrenceId === 'string' && data.occurrenceId.length > 0
+          ? data.occurrenceId
+          : // Legacy V1 payloads carry no occurrence; derive the stable
+            // per-todo identifier so they keep working until the next
+            // reschedule replaces them.
+            todoReminderIdentifier(todoId),
+      notificationIdentifier: response?.notification.request.identifier ?? '',
+      snoozed: data.snoozed === true,
     };
+  }
+
+  if (data?.kind !== HABIT_REMINDER_DATA_KIND) {
+    return { kind: 'unknown', actionIdentifier };
   }
 
   const habitId = data.habitId;
@@ -114,6 +168,29 @@ export async function dispatchNotificationResponse(
   handlers: NotificationResponseHandlers,
 ): Promise<ClassifiedNotificationResponse> {
   const classified = classifyNotificationResponse(response);
+
+  if (classified.kind === 'todo-reminder') {
+    if (classified.action === 'open') {
+      handlers.openTodo(classified.todoId);
+    } else if (classified.action === 'mark_done') {
+      await handlers.markDone({
+        todoId: classified.todoId,
+        actionKey: getTodoReminderActionKey(
+          classified.occurrenceId,
+          TODO_REMINDER_MARK_DONE_ACTION,
+        ),
+        occurrenceId: classified.occurrenceId,
+      });
+    } else if (classified.action === 'snooze') {
+      await handlers.snoozeTodo({
+        todoId: classified.todoId,
+        actionKey: getTodoReminderActionKey(classified.occurrenceId, TODO_REMINDER_SNOOZE_ACTION),
+        occurrenceId: classified.occurrenceId,
+      });
+    }
+    return classified;
+  }
+
   if (classified.kind !== 'habit-reminder') return classified;
 
   if (classified.action === 'open') {

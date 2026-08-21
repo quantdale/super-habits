@@ -13,6 +13,7 @@ import { LinkedActionsEditorSection } from '@/core/linked-actions/LinkedActionsE
 import { buildLinkedActionEditorRowsFromRules } from '@/core/linked-actions/linkedActionsEditor.adapter';
 import { TODO_LINKED_ACTIONS_EDITOR_CONFIG } from '@/core/linked-actions/linkedActionsEditor.config';
 import { createSaveLinkedActionRuleInputFromEditorRow } from '@/core/linked-actions/linkedActionsEditor.model';
+import { createLinkedActionsNotice } from '@/core/linked-actions/linkedActionsNotice';
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
@@ -365,11 +366,26 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const runBulkAction = useCallback(
     async (action: () => Promise<unknown>) => {
-      await action();
-      exitSelectionMode();
-      void refresh();
+      try {
+        await action();
+      } catch (error) {
+        // A failed bulk edit must never strand the screen in selection mode
+        // with stale rows or escape as an unhandled rejection.
+        showNotice(
+          createLinkedActionsNotice({
+            message:
+              error instanceof Error ? error.message : 'Bulk action failed. Please try again.',
+            reason: 'bulk_action_failed',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+      } finally {
+        exitSelectionMode();
+        void refresh();
+      }
     },
-    [exitSelectionMode, refresh],
+    [exitSelectionMode, refresh, showNotice],
   );
 
   const handleBulkComplete = useCallback(

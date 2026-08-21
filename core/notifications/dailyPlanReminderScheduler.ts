@@ -20,7 +20,7 @@ import { getTodoRemindersEnabled, getDailyPlanReminderTime } from './notificatio
 export type DailyPlanReminderSyncResult =
   | { status: 'scheduled'; identifier: string; hour: number; minute: number }
   | { status: 'cancelled' }
-  | { status: 'skipped'; reason: 'disabled' | 'web' };
+  | { status: 'skipped'; reason: 'disabled' | 'web' | 'permission-denied' };
 
 export async function syncDailyPlanReminder(): Promise<DailyPlanReminderSyncResult> {
   if (Platform.OS === 'web') return { status: 'skipped', reason: 'web' };
@@ -43,6 +43,11 @@ export async function syncDailyPlanReminder(): Promise<DailyPlanReminderSyncResu
     hour: time.hour,
     minute: time.minute,
   });
-  if (!scheduled) return { status: 'skipped', reason: 'web' };
+  // Distinguish "impossible on this platform" from "blocked by the user"
+  // instead of misreporting native permission denial as web (audit F5).
+  if (scheduled === 'permission-denied') {
+    return { status: 'skipped', reason: 'permission-denied' };
+  }
+  if (!scheduled || scheduled === 'web') return { status: 'skipped', reason: 'web' };
   return { status: 'scheduled', identifier: scheduled, hour: time.hour, minute: time.minute };
 }

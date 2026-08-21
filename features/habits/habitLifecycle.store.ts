@@ -1,16 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { archiveHabit, listHabits, pauseHabit } from '@/features/habits/habits.data';
 
 /**
- * Local (device-only) habit lifecycle preference sets. Habits have no
- * paused/archived columns in the frozen v15 schema, so pause/archive is a
- * local UI-layer state: archived habits are hidden from the default list and
- * paused habits stay visible but are excluded from "today" progress.
+ * One-time migration of the pre-v20 habit lifecycle preference sets.
+ *
+ * Pause/archive used to be device-local id arrays under
+ * `superhabits.habits.pausedIds` / `.archivedIds`. Migration 20 made lifecycle
+ * state durable (`habits.status` + `habits.lifecycle_history`, synced with the
+ * backup), so this module only imports the legacy sets into the columns once
+ * and then retires the keys. It never reads them again afterwards.
  */
 
 const PAUSED_IDS_KEY = 'superhabits.habits.pausedIds';
 const ARCHIVED_IDS_KEY = 'superhabits.habits.archivedIds';
+const LEGACY_LIFECYCLE_KEYS = [PAUSED_IDS_KEY, ARCHIVED_IDS_KEY];
 
-async function readIdSet(key: string): Promise<string[]> {
+async function readLegacyIdSet(key: string): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(key);
     if (!raw) return [];
@@ -22,25 +27,51 @@ async function readIdSet(key: string): Promise<string[]> {
   }
 }
 
-async function writeIdSet(key: string, ids: readonly string[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(key, JSON.stringify(ids));
-  } catch {
-    // Preference write failures must never break the habit flow.
+let importPromise: Promise<void> | null = null;
+
+/**
+ * Import the legacy AsyncStorage pause/archive sets into the durable status
+ * column. Idempotent: the keys are removed after a successful import so later
+ * calls are no-ops, re-importing an already-transitioned habit is a no-op at
+ * the data layer, and a failed import retries on the next call instead of
+ * dropping the user's intent.
+ */
+export function migrateLegacyHabitLifecycle(): Promise<void> {
+  importPromise ??= runLegacyHabitLifecycleImport().catch((error: unknown) => {
+    // Allow a later refresh to retry; nothing was retired from AsyncStorage.
+    importPromise = null;
+    console.error('Legacy habit lifecycle import failed:', error);
+  });
+  return importPromise;
+}
+
+async function runLegacyHabitLifecycleImport(): Promise<void> {
+  const [pausedIds, archivedIds] = await Promise.all([
+    readLegacyIdSet(PAUSED_IDS_KEY),
+    readLegacyIdSet(ARCHIVED_IDS_KEY),
+  ]);
+  if (pausedIds.length === 0 && archivedIds.length === 0) {
+    await removeLegacyKeys();
+    return;
   }
+
+  const liveIds = new Set((await listHabits()).map((habit) => habit.id));
+  const archivedSet = new Set(archivedIds);
+  // Legacy archiving cleared an active pause, so apply archives first and skip
+  // ids present in both sets (archive closes any open pause anyway).
+  for (const habitId of archivedIds) {
+    if (liveIds.has(habitId)) await archiveHabit(habitId);
+  }
+  for (const habitId of pausedIds) {
+    if (liveIds.has(habitId) && !archivedSet.has(habitId)) await pauseHabit(habitId);
+  }
+  await removeLegacyKeys();
 }
 
-export function loadHabitLifecycleSets(): Promise<{ pausedIds: string[]; archivedIds: string[] }> {
-  return (async () => ({
-    pausedIds: await readIdSet(PAUSED_IDS_KEY),
-    archivedIds: await readIdSet(ARCHIVED_IDS_KEY),
-  }))();
-}
-
-export function saveHabitPausedIds(ids: readonly string[]): Promise<void> {
-  return writeIdSet(PAUSED_IDS_KEY, ids);
-}
-
-export function saveHabitArchivedIds(ids: readonly string[]): Promise<void> {
-  return writeIdSet(ARCHIVED_IDS_KEY, ids);
+async function removeLegacyKeys(): Promise<void> {
+  try {
+    await Promise.all(LEGACY_LIFECYCLE_KEYS.map((key) => AsyncStorage.removeItem(key)));
+  } catch {
+    // Removal failures only cost one redundant (no-op) import next launch.
+  }
 }

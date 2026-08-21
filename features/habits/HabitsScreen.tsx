@@ -31,14 +31,17 @@ import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import type { Habit, HabitCategory, HabitIcon } from './types';
 import {
   addHabit,
+  archiveHabit,
   decrementHabit,
   deleteHabit,
   getAllHabitCompletions,
-  getAllHabitCompletionsForRange,
   incrementHabit,
   listHabitLinkedActionRules,
   listHabits,
+  pauseHabit,
+  resumeHabit,
   saveHabitLinkedActionRules,
+  unarchiveHabit,
   updateHabit,
 } from '@/features/habits/habits.data';
 import {
@@ -54,20 +57,16 @@ import {
   formatHabitSchedule,
   getHabitRuleForDate,
   getHabitSchedulePreset,
+  habitCreationDateKey,
   isHabitScheduledOn,
   normalizeHabitWeekdays,
   sortHabits,
-  toggleHabitLifecycleId,
   type HabitSchedulePreset,
   type HabitSortMode,
   type HabitStatusFilter,
   type HabitWeekday,
 } from '@/features/habits/habits.domain';
-import {
-  loadHabitLifecycleSets,
-  saveHabitArchivedIds,
-  saveHabitPausedIds,
-} from '@/features/habits/habitLifecycle.store';
+import { migrateLegacyHabitLifecycle } from '@/features/habits/habitLifecycle.store';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { HabitCircle } from '@/features/habits/HabitCircle';
 import { HabitsOverviewGrid } from '@/features/habits/HabitsOverviewGrid';
@@ -172,56 +171,24 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [linkedActionRows, setLinkedActionRows] = useState<LinkedActionEditorRowDraft[]>([]);
   const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
-  const [pausedHabitIds, setPausedHabitIds] = useState<string[]>([]);
-  const [archivedHabitIds, setArchivedHabitIds] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<HabitStatusFilter>('active');
   const [sortMode, setSortMode] = useState<HabitSortMode>('default');
   const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
 
   const displayedHabits = useMemo(
-    () =>
-      sortHabits(
-        filterHabits(habits, { status: statusFilter }, pausedHabitIds, archivedHabitIds),
-        sortMode,
-        streakMap,
-      ),
-    [habits, statusFilter, pausedHabitIds, archivedHabitIds, sortMode, streakMap],
-  );
-
-  const handleTogglePause = useCallback(
-    async (habitId: string) => {
-      const next = toggleHabitLifecycleId(pausedHabitIds, habitId);
-      setPausedHabitIds(next);
-      await saveHabitPausedIds(next);
-    },
-    [pausedHabitIds],
-  );
-
-  const handleToggleArchive = useCallback(
-    async (habitId: string) => {
-      const nextArchived = toggleHabitLifecycleId(archivedHabitIds, habitId);
-      setArchivedHabitIds(nextArchived);
-      await saveHabitArchivedIds(nextArchived);
-      // Archiving also clears an active pause so the states stay exclusive.
-      if (nextArchived.includes(habitId) && pausedHabitIds.includes(habitId)) {
-        const nextPaused = pausedHabitIds.filter((id) => id !== habitId);
-        setPausedHabitIds(nextPaused);
-        await saveHabitPausedIds(nextPaused);
-      }
-    },
-    [archivedHabitIds, pausedHabitIds],
+    () => sortHabits(filterHabits(habits, { status: statusFilter }), sortMode, streakMap),
+    [habits, statusFilter, sortMode, streakMap],
   );
 
   const refresh = useCallback(async () => {
-    const [list, lifecycle] = await Promise.all([
-      listHabits(),
-      loadHabitLifecycleSets().catch(() => ({ pausedIds: [], archivedIds: [] })),
-    ]);
+    // One-time import of the pre-v20 AsyncStorage pause/archive sets.
+    await migrateLegacyHabitLifecycle();
+    const list = await listHabits();
     setHabits(list);
     setHabitsLoaded(true);
-    setPausedHabitIds(lifecycle.pausedIds);
-    setArchivedHabitIds(lifecycle.archivedIds);
     const todayKey = toDateKey();
+    // F13: one full completion scan feeds today counts, streaks (full
+    // history), and the 364-day grid slice — no second overlapping query.
     const allHabitCompletions = await getAllHabitCompletions();
     const completionsByHabit = new Map<string, typeof allHabitCompletions>();
     const todayCounts = new Map<string, number>();
@@ -245,8 +212,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         habit.target_per_day,
         undefined,
         habit.rule_history,
-        undefined,
+        habitCreationDateKey(habit.created_at),
         todayKey,
+        habit.lifecycle_history,
       );
       streaks[habit.id] = calculateCurrentStreak(dayCompletions, todayKey);
     }
@@ -255,9 +223,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     const start364 = new Date();
     start364.setDate(start364.getDate() - 363);
     const startKey = toDateKey(start364);
-    const endKey = toDateKey(new Date());
 
-    const allCompletions = await getAllHabitCompletionsForRange(startKey, endKey);
+    const gridCompletions = allHabitCompletions.filter(
+      (completion) => completion.date_key >= startKey,
+    );
     const gridBuilt = buildHabitGrid(
       list.map((h) => ({
         id: h.id,
@@ -266,9 +235,11 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         target_per_day: h.target_per_day,
         rule_history: h.rule_history,
         created_at: h.created_at,
+        lifecycle_history: h.lifecycle_history,
       })),
-      allCompletions,
+      gridCompletions,
       364,
+      todayKey,
     );
     const pct = calculateOverallConsistency(gridBuilt);
     const nextHeatmapDays = buildAggregatedHabitHeatmap(gridBuilt, 364);
@@ -282,6 +253,30 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   }, []);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
+
+  const handleTogglePause = useCallback(
+    async (habit: Habit) => {
+      if ((habit.status ?? 'active') === 'paused') {
+        await resumeHabit(habit.id);
+      } else {
+        await pauseHabit(habit.id);
+      }
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const handleToggleArchive = useCallback(
+    async (habit: Habit) => {
+      if ((habit.status ?? 'active') === 'archived') {
+        await unarchiveHabit(habit.id);
+      } else {
+        await archiveHabit(habit.id);
+      }
+      await refresh();
+    },
+    [refresh],
+  );
 
   useEffect(() => {
     setHabitDataRefreshHandler(() => void refresh());
@@ -625,10 +620,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   };
 
   const todayKey = toDateKey();
-  const scheduledTodayCount = habits.filter((habit) =>
+  // Paused/archived habits carry no obligation today (F1): only durable-active
+  // rows count toward the scheduled/completed denominators.
+  const activeHabits = habits.filter((habit) => (habit.status ?? 'active') === 'active');
+  const scheduledTodayCount = activeHabits.filter((habit) =>
     isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day),
   ).length;
-  const completedTodayCount = habits.filter(
+  const completedTodayCount = activeHabits.filter(
     (habit) =>
       isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day) &&
       (completionMap[habit.id] ?? 0) >= habit.target_per_day,
@@ -1384,19 +1382,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           setDetailHabit(null);
           setInsightsHabit(habit);
         }}
-        lifecycleState={
-          detailHabit === null
-            ? 'active'
-            : archivedHabitIds.includes(detailHabit.id)
-              ? 'archived'
-              : pausedHabitIds.includes(detailHabit.id)
-                ? 'paused'
-                : 'active'
-        }
         onTogglePause={
           detailHabit
             ? () => {
-                void handleTogglePause(detailHabit.id);
+                void handleTogglePause(detailHabit);
                 setDetailHabit(null);
               }
             : undefined
@@ -1404,7 +1393,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         onToggleArchive={
           detailHabit
             ? () => {
-                void handleToggleArchive(detailHabit.id);
+                void handleToggleArchive(detailHabit);
                 setDetailHabit(null);
               }
             : undefined

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Switch, Text, TextInput, View } from 'react-native';
-import { getNotificationPermissionState } from '@/lib/notifications';
+import { getNotificationPermissionState, requestTodoReminderPermission } from '@/lib/notifications';
 import {
   getDailyPlanReminderTime,
   getTodoRemindersEnabled,
@@ -9,6 +9,7 @@ import {
 } from '@/core/notifications/notificationPreferences';
 import { normalizeTimeOfDayInput } from '@/core/notifications/reminderPlanning';
 import { syncDailyPlanReminder } from '@/core/notifications/dailyPlanReminderScheduler';
+import { reconcileTodoReminders } from '@/core/notifications/todoReminderScheduler';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { ValidationError } from '@/core/ui/ValidationError';
@@ -73,10 +74,45 @@ export function SettingsNotificationsSection() {
     setError(null);
     setSavedNote(null);
     try {
+      if (enabled) {
+        // Request from an interactive context (audit F8): the OS prompt must
+        // be triggered by this tap, not by a later background schedule call.
+        const permission = await requestTodoReminderPermission();
+        if (permission !== 'granted') {
+          setError(
+            permission === 'denied'
+              ? 'Notifications are blocked. Enable them in system settings, then turn reminders on again.'
+              : 'Native reminders are available on Android and iOS only.',
+          );
+          return;
+        }
+      }
       await setTodoRemindersEnabled(enabled);
       setTodoRemindersEnabledState(enabled);
+      // Reconcile the whole todo-reminder namespace so toggle-off cancels
+      // live reminders and toggle-on schedules existing due todos (audit F3).
+      const reconcile = await reconcileTodoReminders();
+      if (!enabled) {
+        setSavedNote(
+          reconcile.status === 'reconciled' && reconcile.cancelled > 0
+            ? `Todo reminders off. ${reconcile.cancelled} scheduled reminder(s) cancelled.`
+            : 'Todo reminders off.',
+        );
+      } else if (reconcile.status === 'permission_denied') {
+        setSavedNote('Todo reminders on, but notification access is blocked in system settings.');
+      } else if (reconcile.status === 'unsupported') {
+        setSavedNote('Todo reminders on. Native reminders are unavailable on this platform.');
+      } else if (reconcile.status === 'failed') {
+        setError('Todo reminders turned on, but scheduling failed. Try toggling off and on.');
+      } else {
+        setSavedNote(
+          reconcile.scheduled > 0
+            ? `Todo reminders on. ${reconcile.scheduled} reminder(s) scheduled.`
+            : 'Todo reminders on.',
+        );
+      }
+      // The daily-plan nudge follows this toggle; keep it in sync.
       await syncDailyPlanReminder();
-      setSavedNote(enabled ? 'Todo reminders on.' : 'Todo reminders off.');
     } catch (err) {
       console.error('[SettingsNotificationsSection] toggle failed', err);
       setError('Unable to update the todo reminders toggle right now.');
@@ -97,9 +133,19 @@ export function SettingsNotificationsSection() {
     setSavedNote(null);
     try {
       await setDailyPlanReminderTime({ hour, minute });
-      await syncDailyPlanReminder();
+      const result = await syncDailyPlanReminder();
       setDailyPlanTimeInput(normalized);
-      setSavedNote(`Daily plan reminder saved for ${normalized}.`);
+      // Report what actually happened instead of an unconditional success
+      // note (audit F6): the nudge is gated by the master todo toggle.
+      if (result.status === 'scheduled') {
+        setSavedNote(`Daily plan reminder saved for ${normalized}.`);
+      } else if (result.status === 'cancelled') {
+        setSavedNote(`Saved for ${normalized}. Turn on todo due-date reminders to schedule it.`);
+      } else if (result.reason === 'permission-denied') {
+        setError('Notification access is blocked in system settings.');
+      } else {
+        setSavedNote(`Saved for ${normalized}. Native reminders are unavailable here.`);
+      }
     } catch (err) {
       console.error('[SettingsNotificationsSection] save daily-plan time failed', err);
       setError('Unable to save the daily plan reminder time right now.');
@@ -155,6 +201,11 @@ export function SettingsNotificationsSection() {
           <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
             A daily nudge to review your plan. Uses 24-hour HH:mm.
           </Text>
+          {!todoRemindersEnabled ? (
+            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+              Follows the todo due-date reminders toggle — turn it on to schedule this nudge.
+            </Text>
+          ) : null}
           <View className="mt-2 flex-row items-center gap-2">
             <TextInput
               accessibilityLabel="Daily plan reminder time"
@@ -168,7 +219,7 @@ export function SettingsNotificationsSection() {
               placeholder="08:00"
               keyboardType="numbers-and-punctuation"
               maxLength={5}
-              editable={!loading && !saving}
+              editable={!loading && !saving && todoRemindersEnabled}
               onChangeText={(value) => {
                 setError(null);
                 setSavedNote(null);
@@ -179,8 +230,8 @@ export function SettingsNotificationsSection() {
               accessibilityRole="button"
               accessibilityLabel="Save daily plan reminder time"
               className="rounded-full px-4 py-2"
-              style={{ backgroundColor: `${ACCENT}18` }}
-              disabled={loading || saving}
+              style={{ backgroundColor: `${ACCENT}18`, opacity: todoRemindersEnabled ? 1 : 0.5 }}
+              disabled={loading || saving || !todoRemindersEnabled}
               onPress={() => void handleSaveDailyPlanTime()}
             >
               <Text className="text-sm font-semibold" style={{ color: ACCENT }}>

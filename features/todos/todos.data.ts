@@ -1,3 +1,4 @@
+import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
 import type { Todo, TodoPriority, TodoRecurrence } from '@/core/db/types';
 import type {
@@ -13,8 +14,10 @@ import {
 } from '@/core/linked-actions/linkedActions.data';
 import { createId } from '@/lib/id';
 import { nowIso, toDateKey } from '@/lib/time';
-import { runSyncedMutation } from '@/core/sync/syncedMutation';
+import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
+import type { SyncRecord } from '@/core/sync/sync.engine';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
+import { parseTopTodoIds, serializeTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import {
   cancelTodoDueReminder,
   syncTodoDueReminder,
@@ -178,16 +181,17 @@ export async function addTodo(input: {
   const dueDate =
     input.dueDate !== undefined ? input.dueDate : input.recurrence === 'daily' ? toDateKey() : null;
 
-  const maxRow = await db.getFirstAsync<{ maxOrder: number }>(
-    `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
-     FROM todos WHERE deleted_at IS NULL AND completed = 0`,
-  );
-  const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
-
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
     mutate: async (transactionDb) => {
+      // Allocate sort_order INSIDE the mutation transaction so two concurrent
+      // adds can never read the same MAX(sort_order) and tie (F9).
+      const maxRow = await transactionDb.getFirstAsync<{ maxOrder: number }>(
+        `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
+         FROM todos WHERE deleted_at IS NULL AND completed = 0`,
+      );
+      const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
       await transactionDb.runAsync(
         `INSERT INTO todos
            (id, title, notes, completed, completed_at, due_date, priority,
@@ -237,52 +241,57 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
   if (inputs.length === 0) return;
 
   const db = await getDatabase();
-  const maxRow = await db.getFirstAsync<{ maxOrder: number }>(
-    `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
-     FROM todos WHERE deleted_at IS NULL AND completed = 0`,
-  );
-  const firstSortOrder = (maxRow?.maxOrder ?? 0) + 1;
 
-  await Promise.all(
-    inputs.map(async (input, index) => {
-      const id = createId('todo');
-      const now = nowIso();
-      await runSyncedMutation({
-        db,
-        record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
-        mutate: async (transactionDb) => {
-          const result = await transactionDb.runAsync(
-            `INSERT INTO todos
-               (id, title, notes, completed, completed_at, due_date, priority,
-                sort_order, recurrence, recurrence_id,
-                created_at, updated_at, deleted_at)
-             SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, NULL
-             WHERE NOT EXISTS (
-               SELECT 1
-               FROM todos
-               WHERE recurrence_id = ?
-                 AND due_date = ?
-                 AND deleted_at IS NULL
-             )`,
-            [
-              id,
-              input.title,
-              input.notes,
-              input.dueDate,
-              input.priority,
-              firstSortOrder + index,
-              input.recurrenceId,
-              now,
-              now,
-              input.recurrenceId,
-              input.dueDate,
-            ],
-          );
-          return { changed: result.changes === 1, value: undefined };
-        },
-      });
-    }),
-  );
+  // One transaction for the whole batch: the MAX(sort_order) baseline is read
+  // inside it and each insert takes the next slot, so a concurrent manual add
+  // or a parallel batch can never interleave between reads and inserts (F9).
+  await runBackupMutation<number>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const maxRow = await transactionDb.getFirstAsync<{ maxOrder: number }>(
+        `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
+         FROM todos WHERE deleted_at IS NULL AND completed = 0`,
+      );
+      const firstSortOrder = (maxRow?.maxOrder ?? 0) + 1;
+      let inserted = 0;
+      for (const [index, input] of inputs.entries()) {
+        const id = createId('todo');
+        const now = nowIso();
+        const result = await transactionDb.runAsync(
+          `INSERT INTO todos
+             (id, title, notes, completed, completed_at, due_date, priority,
+              sort_order, recurrence, recurrence_id,
+              created_at, updated_at, deleted_at)
+           SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, NULL
+           WHERE NOT EXISTS (
+             SELECT 1
+             FROM todos
+             WHERE recurrence_id = ?
+               AND due_date = ?
+               AND deleted_at IS NULL
+           )`,
+          [
+            id,
+            input.title,
+            input.notes,
+            input.dueDate,
+            input.priority,
+            firstSortOrder + index,
+            input.recurrenceId,
+            now,
+            now,
+            input.recurrenceId,
+            input.dueDate,
+          ],
+        );
+        if (result.changes === 1) {
+          inserted += 1;
+          enqueue({ entity: 'todos', id, updatedAt: now, operation: 'create' });
+        }
+      }
+      return { changed: inserted > 0, value: inserted };
+    },
+  });
 }
 
 export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<Todo[]> {
@@ -321,23 +330,105 @@ export async function listAllActiveTodosForRecurrence(): Promise<
 }
 
 export async function updateTodoOrder(orderedIds: string[]): Promise<void> {
+  if (orderedIds.length === 0) return;
   const db = await getDatabase();
   const now = nowIso();
-  for (let i = 0; i < orderedIds.length; i++) {
-    await runSyncedMutation({
-      db,
-      record: { entity: 'todos', id: orderedIds[i], updatedAt: now, operation: 'update' },
-      mutate: async (transactionDb) => {
+  // One transaction per drag: absolute sort_order values keep retries safe,
+  // and batching avoids N separate transactions/outbox records per reorder,
+  // which is measurably cheaper on web OPFS (F10).
+  await runBackupMutation<number>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      let changed = 0;
+      for (let i = 0; i < orderedIds.length; i++) {
         const result = await transactionDb.runAsync(
           `UPDATE todos SET sort_order = ?, updated_at = ?
            WHERE id = ?
              AND deleted_at IS NULL`,
           [i + 1, now, orderedIds[i]],
         );
-        return { changed: result.changes === 1, value: undefined };
-      },
-    });
+        if (result.changes === 1) {
+          changed += 1;
+          enqueue({ entity: 'todos', id: orderedIds[i], updatedAt: now, operation: 'update' });
+        }
+      }
+      return { changed: changed > 0, value: changed };
+    },
+  });
+}
+
+type TodoAssociationInput = { projectId?: string | null; goalId?: string | null };
+
+type TodoAssociationResolution = {
+  nextProjectId: string | null;
+  nextGoalId: string | null;
+};
+
+/**
+ * Resolve the next project_id/goal_id pair for a Todo against the H9
+ * association invariants. Shared by single edits and bulk assignment so both
+ * inherit identical rules:
+ * - A non-null projectId/goalId MUST reference an existing, non-deleted
+ *   parent; otherwise the resolver throws a clear error (no dangling refs).
+ * - Assigning a Goal auto-aligns project_id to that Goal's project_id when
+ *   the Goal belongs to a Project; an explicit projectId is overridden by the
+ *   goal here.
+ * - F12: explicitly clearing the project also clears a remaining Goal that
+ *   itself belongs to a Project — such a Goal pins the Todo to its Project,
+ *   so keeping it would leave `project_id = NULL` while violating the
+ *   alignment invariant. A Goal without a Project imposes no alignment and is
+ *   kept.
+ */
+async function resolveTodoProjectGoalAssociation(
+  transactionDb: SQLite.SQLiteDatabase,
+  current: Pick<Todo, 'project_id' | 'goal_id'>,
+  association: TodoAssociationInput,
+): Promise<TodoAssociationResolution> {
+  let nextProjectId = current.project_id;
+  let nextGoalId = current.goal_id;
+
+  if (association.projectId !== undefined) {
+    if (association.projectId !== null) {
+      const project = await transactionDb.getFirstAsync<{ id: string }>(
+        `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+        [association.projectId],
+      );
+      if (!project) throw new Error('Project not found.');
+    }
+    nextProjectId = association.projectId;
   }
+
+  if (association.goalId !== undefined) {
+    if (association.goalId !== null) {
+      const goal = await transactionDb.getFirstAsync<{
+        id: string;
+        project_id: string | null;
+      }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
+        association.goalId,
+      ]);
+      if (!goal) throw new Error('Goal not found.');
+      nextGoalId = association.goalId;
+      // Hierarchical consistency: a Todo assigned to a Goal inherits the
+      // Goal's Project.
+      if (goal.project_id !== null) {
+        nextProjectId = goal.project_id;
+      }
+    } else {
+      nextGoalId = null;
+    }
+  } else if (association.projectId === null && nextGoalId !== null) {
+    // F12: clearing the project must not leave a goal that still binds this
+    // todo to a project.
+    const goal = await transactionDb.getFirstAsync<{ project_id: string | null }>(
+      `SELECT project_id FROM goals WHERE id = ? AND deleted_at IS NULL`,
+      [nextGoalId],
+    );
+    if (goal && goal.project_id !== null) {
+      nextGoalId = null;
+    }
+  }
+
+  return { nextProjectId, nextGoalId };
 }
 
 export async function updateTodo(
@@ -385,52 +476,17 @@ export async function updateTodo(
         return { changed: false, value: undefined };
       }
 
-      // H9: validate and reconcile project/goal associations.
-      let nextProjectId: string | null = current.project_id;
-      let nextGoalId: string | null = current.goal_id;
-      let projectChanged = false;
-      let goalChanged = false;
+      // H9: validate and reconcile project/goal associations via the shared
+      // resolver (includes the F12 clear-project/goal-alignment rule).
+      const resolution = await resolveTodoProjectGoalAssociation(transactionDb, current, updates);
 
-      if (updates.projectId !== undefined) {
-        if (updates.projectId !== null) {
-          const project = await transactionDb.getFirstAsync<{ id: string }>(
-            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
-            [updates.projectId],
-          );
-          if (!project) throw new Error('Project not found.');
-        }
-        nextProjectId = updates.projectId;
-        projectChanged = true;
-      }
-      if (updates.goalId !== undefined) {
-        if (updates.goalId !== null) {
-          const goal = await transactionDb.getFirstAsync<{
-            id: string;
-            project_id: string | null;
-          }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
-            updates.goalId,
-          ]);
-          if (!goal) throw new Error('Goal not found.');
-          nextGoalId = updates.goalId;
-          // Hierarchical consistency: assigning a Goal auto-aligns project_id to
-          // the Goal's Project when it has one.
-          if (goal.project_id !== null) {
-            nextProjectId = goal.project_id;
-            projectChanged = true;
-          }
-        } else {
-          nextGoalId = null;
-        }
-        goalChanged = true;
-      }
-
-      if (projectChanged) {
+      if (updates.projectId !== undefined || resolution.nextProjectId !== current.project_id) {
         fields.push('project_id = ?');
-        values.push(nextProjectId);
+        values.push(resolution.nextProjectId);
       }
-      if (goalChanged) {
+      if (updates.goalId !== undefined || resolution.nextGoalId !== current.goal_id) {
         fields.push('goal_id = ?');
-        values.push(nextGoalId);
+        values.push(resolution.nextGoalId);
       }
 
       const result = await transactionDb.runAsync(
@@ -473,7 +529,7 @@ export async function listTodoLinkedActionRules(
 /**
  * Associate (or clear, with null) a Todo with a Project and/or Goal.
  *
- * H9 association invariants:
+ * H9 association invariants (see `resolveTodoProjectGoalAssociation`):
  * - A non-null projectId/goalId MUST reference an existing, non-deleted parent;
  *   otherwise the setter throws a clear error (no dangling references).
  * - Assigning a Goal auto-aligns project_id to that Goal's project_id when the
@@ -481,12 +537,14 @@ export async function listTodoLinkedActionRules(
  *   provided projectId is respected and otherwise the current project_id is
  *   preserved (the stricter "clear project on goal-without-project" rule is not
  *   applied for Todos).
+ * - Clearing the project also clears a remaining Goal that belongs to a
+ *   Project (F12), so bulk "No project" inherits the same rule.
  * - The whole change runs inside the synced-mutation transaction so it is atomic
  *   and the outbox intent stays coherent with the final row.
  */
 export async function setTodoProjectGoal(
   todoId: string,
-  association: { projectId?: string | null; goalId?: string | null },
+  association: TodoAssociationInput,
 ): Promise<void> {
   if (association.projectId === undefined && association.goalId === undefined) return;
   const db = await getDatabase();
@@ -503,44 +561,16 @@ export async function setTodoProjectGoal(
         return { changed: false, value: undefined };
       }
 
-      let nextProjectId = current.project_id;
-      let nextGoalId = current.goal_id;
-
-      if (association.projectId !== undefined) {
-        if (association.projectId !== null) {
-          const project = await transactionDb.getFirstAsync<{ id: string }>(
-            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
-            [association.projectId],
-          );
-          if (!project) throw new Error('Project not found.');
-        }
-        nextProjectId = association.projectId;
-      }
-
-      if (association.goalId !== undefined) {
-        if (association.goalId !== null) {
-          const goal = await transactionDb.getFirstAsync<{
-            id: string;
-            project_id: string | null;
-          }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
-            association.goalId,
-          ]);
-          if (!goal) throw new Error('Goal not found.');
-          nextGoalId = association.goalId;
-          // Hierarchical consistency: a Todo assigned to a Goal inherits the
-          // Goal's Project. An explicit projectId is overridden by the goal here.
-          if (goal.project_id !== null) {
-            nextProjectId = goal.project_id;
-          }
-        } else {
-          nextGoalId = null;
-        }
-      }
+      const resolution = await resolveTodoProjectGoalAssociation(
+        transactionDb,
+        current,
+        association,
+      );
 
       const result = await transactionDb.runAsync(
         `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
-        [nextProjectId, nextGoalId, now, todoId],
+        [resolution.nextProjectId, resolution.nextGoalId, now, todoId],
       );
       return { changed: result.changes === 1, value: undefined };
     },
@@ -724,36 +754,272 @@ export async function setTodoCompletionState(
   return setTodoCompletion(todoId, completed);
 }
 
+export type BulkTodoOutcome = {
+  /** Ids whose row actually changed (and got a backup intent). */
+  changed: number;
+  /** Ids skipped: missing/tombstoned, or already in the desired state. */
+  skipped: number;
+};
+
+type BulkCompletionRow = Pick<
+  Todo,
+  'id' | 'title' | 'notes' | 'priority' | 'completed' | 'due_date' | 'recurrence' | 'recurrence_id'
+>;
+
 /**
- * Bulk operations apply the same per-id invariants (soft delete, sync enqueue,
- * linked-action dispatch) as their single-item counterparts, sequentially so a
- * failure mid-batch leaves earlier items durably committed.
+ * Bulk operations apply the same per-id invariants as their single-item
+ * counterparts (soft delete, sync enqueue, linked-action dispatch), but commit
+ * all row writes in ONE transaction so a mid-batch failure can never leave a
+ * half-applied edit behind. Per-row backup intents are enqueued inside that
+ * same transaction; post-commit side effects (reminders, recurring follow-ups,
+ * linked-action dispatch) then run per changed item exactly like the
+ * single-item path, preserving idempotent retry semantics.
  */
-export async function bulkSetTodoCompletion(ids: string[], completed: 0 | 1): Promise<void> {
-  for (const id of ids) {
-    await setTodoCompletion(id, completed);
+export async function bulkSetTodoCompletion(
+  ids: string[],
+  completed: 0 | 1,
+): Promise<BulkTodoOutcome> {
+  if (ids.length === 0) return { changed: 0, skipped: 0 };
+  const db = await getDatabase();
+  const now = nowIso();
+
+  type AppliedCompletion = { row: BulkCompletionRow; previous: 0 | 1 };
+  const outcome = await runBackupMutation<AppliedCompletion[]>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const applied: AppliedCompletion[] = [];
+      for (const id of ids) {
+        const current = await transactionDb.getFirstAsync<BulkCompletionRow>(
+          `SELECT id, title, notes, priority, completed, due_date, recurrence, recurrence_id
+           FROM todos
+           WHERE id = ?
+             AND deleted_at IS NULL`,
+          [id],
+        );
+        if (!current) continue;
+        const previous = current.completed;
+        // Idempotent per-item semantics: applying the desired state twice is a
+        // safe no-op for that row.
+        if (previous === completed) continue;
+        const result = await transactionDb.runAsync(
+          `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?
+           WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
+          [completed, completed === 1 ? now : null, now, current.id, previous],
+        );
+        if (result.changes !== 1) continue;
+        enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });
+        applied.push({ row: current, previous });
+      }
+      return { changed: applied.length > 0, value: applied };
+    },
+  });
+
+  // Post-commit side effects, identical to setTodoCompletion's per-item path.
+  for (const { row, previous } of outcome.value) {
+    const next = completed;
+    if (next === 1) {
+      await cancelReminderSafely(row.id);
+    } else if (previous === 1 && row.due_date) {
+      await syncReminderSafely({ id: row.id, title: row.title, dueDate: row.due_date });
+    }
+
+    if (next === 1 && row.recurrence === 'daily' && row.recurrence_id) {
+      const tomorrow = getTomorrowDateKey();
+      const existing = await db.getFirstAsync<{ id: string }>(
+        `SELECT id FROM todos
+         WHERE recurrence_id = ?
+           AND due_date = ?
+           AND deleted_at IS NULL`,
+        [row.recurrence_id, tomorrow],
+      );
+      if (!existing) {
+        await createRecurringInstance({
+          title: row.title,
+          notes: row.notes,
+          priority: row.priority,
+          recurrenceId: row.recurrence_id,
+          dueDate: tomorrow,
+        });
+      }
+    }
+
+    // Linked actions fire only on a genuine non-recurring 0->1 completion,
+    // exactly like setTodoCompletion.
+    if (!(previous === 0 && next === 1 && row.recurrence !== 'daily')) continue;
+
+    await linkedActionsEngine.processSourceAction({
+      occurredAt: now,
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: row.id,
+      triggerType: 'todo.completed',
+      label: row.title,
+      sourceDateKey: toDateKey(),
+      sourceRecordId: row.id,
+      origin: {
+        originKind: 'user',
+        originRuleId: null,
+        originEventId: null,
+      },
+      payload: {
+        previousCompleted: previous,
+        currentCompleted: next,
+        recurrence: row.recurrence,
+      },
+    });
   }
+
+  return {
+    changed: outcome.value.length,
+    skipped: ids.length - outcome.value.length,
+  };
 }
 
-export async function bulkUpdateTodoPriority(ids: string[], priority: TodoPriority): Promise<void> {
-  for (const id of ids) {
-    await updateTodo(id, { priority });
-  }
+export async function bulkUpdateTodoPriority(
+  ids: string[],
+  priority: TodoPriority,
+): Promise<BulkTodoOutcome> {
+  if (ids.length === 0) return { changed: 0, skipped: 0 };
+  const db = await getDatabase();
+  const now = nowIso();
+  const outcome = await runBackupMutation<number>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      let changed = 0;
+      for (const id of ids) {
+        // Rows already at the target priority are skipped without rewriting
+        // updated_at or re-enqueueing a redundant backup intent.
+        const result = await transactionDb.runAsync(
+          `UPDATE todos SET priority = ?, updated_at = ?
+           WHERE id = ? AND priority != ? AND deleted_at IS NULL`,
+          [priority, now, id, priority],
+        );
+        if (result.changes !== 1) continue;
+        enqueue({ entity: 'todos', id, updatedAt: now, operation: 'update' });
+        changed += 1;
+      }
+      return { changed: changed > 0, value: changed };
+    },
+  });
+  return { changed: outcome.value, skipped: ids.length - outcome.value };
 }
 
 export async function bulkAssignTodosProject(
   ids: string[],
   projectId: string | null,
-): Promise<void> {
-  for (const id of ids) {
-    await setTodoProjectGoal(id, { projectId });
-  }
+): Promise<BulkTodoOutcome> {
+  if (ids.length === 0) return { changed: 0, skipped: 0 };
+  const db = await getDatabase();
+  const now = nowIso();
+  const outcome = await runBackupMutation<number>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      let changed = 0;
+      for (const id of ids) {
+        const current = await transactionDb.getFirstAsync<Pick<Todo, 'project_id' | 'goal_id'>>(
+          `SELECT project_id, goal_id FROM todos WHERE id = ? AND deleted_at IS NULL`,
+          [id],
+        );
+        if (!current) continue;
+        // Shared resolver so bulk inherits the exact single-edit rules,
+        // including the F12 clear-project/goal-alignment behavior.
+        const resolution = await resolveTodoProjectGoalAssociation(transactionDb, current, {
+          projectId,
+        });
+        if (
+          resolution.nextProjectId === current.project_id &&
+          resolution.nextGoalId === current.goal_id
+        ) {
+          continue;
+        }
+        const result = await transactionDb.runAsync(
+          `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?
+           WHERE id = ? AND deleted_at IS NULL`,
+          [resolution.nextProjectId, resolution.nextGoalId, now, id],
+        );
+        if (result.changes !== 1) continue;
+        enqueue({ entity: 'todos', id, updatedAt: now, operation: 'update' });
+        changed += 1;
+      }
+      return { changed: changed > 0, value: changed };
+    },
+  });
+  return { changed: outcome.value, skipped: ids.length - outcome.value };
 }
 
-export async function bulkRemoveTodos(ids: string[]): Promise<void> {
-  for (const id of ids) {
-    await removeTodo(id);
+/**
+ * Tombstone one todo plus its dependents inside an open transaction. Returns
+ * whether the row existed and was tombstoned by this call.
+ */
+async function removeTodoWithinTransaction(
+  transactionDb: SQLite.SQLiteDatabase,
+  id: string,
+  now: string,
+  enqueue: (record: SyncRecord) => void,
+): Promise<boolean> {
+  const tombstone = await transactionDb.runAsync(
+    'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    [now, now, id],
+  );
+  if (tombstone.changes === 0) return false;
+
+  await replaceLinkedActionRulesForSourceEntity({
+    feature: 'todos',
+    entityType: 'todo',
+    entityId: id,
+    rules: [],
+    db: transactionDb,
+    enqueue,
+  });
+  await deleteLinkedActionRulesForTargetEntity({
+    feature: 'todos',
+    entityType: 'todo',
+    entityId: id,
+    deletedAt: now,
+    db: transactionDb,
+    enqueue,
+  });
+
+  // F11: prune the removed id from any daily plan's top_todo_ids inside the
+  // same transaction. daily_plans is a synced entity, so each touched plan
+  // gets its own update intent; plans without the id are left untouched.
+  const plans = await transactionDb.getAllAsync<{ id: string; top_todo_ids: string }>(
+    `SELECT id, top_todo_ids FROM daily_plans
+     WHERE deleted_at IS NULL AND top_todo_ids LIKE ?`,
+    [`%"${id}"%`],
+  );
+  for (const plan of plans) {
+    const topTodoIds = parseTopTodoIds(plan.top_todo_ids);
+    if (!topTodoIds.includes(id)) continue;
+    await transactionDb.runAsync(
+      `UPDATE daily_plans SET top_todo_ids = ?, updated_at = ? WHERE id = ?`,
+      [serializeTopTodoIds(topTodoIds.filter((todoId) => todoId !== id)), now, plan.id],
+    );
+    enqueue({ entity: 'daily_plans', id: plan.id, updatedAt: now, operation: 'update' });
   }
+
+  return true;
+}
+
+export async function bulkRemoveTodos(ids: string[]): Promise<BulkTodoOutcome> {
+  if (ids.length === 0) return { changed: 0, skipped: 0 };
+  const db = await getDatabase();
+  const now = nowIso();
+  const outcome = await runBackupMutation<string[]>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const removedIds: string[] = [];
+      for (const id of ids) {
+        const removed = await removeTodoWithinTransaction(transactionDb, id, now, enqueue);
+        if (removed) removedIds.push(id);
+      }
+      return { changed: removedIds.length > 0, value: removedIds };
+    },
+  });
+  for (const id of outcome.value) {
+    await cancelReminderSafely(id);
+  }
+  return { changed: outcome.value.length, skipped: ids.length - outcome.value.length };
 }
 
 export async function removeTodo(id: string): Promise<void> {
@@ -763,29 +1029,8 @@ export async function removeTodo(id: string): Promise<void> {
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'delete' },
     mutate: async (transactionDb, enqueue) => {
-      const tombstone = await transactionDb.runAsync(
-        'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-        [now, now, id],
-      );
-      if (tombstone.changes === 0) return { changed: false, value: undefined };
-
-      await replaceLinkedActionRulesForSourceEntity({
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: id,
-        rules: [],
-        db: transactionDb,
-        enqueue,
-      });
-      await deleteLinkedActionRulesForTargetEntity({
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: id,
-        deletedAt: now,
-        db: transactionDb,
-        enqueue,
-      });
-      return { changed: true, value: undefined };
+      const removed = await removeTodoWithinTransaction(transactionDb, id, now, enqueue);
+      return { changed: removed, value: undefined };
     },
   });
   if (!result.changed) return;

@@ -270,16 +270,25 @@ export async function requestTodoReminderPermission(): Promise<NotificationPermi
   }
 }
 
+/**
+ * Tri-state schedule outcome: `'web'` when native scheduling is impossible on
+ * this platform, `'permission-denied'` when the OS refused/blocked access, the
+ * scheduled identifier on success, or null when the native layer returned
+ * nothing usable. Callers must be able to tell "impossible here" apart from
+ * "blocked by the user" (audit F5).
+ */
+export type ScheduleReminderOutcome = 'web' | 'permission-denied' | null | (string & {});
+
 export async function scheduleTodoReminderNotification(input: {
   identifier: string;
   title: string;
   body: string;
   data: Record<string, unknown>;
   fireAt: Date;
-}): Promise<string | null> {
-  if (Platform.OS === 'web') return null;
+}): Promise<ScheduleReminderOutcome> {
+  if (Platform.OS === 'web') return 'web';
   const allowed = await ensureNotificationPermission();
-  if (!allowed) return null;
+  if (!allowed) return 'permission-denied';
   return Notifications.scheduleNotificationAsync({
     identifier: input.identifier,
     content: {
@@ -324,10 +333,10 @@ export async function scheduleDailyPlanReminderNotification(input: {
   data: Record<string, unknown>;
   hour: number;
   minute: number;
-}): Promise<string | null> {
-  if (Platform.OS === 'web') return null;
+}): Promise<ScheduleReminderOutcome> {
+  if (Platform.OS === 'web') return 'web';
   const allowed = await ensureNotificationPermission();
-  if (!allowed) return null;
+  if (!allowed) return 'permission-denied';
   if (Platform.OS === 'android') {
     await ensureDailyPlanReminderChannel();
   }
