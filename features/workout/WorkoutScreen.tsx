@@ -13,16 +13,19 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
-import type { WorkoutRoutine, RoutineWithExercises } from './types';
+import type { WorkoutRoutine, RoutineWithExercises, WorkoutLog } from './types';
 import {
   addRoutine,
   completeRoutine,
   deleteRoutine,
   getRoutineWithExercises,
   listRoutines,
+  listSessionTotalsForRange,
   listWorkoutLogsForRange,
+  duplicateRoutine,
 } from '@/features/workout/workout.data';
 import {
+  buildVolumePerWeek,
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
@@ -33,6 +36,8 @@ import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
 import { WorkoutSessionScreen } from './WorkoutSessionScreen';
+import { WorkoutHistoryDetailModal } from './WorkoutHistoryDetail';
+import { WeeklyVolumeChart } from './WeeklyVolumeChart';
 
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
@@ -99,6 +104,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
   const [workoutHeatmapDays, setWorkoutHeatmapDays] = useState<HeatmapDay[]>([]);
+  const [recentLogs, setRecentLogs] = useState<WorkoutLog[]>([]);
+  const [weeklyVolume, setWeeklyVolume] = useState<ReturnType<typeof buildVolumePerWeek>>([]);
+  const [detailLogId, setDetailLogId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>({ type: 'list' });
   const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
@@ -115,6 +123,12 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     const allLogs = await listWorkoutLogsForRange(startKey, endKey);
     setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 364));
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
+    setRecentLogs(allLogs.slice(0, 10));
+
+    const volumeStart = new Date();
+    volumeStart.setDate(volumeStart.getDate() - 7 * 7 - ((volumeStart.getDay() + 6) % 7));
+    const totals = await listSessionTotalsForRange(toDateKey(volumeStart), endKey);
+    setWeeklyVolume(buildVolumePerWeek(totals, 8));
   }, []);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
@@ -185,6 +199,12 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         routineId={routineModal?.routineId ?? ''}
         routineName={routineModal?.routineName ?? ''}
         onClose={() => setRoutineModal(null)}
+        onUseAsTemplate={async () => {
+          if (!routineModal) return;
+          await duplicateRoutine(routineModal.routineId);
+          setRoutineModal(null);
+          void refresh();
+        }}
         onStartWorkout={async () => {
           if (!routineModal) return;
           const full = await getRoutineWithExercises(routineModal.routineId);
@@ -195,6 +215,11 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           setRoutineModal(null);
           setCurrentView({ type: 'session', routine: full });
         }}
+      />
+      <WorkoutHistoryDetailModal
+        visible={detailLogId !== null}
+        logId={detailLogId}
+        onClose={() => setDetailLogId(null)}
       />
       {confirmationDialog}
       <Screen scroll>
@@ -313,6 +338,63 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 }}
               />
             ))}
+          </ScreenSection>
+        ) : null}
+
+        <ScreenSection className="mb-0">
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Weekly volume"
+            headerSubtitle="Completed sets per week over the last 8 weeks."
+            headerRight={<MaterialIcons name="bar-chart" size={22} color={tokens.textOnAccent} />}
+            className="mb-0"
+          >
+            {weeklyVolume.some((w) => w.totalSets > 0) ? (
+              <WeeklyVolumeChart data={weeklyVolume} />
+            ) : (
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                Complete a session to start filling your weekly volume chart.
+              </Text>
+            )}
+          </Card>
+        </ScreenSection>
+
+        {recentLogs.length > 0 ? (
+          <ScreenSection>
+            <View className="mb-4 mt-1">
+              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                Recent sessions
+              </Text>
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                Tap a session to see every exercise and set you completed.
+              </Text>
+            </View>
+            {recentLogs.map((log) => {
+              const routine = routines.find((r) => r.id === log.routine_id);
+              return (
+                <Card key={log.id} accentColor={COLOR} style={{ marginBottom: 12 }}>
+                  <RectButton
+                    onPress={() => setDetailLogId(log.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open session from ${log.completed_at}`}
+                    style={{ backgroundColor: 'transparent' }}
+                  >
+                    <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                      {routine?.name ?? 'Workout'}
+                    </Text>
+                    <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                      {new Date(log.completed_at).toLocaleString('en', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </RectButton>
+                </Card>
+              );
+            })}
           </ScreenSection>
         ) : null}
 

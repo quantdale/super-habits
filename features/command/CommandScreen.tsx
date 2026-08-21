@@ -9,6 +9,10 @@ import { type AppSection } from '@/core/providers/navigationContext';
 import { toDateKey } from '@/lib/time';
 import { executeDraftAction } from './command.executor';
 import { commandParser } from './commandParser';
+import {
+  getCommandHistory,
+  recordCommandInvocation,
+} from './commandHistory';
 import { getAiCommandParseConfig, isAiCommandInternalRolloutAvailable } from './commandConfig';
 import { getAiCommandInternalRolloutPreference } from './commandInternalRollout';
 import {
@@ -246,6 +250,17 @@ export function CommandScreen({
     { outcome: 'success' }
   > | null>(null);
   const [mode, setMode] = useState<CommandMode>('create');
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCommandHistory().then((entries) => {
+      if (!cancelled) setCommandHistory(entries.map((entry) => entry.rawText));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!AI_ASK_EXPERIMENT_ENABLED) return;
@@ -341,6 +356,13 @@ export function CommandScreen({
     setExecutionError(null);
     setSuccessResult(null);
     setIsParsing(true);
+    if (rawText.trim().length > 0) {
+      void recordCommandInvocation(rawText).then(() =>
+        getCommandHistory().then((entries) =>
+          setCommandHistory(entries.map((entry) => entry.rawText)),
+        ),
+      );
+    }
 
     const parserContext = getParserContext();
     const now = new Date();
@@ -539,6 +561,8 @@ export function CommandScreen({
           isParsing={isParsing}
           parseDisabled={!hasCommandText || isParsing}
           onParse={handleParseCommand}
+          history={commandHistory}
+          onPickHistoryText={handleRawTextChange}
         />
       </CommandSection>
 

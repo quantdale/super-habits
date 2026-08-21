@@ -110,8 +110,7 @@ export type DailyOverviewFacts = {
 };
 
 /** Backward-compatible V1 fact shape for legacy tests/clients. */
-export type HabitStreakFacts =
-  | {
+export type HabitStreakFacts =  | {
       scope: 'single';
       habitName: string;
       currentStreak: number;
@@ -137,6 +136,10 @@ export type AskUnsupportedReasonCode =
   | 'habit_ambiguous'
   | 'routine_not_found'
   | 'routine_ambiguous'
+  | 'project_not_found'
+  | 'project_ambiguous'
+  | 'goal_not_found'
+  | 'goal_ambiguous'
   | 'invalid_range';
 
 export type AskUnavailableReasonCode =
@@ -175,4 +178,35 @@ export type AskParseInput = {
   timeZone: string;
   todayDateKey: string;
   tomorrowDateKey: string;
+};
+
+/**
+ * Planning Ask facts (W6). These are retrieved locally and formatted
+ * deterministically; they are not yet remote-classified intents.
+ */
+export type ProjectStatusFacts = {
+  scope: 'single' | 'overall';
+  projects: {
+    name: string;
+    status: string;
+    targetDate: string | null;
+    openTodoCount: number;
+  }[];
+};
+
+export type GoalProgressFacts = {
+  scope: 'single' | 'overall';
+  goals: {
+    title: string;
+    progressPercent: number;
+    status: string;
+  }[];
+};
+
+export type TodayFocusFacts = {
+  dateKey: string;
+  planIntention: string | null;
+  topTodos: { title: string; completed: boolean }[];
+  pendingTodoCount: number;
+  habitsRemainingCount: number | null;
 };

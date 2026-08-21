@@ -304,6 +304,127 @@ async function executeStartFocus(
   };
 }
 
+const COMMAND_PROJECT_COLOR_HEX: Record<string, string> = {
+  blue: '#3B82F6',
+  green: '#10B981',
+  emerald: '#10B981',
+  violet: '#8B5CF6',
+  purple: '#8B5CF6',
+  orange: '#F97316',
+  amber: '#F59E0B',
+  yellow: '#F59E0B',
+  pink: '#EC4899',
+  teal: '#14B8A6',
+  red: '#EF4444',
+  indigo: '#6366F1',
+  lime: '#84CC16',
+};
+
+function resolveProjectColor(colorName: string | null): string | undefined {
+  if (!colorName) return undefined;
+  return COMMAND_PROJECT_COLOR_HEX[colorName.trim().toLowerCase()];
+}
+
+async function executeCreateProject(
+  draft: Extract<DraftAiAction, { kind: 'create_project' }>,
+): Promise<CommandExecutionResult> {
+  const name = draft.fields.name?.trim() ?? '';
+  if (!name) {
+    return { outcome: 'validation_error', message: 'Add the project name before continuing.' };
+  }
+
+  try {
+    const entityId = await addProject({
+      name,
+      color: resolveProjectColor(draft.fields.color),
+      targetDate: draft.fields.targetDate,
+    });
+    return {
+      outcome: 'success',
+      kind: draft.kind,
+      entityId,
+      message: 'Project created.',
+    };
+  } catch (error) {
+    return {
+      outcome: 'error',
+      message: error instanceof Error ? error.message : 'Unable to create the project.',
+    };
+  }
+}
+
+async function executeUpdateGoalProgress(
+  draft: Extract<DraftAiAction, { kind: 'update_goal_progress' }>,
+  options: CommandExecutionOptions,
+): Promise<CommandExecutionResult> {
+  let goalId = options.resolvedEntityId ?? null;
+  if (!goalId) {
+    const goals = await listGoals();
+    const resolution = resolveGoalReference(draft.fields.goalTitle, goals, goals);
+    if (resolution.status !== 'exact') {
+      return { outcome: 'validation_error', message: 'Choose one active Goal before confirming.' };
+    }
+    goalId = resolution.entity.id;
+  }
+
+  const percent = draft.fields.percent;
+  if (percent === null) {
+    return { outcome: 'validation_error', message: 'Goal progress percent is required.' };
+  }
+
+  const clampedPercent = Math.min(100, Math.max(0, Math.round(percent)));
+  try {
+    await setGoalProgress(goalId, clampedPercent);
+    return {
+      outcome: 'success',
+      kind: draft.kind,
+      entityId: goalId,
+      message: `Goal progress set to ${clampedPercent}%.`,
+    };
+  } catch (error) {
+    return {
+      outcome: 'error',
+      message: error instanceof Error ? error.message : 'Unable to update the goal.',
+    };
+  }
+}
+
+async function executeAddTodoToDailyPlan(
+  draft: Extract<DraftAiAction, { kind: 'add_todo_to_daily_plan' }>,
+  options: CommandExecutionOptions,
+): Promise<CommandExecutionResult> {
+  const dateKey = draft.fields.dateKey ?? toDateKey();
+  let todoId = options.resolvedEntityId ?? null;
+  if (!todoId) {
+    const todos = await listTodos();
+    const resolution = resolveTodoReference(draft.fields.todoTitle, todos, todos);
+    if (resolution.status !== 'exact') {
+      return { outcome: 'validation_error', message: 'Choose one active Todo before confirming.' };
+    }
+    todoId = resolution.entity.id;
+  }
+
+  const plan = await getDailyPlan(dateKey);
+  const existingIds = plan ? parseTopTodoIds(plan.top_todo_ids) : [];
+  if (existingIds.includes(todoId)) {
+    return { outcome: 'duplicate', message: 'That Todo is already on the daily plan.' };
+  }
+  if (existingIds.length >= MAX_TOP_PRIORITIES) {
+    return {
+      outcome: 'validation_error',
+      message: `The daily plan already has ${MAX_TOP_PRIORITIES} top priorities.`,
+    };
+  }
+
+  await setDailyPlanTopTodos(dateKey, [...existingIds, todoId]);
+  return {
+    outcome: 'success',
+    kind: draft.kind,
+    entityId: todoId,
+    message: 'Todo added to the daily plan.',
+  };
+}
+
 export async function executeDraftAction(
   draft: DraftAiAction,
   options: CommandExecutionOptions = {},
@@ -347,6 +468,15 @@ export async function executeDraftAction(
         break;
       case 'start_focus_session':
         result = await executeStartFocus(draft, options);
+        break;
+      case 'create_project':
+        result = await executeCreateProject(draft);
+        break;
+      case 'update_goal_progress':
+        result = await executeUpdateGoalProgress(draft, options);
+        break;
+      case 'add_todo_to_daily_plan':
+        result = await executeAddTodoToDailyPlan(draft, options);
         break;
     }
 

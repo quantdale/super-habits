@@ -1,10 +1,9 @@
 import { getDatabase } from '@/core/db/client';
 import { runLocalMutation } from '@/core/db/localMutation';
 import { createId } from '@/lib/id';
-import { nowIso, toDateKey } from '@/lib/time';
+import { nowIso } from '@/lib/time';
 import {
   clampProgressPercent,
-  GOAL_HORIZON_WINDOW_DAYS,
   normalizeGoalHorizon,
   normalizeGoalProgress,
   normalizeGoalStatus,
@@ -208,67 +207,4 @@ export async function countActiveGoals(): Promise<number> {
     `SELECT COUNT(*) AS count FROM goals WHERE deleted_at IS NULL AND status NOT IN ('completed', 'archived')`,
   );
   return row?.count ?? 0;
-}
-
-// ---------------------------------------------------------------------------
-// Linked-entity rollups (bounded aggregate queries)
-// ---------------------------------------------------------------------------
-
-export type GoalRollupData = {
-  todos: { total: number; done: number };
-  habits: { habitCount: number; completionsInWindow: number; windowDays: number };
-};
-
-/**
- * Bounded rollup inputs for one goal: linked-todo done/total and linked-habit
- * completion counts over the goal's horizon window (custom horizons fall back
- * to 30 days). Small aggregate queries, no row loads.
- */
-export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
-  const db = await getDatabase();
-  const goal = await db.getFirstAsync<Pick<Goal, 'horizon'>>(
-    `SELECT horizon FROM goals WHERE id = ? AND deleted_at IS NULL`,
-    [goalId],
-  );
-  const windowDays = GOAL_HORIZON_WINDOW_DAYS[goal?.horizon ?? 'month'] ?? 30;
-  const effectiveDays = windowDays ?? 30;
-  const windowStart = toDateKey(new Date(Date.now() - (effectiveDays - 1) * 86_400_000));
-
-  const todoRow = await db.getFirstAsync<{ total: number; done: number }>(
-    `SELECT COUNT(*) AS total, COALESCE(SUM(completed), 0) AS done
-     FROM todos WHERE goal_id = ? AND deleted_at IS NULL`,
-    [goalId],
-  );
-  const habitCountRow = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
-    [goalId],
-  );
-  const completionRow = await db.getFirstAsync<{ completions: number }>(
-    `SELECT COUNT(*) AS completions
-     FROM habit_completions hc
-     JOIN habits h ON h.id = hc.habit_id
-     WHERE h.goal_id = ? AND h.deleted_at IS NULL AND hc.date_key >= ?
-       AND hc.count > 0`,
-    [goalId, windowStart],
-  );
-
-  return {
-    todos: { total: todoRow?.total ?? 0, done: todoRow?.done ?? 0 },
-    habits: {
-      habitCount: habitCountRow?.count ?? 0,
-      completionsInWindow: completionRow?.completions ?? 0,
-      windowDays: effectiveDays,
-    },
-  };
-}
-
-/** Habits linked to a goal (for the goal detail rollup section). */
-export async function listHabitsForGoal(
-  goalId: string,
-): Promise<{ id: string; name: string }[]> {
-  const db = await getDatabase();
-  return db.getAllAsync<{ id: string; name: string }>(
-    `SELECT id, name FROM habits WHERE goal_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`,
-    [goalId],
-  );
 }

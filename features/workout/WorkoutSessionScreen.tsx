@@ -7,12 +7,23 @@ import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import {
+  applyRestDefault,
   buildTimerSequence,
+  computeSessionTotalSets,
   formatWorkoutTime,
   summarizeCompletedSets,
   type TimerPhase,
 } from './workout.domain';
 import { logWorkoutSession } from './workout.data';
+import {
+  DEFAULT_REST_SECONDS,
+  REST_SECONDS_MAX,
+  REST_SECONDS_MIN,
+  REST_SECONDS_STEP,
+  clampRestSeconds,
+  loadRestSecondsDefault,
+  saveRestSecondsDefault,
+} from './restTimerPreferences';
 import type { RoutineWithExercises } from './types';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 
@@ -26,25 +37,47 @@ type Props = {
 
 export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   const { tokens } = useAppTheme();
+  // Loaded from AsyncStorage; zero-rest sets inherit this default.
+  const [restDefault, setRestDefault] = useState<number | null>(null);
   const sequence = useMemo(
     () =>
       buildTimerSequence(
-        routine.exercises.map((ex) => ({
-          name: ex.name,
-          sets: ex.sets.map((s) => ({
-            set_number: s.set_number,
-            active_seconds: s.active_seconds,
-            rest_seconds: s.rest_seconds,
+        applyRestDefault(
+          routine.exercises.map((ex) => ({
+            name: ex.name,
+            sets: ex.sets.map((s) => ({
+              set_number: s.set_number,
+              active_seconds: s.active_seconds,
+              rest_seconds: s.rest_seconds,
+            })),
           })),
-        })),
+          restDefault ?? 0,
+        ),
       ),
-    [routine.exercises],
+    [routine.exercises, restDefault],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadRestSecondsDefault().then((seconds) => {
+      if (!cancelled) setRestDefault(seconds);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleAdjustRestDefault = (delta: number) => {
+    const next = clampRestSeconds((restDefault ?? DEFAULT_REST_SECONDS) + delta);
+    setRestDefault(next);
+    void saveRestSecondsDefault(next);
+  };
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remaining, setRemaining] = useState(() => sequence[0]?.durationSeconds ?? 0);
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const currentPhase: TimerPhase | undefined = sequence[currentIndex];
 
@@ -56,6 +89,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   useEffect(() => {
     if (!isRunning || isComplete) return;
     const id = setInterval(() => {
+      setElapsedSeconds((e) => e + 1);
       setRemaining((prev) => {
         if (prev > 1) return prev - 1;
 
@@ -99,6 +133,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
     onFinish();
   };
 
+  const handleAdjustRemaining = (delta: number) => {
+    setRemaining((prev) => Math.max(1, prev + delta));
+  };
+
   const handleCancel = () => {
     Alert.alert('End workout?', 'Progress will not be saved.', [
       { text: 'Keep going', style: 'cancel' },
@@ -114,6 +152,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
   };
 
   if (isComplete) {
+    const summary = summarizeCompletedSets(sequence, currentIndex);
+    const totalSets = computeSessionTotalSets(summary);
     return (
       <Screen>
         <View className="flex-1 justify-center">
@@ -126,6 +166,32 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
               <Text className="text-center text-sm" style={{ color: tokens.textMuted }}>
                 {routine.name} is done. Save this session to update your history.
               </Text>
+              <View className="flex-row gap-6">
+                <View className="items-center">
+                  <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                    {formatWorkoutTime(elapsedSeconds)}
+                  </Text>
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    Duration
+                  </Text>
+                </View>
+                <View className="items-center">
+                  <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                    {totalSets}
+                  </Text>
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    Sets done
+                  </Text>
+                </View>
+                <View className="items-center">
+                  <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                    {summary.length}
+                  </Text>
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    Exercises
+                  </Text>
+                </View>
+              </View>
               <View className="w-full">
                 <Button label="Save and finish" onPress={handleFinish} color={WORKOUT_COLOR} />
               </View>
@@ -220,6 +286,57 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel }: Props) {
           ) : (
             <Button label="Skip" variant="ghost" onPress={handleSkip} />
           )}
+          {!isActive ? (
+            <View className="flex-row items-center justify-center gap-6">
+              <Pressable
+                onPress={() => handleAdjustRemaining(-REST_SECONDS_STEP)}
+                accessibilityRole="button"
+                accessibilityLabel={`Reduce rest by ${REST_SECONDS_STEP} seconds`}
+                className="rounded-full px-4 py-2"
+                style={{ backgroundColor: tokens.surfaceElevated }}
+              >
+                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                  −{REST_SECONDS_STEP}s
+                </Text>
+              </Pressable>
+              <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                Rest adjust
+              </Text>
+              <Pressable
+                onPress={() => handleAdjustRemaining(REST_SECONDS_STEP)}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${REST_SECONDS_STEP} seconds of rest`}
+                className="rounded-full px-4 py-2"
+                style={{ backgroundColor: tokens.surfaceElevated }}
+              >
+                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                  +{REST_SECONDS_STEP}s
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+
+        <View className="mt-5 flex-row items-center justify-center gap-3">
+          <Text className="text-xs" style={{ color: tokens.textMuted }}>
+            Default rest: {restDefault === null ? '…' : `${restDefault}s`}
+          </Text>
+          <Pressable
+            onPress={() => handleAdjustRestDefault(-REST_SECONDS_STEP)}
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease default rest to at least ${REST_SECONDS_MIN} seconds`}
+            hitSlop={8}
+          >
+            <Text className="text-sm font-semibold text-workout">−</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleAdjustRestDefault(REST_SECONDS_STEP)}
+            accessibilityRole="button"
+            accessibilityLabel={`Increase default rest up to ${REST_SECONDS_MAX} seconds`}
+            hitSlop={8}
+          >
+            <Text className="text-sm font-semibold text-workout">+</Text>
+          </Pressable>
         </View>
 
         {currentIndex + 1 < sequence.length ? (

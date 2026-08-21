@@ -120,12 +120,17 @@ describe('daysUntilDate / computeTargetDateCountdown', () => {
 
   it('labels today, remaining, and overdue states', () => {
     expect(computeTargetDateCountdown('2026-08-20', '2026-08-20')?.label).toBe('Due today');
+<<<<<<< Updated upstream
     expect(computeTargetDateCountdown('2026-08-22', '2026-08-20')?.label).toBe(
       '2 days remaining',
     );
     expect(computeTargetDateCountdown('2026-08-19', '2026-08-20')?.label).toBe(
       '1 day overdue',
     );
+=======
+    expect(computeTargetDateCountdown('2026-08-22', '2026-08-20')?.label).toBe('2 days remaining');
+    expect(computeTargetDateCountdown('2026-08-19', '2026-08-20')?.label).toBe('1 day overdue');
+>>>>>>> Stashed changes
     expect(computeTargetDateCountdown('2026-08-19', '2026-08-20')?.isOverdue).toBe(true);
   });
 });
@@ -144,11 +149,15 @@ describe('filterProjectRows / sortProjectRows', () => {
   });
 
   it('sorts by progress descending', () => {
+<<<<<<< Updated upstream
     expect(sortProjectRows(rows, 'progress').map((r) => r.project.id)).toEqual([
       'b',
       'c',
       'a',
     ]);
+=======
+    expect(sortProjectRows(rows, 'progress').map((r) => r.project.id)).toEqual(['b', 'c', 'a']);
+>>>>>>> Stashed changes
   });
 
   it('sorts by target date ascending with undated last', () => {
@@ -157,11 +166,15 @@ describe('filterProjectRows / sortProjectRows', () => {
       makeRow({ project: { id: 'y', target_date: null } }),
       makeRow({ project: { id: 'z', target_date: '2026-05-01' } }),
     ];
+<<<<<<< Updated upstream
     expect(sortProjectRows(dated, 'target_date').map((r) => r.project.id)).toEqual([
       'z',
       'x',
       'y',
     ]);
+=======
+    expect(sortProjectRows(dated, 'target_date').map((r) => r.project.id)).toEqual(['z', 'x', 'y']);
+>>>>>>> Stashed changes
   });
 
   it('sorts by name and preserves manual order for the manual key', () => {
@@ -169,10 +182,14 @@ describe('filterProjectRows / sortProjectRows', () => {
       makeRow({ project: { id: '1', name: 'Beta' } }),
       makeRow({ project: { id: '2', name: 'Alpha' } }),
     ];
+<<<<<<< Updated upstream
     expect(sortProjectRows(named, 'name').map((r) => r.project.name)).toEqual([
       'Alpha',
       'Beta',
     ]);
+=======
+    expect(sortProjectRows(named, 'name').map((r) => r.project.name)).toEqual(['Alpha', 'Beta']);
+>>>>>>> Stashed changes
     expect(sortProjectRows(named, 'manual').map((r) => r.project.id)).toEqual(['1', '2']);
   });
 });

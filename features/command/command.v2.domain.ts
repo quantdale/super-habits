@@ -200,6 +200,99 @@ function parseFocusStart(input: ParseCommandInput): DraftStartFocusSession | nul
   });
 }
 
+function parseProjectCreation(input: ParseCommandInput): DraftCreateProject | null {
+  const text = input.rawText.trim();
+  const match = text.match(
+    /^(?:please\s+)?(?:create|make|add|new)\s+(?:a\s+)?project(?:\s+(?:called|named))?\s+(.+)$/i,
+  );
+  if (!match) return null;
+
+  let workingText = match[1];
+  const dateMatch = workingText.match(DATE_PATTERN);
+  let targetDate: string | null = null;
+  if (dateMatch) {
+    targetDate = dateMatch[0];
+    workingText = workingText.replace(dateMatch[0], ' ');
+  }
+  workingText = workingText.replace(/\b(?:due|by|target(?:\s+date)?)\b/gi, ' ');
+
+  const colorMatch = workingText.match(
+    /\b(blue|green|violet|orange|amber|pink|teal|red|indigo|lime)\b/i,
+  );
+  let color: string | null = null;
+  if (colorMatch) {
+    color = colorMatch[1].toLowerCase();
+    workingText = workingText.replace(colorMatch[0], ' ');
+  }
+
+  const name = clean(workingText.replace(/[.,!?;:]+$/g, ''));
+  return baseDraft<DraftCreateProject>({
+    kind: 'create_project',
+    rawText: input.rawText,
+    status: name ? 'ready' : 'needs_input',
+    fields: { name, color, targetDate },
+    missingFields: name ? [] : [{ field: 'name', message: 'What should the project be called?' }],
+  });
+}
+
+function parseGoalProgressUpdate(input: ParseCommandInput): DraftUpdateGoalProgress | null {
+  const text = input.rawText.trim();
+  const match = text.match(
+    /^(?:please\s+)?(?:set|update)\s+goal\s+(.+?)\s+(?:to|at)\s+(\d{1,3})\s*%$/i,
+  );
+  if (!match) return null;
+
+  const rawPercent = Number(match[2]);
+  const warnings: DraftWarning[] = [];
+  if (rawPercent > 100) {
+    warnings.push({
+      code: 'percent_clamped',
+      message: 'Progress was clamped to the 0–100 range.',
+    });
+  }
+  const goalTitle = clean(match[1]);
+  return baseDraft<DraftUpdateGoalProgress>({
+    kind: 'update_goal_progress',
+    rawText: input.rawText,
+    status: goalTitle ? 'ready' : 'needs_input',
+    warnings,
+    fields: { goalTitle, percent: Math.min(100, Math.max(0, rawPercent)) },
+    missingFields: goalTitle
+      ? []
+      : [{ field: 'goalTitle', message: 'Which Goal should be updated?' }],
+  });
+}
+
+function parseDailyPlanAddition(input: ParseCommandInput): DraftAddTodoToDailyPlan | null {
+  const text = input.rawText.trim();
+  const match = text.match(
+    /^(?:please\s+)?add\s+(.+?)\s+to\s+(?:my\s+)?plan(?:\s+for\s+(today|tomorrow))?$/i,
+  );
+  if (!match) return null;
+
+  let dateKey: string | null = null;
+  if (match[2]) {
+    if (match[2].toLowerCase() === 'tomorrow') {
+      const nextDay = new Date(input.now);
+      nextDay.setDate(nextDay.getDate() + 1);
+      dateKey = toDateKey(nextDay);
+    } else {
+      dateKey = toDateKey(input.now);
+    }
+  }
+
+  const todoTitle = clean(match[1]);
+  return baseDraft<DraftAddTodoToDailyPlan>({
+    kind: 'add_todo_to_daily_plan',
+    rawText: input.rawText,
+    status: todoTitle ? 'ready' : 'needs_input',
+    fields: { todoTitle, dateKey },
+    missingFields: todoTitle
+      ? []
+      : [{ field: 'todoTitle', message: 'Which Todo should be added to the plan?' }],
+  });
+}
+
 export function parseV2CommandDraft(input: ParseCommandInput): ParseCommandResult | null {
   const text = input.rawText.trim();
   if (!text) return null;
@@ -209,7 +302,10 @@ export function parseV2CommandDraft(input: ParseCommandInput): ParseCommandResul
     parseCalorieEntry(input) ??
     parseWorkoutLog(input) ??
     parseTodoCompletion(input) ??
-    parseHabitLog(input);
+    parseHabitLog(input) ??
+    parseGoalProgressUpdate(input) ??
+    parseDailyPlanAddition(input) ??
+    parseProjectCreation(input);
   if (parsed) return { outcome: 'draft', draft: parsed };
 
   // Preserve existing V1 create parsing for all other text. This branch is

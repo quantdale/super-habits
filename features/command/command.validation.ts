@@ -100,5 +100,31 @@ export function validateCommandDraftFields(draft: DraftAiAction): string | null 
         draft.fields.durationMinutes >= COMMAND_MIN_FOCUS_MINUTES
         ? null
         : `Focus duration must be a whole number from ${COMMAND_MIN_FOCUS_MINUTES} to ${COMMAND_MAX_FOCUS_MINUTES} minutes.`;
+    case 'create_project':
+      if (!normalizeReference(draft.fields.name)) {
+        return 'Add the project name before continuing.';
+      }
+      if (draft.fields.targetDate !== null && !isValidCommandDateKey(draft.fields.targetDate)) {
+        return 'Project target date must be a valid local date.';
+      }
+      return null;
+    case 'update_goal_progress':
+      if (!normalizeReference(draft.fields.goalTitle)) {
+        return 'Add the goal title before continuing.';
+      }
+      return draft.fields.percent !== null &&
+        Number.isFinite(draft.fields.percent) &&
+        draft.fields.percent >= 0 &&
+        draft.fields.percent <= 100
+        ? null
+        : 'Goal progress must be between 0 and 100 percent.';
+    case 'add_todo_to_daily_plan':
+      if (!normalizeReference(draft.fields.todoTitle)) {
+        return 'Add the Todo title before continuing.';
+      }
+      if (draft.fields.dateKey !== null && !isValidCommandDateKey(draft.fields.dateKey)) {
+        return 'Daily plan date must be a valid local date.';
+      }
+      return null;
   }
 }

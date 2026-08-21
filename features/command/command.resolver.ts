@@ -1,4 +1,4 @@
-import type { Habit, Todo, WorkoutRoutine } from '@/core/db/types';
+import type { Goal, Habit, Todo, WorkoutRoutine } from '@/core/db/types';
 
 export type EntityResolutionStatus =
   'exact' | 'ambiguous' | 'not_found' | 'deleted' | 'already_satisfied' | 'conflict';
@@ -73,6 +73,14 @@ export function resolveWorkoutRoutineReference(
   allRoutines: WorkoutRoutine[] = activeRoutines,
 ): EntityResolution<WorkoutRoutine> {
   return resolveNamedEntity(reference, activeRoutines, allRoutines, (routine) => routine.name);
+}
+
+export function resolveGoalReference(
+  reference: string | null,
+  activeGoals: Goal[],
+  allGoals: Goal[] = activeGoals,
+): EntityResolution<Goal> {
+  return resolveNamedEntity(reference, activeGoals, allGoals, (goal) => goal.title);
 }
 
 export function resolutionMessage(resolution: EntityResolution<unknown>, label: string): string {

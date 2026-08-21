@@ -17,6 +17,15 @@ import {
   getPomodoroSettings,
   savePomodoroSettings,
 } from '@/features/pomodoro/pomodoro.data';
+import { listTodos } from '@/features/todos/todos.data';
+import type { Todo } from '@/core/db/types';
+import { getActivePresetId, getPomodoroPresets, setActivePresetId } from './pomodoro.presets.store';
+import {
+  getAllSessionAssociations,
+  getAllSessionNotes,
+  setSessionAssociation,
+  type SessionAssociation,
+} from './pomodoro.sessionMeta';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import type { PomodoroSession } from './types';
@@ -25,14 +34,19 @@ import {
   buildPomodoroHeatmapDays,
   applySettingsToTimerState,
   calculateGrowthProgress,
+  computeFocusStats,
   computePomodoroStreakFromHeatmapDays,
   DEFAULT_SETTINGS,
+  BUILT_IN_PRESETS,
+  getAbandonNotice,
   getModeColor,
   getModeDuration,
   getModeLabel,
   getNextMode,
   getPlantStage,
+  shouldAutoStartNext,
   type PomodoroMode,
+  type PomodoroPreset,
   type PomodoroSettings,
 } from './pomodoro.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
@@ -41,6 +55,10 @@ import { FocusSprout } from './FocusSprout';
 import { GardenGrid } from './GardenGrid';
 import { BackgroundWarning } from './BackgroundWarning';
 import { PomodoroSettingsInline } from './PomodoroSettingsInline';
+import { PomodoroPresetSelector } from './PomodoroPresetSelector';
+import { TodoAssociationPicker } from './TodoAssociationPicker';
+import { SessionNotePrompt } from './SessionNotePrompt';
+import { RecentSessionsList } from './RecentSessionsList';
 import {
   usePomodoroCommandBridge,
   type PomodoroCommandStartResult,
@@ -76,6 +94,15 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [pomodoroHeatmapDays, setPomodoroHeatmapDays] = useState<HeatmapDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
+  const [presets, setPresets] = useState<PomodoroPreset[]>(BUILT_IN_PRESETS);
+  const [activePresetId, setActivePresetIdState] = useState<string | null>(BUILT_IN_PRESETS[0].id);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [todosLoading, setTodosLoading] = useState(false);
+  const [pendingAssociation, setPendingAssociation] = useState<SessionAssociation | null>(null);
+  const [associations, setAssociations] = useState<Record<string, SessionAssociation>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [notePromptSessionId, setNotePromptSessionId] = useState<string | null>(null);
+  const [showLinkTodo, setShowLinkTodo] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickTime = useRef<number | null>(null);
   const startInFlightRef = useRef(false);
@@ -85,6 +112,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const settingsRef = useRef<PomodoroSettings>(DEFAULT_SETTINGS);
   const totalSecondsRef = useRef(DEFAULT_SETTINGS.focusMinutes * 60);
   const startedAtRef = useRef<Date | null>(null);
+  const activePresetRef = useRef<PomodoroPreset>(BUILT_IN_PRESETS[0]);
+  const pendingAssociationRef = useRef<SessionAssociation | null>(null);
+  const startRef = useRef<((minutes?: number) => Promise<PomodoroCommandStartResult>) | null>(null);
 
   useEffect(() => {
     currentModeRef.current = currentMode;
@@ -92,6 +122,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     settingsRef.current = settings;
     totalSecondsRef.current = totalSeconds;
     startedAtRef.current = startedAt;
+    pendingAssociationRef.current = pendingAssociation;
   });
   useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
 
@@ -120,11 +151,38 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     const s = await listPomodoroSessionsForDateRange(startKey, endKey);
     setSessions(s);
     setPomodoroHeatmapDays(buildPomodoroHeatmapDays(s, 364));
+    const [assocMap, noteMap] = await Promise.all([
+      getAllSessionAssociations(),
+      getAllSessionNotes(),
+    ]);
+    setAssociations(assocMap);
+    setNotes(noteMap);
+  }, []);
+
+  const loadPresets = useCallback(async () => {
+    const stored = await getPomodoroPresets();
+    setPresets(stored);
+    const activeId = await getActivePresetId(stored);
+    setActivePresetIdState(activeId);
+    if (activeId) {
+      activePresetRef.current = stored.find((p) => p.id === activeId) ?? BUILT_IN_PRESETS[0];
+    }
+  }, []);
+
+  const loadTodos = useCallback(async () => {
+    setTodosLoading(true);
+    try {
+      setTodos(await listTodos());
+    } catch {
+      setTodos([]);
+    } finally {
+      setTodosLoading(false);
+    }
   }, []);
 
   const refresh = useCallback(async () => {
-    await Promise.all([loadHistory(), loadSettings()]);
-  }, [loadHistory, loadSettings]);
+    await Promise.all([loadHistory(), loadSettings(), loadPresets()]);
+  }, [loadHistory, loadSettings, loadPresets]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
@@ -172,14 +230,19 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
           if (mode === 'focus' && started) {
             const endedAt = new Date();
-            void logPomodoroSession(
-              started.toISOString(),
-              endedAt.toISOString(),
-              totalSec,
-              'focus',
-            ).catch((err) => {
-              console.error('[PomodoroScreen] logPomodoroSession failed', err);
-            });
+            void logPomodoroSession(started.toISOString(), endedAt.toISOString(), totalSec, 'focus')
+              .then((sessionId) => {
+                const assoc = pendingAssociationRef.current;
+                if (assoc) {
+                  void setSessionAssociation(sessionId, assoc)
+                    .then(() => setPendingAssociation(null))
+                    .catch(() => undefined);
+                }
+                setNotePromptSessionId(sessionId);
+              })
+              .catch((err) => {
+                console.error('[PomodoroScreen] logPomodoroSession failed', err);
+              });
             void loadHistory();
             const nextCompleted = completedFocusRef.current + 1;
             setCompletedFocus(nextCompleted);
@@ -201,6 +264,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           setStartedAt(null);
           startedAtRef.current = null;
           setShowWarning(false);
+
+          // Preset-driven auto-start: begin the suggested next mode after a
+          // short beat so the completion state is briefly visible.
+          if (shouldAutoStartNext(mode, activePresetRef.current)) {
+            setTimeout(() => {
+              void startRef.current?.();
+            }, 800);
+          }
 
           return nextDuration;
         }
@@ -284,6 +355,45 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     [start],
   );
 
+  useEffect(() => {
+    startRef.current = start;
+  }, [start]);
+
+  const handleSelectPreset = useCallback(
+    async (preset: PomodoroPreset) => {
+      activePresetRef.current = preset;
+      setActivePresetIdState(preset.id);
+      await setActivePresetId(preset.id).catch(() => undefined);
+      // Applying a preset rewrites the timer settings; a running or paused
+      // session keeps its current duration and the preset applies next round.
+      if (isRunning || isPaused) return;
+      await savePomodoroSettings({
+        focusMinutes: preset.focusMinutes,
+        shortBreakMinutes: preset.shortBreakMinutes,
+        longBreakMinutes: preset.longBreakMinutes,
+        sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
+      });
+      setSettings((prev) => ({
+        ...prev,
+        focusMinutes: preset.focusMinutes,
+        shortBreakMinutes: preset.shortBreakMinutes,
+        longBreakMinutes: preset.longBreakMinutes,
+        sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
+      }));
+      const duration = getModeDuration(currentModeRef.current, {
+        focusMinutes: preset.focusMinutes,
+        shortBreakMinutes: preset.shortBreakMinutes,
+        longBreakMinutes: preset.longBreakMinutes,
+        sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
+      });
+      setTotalSeconds(duration);
+      totalSecondsRef.current = duration;
+      setRemaining(duration);
+      lastTickTime.current = null;
+    },
+    [isPaused, isRunning],
+  );
+
   useEffect(
     () =>
       registerCommandTimer({
@@ -335,6 +445,15 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const upNextMinutes = Math.round(getModeDuration(upNextMode, settings) / 60);
 
   const pomodoroStreak = computePomodoroStreakFromHeatmapDays(pomodoroHeatmapDays);
+  const focusStats = computeFocusStats(sessions, new Date());
+  const elapsedSeconds = totalSeconds - remaining;
+  const abandonNotice = getAbandonNotice({
+    mode: currentMode,
+    phase: isRunning ? 'running' : isPaused ? 'paused' : 'idle',
+    remaining,
+    totalSeconds,
+  });
+  const abandonLabel = currentMode === 'focus' && elapsedSeconds >= 60 ? 'Abandon' : 'Reset';
 
   return (
     <Screen scroll>
@@ -374,6 +493,45 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             />
           </View>
         </View>
+        <View className="mt-3 flex-row flex-wrap gap-3">
+          <View className="min-w-[110px] flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={textColor}
+              icon="today"
+              title="Today"
+              value={`${focusStats.todayMinutes}m`}
+              subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
+              note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
+            />
+          </View>
+          <View className="min-w-[110px] flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={textColor}
+              icon="date-range"
+              title="This week"
+              value={`${focusStats.weekMinutes}m`}
+              subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
+              note="Last 7 days"
+            />
+          </View>
+          <View className="min-w-[110px] flex-1">
+            <FeatureStatCard
+              accentColor={COLOR}
+              textColor={textColor}
+              icon="insights"
+              title="30 days"
+              value={`${focusStats.thirtyDayMinutes}m`}
+              subtitle={
+                focusStats.bestDay
+                  ? `Best day ${focusStats.bestDay.minutes}m`
+                  : `${focusStats.thirtyDaySessions} sessions`
+              }
+              note={focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'}
+            />
+          </View>
+        </View>
       </ScreenSection>
 
       <ScreenSection>
@@ -384,6 +542,15 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           headerSubtitle="Classic focus and break sequence with live progress."
           className="mb-0"
         >
+          <View className="mb-4">
+            <PomodoroPresetSelector
+              presets={presets}
+              activePresetId={activePresetId}
+              onSelect={(p) => void handleSelectPreset(p)}
+              disabled={isRunning || isPaused}
+            />
+          </View>
+
           <View className="mb-4 flex-row flex-wrap justify-center">
             {(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => (
               <PillChip
@@ -449,6 +616,12 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           </View>
 
           <View className="mt-4 gap-3">
+            {abandonNotice ? (
+              <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+                {abandonNotice.title} {abandonNotice.body}
+              </Text>
+            ) : null}
+
             {!isRunning && !isPaused && remaining === totalSeconds ? (
               <Button label={startLabel} onPress={() => void start()} color={COLOR} />
             ) : null}
@@ -459,7 +632,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   <Button label="Pause" variant="ghost" onPress={pause} />
                 </View>
                 <View className="flex-1">
-                  <Button label="Reset" variant="ghost" onPress={reset} />
+                  <Button label={`${abandonLabel} (not logged)`} variant="ghost" onPress={reset} />
                 </View>
               </View>
             ) : null}
@@ -470,7 +643,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   <Button label="Resume" onPress={resume} color={COLOR} />
                 </View>
                 <View className="flex-1">
-                  <Button label="Reset" variant="ghost" onPress={reset} />
+                  <Button label={`${abandonLabel} (not logged)`} variant="ghost" onPress={reset} />
                 </View>
               </View>
             ) : null}
@@ -498,15 +671,81 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         </ScreenSection>
       ) : null}
 
+      {!isRunning && !isPaused && currentMode === 'focus' ? (
+        <ScreenSection>
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Link a todo"
+            headerSubtitle={
+              pendingAssociation
+                ? `Next focus will be linked to “${pendingAssociation.todoTitle}”.`
+                : 'Optionally attach an open todo to your next focus session.'
+            }
+            className="mb-0"
+          >
+            {showLinkTodo ? (
+              <View className="gap-3">
+                <TodoAssociationPicker
+                  todos={todos}
+                  selected={pendingAssociation}
+                  onSelect={setPendingAssociation}
+                  onRetryLoad={() => void loadTodos()}
+                  loading={todosLoading}
+                />
+                <View className="self-start">
+                  <Button label="Done" variant="ghost" onPress={() => setShowLinkTodo(false)} />
+                </View>
+              </View>
+            ) : (
+              <View className="self-start">
+                <Button
+                  label={pendingAssociation ? 'Change linked todo' : 'Choose a todo'}
+                  variant="ghost"
+                  onPress={() => {
+                    setShowLinkTodo(true);
+                    if (todos.length === 0) void loadTodos();
+                  }}
+                />
+              </View>
+            )}
+          </Card>
+        </ScreenSection>
+      ) : null}
+
+      {notePromptSessionId ? (
+        <ScreenSection>
+          <Card
+            variant="header"
+            accentColor={COLOR}
+            headerTitle="Session complete"
+            headerSubtitle="Add an optional note to remember what this session was for."
+            className="mb-0"
+          >
+            <SessionNotePrompt
+              sessionId={notePromptSessionId}
+              onSaved={() => {
+                setNotePromptSessionId(null);
+                void loadHistory();
+              }}
+              onDismiss={() => setNotePromptSessionId(null)}
+            />
+          </Card>
+        </ScreenSection>
+      ) : null}
+
       <ScreenSection className="mb-0">
         <Card
           variant="header"
           accentColor={COLOR}
           headerTitle="Focus history"
-          headerSubtitle="Garden view plus the last 52 weeks of activity."
+          headerSubtitle="Recent sessions, garden view, and the last 52 weeks of activity."
           className="mb-0"
         >
-          <GardenGrid sessions={sessions} />
+          <RecentSessionsList sessions={sessions} associations={associations} notes={notes} />
+          <View className="mt-4">
+            <GardenGrid sessions={sessions} />
+          </View>
           <View className="mt-6 w-full min-w-0 items-center justify-center">
             <GitHubHeatmap days={pomodoroHeatmapDays} color={COLOR} weeks={52} />
           </View>

@@ -25,7 +25,7 @@ async function readJsonMap<T>(key: string): Promise<Record<string, T>> {
   try {
     const raw = await AsyncStorage.getItem(key);
     if (!raw) return {};
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     return parsed as Record<string, T>;
   } catch {

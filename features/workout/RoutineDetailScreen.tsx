@@ -44,6 +44,7 @@ type Props = {
   routineName: string;
   onClose: () => void;
   onStartWorkout: () => void;
+  onUseAsTemplate?: () => void | Promise<void>;
 };
 
 export function RoutineDetailModal({
@@ -52,6 +53,7 @@ export function RoutineDetailModal({
   routineName,
   onClose,
   onStartWorkout,
+  onUseAsTemplate,
 }: Props) {
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -307,6 +309,19 @@ export function RoutineDetailModal({
         {exercises.length > 0 ? (
           <View className="mt-6">
             <Button label="Start workout" onPress={onStartWorkout} color={COLOR} />
+          </View>
+        ) : null}
+
+        {exercises.length > 0 && onUseAsTemplate ? (
+          <View className="mt-3">
+            <Button
+              label="Use as template (duplicate)"
+              variant="ghost"
+              onPress={() => void onUseAsTemplate()}
+            />
+            <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
+              Creates “{routineName} (copy)” with the same exercises and sets.
+            </Text>
           </View>
         ) : null}
       </Modal>

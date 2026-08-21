@@ -23,6 +23,11 @@ import {
   listPendingTodos,
   type PendingTodoFilters,
 } from '@/features/todos/todos.data';
+import { listProjects, listTodosForProject } from '@/features/projects/projects.data';
+import { listGoals } from '@/features/goals/goals.data';
+import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
+import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
 import { listRoutines, listWorkoutLogsForRange } from '@/features/workout/workout.data';
 import { timestampToLocalDateKey, dateKeyToLocalDate, toDateKey } from '@/lib/time';
 import { isValidCommandDateKey, normalizeReference } from './command.validation';
@@ -32,10 +37,13 @@ import type {
   CalorieSummaryFacts,
   DailyOverviewFacts,
   FocusSummaryFacts,
+  GoalProgressFacts,
   HabitProgressFacts,
   HabitProgressMetric,
   HabitStreakFacts,
   PendingTodosFacts,
+  ProjectStatusFacts,
+  TodayFocusFacts,
   WorkoutSummaryFacts,
 } from './ask.types';
 
@@ -48,6 +56,10 @@ export class AskRetrievalError extends Error {
     | 'habit_ambiguous'
     | 'routine_not_found'
     | 'routine_ambiguous'
+    | 'project_not_found'
+    | 'project_ambiguous'
+    | 'goal_not_found'
+    | 'goal_ambiguous'
     | 'invalid_range';
 
   constructor(reasonCode: AskRetrievalError['reasonCode'], message: string) {
@@ -385,3 +397,120 @@ export async function retrieveDailyOverview(dateKey: string): Promise<DailyOverv
 }
 
 export { defaultRange, validateRange, MAX_ASK_RANGE_DAYS };
+
+// ---------------------------------------------------------------------------
+// Planning Ask retrieval (W6): projects / goals / daily plan. These are local
+// deterministic lookups with bounded results; they are not remote intents yet.
+// ---------------------------------------------------------------------------
+
+function normalizeNameReference(value: string | null): string {
+  return normalizeReference(value)?.toLocaleLowerCase() ?? '';
+}
+
+export async function retrieveProjectStatus(
+  projectName: string | null,
+): Promise<ProjectStatusFacts> {
+  const projects = await listProjects();
+  if (projectName) {
+    const normalized = normalizeNameReference(projectName);
+    const matches = projects.filter(
+      (project) => project.name.trim().toLocaleLowerCase() === normalized,
+    );
+    if (matches.length > 1) {
+      throw new AskRetrievalError(
+        'project_ambiguous',
+        `More than one Project named "${projectName}" was found.`,
+      );
+    }
+    const project = matches[0];
+    if (!project) {
+      throw new AskRetrievalError(
+        'project_not_found',
+        `No active Project named "${projectName}" was found.`,
+      );
+    }
+    const todos = await listTodosForProject(project.id);
+    return {
+      scope: 'single',
+      projects: [
+        {
+          name: project.name,
+          status: project.status,
+          targetDate: project.target_date,
+          openTodoCount: todos.filter((todo) => todo.completed === 0).length,
+        },
+      ],
+    };
+  }
+
+  const bounded = projects.slice(0, MAX_FACT_ITEMS);
+  const openCounts = await Promise.all(
+    bounded.map(async (project) => {
+      const todos = await listTodosForProject(project.id);
+      return todos.filter((todo) => todo.completed === 0).length;
+    }),
+  );
+  return {
+    scope: 'overall',
+    projects: bounded.map((project, index) => ({
+      name: project.name,
+      status: project.status,
+      targetDate: project.target_date,
+      openTodoCount: openCounts[index],
+    })),
+  };
+}
+
+export async function retrieveGoalProgressSummary(
+  goalTitle: string | null,
+): Promise<GoalProgressFacts> {
+  const goals = await listGoals();
+  let selected = goals;
+  if (goalTitle) {
+    const normalized = normalizeNameReference(goalTitle);
+    const matches = goals.filter((goal) => goal.title.trim().toLocaleLowerCase() === normalized);
+    if (matches.length > 1) {
+      throw new AskRetrievalError(
+        'goal_ambiguous',
+        `More than one Goal titled "${goalTitle}" was found.`,
+      );
+    }
+    if (matches.length === 0) {
+      throw new AskRetrievalError('goal_not_found', `No active Goal titled "${goalTitle}" was found.`);
+    }
+    selected = matches;
+  }
+
+  return {
+    scope: goalTitle ? 'single' : 'overall',
+    goals: selected.slice(0, MAX_FACT_ITEMS).map((goal) => ({
+      title: goal.title,
+      progressPercent: goal.progress_percent,
+      status: goal.status,
+    })),
+  };
+}
+
+export async function retrieveTodayFocus(dateKey: string): Promise<TodayFocusFacts> {
+  if (!isValidCommandDateKey(dateKey)) {
+    throw new AskRetrievalError('invalid_range', 'Focus date is invalid.');
+  }
+  const [plan, pendingTodos] = await Promise.all([
+    getDailyPlan(dateKey),
+    listPendingTodos({ todayDateKey: dateKey, limit: MAX_FACT_ITEMS }),
+  ]);
+  const topTodoIds = plan ? parseTopTodoIds(plan.top_todo_ids) : [];
+  const titleById = new Map(pendingTodos.map((todo) => [todo.id, todo.title]));
+  const topTodos = topTodoIds
+    .map((id) => titleById.get(id))
+    .filter((title): title is string => title !== null)
+    .slice(0, MAX_TOP_PRIORITIES);
+
+  return {
+    dateKey,
+    planIntention: plan?.intention?.trim() ? plan.intention.trim() : null,
+    topTodos: topTodos.map((title) => ({ title, completed: false })),
+    pendingTodoCount: pendingTodos.length,
+    habitsRemainingCount: null,
+  };
+}

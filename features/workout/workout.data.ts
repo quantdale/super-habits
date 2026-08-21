@@ -816,3 +816,104 @@ export async function getRoutineNamesByIds(ids: string[]): Promise<{ id: string;
     ids,
   );
 }
+
+// --- History detail ---
+
+export type WorkoutLogDetail = {
+  log: WorkoutLog;
+  routineName: string | null;
+  exercises: WorkoutSessionExercise[];
+};
+
+/** Full per-session detail: log header plus its workout_session_exercises rows. */
+export async function getWorkoutLogDetail(logId: string): Promise<WorkoutLogDetail | null> {
+  const db = await getDatabase();
+  const log = await db.getFirstAsync<WorkoutLog>(`SELECT * FROM workout_logs WHERE id = ?`, [
+    logId,
+  ]);
+  if (!log) return null;
+  const routine = await db.getFirstAsync<{ name: string }>(
+    `SELECT name FROM workout_routines WHERE id = ?`,
+    [log.routine_id],
+  );
+  const exercises = await db.getAllAsync<WorkoutSessionExercise>(
+    `SELECT * FROM workout_session_exercises
+     WHERE log_id = ?
+     ORDER BY created_at ASC, id ASC`,
+    [logId],
+  );
+  return { log, routineName: routine?.name ?? null, exercises };
+}
+
+/**
+ * Bounded per-session set totals for a local date-key range.
+ * Used by the volume-per-week chart; one row per session.
+ */
+export async function listSessionTotalsForRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<{ id: string; completedAt: string; totalSets: number }[]> {
+  const db = await getDatabase();
+  const { startUtcIso, endUtcExclusiveIso } = getUtcIsoRangeForLocalDateKeys(
+    startDateKey,
+    endDateKey,
+  );
+  return db.getAllAsync<{ id: string; completedAt: string; totalSets: number }>(
+    `SELECT l.id AS id,
+            l.completed_at AS completedAt,
+            COALESCE(SUM(e.sets_completed), 0) AS totalSets
+     FROM workout_logs l
+     LEFT JOIN workout_session_exercises e ON e.log_id = l.id
+     WHERE l.completed_at >= ? AND l.completed_at < ?
+     GROUP BY l.id, l.completed_at
+     ORDER BY l.completed_at DESC`,
+    [startUtcIso, endUtcExclusiveIso],
+  );
+}
+
+// --- Routine duplication ---
+
+/**
+ * Duplicate a routine ("use as template"): creates a new routine copying
+ * routine_exercises and routine_exercise_sets via the existing insert
+ * helpers (addExercise/addSet), which own the createId prefixes and sync
+ * enqueue calls for every nested row. Returns the new routine id, or null
+ * when the source routine no longer exists.
+ */
+export async function duplicateRoutine(routineId: string): Promise<string | null> {
+  const db = await getDatabase();
+  const source = await getRoutineWithExercises(routineId);
+  if (!source) return null;
+
+  const newId = createId('wrk');
+  const now = nowIso();
+  const newName = `${source.name} (copy)`;
+  await runSyncedMutation({
+    db,
+    record: { entity: 'workout_routines', id: newId, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb) => {
+      await transactionDb.runAsync(
+        'INSERT INTO workout_routines (id, name, description, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL)',
+        [newId, newName, source.description, now, now],
+      );
+      return { changed: true, value: undefined };
+    },
+  });
+
+  for (const exercise of source.exercises) {
+    const exerciseId = await addExercise({
+      routineId: newId,
+      name: exercise.name,
+      sortOrder: exercise.sort_order,
+    });
+    for (const set of exercise.sets) {
+      await addSet({
+        exerciseId,
+        setNumber: set.set_number,
+        activeSeconds: set.active_seconds,
+        restSeconds: set.rest_seconds,
+      });
+    }
+  }
+  return newId;
+}

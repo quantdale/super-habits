@@ -311,7 +311,10 @@ export const BUILT_IN_PRESETS: PomodoroPreset[] = [
   },
 ];
 
-function normalizePreset(candidate: Record<string, unknown>, fallback: PomodoroPreset): PomodoroPreset {
+function normalizePreset(
+  candidate: Record<string, unknown>,
+  fallback: PomodoroPreset,
+): PomodoroPreset {
   const name =
     typeof candidate.name === 'string' && candidate.name.trim().length > 0
       ? candidate.name.trim().slice(0, 40)
@@ -419,7 +422,6 @@ function isFocusSession(session: Pick<PomodoroSession, 'session_type'>): boolean
  */
 export function computeFocusStats(sessions: PomodoroSession[], today: Date): FocusStats {
   const perDay = new Map<string, { minutes: number; sessions: number }>();
-  let todayKeyCounted = false;
   let todayMinutes = 0;
   let todaySessions = 0;
 
@@ -433,7 +435,7 @@ export function computeFocusStats(sessions: PomodoroSession[], today: Date): Foc
     entry.minutes += minutes;
     entry.sessions += 1;
     perDay.set(dateKey, entry);
-    if (!todayKeyCounted && dateKey === todayDateKey) {
+    if (dateKey === todayDateKey) {
       todayMinutes += minutes;
       todaySessions += 1;
     }

@@ -17,7 +17,10 @@ export type DraftKind =
   | 'log_habit'
   | 'log_calorie_entry'
   | 'log_workout_routine'
-  | 'start_focus_session';
+  | 'start_focus_session'
+  | 'create_project'
+  | 'update_goal_progress'
+  | 'add_todo_to_daily_plan';
 export type ParsePath = 'mock' | 'remote' | 'remote_with_fallback';
 export type ParseLatencyBucket = 'fast' | 'noticeable' | 'frustrating';
 export type ParseUnsupportedReasonCode = 'unsupported';
@@ -42,7 +45,8 @@ export type DraftWarning = {
     | 'missing_nutrition'
     | 'active_timer_conflict'
     | 'already_satisfied'
-    | 'off_day';
+    | 'off_day'
+    | 'percent_clamped';
   message: string;
 };
 
@@ -130,6 +134,31 @@ export type DraftStartFocusSession = DraftBase<'start_focus_session'> & {
   };
 };
 
+export type DraftCreateProject = DraftBase<'create_project'> & {
+  kind: 'create_project';
+  fields: {
+    name: string | null;
+    color: string | null;
+    targetDate: string | null;
+  };
+};
+
+export type DraftUpdateGoalProgress = DraftBase<'update_goal_progress'> & {
+  kind: 'update_goal_progress';
+  fields: {
+    goalTitle: string | null;
+    percent: number | null;
+  };
+};
+
+export type DraftAddTodoToDailyPlan = DraftBase<'add_todo_to_daily_plan'> & {
+  kind: 'add_todo_to_daily_plan';
+  fields: {
+    todoTitle: string | null;
+    dateKey: string | null;
+  };
+};
+
 export type DraftAiAction =
   | DraftCreateTodo
   | DraftCompleteTodo
@@ -137,7 +166,10 @@ export type DraftAiAction =
   | DraftLogHabit
   | DraftLogCalorieEntry
   | DraftLogWorkoutRoutine
-  | DraftStartFocusSession;
+  | DraftStartFocusSession
+  | DraftCreateProject
+  | DraftUpdateGoalProgress
+  | DraftAddTodoToDailyPlan;
 
 export type ParseCommandInput = {
   rawText: string;
