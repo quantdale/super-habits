@@ -26,7 +26,6 @@ export function MacroDonutChart({
 }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const ringNeutral = tokens.border;
-  const overColor = tokens.dangerSolid;
   const consumed = totalKcal;
   const goal = Math.max(0, goalKcal);
 
@@ -47,8 +46,10 @@ export function MacroDonutChart({
       }
       return [{ value: Math.max(consumed, 1), color: sectionColor }];
     }
+    // Over-target stays informational (blueprint Gate F): the ring keeps the
+    // section accent instead of flipping to alarm red.
     if (consumed > goal) {
-      return [{ value: Math.max(consumed, 1), color: overColor }];
+      return [{ value: Math.max(consumed, 1), color: sectionColor }];
     }
     const remaining = goal - consumed;
     if (consumed <= 0) {
@@ -61,7 +62,7 @@ export function MacroDonutChart({
       { value: consumed, color: sectionColor },
       { value: remaining, color: ringNeutral },
     ];
-  }, [consumed, goal, overColor, ringNeutral, sectionColor]);
+  }, [consumed, goal, ringNeutral, sectionColor]);
 
   const macroValues = { protein, carbs, fats, fiber };
 

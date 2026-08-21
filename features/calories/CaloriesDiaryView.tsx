@@ -8,10 +8,12 @@ import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
-import { SavedMealChips } from './SavedMealChips';
+import { FrequentFoodChips, SavedMealChips } from './SavedMealChips';
+import { QuickAddKcal } from './QuickAddKcal';
 import { EntryMacroShareLine } from './EntryMacroShareLine';
 import { CopyDayModal, DiaryDayNavigator } from './DiaryDayNavigator';
 import { filterSavedMeals } from './calories.domain';
+import type { FrequentFood } from './calories.domain';
 import type { CalorieEntry, DailySummary, MealType, SavedMeal } from './types';
 
 export type MealSection = {
@@ -176,6 +178,7 @@ type CaloriesDiaryViewProps = {
   colorText: string;
   todayCard: ReactNode;
   recentMeals: SavedMeal[];
+  frequentFoods: FrequentFood[];
   allSavedMeals: SavedMeal[];
   groupedEntries: MealSection[];
   collapsedMeals: Partial<Record<MealType, boolean>>;
@@ -186,6 +189,8 @@ type CaloriesDiaryViewProps = {
   /** Last copy-day outcome, surfaced as inline status text. */
   copyStatus: string | null;
   onSelectSavedMeal: (meal: SavedMeal) => void;
+  onSelectFrequentFood: (food: FrequentFood) => void;
+  onQuickAddKcal: (kcal: number) => Promise<void>;
   onBrowseSavedMeals: () => void;
   onManualAdd: (query: string) => void;
   onToggleMealGroup: (mealType: MealType) => void;
@@ -288,14 +293,20 @@ const DiaryQuickAdd = memo(function DiaryQuickAdd({
   accentColor,
   allSavedMeals,
   recentMeals,
+  frequentFoods,
   onSelectSavedMeal,
+  onSelectFrequentFood,
+  onQuickAddKcal,
   onBrowseSavedMeals,
   onManualAdd,
 }: {
   accentColor: string;
   allSavedMeals: SavedMeal[];
   recentMeals: SavedMeal[];
+  frequentFoods: FrequentFood[];
   onSelectSavedMeal: (meal: SavedMeal) => void;
+  onSelectFrequentFood: (food: FrequentFood) => void;
+  onQuickAddKcal: (kcal: number) => Promise<void>;
   onBrowseSavedMeals: () => void;
   onManualAdd: (query: string) => void;
 }) {
@@ -312,6 +323,8 @@ const DiaryQuickAdd = memo(function DiaryQuickAdd({
         className="mb-0"
       >
         <SavedMealChips meals={recentMeals} onSelect={onSelectSavedMeal} />
+        <FrequentFoodChips foods={frequentFoods} onSelect={onSelectFrequentFood} />
+        <QuickAddKcal onSubmit={onQuickAddKcal} accentColor={accentColor} />
         <DiaryQuickAddSearch
           accentColor={accentColor}
           allSavedMeals={allSavedMeals}
@@ -329,23 +342,28 @@ function areDiaryQuickAddDataEqual(
     accentColor: string;
     allSavedMeals: SavedMeal[];
     recentMeals: SavedMeal[];
-    onSelectSavedMeal: (meal: SavedMeal) => void;
-    onBrowseSavedMeals: () => void;
-    onManualAdd: (query: string) => void;
+    frequentFoods: FrequentFood[];
+    onSelectFrequentFood: (food: FrequentFood) => void;
+    onQuickAddKcal: (kcal: number) => Promise<void>;
   }>,
   next: Readonly<{
     accentColor: string;
     allSavedMeals: SavedMeal[];
     recentMeals: SavedMeal[];
-    onSelectSavedMeal: (meal: SavedMeal) => void;
-    onBrowseSavedMeals: () => void;
-    onManualAdd: (query: string) => void;
+    frequentFoods: FrequentFood[];
+    onSelectFrequentFood: (food: FrequentFood) => void;
+    onQuickAddKcal: (kcal: number) => Promise<void>;
   }>,
 ): boolean {
   return (
     previous.accentColor === next.accentColor &&
     previous.allSavedMeals === next.allSavedMeals &&
-    previous.recentMeals === next.recentMeals
+    previous.recentMeals === next.recentMeals &&
+    // The quick-add handlers close over the diary's selected day; identity
+    // changes when that day moves, so the fresh closure must get through.
+    previous.frequentFoods === next.frequentFoods &&
+    previous.onSelectFrequentFood === next.onSelectFrequentFood &&
+    previous.onQuickAddKcal === next.onQuickAddKcal
   );
 }
 
@@ -354,6 +372,7 @@ export function CaloriesDiaryView({
   colorText,
   todayCard,
   recentMeals,
+  frequentFoods,
   allSavedMeals,
   groupedEntries,
   collapsedMeals,
@@ -361,6 +380,8 @@ export function CaloriesDiaryView({
   summaries,
   copyStatus,
   onSelectSavedMeal,
+  onSelectFrequentFood,
+  onQuickAddKcal,
   onBrowseSavedMeals,
   onManualAdd,
   onToggleMealGroup,
@@ -380,7 +401,10 @@ export function CaloriesDiaryView({
         accentColor={accentColor}
         allSavedMeals={allSavedMeals}
         recentMeals={recentMeals}
+        frequentFoods={frequentFoods}
         onSelectSavedMeal={onSelectSavedMeal}
+        onSelectFrequentFood={onSelectFrequentFood}
+        onQuickAddKcal={onQuickAddKcal}
         onBrowseSavedMeals={onBrowseSavedMeals}
         onManualAdd={onManualAdd}
       />

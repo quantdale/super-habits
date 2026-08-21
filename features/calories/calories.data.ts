@@ -88,6 +88,22 @@ export async function listCalorieEntries(dateKey = toDateKey()): Promise<Calorie
   );
 }
 
+/**
+ * All non-deleted entries logged between two date keys (inclusive), newest
+ * first. Feeds frequency rollups (e.g. the Frequent quick-log chips) that
+ * need food names across many days, which the per-day reader cannot provide.
+ */
+export async function listCalorieEntriesInRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<CalorieEntry[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<CalorieEntry>(
+    'SELECT * FROM calorie_entries WHERE deleted_at IS NULL AND consumed_on >= ? AND consumed_on <= ? ORDER BY created_at DESC',
+    [startDateKey, endDateKey],
+  );
+}
+
 export async function hasAnyCalorieEntries(): Promise<boolean> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ id: string }>(

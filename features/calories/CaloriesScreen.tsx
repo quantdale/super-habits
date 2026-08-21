@@ -19,6 +19,7 @@ import {
   getCalorieGoal,
   getCalorieSummaryByRange,
   listCalorieEntries,
+  listCalorieEntriesInRange,
   listRecentSavedMeals,
   searchSavedMeals,
   setCalorieGoal,
@@ -28,6 +29,7 @@ import {
   buildCalorieActivityDays,
   buildCalorieHeatmapDays,
   buildDailyTrend,
+  buildFrequentFoods,
   calculateGoalProgress,
   caloriesTotal,
   kcalFromMacros,
@@ -40,7 +42,7 @@ import type {
   MealType,
   SavedMeal,
 } from '@/features/calories/types';
-import type { MacroTargets } from '@/features/calories/calories.domain';
+import type { FrequentFood, MacroTargets } from '@/features/calories/calories.domain';
 
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { toDateKey } from '@/lib/time';
@@ -60,8 +62,16 @@ import { SavedMealSearchModal } from './SavedMealSearchModal';
 
 const COLOR = SECTION_COLORS.calories;
 const CALORIES_VIEW_MODE_STORAGE_KEY = 'superhabits.calories.viewMode';
+/** Food name for kcal-only quick-add entries written through the normal create path. */
+const QUICK_ADD_FOOD_NAME = 'Quick add';
 
 type CaloriesViewMode = 'form' | 'diary';
+
+/** Narrow prefill shape shared by saved-meal and frequent-food chip taps. */
+type MealPrefillSource = Pick<
+  SavedMeal,
+  'food_name' | 'protein' | 'carbs' | 'fats' | 'fiber' | 'meal_type'
+>;
 
 const MEAL_OPTIONS: readonly { value: MealType; label: string }[] = [
   { value: 'breakfast', label: 'Breakfast' },
@@ -139,6 +149,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
   const [recentMeals, setRecentMeals] = useState<SavedMeal[]>([]);
   const [allSavedMeals, setAllSavedMeals] = useState<SavedMeal[]>([]);
+  const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
@@ -158,6 +169,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const refresh = useCallback(async () => {
     const startYear = new Date();
     startYear.setDate(startYear.getDate() - 364);
+    // Rolling 30-day window feeding the Frequent chips (most-logged foods).
+    const startWindow = new Date();
+    startWindow.setDate(startWindow.getDate() - 29);
 
     // The diary's saved-meal search is interactive as soon as the Calories
     // section appears. Start its small catalog independently of the heavier
@@ -167,20 +181,26 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     const savedMealsPromise = Promise.all([listRecentSavedMeals(5), searchSavedMeals('')]);
     const summaryPromise = getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date()));
     const goalPromise = getCalorieGoal();
+    const frequentEntriesPromise = listCalorieEntriesInRange(
+      toDateKey(startWindow),
+      toDateKey(new Date()),
+    );
 
     const [recent, all] = await savedMealsPromise;
     setRecentMeals(recent);
     setAllSavedMeals(all);
 
-    const [nextEntries, rangeYear, savedGoal] = await Promise.all([
+    const [nextEntries, rangeYear, savedGoal, windowEntries] = await Promise.all([
       entriesPromise,
       summaryPromise,
       goalPromise,
+      frequentEntriesPromise,
     ]);
 
     setEntries(nextEntries);
     setSummary364(rangeYear);
     setGoal(savedGoal);
+    setFrequentFoods(buildFrequentFoods(windowEntries));
   }, [selectedDateKey]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
@@ -387,7 +407,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
   }, []);
 
-  const applySavedMealToDraft = (meal: SavedMeal) => {
+  /** Shared prefill for saved-meal and frequent-food chips; identical tap path. */
+  const applyMealToDraft = useCallback((meal: MealPrefillSource) => {
     setCalorieError(null);
     setEditingEntryId(null);
     setFood(meal.food_name);
@@ -396,14 +417,27 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setFats(String(meal.fats));
     setFiber(String(meal.fiber));
     setMealType(meal.meal_type as MealType);
-  };
+  }, []);
 
-  const handleSelectSavedMeal = (meal: SavedMeal) => {
-    applySavedMealToDraft(meal);
-    if (viewMode === 'diary') {
-      setEntryModalVisible(true);
-    }
-  };
+  const handleSelectSavedMeal = useCallback(
+    (meal: SavedMeal) => {
+      applyMealToDraft(meal);
+      if (viewMode === 'diary') {
+        setEntryModalVisible(true);
+      }
+    },
+    [applyMealToDraft, viewMode],
+  );
+
+  const handleSelectFrequentFood = useCallback(
+    (food: FrequentFood) => {
+      applyMealToDraft(food.latestEntry);
+      if (viewMode === 'diary') {
+        setEntryModalVisible(true);
+      }
+    },
+    [applyMealToDraft, viewMode],
+  );
 
   const openEntryEditModal = (entry: CalorieEntry) => {
     setFood(entry.food_name);
@@ -477,6 +511,29 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         // The copy is all-or-nothing: a failure left the selected day intact.
         setCopyStatus('Copy failed. Nothing was changed.');
       }
+      await refresh();
+    },
+    [refresh, selectedDateKey],
+  );
+
+  /**
+   * Kcal-only quick add. calorie_entries stores an explicit calories column,
+   * so a zero-macro entry needs no fabricated macros and no schema change;
+   * it rides the same create path (sync/backup intents included) as the full
+   * form and logs onto the diary's selected day (today in form mode).
+   */
+  const handleQuickAddKcal = useCallback(
+    async (kcal: number) => {
+      await addCalorieEntry({
+        foodName: QUICK_ADD_FOOD_NAME,
+        calories: kcal,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+        mealType: 'snack',
+        consumedOn: selectedDateKey,
+      });
       await refresh();
     },
     [refresh, selectedDateKey],
@@ -601,16 +658,15 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           className="h-2 w-full overflow-hidden rounded-full"
           style={{ backgroundColor: tokens.border }}
         >
+          {/* Over-target stays informational (blueprint Gate F): accent fill,
+              factual caption in the neutral-caution tone — never danger red. */}
           <View
             className="h-full rounded-full"
-            style={{
-              width: `${goalProgress.percent}%`,
-              backgroundColor: goalProgress.over ? tokens.dangerSolid : COLOR,
-            }}
+            style={{ width: `${goalProgress.percent}%`, backgroundColor: COLOR }}
           />
         </View>
         {goalProgress.over ? (
-          <Text className="mt-1 text-center text-xs" style={{ color: tokens.dangerText }}>
+          <Text className="mt-1 text-center text-xs" style={{ color: tokens.warningText }}>
             {caloriesTotal(entries) - goal.calories} kcal over goal
           </Text>
         ) : null}
@@ -632,12 +688,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
                 className="h-1.5 w-full overflow-hidden rounded-full"
                 style={{ backgroundColor: tokens.border }}
               >
+                {/* Macro over-target keeps the accent fill; the "n g over"
+                    caption beside the label already carries the fact. */}
                 <View
                   className="h-full rounded-full"
-                  style={{
-                    width: `${progress.percent}%`,
-                    backgroundColor: progress.over ? tokens.dangerSolid : COLOR,
-                  }}
+                  style={{ width: `${progress.percent}%`, backgroundColor: COLOR }}
                 />
               </View>
             </View>
@@ -677,6 +732,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           goalProgress={goalProgress}
           hasCalorieStripActivity={hasCalorieStripActivity}
           recentMeals={recentMeals}
+          frequentFoods={frequentFoods}
           allSavedMeals={allSavedMeals}
           entries={entries}
           todayCard={dailySummaryCard}
@@ -690,6 +746,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           computedKcal={computedKcal}
           calorieError={calorieError}
           onSelectSavedMeal={handleSelectSavedMeal}
+          onSelectFrequentFood={handleSelectFrequentFood}
+          onQuickAddKcal={handleQuickAddKcal}
           onBrowseSavedMeals={() => setSearchSheetVisible(true)}
           onFoodChange={(value) => {
             setCalorieError(null);
@@ -725,6 +783,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           colorText={colorText}
           todayCard={dailySummaryCard}
           recentMeals={recentMeals}
+          frequentFoods={frequentFoods}
           allSavedMeals={allSavedMeals}
           groupedEntries={groupedEntries}
           collapsedMeals={collapsedMeals}
@@ -732,6 +791,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           summaries={summary364}
           copyStatus={copyStatus}
           onSelectSavedMeal={handleSelectSavedMeal}
+          onSelectFrequentFood={handleSelectFrequentFood}
+          onQuickAddKcal={handleQuickAddKcal}
           onBrowseSavedMeals={() => setSearchSheetVisible(true)}
           onManualAdd={openManualAddModal}
           onToggleMealGroup={toggleMealGroup}

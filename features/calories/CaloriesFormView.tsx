@@ -11,7 +11,9 @@ import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import type { ActivityDay } from '@/features/shared/activityTypes';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
 import { EntryMacroShareLine } from './EntryMacroShareLine';
-import { SavedMealChips } from './SavedMealChips';
+import { FrequentFoodChips, SavedMealChips } from './SavedMealChips';
+import { QuickAddKcal } from './QuickAddKcal';
+import type { FrequentFood } from './calories.domain';
 import type { CalorieEntry, MealType, SavedMeal } from './types';
 
 const CalorieEntrySwipeRow = memo(
@@ -69,6 +71,7 @@ type CaloriesFormViewProps = {
   goalProgress: { percent: number; remaining: number; over: boolean };
   hasCalorieStripActivity: boolean;
   recentMeals: SavedMeal[];
+  frequentFoods: FrequentFood[];
   allSavedMeals: SavedMeal[];
   entries: CalorieEntry[];
   todayCard: ReactNode;
@@ -82,6 +85,8 @@ type CaloriesFormViewProps = {
   computedKcal: number;
   calorieError: string | null;
   onSelectSavedMeal: (meal: SavedMeal) => void;
+  onSelectFrequentFood: (food: FrequentFood) => void;
+  onQuickAddKcal: (kcal: number) => Promise<void>;
   onBrowseSavedMeals: () => void;
   onFoodChange: (value: string) => void;
   onProteinChange: (value: string) => void;
@@ -101,6 +106,7 @@ export function CaloriesFormView({
   goalProgress,
   hasCalorieStripActivity,
   recentMeals,
+  frequentFoods,
   allSavedMeals,
   entries,
   todayCard,
@@ -114,6 +120,8 @@ export function CaloriesFormView({
   computedKcal,
   calorieError,
   onSelectSavedMeal,
+  onSelectFrequentFood,
+  onQuickAddKcal,
   onBrowseSavedMeals,
   onFoodChange,
   onProteinChange,
@@ -162,6 +170,10 @@ export function CaloriesFormView({
         </View>
       </ScreenSection>
 
+      {/* Blueprint ordering: today's summary anchors the screen above the
+          add-entry form (diary mode already renders the summary first). */}
+      <ScreenSection>{todayCard}</ScreenSection>
+
       <ScreenSection>
         <Card
           variant="header"
@@ -171,6 +183,8 @@ export function CaloriesFormView({
           className="mb-0"
         >
           <SavedMealChips meals={recentMeals} onSelect={onSelectSavedMeal} />
+          <FrequentFoodChips foods={frequentFoods} onSelect={onSelectFrequentFood} />
+          <QuickAddKcal onSubmit={onQuickAddKcal} accentColor={accentColor} />
           {allSavedMeals.length > 0 ? (
             <Pressable
               onPress={onBrowseSavedMeals}
@@ -205,8 +219,6 @@ export function CaloriesFormView({
           />
         </Card>
       </ScreenSection>
-
-      <ScreenSection>{todayCard}</ScreenSection>
 
       {entries.length > 0 ? (
         <ScreenSection>

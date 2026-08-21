@@ -41,7 +41,8 @@ export function CaloriesCard({ summary, loading }: { summary: CaloriesSummary; l
             className="h-full rounded-full"
             style={{
               width: `${Math.min(100, Math.round(summary.ratio * 100))}%`,
-              backgroundColor: over ? '#EF4444' : accent,
+              // Over-target is information, not an error: fill stays the accent.
+              backgroundColor: accent,
             }}
           />
         </View>

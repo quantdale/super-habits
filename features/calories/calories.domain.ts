@@ -1,4 +1,4 @@
-import type { CalorieGoal, DailySummary, SavedMeal } from './types';
+import type { CalorieEntry, CalorieGoal, DailySummary, SavedMeal } from './types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { buildDateRange, buildDateRangeOldestFirst } from '@/lib/time';
@@ -397,4 +397,45 @@ export function buildCalorieHeatmapDays(
     if (pct < 0.66) return { dateKey, value: 2 };
     return { dateKey, value: 3 };
   });
+}
+
+export type FrequentFood = {
+  /** Display name — the most recent casing seen inside the window. */
+  foodName: string;
+  /** Times this food was logged inside the analyzed window. */
+  logCount: number;
+  /** Most recent entry in the window; the prefill source for re-logging. */
+  latestEntry: Pick<
+    CalorieEntry,
+    'food_name' | 'calories' | 'protein' | 'carbs' | 'fats' | 'fiber' | 'meal_type'
+  >;
+};
+
+/**
+ * Most-frequently-logged foods for the "Frequent" quick-log chips. Pure
+ * rollup: the caller supplies entries already filtered to the desired window
+ * (e.g. the last 30 days), newest-first as produced by the data layer, so
+ * `latestEntry` is the newest log and display casing follows it. Foods group
+ * case-insensitively; ties break alphabetically; top `limit` are returned.
+ */
+export function buildFrequentFoods(entries: CalorieEntry[], limit: number = 5): FrequentFood[] {
+  const buckets = new Map<
+    string,
+    { foodName: string; logCount: number; latestEntry: CalorieEntry }
+  >();
+  for (const entry of entries) {
+    const name = entry.food_name.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.logCount += 1;
+    } else {
+      buckets.set(key, { foodName: name, logCount: 1, latestEntry: entry });
+    }
+  }
+  return [...buckets.values()]
+    .sort((a, b) => b.logCount - a.logCount || a.foodName.localeCompare(b.foodName))
+    .slice(0, Math.max(0, limit))
+    .map(({ foodName, logCount, latestEntry }) => ({ foodName, logCount, latestEntry }));
 }
