@@ -70,6 +70,35 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
   const weekColumns = useMemo(() => buildHeatmapWeekColumns(days, weeks), [days, weeks]);
   const monthLabels = useMemo(() => monthLabelsForHeatmapWeeks(weekColumns), [weekColumns]);
 
+  // Container-level screen-reader summary (blueprint §9): total contributions,
+  // week span, best streak and busiest day. Individual cells stay unlabeled so
+  // they don't flood the accessibility tree — the grid reads as one element.
+  const summaryLabel = useMemo(() => {
+    const activeDays = days.filter((d) => d.value > 0);
+    if (days.length === 0 || activeDays.length === 0) {
+      return 'Activity heatmap: no activity recorded yet.';
+    }
+    const total = activeDays.reduce((sum, d) => sum + d.value, 0);
+    let bestDay = activeDays[0];
+    for (const d of activeDays) {
+      if (d.value > bestDay.value) bestDay = d;
+    }
+    const sorted = [...activeDays].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+    let bestStreak = 1;
+    let currentStreak = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const prevMs = Date.parse(`${sorted[i - 1].dateKey}T00:00:00Z`);
+      const currMs = Date.parse(`${sorted[i].dateKey}T00:00:00Z`);
+      currentStreak = currMs - prevMs === 86_400_000 ? currentStreak + 1 : 1;
+      if (currentStreak > bestStreak) bestStreak = currentStreak;
+    }
+    return [
+      `Activity heatmap: ${total} total across ${weekColumns.length} weeks.`,
+      `Best day ${bestDay.dateKey} with ${bestDay.value}.`,
+      `Longest active streak ${bestStreak} ${bestStreak === 1 ? 'day' : 'days'}.`,
+    ].join(' ');
+  }, [days, weekColumns.length]);
+
   const footer = label ? (
     <Text
       style={{
@@ -104,7 +133,12 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
   }
 
   const grid = (
-    <View style={{ flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={summaryLabel}
+      style={{ flexDirection: 'column', alignItems: 'center', width: '100%' }}
+    >
       <View style={{ flexDirection: 'row', gap: GAP, marginBottom: 4 }}>
         <View style={{ width: DAY_LABEL_COL_WIDTH, marginRight: 2 }} />
         {weekColumns.map((_, wi) => (

@@ -132,6 +132,30 @@ export function serializeTopTodoIds(ids: string[]): string {
   return JSON.stringify(deduped.slice(0, MAX_TOP_PRIORITIES));
 }
 
+/**
+ * Parse the stored `top_todo_titles` JSON into a bounded list of title
+ * strings, aligned index-wise with `parseTopTodoIds(top_todo_ids)`. Always
+ * returns a valid array; malformed storage degrades to []. Empty-string
+ * entries mean "no snapshot for this slot" and stay in place so alignment is
+ * preserved.
+ */
+export function parseTopTodoTitles(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const result: string[] = [];
+    for (const item of parsed) {
+      if (typeof item !== 'string') continue;
+      result.push(item);
+      if (result.length >= MAX_TOP_PRIORITIES) break;
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
 /** Add a Todo to the top-priority set, preserving selection order; no-op if already present. */
 export function addTopTodoId(current: string[], todoId: string): string[] {
   if (current.includes(todoId)) return current;

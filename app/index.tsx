@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
-import { Pressable, Text, View, useWindowDimensions, type ViewProps } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform, Pressable, Text, View, useWindowDimensions, type ViewProps } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
@@ -60,6 +60,7 @@ type TopTabItemProps = {
   tabRailColor: string;
   tabRailBorderColor: string;
   inactiveColor: string;
+  focusRingColor: string;
   onPress?: () => void;
 };
 
@@ -72,32 +73,47 @@ function TopTabItem({
   tabRailColor,
   tabRailBorderColor,
   inactiveColor,
+  focusRingColor,
   onPress,
 }: TopTabItemProps) {
+  // RN 0.83's Pressable style callback only exposes `pressed`, so keyboard
+  // focus is tracked via onFocus/onBlur (functional on web) to draw the ring.
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: isFocused }}
+      focusable
       onPress={onPress}
-      style={{
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 5,
-        minWidth: 0,
-        backgroundColor: isFocused ? surfaceColor : tabRailColor,
-        borderBottomWidth: isFocused ? 0 : 1,
-        borderBottomColor: tabRailBorderColor,
-        borderTopLeftRadius: isFocused ? 16 : 8,
-        borderTopRightRadius: isFocused ? 16 : 8,
-        marginTop: isFocused ? 0 : 3,
-        marginBottom: isFocused ? -1 : 0,
-        zIndex: isFocused ? 2 : 0,
-        paddingVertical: 10,
-        paddingHorizontal: 4,
-      }}
+      onFocus={() => setKeyboardFocused(true)}
+      onBlur={() => setKeyboardFocused(false)}
+      style={[
+        {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 5,
+          minWidth: 0,
+          backgroundColor: isFocused ? surfaceColor : tabRailColor,
+          borderBottomWidth: isFocused ? 0 : 1,
+          borderBottomColor: tabRailBorderColor,
+          borderTopLeftRadius: isFocused ? 16 : 8,
+          borderTopRightRadius: isFocused ? 16 : 8,
+          marginTop: isFocused ? 0 : 3,
+          marginBottom: isFocused ? -1 : 0,
+          zIndex: isFocused ? 2 : 0,
+          paddingVertical: 10,
+          paddingHorizontal: 4,
+          minHeight: 48,
+        },
+        // Visible keyboard-focus indication on web so the tab rail stays
+        // fully keyboard-operable.
+        keyboardFocused && Platform.OS === 'web'
+          ? { outlineColor: focusRingColor, outlineStyle: 'solid', outlineWidth: 2 }
+          : null,
+      ]}
     >
       <MaterialIcons
         name={icon as keyof typeof MaterialIcons.glyphMap}
@@ -262,6 +278,7 @@ export default function Index() {
               tabRailColor={tokens.tabRail}
               tabRailBorderColor={tokens.tabRailBorder}
               inactiveColor={tokens.iconMuted}
+              focusRingColor={tokens.accent}
               onPress={() => setActiveSection(item.name)}
             />
           );

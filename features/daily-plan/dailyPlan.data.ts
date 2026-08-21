@@ -19,7 +19,7 @@ import { INTENTION_MAX, NOTES_MAX, REFLECTION_MAX } from '@/features/daily-plan/
 import type { DailyPlanAdherence } from '@/features/daily-plan/dailyPlan.domain';
 import { listPendingTodos } from '@/features/todos/todos.data';
 
-const DAILY_PLAN_SELECT = `id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at`;
+const DAILY_PLAN_SELECT = `id, date_key, intention, top_todo_ids, top_todo_titles, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at`;
 
 export async function getDailyPlan(dateKey: string): Promise<DailyPlan | null> {
   const db = await getDatabase();
@@ -66,6 +66,27 @@ async function filterExistingTodoIdsInTx(
   );
   const existingSet = new Set(rows.map((r) => r.id));
   return ids.filter((id) => existingSet.has(id));
+}
+
+/**
+ * Title snapshots for the plan's priority ids, taken at save time inside the
+ * write transaction (migration 21). Output is a JSON string[] aligned
+ * index-wise with `ids`; a title missing mid-snapshot (todo hard-gone between
+ * filtering and this read — same transaction, so practically impossible)
+ * stores '' and readers fall through to the live lookup.
+ */
+async function snapshotTopTodoTitlesInTx(
+  tx: SQLite.SQLiteDatabase,
+  ids: string[],
+): Promise<string> {
+  if (ids.length === 0) return '[]';
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await tx.getAllAsync<{ id: string; title: string }>(
+    `SELECT id, title FROM todos WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+    ids,
+  );
+  const titleById = new Map(rows.map((r) => [r.id, r.title] as const));
+  return JSON.stringify(ids.map((id) => titleById.get(id) ?? ''));
 }
 
 function readActivePlanByDateKey(
@@ -121,21 +142,24 @@ export async function upsertDailyPlanInTx(
 
   if (!existing) {
     const id = createId('dplan');
-    const nextTopTodoIds = updates.topTodoIds
-      ? serializeTopTodoIds(await filterExistingTodoIdsInTx(tx, updates.topTodoIds))
-      : '[]';
+    const nextTopTodoIdList = updates.topTodoIds
+      ? await filterExistingTodoIdsInTx(tx, updates.topTodoIds)
+      : [];
+    const nextTopTodoIds = serializeTopTodoIds(nextTopTodoIdList);
+    const nextTopTodoTitles = await snapshotTopTodoTitlesInTx(tx, nextTopTodoIdList);
     const nextStatus = updates.status ?? 'draft';
     const completedAt = nextStatus === 'completed' ? now : null;
     try {
       await tx.runAsync(
         `INSERT INTO daily_plans
-           (id, date_key, intention, top_todo_ids, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+           (id, date_key, intention, top_todo_ids, top_todo_titles, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           dateKey,
           clampText(updates.intention, INTENTION_MAX),
           nextTopTodoIds,
+          nextTopTodoTitles,
           clampFocusTargetMinutes(updates.focusTargetMinutes ?? 0),
           clampText(updates.notes, NOTES_MAX),
           clampText(updates.reflection, REFLECTION_MAX),
@@ -158,10 +182,13 @@ export async function upsertDailyPlanInTx(
   }
 
   let nextTopTodoIds = existing.top_todo_ids ?? '[]';
+  let nextTopTodoIdList: string[] | null = null;
   if (updates.topTodoIds !== undefined) {
-    nextTopTodoIds = serializeTopTodoIds(
-      await filterExistingTodoIdsInTx(tx, parseTopTodoIds(serializeTopTodoIds(updates.topTodoIds))),
+    nextTopTodoIdList = await filterExistingTodoIdsInTx(
+      tx,
+      parseTopTodoIds(serializeTopTodoIds(updates.topTodoIds)),
     );
+    nextTopTodoIds = serializeTopTodoIds(nextTopTodoIdList);
   }
 
   const nextStatus = updates.status ?? existing.status;
@@ -174,9 +201,12 @@ export async function upsertDailyPlanInTx(
     fields.push('intention = ?');
     values.push(clampText(updates.intention, INTENTION_MAX));
   }
-  if (updates.topTodoIds !== undefined) {
+  if (nextTopTodoIdList !== null) {
     fields.push('top_todo_ids = ?');
     values.push(nextTopTodoIds);
+    // Keep the title snapshot aligned index-wise with the ids just written.
+    fields.push('top_todo_titles = ?');
+    values.push(await snapshotTopTodoTitlesInTx(tx, nextTopTodoIdList));
   }
   if (updates.focusTargetMinutes !== undefined) {
     fields.push('focus_target_minutes = ?');

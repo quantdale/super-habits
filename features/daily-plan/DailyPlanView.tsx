@@ -13,6 +13,7 @@ import {
 } from '@/features/daily-plan/dailyPlan.data';
 import {
   parseTopTodoIds,
+  parseTopTodoTitles,
   toggleTopTodoId,
   normalizeEnergyScore,
 } from '@/features/daily-plan/dailyPlan.domain';
@@ -145,9 +146,12 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   const isCompleted = plan?.status === 'completed';
   const pendingById = new Map(pendingTodos.map((t) => [t.id, t.title]));
-  const selectedItems = topTodoIds.map((id) => ({
+  // Title resolution: save-time snapshot first (survives deletion/renames),
+  // then the live todo lookup; '(unavailable)' stays the last resort.
+  const snapshotTitles = parseTopTodoTitles(plan?.top_todo_titles);
+  const selectedItems = topTodoIds.map((id, i) => ({
     id,
-    title: pendingById.get(id) ?? '(unavailable)',
+    title: snapshotTitles[i] || pendingById.get(id) || '(unavailable)',
   }));
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const candidateTodos = pendingTodos

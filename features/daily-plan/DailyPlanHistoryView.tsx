@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
 import { listRecentDailyPlans } from '@/features/daily-plan/dailyPlan.data';
-import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
+import { parseTopTodoIds, parseTopTodoTitles } from '@/features/daily-plan/dailyPlan.domain';
 import { DAILY_PLAN_STATUS_LABELS } from '@/features/daily-plan/dailyPlan.types';
 import { listPendingTodos } from '@/features/todos/todos.data';
 import type { DailyPlan } from '@/core/db/types';
@@ -27,10 +27,17 @@ export function DailyPlanHistoryView() {
       const [plans, todos] = await Promise.all([listRecentDailyPlans(30), listPendingTodos()]);
       const titleById = new Map(todos.map((t) => [t.id, t.title] as const));
       setEntries(
-        plans.map((p) => ({
-          ...p,
-          todoTitles: parseTopTodoIds(p.top_todo_ids).map((id) => titleById.get(id) ?? '(removed)'),
-        })),
+        plans.map((p) => {
+          // Save-time snapshot first (survives deletion), live lookup second;
+          // '(removed)' remains the last resort for snapshot-less rows.
+          const snapshotTitles = parseTopTodoTitles(p.top_todo_titles);
+          return {
+            ...p,
+            todoTitles: parseTopTodoIds(p.top_todo_ids).map(
+              (id, i) => snapshotTitles[i] || titleById.get(id) || '(removed)',
+            ),
+          };
+        }),
       );
     } finally {
       setLoading(false);

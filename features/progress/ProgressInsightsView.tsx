@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
@@ -11,6 +11,7 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildProgressSummary } from '@/features/progress/progress.summary';
 import { pctDelta, PROGRESS_WINDOW_OPTIONS, trendOf } from '@/features/progress/progress.domain';
+import { buildProgressNarrative } from '@/features/progress/progress.narrative';
 import type { ProgressSummary } from '@/features/progress/progress.types';
 
 type StatCard = {
@@ -63,6 +64,10 @@ export function ProgressInsightsView() {
       void load(windowDays);
     }, [load, windowDays]),
   );
+
+  // Blueprint §9: factual observations above the charts; empty when there is
+  // nothing honest to say.
+  const narrative = useMemo(() => (summary ? buildProgressNarrative(summary) : []), [summary]);
 
   if (loadError && !isLoading && !summary) {
     return (
@@ -130,6 +135,13 @@ export function ProgressInsightsView() {
           icon: 'timer',
         },
         {
+          label: 'Focus sessions',
+          current: summary.focusSessions.current,
+          previous: summary.focusSessions.previous,
+          color: SECTION_COLORS.focus,
+          icon: 'repeat',
+        },
+        {
           label: 'Workouts',
           current: summary.workoutSessions.current,
           previous: summary.workoutSessions.previous,
@@ -175,6 +187,21 @@ export function ProgressInsightsView() {
           Last {summary.windowDays} days ({summary.range.currentStart} → {summary.range.currentEnd})
           vs prior {summary.windowDays} days
         </Text>
+      ) : null}
+
+      {narrative.length > 0 ? (
+        <Card accentColor={SECTION_COLORS.todos} innerClassName="p-3">
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            This window
+          </Text>
+          <View className="mt-2 gap-1.5">
+            {narrative.map((line, i) => (
+              <Text key={`${i}-${line}`} className="text-sm" style={{ color: tokens.text }}>
+                • {line}
+              </Text>
+            ))}
+          </View>
+        </Card>
       ) : null}
 
       <View className="flex-row flex-wrap gap-3">

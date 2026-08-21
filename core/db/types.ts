@@ -222,6 +222,12 @@ export type DailyPlan = BaseEntity & {
   intention: string;
   /** JSON-serialized array of up to three Todo IDs (string[]). */
   top_todo_ids: string;
+  /**
+   * JSON-serialized title snapshots (string[]) aligned index-wise with
+   * top_todo_ids at save time (migration 21). Nullable: NULL on pre-v21 rows
+   * until their next save re-snapshots.
+   */
+  top_todo_titles?: string | null;
   focus_target_minutes: number;
   notes: string;
   reflection: string;

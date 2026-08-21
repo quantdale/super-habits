@@ -9,6 +9,7 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
   addGoal,
   getGoal,
+  getGoalRollup,
   listTodosForGoal,
   softDeleteGoal,
   updateGoal,
@@ -21,11 +22,16 @@ import {
   type GoalInput,
 } from '@/features/goals/goals.types';
 import {
+  computeGoalRollup,
+  describeGoalHorizon,
   GOAL_DESCRIPTION_MAX,
   GOAL_TITLE_MAX,
+  parseGoalProgressText,
   validateGoalInput,
+  type GoalRollup,
 } from '@/features/goals/goals.domain';
 import { listTodos, setTodoProjectGoal } from '@/features/todos/todos.data';
+import { listHabits } from '@/features/habits/habits.data';
 import { listProjects } from '@/features/projects/projects.data';
 import type { GoalHorizon, GoalStatus } from '@/core/db/types';
 
@@ -49,15 +55,30 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
+  const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string; completed: 0 | 1 }[]>(
+    [],
+  );
   const [candidateTodos, setCandidateTodos] = useState<{ id: string; title: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [suggestedRollup, setSuggestedRollup] = useState<GoalRollup | null>(null);
+  const [linkedActiveHabitCount, setLinkedActiveHabitCount] = useState(0);
+  const [progressText, setProgressText] = useState('0');
+  const [progressParseError, setProgressParseError] = useState<string | null>(null);
 
   const reloadLinks = useCallback(async () => {
     if (isCreate || !goalId) return;
-    const todos = await listTodosForGoal(goalId);
-    setLinkedTodos(todos.map((t) => ({ id: t.id, title: t.title })));
-    const all = await listTodos();
+    const [todos, allHabits, rollupData, all] = await Promise.all([
+      listTodosForGoal(goalId),
+      listHabits(),
+      getGoalRollup(goalId),
+      listTodos(),
+    ]);
+    setLinkedTodos(todos.map((t) => ({ id: t.id, title: t.title, completed: t.completed })));
+    // Active habits only (legacy rows without a status count as active).
+    setLinkedActiveHabitCount(
+      allHabits.filter((h) => h.goal_id === goalId && (h.status ?? 'active') === 'active').length,
+    );
+    setSuggestedRollup(computeGoalRollup(rollupData));
     const linkedIds = new Set(todos.map((t) => t.id));
     setCandidateTodos(
       all
@@ -81,6 +102,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       setHorizon(goal.horizon);
       setStatus(goal.status);
       setProgress(goal.progress_percent);
+      setProgressText(String(goal.progress_percent));
       setTargetDate(goal.target_date ?? '');
       setProjectId(goal.project_id);
       await reloadLinks();
@@ -140,6 +162,23 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
     onBack();
   }, [isCreate, goalId, onBack]);
 
+  const applyProgressText = useCallback(() => {
+    const result = parseGoalProgressText(progressText);
+    if (!result.ok) {
+      setProgressParseError(result.error);
+      return;
+    }
+    setProgressParseError(null);
+    setProgress(result.value);
+    setProgressText(String(result.value));
+  }, [progressText]);
+
+  // Gentle planning cue (blueprint §8): a goal without any pending linked task
+  // or active linked habit has no next action yet — neutral, never a warning.
+  const pendingLinkedTodoCount = linkedTodos.filter((t) => !t.completed).length;
+  const showNextActionCue =
+    !isCreate && goalId !== null && pendingLinkedTodoCount === 0 && linkedActiveHabitCount === 0;
+
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
@@ -194,6 +233,9 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
           </Pressable>
         ))}
       </View>
+      <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+        {describeGoalHorizon(horizon).cadenceHint}
+      </Text>
 
       <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
         Status
@@ -244,7 +286,69 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
             variant="ghost"
           />
         </View>
+
+        {!isCreate && suggestedRollup && !suggestedRollup.isEmpty ? (
+          <Text
+            className="mt-2 text-xs"
+            style={{ color: tokens.textMuted }}
+            accessibilityLabel={`Suggested from linked work: ${suggestedRollup.suggestedPercent} percent`}
+          >
+            Suggested from linked work: {suggestedRollup.suggestedPercent}%
+          </Text>
+        ) : null}
+
+        <View className="mt-2 flex-row items-end gap-2">
+          <View className="flex-1">
+            <TextField
+              label="Or type progress (0–100)"
+              value={progressText}
+              onChangeText={(v) => {
+                setProgressText(v);
+                if (progressParseError) setProgressParseError(null);
+              }}
+              keyboardType="number-pad"
+              placeholder="e.g. 42%"
+              accessibilityLabel="Goal progress percent"
+            />
+          </View>
+          <Button label="Set" onPress={applyProgressText} variant="ghost" />
+        </View>
+        {progressParseError ? (
+          <Text className="mt-1 text-xs" style={{ color: tokens.dangerSolid }}>
+            {progressParseError}
+          </Text>
+        ) : null}
       </View>
+
+      {showNextActionCue ? (
+        <View
+          className="rounded-xl border p-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+        >
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+            No next action linked yet
+          </Text>
+          {candidateTodos.slice(0, 2).map((t) => (
+            <Pressable
+              key={t.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Link task ${t.title} to this goal`}
+              className="mt-2 flex-row items-center gap-2 self-start rounded-lg border px-3 py-3"
+              style={{ borderColor: tokens.border }}
+              onPress={async () => {
+                if (!goalId) return;
+                await setTodoProjectGoal(t.id, { goalId });
+                await reloadLinks();
+              }}
+            >
+              <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
+              <Text className="text-sm" style={{ color: tokens.text }} numberOfLines={1}>
+                Link “{t.title}”
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {projects.length > 0 ? (
         <View className="mt-2">

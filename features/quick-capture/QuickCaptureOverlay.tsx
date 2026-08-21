@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
@@ -17,9 +18,14 @@ import { addGoal, listGoals, softDeleteGoal } from '@/features/goals/goals.data'
 import { PROJECT_COLORS } from '@/features/projects/projects.types';
 import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain';
 import {
+  loadLastCaptureMode,
+  loadPersistedRecentCaptures,
+  persistLastCaptureMode,
+  persistRecentCaptures,
   pushRecentCapture,
   removeRecentCapture,
   undoRecentCapture,
+  type PersistedRecentCapture,
   type RecentCapture,
 } from '@/features/quick-capture/recentCaptures';
 import type { TodoPriority } from '@/core/db/types';
@@ -38,6 +44,57 @@ const MODES: { key: CaptureMode; label: string }[] = [
 const PRIORITIES: TodoPriority[] = ['urgent', 'normal', 'low'];
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
+/** Destinations whose capture can optionally link to a project. */
+const LINKS_TO_PROJECT: readonly CaptureMode[] = ['todo', 'habit', 'goal'];
+
+/**
+ * Rebuild a persisted capture's undo closure after a reload. Entries from an
+ * unknown/older schema, or kinds without a resolvable target, restore
+ * without undo instead of breaking the list.
+ */
+function rebuildRecentCapture(record: PersistedRecentCapture): RecentCapture | null {
+  const separatorIndex = record.key.indexOf(':');
+  if (separatorIndex <= 0) return null;
+  const kind = record.key.slice(0, separatorIndex);
+  const entityId = record.key.slice(separatorIndex + 1);
+  let undo: () => Promise<unknown>;
+  switch (kind) {
+    case 'todo':
+      undo = () => removeTodo(entityId);
+      break;
+    case 'habit':
+      undo = () => deleteHabit(entityId);
+      break;
+    case 'project':
+      undo = () => softDeleteProject(entityId);
+      break;
+    case 'goal':
+      undo = () => softDeleteGoal(entityId);
+      break;
+    case 'calorie': {
+      const ref = record.calorieRef;
+      if (!ref) return null;
+      undo = async () => {
+        // Same content-match resolution as the live path: addCalorieEntry
+        // does not return the row id.
+        const entries = await listCalorieEntries();
+        const match = entries.find(
+          (entry) =>
+            entry.food_name === ref.foodName &&
+            entry.calories === ref.calories &&
+            entry.meal_type === ref.mealType,
+        );
+        if (!match) return;
+        await deleteCalorieEntry(match.id);
+      };
+      break;
+    }
+    default:
+      return null;
+  }
+  return { key: record.key, label: record.label, calorieRef: record.calorieRef, undo };
+}
+
 export function QuickCaptureOverlay() {
   const { tokens } = useAppTheme();
   const { closeQuickCapture, setActiveSection } = useAppNavigation();
@@ -51,7 +108,7 @@ export function QuickCaptureOverlay() {
   const [mealType, setMealType] = useState<(typeof MEAL_TYPES)[number]>('breakfast');
   const [calories, setCalories] = useState('');
   const [projectLink, setProjectLink] = useState<string | null>(null);
-  const [goalLink, setGoalLink] = useState<string | null>(null);
+  const [linksExpanded, setLinksExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [recent, setRecent] = useState<RecentCapture[]>([]);
@@ -67,6 +124,35 @@ export function QuickCaptureOverlay() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
     void refreshOptions();
   }, [refreshOptions]);
+
+  // Restore the persisted recent list and last-used destination once per
+  // open; the modal unmounts this overlay between opens.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [storedRecords, storedMode] = await Promise.all([
+        loadPersistedRecentCaptures(),
+        loadLastCaptureMode(),
+      ]);
+      if (cancelled) return;
+      const restored = storedRecords
+        .map(rebuildRecentCapture)
+        .filter((entry): entry is RecentCapture => entry !== null);
+
+      setRecent(restored);
+      if (storedMode && MODES.some((m) => m.key === storedMode)) {
+        setMode(storedMode as CaptureMode);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Mirror the live list back to storage so reloads restore it.
+  useEffect(() => {
+    persistRecentCaptures(recent);
+  }, [recent]);
 
   // Live natural-language parse preview for todo mode (parser stays pure;
   // the loaded lists are passed in here).
@@ -84,7 +170,7 @@ export function QuickCaptureOverlay() {
     setPriority('normal');
     setPriorityTouched(false);
     setProjectLink(null);
-    setGoalLink(null);
+    setLinksExpanded(false);
     setError(null);
     setSaved(false);
   }, []);
@@ -92,6 +178,7 @@ export function QuickCaptureOverlay() {
   const switchMode = useCallback(
     (next: CaptureMode) => {
       setMode(next);
+      persistLastCaptureMode(next);
       resetForm();
     },
     [resetForm],
@@ -168,6 +255,7 @@ export function QuickCaptureOverlay() {
         pushRecent({
           key: `calorie:${Date.now()}`,
           label: `${capturedFood} · ${cal} kcal`,
+          calorieRef: { foodName: capturedFood, calories: cal, mealType },
           undo: async () => {
             // addCalorieEntry does not return the row id; resolve the
             // just-added entry from today's newest-first list before deleting.
@@ -198,7 +286,7 @@ export function QuickCaptureOverlay() {
           setError('Goal title is required.');
           return;
         }
-        const id = await addGoal({ title: title.trim(), horizon: 'month', projectId: goalLink });
+        const id = await addGoal({ title: title.trim(), horizon: 'month', projectId: projectLink });
         pushRecent({
           key: `goal:${id}`,
           label: `Goal · ${title.trim()}`,
@@ -224,7 +312,6 @@ export function QuickCaptureOverlay() {
     priorityTouched,
     priority,
     projectLink,
-    goalLink,
     title,
     calories,
     mealType,
@@ -266,13 +353,8 @@ export function QuickCaptureOverlay() {
             label={mode === 'calorie' ? 'Food name' : mode === 'habit' ? 'Habit name' : 'Title'}
             value={title}
             onChangeText={setTitle}
-            placeholder={
-              mode === 'todo'
-                ? 'e.g. Pay rent tomorrow !urgent #home'
-                : mode === 'calorie'
-                  ? 'e.g. Chicken breast'
-                  : 'Name'
-            }
+            placeholder="What do you want to remember?"
+            autoFocus
             onSubmitEditing={handleSubmit}
           />
 
@@ -366,21 +448,39 @@ export function QuickCaptureOverlay() {
             </>
           ) : null}
 
-          {mode === 'todo' || mode === 'habit' ? (
-            <LinkPicker
-              label="Project"
-              options={projects}
-              selectedId={projectLink}
-              onSelect={setProjectLink}
-            />
-          ) : null}
-          {mode === 'goal' ? (
-            <LinkPicker
-              label="Project"
-              options={goals.map((g) => ({ id: g.id, name: g.title }))}
-              selectedId={goalLink}
-              onSelect={setGoalLink}
-            />
+          {LINKS_TO_PROJECT.includes(mode) && projects.length > 0 ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Link to project"
+                accessibilityState={{ expanded: linksExpanded }}
+                className="flex-row items-center gap-1.5 rounded-xl border px-4 py-3"
+                style={{
+                  minHeight: 44,
+                  borderColor: tokens.border,
+                  backgroundColor: tokens.surfaceElevated,
+                }}
+                onPress={() => setLinksExpanded((v) => !v)}
+              >
+                <MaterialIcons name="add-link" size={16} color={tokens.textMuted} />
+                <Text className="flex-1 text-sm font-medium" style={{ color: tokens.text }}>
+                  Link to…
+                </Text>
+                <MaterialIcons
+                  name={linksExpanded ? 'expand-less' : 'expand-more'}
+                  size={18}
+                  color={tokens.textMuted}
+                />
+              </Pressable>
+              {linksExpanded ? (
+                <LinkPicker
+                  label="Project"
+                  options={projects}
+                  selectedId={projectLink}
+                  onSelect={setProjectLink}
+                />
+              ) : null}
+            </>
           ) : null}
 
           {error ? (
@@ -444,6 +544,7 @@ function CaptureInput({
   placeholder,
   keyboardType = 'default',
   onSubmitEditing,
+  autoFocus = false,
 }: {
   label: string;
   value: string;
@@ -451,14 +552,26 @@ function CaptureInput({
   placeholder?: string;
   keyboardType?: 'default' | 'numeric';
   onSubmitEditing: () => void;
+  autoFocus?: boolean;
 }) {
   const { tokens } = useAppTheme();
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    // Focus once the sheet's fade-in settles; focusing synchronously inside
+    // the animating modal is unreliable on web and native alike.
+    const timer = setTimeout(() => inputRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
+  }, [autoFocus]);
+
   return (
     <View className="mb-3">
       <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
         {label}
       </Text>
       <TextInput
+        ref={inputRef}
         accessibilityLabel={label}
         className="rounded-2xl border px-4 py-3 text-base"
         style={{

@@ -723,6 +723,18 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     });
   }
+
+  // Migration 21: Daily-plan priority title snapshots.
+  // daily_plans.top_todo_titles stores a nullable JSON string[] aligned
+  // index-wise with top_todo_ids at save time, so plan views keep showing a
+  // priority's historical title after the todo is renamed or deleted.
+  // NULL on pre-v21 rows until their next save re-snapshots; readers fall back
+  // to a live todo lookup, then '(unavailable)'/'(removed)'.
+  if (version < 21) {
+    await applyMigration(db, 21, async () => {
+      await addColumnIfMissing(db, 'daily_plans', 'top_todo_titles', 'TEXT');
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

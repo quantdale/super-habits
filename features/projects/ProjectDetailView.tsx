@@ -29,6 +29,7 @@ import {
   validateProjectInput,
   computeProjectProgress,
   computeTargetDateCountdown,
+  compareTodosByNextUp,
 } from '@/features/projects/projects.domain';
 
 import { updateGoal } from '@/features/goals/goals.data';
@@ -85,6 +86,7 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
     setCandidateTodos(
       allTodos
         .filter((t) => !t.completed && !t.project_id && !linkedTodoIds.has(t.id))
+        .sort(compareTodosByNextUp)
         .slice(0, 20)
         .map((t) => ({ id: t.id, title: t.title })),
     );
@@ -263,7 +265,7 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
 
       {!isCreate && projectId ? (
         <AssociationSection
-          title="Linked Tasks"
+          title="Next up"
           linked={linkedTodos}
           candidates={candidateTodos}
           labelOf={(i) => i.title ?? ''}

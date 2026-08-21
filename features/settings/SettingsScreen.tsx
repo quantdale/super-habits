@@ -24,6 +24,7 @@ import { getPomodoroSettings, savePomodoroSettings } from '@/features/pomodoro/p
 import { DEFAULT_SETTINGS, type PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
 import { validateCalorieGoal, validatePomodoroSettings } from '@/lib/validation';
 import { maybeLoadRestorePreviewForSettings } from '@/features/settings/settingsRestorePreview';
+import { SettingsAccessibilitySection } from '@/features/settings/SettingsAccessibilitySection';
 import { SettingsAppearanceSection } from '@/features/settings/SettingsAppearanceSection';
 import { SettingsBackupSection } from '@/features/settings/SettingsBackupSection';
 import { SettingsPortableSection } from '@/features/settings/SettingsPortableSection';
@@ -348,6 +349,8 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         onSelectMode={setMode}
         onSelectTheme={setTheme}
       />
+
+      <SettingsAccessibilitySection />
 
       <SettingsBackupSection
         outboxSummary={outboxSummary}

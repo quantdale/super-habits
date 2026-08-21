@@ -1,4 +1,4 @@
-import type { Project, ProjectStatus } from '@/core/db/types';
+import type { Project, ProjectStatus, TodoPriority } from '@/core/db/types';
 import { dateKeyToLocalDate, isValidDateKey } from '@/lib/time';
 import {
   PROJECT_COLORS,
@@ -224,4 +224,23 @@ export function sortProjectRows(rows: ProjectListRow[], sortKey: ProjectSortKey)
       // Data layer already returns manual order (sort_order ASC).
       return copy;
   }
+}
+
+const PRIORITY_RANK: Record<TodoPriority, number> = { urgent: 0, normal: 1, low: 2 };
+
+/**
+ * "Next up" order for candidate tasks: dated todos first by soonest due date,
+ * undated last; ties broken by priority (urgent → normal → low). Stable, so
+ * equal due/priority candidates keep the data layer's manual order.
+ */
+export function compareTodosByNextUp(
+  a: { due_date: string | null; priority: TodoPriority },
+  b: { due_date: string | null; priority: TodoPriority },
+): number {
+  if (a.due_date && b.due_date && a.due_date !== b.due_date) {
+    return a.due_date.localeCompare(b.due_date);
+  }
+  if (a.due_date && !b.due_date) return -1;
+  if (!a.due_date && b.due_date) return 1;
+  return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
 }
