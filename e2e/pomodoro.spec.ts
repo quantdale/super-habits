@@ -28,7 +28,9 @@ test.describe('Pomodoro', () => {
 
   test('resets timer', async ({ page }) => {
     await page.getByText('Start focus', { exact: true }).click();
-    await page.getByText('Reset', { exact: true }).click();
+    // Wave-v2 rename: the reset control reads 'Reset (not logged)' while the
+    // focus session is under a minute.
+    await page.getByRole('button', { name: /^Reset \(not logged\)$/ }).click();
     await expect(page.getByText('25:00')).toBeVisible();
     await expect(page.getByText('Start focus', { exact: true })).toBeVisible();
   });
