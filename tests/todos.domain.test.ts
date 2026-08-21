@@ -106,7 +106,12 @@ describe('todos list query (search/filter/sort/group)', () => {
   });
   const todos = [
     mk({ title: 'Buy milk', due_date: '2026-04-15', priority: 'urgent', sort_order: 1 }),
-    mk({ title: 'Write report', notes: 'quarterly numbers', due_date: '2026-04-16', sort_order: 2 }),
+    mk({
+      title: 'Write report',
+      notes: 'quarterly numbers',
+      due_date: '2026-04-16',
+      sort_order: 2,
+    }),
     mk({ title: 'Read book', due_date: '2026-05-01', priority: 'low', sort_order: 3 }),
     mk({ title: 'No date task', sort_order: 4, created_at: '2026-04-12T00:00:00Z' }),
   ];
@@ -124,13 +129,21 @@ describe('todos list query (search/filter/sort/group)', () => {
   });
 
   it('filterTodos filters by due window', () => {
-    expect(filterTodos(todos, { dueWindow: 'overdue', todayKey: today }).map((t) => t.title)).toEqual(['Buy milk']);
-    expect(filterTodos(todos, { dueWindow: 'today', todayKey: today }).map((t) => t.title)).toEqual(['Write report']);
+    expect(
+      filterTodos(todos, { dueWindow: 'overdue', todayKey: today }).map((t) => t.title),
+    ).toEqual(['Buy milk']);
+    expect(filterTodos(todos, { dueWindow: 'today', todayKey: today }).map((t) => t.title)).toEqual(
+      ['Write report'],
+    );
     expect(filterTodos(todos, { dueWindow: 'week', todayKey: today }).map((t) => t.title)).toEqual([
       'Write report',
     ]);
-    expect(filterTodos(todos, { dueWindow: 'later', todayKey: today }).map((t) => t.title)).toEqual(['Read book']);
-    expect(filterTodos(todos, { dueWindow: 'no_due', todayKey: today }).map((t) => t.title)).toEqual(['No date task']);
+    expect(filterTodos(todos, { dueWindow: 'later', todayKey: today }).map((t) => t.title)).toEqual(
+      ['Read book'],
+    );
+    expect(
+      filterTodos(todos, { dueWindow: 'no_due', todayKey: today }).map((t) => t.title),
+    ).toEqual(['No date task']);
     expect(filterTodos(todos, { dueWindow: 'all', todayKey: today })).toHaveLength(4);
   });
 
@@ -179,7 +192,11 @@ describe('todos list query (search/filter/sort/group)', () => {
   it('applyTodoListQuery composes search, filter, and sort', () => {
     const result = applyTodoListQuery(todos, { search: 'report', sort: 'manual' });
     expect(result.map((t) => t.title)).toEqual(['Write report']);
-    const result2 = applyTodoListQuery(todos, { dueWindow: 'week', sort: 'due_date', todayKey: today });
+    const result2 = applyTodoListQuery(todos, {
+      dueWindow: 'week',
+      sort: 'due_date',
+      todayKey: today,
+    });
     expect(result2.map((t) => t.title)).toEqual(['Write report']);
   });
 
