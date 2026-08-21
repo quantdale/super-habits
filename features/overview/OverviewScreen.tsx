@@ -34,6 +34,7 @@ import { TodosCard } from './cards/TodosCard';
 import { TodayPlanCard } from './cards/TodayPlanCard';
 import { WorkoutCard } from './cards/WorkoutCard';
 import { CustomizeCardsPanel } from './CustomizeCardsPanel';
+import { FirstRunOnboardingCard } from './FirstRunOnboardingCard';
 import { NextBestActionHero } from './NextBestActionHero';
 import { TodayProgressStrip } from './TodayProgressStrip';
 import { loadCardLayout, saveCardLayout } from './cardLayout.storage';
@@ -495,6 +496,18 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                     ))}
                   </View>
                 </View>
+              ) : null}
+              {/* Lightweight first-run onboarding (docs/ui-ux/03-feature-
+                  blueprints.md §13): an ordinary card at the very bottom —
+                  never a modal, hidden once completed/skipped or once real
+                  data exists. */}
+              {!isCustomizing ? (
+                <FirstRunOnboardingCard
+                  hasAnyData={hasAnyData}
+                  onDataChanged={() => {
+                    void refresh();
+                  }}
+                />
               ) : null}
             </View>
           )}
