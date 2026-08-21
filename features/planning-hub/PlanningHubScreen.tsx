@@ -9,6 +9,7 @@ import { GoalListView } from '@/features/goals/GoalListView';
 import { GoalDetailView } from '@/features/goals/GoalDetailView';
 import { DailyPlanView } from '@/features/daily-plan/DailyPlanView';
 import { TodayBriefingView } from '@/features/planning-hub/TodayBriefingView';
+import { GuidedPlanningFlow } from '@/features/planning-hub/GuidedPlanningFlow';
 import { ActivityTimelineView } from '@/features/activity/ActivityTimelineView';
 import { ProgressInsightsView } from '@/features/progress/ProgressInsightsView';
 
@@ -30,6 +31,9 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
   const { tokens } = useAppTheme();
   const [view, setView] = useState<PlanningHubView>(initialView);
   const [detail, setDetail] = useState<Detail>(null);
+  // Bumped after a guided-flow save so the briefing and the full editor
+  // remount with the fresh plan instead of showing stale state.
+  const [todayVersion, setTodayVersion] = useState(0);
 
   const selectTab = useCallback((tab: PlanningHubView) => {
     setDetail(null);
@@ -74,8 +78,9 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
           />
         ) : view === 'today' ? (
           <View className="gap-3">
-            <TodayBriefingView />
-            <DailyPlanView />
+            <GuidedPlanningFlow onPlanSaved={() => setTodayVersion((v) => v + 1)} />
+            <TodayBriefingView key={`briefing-${todayVersion}`} />
+            <DailyPlanView key={`plan-${todayVersion}`} />
           </View>
         ) : view === 'projects' ? (
           <ProjectListView onOpenProject={(id) => setDetail({ kind: 'project', id })} />
