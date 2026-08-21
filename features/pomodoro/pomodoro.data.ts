@@ -198,8 +198,11 @@ export async function applyRemotePomodoroSessions(
          ended_at,
          duration_seconds,
          session_type,
-         created_at
-       ) VALUES (?, ?, ?, ?, ?, ?)`,
+         created_at,
+         linked_todo_id,
+         linked_todo_title,
+         note
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.started_at,
@@ -207,6 +210,10 @@ export async function applyRemotePomodoroSessions(
         row.duration_seconds,
         row.session_type,
         row.created_at,
+        // Legacy rows predate the metadata columns; absent = null.
+        row.linked_todo_id ?? null,
+        row.linked_todo_title ?? null,
+        row.note ?? null,
       ],
     );
   }

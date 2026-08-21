@@ -11,6 +11,7 @@ import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
 import { getSupabaseAuthUserId, supabase } from '@/lib/supabase';
 import {
   BACKUP_ENTITIES,
+  BACKUP_ENTITY_COLUMNS,
   BACKUP_HARD_DELETE_ENTITIES,
   BACKUP_MANIFEST_RECORD_ID,
   BACKUP_SETTINGS_RECORD_ID,
@@ -188,8 +189,17 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     }
 
     const payloadRows = rows.map((row) => {
-      const { user_id: _localOwner, ...localRow } = row;
-      return { ...localRow, user_id: currentUserId };
+      // Project each local row onto the entity's canonical backup columns so
+      // extra local columns (e.g. a freshly migrated device pushing against an
+      // un-migrated remote) never break push. Columns absent from the local
+      // row (pre-migration schema) are omitted entirely rather than sent as
+      // NULL, so push also decouples from remote migration timing; explicit
+      // local NULLs are still sent to overwrite remote values.
+      const projected: Record<string, unknown> = {};
+      for (const column of BACKUP_ENTITY_COLUMNS[entity]) {
+        if (row[column] !== undefined) projected[column] = row[column];
+      }
+      return { ...projected, user_id: currentUserId };
     });
 
     const { error } = await client.from(entity).upsert(payloadRows, {

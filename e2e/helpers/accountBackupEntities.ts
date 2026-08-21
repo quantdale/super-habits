@@ -23,6 +23,7 @@ export const BACKUP_REST_ENTITIES = [
   'routine_exercise_sets',
   'workout_logs',
   'workout_session_exercises',
+  'workout_session_sets',
   'pomodoro_sessions',
   'linked_action_rules',
   'weekly_reviews',

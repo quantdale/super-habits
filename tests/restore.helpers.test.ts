@@ -114,6 +114,9 @@ describe('restore helper writers', () => {
         '2026-04-10T10:00:00.000Z',
         '2026-04-20T10:00:00.000Z',
         '2026-04-21T00:00:00.000Z',
+        // Planning links (scope V4) restore as unassigned when absent.
+        null,
+        null,
       ],
     );
     expect(syncEngine.enqueue).not.toHaveBeenCalled();
@@ -153,6 +156,12 @@ describe('restore helper writers', () => {
         '2026-04-11T10:00:00.000Z',
         '2026-04-20T10:00:00.000Z',
         '2026-04-21T00:00:00.000Z',
+        // Planning links + lifecycle columns (scopes V4/V5); legacy rows
+        // restore as unassigned and active.
+        null,
+        null,
+        'active',
+        null,
       ],
     );
     expect(syncEngine.enqueue).not.toHaveBeenCalled();

@@ -222,3 +222,44 @@ export async function countActiveProjects(): Promise<number> {
   );
   return row?.count ?? 0;
 }
+
+/**
+ * Restore-only import for projects. Plain INSERT OR REPLACE preserving ids,
+ * ordering, tombstones, and timestamps — data reconstruction only; no
+ * completion events, no child reconciliation.
+ */
+export async function applyRemoteProjects(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: Project[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO projects (
+         id,
+         name,
+         description,
+         color,
+         status,
+         target_date,
+         sort_order,
+         created_at,
+         updated_at,
+         deleted_at,
+         completed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.name,
+        row.description,
+        row.color,
+        row.status,
+        row.target_date,
+        row.sort_order,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+        row.completed_at ?? null,
+      ],
+    );
+  }
+}

@@ -5,6 +5,7 @@ import {
   WorkoutLog,
   WorkoutRoutine,
   WorkoutSessionExercise,
+  WorkoutSessionSet,
 } from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import {
@@ -786,9 +787,44 @@ export async function applyRemoteWorkoutLogs(
   for (const row of rows) {
     await db.runAsync(
       `INSERT OR REPLACE INTO workout_logs (
-         id, routine_id, notes, completed_at, created_at
-       ) VALUES (?, ?, ?, ?, ?)`,
-      [row.id, row.routine_id, row.notes, row.completed_at, row.created_at],
+         id, routine_id, notes, completed_at, created_at,
+         started_at, ended_at, duration_seconds
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.routine_id,
+        row.notes,
+        row.completed_at,
+        row.created_at,
+        // Legacy rows predate real session timing; absent = NULL (untimed).
+        row.started_at ?? null,
+        row.ended_at ?? null,
+        row.duration_seconds ?? null,
+      ],
+    );
+  }
+}
+
+export async function applyRemoteWorkoutSessionSets(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: WorkoutSessionSet[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO workout_session_sets (
+         id, session_exercise_id, set_number, weight, reps, weight_unit,
+         completed, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.session_exercise_id,
+        row.set_number,
+        row.weight,
+        row.reps,
+        row.weight_unit,
+        row.completed,
+        row.created_at,
+      ],
     );
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
-import { BACKUP_SCOPE_VERSION } from '@/core/backup/backup.types';
+import { BACKUP_SCOPE_VERSION, type BackupEntity } from '@/core/backup/backup.types';
 import { PORTABLE_BACKUP_FORMAT_VERSION } from '@/core/portable/portable.types';
 
 /**
@@ -76,8 +76,13 @@ const ALL_TABLES = [
   'routine_exercise_sets',
   'workout_logs',
   'workout_session_exercises',
+  'workout_session_sets',
   'pomodoro_sessions',
   'linked_action_rules',
+  'weekly_reviews',
+  'projects',
+  'goals',
+  'daily_plans',
 ] as const;
 
 async function dumpTable(db: TestDatabase, table: string): Promise<Record<string, unknown>[]> {
@@ -103,8 +108,25 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
   const pomodoro = await import('@/features/pomodoro/pomodoro.data');
   const workout = await import('@/features/workout/workout.data');
   const linkedActions = await import('@/core/linked-actions/linkedActions.data');
+  const projects = await import('@/features/projects/projects.data');
+  const goals = await import('@/features/goals/goals.data');
+  const dailyPlan = await import('@/features/daily-plan/dailyPlan.data');
+  const weeklyReview = await import('@/features/weekly-review/weeklyReview.data');
 
-  const todoId = await todos.addTodo({ title: 'Ship portable backup', priority: 'urgent' });
+  // Planning scope: project → goal → first todo linked to both.
+  const projectId = await projects.addProject({
+    name: 'Launch plan',
+    description: 'Portable wave',
+    status: 'active',
+  });
+  const goalId = await goals.addGoal({ projectId, title: 'Ship portable v2' });
+
+  const todoId = await todos.addTodo({
+    title: 'Ship portable backup',
+    priority: 'urgent',
+    projectId,
+    goalId,
+  });
   await todos.addTodo({
     title: 'Morning pages',
     notes: 'Journal every day',
@@ -241,6 +263,38 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
       { exerciseName: 'Overhead press', setsCompleted: 1 },
     ],
   });
+  // Per-set session data (scope V5) attached to the logged session exercises.
+  const sessionExercises = await db.getAllAsync<{ id: string; exercise_name: string }>(
+    'SELECT id, exercise_name FROM workout_session_exercises ORDER BY id ASC',
+  );
+  const benchSessionExercise = sessionExercises.find((row) => row.exercise_name === 'Bench press');
+  const overheadSessionExercise = sessionExercises.find(
+    (row) => row.exercise_name === 'Overhead press',
+  );
+  await db.runAsync(
+    `INSERT INTO workout_session_sets (id, session_exercise_id, set_number, weight, reps, weight_unit, completed, created_at)
+     VALUES ('wset_1', ?, 1, 60, 8, 'kg', 1, '2026-08-03T10:00:00.000Z'),
+            ('wset_2', ?, 2, 62.5, 6, 'kg', 1, '2026-08-03T10:05:00.000Z'),
+            ('wset_3', ?, 1, NULL, NULL, NULL, 0, '2026-08-03T10:10:00.000Z')`,
+    [
+      benchSessionExercise?.id ?? '',
+      benchSessionExercise?.id ?? '',
+      overheadSessionExercise?.id ?? '',
+    ],
+  );
+  await dailyPlan.upsertDailyPlan('2026-08-03', {
+    intention: 'Deep work',
+    topTodoIds: [todoId],
+  });
+  await weeklyReview.saveWeeklyReview({
+    weekKey: '2026-W31',
+    weekStartDate: '2026-07-27',
+    weekEndDate: '2026-08-02',
+    nextWeekStartDate: '2026-08-03',
+    summaryPayload: '{"highlights":["portable"]}',
+    planPayload: '{"focus":"round-trip"}',
+    reflection: 'Solid week',
+  });
 
   return { todoId, habitId };
 }
@@ -361,6 +415,12 @@ describe('portable import — source→import semantic equivalence', () => {
     expect(outcome.preview.counts.workout_logs).toBe(1);
     expect(outcome.preview.counts.workout_session_exercises).toBe(2);
     expect(outcome.preview.counts.linked_action_rules).toBe(1);
+    // Planning scope + weekly reviews + per-set session data.
+    expect(outcome.preview.counts.projects).toBe(1);
+    expect(outcome.preview.counts.goals).toBe(1);
+    expect(outcome.preview.counts.daily_plans).toBe(1);
+    expect(outcome.preview.counts.weekly_reviews).toBe(1);
+    expect(outcome.preview.counts.workout_session_sets).toBe(3);
     expect(outcome.preview.ownerVerdict).toBe('local_only_source');
 
     // NO-WRITE-BEFORE-CONFIRM: the destination is still completely empty —
@@ -378,11 +438,45 @@ describe('portable import — source→import semantic equivalence', () => {
     expect(imported.importedCounts.todos).toBe(3);
     expect(imported.importedCounts.linked_action_rules).toBe(1);
 
+    // importedCounts must equal the preview counts for EVERY entity — the
+    // import imports everything the preview listed (F1 contract).
+    for (const entity of Object.keys(outcome.preview.counts) as BackupEntity[]) {
+      expect(imported.importedCounts[entity], entity).toBe(outcome.preview.counts[entity]);
+    }
+
     // Row-level equivalence across every recoverable table.
     const targetDump = await dumpAll(targetDb);
     for (const table of ALL_TABLES) {
       expect(targetDump[table]).toEqual(sourceDump[table]);
     }
+
+    // Planning references resolve to imported rows on the destination.
+    const restoredTodo = await targetDb.getFirstAsync<{
+      project_id: string | null;
+      goal_id: string | null;
+    }>('SELECT project_id, goal_id FROM todos WHERE title = ? AND deleted_at IS NULL', [
+      'Ship portable backup',
+    ]);
+    const restoredProject = await targetDb.getFirstAsync<{ name: string }>(
+      'SELECT name FROM projects WHERE id = ?',
+      [restoredTodo?.project_id ?? ''],
+    );
+    expect(restoredProject?.name).toBe('Launch plan');
+    const restoredGoal = await targetDb.getFirstAsync<{ title: string; project_id: string | null }>(
+      'SELECT title, project_id FROM goals WHERE id = ?',
+      [restoredTodo?.goal_id ?? ''],
+    );
+    expect(restoredGoal?.title).toBe('Ship portable v2');
+    expect(restoredGoal?.project_id).toBe(restoredTodo?.project_id);
+    const restoredPlanTopIds = await targetDb.getFirstAsync<{ top_todo_ids: string }>(
+      'SELECT top_todo_ids FROM daily_plans',
+    );
+    const planTopId = (JSON.parse(restoredPlanTopIds?.top_todo_ids ?? '[]') as string[])[0];
+    const planTodoCount = await targetDb.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM todos WHERE id = ? AND deleted_at IS NULL',
+      [planTopId],
+    );
+    expect(Number(planTodoCount?.count)).toBe(1);
 
     // Habit progress insights: streaks, windows, consistency, occurrences.
     const habits = await import('@/features/habits/habits.data');

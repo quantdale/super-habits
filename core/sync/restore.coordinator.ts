@@ -17,6 +17,7 @@ import {
   isDeviceEmptyForRestore,
   restoreFromRemoteBackupV2,
 } from '@/core/backup/backupRestore';
+import { validateBackupRow } from '@/core/backup/backupValidators';
 import type {
   BackupFreshnessSignature,
   LocalSyncBackedCounts,
@@ -520,9 +521,36 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     fetchRemoteRows('calorie_entries', ownerUserId),
   ]);
 
+  // Remote rows are untrusted external input: every fetched row must pass the
+  // shared backup-row validator BEFORE any local write (same semantics as the
+  // V2 restore and portable import paths).
+  const validationErrors: string[] = [];
+  const scopedRows: [RestoreScopedEntity, readonly Record<string, unknown>[]][] = [
+    ['todos', todos],
+    ['habits', habits],
+    ['calorie_entries', calorieEntries],
+  ];
+  for (const [entity, rows] of scopedRows) {
+    for (const row of rows) {
+      const validation = validateBackupRow(entity, row);
+      if (!validation.ok) {
+        validationErrors.push(`${entity}: ${validation.errors.join('; ')}`);
+      }
+    }
+  }
+  if (validationErrors.length > 0) {
+    return {
+      status: 'invalid',
+      message: 'The remote backup contains malformed rows and was not imported.',
+      diagnostics: validationErrors.slice(0, 50),
+      preview: await getRestorePreview(),
+    };
+  }
+
   const restoredAt = nowIso();
 
   let localRowsAppeared = false;
+  let ownerChanged = false;
   await db.withTransactionAsync(async () => {
     // Re-verify complete emptiness (ALL user tables, not only synced tables)
     // inside the transaction: local rows written between the eligibility
@@ -535,7 +563,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
 
     const transactionOwner = await getLocalDatasetOwner(db);
     if (transactionOwner && transactionOwner !== ownerUserId) {
-      localRowsAppeared = true;
+      ownerChanged = true;
       return;
     }
 
@@ -549,6 +577,15 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
       await setLocalDatasetOwner(db, ownerUserId);
     }
   });
+
+  if (ownerChanged) {
+    return {
+      status: 'invalid',
+      message: 'The local dataset owner changed during restore; the import was aborted.',
+      diagnostics: ['local dataset owner changed inside the restore transaction'],
+      preview: await getRestorePreview(),
+    };
+  }
 
   if (localRowsAppeared) {
     return {

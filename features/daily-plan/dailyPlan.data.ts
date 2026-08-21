@@ -253,3 +253,48 @@ export async function getDailyPlanAdherence(days = 30): Promise<DailyPlanAdheren
 }
 
 export { parseTopTodoIds };
+
+/**
+ * Restore-only import for daily plans. Plain INSERT OR REPLACE preserving ids,
+ * date keys, tombstones, and timestamps — data reconstruction only; no
+ * carry-forward, no completion events.
+ */
+export async function applyRemoteDailyPlans(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: DailyPlan[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO daily_plans (
+         id,
+         date_key,
+         intention,
+         top_todo_ids,
+         focus_target_minutes,
+         notes,
+         reflection,
+         energy_score,
+         status,
+         created_at,
+         updated_at,
+         deleted_at,
+         completed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.date_key,
+        row.intention,
+        row.top_todo_ids,
+        row.focus_target_minutes,
+        row.notes,
+        row.reflection,
+        row.energy_score,
+        row.status,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+        row.completed_at ?? null,
+      ],
+    );
+  }
+}

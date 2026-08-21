@@ -33,9 +33,12 @@ import {
 } from '@/core/backup/backupSettings';
 import type {
   CalorieEntry,
+  DailyPlan,
+  Goal,
   Habit,
   HabitCompletion,
   PomodoroSession,
+  Project,
   RoutineExercise,
   RoutineExerciseSet,
   SavedMeal,
@@ -43,6 +46,7 @@ import type {
   WorkoutLog,
   WorkoutRoutine,
   WorkoutSessionExercise,
+  WorkoutSessionSet,
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
@@ -53,12 +57,16 @@ import {
   applyRemoteSavedMeals,
 } from '@/features/calories/calories.data';
 import { applyRemotePomodoroSessions } from '@/features/pomodoro/pomodoro.data';
+import { applyRemoteProjects } from '@/features/projects/projects.data';
+import { applyRemoteGoals } from '@/features/goals/goals.data';
+import { applyRemoteDailyPlans } from '@/features/daily-plan/dailyPlan.data';
 import {
   applyRemoteRoutineExercises,
   applyRemoteRoutineExerciseSets,
   applyRemoteWorkoutLogs,
   applyRemoteWorkoutRoutines,
   applyRemoteWorkoutSessionExercises,
+  applyRemoteWorkoutSessionSets,
 } from '@/features/workout/workout.data';
 import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
 import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
@@ -470,8 +478,16 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       diagnostics: ['user_backup_settings.user_id does not match the restore owner'],
     };
   }
+  // Settings version gate (epoch-aware): the row, the manifest, and the
+  // manifest's settings metadata must agree on ONE supported contract version.
+  // The current version canonicalizes with the live field set; a historical V2
+  // payload verifies against the frozen V2 canonical text. Anything else fails
+  // closed as unsupported_version.
+  const settingsVersion = settingsRow.settings_version;
+  const isCurrentSettingsVersion = settingsVersion === BACKUP_SETTINGS_VERSION;
+  const isHistoricalSettingsV2 = settingsVersion === 2;
   if (
-    settingsRow.settings_version !== BACKUP_SETTINGS_VERSION ||
+    (!isCurrentSettingsVersion && !isHistoricalSettingsV2) ||
     settingsRow.settings_version !== manifest.settingsVersion ||
     settingsRow.settings_version !== manifest.settingsMetadata.version
   ) {
@@ -495,7 +511,9 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
   const normalizedSettings = normalizeRecoverableSettings(settingsRow.payload);
-  const settingsChecksum = canonicalizeSettingsPayload(normalizedSettings);
+  const settingsChecksum = canonicalizeSettingsPayload(normalizedSettings, {
+    settingsVersion: isHistoricalSettingsV2 ? 2 : BACKUP_SETTINGS_VERSION,
+  });
   if (settingsChecksum !== manifest.settingsMetadata.checksum) {
     return {
       status: 'invalid',
@@ -535,12 +553,17 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       return;
     }
 
-    // Dependency order: parents before children; settings staged and applied
-    // after full validation (already done above). Rows were runtime-validated
-    // and integrity-verified above; the casts apply the validated shapes.
+    // Dependency order: parents before children (Projects → Goals →
+    // Todos/Habits → Daily Plans; workout_session_sets after its session
+    // exercises); settings staged and applied after full validation (already
+    // done above). Rows were runtime-validated and integrity-verified above;
+    // the casts apply the validated shapes.
     const typed = <T>(entity: BackupEntity): T => (rowsByEntity[entity] ?? []) as unknown as T;
+    await applyRemoteProjects(transactionDb, typed<Project[]>('projects'));
+    await applyRemoteGoals(transactionDb, typed<Goal[]>('goals'));
     await applyRemoteTodos(transactionDb, typed<Todo[]>('todos'));
     await applyRemoteHabits(transactionDb, typed<Habit[]>('habits'));
+    await applyRemoteDailyPlans(transactionDb, typed<DailyPlan[]>('daily_plans'));
     await applyRemoteHabitCompletions(transactionDb, typed<HabitCompletion[]>('habit_completions'));
     await applyRemoteCalorieEntries(transactionDb, typed<CalorieEntry[]>('calorie_entries'));
     await applyRemoteSavedMeals(transactionDb, typed<SavedMeal[]>('saved_meals'));
@@ -555,12 +578,16 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       transactionDb,
       typed<WorkoutSessionExercise[]>('workout_session_exercises'),
     );
+    await applyRemoteWorkoutSessionSets(
+      transactionDb,
+      typed<WorkoutSessionSet[]>('workout_session_sets'),
+    );
     await applyRemotePomodoroSessions(transactionDb, typed<PomodoroSession[]>('pomodoro_sessions'));
     await applyRemoteLinkedActionRules(
       transactionDb,
       typed<LinkedActionRuleRow[]>('linked_action_rules'),
     );
-    await applyRemoteWeeklyReviews(typed<WeeklyReview[]>('weekly_reviews'));
+    await applyRemoteWeeklyReviews(transactionDb, typed<WeeklyReview[]>('weekly_reviews'));
 
     // Settings: the payload was fetched and integrity-verified ABOVE, before
     // this transaction began. SQLite-backed settings join the transaction
@@ -777,7 +804,11 @@ async function getBackfillStatusForSummary(
     'SELECT value FROM app_meta WHERE key = ?',
     [appMetaKeys.backupScopeVersion.key],
   );
-  if (scope && scope.value !== null && parseInt(scope.value, 10) >= BACKUP_SCHEMA_VERSION) {
+  // The marker stores the recoverable SCOPE version (the writer gates on
+  // BACKUP_SCOPE_VERSION), so compare against that — comparing against the
+  // schema version would report "complete" from a stale low scope value after
+  // any scope bump.
+  if (scope && scope.value !== null && parseInt(scope.value, 10) >= BACKUP_SCOPE_VERSION) {
     return 'complete';
   }
   return 'idle';

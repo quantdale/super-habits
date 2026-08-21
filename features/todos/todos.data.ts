@@ -866,8 +866,10 @@ export async function applyRemoteTodos(
          recurrence_id,
          created_at,
          updated_at,
-         deleted_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         deleted_at,
+         project_id,
+         goal_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.title,
@@ -882,6 +884,10 @@ export async function applyRemoteTodos(
         row.created_at,
         row.updated_at,
         row.deleted_at,
+        // Planning links joined the recoverable scope in V4; legacy rows omit
+        // them and restore as unassigned.
+        (row as unknown as { project_id?: string | null }).project_id ?? null,
+        (row as unknown as { goal_id?: string | null }).goal_id ?? null,
       ],
     );
   }

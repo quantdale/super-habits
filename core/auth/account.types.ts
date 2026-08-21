@@ -101,6 +101,12 @@ export type AccountRemoteFingerprint = {
   /** Diagnostics only — never used as a security invariant. */
   counts: Record<string, number>;
   ownerIds: string[];
+  /**
+   * Recorded when an entity's remote table is missing on a pre-migration
+   * remote and its count was therefore treated as 0. Presence of a diagnostic
+   * never changes the verdicts derived from counts; it only explains them.
+   */
+  diagnostics?: string[];
 };
 
 export type PendingProtection = {

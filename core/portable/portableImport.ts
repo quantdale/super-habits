@@ -28,27 +28,15 @@ import {
 } from '@/core/portable/portable.types';
 import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 import { nowIso } from '@/lib/time';
-import { applyRemoteTodos } from '@/features/todos/todos.data';
-import { applyRemoteHabits, applyRemoteHabitCompletions } from '@/features/habits/habits.data';
-import {
-  applyRemoteCalorieEntries,
-  applyRemoteSavedMeals,
-} from '@/features/calories/calories.data';
-import { applyRemotePomodoroSessions } from '@/features/pomodoro/pomodoro.data';
-import {
-  applyRemoteRoutineExercises,
-  applyRemoteRoutineExerciseSets,
-  applyRemoteWorkoutLogs,
-  applyRemoteWorkoutRoutines,
-  applyRemoteWorkoutSessionExercises,
-} from '@/features/workout/workout.data';
-import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import type {
   CalorieEntry,
+  DailyPlan,
+  Goal,
   Habit,
   HabitCompletion,
   PomodoroSession,
+  Project,
   RoutineExercise,
   RoutineExerciseSet,
   SavedMeal,
@@ -56,8 +44,30 @@ import type {
   WorkoutLog,
   WorkoutRoutine,
   WorkoutSessionExercise,
+  WorkoutSessionSet,
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
+import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
+import { applyRemoteTodos } from '@/features/todos/todos.data';
+import { applyRemoteHabits, applyRemoteHabitCompletions } from '@/features/habits/habits.data';
+import {
+  applyRemoteCalorieEntries,
+  applyRemoteSavedMeals,
+} from '@/features/calories/calories.data';
+import { applyRemotePomodoroSessions } from '@/features/pomodoro/pomodoro.data';
+import { applyRemoteProjects } from '@/features/projects/projects.data';
+import { applyRemoteGoals } from '@/features/goals/goals.data';
+import { applyRemoteDailyPlans } from '@/features/daily-plan/dailyPlan.data';
+import {
+  applyRemoteRoutineExercises,
+  applyRemoteRoutineExerciseSets,
+  applyRemoteWorkoutLogs,
+  applyRemoteWorkoutRoutines,
+  applyRemoteWorkoutSessionExercises,
+  applyRemoteWorkoutSessionSets,
+} from '@/features/workout/workout.data';
+import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
+import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
 
 /**
  * Portable Data Import V1.
@@ -285,13 +295,17 @@ export async function confirmPortableImport(input: {
         };
       }
 
-      // Dependency order: parents before children. Rows were runtime-validated
-      // and integrity-verified in `preparePortableImport`; the casts apply the
-      // validated shapes.
+      // Dependency order: parents before children (Projects → Goals →
+      // Todos/Habits → Daily Plans; workout_session_sets after its session
+      // exercises). Rows were runtime-validated and integrity-verified in
+      // `preparePortableImport`; the casts apply the validated shapes.
       const entities = input.file.entities;
       const typed = <T>(entity: BackupEntity): T => (entities[entity] ?? []) as unknown as T;
+      await applyRemoteProjects(transactionDb, typed<Project[]>('projects'));
+      await applyRemoteGoals(transactionDb, typed<Goal[]>('goals'));
       await applyRemoteTodos(transactionDb, typed<Todo[]>('todos'));
       await applyRemoteHabits(transactionDb, typed<Habit[]>('habits'));
+      await applyRemoteDailyPlans(transactionDb, typed<DailyPlan[]>('daily_plans'));
       await applyRemoteHabitCompletions(
         transactionDb,
         typed<HabitCompletion[]>('habit_completions'),
@@ -312,6 +326,10 @@ export async function confirmPortableImport(input: {
         transactionDb,
         typed<WorkoutSessionExercise[]>('workout_session_exercises'),
       );
+      await applyRemoteWorkoutSessionSets(
+        transactionDb,
+        typed<WorkoutSessionSet[]>('workout_session_sets'),
+      );
       await applyRemotePomodoroSessions(
         transactionDb,
         typed<PomodoroSession[]>('pomodoro_sessions'),
@@ -320,6 +338,7 @@ export async function confirmPortableImport(input: {
         transactionDb,
         typed<LinkedActionRuleRow[]>('linked_action_rules'),
       );
+      await applyRemoteWeeklyReviews(transactionDb, typed<WeeklyReview[]>('weekly_reviews'));
 
       // Settings: SQLite-backed values join the transaction directly; theme
       // (AsyncStorage) is staged durably here and applied after commit with

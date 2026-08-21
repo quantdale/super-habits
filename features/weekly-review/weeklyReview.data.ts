@@ -1,7 +1,8 @@
+import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
+import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
-import { syncEngine } from '@/core/sync/sync.engine';
 import type { WeeklyReview } from './weeklyReview.types';
 
 /** List recent completed reviews, newest first. */
@@ -36,7 +37,10 @@ export async function getWeeklyReviewById(id: string): Promise<WeeklyReview | nu
 /**
  * Save (create or update) a completed weekly review.
  * Idempotent by week_key — updates if one already exists for that week.
- * Enqueues a sync record inside the same logical write.
+ * The sync intent is created through the runBackupMutation boundary so the
+ * outbox row lands in the SAME transaction as the review row and carries the
+ * durable dataset owner (a bare enqueue would write an unowned intent that
+ * backfill could never rebind).
  */
 export async function saveWeeklyReview(input: {
   weekKey: string;
@@ -50,71 +54,83 @@ export async function saveWeeklyReview(input: {
   const db = await getDatabase();
   const now = nowIso();
 
-  const existing = await db.getFirstAsync<{ id: string }>(
-    `SELECT id FROM weekly_reviews WHERE week_key = ? AND deleted_at IS NULL`,
-    [input.weekKey],
-  );
+  const outcome = await runBackupMutation<string>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const existing = await transactionDb.getFirstAsync<{ id: string }>(
+        `SELECT id FROM weekly_reviews WHERE week_key = ? AND deleted_at IS NULL`,
+        [input.weekKey],
+      );
 
-  if (existing) {
-    await db.runAsync(
-      `UPDATE weekly_reviews
-         SET summary_payload = ?, plan_payload = ?, reflection = ?,
-             completed_at = ?, status = 'completed', updated_at = ?
-       WHERE id = ? AND deleted_at IS NULL`,
-      [input.summaryPayload, input.planPayload, input.reflection, now, now, existing.id],
-    );
-    syncEngine.enqueue({
-      entity: 'weekly_reviews',
-      id: existing.id,
-      updatedAt: now,
-      operation: 'update',
-    });
-    return existing.id;
-  }
+      if (existing) {
+        await transactionDb.runAsync(
+          `UPDATE weekly_reviews
+             SET summary_payload = ?, plan_payload = ?, reflection = ?,
+                 completed_at = ?, status = 'completed', updated_at = ?
+           WHERE id = ? AND deleted_at IS NULL`,
+          [input.summaryPayload, input.planPayload, input.reflection, now, now, existing.id],
+        );
+        enqueue({
+          entity: 'weekly_reviews',
+          id: existing.id,
+          updatedAt: now,
+          operation: 'update',
+        });
+        return { value: existing.id, changed: true };
+      }
 
-  const id = createId('wrev');
-  await db.runAsync(
-    `INSERT INTO weekly_reviews
-       (id, week_key, week_start_date, week_end_date, next_week_start_date,
-        completed_at, status, summary_payload, plan_payload, reflection,
-        created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?, ?, NULL)`,
-    [
-      id,
-      input.weekKey,
-      input.weekStartDate,
-      input.weekEndDate,
-      input.nextWeekStartDate,
-      now,
-      input.summaryPayload,
-      input.planPayload,
-      input.reflection,
-      now,
-      now,
-    ],
-  );
-  syncEngine.enqueue({
-    entity: 'weekly_reviews',
-    id,
-    updatedAt: now,
-    operation: 'create',
+      const id = createId('wrev');
+      await transactionDb.runAsync(
+        `INSERT INTO weekly_reviews
+           (id, week_key, week_start_date, week_end_date, next_week_start_date,
+            completed_at, status, summary_payload, plan_payload, reflection,
+            created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?, ?, NULL)`,
+        [
+          id,
+          input.weekKey,
+          input.weekStartDate,
+          input.weekEndDate,
+          input.nextWeekStartDate,
+          now,
+          input.summaryPayload,
+          input.planPayload,
+          input.reflection,
+          now,
+          now,
+        ],
+      );
+      enqueue({
+        entity: 'weekly_reviews',
+        id,
+        updatedAt: now,
+        operation: 'create',
+      });
+      return { value: id, changed: true };
+    },
   });
-  return id;
+  return outcome.value;
 }
 
 /** Soft-delete a review (future use). */
 export async function deleteWeeklyReview(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
-  await db.runAsync(
-    `UPDATE weekly_reviews SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
-    [now, now, id],
-  );
-  syncEngine.enqueue({
-    entity: 'weekly_reviews',
-    id,
-    updatedAt: now,
-    operation: 'delete',
+  await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      await transactionDb.runAsync(
+        `UPDATE weekly_reviews SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
+        [now, now, id],
+      );
+      enqueue({
+        entity: 'weekly_reviews',
+        id,
+        updatedAt: now,
+        operation: 'delete',
+      });
+      return { value: undefined, changed: true };
+    },
   });
 }
 
@@ -128,9 +144,15 @@ export async function hasWeeklyReviewForWeek(weekKey: string): Promise<boolean> 
   return (row?.count ?? 0) > 0;
 }
 
-/** Apply remote weekly reviews (for restore/portable import). Inert — no side effects. */
-export async function applyRemoteWeeklyReviews(reviews: WeeklyReview[]): Promise<void> {
-  const db = await getDatabase();
+/**
+ * Apply remote weekly reviews (for restore/portable import). Inert — no side
+ * effects. Takes the caller's database connection so restore can run it on the
+ * import transaction.
+ */
+export async function applyRemoteWeeklyReviews(
+  db: SQLite.SQLiteDatabase,
+  reviews: WeeklyReview[],
+): Promise<void> {
   for (const review of reviews) {
     await db.runAsync(
       `INSERT OR REPLACE INTO weekly_reviews

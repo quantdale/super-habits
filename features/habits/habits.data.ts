@@ -1002,8 +1002,12 @@ export async function applyRemoteHabits(
          rule_history,
          created_at,
          updated_at,
-         deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         deleted_at,
+         project_id,
+         goal_id,
+         status,
+         lifecycle_history
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.name,
@@ -1016,6 +1020,11 @@ export async function applyRemoteHabits(
         row.created_at,
         row.updated_at,
         row.deleted_at,
+        row.project_id,
+        row.goal_id,
+        // Legacy rows predate the lifecycle columns; absent status = 'active'.
+        row.status ?? 'active',
+        row.lifecycle_history ?? null,
       ],
     );
   }

@@ -208,3 +208,46 @@ export async function countActiveGoals(): Promise<number> {
   );
   return row?.count ?? 0;
 }
+
+/**
+ * Restore-only import for goals. Plain INSERT OR REPLACE preserving ids,
+ * ordering, tombstones, and timestamps — data reconstruction only; no
+ * completion events, no child reconciliation.
+ */
+export async function applyRemoteGoals(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  rows: Goal[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO goals (
+         id,
+         project_id,
+         title,
+         description,
+         horizon,
+         target_date,
+         status,
+         progress_percent,
+         created_at,
+         updated_at,
+         deleted_at,
+         completed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.project_id,
+        row.title,
+        row.description,
+        row.horizon,
+        row.target_date,
+        row.status,
+        row.progress_percent,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+        row.completed_at ?? null,
+      ],
+    );
+  }
+}

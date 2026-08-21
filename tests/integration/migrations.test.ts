@@ -118,14 +118,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 19', async () => {
+  it('bootstraps from zero and reaches stored schema version 20', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('19');
+    expect(row?.value).toBe('20');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -209,13 +209,13 @@ describe('tests/integration/migrations', () => {
     const file = path.join(dir, 'superhabits.db');
 
     try {
-      // Session 1: a fresh empty file gets bootstrapped + migrated to v19.
+      // Session 1: a fresh empty file gets bootstrapped + migrated to v20.
       const session1 = await openDb({ filename: file });
       const v1 = await session1.getFirstAsync<{ value: string }>(
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('19');
+      expect(v1?.value).toBe('20');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -226,7 +226,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('19');
+      expect(v2?.value).toBe('20');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",

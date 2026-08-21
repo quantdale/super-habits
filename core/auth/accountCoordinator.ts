@@ -51,7 +51,7 @@ import {
  * account safety gate must check every entity that can carry meaningful user
  * backup state — not just the original four V1 sync tables.
  *
- * Covers all `BACKUP_ENTITIES` (12 table-backed entities) plus
+ * Covers all `BACKUP_ENTITIES` (17 table-backed entities) plus
  * `BACKUP_SYNTHETIC_ENTITIES` (`user_backup_settings`, `backup_manifest`).
  * AI quota counters and implementation-only infrastructure tables are excluded
  * because they are not user recovery data.
@@ -63,7 +63,30 @@ function defaultNow(): Date {
   return new Date();
 }
 
-async function getRemoteFingerprint(userId: string): Promise<AccountRemoteFingerprint> {
+/**
+ * True when a per-entity count query failed because the remote does not have
+ * that table yet (pre-migration server: PostgREST schema-cache miss PGRST205,
+ * an HTTP-404-style relation-not-found, or the raw "relation ... does not
+ * exist" form). Such a remote carries zero rows for that entity, so the
+ * fingerprint may treat it as empty; every OTHER error must propagate
+ * fail-closed.
+ */
+function isMissingRemoteTableError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === 'string' ? candidate.code : '';
+  const message = typeof candidate.message === 'string' ? candidate.message : '';
+  return (
+    code === 'PGRST205' ||
+    code === '404' ||
+    /PGRST205/i.test(message) ||
+    /could not find the table .* in the schema cache/i.test(message) ||
+    /relation .* does not exist/i.test(message)
+  );
+}
+
+/** Exported for diagnostics/tests: owner-scoped remote row counts per entity. */
+export async function getRemoteFingerprint(userId: string): Promise<AccountRemoteFingerprint> {
   const client = supabase;
   if (!client) return { counts: {}, ownerIds: [] };
 
@@ -73,17 +96,30 @@ async function getRemoteFingerprint(userId: string): Promise<AccountRemoteFinger
         .from(entity)
         .select('user_id', { count: 'exact', head: true })
         .eq('user_id', userId);
-      if (error) throw error;
-      return {
-        entity,
-        count: count ?? 0,
-      };
+      if (error) {
+        // A pre-migration remote lacks tables that this app's backup scope
+        // includes (e.g. weekly_reviews). That entity provably holds zero rows
+        // there, so treat it as count 0 with a recorded diagnostic instead of
+        // failing every protection/recovery flow. All other errors rethrow.
+        if (!isMissingRemoteTableError(error)) throw error;
+        return {
+          entity,
+          count: 0,
+          diagnostic: `${entity}: remote table missing (treated as empty)`,
+        };
+      }
+      return { entity, count: count ?? 0, diagnostic: null };
     }),
   );
+
+  const diagnostics = results
+    .map(({ diagnostic }) => diagnostic)
+    .filter((diagnostic): diagnostic is string => diagnostic !== null);
 
   return {
     counts: Object.fromEntries(results.map(({ entity, count }) => [entity, count])),
     ownerIds: results.some((r) => r.count > 0) ? [userId] : [],
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
   };
 }
 

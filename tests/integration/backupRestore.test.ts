@@ -50,6 +50,29 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
+/**
+ * Injectable failure point INSIDE the restore import transaction: when set,
+ * the first `setAppMetaText` write for this key throws after the entity
+ * appliers have run (used to prove the weekly-reviews import rolls back).
+ */
+const appMetaWriteFailure = vi.hoisted(() => ({ failForKey: null as string | null }));
+
+vi.mock('@/core/db/appMeta', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/core/db/appMeta')>();
+  return {
+    ...actual,
+    setAppMetaText: async (
+      ...args: Parameters<typeof actual.setAppMetaText>
+    ): Promise<ReturnType<typeof actual.setAppMetaText>> => {
+      const key = (args[1] as { key?: string } | undefined)?.key ?? null;
+      if (appMetaWriteFailure.failForKey !== null && key === appMetaWriteFailure.failForKey) {
+        throw new Error('simulated app_meta write failure');
+      }
+      return actual.setAppMetaText(...args);
+    },
+  };
+});
+
 /** True while any withSQLiteTransaction callback is executing. */
 const transactionOpen = vi.hoisted(() => ({ value: false }));
 
@@ -205,8 +228,13 @@ const REMOTE_ENTITIES = [
   'routine_exercise_sets',
   'workout_logs',
   'workout_session_exercises',
+  'workout_session_sets',
   'pomodoro_sessions',
   'linked_action_rules',
+  'weekly_reviews',
+  'projects',
+  'goals',
+  'daily_plans',
   'user_backup_settings',
   'backup_manifest',
 ];
@@ -252,8 +280,13 @@ async function expectZeroImportedRows(db: TestDatabase): Promise<void> {
     'routine_exercise_sets',
     'workout_logs',
     'workout_session_exercises',
+    'workout_session_sets',
     'pomodoro_sessions',
     'linked_action_rules',
+    'weekly_reviews',
+    'projects',
+    'goals',
+    'daily_plans',
   ]) {
     const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
     expect(Number(row?.count), table).toBe(0);
@@ -422,12 +455,15 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
     const manifestRow = manifestRows?.[0];
     expect(manifestRow).toBeDefined();
     // Simulate a backup produced before Projects/Goals/Daily Plans entered the
-    // recoverable scope: drop the scope-4 entities and the explicit scope flag
-    // so resolution must fall back to the known historical scope-3 entity set.
+    // recoverable scope (and before the V5 per-set workout entity): drop the
+    // post-V3 entities and the explicit scope flag so resolution must fall
+    // back to the known historical scope-3 entity set.
     if (manifestRow) {
       delete manifestRow.backup_scope_version;
       const metadata = (manifestRow as Record<string, Record<string, unknown>>).entity_metadata;
-      for (const dropped of ['projects', 'goals', 'daily_plans']) delete metadata[dropped];
+      for (const dropped of ['projects', 'goals', 'daily_plans', 'workout_session_sets']) {
+        delete metadata[dropped];
+      }
     }
     const serving = buildServingSupabase(remote);
     installSupabaseMock(serving.supabase);
@@ -436,7 +472,7 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
     const summary = await getBackupStateSummary('user_a');
     expect(summary.state).toBe('v2_complete');
     expect(summary.missingEntities).toEqual(
-      expect.arrayContaining(['projects', 'goals', 'daily_plans']),
+      expect.arrayContaining(['projects', 'goals', 'daily_plans', 'workout_session_sets']),
     );
     await targetDb.closeAsync();
   });
@@ -494,8 +530,24 @@ async function seedSourceDevice(db: TestDatabase) {
   const pomodoro = await import('@/features/pomodoro/pomodoro.data');
   const workout = await import('@/features/workout/workout.data');
   const linkedActions = await import('@/core/linked-actions/linkedActions.data');
+  const projects = await import('@/features/projects/projects.data');
+  const goals = await import('@/features/goals/goals.data');
+  const dailyPlan = await import('@/features/daily-plan/dailyPlan.data');
+  const weeklyReview = await import('@/features/weekly-review/weeklyReview.data');
 
-  const todoId = await todos.addTodo({ title: 'Ship backup v2', priority: 'urgent' });
+  // Planning scope: project → goal → linked todo → daily plan referencing it.
+  const projectId = await projects.addProject({
+    name: 'Launch plan',
+    description: 'Hardening wave',
+    status: 'active',
+  });
+  const goalId = await goals.addGoal({ projectId, title: 'Ship wave v2' });
+  const todoId = await todos.addTodo({
+    title: 'Ship backup v2',
+    priority: 'urgent',
+    projectId,
+    goalId,
+  });
   // Habit predates its completion history (created Aug 1, rule history
   // effective from Aug 1) so streaks compute over the historical window.
   const habitId = 'habit_1';
@@ -569,9 +621,33 @@ async function seedSourceDevice(db: TestDatabase) {
     notes: 'Felt strong',
     exercises: [{ exerciseName: 'Bench press', setsCompleted: 3 }],
   });
+  // Per-set session data (scope V5): attach recorded sets to the logged
+  // session's exercise.
+  const sessionExerciseRow = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM workout_session_exercises ORDER BY id ASC LIMIT 1',
+  );
+  await db.runAsync(
+    `INSERT INTO workout_session_sets (id, session_exercise_id, set_number, weight, reps, weight_unit, completed, created_at)
+     VALUES ('wset_1', ?, 1, 60, 8, 'kg', 1, '2026-08-03T10:00:00.000Z'),
+            ('wset_2', ?, 2, 62.5, 6, 'kg', 1, '2026-08-03T10:05:00.000Z')`,
+    [sessionExerciseRow?.id ?? '', sessionExerciseRow?.id ?? ''],
+  );
+  await dailyPlan.upsertDailyPlan('2026-08-03', {
+    intention: 'Deep work',
+    topTodoIds: [todoId],
+  });
+  await weeklyReview.saveWeeklyReview({
+    weekKey: '2026-W31',
+    weekStartDate: '2026-07-27',
+    weekEndDate: '2026-08-02',
+    nextWeekStartDate: '2026-08-03',
+    summaryPayload: '{"highlights":["shipped"]}',
+    planPayload: '{"focus":"stability"}',
+    reflection: 'Solid week',
+  });
   // The raw completion inserts above have no outbox intent yet; enqueue them
   // the way a real device would (backfill covers pre-existing history).
-  return { todoId, habitId };
+  return { todoId, habitId, projectId, goalId };
 }
 
 describe('backup completeness v2 restore', () => {
@@ -808,8 +884,7 @@ describe('backup completeness v2 restore', () => {
     await orphanTarget.closeAsync();
   });
 
-  it('blocks when local content appears after the preview (complete emptiness)', async () => {
-    const recording = buildRecordingSupabase();
+  it('blocks when local content appears after the preview (complete emptiness)', async () => {    const recording = buildRecordingSupabase();
     installSupabaseMock(recording.supabase);
     const sourceDb = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
@@ -870,6 +945,103 @@ describe('backup completeness v2 restore', () => {
       'SELECT COUNT(*) AS count FROM todos',
     );
     expect(Number(counts?.count)).toBe(0);
+    await targetDb.closeAsync();
+  });
+
+  it('imports the full scope-5 planning scope with truthful counts and resolvable references', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('restored');
+    if (result.status !== 'restored') return;
+
+    // importedCounts are truthful for every planning-scope entity.
+    expect(result.importedCounts.projects).toBe(1);
+    expect(result.importedCounts.goals).toBe(1);
+    expect(result.importedCounts.daily_plans).toBe(1);
+    expect(result.importedCounts.weekly_reviews).toBe(1);
+    expect(result.importedCounts.workout_session_sets).toBe(2);
+
+    // The restored todo's project_id resolves to the IMPORTED project row.
+    const todoRow = await targetDb.getFirstAsync<{ project_id: string | null; goal_id: string | null }>(
+      'SELECT project_id, goal_id FROM todos WHERE title = ? AND deleted_at IS NULL',
+      ['Ship backup v2'],
+    );
+    expect(todoRow?.project_id).toBeTruthy();
+    const projectRow = await targetDb.getFirstAsync<{ name: string; deleted_at: string | null }>(
+      'SELECT name, deleted_at FROM projects WHERE id = ?',
+      [todoRow?.project_id ?? ''],
+    );
+    expect(projectRow?.name).toBe('Launch plan');
+    expect(projectRow?.deleted_at).toBeNull();
+
+    // The goal resolves too, and its project_id points at the same project.
+    const goalRow = await targetDb.getFirstAsync<{ title: string; project_id: string | null }>(
+      'SELECT title, project_id FROM goals WHERE id = ?',
+      [todoRow?.goal_id ?? ''],
+    );
+    expect(goalRow?.title).toBe('Ship wave v2');
+    expect(goalRow?.project_id).toBe(todoRow?.project_id);
+
+    // Daily plan top_todo_ids resolve to restored, live todos.
+    const planRow = await targetDb.getFirstAsync<{ top_todo_ids: string }>(
+      'SELECT top_todo_ids FROM daily_plans',
+    );
+    const topIds = JSON.parse(planRow?.top_todo_ids ?? '[]') as string[];
+    expect(topIds).toHaveLength(1);
+    const topTodo = await targetDb.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM todos WHERE id = ? AND deleted_at IS NULL',
+      [topIds[0]],
+    );
+    expect(Number(topTodo?.count)).toBe(1);
+
+    // Weekly review content is restored verbatim.
+    const reviewRow = await targetDb.getFirstAsync<{ reflection: string; week_key: string }>(
+      'SELECT reflection, week_key FROM weekly_reviews',
+    );
+    expect(reviewRow?.week_key).toBe('2026-W31');
+    expect(reviewRow?.reflection).toBe('Solid week');
+
+    // Per-set session data landed under its session exercise.
+    const setRows = await targetDb.getAllAsync<{ id: string; session_exercise_id: string }>(
+      'SELECT id, session_exercise_id FROM workout_session_sets ORDER BY set_number ASC',
+    );
+    expect(setRows).toHaveLength(2);
+    const parentExercise = await targetDb.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM workout_session_exercises WHERE id = ?',
+      [setRows[0]?.session_exercise_id ?? ''],
+    );
+    expect(Number(parentExercise?.count)).toBe(1);
+    await targetDb.closeAsync();
+  });
+
+  it('rolls back weekly_reviews (and everything else) when a post-import write fails', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    // Fail INSIDE the import transaction AFTER the entity appliers (including
+    // weekly_reviews) have run: the last_restore_signature app_meta write sits
+    // behind them. The whole transaction must roll back.
+    appMetaWriteFailure.failForKey = 'last_restore_signature';
+    try {
+      const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+      await expect(restoreFromRemoteBackupV2()).rejects.toThrow('simulated app_meta write failure');
+    } finally {
+      appMetaWriteFailure.failForKey = null;
+    }
+
+    // Zero weekly_reviews rows persisted: the import never leaked out of the
+    // transaction, so a retry is not blocked by a half-restored device.
+    const reviewCount = await targetDb.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM weekly_reviews',
+    );
+    expect(Number(reviewCount?.count)).toBe(0);
+    await expectZeroImportedRows(targetDb);
     await targetDb.closeAsync();
   });
 });

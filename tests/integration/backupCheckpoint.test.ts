@@ -233,7 +233,7 @@ describe('backup completeness v2 checkpoint', () => {
     const manifest = supabaseMock.upserted[manifestIndex].rows[0];
     const settings = supabaseMock.upserted[settingsIndex].rows[0];
     const metadata = manifest.settings_metadata as { version: number; checksum: string };
-    expect(metadata.version).toBe(2);
+    expect(metadata.version).toBe(3); // BACKUP_SETTINGS_VERSION (V3 wave)
     expect(metadata.checksum).toMatch(/^[0-9a-f]{64}$/);
     // The uploaded settings payload must hash to the certified checksum.
     const { canonicalizeSettingsPayload } = await import('@/core/backup/backupSettings');

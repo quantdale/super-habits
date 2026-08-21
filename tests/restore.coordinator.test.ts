@@ -172,6 +172,7 @@ function buildDb(localCounts: Record<string, number>, initialMeta: Record<string
         activeMetaBuffer = null;
       }
     }),
+    isInTransaction: () => activeBuffer !== null,
     getCommittedWrites: () => committedWrites,
     getMeta: () => ({ ...meta }),
   };
@@ -259,6 +260,54 @@ async function loadCoordinator(options: {
 describe('core/sync/restore.coordinator', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  // The V1 restore path validates every fetched remote row with the shared
+  // backup-row validator (same contract as Restore V2 / portable import), so
+  // its fixtures must be schema-valid rows.
+  const validTodoRow = (overrides: Record<string, unknown> = {}) => ({
+    id: 'todo_1',
+    title: 'Ship restore',
+    notes: null,
+    completed: 0,
+    due_date: null,
+    priority: 'normal',
+    sort_order: 0,
+    recurrence: null,
+    recurrence_id: null,
+    created_at: '2026-04-19T12:00:00.000Z',
+    updated_at: '2026-04-20T12:00:00.000Z',
+    deleted_at: null,
+    ...overrides,
+  });
+  const validHabitRow = (overrides: Record<string, unknown> = {}) => ({
+    id: 'habit_1',
+    name: 'Hydrate',
+    target_per_day: 1,
+    reminder_time: null,
+    category: 'anytime',
+    icon: 'check-circle',
+    color: '#0ea5e9',
+    rule_history: '[]',
+    created_at: '2026-04-17T12:00:00.000Z',
+    updated_at: '2026-04-18T12:00:00.000Z',
+    deleted_at: null,
+    ...overrides,
+  });
+  const validCalorieRow = (overrides: Record<string, unknown> = {}) => ({
+    id: 'cal_1',
+    food_name: 'Oats',
+    calories: 300,
+    protein: 10,
+    carbs: 50,
+    fats: 5,
+    fiber: 4,
+    meal_type: 'breakfast',
+    consumed_on: '2026-04-15',
+    created_at: '2026-04-15T12:00:00.000Z',
+    updated_at: '2026-04-16T12:00:00.000Z',
+    deleted_at: null,
+    ...overrides,
   });
 
   it('marks the device as empty-device eligible only when all sync-backed tables are empty', async () => {
@@ -665,40 +714,15 @@ describe('core/sync/restore.coordinator', () => {
         workout_routines: 0,
       },
       remoteRowsByEntity: {
-        todos: [
-          {
-            id: 'todo_1',
-            title: 'Ship restore',
-            updated_at: '2026-04-20T12:00:00.000Z',
-            created_at: '2026-04-19T12:00:00.000Z',
-            deleted_at: null,
-          },
-          {
-            id: 'todo_2',
-            title: 'Deleted todo',
-            updated_at: '2026-04-20T13:00:00.000Z',
-            created_at: '2026-04-19T13:00:00.000Z',
-            deleted_at: '2026-04-20T14:00:00.000Z',
-          },
-        ],
-        habits: [
-          {
-            id: 'habit_1',
-            name: 'Hydrate',
-            updated_at: '2026-04-18T12:00:00.000Z',
-            created_at: '2026-04-17T12:00:00.000Z',
-            deleted_at: null,
-          },
-        ],
-        calorie_entries: [
-          {
-            id: 'cal_1',
-            food_name: 'Oats',
-            updated_at: '2026-04-16T12:00:00.000Z',
-            created_at: '2026-04-15T12:00:00.000Z',
-            deleted_at: null,
-          },
-        ],
+        todos: [validTodoRow(), validTodoRow({
+          id: 'todo_2',
+          title: 'Deleted todo',
+          updated_at: '2026-04-20T13:00:00.000Z',
+          created_at: '2026-04-19T13:00:00.000Z',
+          deleted_at: '2026-04-20T14:00:00.000Z',
+        })],
+        habits: [validHabitRow()],
+        calorie_entries: [validCalorieRow()],
         workout_routines: [
           {
             id: 'wrk_1',
@@ -736,6 +760,81 @@ describe('core/sync/restore.coordinator', () => {
     expect(metaWrites).toHaveLength(4);
   });
 
+  it('rejects malformed remote rows as invalid instead of importing them', async () => {
+    const loaded = await loadCoordinator({
+      localCounts: {
+        todos: 0,
+        habits: 0,
+        calorie_entries: 0,
+        workout_routines: 0,
+      },
+      remoteRowsByEntity: {
+        // Missing required fields (title/completed/priority/...) — the legacy
+        // V1 path must apply the same untrusted-input validation as Restore V2.
+        todos: [
+          {
+            id: 'todo_1',
+            updated_at: '2026-04-20T12:00:00.000Z',
+            created_at: '2026-04-19T12:00:00.000Z',
+          },
+        ],
+        habits: [validHabitRow()],
+        calorie_entries: [validCalorieRow()],
+      },
+    });
+
+    const result = await loaded.restoreFromRemoteBackup();
+
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.diagnostics.join(' ')).toContain('todos:');
+    }
+    expect(loaded.applyRemoteTodos).not.toHaveBeenCalled();
+    expect(loaded.applyRemoteHabits).not.toHaveBeenCalled();
+    expect(loaded.applyRemoteCalorieEntries).not.toHaveBeenCalled();
+    expect(loaded.db.getCommittedWrites()).toEqual([]);
+  });
+
+  it('reports an owner change inside the transaction as invalid, not local_data_present', async () => {
+    const loaded = await loadCoordinator({
+      localCounts: {
+        todos: 0,
+        habits: 0,
+        calorie_entries: 0,
+        workout_routines: 0,
+      },
+      remoteRowsByEntity: {
+        todos: [validTodoRow()],
+        habits: [validHabitRow()],
+        calorie_entries: [validCalorieRow()],
+      },
+    });
+
+    // The owner is unbound before the restore; flip it to a foreign account
+    // for reads issued INSIDE the transaction to simulate another account
+    // claiming the dataset mid-restore. The in-transaction owner re-check must
+    // surface as an owner-mismatch failure, never as `local_data_present`.
+    const original = loaded.db.getFirstAsync.getMockImplementation()!;
+    loaded.db.getFirstAsync.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (
+        loaded.db.isInTransaction() &&
+        sql === 'SELECT value FROM app_meta WHERE key = ?' &&
+        String(params?.[0] ?? '') === 'account.owner_user_id'
+      ) {
+        return { value: 'user_b' };
+      }
+      return original(sql, params);
+    });
+
+    const result = await loaded.restoreFromRemoteBackup();
+
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.message).toContain('owner changed');
+    }
+    expect(loaded.db.getCommittedWrites()).toEqual([]);
+  });
+
   it('uses a transaction so failed restore writes do not commit partial local changes', async () => {
     const loaded = await loadCoordinator({
       localCounts: {
@@ -745,13 +844,7 @@ describe('core/sync/restore.coordinator', () => {
         workout_routines: 0,
       },
       remoteRowsByEntity: {
-        todos: [
-          {
-            id: 'todo_1',
-            updated_at: '2026-04-20T12:00:00.000Z',
-            created_at: '2026-04-19T12:00:00.000Z',
-          },
-        ],
+        todos: [validTodoRow()],
       },
       applyFailure: {
         entity: 'todos',
@@ -804,13 +897,7 @@ describe('core/sync/restore.coordinator', () => {
     const loaded = await loadCoordinator({
       localCounts,
       remoteRowsByEntity: {
-        todos: [
-          {
-            id: 'todo_1',
-            updated_at: '2026-04-20T12:00:00.000Z',
-            created_at: '2026-04-19T12:00:00.000Z',
-          },
-        ],
+        todos: [validTodoRow()],
       },
     });
 

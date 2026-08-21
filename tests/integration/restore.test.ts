@@ -140,7 +140,7 @@ function remoteTodo(overrides: Partial<Omit<Todo, 'id'>> & { id: string }): Todo
 }
 
 const AVAILABLE_REMOTE_TODOS: RemoteRowsByEntity = {
-  todos: [remoteTodo({ id: 'todo_imported' })],
+  todos: [remoteTodo({ id: 'todo_1785000000000_imported' })],
   habits: [],
   calorie_entries: [],
   workout_routines: [],
@@ -222,7 +222,7 @@ describe('in-transaction re-check abort path', () => {
 
     // Nothing was imported — the remote todo never landed.
     const imported = await db.getFirstAsync<{ id: string }>('SELECT id FROM todos WHERE id = ?', [
-      'todo_imported',
+      'todo_1785000000000_imported',
     ]);
     expect(imported).toBeNull();
 
