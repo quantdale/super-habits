@@ -39,7 +39,6 @@ export function DailyPlanHistoryView() {
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
   }, [refresh]);
 
   if (loading) {
@@ -54,7 +53,7 @@ export function DailyPlanHistoryView() {
     return (
       <Card>
         <Text className="py-3 text-center text-sm" style={{ color: tokens.textMuted }}>
-          No past plans yet. Save today's plan to start your history.
+          No past plans yet. Save today&apos;s plan to start your history.
         </Text>
       </Card>
     );
@@ -113,12 +112,16 @@ export function DailyPlanHistoryView() {
               <View className="mt-2 gap-1">
                 {entry.intention ? (
                   <Text className="text-sm italic" style={{ color: tokens.textMuted }}>
-                    “{entry.intention}”
+                    &ldquo;{entry.intention}&rdquo;
                   </Text>
                 ) : null}
                 {entry.todoTitles.length > 0 ? (
                   entry.todoTitles.map((title, i) => (
-                    <Text key={`${entry.id}-${i}`} className="text-sm" style={{ color: tokens.text }}>
+                    <Text
+                      key={`${entry.id}-${i}`}
+                      className="text-sm"
+                      style={{ color: tokens.text }}
+                    >
                       • {title}
                     </Text>
                   ))
