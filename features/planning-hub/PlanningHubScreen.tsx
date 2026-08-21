@@ -8,6 +8,7 @@ import { ProjectDetailView } from '@/features/projects/ProjectDetailView';
 import { GoalListView } from '@/features/goals/GoalListView';
 import { GoalDetailView } from '@/features/goals/GoalDetailView';
 import { DailyPlanView } from '@/features/daily-plan/DailyPlanView';
+import { TodayBriefingView } from '@/features/planning-hub/TodayBriefingView';
 import { ActivityTimelineView } from '@/features/activity/ActivityTimelineView';
 import { ProgressInsightsView } from '@/features/progress/ProgressInsightsView';
 
@@ -66,9 +67,16 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
         {detail?.kind === 'project' ? (
           <ProjectDetailView projectId={detail.id} onBack={() => setDetail(null)} />
         ) : detail?.kind === 'goal' ? (
-          <GoalDetailView goalId={detail.id} onBack={() => setDetail(null)} />
+          <GoalDetailView
+            goalId={detail.id}
+            onBack={() => setDetail(null)}
+            onOpenProject={(projectId) => setDetail({ kind: 'project', id: projectId })}
+          />
         ) : view === 'today' ? (
-          <DailyPlanView />
+          <View className="gap-3">
+            <TodayBriefingView />
+            <DailyPlanView />
+          </View>
         ) : view === 'projects' ? (
           <ProjectListView onOpenProject={(id) => setDetail({ kind: 'project', id })} />
         ) : view === 'goals' ? (

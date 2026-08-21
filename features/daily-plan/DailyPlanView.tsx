@@ -5,13 +5,19 @@ import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { getDailyPlan, upsertDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import {
+  getDailyPlan,
+  upsertDailyPlan,
+  carryForwardFromPreviousDay,
+  getDailyPlanAdherence,
+} from '@/features/daily-plan/dailyPlan.data';
 import {
   parseTopTodoIds,
   toggleTopTodoId,
   normalizeEnergyScore,
 } from '@/features/daily-plan/dailyPlan.domain';
 import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
+import { DailyPlanHistoryView } from '@/features/daily-plan/DailyPlanHistoryView';
 import { listPendingTodos } from '@/features/todos/todos.data';
 import { listHabits } from '@/features/habits/habits.data';
 import { isHabitScheduledOn } from '@/features/habits/habits.domain';
@@ -20,6 +26,11 @@ import type { DailyPlan } from '@/core/db/types';
 
 type DailyPlanViewProps = {
   dateKey?: string;
+};
+
+type AdherenceSummary = {
+  committedStreak: number;
+  completedStreak: number;
 };
 
 export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
@@ -35,12 +46,17 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const [pendingTodos, setPendingTodos] = useState<{ id: string; title: string }[]>([]);
   const [scheduledHabits, setScheduledHabits] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [adherence, setAdherence] = useState<AdherenceSummary | null>(null);
+  const [carryingForward, setCarryingForward] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [existing, todos, habits] = await Promise.all([
+    const [existing, todos, habits, adherenceSummary] = await Promise.all([
       getDailyPlan(today),
       listPendingTodos(),
       listHabits(),
+      getDailyPlanAdherence().catch(() => null),
     ]);
     if (existing) {
       setPlan(existing);
@@ -67,16 +83,31 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         .filter((h) => isHabitScheduledOn(h.rule_history, today, h.target_per_day))
         .map((h) => h.name),
     );
+    if (adherenceSummary) {
+      setAdherence({
+        committedStreak: adherenceSummary.committedStreak,
+        completedStreak: adherenceSummary.completedStreak,
+      });
+    }
   }, [today]);
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
   }, [refresh]);
 
   const toggleTodo = useCallback((todoId: string) => {
     setTopTodoIds((current) => toggleTopTodoId(current, todoId));
   }, []);
+
+  const handleCarryForward = useCallback(async () => {
+    setCarryingForward(true);
+    try {
+      await carryForwardFromPreviousDay(today);
+      await refresh();
+    } finally {
+      setCarryingForward(false);
+    }
+  }, [today, refresh]);
 
   const persist = useCallback(
     async (
@@ -111,13 +142,37 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
     id,
     title: pendingById.get(id) ?? '(unavailable)',
   }));
-  const candidateTodos = pendingTodos.filter((t) => !topTodoIds.includes(t.id));
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const candidateTodos = pendingTodos
+    .filter((t) => !topTodoIds.includes(t.id))
+    .filter((t) => normalizedQuery.length === 0 || t.title.toLowerCase().includes(normalizedQuery));
 
   return (
     <View className="gap-3">
       <Text className="text-lg font-bold" style={{ color: tokens.text }}>
         Plan for {today}
       </Text>
+
+      {adherence ? (
+        <Text className="text-sm" style={{ color: tokens.textMuted }}>
+          Streaks: {adherence.committedStreak} committed · {adherence.completedStreak} completed
+        </Text>
+      ) : null}
+
+      {!isCompleted ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Carry forward unfinished priorities from yesterday"
+          className="self-start rounded-full border px-3 py-1.5"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          onPress={() => void handleCarryForward()}
+          disabled={carryingForward}
+        >
+          <Text className="text-sm" style={{ color: tokens.text }}>
+            {carryingForward ? 'Carrying forward…' : 'Carry forward from yesterday'}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <TextField
         label="Intention"
@@ -145,6 +200,12 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           />
         </View>
       ))}
+      <TextField
+        label="Quick-add priority"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search todos to add…"
+      />
       {candidateTodos.slice(0, 12).map((t) => (
         <Pressable
           key={t.id}
@@ -248,6 +309,20 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           Plan completed.
         </Text>
       )}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={showHistory ? 'Hide plan history' : 'Show plan history'}
+        accessibilityState={{ expanded: showHistory }}
+        className="self-start rounded-full border px-3 py-1.5"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+        onPress={() => setShowHistory((current) => !current)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showHistory ? 'Hide plan history' : 'Plan history'}
+        </Text>
+      </Pressable>
+      {showHistory ? <DailyPlanHistoryView /> : null}
     </View>
   );
 }

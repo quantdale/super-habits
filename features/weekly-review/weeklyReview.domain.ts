@@ -6,7 +6,7 @@ import type {
   NewTodoCommitmentDraft,
   ReviewInsight,
 } from './weeklyReview.types';
-import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, toDateKey, isValidDateKey } from '@/lib/time';
 
 // ---------- constants ----------
 
@@ -269,4 +269,46 @@ export function parsePlanPayload(
   } catch {
     return null;
   }
+}
+
+// ---------- next-week plan suggestions ----------
+
+export type NextWeekPlanSuggestion = {
+  dateKey: string;
+  todoIds: string[];
+};
+
+const MAX_SUGGESTIONS_PER_DAY = 3;
+const MAX_SUGGESTION_DAYS = 7;
+
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const date = dateKeyToLocalDate(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+/**
+ * Distribute carry-forward candidates across next week's days (Monday-start),
+ * at most MAX_SUGGESTIONS_PER_DAY per day over at most MAX_SUGGESTION_DAYS
+ * days. Pure and deterministic: candidates are assigned in input order and
+ * deduplicated.
+ */
+export function buildNextWeekPlanSuggestions(input: {
+  candidateTodoIds: readonly string[];
+  nextWeekStartDateKey: string;
+}): NextWeekPlanSuggestion[] {
+  const { nextWeekStartDateKey } = input;
+  const candidateTodoIds = Array.from(new Set(input.candidateTodoIds));
+  if (candidateTodoIds.length === 0) return [];
+  if (!isValidDateKey(nextWeekStartDateKey)) return [];
+
+  const suggestions: NextWeekPlanSuggestion[] = [];
+  let cursor = 0;
+  for (let dayOffset = 0; dayOffset < MAX_SUGGESTION_DAYS; dayOffset++) {
+    if (cursor >= candidateTodoIds.length) break;
+    const todoIds = candidateTodoIds.slice(cursor, cursor + MAX_SUGGESTIONS_PER_DAY);
+    cursor += todoIds.length;
+    suggestions.push({ dateKey: addDaysToDateKey(nextWeekStartDateKey, dayOffset), todoIds });
+  }
+  return suggestions;
 }

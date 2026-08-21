@@ -9,11 +9,14 @@ import { buildWeeklyReviewSummary } from './weeklyReview.summary';
 import {
   validateReviewDraft,
   getReviewWeek,
+  buildNextWeekPlanSuggestions,
   MAX_PRIORITIES,
   MAX_REFLECTION_LENGTH,
 } from './weeklyReview.domain';
 import { executeWeeklyReview } from './weeklyReview.executor';
+import { applyNextWeekPlanSuggestions } from './weeklyReview.applyNextWeek';
 import { getWeeklyReviewByWeekKey } from './weeklyReview.data';
+import { ReviewHistoryView } from './ReviewHistoryView';
 import type {
   WeeklyReviewSummaryV1,
   WeeklyReviewDraft,
@@ -50,6 +53,9 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const [reflection, setReflection] = useState('');
   const [executing, setExecuting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
+  const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
   const week = useMemo(() => getReviewWeek(), []);
 
@@ -126,6 +132,57 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     void handleConfirm();
   }, [handleConfirm]);
 
+  const carryForwardTodoIds = useMemo(
+    () =>
+      todoDecisions
+        .filter(
+          (d): d is Extract<WeeklyTodoDecision, { action: 'carry_forward' }> =>
+            d.action === 'carry_forward',
+        )
+        .map((d) => d.todoId),
+    [todoDecisions],
+  );
+
+  const nextWeekSuggestions = useMemo(
+    () =>
+      buildNextWeekPlanSuggestions({
+        candidateTodoIds: carryForwardTodoIds,
+        nextWeekStartDateKey: week.nextWeekStartDateKey,
+      }),
+    [carryForwardTodoIds, week.nextWeekStartDateKey],
+  );
+
+  const handleApplyNextWeek = useCallback(async () => {
+    setApplyStatus('applying');
+    try {
+      const result = await applyNextWeekPlanSuggestions(nextWeekSuggestions);
+      setApplyStatus('applied');
+      setApplyMessage(
+        result.addedCount === 0
+          ? 'Nothing to add — next week already covers these priorities.'
+          : `Added ${result.addedCount} priorit${result.addedCount === 1 ? 'y' : 'ies'} across ${result.appliedDateKeys.length} day${result.appliedDateKeys.length === 1 ? '' : 's'} of next week.`,
+      );
+    } catch (e) {
+      setApplyStatus('error');
+      setApplyMessage(e instanceof Error ? e.message : 'Failed to apply suggestions');
+    }
+  }, [nextWeekSuggestions]);
+
+  const historyToggle = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={showHistory ? 'Hide past reviews' : 'Show past reviews'}
+      accessibilityState={{ expanded: showHistory }}
+      className="mb-3 self-start rounded-full border px-3 py-1.5"
+      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+      onPress={() => setShowHistory((current) => !current)}
+    >
+      <Text className="text-sm" style={{ color: tokens.text }}>
+        {showHistory ? 'Hide past reviews' : 'Past reviews'}
+      </Text>
+    </Pressable>
+  );
+
   if (loading) {
     return (
       <Screen scroll>
@@ -157,6 +214,12 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     return (
       <Screen scroll>
         <PageHeader title="Weekly Review" />
+        {historyToggle}
+        {showHistory ? (
+          <View className="mb-4">
+            <ReviewHistoryView />
+          </View>
+        ) : null}
         <Card accentColor={tokens.successText ?? '#16a34a'}>
           <View className="py-8 items-center">
             <Text className="text-2xl font-bold mb-2" style={{ color: tokens.text }}>
@@ -165,7 +228,33 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
             <Text className="text-base text-center mb-6" style={{ color: tokens.textMuted }}>
               Your weekly review for {week.startDateKey} – {week.endDateKey} has been saved.
             </Text>
-            <Button label="Done" onPress={onClose} />
+            {nextWeekSuggestions.length > 0 && applyStatus !== 'applied' ? (
+              <View className="mb-6 w-full items-center gap-2">
+                <Text className="text-center text-sm" style={{ color: tokens.textMuted }}>
+                  {carryForwardTodoIds.length} carry-forward candidate
+                  {carryForwardTodoIds.length === 1 ? '' : 's'} can seed next week&apos;s daily
+                  plans.
+                </Text>
+                <Button
+                  label={
+                    applyStatus === 'applying'
+                      ? 'Applying…'
+                      : 'Add carry-forwards to next week’s plans'
+                  }
+                  onPress={() => void handleApplyNextWeek()}
+                  disabled={applyStatus === 'applying'}
+                />
+              </View>
+            ) : null}
+            {applyMessage ? (
+              <Text
+                className="mb-6 text-center text-sm"
+                style={{ color: applyStatus === 'error' ? tokens.dangerText : tokens.textMuted }}
+              >
+                {applyMessage}
+              </Text>
+            ) : null}
+            <Button label="Done" variant="ghost" onPress={onClose} />
           </View>
         </Card>
       </Screen>
@@ -175,6 +264,12 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   return (
     <Screen scroll>
       <PageHeader title="Weekly Review" />
+      {historyToggle}
+      {showHistory ? (
+        <View className="mb-4">
+          <ReviewHistoryView />
+        </View>
+      ) : null}
 
       {/* Step indicator */}
       <View className="flex-row justify-center mb-4">
