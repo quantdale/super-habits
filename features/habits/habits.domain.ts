@@ -485,7 +485,7 @@ export function buildHabitActivityDays(grid: HabitGridRow[], days: number = 30):
 export type HabitStatusFilter = 'all' | 'active' | 'paused' | 'archived';
 
 export type HabitListFilters = {
-  category?: string | 'all';
+  category?: string;
   status?: HabitStatusFilter;
 };
 

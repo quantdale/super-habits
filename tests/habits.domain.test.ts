@@ -411,7 +411,9 @@ describe('habit list filtering / sorting', () => {
 
   it('filterHabits selects paused and archived sets', () => {
     expect(filterHabits(habits, { status: 'paused' }, ['h2'], []).map((h) => h.id)).toEqual(['h2']);
-    expect(filterHabits(habits, { status: 'archived' }, [], ['h3']).map((h) => h.id)).toEqual(['h3']);
+    expect(filterHabits(habits, { status: 'archived' }, [], ['h3']).map((h) => h.id)).toEqual([
+      'h3',
+    ]);
     expect(filterHabits(habits, { status: 'all' }, ['h2'], ['h3'])).toHaveLength(3);
   });
 
