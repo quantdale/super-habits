@@ -202,7 +202,7 @@ export function shapeHabitsSummary(
     name: string;
     color: string;
     target_per_day: number;
-    rule_history: unknown;
+    rule_history?: string | null;
   }[],
   completions: readonly { habit_id: string; date_key: string; count: number }[],
   todayKey: string,

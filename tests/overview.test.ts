@@ -30,9 +30,9 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
     notes: null,
     completed: 0,
     due_date: null,
-    priority: 'medium',
+    priority: 'normal',
     sort_order: 0,
-    recurrence: 'none',
+    recurrence: null,
     recurrence_id: null,
     project_id: null,
     goal_id: null,
@@ -89,12 +89,15 @@ describe('card layout persistence helpers', () => {
   });
 
   it('moveCard swaps neighbors and is safe at boundaries', () => {
-    const layout: OverviewCardId[] = ['a', 'b', 'c'] as unknown as OverviewCardId[];
-    expect(moveCard(layout, 'b', -1)).toEqual(['b', 'a', 'c']);
-    expect(moveCard(layout, 'b', 1)).toEqual(['a', 'c', 'b']);
-    expect(moveCard(layout, 'a', -1)).toEqual(['a', 'b', 'c']);
-    expect(moveCard(layout, 'c', 1)).toEqual(['a', 'b', 'c']);
-    expect(moveCard(layout, 'zzz' as OverviewCardId, 1)).toEqual(['a', 'b', 'c']);
+    const a = 'a' as OverviewCardId;
+    const b = 'b' as OverviewCardId;
+    const c = 'c' as OverviewCardId;
+    const layout: OverviewCardId[] = [a, b, c];
+    expect(moveCard(layout, b, -1)).toEqual([b, a, c]);
+    expect(moveCard(layout, b, 1)).toEqual([a, c, b]);
+    expect(moveCard(layout, a, -1)).toEqual([a, b, c]);
+    expect(moveCard(layout, c, 1)).toEqual([a, b, c]);
+    expect(moveCard(layout, 'zzz' as OverviewCardId, 1)).toEqual([a, b, c]);
   });
 });
 
