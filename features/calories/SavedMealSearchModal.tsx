@@ -5,7 +5,12 @@ import { Modal } from '@/core/ui/Modal';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { filterSavedMeals } from './calories.domain';
+import {
+  filterSavedMeals,
+  listSavedMealCategories,
+  parseMealCategory,
+  sortSavedMealsForSearch,
+} from './calories.domain';
 import { deleteSavedMeal } from './calories.data';
 import type { SavedMeal } from './types';
 
@@ -19,16 +24,30 @@ type Props = {
 
 export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDeleted }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
+  const colorText = sectionAccents.calories.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [query, setQuery] = useState('');
-  const filtered = useMemo(() => filterSavedMeals(meals, query), [meals, query]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const categories = useMemo(() => listSavedMealCategories(meals), [meals]);
+  const filtered = useMemo(() => {
+    const matchingQuery = filterSavedMeals(meals, query);
+    const byCategory = activeCategory
+      ? matchingQuery.filter(
+          (meal) => parseMealCategory(meal.food_name).category === activeCategory,
+        )
+      : matchingQuery;
+    return sortSavedMealsForSearch(byCategory, query);
+  }, [meals, query, activeCategory]);
 
   // Clear the search when the modal closes, without an effect:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
-    if (!visible) setQuery('');
+    if (!visible) {
+      setQuery('');
+      setActiveCategory(null);
+    }
   }
 
   const handleDelete = (meal: SavedMeal) => {
@@ -65,6 +84,35 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
           />
         </View>
 
+        {categories.length > 0 ? (
+          <View className="mb-3 flex-row flex-wrap gap-2">
+            {[null, ...categories].map((category) => {
+              const active = activeCategory === category;
+              return (
+                <Pressable
+                  key={category ?? '__all__'}
+                  onPress={() => setActiveCategory(category)}
+                  accessibilityRole="button"
+                  accessibilityLabel={category ? `Filter by ${category}` : 'Show all categories'}
+                  accessibilityState={{ selected: active }}
+                  className="rounded-full border px-3 py-1.5"
+                  style={{
+                    borderColor: active ? sectionAccents.calories.text : tokens.border,
+                    backgroundColor: active ? sectionAccents.calories.tint : tokens.surfaceElevated,
+                  }}
+                >
+                  <Text
+                    className="text-xs font-medium"
+                    style={{ color: active ? colorText : tokens.textMuted }}
+                  >
+                    {category ?? 'All'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
         {filtered.length === 0 ? (
           <EmptyStateCard
             accentColor={SECTION_COLORS.calories}
@@ -93,9 +141,24 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
                 }}
               >
                 <View className="flex-1">
-                  <Text className="text-sm font-medium" style={{ color: tokens.text }}>
-                    {meal.food_name}
-                  </Text>
+                  <View className="flex-row flex-wrap items-center gap-2">
+                    <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+                      {parseMealCategory(meal.food_name).name}
+                    </Text>
+                    {parseMealCategory(meal.food_name).category ? (
+                      <View
+                        className="rounded-full px-2 py-0.5"
+                        style={{ backgroundColor: sectionAccents.calories.tint }}
+                      >
+                        <Text
+                          className="text-[10px] font-semibold"
+                          style={{ color: sectionAccents.calories.text }}
+                        >
+                          {parseMealCategory(meal.food_name).category}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
                     {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fats}g
                     {meal.fiber > 0 ? ` · Fi ${meal.fiber}g` : ''}

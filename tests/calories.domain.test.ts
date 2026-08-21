@@ -12,6 +12,9 @@ import {
   summarizeMacroTrend,
   normalizeMacroTargets,
   buildTargetProgress,
+  parseMealCategory,
+  listSavedMealCategories,
+  sortSavedMealsForSearch,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
 import type { SavedMeal } from '@/core/db/types';
@@ -357,5 +360,56 @@ describe('buildTargetProgress', () => {
 
   it('treats NaN actual as zero', () => {
     expect(buildTargetProgress(NaN, 100).percent).toBe(0);
+  });
+});
+
+describe('parseMealCategory', () => {
+  it('extracts a leading "Category:" prefix', () => {
+    expect(parseMealCategory('Breakfast: overnight oats')).toEqual({
+      category: 'Breakfast',
+      name: 'overnight oats',
+    });
+  });
+
+  it('returns the raw name when no valid prefix exists', () => {
+    expect(parseMealCategory('Chicken breast')).toEqual({ category: null, name: 'Chicken breast' });
+    expect(parseMealCategory(': no category')).toEqual({ category: null, name: ': no category' });
+    expect(parseMealCategory('Category:')).toEqual({ category: null, name: 'Category:' });
+  });
+});
+
+describe('listSavedMealCategories', () => {
+  it('returns distinct sorted categories, ignoring uncategorized meals', () => {
+    const meals = [
+      meal('Lunch: wrap'),
+      meal('breakfast: oats'),
+      meal('Lunch: salad'),
+      meal('Plain'),
+    ];
+    expect(listSavedMealCategories(meals)).toEqual(['breakfast', 'Lunch']);
+    expect(listSavedMealCategories([meal('Plain')])).toEqual([]);
+  });
+});
+
+describe('sortSavedMealsForSearch', () => {
+  const base = { ...meal('x'), calories: 0 };
+  const mk = (name: string, useCount: number, lastUsed: string): SavedMeal => ({
+    ...base,
+    food_name: name,
+    use_count: useCount,
+    last_used_at: lastUsed,
+  });
+
+  it('puts prefix matches first, then use_count desc, then recency, then name', () => {
+    const meals = [
+      mk('Oat cookies', 5, '2026-01-01T00:00:00Z'),
+      mk('Oats', 2, '2026-03-01T00:00:00Z'),
+      mk('Toast', 9, '2026-02-01T00:00:00Z'),
+      mk('Oat milk', 2, '2026-05-01T00:00:00Z'),
+    ];
+    const sorted = sortSavedMealsForSearch(meals, 'oat');
+    expect(sorted.map((m) => m.food_name)).toEqual(['Oat cookies', 'Oat milk', 'Oats']);
+    const noQuery = sortSavedMealsForSearch(meals);
+    expect(noQuery[0].food_name).toBe('Toast');
   });
 });

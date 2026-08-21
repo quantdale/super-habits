@@ -183,11 +183,62 @@ export function buildTargetProgress(actual: number, target: number): TargetProgr
  * Client-side filter for saved meals search.
  * Used to filter the already-loaded list without a DB round-trip
  * when the user types in the search input.
+ * Matches the food name and the optional "Category:" name prefix.
  */
 export function filterSavedMeals(meals: SavedMeal[], query: string): SavedMeal[] {
   if (!query.trim()) return meals;
   const q = query.trim().toLowerCase();
-  return meals.filter((m) => m.food_name.toLowerCase().includes(q));
+  return meals.filter((m) => {
+    const { category } = parseMealCategory(m.food_name);
+    return (
+      m.food_name.toLowerCase().includes(q) ||
+      (category !== null && category.toLowerCase().includes(q))
+    );
+  });
+}
+
+/**
+ * Category convention: a leading "Category:" prefix in the food name
+ * (e.g. "Breakfast: overnight oats"). No schema change needed — the
+ * category lives in the existing food_name column. Returns the raw name
+ * unchanged when no valid prefix is present.
+ */
+export function parseMealCategory(foodName: string): { category: string | null; name: string } {
+  const match = /^([^:#\n]{1,24}):\s*([^\n].*)$/.exec(foodName.trim());
+  if (!match) return { category: null, name: foodName };
+  const category = match[1].trim();
+  const name = match[2].trim();
+  if (!category || !name) return { category: null, name: foodName };
+  return { category, name };
+}
+
+/** Distinct categories in stable alphabetical order (nulls last). */
+export function listSavedMealCategories(meals: SavedMeal[]): string[] {
+  const categories = new Set<string>();
+  for (const meal of meals) {
+    const { category } = parseMealCategory(meal.food_name);
+    if (category !== null) categories.add(category);
+  }
+  return [...categories].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Search-result ordering: names starting with the query first (when a query
+ * is given), then most-used, then most-recently-used, then alphabetical.
+ */
+export function sortSavedMealsForSearch(meals: SavedMeal[], query: string = ''): SavedMeal[] {
+  const q = query.trim().toLowerCase();
+  return [...meals].sort((a, b) => {
+    if (q) {
+      const aStarts = a.food_name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.food_name.toLowerCase().startsWith(q) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+    }
+    if (b.use_count !== a.use_count) return b.use_count - a.use_count;
+    const byRecent = (b.last_used_at ?? '').localeCompare(a.last_used_at ?? '');
+    if (byRecent !== 0) return byRecent;
+    return a.food_name.localeCompare(b.food_name);
+  });
 }
 
 /**
