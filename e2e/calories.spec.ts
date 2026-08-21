@@ -101,7 +101,7 @@ test.describe('Calories', () => {
   test('goal modal save updates the goal line and progress bar', async ({ page }) => {
     await page.getByText('Goal: 2000 kcal ✎').click();
     await expect(page.getByText('Daily goals', { exact: true })).toBeVisible();
-    await page.getByLabel('Calories (kcal)').fill('1500');
+    await page.getByRole('textbox', { name: 'Calories (kcal)' }).fill('1500');
     await page.getByText('Save goals', { exact: true }).click();
 
     await expect(page.getByText('Goal: 1500 kcal ✎')).toBeVisible({ timeout: 15_000 });

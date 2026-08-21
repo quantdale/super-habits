@@ -28,7 +28,7 @@
     "supabase:schema:validate": "node scripts/validate-supabase-schema.mjs",
     "openspec:validate": "openspec validate --all",
     "doctor": "npx expo-doctor",
-    "e2e": "playwright test --project=chromium --project=journeys --project=simulation",
+    "e2e": "playwright test --project=chromium --project=journeys --project=simulation --project=pwa",
     "e2e:full": "npm run build:web && npm run e2e",
     "e2e:journeys": "playwright test --project=journeys",
     "e2e:journeys:p0": "playwright test --project=journeys --grep @p0",

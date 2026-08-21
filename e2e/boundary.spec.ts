@@ -89,8 +89,18 @@ test.describe('Todos — boundary inputs', () => {
       await titleInput.fill(`Task ${i}`);
       await submitTodoModal(page, { waitForClose: true });
     }
+    await expect(page.getByText('Task 1', { exact: true })).toBeVisible({ timeout: 20_000 });
+    // The pending list is virtualized (DraggableFlatList mounts a window):
+    // hover a mounted row so wheel events target the list scroller, then
+    // scroll to the tail so the last-created task mounts before asserting.
+    const anchorRow = page.getByText('Task 11', { exact: true }).last();
+    await anchorRow.waitFor({ state: 'visible', timeout: 20_000 });
+    await anchorRow.hover();
+    for (let i = 0; i < 12; i += 1) {
+      await page.mouse.wheel(0, 900);
+      await page.waitForTimeout(150);
+    }
     await expect(page.getByText('Task 30')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('Task 1', { exact: true })).toBeVisible();
   });
 });
 
@@ -111,9 +121,11 @@ test.describe('Habits — boundary inputs', () => {
     await page.getByLabel('Habit name').fill('One tap');
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('One tap').first()).toBeVisible();
+    // Increment via the habit circle's accessible button (stable contract),
+    // then assert no NaN/Infinity leaks into the rendered progress.
     await page
-      .getByText('One tap', { exact: true })
-      .locator('xpath=preceding-sibling::*[1]')
+      .getByRole('button', { name: /One tap: \d+ of 1 today\. Tap to add one/ })
+      .first()
       .click();
     await expect(page.locator('body')).not.toContainText('NaN');
     await expect(page.locator('body')).not.toContainText('Infinity');

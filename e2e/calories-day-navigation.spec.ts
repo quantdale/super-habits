@@ -48,8 +48,8 @@ test.describe('Calories diary day navigation', () => {
   test('prev/next/jump-to-today with per-day totals header', async ({ page }) => {
     await seedPastDayEntry(page, dateKeyOffset(-1), 'Yesterday oats');
 
-    const prev = page.getByRole('button', { name: 'Previous day' });
-    const next = page.getByRole('button', { name: 'Next day' });
+    const prev = page.getByRole('button', { name: 'Previous day', exact: true });
+    const next = page.getByRole('button', { name: 'Next day', exact: true });
     const jumpToday = page.getByRole('button', { name: 'Jump to today' });
 
     // Today selected: no forward navigation, already on today.
@@ -112,7 +112,7 @@ test.describe('Calories diary day navigation', () => {
     await seedPastDayEntry(page, dateKeyOffset(-2), 'Copy source oats');
 
     // Select yesterday so the seeded day-before-yesterday is an earlier candidate.
-    await page.getByRole('button', { name: 'Previous day' }).click();
+    await page.getByRole('button', { name: 'Previous day', exact: true }).click();
     await expect(page.getByText('Yesterday', { exact: true }).first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Copy a previous day' }).click();
@@ -127,10 +127,11 @@ test.describe('Calories diary day navigation', () => {
     });
     await expect(page.getByText('Copy source oats')).toBeVisible();
 
-    // Repeated invocation duplicates by design — and reports the new count.
+    // Repeated invocation duplicates by design — the status reports THIS
+    // invocation's copied count (1), while the list now holds both copies.
     await page.getByRole('button', { name: 'Copy a previous day' }).click();
     await page.getByRole('button', { name: /into Yesterday$/ }).click();
-    await expect(page.getByLabel('Copy day status')).toContainText(/Copied 2 entries into/, {
+    await expect(page.getByLabel('Copy day status')).toContainText(/Copied 1 entry into/, {
       timeout: 15_000,
     });
     await expect(page.getByText('Copy source oats')).toHaveCount(2);
@@ -141,7 +142,7 @@ test.describe('Calories diary day navigation', () => {
 
     // On yesterday, the only logged day (yesterday itself) is not an earlier
     // candidate, and future days are excluded by construction.
-    await page.getByRole('button', { name: 'Previous day' }).click();
+    await page.getByRole('button', { name: 'Previous day', exact: true }).click();
     await page.getByRole('button', { name: 'Copy a previous day' }).click();
     await expect(page.getByText('No earlier logged days')).toBeVisible();
   });
