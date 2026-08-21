@@ -10,3 +10,22 @@ export {
   getTheme,
   type ThemeId,
 } from '@/core/theme/registry';
+export {
+  spacing,
+  radius,
+  typography,
+  elevation,
+  size,
+  layout,
+  opacity,
+  layers,
+} from '@/core/theme/designTokens';
+export {
+  MOTION_DURATION,
+  useMotionDuration,
+  useReducedMotion,
+  setMotionPreference,
+  getMotionPreference,
+  type MotionPreference,
+  type MotionRole,
+} from '@/core/theme/motion';

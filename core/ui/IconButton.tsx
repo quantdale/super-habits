@@ -40,10 +40,15 @@ export function IconButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       className="h-11 w-11 items-center justify-center rounded-2xl border"
-      style={{
+      style={({ pressed }) => ({
         borderColor: selected ? withAlpha(resolvedAccent, 0.28) : tokens.border,
-        backgroundColor: selected ? withAlpha(resolvedAccent, 0.12) : tokens.surface,
-      }}
+        backgroundColor:
+          selected && !pressed
+            ? withAlpha(resolvedAccent, 0.12)
+            : pressed
+              ? tokens.surfaceActive
+              : tokens.surface,
+      })}
     >
       <MaterialIcons name={icon} size={size} color={selected ? resolvedAccent : tokens.iconMuted} />
     </Pressable>
