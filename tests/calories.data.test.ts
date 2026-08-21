@@ -277,3 +277,91 @@ describe('calories.data', () => {
     );
   });
 });
+
+describe('copyCalorieEntriesFromDay', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getDatabase).mockResolvedValue(db as never);
+    vi.mocked(nowIso).mockReturnValue('2026-04-06T10:00:00.000Z');
+    vi.mocked(toDateKey).mockReturnValue('2026-04-06');
+    db.runAsync.mockResolvedValue({ changes: 1 });
+    db.getFirstAsync.mockImplementation(async () => null);
+  });
+
+  it('duplicates source entries into the target day with fresh ids and create records', async () => {
+    const { copyCalorieEntriesFromDay } = await import('@/features/calories/calories.data');
+    db.getAllAsync.mockResolvedValueOnce([
+      {
+        id: 'cal_src1',
+        food_name: 'Oats',
+        calories: 300,
+        protein: 10,
+        carbs: 50,
+        fats: 6,
+        fiber: 8,
+        meal_type: 'breakfast',
+        consumed_on: '2026-04-05',
+        created_at: '2026-04-05T08:00:00.000Z',
+        updated_at: '2026-04-05T08:00:00.000Z',
+        deleted_at: null,
+      },
+      {
+        id: 'cal_src2',
+        food_name: 'Chicken breast',
+        calories: 220,
+        protein: 40,
+        carbs: 0,
+        fats: 5,
+        fiber: 0,
+        meal_type: 'lunch',
+        consumed_on: '2026-04-05',
+        created_at: '2026-04-05T12:00:00.000Z',
+        updated_at: '2026-04-05T12:00:00.000Z',
+        deleted_at: null,
+      },
+    ]);
+    vi.mocked(createId).mockReturnValueOnce('cal_new1').mockReturnValueOnce('cal_new2');
+
+    const copied = await copyCalorieEntriesFromDay('2026-04-05', '2026-04-06');
+
+    expect(copied).toBe(2);
+    expect(db.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('consumed_on = ?'), [
+      '2026-04-05',
+    ]);
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO calorie_entries'),
+      [
+        'cal_new1',
+        'Oats',
+        300,
+        10,
+        50,
+        6,
+        8,
+        'breakfast',
+        '2026-04-06',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
+      ],
+    );
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'calorie_entries',
+        id: 'cal_new2',
+        updatedAt: '2026-04-06T10:00:00.000Z',
+        operation: 'create',
+        revision: 1,
+      },
+      { durablyPersisted: true },
+    );
+  });
+
+  it('copies nothing when the source day is empty', async () => {
+    const { copyCalorieEntriesFromDay } = await import('@/features/calories/calories.data');
+    db.getAllAsync.mockResolvedValueOnce([]);
+
+    await expect(copyCalorieEntriesFromDay('2026-04-01')).resolves.toBe(0);
+    expect(db.runAsync).not.toHaveBeenCalled();
+    expect(syncEngine.enqueuePrepared).not.toHaveBeenCalled();
+  });
+});

@@ -328,6 +328,57 @@ export async function deleteSavedMeal(id: string): Promise<void> {
   });
 }
 
+/**
+ * Copy-day: duplicate every entry logged on `sourceDateKey` into
+ * `targetDateKey` (default today). Each copy gets a fresh id and its own
+ * synced create record. Saved-meal maintenance is deliberately skipped so
+ * copying does not inflate use_count.
+ * Returns the number of entries copied.
+ */
+export async function copyCalorieEntriesFromDay(
+  sourceDateKey: string,
+  targetDateKey: string = toDateKey(),
+): Promise<number> {
+  const db = await getDatabase();
+  const sourceEntries = await db.getAllAsync<CalorieEntry>(
+    `SELECT * FROM calorie_entries
+     WHERE deleted_at IS NULL AND consumed_on = ?
+     ORDER BY created_at ASC`,
+    [sourceDateKey],
+  );
+
+  let copied = 0;
+  for (const entry of sourceEntries) {
+    const id = createId('cal');
+    const now = nowIso();
+    const result = await runSyncedMutation({
+      db,
+      record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'create' },
+      mutate: async (transactionDb) => {
+        await transactionDb.runAsync(
+          'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+          [
+            id,
+            entry.food_name,
+            entry.calories,
+            entry.protein,
+            entry.carbs,
+            entry.fats,
+            entry.fiber,
+            entry.meal_type,
+            targetDateKey,
+            now,
+            now,
+          ],
+        );
+        return { changed: true, value: undefined };
+      },
+    });
+    if (result.changed) copied += 1;
+  }
+  return copied;
+}
+
 export async function deleteCalorieEntry(id: string): Promise<'deleted' | 'not_found'> {
   const now = nowIso();
   const db = await getDatabase();

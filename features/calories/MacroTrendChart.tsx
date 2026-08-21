@@ -3,10 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import {
-  buildMacroTrendPoints,
-  summarizeMacroTrend,
-} from './calories.domain';
+import { buildMacroTrendPoints, summarizeMacroTrend } from './calories.domain';
 import type { DailySummary } from './types';
 
 const COLOR = SECTION_COLORS.calories;
@@ -24,7 +21,10 @@ function WindowToggle({
 }) {
   const { tokens } = useAppTheme();
   return (
-    <View className="flex-row self-start rounded-full border p-0.5" style={{ borderColor: tokens.border }}>
+    <View
+      className="flex-row self-start rounded-full border p-0.5"
+      style={{ borderColor: tokens.border }}
+    >
       {WINDOW_OPTIONS.map((option) => {
         const active = option === value;
         return (
@@ -59,7 +59,10 @@ export function MacroTrendChart({ summaries }: { summaries: DailySummary[] }) {
   const { tokens } = useAppTheme();
   const [windowDays, setWindowDays] = useState<WindowDays>(7);
 
-  const points = useMemo(() => buildMacroTrendPoints(summaries, windowDays), [summaries, windowDays]);
+  const points = useMemo(
+    () => buildMacroTrendPoints(summaries, windowDays),
+    [summaries, windowDays],
+  );
   const summary = useMemo(() => summarizeMacroTrend(points), [points]);
 
   const barData = points.map((p) => ({
@@ -112,7 +115,8 @@ export function MacroTrendChart({ summaries }: { summaries: DailySummary[] }) {
       <View className="mt-1 flex-row items-center gap-1 px-1">
         <View style={{ width: 16, height: 1.5, backgroundColor: tokens.textMuted }} />
         <Text className="text-xs" style={{ color: tokens.textMuted }}>
-          Avg {summary.avgCalories} kcal/day · logged {summary.daysWithData}/{summary.windowDays} days
+          Avg {summary.avgCalories} kcal/day · logged {summary.daysWithData}/{summary.windowDays}{' '}
+          days
         </Text>
       </View>
 
