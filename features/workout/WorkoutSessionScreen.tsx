@@ -70,6 +70,12 @@ export type SessionResume = {
   phaseIndex: number;
   startedAtMs: number;
   elapsedSeconds: number;
+  /** Prior-phase outcomes saved with the draft (empty for legacy drafts). */
+  dispositions?: Record<number, PhaseDisposition>;
+  /** Entered measurements saved with the draft (absent for legacy drafts). */
+  enteredSets?: Record<number, EnteredSetValues>;
+  /** Seconds left on the resumed phase when the draft was written. */
+  remainingSeconds?: number;
 };
 
 type Props = {
@@ -138,27 +144,37 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     void saveRestSecondsDefault(restDefault).then(() => setPersistedRestDefault(restDefault));
   };
 
-  // A resumed session restarts paused at the saved phase cursor; prior phases
-  // count as completed with their measurements unrecorded (the minimal draft
-  // does not carry entered values or skip flags).
-  const [currentIndex, setCurrentIndex] = useState(() =>
-    resume ? clampPhaseIndex(resume.phaseIndex, sequence.length) : 0,
-  );
-  const [remaining, setRemaining] = useState(
-    () => sequence[clampPhaseIndex(resume?.phaseIndex ?? 0, sequence.length)]?.durationSeconds ?? 0,
-  );
+  // A resumed session restarts paused at the saved phase cursor, replaying the
+  // draft's saved dispositions and entered measurements. Legacy drafts (which
+  // predate those fields) reconstruct with prior phases counted as completed
+  // and their measurements unrecorded.
+  const resumedIndex = resume ? clampPhaseIndex(resume.phaseIndex, sequence.length) : 0;
+  const [currentIndex, setCurrentIndex] = useState(resumedIndex);
+  const [remaining, setRemaining] = useState(() => {
+    const phase = sequence[resumedIndex];
+    if (!phase) return 0;
+    const saved = Math.round(resume?.remainingSeconds ?? NaN);
+    return Number.isFinite(saved) && saved > 0
+      ? Math.min(saved, phase.durationSeconds)
+      : phase.durationSeconds;
+  });
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  // Display-only tick counter; the persisted duration is derived from real
-  // wall-clock timestamps (startedAtMsRef → handleFinish), not from ticks.
+  // Active-time tick counter; the persisted duration is this counter for
+  // resumed sessions (wall-clock would include time the app was closed) and
+  // real timestamps (startedAtMsRef → handleFinish) otherwise.
   const [elapsedSeconds, setElapsedSeconds] = useState(() =>
     Math.max(0, Math.round(resume?.elapsedSeconds ?? 0)),
   );
   // Per-phase outcome: natural timeout marks 'completed', Skip marks
   // 'skipped'. Skipped active phases are never counted as completed work.
-  const [dispositions, setDispositions] = useState<Record<number, PhaseDisposition>>({});
+  const [dispositions, setDispositions] = useState<Record<number, PhaseDisposition>>(() => ({
+    ...(resume?.dispositions ?? {}),
+  }));
   // Optional weight/reps entry keyed by sequence index of each active phase.
-  const [enteredSets, setEnteredSets] = useState<Record<number, EnteredSetValues>>({});
+  const [enteredSets, setEnteredSets] = useState<Record<number, EnteredSetValues>>(() => ({
+    ...(resume?.enteredSets ?? {}),
+  }));
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [savedOutcome, setSavedOutcome] = useState<{ newRecords: string[] } | null>(null);
@@ -185,17 +201,40 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     enteredSetsRef.current = enteredSets;
   });
 
+  const dispositionsRef = useRef(dispositions);
+  useEffect(() => {
+    dispositionsRef.current = dispositions;
+  });
+
+  const remainingRef = useRef(remaining);
+  useEffect(() => {
+    remainingRef.current = remaining;
+  });
+
   // Draft persistence: written on Start and on every phase transition so an
   // app restart can offer to resume; cleared on finish/abandon/discard.
   const persistDraft = useCallback(
     (phaseIndex: number) => {
       const startedAtMs = startedAtMsRef.current;
       if (startedAtMs === null) return;
+      // JSON keys are strings; the normalizer keeps only valid entries.
+      const draftDispositions = Object.fromEntries(
+        Object.entries(dispositionsRef.current).map(([index, disposition]) => [
+          String(index),
+          disposition,
+        ]),
+      );
+      const draftEnteredSets = Object.fromEntries(
+        Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),
+      );
       void saveWorkoutSessionDraft({
         routineId: routine.id,
         startedAtIso: new Date(startedAtMs).toISOString(),
         phaseIndex,
         elapsedAdjustSeconds: elapsedSecondsRef.current,
+        ...(Object.keys(draftDispositions).length > 0 ? { dispositions: draftDispositions } : {}),
+        ...(Object.keys(draftEnteredSets).length > 0 ? { enteredSets: draftEnteredSets } : {}),
+        remainingSeconds: remainingRef.current,
       }).catch(() => {
         // Best-effort: the live session never depends on the draft.
       });
@@ -427,6 +466,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         })),
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,
         endedAt: new Date(endedAtMs).toISOString(),
+        // Resumed sessions log active time, not wall-clock: the gap between the
+        // original start and the restart must not count as workout minutes.
+        ...(resume ? { activeDurationSeconds: Math.max(0, elapsedSecondsRef.current) } : {}),
       });
       clearDraft();
       setSavedOutcome({ newRecords });

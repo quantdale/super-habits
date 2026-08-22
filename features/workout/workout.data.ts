@@ -703,11 +703,20 @@ export async function logWorkoutSession(input: {
   /** Wall-clock session start/end (ISO). NULL = untimed session. */
   startedAt?: string | null;
   endedAt?: string | null;
+  /** Explicit active-time duration (whole seconds). When provided it overrides
+   *  the wall-clock start→end derivation — used by resumed sessions, where
+   *  wall-clock includes time the app was closed. Invalid values fall back to
+   *  the derived duration. */
+  activeDurationSeconds?: number | null;
 }): Promise<void> {
   const db = await getDatabase();
   const logId = createId('wrk');
   const now = nowIso();
-  const durationSeconds = deriveDurationSeconds(input.startedAt ?? null, input.endedAt ?? null);
+  const override = input.activeDurationSeconds;
+  const durationSeconds =
+    typeof override === 'number' && Number.isFinite(override) && override >= 0
+      ? Math.round(override)
+      : deriveDurationSeconds(input.startedAt ?? null, input.endedAt ?? null);
 
   await runBackupMutation({
     db,
@@ -1114,9 +1123,11 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
 // (a restored device has no live workout to resume).
 // ---------------------------------------------------------------------------
 
-/** Minimal in-progress session state persisted for resume after an app
- *  restart. Entered weight/reps and skip flags stay session-local by design;
- *  a resumed session reconstructs at the saved phase cursor with prior phases
+/** In-progress session state persisted for resume after an app restart.
+ *  Dispositions, entered weight/reps, and remaining seconds ride along so a
+ *  resumed session replays exactly what was recorded before the restart.
+ *  Drafts written before these fields existed (legacy shape) stay restorable:
+ *  a resumed legacy draft reconstructs at the saved cursor with prior phases
  *  counted as completed and their measurements unrecorded. */
 export type WorkoutSessionDraft = {
   routineId: string;
@@ -1124,9 +1135,49 @@ export type WorkoutSessionDraft = {
   startedAtIso: string;
   /** Index into the routine's timer-phase sequence. */
   phaseIndex: number;
-  /** Display-clock seconds already elapsed when the draft was written. */
+  /** Active-time seconds already elapsed when the draft was written. */
   elapsedAdjustSeconds?: number;
+  /** Per-phase outcome keyed by stringified sequence index. */
+  dispositions?: Record<string, 'completed' | 'skipped'>;
+  /** Entered measurements keyed by stringified sequence index of each active phase. */
+  enteredSets?: Record<string, { weight: string; reps: string }>;
+  /** Seconds left on the phase at `phaseIndex` when the draft was written. */
+  remainingSeconds?: number;
 };
+
+type PhaseDispositionValue = 'completed' | 'skipped';
+
+function normalizeDispositionMap(
+  value: unknown,
+): Record<string, PhaseDispositionValue> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const out: Record<string, PhaseDispositionValue> = {};
+  let any = false;
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if ((raw === 'completed' || raw === 'skipped') && key.length > 0) {
+      out[key] = raw;
+      any = true;
+    }
+  }
+  return any ? out : undefined;
+}
+
+function normalizeEnteredSetMap(
+  value: unknown,
+): Record<string, { weight: string; reps: string }> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const out: Record<string, { weight: string; reps: string }> = {};
+  let any = false;
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const entry = raw as Record<string, unknown>;
+    if (typeof entry.weight === 'string' && typeof entry.reps === 'string' && key.length > 0) {
+      out[key] = { weight: entry.weight, reps: entry.reps };
+      any = true;
+    }
+  }
+  return any ? out : undefined;
+}
 
 function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | null {
   if (typeof value !== 'object' || value === null) return null;
@@ -1142,12 +1193,22 @@ function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | nul
     return null;
   }
   const elapsed = candidate.elapsedAdjustSeconds;
+  const dispositions = normalizeDispositionMap(candidate.dispositions);
+  const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
+  const remainingSeconds = candidate.remainingSeconds;
   return {
     routineId: candidate.routineId,
     startedAtIso: candidate.startedAtIso,
     phaseIndex: candidate.phaseIndex,
     ...(typeof elapsed === 'number' && Number.isFinite(elapsed) && elapsed >= 0
       ? { elapsedAdjustSeconds: Math.round(elapsed) }
+      : {}),
+    ...(dispositions ? { dispositions } : {}),
+    ...(enteredSets ? { enteredSets } : {}),
+    ...(typeof remainingSeconds === 'number' &&
+    Number.isFinite(remainingSeconds) &&
+    remainingSeconds >= 0
+      ? { remainingSeconds: Math.round(remainingSeconds) }
       : {}),
   };
 }

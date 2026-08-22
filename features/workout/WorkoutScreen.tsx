@@ -35,6 +35,8 @@ import {
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
   formatLastPerformedLabel,
+  type EnteredSetValues,
+  type PhaseDisposition,
 } from '@/features/workout/workout.domain';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
@@ -222,6 +224,16 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       return;
     }
     const startedAtMs = Date.parse(draft.startedAtIso);
+    const dispositions: Record<number, PhaseDisposition> = {};
+    for (const [index, disposition] of Object.entries(draft.dispositions ?? {})) {
+      const parsed = Number.parseInt(index, 10);
+      if (Number.isInteger(parsed)) dispositions[parsed] = disposition;
+    }
+    const enteredSets: Record<number, EnteredSetValues> = {};
+    for (const [index, values] of Object.entries(draft.enteredSets ?? {})) {
+      const parsed = Number.parseInt(index, 10);
+      if (Number.isInteger(parsed)) enteredSets[parsed] = values;
+    }
     setCurrentView({
       type: 'session',
       routine: full,
@@ -229,6 +241,11 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         phaseIndex: draft.phaseIndex,
         startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
         elapsedSeconds: draft.elapsedAdjustSeconds ?? 0,
+        ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
+        ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
+        ...(typeof draft.remainingSeconds === 'number'
+          ? { remainingSeconds: draft.remainingSeconds }
+          : {}),
       },
     });
   }, [draft]);
