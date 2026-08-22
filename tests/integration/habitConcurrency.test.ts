@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { toDateKey } from '@/lib/time';
 
 async function seedThresholdCase(targetPerDay: number) {
   const db = await freshDatabase();
@@ -30,7 +31,7 @@ async function seedThresholdCase(targetPerDay: number) {
 describe('habit threshold concurrency', () => {
   it('fires a target=1 threshold action once for two genuinely concurrent increments', async () => {
     const { db, habits, habitId } = await seedThresholdCase(1);
-    const dateKey = '2026-08-14';
+    const dateKey = toDateKey();
 
     const results = await Promise.all([
       habits.incrementHabit(habitId, dateKey),
@@ -56,7 +57,7 @@ describe('habit threshold concurrency', () => {
 
   it('fires a target=2 threshold action once when two concurrent increments reach it', async () => {
     const { db, habits, habitId } = await seedThresholdCase(2);
-    const dateKey = '2026-08-14';
+    const dateKey = toDateKey();
 
     const results = await Promise.all([
       habits.incrementHabit(habitId, dateKey),
@@ -82,7 +83,7 @@ describe('habit threshold concurrency', () => {
 
   it('keeps three concurrent increments lossless and crosses the threshold once', async () => {
     const { db, habits, habitId } = await seedThresholdCase(2);
-    const dateKey = '2026-08-14';
+    const dateKey = toDateKey();
 
     await Promise.all(Array.from({ length: 3 }, () => habits.incrementHabit(habitId, dateKey)));
 

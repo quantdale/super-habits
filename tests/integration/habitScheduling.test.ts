@@ -110,12 +110,14 @@ describe('real SQLite habit scheduling persistence', () => {
     const offDay = nextWeekdayOutside([1, 3, 5]);
     const id = await habits.addHabit('Gym', 1, 'anytime', 'fitness-center', '#10b981', [1, 3, 5]);
 
-    await habits.incrementHabit(id, offDay); // Tomorrow is Tuesday, intentionally off schedule.
+    // Lifecycle/schedule write gate: an off-schedule date accepts no
+    // completion writes at all.
+    await habits.incrementHabit(id, offDay);
     const row = await db.getFirstAsync<{ count: number }>(
       'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
       [id, offDay],
     );
-    expect(row?.count).toBe(1);
+    expect(row).toBeNull();
 
     const habit = (await habits.listHabits())[0];
     const completions = await habits.getCompletionHistory(id);

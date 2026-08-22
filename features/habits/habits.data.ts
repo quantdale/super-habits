@@ -41,6 +41,8 @@ import {
   createHabitRule,
   getHabitRuleForDate,
   getHabitTargetForDate,
+  isHabitActionableOn,
+  isHabitLifecycleMaskedOn,
   isHabitScheduledOn,
   parseHabitRuleHistory,
   serializeHabitLifecycleHistory,
@@ -145,8 +147,10 @@ export async function incrementHabit(
     target_per_day: number;
     created_at: string;
     rule_history: string | null;
+    status: string | null;
+    lifecycle_history: string | null;
   }>(
-    `SELECT name, target_per_day, created_at, rule_history
+    `SELECT name, target_per_day, created_at, rule_history, status, lifecycle_history
      FROM habits
      WHERE id = ?
        AND deleted_at IS NULL`,
@@ -162,11 +166,32 @@ export async function incrementHabit(
     };
   }
 
+  const creationDateKey = safeTimestampToLocalDateKey(habit.created_at);
+  // Lifecycle/schedule write gate (spec: historical edits obey lifecycle and
+  // schedule history): a paused/archived habit, or a date that is unscheduled,
+  // pre-creation/pre-effective, or inside a paused/archived interval, accepts
+  // no completion writes.
+  if (
+    (habit.status ?? 'active') !== 'active' ||
+    !isHabitActionableOn(
+      habit.rule_history,
+      dateKey,
+      habit.target_per_day,
+      creationDateKey,
+      habit.lifecycle_history,
+    )
+  ) {
+    return {
+      count: 0,
+      linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
+    };
+  }
+
   const targetPerDay = getHabitTargetForDate(
     parseHabitRuleHistory(habit.rule_history),
     dateKey,
     habit.target_per_day,
-    safeTimestampToLocalDateKey(habit.created_at),
+    creationDateKey,
   );
 
   // Atomic upsert inside a transaction with a durable backup intent: two
@@ -869,8 +894,10 @@ export async function incrementHabitFromLinkedAction(input: {
   const db = await getDatabase();
   let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
   const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
-    const habit = await transactionDb.getFirstAsync<Pick<Habit, 'id' | 'name' | 'deleted_at'>>(
-      `SELECT id, name, deleted_at
+    const habit = await transactionDb.getFirstAsync<
+      Pick<Habit, 'id' | 'name' | 'deleted_at' | 'status' | 'lifecycle_history'>
+    >(
+      `SELECT id, name, deleted_at, status, lifecycle_history
        FROM habits
        WHERE id = ?`,
       [input.habitId],
@@ -887,6 +914,29 @@ export async function incrementHabitFromLinkedAction(input: {
         result: {
           status: 'skipped' as const,
           reason: 'target_missing',
+          ...(input.executionId ? { executionFinalized: true } : {}),
+        },
+        mutated: false,
+      };
+    }
+
+    // A paused/archived habit (or a date inside a paused/archived interval)
+    // accepts no completion writes, even from linked actions.
+    if (
+      (habit.status ?? 'active') !== 'active' ||
+      isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
+    ) {
+      if (input.executionId) {
+        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+          status: 'skipped',
+          errorMessage: 'target_inactive',
+        });
+      }
+      return {
+        result: {
+          status: 'skipped' as const,
+          reason: 'target_inactive',
+          targetLabel: habit.name,
           ...(input.executionId ? { executionFinalized: true } : {}),
         },
         mutated: false,
@@ -965,9 +1015,19 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
   let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
   const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
     const habit = await transactionDb.getFirstAsync<
-      Pick<Habit, 'id' | 'name' | 'target_per_day' | 'created_at' | 'rule_history' | 'deleted_at'>
+      Pick<
+        Habit,
+        | 'id'
+        | 'name'
+        | 'target_per_day'
+        | 'created_at'
+        | 'rule_history'
+        | 'deleted_at'
+        | 'status'
+        | 'lifecycle_history'
+      >
     >(
-      `SELECT id, name, target_per_day, created_at, rule_history, deleted_at
+      `SELECT id, name, target_per_day, created_at, rule_history, deleted_at, status, lifecycle_history
        FROM habits
        WHERE id = ?`,
       [input.habitId],
@@ -983,6 +1043,29 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
         result: {
           status: 'skipped' as const,
           reason: 'target_missing',
+          ...(input.executionId ? { executionFinalized: true } : {}),
+        },
+        mutated: false,
+      };
+    }
+
+    // A paused/archived habit (or a date inside a paused/archived interval)
+    // accepts no completion writes, even from linked actions.
+    if (
+      (habit.status ?? 'active') !== 'active' ||
+      isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
+    ) {
+      if (input.executionId) {
+        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+          status: 'skipped',
+          errorMessage: 'target_inactive',
+        });
+      }
+      return {
+        result: {
+          status: 'skipped' as const,
+          reason: 'target_inactive',
+          targetLabel: habit.name,
           ...(input.executionId ? { executionFinalized: true } : {}),
         },
         mutated: false,

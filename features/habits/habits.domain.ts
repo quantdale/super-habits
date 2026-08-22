@@ -296,6 +296,27 @@ export function isHabitScheduledOn(
   return rule ? rule.weekdays.includes(weekdayForDateKey(dateKey)) : false;
 }
 
+/**
+ * True when a completion write for the date is actionable under the
+ * authoritative schedule/effective/lifecycle history: the date is on or after
+ * the creation boundary, covered by an effective schedule rule whose weekdays
+ * include it, and not inside a paused/archived lifecycle interval. This is the
+ * data/domain write gate shared by increments, linked-action adapters, and UI
+ * enablement — historical edits must never land on non-actionable dates.
+ */
+export function isHabitActionableOn(
+  ruleHistory: HabitRuleHistoryInput,
+  dateKey: string,
+  fallbackTargetPerDay = 1,
+  fallbackEffectiveFromDate?: string,
+  lifecycleHistory?: HabitLifecycleHistoryInput,
+): boolean {
+  return (
+    isHabitScheduledOn(ruleHistory, dateKey, fallbackTargetPerDay, fallbackEffectiveFromDate) &&
+    !isHabitLifecycleMaskedOn(lifecycleHistory, dateKey)
+  );
+}
+
 export function getHabitSchedulePreset(weekdays: readonly number[]): HabitSchedulePreset {
   const normalized = normalizeHabitWeekdays(weekdays);
   if (normalized.join(',') === ALL_HABIT_WEEKDAYS.join(',')) return 'every_day';

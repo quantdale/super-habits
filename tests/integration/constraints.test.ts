@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { toDateKey } from '@/lib/time';
 
 /**
  * Task 2.6 — SQL constraints the app's data layer depends on, asserted against
@@ -20,7 +21,9 @@ import { freshDatabase } from './helpers/db';
  * imports the data layers afterwards (the module registry is reset per test).
  */
 
-const DATE_KEY = '2026-07-01';
+// Increments must land on an actionable date (today) for the write gate to
+// let them through; this suite exercises the UNIQUE-constraint mechanics.
+const DATE_KEY = toDateKey();
 
 describe('habit_completions UNIQUE(habit_id, date_key)', () => {
   it('two rapid increments through the real data layer produce one row, not a constraint violation', async () => {

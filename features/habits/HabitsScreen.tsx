@@ -60,6 +60,7 @@ import {
   getHabitSchedulePreset,
   getHabitTargetForDate,
   habitCreationDateKey,
+  isHabitActionableOn,
   isHabitScheduledOn,
   normalizeHabitWeekdays,
   sortHabits,
@@ -1020,11 +1021,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                             const displayCount =
                               countsByHabitDate[habit.id]?.[selectedDateKey] ?? 0;
                             const streak = streakMap[habit.id] ?? 0;
-                            const scheduledOnSelected = isHabitScheduledOn(
-                              habit.rule_history,
-                              selectedDateKey,
-                              habit.target_per_day,
-                            );
+                            // Write gate mirrors the data layer: paused/
+                            // archived habits, lifecycle-masked dates, and
+                            // pre-creation dates accept no check-ins.
+                            const actionableOnSelected =
+                              (habit.status ?? 'active') === 'active' &&
+                              isHabitActionableOn(
+                                habit.rule_history,
+                                selectedDateKey,
+                                habit.target_per_day,
+                                habitCreationDateKey(habit.created_at),
+                                habit.lifecycle_history,
+                              );
                             const currentRule = getHabitRuleForDate(
                               habit.rule_history,
                               selectedDateKey,
@@ -1044,7 +1052,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                                   size={60}
                                   showName={false}
                                   showStreak={false}
-                                  scheduledToday={scheduledOnSelected}
+                                  scheduledToday={actionableOnSelected}
                                   dayPhrase={
                                     viewingPastDay
                                       ? `on ${formatStripDateLabel(selectedDateKey)}`
@@ -1053,7 +1061,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                                   onIncrement={() => handleIncrement(habit.id, selectedDateKey)}
                                   onDecrement={() => handleDecrement(habit.id, selectedDateKey)}
                                 />
-                                {isQuantitative && scheduledOnSelected ? (
+                                {isQuantitative && actionableOnSelected ? (
                                   <>
                                     <Text
                                       className="mt-1 w-[84px] text-center text-[11px] font-semibold tabular-nums"

@@ -17,6 +17,7 @@ import {
   getHabitSchedulePreset,
   habitCreationDateKey,
   isHabitLifecycleMaskedOn,
+  isHabitActionableOn,
   isHabitScheduledOn,
   parseHabitLifecycleHistory,
   parseHabitRuleHistory,
@@ -680,5 +681,36 @@ describe('paused-interval masking (F1)', () => {
       pausedCount: 1,
       archivedCount: 1,
     });
+  });
+});
+
+describe('isHabitActionableOn (lifecycle write gate)', () => {
+  const everyDay = JSON.stringify([
+    { effective_from_date: '2026-04-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 1 },
+  ]);
+  const weekdaysOnly = JSON.stringify([
+    { effective_from_date: '2026-04-01', weekdays: [1, 2, 3, 4, 5], target_per_day: 1 },
+  ]);
+
+  it('accepts scheduled, on-or-after-effective, unmasked dates', () => {
+    // 2026-04-14 is a Tuesday.
+    expect(isHabitActionableOn(everyDay, '2026-04-14', 1, '2026-04-01')).toBe(true);
+    expect(isHabitActionableOn(weekdaysOnly, '2026-04-14', 1, '2026-04-01')).toBe(true);
+  });
+
+  it('rejects unscheduled weekdays and pre-effective/pre-creation dates', () => {
+    // 2026-04-11 is a Saturday.
+    expect(isHabitActionableOn(weekdaysOnly, '2026-04-11', 1, '2026-04-01')).toBe(false);
+    expect(isHabitActionableOn(everyDay, '2026-03-31', 1, '2026-04-01')).toBe(false);
+  });
+
+  it('rejects dates inside paused/archived intervals (inclusive bounds)', () => {
+    const lifecycle = JSON.stringify([
+      { status: 'paused', from_date_key: '2026-04-10', to_date_key: null },
+    ]);
+    expect(isHabitActionableOn(everyDay, '2026-04-14', 1, '2026-04-01')).toBe(true);
+    expect(isHabitActionableOn(everyDay, '2026-04-14', 1, '2026-04-01', lifecycle)).toBe(false);
+    // The day before the pause starts stays actionable (inclusive bounds).
+    expect(isHabitActionableOn(everyDay, '2026-04-09', 1, '2026-04-01', lifecycle)).toBe(true);
   });
 });

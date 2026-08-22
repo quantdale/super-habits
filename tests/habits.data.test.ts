@@ -6,6 +6,7 @@ import {
   pauseHabit,
   resumeHabit,
   completeHabitFromNotification,
+  ensureHabitDailyTargetFromLinkedAction,
 } from '@/features/habits/habits.data';
 
 const { getDatabase } = vi.hoisted(() => ({
@@ -48,14 +49,24 @@ describe('features/habits/habits.data', () => {
     });
   });
 
+  // Complete habit row for an active, every-day habit effective well before
+  // the test date keys used below.
+  const ACTIVE_HABIT_ROW = {
+    name: 'Hydrate',
+    target_per_day: 2,
+    created_at: '2026-04-01T00:00:00.000Z',
+    rule_history: JSON.stringify([
+      { effective_from_date: '2026-04-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 2 },
+    ]),
+    status: 'active',
+    lifecycle_history: null,
+  };
+
   it('emits a linked-actions source event when an increment reaches the daily target', async () => {
     const db = {
       getFirstAsync: vi
         .fn()
-        .mockResolvedValueOnce({
-          name: 'Hydrate',
-          target_per_day: 2,
-        })
+        .mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW })
         // Post-upsert re-read: the increment just landed count 2.
         .mockResolvedValueOnce({
           id: 'hcmp_1',
@@ -110,8 +121,15 @@ describe('features/habits/habits.data', () => {
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
-          name: 'Hydrate',
+          ...ACTIVE_HABIT_ROW,
           target_per_day: 3,
+          rule_history: JSON.stringify([
+            {
+              effective_from_date: '2026-04-01',
+              weekdays: [1, 2, 3, 4, 5, 6, 7],
+              target_per_day: 3,
+            },
+          ]),
         })
         .mockResolvedValueOnce({
           id: 'hcmp_1',
@@ -138,10 +156,7 @@ describe('features/habits/habits.data', () => {
     const db = {
       getFirstAsync: vi
         .fn()
-        .mockResolvedValueOnce({
-          name: 'Hydrate',
-          target_per_day: 2,
-        })
+        .mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW })
         .mockResolvedValueOnce({
           id: 'hcmp_1',
           count: 3,
@@ -179,6 +194,83 @@ describe('features/habits/habits.data', () => {
     });
   });
 
+  it.each(['paused', 'archived'] as const)(
+    'refuses increments for a %s habit without writing a completion row',
+    async (status) => {
+      const db = {
+        getFirstAsync: vi.fn().mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW, status }),
+        runAsync: vi.fn().mockResolvedValue(undefined),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      await expect(incrementHabit('habit_1', '2026-04-14')).resolves.toEqual({
+        count: 0,
+        linkedActions: { matchedRuleCount: 0, notices: [] },
+      });
+      expect(
+        db.getFirstAsync.mock.calls.some(([sql]) =>
+          (sql as string).includes('INSERT INTO habit_completions'),
+        ),
+      ).toBe(false);
+      expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses increments on a date masked by an open pause interval even while active again', async () => {
+    // Resumed on 2026-04-20: the pause interval [2026-04-10, 2026-04-20]
+    // keeps 2026-04-14 masked for writes and streak math alike.
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValueOnce({
+        ...ACTIVE_HABIT_ROW,
+        lifecycle_history: JSON.stringify([
+          { status: 'paused', from_date_key: '2026-04-10', to_date_key: '2026-04-20' },
+        ]),
+      }),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(incrementHabit('habit_1', '2026-04-14')).resolves.toEqual({
+      count: 0,
+      linkedActions: { matchedRuleCount: 0, notices: [] },
+    });
+    expect(db.runAsync).not.toHaveBeenCalled();
+  });
+
+  it('refuses increments before the habit creation/effective date', async () => {
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW }),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(incrementHabit('habit_1', '2026-03-30')).resolves.toEqual({
+      count: 0,
+      linkedActions: { matchedRuleCount: 0, notices: [] },
+    });
+    expect(db.runAsync).not.toHaveBeenCalled();
+  });
+
+  it('refuses increments on unscheduled weekdays', async () => {
+    // Weekdays-only schedule; 2026-04-11 is a Saturday.
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValueOnce({
+        ...ACTIVE_HABIT_ROW,
+        rule_history: JSON.stringify([
+          { effective_from_date: '2026-04-01', weekdays: [1, 2, 3, 4, 5], target_per_day: 2 },
+        ]),
+      }),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(incrementHabit('habit_1', '2026-04-11')).resolves.toEqual({
+      count: 0,
+      linkedActions: { matchedRuleCount: 0, notices: [] },
+    });
+    expect(db.runAsync).not.toHaveBeenCalled();
+  });
+
   it('uses the same atomic upsert on repeated increments (double-tap safety)', async () => {
     // Each tap performs a habit read, the atomic upsert (RETURNING), and a
     // sync_outbox owner read inside the backup transaction. Resolve by SQL
@@ -191,7 +283,7 @@ describe('features/habits/habits.data', () => {
           return { id: 'hcmp_1', count: upsertCount };
         }
         if (typeof sql === 'string' && sql.includes('FROM habits')) {
-          return { name: 'Hydrate', target_per_day: 5 };
+          return { ...ACTIVE_HABIT_ROW, target_per_day: 5 };
         }
         return null;
       }),
@@ -336,6 +428,79 @@ describe('features/habits/habits.data', () => {
       ],
     );
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'incrementHabitFromLinkedAction',
+      () =>
+        incrementHabitFromLinkedAction({ habitId: 'habit_1', amount: 1, dateKey: '2026-04-14' }),
+    ],
+    [
+      'ensureHabitDailyTargetFromLinkedAction',
+      () =>
+        ensureHabitDailyTargetFromLinkedAction({
+          habitId: 'habit_1',
+          minimumCount: 'target_per_day',
+          dateKey: '2026-04-14',
+        }),
+    ],
+  ] as const)('%s skips paused/archived habits as target_inactive', async (_name, run) => {
+    for (const status of ['paused', 'archived'] as const) {
+      const db = {
+        getFirstAsync: vi.fn().mockResolvedValueOnce({
+          id: 'habit_1',
+          name: 'Hydrate',
+          target_per_day: 2,
+          deleted_at: null,
+          status,
+          lifecycle_history: null,
+        }),
+        runAsync: vi.fn().mockResolvedValue(undefined),
+      };
+      getDatabase.mockResolvedValue(db);
+
+      await expect(run()).resolves.toEqual({
+        status: 'skipped',
+        reason: 'target_inactive',
+        targetLabel: 'Hydrate',
+      });
+      expect(
+        db.getFirstAsync.mock.calls.some(([sql]) =>
+          (sql as string).includes('INSERT INTO habit_completions'),
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it('ensureHabitDailyTargetFromLinkedAction skips dates masked by a pause interval', async () => {
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValueOnce({
+        id: 'habit_1',
+        name: 'Hydrate',
+        target_per_day: 2,
+        deleted_at: null,
+        status: 'active',
+        lifecycle_history: JSON.stringify([
+          { status: 'paused', from_date_key: '2026-04-10', to_date_key: null },
+        ]),
+      }),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(
+      ensureHabitDailyTargetFromLinkedAction({
+        habitId: 'habit_1',
+        minimumCount: 'target_per_day',
+        dateKey: '2026-04-14',
+      }),
+    ).resolves.toEqual({
+      status: 'skipped',
+      reason: 'target_inactive',
+      targetLabel: 'Hydrate',
+    });
+    expect(db.runAsync).not.toHaveBeenCalled();
   });
 });
 
