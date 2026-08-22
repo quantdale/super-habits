@@ -2,11 +2,10 @@ import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
-import { nowIso } from '@/lib/time';
+import { isValidDateKey, nowIso } from '@/lib/time';
 import { upsertDailyPlanInTx } from '@/features/daily-plan/dailyPlan.data';
 import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
-import { isValidDateKey } from '@/lib/time';
 import type { NextWeekPlanSuggestion } from './weeklyReview.domain';
 import type { WeeklyReview } from './weeklyReview.types';
 

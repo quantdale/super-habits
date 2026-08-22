@@ -152,7 +152,7 @@ describe('core/db/client', () => {
     expect(cutoverCall?.[1]).toEqual(['date_key_cutover', expect.any(String)]);
   });
 
-  it('applies migrations from version 0 and bumps to schema version 15', async () => {
+  it('applies migrations from version 0 and records the v15 owner-binding write (final version is 21)', async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
