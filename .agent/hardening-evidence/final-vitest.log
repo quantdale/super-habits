@@ -1,0 +1,315 @@
+
+> superhabits@1.0.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Michael Roy/Documents/super-habits[39m
+
+[90mstdout[2m | tests/integration/backupPerformance.test.ts[2m > [22m[2mbackup v2 closure performance recording[2m > [22m[2mrecords checkpoint capture at small and long-history scale, and restore end-to-end
+[22m[39m[perf] checkpoint capture (small: 10 todos): 32ms
+
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/restore.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 3991[2mms[22m[39m
+   [33m[2m✓[22m[39m restore emptiness semantics (getLocalSyncBackedCounts)[2m > [22ma truly empty device with a restorable backup is eligible [33m 1550[2mms[22m[39m
+   [33m[2m✓[22m[39m restore emptiness semantics (getLocalSyncBackedCounts)[2m > [22many live row in any sync-backed table blocks restore [33m 334[2mms[22m[39m
+   [33m[2m✓[22m[39m restore emptiness semantics (getLocalSyncBackedCounts)[2m > [22ma workout routine — excluded from phase-one imports — still counts as local data [33m 338[2mms[22m[39m
+   [33m[2m✓[22m[39m in-transaction re-check abort path[2m > [22ma todo written after the eligibility preview but before the import aborts the restore [33m 327[2mms[22m[39m
+   [33m[2m✓[22m[39m CG-2: restore emptiness counts deleted rows[2m > [22ma device holding only soft-deleted todos is not empty — restore must be blocked (CG-2: fix-restore-emptiness-counts-deleted-rows) [33m 306[2mms[22m[39m
+   [33m[2m✓[22m[39m CG-2: restore emptiness counts deleted rows[2m > [22man import never resurrects a locally-deleted todo whose deletion was not yet pushed (CG-2: fix-restore-emptiness-counts-deleted-rows) [33m 305[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/linkedActions.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 4311[2mms[22m[39m
+   [33m[2m✓[22m[39m full source → rule → effect → execution cycle[2m > [22mcompleting a todo once increments the target habit exactly once and records the execution [33m 1136[2mms[22m[39m
+   [33m[2m✓[22m[39m re-fire suppression[2m > [22mdeduplicates fresh source events for the same completion day [33m 382[2mms[22m[39m
+   [33m[2m✓[22m[39m crash recovery and exactly-once receipts[2m > [22mcoalesces concurrent execution creation for one stable source identity [33m 313[2mms[22m[39m
+   [33m[2m✓[22m[39m crash recovery and exactly-once receipts[2m > [22mreclaims an execution after a crash between claim and effect, including a persisted restart [33m 555[2mms[22m[39m
+   [33m[2m✓[22m[39m crash recovery and exactly-once receipts[2m > [22mdoes not increment a habit twice when the effect commits before finalization crashes [33m 526[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/habitReminderActions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 4930[2mms[22m[39m
+   [33m[2m✓[22m[39m habit reminder Mark complete against real SQLite[2m > [22mincrements target one once and survives a concurrent duplicate response [33m 849[2mms[22m[39m
+   [33m[2m✓[22m[39m habit reminder Mark complete against real SQLite[2m > [22mincrements a partial target by exactly one rather than filling the target [33m 365[2mms[22m[39m
+   [33m[2m✓[22m[39m habit reminder Mark complete against real SQLite[2m > [22mdeleted is a safe no-op [33m 325[2mms[22m[39m
+   [33m[2m✓[22m[39m habit reminder Mark complete against real SQLite[2m > [22mreplays safely after reopening the same database file [33m 596[2mms[22m[39m
+   [33m[2m✓[22m[39m habit reminder Snooze against real SQLite[2m > [22mschedules one fixed fifteen-minute replacement and preserves configured time [33m 385[2mms[22m[39m
+   [33m[2m✓[22m[39m habit reminder Snooze against real SQLite[2m > [22mdeleted habit cannot snooze [33m 304[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/fixtures.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 5732[2mms[22m[39m
+   [33m[2m✓[22m[39m tests/integration/fixtures[2m > [22mSMALL seeds a realistic single day through the real data layers [33m 1491[2mms[22m[39m
+   [33m[2m✓[22m[39m tests/integration/fixtures[2m > [22mTYPICAL spans thirty days of consistent use [33m 646[2mms[22m[39m
+   [33m[2m✓[22m[39m tests/integration/fixtures[2m > [22mHEAVY spans three months at volume [33m 3153[2mms[22m[39m
+   [33m[2m✓[22m[39m tests/integration/fixtures[2m > [22mdate keys are local-calendar and consistent with the injected clock [33m 440[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/restore.coordinator.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 5928[2mms[22m[39m
+   [33m[2m✓[22m[39m core/sync/restore.coordinator[2m > [22mmarks the device as empty-device eligible only when all sync-backed tables are empty [33m 1636[2mms[22m[39m
+   [33m[2m✓[22m[39m core/sync/restore.coordinator[2m > [22mchanges the freshness signature when remote backup metadata changes [33m 477[2mms[22m[39m
+   [33m[2m✓[22m[39m core/sync/restore.coordinator[2m > [22mdismisses only the matching current backup freshness signature [33m 426[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/portableExportImport.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 5418[2mms[22m[39m
+   [33m[2m✓[22m[39m portable export[2m > [22mexports the complete recoverable scope read-only with a valid envelope [33m 1566[2mms[22m[39m
+   [33m[2m✓[22m[39m portable export[2m > [22mrecords a one-way owner fingerprint when a durable owner binding exists [33m 423[2mms[22m[39m
+   [33m[2m✓[22m[39m portable import — source→import semantic equivalence[2m > [22mrestores the complete scope atomically, without side effects [33m 835[2mms[22m[39m
+   [33m[2m✓[22m[39m portable import — source→import semantic equivalence[2m > [22mblocks a second confirm (double-confirm cannot import twice) [33m 713[2mms[22m[39m
+   [33m[2m✓[22m[39m portable import — source→import semantic equivalence[2m > [22mkeeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart [33m 760[2mms[22m[39m
+   [33m[2m✓[22m[39m portable import — cloud backup interaction[2m > [22mnever claims cloud completeness and enqueues imported state for a compatible owner [33m 1115[2mms[22m[39m
+[90mstdout[2m | tests/integration/portableLargeDataset.test.ts[2m > [22m[2mportable large long-term dataset[2m > [22m[2mexports and imports tens of thousands of rows with measured, bounded timings
+[22m[39m[portable-large] rows=18127 fileBytes=5474664 exportMs=1012 prepareMs=1146 importMs=1225
+
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/portableLargeDataset.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 5628[2mms[22m[39m
+   [33m[2m✓[22m[39m portable large long-term dataset[2m > [22mexports and imports tens of thousands of rows with measured, bounded timings [33m 5620[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/portableOwnerRecovery.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 6802[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — Finding 1 dead end[2m > [22mREPRO (red before the fix): imported owner-backed dataset exposes matching-account recovery [33m 1965[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mA: matching account binds the imported dataset, rows survive, backfill enqueues under A [33m 701[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mB: wrong account is signed out fail-closed and never binds the imported dataset [33m 678[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mC/D: temporary-session remote footprint gates the switch; empty footprint allows it [33m 602[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mE: remote unavailable keeps the dataset local and the recovery retryable [33m 661[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mF: a local-only import never gets the imported-owner exception [33m 670[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mI: matching account already authenticated after import binds automatically without recovery [33m 551[2mms[22m[39m
+   [33m[2m✓[22m[39m imported-owner recovery — real SQLite end to end[2m > [22mH: an owner-bound device blocks the source-owner file before import [33m 696[2mms[22m[39m
+[90mstdout[2m | tests/integration/backupPerformance.test.ts[2m > [22m[2mbackup v2 closure performance recording[2m > [22m[2mrecords checkpoint capture at small and long-history scale, and restore end-to-end
+[22m[39m[perf] checkpoint capture (long: 2000 completions + 1 todo): 5659ms
+
+[90mstderr[2m | tests/integration/backupCheckpoint.test.ts[2m > [22m[2mbackup completeness v2 checkpoint[2m > [22m[2mdrops a stale manifest intent when settings change after capture and recovers without looping
+[22m[39m[sync] dropping stale backup_manifest record: settings changed after capture; a newer checkpoint will certify the current settings.
+
+[90mstdout[2m | tests/integration/backupPerformance.test.ts[2m > [22m[2mbackup v2 closure performance recording[2m > [22m[2mrecords checkpoint capture at small and long-history scale, and restore end-to-end
+[22m[39m[perf] restore v2 (long: 2000 completions): 291ms
+
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/backupPerformance.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 7973[2mms[22m[39m
+   [33m[2m✓[22m[39m backup v2 closure performance recording[2m > [22mrecords checkpoint capture at small and long-history scale, and restore end-to-end [33m 7970[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/backupCheckpoint.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 3008[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mpublishes a complete manifest after backfill and drain [33m 446[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mdoes not loop: an idle cycle publishes nothing [33m 326[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mpublishes settings before the manifest and certifies their integrity [33m 302[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mdefers publication when a real mutation commits at the old final-check gap [33m 395[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mdefers publication when a mutation lands inside the capture transaction after the snapshot [33m 315[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mdrops a stale manifest intent when settings change after capture and recovers without looping [33m 407[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 checkpoint[2m > [22mreconciles the last complete generation after a crash between remote push and the local marker [33m 306[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/todoReminderSnooze.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 2825[2mms[22m[39m
+   [33m[2m✓[22m[39m todo reminder Snooze against real SQLite[2m > [22mschedules one fixed fifteen-minute replacement preserving the base occurrence [33m 390[2mms[22m[39m
+   [33m[2m✓[22m[39m todo reminder Snooze against real SQLite[2m > [22mreturns unsupported without throwing when permission is denied [33m 334[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/commandCenterV2.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2161[2mms[22m[39m
+   [33m[2m✓[22m[39m Command Center V2 canonical SQLite execution[2m > [22mkeeps supplied-nutrition rules while allowing a missing calorie correction [33m 700[2mms[22m[39m
+   [33m[2m✓[22m[39m Command Center V2 canonical SQLite execution[2m > [22mblocks Habit logging on an effective off-day without writing progress [33m 334[2mms[22m[39m
+   [33m[2m✓[22m[39m Command Center V2 canonical SQLite execution[2m > [22mkeeps parse/review read-only and makes confirmed mutations idempotent [33m 505[2mms[22m[39m
+   [33m[2m✓[22m[39m Command Center V2 canonical SQLite execution[2m > [22mreviews, gates, and executes model_proxy planning drafts end-to-end [33m 322[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/weeklyReviewExecutor.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2057[2mms[22m[39m
+   [33m[2m✓[22m[39m executeWeeklyReview idempotency (F3)[2m > [22mre-confirming the same week does not duplicate commitments [33m 514[2mms[22m[39m
+   [33m[2m✓[22m[39m executeWeeklyReview idempotency (F3)[2m > [22ma receipt whose Todo was soft-deleted is re-created, not skipped [33m 313[2mms[22m[39m
+   [33m[2m✓[22m[39m executeWeeklyReview idempotency (F3)[2m > [22mreschedule decisions are idempotent on re-run [33m 308[2mms[22m[39m
+   [33m[2m✓[22m[39m applyNextWeekPlanSuggestions structured outcomes (F4)[2m > [22mreports added/skipped/truncated and applies across days in one transaction [33m 365[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/planningRollups.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 2810[2mms[22m[39m
+   [33m[2m✓[22m[39m project rollups (F8 / task 11.1)[2m > [22mgetProjectRollup aggregates linked todos, goals, and habit completions [33m 454[2mms[22m[39m
+   [33m[2m✓[22m[39m project rollups (F8 / task 11.1)[2m > [22mlistProjectRollups covers every project without N+1 and skips unlinked rows [33m 309[2mms[22m[39m
+   [33m[2m✓[22m[39m goal rollups (F8 / task 11.1)[2m > [22mgetGoalRollup bounds habit completions by the horizon window [33m 307[2mms[22m[39m
+   [33m[2m✓[22m[39m F1 — planning mutations enqueue owner-scoped outbox records[2m > [22mproject create/update/reorder/delete each land outbox rows; delete also enqueues cleared children [33m 314[2mms[22m[39m
+   [33m[2m✓[22m[39m F1 — planning mutations enqueue owner-scoped outbox records[2m > [22mgoal create/update/delete enqueue; delete reconciles children into the outbox [33m 314[2mms[22m[39m
+   [33m[2m✓[22m[39m F6/F7 — daily-plan transactional writes[2m > [22mcarryForwardFromPreviousDay merges inside the write transaction and is idempotent [33m 313[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/todoReminderActions.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 2823[2mms[22m[39m
+   [33m[2m✓[22m[39m todo reminder Mark done against real SQLite[2m > [22mcompletes once and survives a concurrent duplicate response [33m 527[2mms[22m[39m
+   [33m[2m✓[22m[39m todo reminder Mark done against real SQLite[2m > [22mreplays safely after reopening the same database file [33m 578[2mms[22m[39m
+warning: in the working copy of '.agent/execplans/reconcile.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/time.ts', LF will be replaced by CRLF the next time Git touches it
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/constraints.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1650[2mms[22m[39m
+   [33m[2m✓[22m[39m habit_completions UNIQUE(habit_id, date_key)[2m > [22mtwo rapid increments through the real data layer produce one row, not a constraint violation [33m 407[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/habitScheduling.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1383[2mms[22m[39m
+   [33m[2m✓[22m[39m real SQLite habit scheduling persistence[2m > [22mpersists an initial schedule and effective target/schedule edits [33m 382[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/deleteSyncAtomicity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1577[2mms[22m[39m
+   [33m[2m✓[22m[39m local tombstone and sync intent atomicity[2m > [22mrolls a todo tombstone back when source linked-action cleanup fails [33m 423[2mms[22m[39m
+   [33m[2m✓[22m[39m local tombstone and sync intent atomicity[2m > [22mapplies the same atomic delete-intent boundary to habits and workout routines [33m 444[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/softDelete.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1356[2mms[22m[39m
+   [33m[2m✓[22m[39m todos soft delete[2m > [22mevery todo read path excludes a soft-deleted row, the row survives, and revive restores it [33m 330[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/agent-execplan.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 4327[2mms[22m[39m
+   [33m[2m✓[22m[39m agent ExecPlan tooling[2m > [22mrejects unresolved placeholders in an ACTIVE checkpoint [33m 385[2mms[22m[39m
+   [33m[2m✓[22m[39m agent ExecPlan tooling[2m > [22maccepts a BLOCKED plan only when its unblock path is explicit [33m 319[2mms[22m[39m
+   [33m[2m✓[22m[39m agent ExecPlan tooling[2m > [22mrequires proof and a no-op next action for COMPLETED plans [33m 545[2mms[22m[39m
+   [33m[2m✓[22m[39m agent ExecPlan tooling[2m > [22mdiscovers parallel OpenSpec and non-OpenSpec plans independently [33m 425[2mms[22m[39m
+   [33m[2m✓[22m[39m agent ExecPlan tooling[2m > [22mreconciles Git paths and reuses date/time QA impact in resume [33m 1601[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/portableImportCorruption.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 10941[2mms[22m[39m
+   [33m[2m✓[22m[39m corruption matrix[2m > [22mrejects every corrupted input and leaves the database unchanged [33m 8468[2mms[22m[39m
+   [33m[2m✓[22m[39m owner compatibility matrix[2m > [22mBLOCKS an owner-A file on an owner-B device and changes nothing [33m 610[2mms[22m[39m
+   [33m[2m✓[22m[39m owner compatibility matrix[2m > [22mallows an owner file on an unclaimed device, records the origin, and clears any provisional binding [33m 542[2mms[22m[39m
+   [33m[2m✓[22m[39m owner compatibility matrix[2m > [22mallows a local-only file on an owner-bound device with an explicit adoption disclosure [33m 580[2mms[22m[39m
+   [33m[2m✓[22m[39m owner compatibility matrix[2m > [22mBLOCKS import on a populated device (complete emptiness guard) [33m 651[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/habitConcurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 912[2mms[22m[39m
+   [33m[2m✓[22m[39m habit threshold concurrency[2m > [22mfires a target=1 threshold action once for two genuinely concurrent increments [33m 436[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/backupBackfill.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1225[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 backfill[2m > [22mdurably enqueues every existing row owner-scoped, including tombstones [33m 347[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 backfill[2m > [22mresumes from per-entity markers after a restart mid-backfill [33m 398[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/dateKeys.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1313[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22ma calorie entry written on a local key is only visible under that key [33m 321[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22mhabit completions keep an explicit local date key and read back by it [33m 341[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m core/sync/__tests__/supabase.adapter.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1207[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/accountOwnershipTransition.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1331[2mms[22m[39m
+   [33m[2m✓[22m[39m real SQLite first-activity ownership transitions[2m > [22mfirst synced write on a fresh anonymous install is owned, never ownerless [33m 313[2mms[22m[39m
+   [33m[2m✓[22m[39m real SQLite first-activity ownership transitions[2m > [22mowner binding, local content, and outbox owner survive restart and flush under owner A [33m 309[2mms[22m[39m
+[90mstderr[2m | tests/integration/caloriesIntegrity.test.ts[2m > [22m[2mcalorie authoritative ledger integrity[2m > [22m[2mreports success when saved-meal cache maintenance fails after the ledger commits
+[22m[39m[calories] saved-meal maintenance failed after add SqliteError: no such table: saved_meals
+    at Database.prepare [90m(C:\Users\Michael Roy\Documents\super-habits\[39mnode_modules\[4mbetter-sqlite3[24m\lib\methods\wrappers.js:5:21[90m)[39m
+    at SqliteTestDatabase.getFirstAsync [90m(C:\Users\Michael Roy\Documents\super-habits\[39mtests\integration\helpers\db.ts:106:26[90m)[39m
+    at Object.mutate [90m(C:\Users\Michael Roy\Documents\super-habits\[39mfeatures\calories\calories.data.ts:262:41[90m)[39m
+    at [90mC:\Users\Michael Roy\Documents\super-habits\[39mcore\sync\syncedMutation.ts:82:32
+    at [90mC:\Users\Michael Roy\Documents\super-habits\[39mcore\db\transactions.ts:38:22
+    at SqliteTestDatabase.withTransactionAsync [90m(C:\Users\Michael Roy\Documents\super-habits\[39mtests\integration\helpers\db.ts:121:13[90m)[39m
+    at [90mC:\Users\Michael Roy\Documents\super-habits\[39mcore\db\transactions.ts:37:14
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+  code: [32m'SQLITE_ERROR'[39m
+}
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/accountRemoteFingerprint.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 606[2mms[22m[39m
+   [33m[2m✓[22m[39m getRemoteFingerprint — missing remote table tolerance[2m > [22mtreats a PGRST205 schema-cache miss as count 0 with a diagnostic [33m 596[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/workoutIntegrity.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 775[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/caloriesIntegrity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 443[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/linkedActionEffectsExactlyOnce.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 848[2mms[22m[39m
+   [33m[2m✓[22m[39m linked-action deterministic effect replay[2m > [22mkeeps todo completion idempotent across a replay [33m 457[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/savedMealUniqueness.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 702[2mms[22m[39m
+   [33m[2m✓[22m[39m saved-meal owner-scoped uniqueness — client contract[2m > [22mpushes the same food name as separate owner-scoped rows for different owners [33m 362[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/db.client.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 359[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/syncAdapterProjection.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 409[2mms[22m[39m
+   [33m[2m✓[22m[39m SupabaseSyncAdapter push projection[2m > [22mupserts only canonical columns when the local row carries an extra unknown column [33m 406[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/migrations.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 489[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/habitInsights.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 376[2mms[22m[39m
+   [33m[2m✓[22m[39m real SQLite habit progress insight loading[2m > [22mreads active completion history once and excludes deleted habits from the shared list [33m 373[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/recurringExpansion.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 349[2mms[22m[39m
+   [33m[2m✓[22m[39m materializes one recurring instance and one outbox record per series/day [33m 347[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/syncOutbox.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 188[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/planningSchemaConvergence.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 742[2mms[22m[39m
+   [33m[2m✓[22m[39m Supabase production schema convergence contract[2m > [22mvalidate-supabase-schema.mjs passes on the repository migration set [33m 711[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/portableFormat.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 259[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.behavior.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 320[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/accountOwnership.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 199[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/portableExportSize.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 236[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/accountRecoverySqlite.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 216[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/calories.domain.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 180[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitLifecycle.store.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 207[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/pomodoro.presets.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 118[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/notifications.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/sync.engine.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 112[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/account.coordinator.test.ts [2m([22m[2m53 tests[22m[2m)[22m[32m 201[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/pomodoro.domain.test.ts [2m([22m[2m59 tests[22m[2m)[22m[32m 127[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/todoReminderScheduler.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/todos.data.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habits.data.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/workout.pr.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/ask.retrieval.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitInsights.domain.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/overview.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/activityTimeline.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/calories.data.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/associationInvariants.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/command.domain.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/todos.domain.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/aiSecurity.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.domain.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.model.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/dailyPlanReminderScheduler.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/projects.domain.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/pomodoro.data.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/linkedActions.data.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habits.domain.test.ts [2m([22m[2m48 tests[22m[2m)[22m[32m 141[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.service.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/goals.domain.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/quickCapture.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/parseAiCommand.normalize.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/askParser.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/workout.data.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/backupRestore.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 19098[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mblocks on a settings fetch error ({data: null, error: {...}}) and leaves the device untouched [33m 2182[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mblocks when the settings row is missing despite the manifest [33m 937[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mblocks on a malformed settings payload [33m 1041[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mblocks on a settings checksum mismatch [33m 862[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mblocks on an unsupported settings version [33m 1034[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mblocks a v2 manifest that does not certify settings integrity [33m 1034[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mnever issues a network call inside the import transaction (guarded full restore) [33m 1085[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mreports BACKUP INVALID when the remote manifest lacks settings integrity metadata [33m 978[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mreports V2 COMPLETE with the certified settings integrity for a valid manifest [33m 858[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mrecognizes a known historical scope-3 backup (pre-planning) as complete V2, not invalid [33m 851[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore — settings integrity (closure)[2m > [22mkeeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart [33m 997[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mrestores the complete scope semantically and without side effects [33m 1032[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mblocks on checksum mismatch and leaves the device untouched [33m 882[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mblocks on malformed rows [33m 844[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mblocks on broken dependencies (orphan completion) even with a valid manifest [33m 543[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mblocks when local content appears after the preview (complete emptiness) [33m 1204[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mblocks with a clear failure when the remote fetch fails mid-way [33m 896[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mimports the full scope-5 planning scope with truthful counts and resolvable references [33m 864[2mms[22m[39m
+   [33m[2m✓[22m[39m backup completeness v2 restore[2m > [22mrolls back weekly_reviews (and everything else) when a post-import write fails [33m 968[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/autoModeRouter.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+[90mstderr[2m | tests/linkedActions.engine.test.ts[2m > [22m[2mcore/linked-actions/linkedActions.engine[2m > [22m[2mskips unsupported legacy target rules without executing effects
+[22m[39mSkipping unsupported linked action rule {
+  ruleId: [32m'link_legacy'[39m,
+  targetFeature: [32m'pomodoro'[39m,
+  targetEntityType: [32m'pomodoro_session'[39m,
+  effectType: [32m'pomodoro.log'[39m
+}
+
+[90mstderr[2m | tests/linkedActions.engine.test.ts[2m > [22m[2mcore/linked-actions/linkedActions.engine[2m > [22m[2mreports unsupported rules during plan mode too
+[22m[39mSkipping unsupported linked action rule {
+  ruleId: [32m'link_legacy'[39m,
+  targetFeature: [32m'pomodoro'[39m,
+  targetEntityType: [32m'pomodoro_session'[39m,
+  effectType: [32m'pomodoro.log'[39m
+}
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/linkedActions.engine.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/weeklyReview.domain.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/command.planning.domain.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/realCommandParser.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/command.executor.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.anomaly.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/backupSettings.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/workout.domain.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/todoReminderReconcile.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/command.v2.contracts.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/notificationResponseDispatcher.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/commandParser.facade.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.backend.guard.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/commandRemoteParity.contract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/linkedActionsEditor.model.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/caloriesTargets.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/command.planning.executor.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/linkedActions.types.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/theme.registry.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/account.domain.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.report.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/backupValidators.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/supabaseOwnership.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/workout.restPreferences.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/checksum.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/planningHub.guidedPlanning.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/portableNativeSize.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/workout.draft.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/accountSupabaseMock.contract.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/restore.helpers.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/validation.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/linkedActionsTargetPicker.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/backupManifest.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/appMeta.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.apileg.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/progress.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/workout.duplicate.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/time.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/pomodoro.stats.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/userAiAsk.normalize.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/dailyPlan.domain.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/supabaseAuthOptions.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/accountSupabaseMock.drift.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/commandModePreference.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/syncPersistence.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/notifications.reminderPlanning.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/portableAccountGating.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/askConversationContext.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/command.history.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/commandConfig.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/planningHub.briefing.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/settingsRuntimeValidation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/inAppNotices.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/settings.restorePreview.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.habitReminderActions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.failure.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/ask.planningRetrieval.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/GitHubHeatmap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/sectionColors.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/restorePromptFlow.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/dayRollover.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/id.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/bootstrapErrorMessage.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.runner.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/simulation.repro.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m143 passed[39m[22m[90m (143)[39m
+[2m      Tests [22m [1m[32m1726 passed[39m[22m[90m (1726)[39m
+[2m   Start at [22m 15:53:40
+[2m   Duration [22m 42.39s[2m (transform 23.94s, setup 4.74s, collect 69.81s, tests 123.99s, environment 69ms, prepare 55.09s)[22m
+

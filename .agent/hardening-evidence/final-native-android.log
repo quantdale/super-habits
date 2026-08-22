@@ -1,0 +1,7 @@
+
+> superhabits@1.0.0 qa:native:android
+> node scripts/qa-native.mjs --platform android --tag smoke
+
+Native QA blocked [ENVIRONMENT]: No booted Android emulator/device is available.
+Remediation: Start an Android E2E emulator, install the E2E APK, and rerun the same command.
+Native QA report: C:\Users\Michael Roy\Documents\super-habits\simulation-output\native\native-android-smoke-2026-08-22T085736218Z.json

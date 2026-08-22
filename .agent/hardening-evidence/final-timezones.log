@@ -1,0 +1,106 @@
+
+> superhabits@1.0.0 qa:timezones
+> node scripts/qa-timezones.mjs
+
+
+[timezone] Asia/Manila
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Michael Roy/Documents/super-habits[39m
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/time.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.domain.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/dateKeys.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1438[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22ma calorie entry written on a local key is only visible under that key [33m 517[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22mhabit completions keep an explicit local date key and read back by it [33m 512[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 16:30:52
+[2m   Duration [22m 3.35s[2m (transform 900ms, setup 266ms, collect 886ms, tests 1.48s, environment 1ms, prepare 2.04s)[22m
+
+
+[timezone] UTC
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Michael Roy/Documents/super-habits[39m
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/time.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.domain.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/dateKeys.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1110[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22ma calorie entry written on a local key is only visible under that key [33m 367[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22mhabit completions keep an explicit local date key and read back by it [33m 445[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 08:30:57
+[2m   Duration [22m 1.99s[2m (transform 682ms, setup 130ms, collect 339ms, tests 1.16s, environment 1ms, prepare 753ms)[22m
+
+
+[timezone] America/New_York
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Michael Roy/Documents/super-habits[39m
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/time.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.domain.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/dateKeys.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1244[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22ma calorie entry written on a local key is only visible under that key [33m 396[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22mhabit completions keep an explicit local date key and read back by it [33m 496[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 04:31:00
+[2m   Duration [22m 2.10s[2m (transform 708ms, setup 145ms, collect 316ms, tests 1.29s, environment 1ms, prepare 795ms)[22m
+
+
+[timezone] Pacific/Honolulu
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Michael Roy/Documents/super-habits[39m
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/time.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.domain.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/dateKeys.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1171[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22ma calorie entry written on a local key is only visible under that key [33m 410[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22mhabit completions keep an explicit local date key and read back by it [33m 449[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 22:31:04
+[2m   Duration [22m 2.10s[2m (transform 811ms, setup 216ms, collect 392ms, tests 1.23s, environment 1ms, prepare 784ms)[22m
+
+
+[timezone] Pacific/Kiritimati
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Michael Roy/Documents/super-habits[39m
+
+ [32m✓[39m [30m[42m unit [49m[39m tests/time.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m [30m[42m unit [49m[39m tests/habitReminders.domain.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m [30m[45m integration [49m[39m tests/integration/dateKeys.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1212[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22ma calorie entry written on a local key is only visible under that key [33m 421[2mms[22m[39m
+   [33m[2m✓[22m[39m local date-key writes and reads[2m > [22mhabit completions keep an explicit local date key and read back by it [33m 459[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 22:31:07
+[2m   Duration [22m 2.11s[2m (transform 755ms, setup 162ms, collect 290ms, tests 1.26s, environment 1ms, prepare 707ms)[22m
+
+
+Timezone matrix passed: Asia/Manila, UTC, America/New_York, Pacific/Honolulu, Pacific/Kiritimati

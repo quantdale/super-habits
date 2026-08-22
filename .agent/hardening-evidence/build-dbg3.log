@@ -1,0 +1,67 @@
+
+> superhabits@1.0.0 build:sync
+> node scripts/build-dist-sync.mjs
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Static rendering is enabled. Learn more: https://docs.expo.dev/router/web/static-rendering/
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 36.0% (6/7)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 39.1% (25/40)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 36.0% ( 41/146)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% ( 48/116)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 36.0% ( 87/208)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% ( 82/194)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓░░░░░░░░░░ 41.8% (246/412)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% (185/331)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓░░░░░░░░░░ 41.8% (339/528)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% (319/515)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.3% (416/575)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% (423/824)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.3% (459/847)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% (508/900)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.3% (575/913)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% ( 659/1049)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.3% (575/913)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% ( 787/1170)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.3% ( 718/1054)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓░░░░░░░░ 52.3% ( 863/1193)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 57.0% ( 892/1182)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 57.9% ( 969/1274)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 60.5% ( 968/1245)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 68.7% (1194/1442)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.8% (1213/1432)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.5% (1278/1527)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 72.1% (1254/1477)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.1% (1468/1640)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.8% (1430/1581)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.2% (1542/1680)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.3% (1508/1662)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 89.0% (1640/1738)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 89.8% (1632/1725)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.6% (1738/1787)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 95.8% (1832/1872)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.2% (1881/1889)
+λ Bundled 73243ms node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1893 modules)
+[expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1880/1880)
+Web Bundled 76085ms node_modules\expo-router\entry.js (1880 modules)
+
+› web bundles (4):
+_expo/static/css/web-4863a23082c754f9c7bc8118e1588a15.css (18KB)
+_expo/static/js/web/entry-2835c6357f85201e6dedaf8b41181acc.js (4.5MB)
+_expo/static/js/web/todoNotificationActions-d52f7c0334057917731b9a171394ae69.js (2.8KB)
+_expo/static/js/web/worker-a092a54381483e0461f10bbafeb5f398.js (139KB)
+
+› Static routes (3):
+/ (index) (18KB)
+/_sitemap (18KB)
+/+not-found (18KB)
+
+Exported: dist-sync
+dist-sync/ carries the dummy Supabase env (https://dummy.supabase.co; non-routable host, no real credentials in any build).

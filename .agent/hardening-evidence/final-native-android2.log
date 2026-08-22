@@ -1,0 +1,7 @@
+
+> superhabits@1.0.0 qa:native:android
+> node scripts/qa-native.mjs --platform android --tag smoke
+
+Native QA blocked [ENVIRONMENT]: com.dale16.superhabits is not installed on the connected Android target.
+Remediation: Build/install the e2e-test APK, then rerun the same command.
+Native QA report: C:\Users\Michael Roy\Documents\super-habits\simulation-output\native\native-android-smoke-2026-08-22T090713562Z.json

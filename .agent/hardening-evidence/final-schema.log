@@ -1,0 +1,5 @@
+
+> superhabits@1.0.0 supabase:schema:validate
+> node scripts/validate-supabase-schema.mjs
+
+Supabase schema contract PASS (12 migration files; 4 owner-scoped sync tables; 10 owner-scoped backup tables; planning + weekly_reviews + workout_session_sets scope-V5 closure; private AI quota RPC).

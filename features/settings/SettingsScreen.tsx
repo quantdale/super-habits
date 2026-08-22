@@ -101,12 +101,17 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
     return () => clearInterval(intervalId);
   }, []);
 
-  const loadRestorePreview = useCallback(async () => {
+  const loadRestorePreview = useCallback(async (options?: { preserveError?: boolean }) => {
     setRestoreLoading(true);
     try {
       const preview = await getRestorePreview();
       setRestorePreview(preview);
-      setRestoreError(null);
+      // A refresh triggered right after a failed restore attempt must not
+      // wipe the fresh error message — otherwise a blocked/invalid restore
+      // fails silently (the row stays stale with no visible feedback).
+      if (!options?.preserveError) {
+        setRestoreError(null);
+      }
     } catch (err) {
       console.error('[SettingsScreen] getRestorePreview failed', err);
       setRestoreError('Unable to load backup status right now.');
@@ -210,7 +215,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
           }`,
         );
       }
-      await loadRestorePreview();
+      await loadRestorePreview({ preserveError: true });
     } catch (err) {
       console.error('[SettingsScreen] restoreFromRemoteBackup failed', err);
       setRestoreError('Restore failed. Your current local data was left unchanged.');

@@ -31,7 +31,9 @@ const WRONG_USER = {
   is_anonymous: false,
 };
 const BACKUP_TODO = {
-  id: 'todo_recovered_v1',
+  // ID must satisfy the production backup-row contract (createId shape:
+  // {prefix}_{ms}_{rand}, enforced by validateBackupRow on the restore path).
+  id: 'todo_1786694400000_a1b2c3d4',
   title: 'Recovered from backup',
   notes: null,
   completed: 0,
@@ -418,7 +420,14 @@ defineJourney({
         await returnToApp(page);
 
         // First activity is local-only: complete a Pomodoro focus session.
-        await page.getByRole('button', { name: TAB_LABELS.pomodoro, exact: true }).click();
+        // Scope to the tab rail landmark: the first-run onboarding card on
+        // Overview exposes interest chips whose labels can equal a tab label
+        // (Habits, Focus, Workout), so an unscoped lookup strict-matches two
+        // buttons (same protocol as helpers/navigation.goToTab).
+        await page
+          .getByRole('tablist', { name: 'Section tabs' })
+          .getByRole('button', { name: TAB_LABELS.pomodoro, exact: true })
+          .click();
         await page.getByText('Start focus', { exact: true }).click();
         await page.clock.fastForward(25 * 60 * 1000);
         // After the focus session completes the timer advances to the next
@@ -431,7 +440,11 @@ defineJourney({
         // recovery on the now-populated device sends the OTP, but verifying
         // with a DIFFERENT account (different UUID) must fail closed.
         // The settings shortcut lives on the Overview section; return there.
-        await page.getByRole('button', { name: TAB_LABELS.overview, exact: true }).click();
+        // Scope to the tab rail landmark (see the Focus note above).
+        await page
+          .getByRole('tablist', { name: 'Section tabs' })
+          .getByRole('button', { name: TAB_LABELS.overview, exact: true })
+          .click();
         await page.getByRole('button', { name: 'Open settings' }).click();
         await expect(page.getByText('Anonymous / unprotected', { exact: true })).toBeVisible();
         await page.getByLabel('Protected account email').fill('other@example.com');

@@ -1,0 +1,44 @@
+
+> superhabits@1.0.0 openspec:validate
+> openspec validate --all
+
+- Validating...
+✓ change/add-backup-completeness-v2
+✓ change/add-durable-agent-execplans
+✓ change/add-habit-reminder-actions
+✓ change/add-habit-scheduling-and-history-semantics
+✓ change/add-native-real-user-e2e
+✓ change/add-portable-data-export-import-v1
+✓ change/add-productivity-expansion-wave-v1
+✓ change/add-recoverable-account-v1
+✓ change/add-schedule-aware-habit-reminders
+✓ change/add-user-simulation-platform
+✓ change/add-weekly-review-planning-v1
+✓ spec/ai-ask
+✓ change/close-cg4-cg5-performance-gaps
+✓ change/close-productivity-expansion-production-schema
+✓ change/command-center-v2
+✓ change/complete-product-roadmap-parallel-wave-v2
+✓ change/correctness-durability-security-hardening
+✓ change/enforce-agent-execplan-lifecycle
+✓ change/fix-account-recovery-dist-sync-closure-audit
+✓ change/fix-account-recovery-dist-sync-determinism
+✓ change/fix-backup-v2-closure-defects
+✓ change/fix-day-rollover-refresh
+✓ change/fix-linked-action-habit-increment-reentry
+✓ change/fix-pomodoro-defaults-propagation
+✓ change/fix-portable-data-v1-closure-defects
+✓ change/fix-recurring-todo-expansion-idempotency
+✓ change/fix-restore-emptiness-counts-deleted-rows
+✓ change/fix-restore-service-worker
+✓ change/fix-todo-add-double-submit
+✓ spec/habit-progress-insights
+✓ change/harden-parallel-completion-wave-v2
+✓ change/harden-productivity-expansion-wave-v1
+✓ change/harden-ui-ux-mass-implementation-wave-v1
+✓ spec/navigation
+✓ change/production-correctness-hardening
+✓ change/secure-supabase-backup-row-ownership
+✓ change/strengthen-autonomous-qa-loop
+✓ spec/user-simulation-testing
+Totals: 38 passed, 0 failed (38 items)

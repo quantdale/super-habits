@@ -61,7 +61,10 @@ let remoteBackupDetected = false;
 const REMOTE_BACKUP: Record<string, Record<string, unknown>[]> = {
   todos: [
     {
-      id: 'todo_old_1',
+      // IDs must satisfy the production backup-row contract (createId shape:
+      // {prefix}_{ms}_{rand}, enforced by validateBackupRow on the restore
+      // path) — restored remote rows are validated before import.
+      id: 'todo_1768035600000_a1b2c3d4',
       title: 'Restored task',
       notes: null,
       completed: 0,
@@ -75,7 +78,7 @@ const REMOTE_BACKUP: Record<string, Record<string, unknown>[]> = {
       deleted_at: null,
     },
     {
-      id: 'todo_old_2',
+      id: 'todo_1768039200000_e5f6a7b8',
       title: 'Restored done task',
       notes: 'from backup',
       completed: 1,
@@ -91,9 +94,13 @@ const REMOTE_BACKUP: Record<string, Record<string, unknown>[]> = {
   ],
   habits: [
     {
-      id: 'habit_old_1',
+      id: 'habit_1767600000000_c9d0e1f2',
       name: 'Hydrate',
       target_per_day: 3,
+      // Required by the production backup-row contract (effective-dated
+      // schedule history, migration 16+): JSON string of dated rules.
+      rule_history:
+        '[{"effective_from_date":"2026-01-05","weekdays":[1,2,3,4,5,6,7],"target_per_day":3}]',
       reminder_time: null,
       category: 'anytime',
       icon: 'water-drop',
@@ -105,7 +112,7 @@ const REMOTE_BACKUP: Record<string, Record<string, unknown>[]> = {
   ],
   calorie_entries: [
     {
-      id: 'cal_old_1',
+      id: 'cal_1768030200000_b3c4d5e6',
       food_name: 'Oatmeal',
       calories: 300,
       protein: 10,

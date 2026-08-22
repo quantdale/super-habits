@@ -1,0 +1,106 @@
+
+Running 14 tests using 1 worker
+
+  ✓   1 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 1. reset to an empty device and detect whether this build has a remote restore boundary @p6 @sync (4.6s)
+  ✓   2 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 2. dismiss the restore prompt ("Not now") @p6 @sync (114ms)
+  ✓   3 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 3. reload: the dismissed prompt does not reappear, restore stays available in Settings @p6 @sync (4.8s)
+  ✓   4 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 4. add a todo → restore is now blocked (device non-empty) @p6 @sync (4.9s)
+  ✘   5 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync (17.8s)
+  -   6 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 6. what did NOT come back: no completions, saved meals, pomodoro sessions or workout logs; streaks read 0 @p6 @sync
+  -   7 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 7. CG-2: a device holding only soft-deleted rows is not empty (decided contract) @p6 @sync
+  ✓   8 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 1. protect the anonymous backup with email @account-v1 @sync (4.5s)
+  ✓   9 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync (6.2s)
+  ✓  10 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 3. session loss pauses remote backup but permits owner recovery @account-v1 @sync (1.8s)
+  ✓  11 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 4. a different authenticated owner is blocked without local reassignment @account-v1 @sync (1.3s)
+  ✓  12 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 5. first synced activity is durably owned by the anonymous account @account-v1 @sync (4.8s)
+  ✓  13 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 6. protection succeeds while the user keeps writing and sync keeps flushing @account-v1 @sync (7.7s)
+  ✘  14 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 7. a populated device cannot switch to a different account after local-only activity @account-v1 @sync (3.2s)
+
+
+  1) [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeHidden[2m([22m[2m)[22m failed
+
+    Locator:  getByText('A remote backup is available and this device is still empty for user data.')
+    Expected: hidden
+    Received: visible
+    Timeout:  15000ms
+
+    Call log:
+    [2m  - Expect "toBeHidden" with timeout 15000ms[22m
+    [2m  - waiting for getByText('A remote backup is available and this device is still empty for user data.')[22m
+    [2m    18 × locator resolved to <div dir="auto" class="css-146c3p1 r-8akbws r-krxsd3 r-dnmrzs r-1qsk4np r-1udbk01 mt-0.5 text-sm">A remote backup is available and this device is s…</div>[22m
+    [2m       - unexpected value "visible"[22m
+
+
+       at journeys\new-phone.spec.ts:427
+
+      425 |         await page.getByRole('button', { name: 'Restore backup', exact: true }).first().click();
+      426 |         // On success the prompt closes (resolveRestorePromptOutcome dismisses).
+    > 427 |         await expect(page.getByText(PROMPT_SUBTITLE)).toBeHidden({ timeout: 15_000 });
+          |                                                       ^
+      428 |
+      429 |         // Row-level: exactly the backed-up rows were imported.
+      430 |         await expectRows(
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\new-phone.spec.ts:427:55)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 7. a populated device cannot switch to a different account after local-only activity @account-v1 @sync 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Focus', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('tablist', { name: 'Section tabs' }).getByLabel('Focus')
+        2) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Focus' }).nth(4)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Focus', exact: true })[22m
+
+
+       at journeys\recoverable-account-v1.spec.ts:423
+
+      421 |
+      422 |         // First activity is local-only: complete a Pomodoro focus session.
+    > 423 |         await page.getByRole('button', { name: TAB_LABELS.pomodoro, exact: true }).click();
+          |                                                                                    ^
+      424 |         await page.getByText('Start focus', { exact: true }).click();
+      425 |         await page.clock.fastForward(25 * 60 * 1000);
+      426 |         // After the focus session completes the timer advances to the next
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\recoverable-account-v1.spec.ts:423:84)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-5eb98-ly-activity-account-v1-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-5eb98-ly-activity-account-v1-sync-journeys-sync\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-5eb98-ly-activity-account-v1-sync-journeys-sync\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-5eb98-ly-activity-account-v1-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-5eb98-ly-activity-account-v1-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync 
+    [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 7. a populated device cannot switch to a different account after local-only activity @account-v1 @sync 
+  2 did not run
+  10 passed (1.2m)

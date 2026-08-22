@@ -1,0 +1,6 @@
+
+> superhabits@1.0.0 sim:validate
+> tsc -p simulation/tsconfig.json && node simulation/.build/simulation/runner/cli.js validate
+
+simulation model: 13 persona(s) [daily-driver, weekend-returner, power-user, error-prone-user, commuter, new-device-migrator, recoverable-anonymous-user, lost-session-user, wrong-account-user, new-phone-recoverer, unknown-email-recoverer, long-term-user, smoke-driver], 7 workflow(s), 22 scenario(s) [command-v2-busy-worker, command-v2-fitness-tracker, command-v2-habit-edge-cases, command-v2-returning-user, first-run-onboarding, week-of-habit-tracking, settings-ripple-with-reload, new-device-migration, habit-reminders-v1, j1-a-tuesday, j2-past-midnight, j3-the-commute, j4-bad-backend, j7-fat-fingers, long-term-user-disaster-recovery, j5-new-phone, j6-chain-reaction, j8-three-months-in, j9-two-tabs, j10-settings-ripple, typical-device-walk, smoke]
+simulation model valid: 22 scenario(s) checked, apiLeg guards clean.

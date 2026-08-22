@@ -1,0 +1,313 @@
+
+Running 1 test using 1 worker
+
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE pageerror Error: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at xl (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:37617)
+    at Pl (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:38986)
+    at Pi (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:92282)
+    at Tc (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:122840)
+    at Pc (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:122088)
+    at zc (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4a
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] Service Worker registration blocked by Playwright
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] Service Worker registration blocked by Playwright
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net POST /auth/v1/verify -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/habit_completions?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/saved_meals?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/routine_exercises?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/routine_exercise_sets?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/workout_logs?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/workout_session_exercises?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/pomodoro_sessions?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/linked_action_rules?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/weekly_reviews?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/projects?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/goals?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/daily_plans?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/workout_session_sets?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/user_backup_settings?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net HEAD /rest/v1/backup_manifest?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE --- RESET FOR STEP 2 ---
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE pageerror Error: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at xl (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:37617)
+    at Pl (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:38986)
+    at Pi (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:92282)
+    at Tc (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:122840)
+    at Pc (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:104:122088)
+    at zc (http://127.0.0.1:8082/_expo/static/js/web/entry-1c80dcfc4a
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] Service Worker registration blocked by Playwright
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE console[error] TypeError: Failed to fetch
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1920:5159
+    at u (http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1917:3191)
+    at _e._request (http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1917:559)
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1924:27694
+    at j._useSession (http://localhost:8082/_expo/s
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] Service Worker registration blocked by Playwright
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /auth/v1/user -> ANON
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net HEAD /rest/v1/todos?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/habit_completions?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/saved_meals?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/routine_exercises?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/routine_exercise_sets?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_logs?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_session_exercises?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/pomodoro_sessions?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/linked_action_rules?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/weekly_reviews?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/projects?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/goals?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/daily_plans?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_session_sets?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/user_backup_settings?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net HEAD /rest/v1/backup_manifest?select=user_id&user_id=eq.00000000-0000-0000-0000-000000000101 -> override=EMPTY
+PROBE net POST /auth/v1/otp
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net GET /auth/v1/user -> ANON
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=EMPTY
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=EMPTY
+PROBE net POST /auth/v1/verify -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE --- CLICKING RESTORE ---
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /rest/v1/todos?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&order=created_at.asc%2Cid.asc&offset=0&limit=1000 -> override=BACKED
+PROBE net GET /rest/v1/habits?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&order=created_at.asc%2Cid.asc&offset=0&limit=1000 -> override=BACKED
+PROBE net GET /rest/v1/calorie_entries?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&order=created_at.asc%2Cid.asc&offset=0&limit=1000 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE ui t+1s {"restoring":0,"restoreFailedBanner":0,"malformedBanner":0,"blockedRuleRow":0,"allowedRuleRow":1,"restoredTaskVisible":0}
+PROBE ui t+2s {"restoring":0,"restoreFailedBanner":0,"malformedBanner":0,"blockedRuleRow":0,"allowedRuleRow":1,"restoredTaskVisible":0}
+PROBE ui t+3s {"restoring":0,"restoreFailedBanner":0,"malformedBanner":0,"blockedRuleRow":0,"allowedRuleRow":1,"restoredTaskVisible":0}
+PROBE --- DB PROBE VIA HARNESS ---
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE todos=[]
+PROBE restore_meta=[]
+PROBE owner=[{"key":"account.owner_user_id","value":"00000000-0000-0000-0000-000000000101"},{"key":"account.owner_binding_state","value":"permanent"}]
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] Service Worker registration blocked by Playwright
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE console[warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE console[warning] Service Worker registration blocked by Playwright
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+PROBE net GET /auth/v1/user -> PERM
+PROBE net HEAD /rest/v1/todos?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/habits?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/calorie_entries?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net HEAD /rest/v1/workout_routines?select=id&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null -> override=BACKED
+PROBE net GET /rest/v1/todos?select=updated_at&user_id=eq.00000000-0000-0000-0000-000000000101&deleted_at=is.null&order=updated_at.desc&limit=1 -> override=BACKED
+PROBE net GET /rest/v1/backup_manifest?select=*&user_id=eq.00000000-0000-0000-0000-000000000101&limit=1 -> override=BACKED
+  ✘  1 [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:132:7 › debug restore deep › protect → recover → restore deep probe @sync (3.1m)
+
+
+  1) [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:132:7 › debug restore deep › protect → recover → restore deep probe @sync 
+
+    [31mTest timeout of 180000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 180000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Open settings' })[22m
+    [2m    - locator resolved to <button tabindex="0" role="button" type="button" aria-label="Open settings" class="css-g5y9jx r-1loqt21 r-1otgn73 flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div class="css-g5y9jx">…</div> from <div>…</div> subtree intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div class="css-g5y9jx">…</div> from <div>…</div> subtree intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    270 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is visible, enabled and stable[22m
+    [2m        - scrolling into view if needed[22m
+    [2m        - done scrolling[22m
+    [2m        - <div class="css-g5y9jx">…</div> from <div>…</div> subtree intercepts pointer events[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\commandObservation.ts:54
+
+      52 | export async function openSettingsScreen(page: Page) {
+      53 |   await page.goto('/', { waitUntil: 'domcontentloaded' });
+    > 54 |   await page.getByRole('button', { name: 'Open settings' }).click();
+         |                                                             ^
+      55 |   await expect(page.getByText('Theme and display', { exact: true })).toBeVisible();
+      56 | }
+      57 |
+        at openSettingsScreen (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\commandObservation.ts:54:61)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\__debug_restore.spec.ts:210:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-9eba8-r-→-restore-deep-probe-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-9eba8-r-→-restore-deep-probe-sync-journeys-sync\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-9eba8-r-→-restore-deep-probe-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-9eba8-r-→-restore-deep-probe-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:132:7 › debug restore deep › protect → recover → restore deep probe @sync 

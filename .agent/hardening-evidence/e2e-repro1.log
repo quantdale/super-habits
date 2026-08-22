@@ -1,0 +1,110 @@
+
+Running 14 tests using 1 worker
+
+  ✓   1 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 1. reset to an empty device and detect whether this build has a remote restore boundary @p6 @sync (4.9s)
+  ✓   2 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 2. dismiss the restore prompt ("Not now") @p6 @sync (105ms)
+  ✓   3 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 3. reload: the dismissed prompt does not reappear, restore stays available in Settings @p6 @sync (2.7s)
+  ✓   4 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 4. add a todo → restore is now blocked (device non-empty) @p6 @sync (4.6s)
+  ✘   5 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync (17.8s)
+  -   6 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 6. what did NOT come back: no completions, saved meals, pomodoro sessions or workout logs; streaks read 0 @p6 @sync
+  -   7 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 7. CG-2: a device holding only soft-deleted rows is not empty (decided contract) @p6 @sync
+  ✓   8 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 1. protect the anonymous backup with email @account-v1 @sync (4.6s)
+  ✘   9 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync (15.7s)
+  -  10 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 3. session loss pauses remote backup but permits owner recovery @account-v1 @sync
+  -  11 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 4. a different authenticated owner is blocked without local reassignment @account-v1 @sync
+  -  12 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 5. first synced activity is durably owned by the anonymous account @account-v1 @sync
+  -  13 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 6. protection succeeds while the user keeps writing and sync keeps flushing @account-v1 @sync
+  -  14 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 7. a populated device cannot switch to a different account after local-only activity @account-v1 @sync
+
+
+  1) [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeHidden[2m([22m[2m)[22m failed
+
+    Locator:  getByText('A remote backup is available and this device is still empty for user data.')
+    Expected: hidden
+    Received: visible
+    Timeout:  15000ms
+
+    Call log:
+    [2m  - Expect "toBeHidden" with timeout 15000ms[22m
+    [2m  - waiting for getByText('A remote backup is available and this device is still empty for user data.')[22m
+    [2m    18 × locator resolved to <div dir="auto" class="css-146c3p1 r-8akbws r-krxsd3 r-dnmrzs r-1qsk4np r-1udbk01 mt-0.5 text-sm">A remote backup is available and this device is s…</div>[22m
+    [2m       - unexpected value "visible"[22m
+
+
+       at journeys\new-phone.spec.ts:424
+
+      422 |         await page.getByRole('button', { name: 'Restore backup', exact: true }).first().click();
+      423 |         // On success the prompt closes (resolveRestorePromptOutcome dismisses).
+    > 424 |         await expect(page.getByText(PROMPT_SUBTITLE)).toBeHidden({ timeout: 15_000 });
+          |                                                       ^
+      425 |
+      426 |         // Row-level: exactly the backed-up rows were imported.
+      427 |         await expectRows(
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\new-phone.spec.ts:424:55)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Restore is only available on an empty device')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for getByText('Restore is only available on an empty device')[22m
+
+
+       at journeys\recoverable-account-v1.spec.ts:272
+
+      270 |         await expect(
+      271 |           page.getByText('Restore is only available on an empty device', { exact: false }),
+    > 272 |         ).toBeVisible();
+          |           ^
+      273 |       },
+      274 |     },
+      275 |     {
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\recoverable-account-v1.spec.ts:272:11)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync 
+    [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync 
+  7 did not run
+  5 passed (1.2m)

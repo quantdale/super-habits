@@ -1,0 +1,35 @@
+
+Running 1 test using 1 worker
+
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] Service Worker registration blocked by Playwright
+PROBE [pageerror] TypeError: Cannot read properties of undefined (reading 'waiting')
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1933:4310
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] Service Worker registration blocked by Playwright
+PROBE [pageerror] TypeError: Cannot read properties of undefined (reading 'waiting')
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1933:4310
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] Service Worker registration blocked by Playwright
+PROBE [pageerror] TypeError: Cannot read properties of undefined (reading 'waiting')
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1933:4310
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] Service Worker registration blocked by Playwright
+PROBE [pageerror] TypeError: Cannot read properties of undefined (reading 'waiting')
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1933:4310
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [probe] POST-RESTORE todos=[{"n":0}]
+PROBE [probe] POST-RESTORE last_restore=[]
+PROBE [probe] POST-RESTORE outbox=[]
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] [expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+PROBE [warning] Service Worker registration blocked by Playwright
+PROBE [pageerror] TypeError: Cannot read properties of undefined (reading 'waiting')
+    at http://localhost:8082/_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js:1933:4310
+PROBE [probe] UI after reload: allowed=0 blocked=0
+  ✓  1 [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:127:7 › debug restore › protect → recover → restore with probes @sync (21.9s)
+
+  1 passed (25.7s)

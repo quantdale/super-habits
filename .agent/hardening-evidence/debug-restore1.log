@@ -1,0 +1,40 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:127:7 › debug restore › protect → recover → restore with probes @sync (3.0m)
+
+
+  1) [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:127:7 › debug restore › protect → recover → restore with probes @sync 
+
+    [31mTest timeout of 180000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 180000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Restore backup', exact: true }).last()[22m
+
+
+      174 |     );
+      175 |
+    > 176 |     await page.getByRole('button', { name: 'Restore backup', exact: true }).last().click();
+          |                                                                                    ^
+      177 |
+      178 |     // Give the restore generous time, then probe DB via harness navigation.
+      179 |     await page.waitForTimeout(4_000);
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\__debug_restore.spec.ts:176:84
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-726b3--→-restore-with-probes-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-726b3--→-restore-with-probes-sync-journeys-sync\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-726b3--→-restore-with-probes-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\__debug_restore-debug-rest-726b3--→-restore-with-probes-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [journeys-sync] › e2e\journeys\__debug_restore.spec.ts:127:7 › debug restore › protect → recover → restore with probes @sync 

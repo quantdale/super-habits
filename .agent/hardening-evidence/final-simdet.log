@@ -1,0 +1,206 @@
+
+> superhabits@1.0.0 sim:run
+> tsc -p simulation/tsconfig.json && node simulation/.build/simulation/runner/cli.js run --mode deterministic
+
+simulation model: 13 persona(s) [daily-driver, weekend-returner, power-user, error-prone-user, commuter, new-device-migrator, recoverable-anonymous-user, lost-session-user, wrong-account-user, new-phone-recoverer, unknown-email-recoverer, long-term-user, smoke-driver], 7 workflow(s), 22 scenario(s) [command-v2-busy-worker, command-v2-fitness-tracker, command-v2-habit-edge-cases, command-v2-returning-user, first-run-onboarding, week-of-habit-tracking, settings-ripple-with-reload, new-device-migration, habit-reminders-v1, j1-a-tuesday, j2-past-midnight, j3-the-commute, j4-bad-backend, j7-fat-fingers, long-term-user-disaster-recovery, j5-new-phone, j6-chain-reaction, j8-three-months-in, j9-two-tabs, j10-settings-ripple, typical-device-walk, smoke]
+running 22 scenario(s), mode=deterministic...
+
+→ scenario 'command-v2-busy-worker' — Use Command Center for a morning focus block and a later Todo completion
+   FAIL: simulation-output/run_mt44da10_e81dpiri/run-report.json
+   digest: simulation-output/run_mt44da10_e81dpiri/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'command-v2-fitness-tracker' — Record fitness progress across Habits, Calories, and Workout through Command Center
+   FAIL: simulation-output/run_mt44ddxp_abewfg1a/run-report.json
+   digest: simulation-output/run_mt44ddxp_abewfg1a/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'command-v2-habit-edge-cases' — Refuse to choose between duplicate Habit names without an explicit choice
+   FAIL: simulation-output/run_mt44dhqv_zbmbxjk2/run-report.json
+   digest: simulation-output/run_mt44dhqv_zbmbxjk2/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'command-v2-returning-user' — Ask for a daily overview without changing accumulated local history
+   FAIL: simulation-output/run_mt44dlm9_p2amplb7/run-report.json
+   digest: simulation-output/run_mt44dlm9_p2amplb7/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'first-run-onboarding' — A brand-new user creates their first habit, first todo, and first meal
+   FAIL: simulation-output/run_mt44dpgh_kd7iispe/run-report.json
+   digest: simulation-output/run_mt44dpgh_kd7iispe/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'week-of-habit-tracking' — Track one habit across seven consecutive days, advancing the clock each day
+   FAIL: simulation-output/run_mt44dtaw_wlx6b3o3/run-report.json
+   digest: simulation-output/run_mt44dtaw_wlx6b3o3/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'settings-ripple-with-reload' — The settings surface opens, a mid-scenario reload happens, and it is still reachable with state intact
+   FAIL: simulation-output/run_mt44dx6q_rj0vr00x/run-report.json
+   digest: simulation-output/run_mt44dx6q_rj0vr00x/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'new-device-migration' — Migration: the old device corpus is written, then a fresh reload proves it is intact
+   FAIL: simulation-output/run_mt44e10q_l2oaprlu/run-report.json
+   digest: simulation-output/run_mt44e10q_l2oaprlu/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'habit-reminders-v1' — Persist representative reminder configurations without changing Habit V2 history
+   FAIL: simulation-output/run_mt44e4wm_zsubo35x/run-report.json
+   digest: simulation-output/run_mt44e4wm_zsubo35x/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j1-a-tuesday' — One Tuesday: tick a habit, add a todo, log a meal, run a focus session, reload
+   FAIL: simulation-output/run_mt44e8re_i5md771v/run-report.json
+   digest: simulation-output/run_mt44e8re_i5md771v/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j2-past-midnight' — Writes after midnight land on the new date_key; earlier rows are untouched
+   FAIL: simulation-output/run_mt44ecii_spndnkyw/run-report.json
+   digest: simulation-output/run_mt44ecii_spndnkyw/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j3-the-commute' — Offline writes survive to the outbox, persist across a reload, and nothing is lost
+   FAIL: simulation-output/run_mt44egbx_rvhg4pbv/run-report.json
+   digest: simulation-output/run_mt44egbx_rvhg4pbv/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j4-bad-backend' — A failed remote push never loses local data; the outbox keeps the record pending
+   FAIL: simulation-output/run_mt44ek45_pphkcxya/run-report.json
+   digest: simulation-output/run_mt44ek45_pphkcxya/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j7-fat-fingers' — Double-incrementing a habit yields ONE completion row (count 2), never two rows
+   FAIL: simulation-output/run_mt44env0_h6s4aqn6/run-report.json
+   digest: simulation-output/run_mt44env0_h6s4aqn6/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'long-term-user-disaster-recovery' — months of ordinary usage produce continuous, replay-free history that a complete V2 backup must preserve
+   FAIL: simulation-output/run_mt44erp1_6bjvslxc/run-report.json
+   digest: simulation-output/run_mt44erp1_6bjvslxc/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j5-new-phone' — On a fresh device the first todo lands as exactly one row
+   FAIL: simulation-output/run_mt44evgn_ceonjkhg/run-report.json
+   digest: simulation-output/run_mt44evgn_ceonjkhg/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j6-chain-reaction' — The source + target todos of a linked action persist exactly once each
+   FAIL: simulation-output/run_mt44ezb4_umcm9t95/run-report.json
+   digest: simulation-output/run_mt44ezb4_umcm9t95/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j8-three-months-in' — Walk every section of a populated device and check the seeded aggregates
+   FAIL: simulation-output/run_mt44f342_sfixrxza/run-report.json
+   digest: simulation-output/run_mt44f342_sfixrxza/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j9-two-tabs' — One tab writes two todos; each lands as exactly one persisted row
+   FAIL: simulation-output/run_mt44f6yh_6ky7szho/run-report.json
+   digest: simulation-output/run_mt44f6yh_6ky7szho/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'j10-settings-ripple' — The settings surface opens, survives a reload, and the reload loses no device state
+   FAIL: simulation-output/run_mt44fatz_j7lcelus/run-report.json
+   digest: simulation-output/run_mt44fatz_j7lcelus/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'typical-device-walk' — Build a TYPICAL-equivalent device from API legs and walk it
+   FAIL: simulation-output/run_mt44feqj_6ulg69i1/run-report.json
+   digest: simulation-output/run_mt44feqj_6ulg69i1/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+→ scenario 'smoke' — exercise every step kind deterministically against the local build
+   FAIL: simulation-output/run_mt44fip3_rnwdmqrf/run-report.json
+   digest: simulation-output/run_mt44fip3_rnwdmqrf/digest.md
+   ✗ failed at step #-1 (setup)
+     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/
+Call log:
+[2m  - navigating to "http://localhost:8081/", waiting until "domcontentloaded"[22m
+
+
+22 scenario(s) FAILED.

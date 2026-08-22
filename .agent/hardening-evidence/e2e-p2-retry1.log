@@ -1,0 +1,13 @@
+
+Running 7 tests using 1 worker
+
+  ✓  1 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 1. Seed HEAVY and verify volumes @p2 (5.4s)
+  ✓  2 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 2. COLD START ≤ 5s: Overview interactive and populated at HEAVY, aggregates match the rows @p2 (918ms)
+  ✓  3 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 3. Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches) @p2 (6.4s)
+  ✓  4 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 4. Todos: 200+ rows rendered, list scrolls to the end, Show/Hide-completed filter @p2 (2.9s)
+  ✓  5 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 5. Habits: 364-day heatmap renders exactly 52 weeks (boundary), consistency matches Overview @p2 (2.5s)
+  ✓  6 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 6. Calories diary: meal groups, expand/collapse, persistence, filter-input response ≤ 500ms @p2 (8.2s)
+[J8 baseline] coldOverview=778ms (limit 5000) | maxSwitch=778ms (limit 800): overview→todos=778, todos→habits=229, habits→focus=223, focus→workout=203, workout→calories=374, calories→overview=202 | diarySearch=312ms (limit 500) | pickerSearch=120ms (limit 500)
+  ✓  7 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 7. Row-level oracles: only the documented todo expansion was written; the walk changed nothing else @p2 (867ms)
+
+  7 passed (30.3s)
