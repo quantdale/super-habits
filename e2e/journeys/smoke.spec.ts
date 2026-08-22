@@ -36,14 +36,14 @@ defineJourney({
       run: async ({ page }) => {
         await returnToApp(page);
         await switchSection(page, 'todos');
-        await expect(page.getByRole('button', { name: 'Add task' }).first()).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Add task' }).last()).toBeVisible();
       },
     },
     {
       name: 'add a todo through the UI and assert it persists as a row',
       run: async ({ page }) => {
         await switchSection(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByRole('button', { name: 'Add task' }).last().click();
         await page.getByPlaceholder(/Add a task/i).fill('Smoke journey todo');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Smoke journey todo').first()).toBeVisible();

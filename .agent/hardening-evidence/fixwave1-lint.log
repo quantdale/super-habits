@@ -1,0 +1,233 @@
+
+> superhabits@1.0.0 lint
+> eslint . --max-warnings 25
+
+
+C:\Users\Michael Roy\Documents\super-habits\core\backup\backupValidators.ts
+  629:22  error  Replace `␍⏎····'top_todo_titles',␍⏎····(v)·=>·v·===·null·||·isBoundedString(v,·'top_todo_titles'),␍⏎··` with `'top_todo_titles',·(v)·=>·v·===·null·||·isBoundedString(v,·'top_todo_titles')`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\features\calories\CaloriesScreen.tsx
+  214:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\calories\CaloriesScreen.tsx:214:7
+  212 |     // past day stays put.
+  213 |     if (followsToday) {
+> 214 |       setSelectedDateKey(toDateKey());
+      |       ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  215 |     }
+  216 |   }, [dayGeneration, followsToday]);
+  217 |  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanHistoryView.tsx
+  48:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanHistoryView.tsx:48:10
+  46 |
+  47 |   useEffect(() => {
+> 48 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  49 |   }, [refresh]);
+  50 |
+  51 |   if (loading) {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanView.tsx
+  96:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\daily-plan\DailyPlanView.tsx:96:10
+  94 |
+  95 |   useEffect(() => {
+> 96 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  97 |   }, [refresh]);
+  98 |
+  99 |   const toggleTodo = useCallback((todoId: string) => {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\goals\GoalListView.tsx
+  76:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\goals\GoalListView.tsx:76:10
+  74 |
+  75 |   useEffect(() => {
+> 76 |     void load();
+     |          ^^^^ Avoid calling setState() directly within an effect
+  77 |   }, [load]);
+  78 |
+  79 |   const visible = useMemo(  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\habits\HabitDetailModal.tsx
+  57:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\habits\HabitDetailModal.tsx:57:7
+  55 |   useEffect(() => {
+  56 |     if (!habit) {
+> 57 |       setCompletions([]);
+     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  58 |       setLoaded(false);
+  59 |       return;
+  60 |     }  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\overview\cards\DashboardCard.tsx
+  27:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Michael Roy\Documents\super-habits\features\planning-hub\TodayBriefingView.tsx
+  53:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\planning-hub\TodayBriefingView.tsx:53:10
+  51 |
+  52 |   useEffect(() => {
+> 53 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  54 |   }, [refresh]);
+  55 |
+  56 |   if (loading && !briefing) {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\pomodoro\PomodoroScreen.tsx
+  294:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\pomodoro\PomodoroScreen.tsx:294:10
+  292 |
+  293 |   useEffect(() => {
+> 294 |     void reconcileActiveTimer();
+      |          ^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  295 |   }, [reconcileActiveTimer]);
+  296 |
+  297 |   useEffect(() => {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\projects\ProjectListView.tsx
+  72:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\projects\ProjectListView.tsx:72:10
+  70 |
+  71 |   useEffect(() => {
+> 72 |     void load();
+     |          ^^^^ Avoid calling setState() directly within an effect
+  73 |   }, [load]);
+  74 |
+  75 |   const visible = useMemo(  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\weekly-review\ReviewHistoryView.tsx
+  31:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Michael Roy\Documents\super-habits\features\weekly-review\ReviewHistoryView.tsx:31:10
+  29 |
+  30 |   useEffect(() => {
+> 31 |     void refresh();
+     |          ^^^^^^^ Avoid calling setState() directly within an effect
+  32 |   }, [refresh]);
+  33 |
+  34 |   if (loading) {  react-hooks/set-state-in-effect
+
+C:\Users\Michael Roy\Documents\super-habits\features\weekly-review\weeklyReview.data.ts
+  5:24  warning  'C:\Users\Michael Roy\Documents\super-habits\lib\time.ts' imported multiple times  import/no-duplicates
+  9:32  warning  'C:\Users\Michael Roy\Documents\super-habits\lib\time.ts' imported multiple times  import/no-duplicates
+
+C:\Users\Michael Roy\Documents\super-habits\features\workout\WorkoutScreen.tsx
+  246:55  error  Replace `·?·{·remainingSeconds:·draft.remainingSeconds·}` with `␍⏎··········?·{·remainingSeconds:·draft.remainingSeconds·}␍⏎·········`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\features\workout\WorkoutSessionScreen.tsx
+  157:47  error  Replace `·?·Math.min(saved,·phase.durationSeconds)` with `⏎······?·Math.min(saved,·phase.durationSeconds)⏎·····`  prettier/prettier
+  169:86  error  Replace `⏎····()·=>·({·...(resume?.dispositions·??·{})·})` with `()·=>·({⏎····...(resume?.dispositions·??·{})`    prettier/prettier
+  171:3   error  Insert `})`                                                                                                       prettier/prettier
+  173:84  error  Replace `⏎····()·=>·({·...(resume?.enteredSets·??·{})·})` with `()·=>·({⏎····...(resume?.enteredSets·??·{})`      prettier/prettier
+  175:3   error  Insert `})`                                                                                                       prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\features\workout\workout.data.ts
+  1150:34  error  Replace `value:·unknown` with `␍⏎··value:·unknown,␍⏎`                                                                                                                                                                   prettier/prettier
+  1172:9   error  Replace `␍⏎······typeof·entry.weight·===·'string'·&&␍⏎······typeof·entry.reps·===·'string'·&&␍⏎······key.length·>·0␍⏎····` with `typeof·entry.weight·===·'string'·&&·typeof·entry.reps·===·'string'·&&·key.length·>·0`  prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\tests\habits.data.test.ts
+  127:14  error  Replace `·effective_from_date:·'2026-04-01',·weekdays:·[1,·2,·3,·4,·5,·6,·7],·target_per_day:·3` with `⏎··············effective_from_date:·'2026-04-01',⏎··············weekdays:·[1,·2,·3,·4,·5,·6,·7],⏎··············target_per_day:·3,⏎···········`                                                          prettier/prettier
+  430:6   error  Replace `'incrementHabitFromLinkedAction',·()·=>·incrementHabitFromLinkedAction({·habitId:·'habit_1',·amount:·1,·dateKey:·'2026-04-14'·})` with `⏎······'incrementHabitFromLinkedAction',⏎······()·=>⏎········incrementHabitFromLinkedAction({·habitId:·'habit_1',·amount:·1,·dateKey:·'2026-04-14'·}),⏎····`  prettier/prettier
+  440:15  error  Replace `⏎····'%s·skips·paused/archived·habits·as·target_inactive',⏎···` with `'%s·skips·paused/archived·habits·as·target_inactive',`                                                                                                                                                                          prettier/prettier
+  443:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  444:7   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  445:1   error  Replace `··········getFirstAsync:·vi⏎············.fn()⏎············` with `········getFirstAsync:·vi.fn()`                                                                                                                                                                                                     prettier/prettier
+  448:11  error  Delete `····`                                                                                                                                                                                                                                                                                                  prettier/prettier
+  449:1   error  Replace `··············` with `··········`                                                                                                                                                                                                                                                                     prettier/prettier
+  450:1   error  Delete `····`                                                                                                                                                                                                                                                                                                  prettier/prettier
+  451:1   error  Replace `··············` with `··········`                                                                                                                                                                                                                                                                     prettier/prettier
+  452:11  error  Delete `····`                                                                                                                                                                                                                                                                                                  prettier/prettier
+  453:1   error  Replace `··············` with `··········`                                                                                                                                                                                                                                                                     prettier/prettier
+  454:9   error  Delete `····`                                                                                                                                                                                                                                                                                                  prettier/prettier
+  455:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  456:7   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  457:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  459:7   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  460:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  461:9   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  462:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  463:7   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  464:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  465:9   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  466:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  467:9   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  468:1   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  469:5   error  Delete `··`                                                                                                                                                                                                                                                                                                    prettier/prettier
+  470:1   error  Replace `····},⏎··` with `··}`                                                                                                                                                                                                                                                                                 prettier/prettier
+
+C:\Users\Michael Roy\Documents\super-habits\tests\integration\backupPerformance.test.ts
+  123:3  warning  Unexpected console statement. Only these console methods are allowed: error, warn  no-console
+
+C:\Users\Michael Roy\Documents\super-habits\tests\workout.draft.test.ts
+   18:46  error  Replace `⏎······storedValue·===·null·?·null·:·{·value:·storedValue·},⏎····` with `storedValue·===·null·?·null·:·{·value:·storedValue·}`  prettier/prettier
+  149:46  error  Replace `⏎······'DELETE·FROM·app_meta·WHERE·key·=·?',` with `'DELETE·FROM·app_meta·WHERE·key·=·?',·[`                                    prettier/prettier
+  151:7   error  Replace `['workout.active_session_draft']` with `'workout.active_session_draft'`                                                         prettier/prettier
+  152:5   error  Insert `]`                                                                                                                               prettier/prettier
+
+✖ 54 problems (41 errors, 13 warnings)
+  41 errors and 1 warning potentially fixable with the `--fix` option.
+

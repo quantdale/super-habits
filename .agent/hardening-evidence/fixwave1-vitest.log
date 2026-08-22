@@ -1,0 +1,619 @@
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ DEPRECATED  'basic' reporter is deprecated and will be removed in Vitest v3.
+Remove 'basic' from 'reporters' option. To match 'basic' reporter 100%, use configuration:
+{
+  "test": {
+    "reporters": [
+      [
+        "default",
+        {
+          "summary": false
+        }
+      ]
+    ]
+  }
+}
+ ❯ |unit| tests/accountRemoteFingerprint.test.ts (4 tests | 1 failed) 5309ms
+   × getRemoteFingerprint — missing remote table tolerance > treats a PGRST205 schema-cache miss as count 0 with a diagnostic 5025ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ getRemoteFingerprint — missing remote table tolerance > tolerates the relation-not-found error form too 279ms
+   ✓ getRemoteFingerprint — missing remote table tolerance > still throws fail-closed for any other per-entity error 3ms
+   ✓ getRemoteFingerprint — missing remote table tolerance > records no diagnostics when every table exists 1ms
+warning: in the working copy of '.agent/execplans/reconcile.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/time.ts', LF will be replaced by CRLF the next time Git touches it
+stdout | tests/integration/backupPerformance.test.ts > backup v2 closure performance recording > records checkpoint capture at small and long-history scale, and restore end-to-end
+[perf] checkpoint capture (small: 10 todos): 81ms
+
+ ✓ |unit| tests/agent-execplan.test.ts (9 tests) 8695ms
+   ✓ agent ExecPlan tooling > accepts a valid ACTIVE plan with wrapped fields and Windows paths with spaces  1040ms
+   ✓ agent ExecPlan tooling > rejects a plan with no Current Checkpoint  1017ms
+   ✓ agent ExecPlan tooling > rejects unresolved placeholders in an ACTIVE checkpoint  909ms
+   ✓ agent ExecPlan tooling > requires proof and a no-op next action for COMPLETED plans  453ms
+   ✓ agent ExecPlan tooling > reconciles Git paths and reuses date/time QA impact in resume  2427ms
+   ✓ agent ExecPlan tooling > validates all versioned plans without requiring legacy plans to opt in  864ms
+   ✓ agent ExecPlan tooling > does not escalate documentation-only impact to every E2E lane  1162ms
+ ❯ |integration| tests/integration/fixtures.test.ts (4 tests | 2 failed) 11209ms
+   ✓ tests/integration/fixtures > SMALL seeds a realistic single day through the real data layers  3718ms
+   × tests/integration/fixtures > TYPICAL spans thirty days of consistent use 1557ms
+     → expected 4 to be greater than or equal to 30
+   × tests/integration/fixtures > HEAVY spans three months at volume 5513ms
+     → expected 15 to be greater than or equal to 1000
+   ✓ tests/integration/fixtures > date keys are local-calendar and consistent with the injected clock  418ms
+ ✓ |integration| tests/integration/habitReminderActions.test.ts (15 tests) 10461ms
+   ✓ habit reminder Mark complete against real SQLite > increments target one once and survives a concurrent duplicate response  2690ms
+   ✓ habit reminder Mark complete against real SQLite > increments a partial target by exactly one rather than filling the target  806ms
+   ✓ habit reminder Mark complete against real SQLite > already satisfied is a safe no-op  478ms
+   ✓ habit reminder Mark complete against real SQLite > deleted is a safe no-op  312ms
+   ✓ habit reminder Mark complete against real SQLite > does not backdate a stale previous-date notification after local midnight  350ms
+   ✓ habit reminder Mark complete against real SQLite > does not mutate when the schedule is edited off the current date  672ms
+   ✓ habit reminder Mark complete against real SQLite > runs a habit completion Linked Action once across response replay  534ms
+   ✓ habit reminder Mark complete against real SQLite > replays safely after reopening the same database file  1520ms
+   ✓ habit reminder Mark complete against real SQLite > keeps two habits isolated by ID  1152ms
+   ✓ habit reminder Snooze against real SQLite > schedules one fixed fifteen-minute replacement and preserves configured time  857ms
+   ✓ habit reminder Snooze against real SQLite > deleted habit cannot snooze  329ms
+ ❯ |unit| tests/restore.coordinator.test.ts (18 tests | 1 failed) 15106ms
+   × core/sync/restore.coordinator > marks the device as empty-device eligible only when all sync-backed tables are empty 5019ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ core/sync/restore.coordinator > blocks restore when active rows exist in sync-backed local tables  3054ms
+   ✓ core/sync/restore.coordinator > blocks restore when local synced tables contain tombstones  321ms
+   ✓ core/sync/restore.coordinator > returns workout restore as excluded in phase one with a concrete reason  347ms
+   ✓ core/sync/restore.coordinator > returns an unavailable restore preview when remote mode is disabled  371ms
+   ✓ core/sync/restore.coordinator > reports remote authentication as unavailable without querying backup rows  1417ms
+   ✓ core/sync/restore.coordinator > does not treat tombstone-only remote rows as restorable backup  618ms
+   ✓ core/sync/restore.coordinator > treats mixed active and deleted remote rows as restorable backup  549ms
+   ✓ core/sync/restore.coordinator > changes the freshness signature when remote backup metadata changes  426ms
+   ✓ core/sync/restore.coordinator > dismisses only the matching current backup freshness signature  382ms
+   ✓ core/sync/restore.coordinator > blocks restore execution on non-empty devices without importing rows 248ms
+   ✓ core/sync/restore.coordinator > blocks restore execution when remote mode is disabled 222ms
+   ✓ core/sync/restore.coordinator > imports only todos, habits, and calorie entries during restore 262ms
+   ✓ core/sync/restore.coordinator > rejects malformed remote rows as invalid instead of importing them 240ms
+   ✓ core/sync/restore.coordinator > reports an owner change inside the transaction as invalid, not local_data_present 236ms
+   ✓ core/sync/restore.coordinator > uses a transaction so failed restore writes do not commit partial local changes  629ms
+   ✓ core/sync/restore.coordinator > aborts restore when the authenticated owner changes after preview  328ms
+   ✓ core/sync/restore.coordinator > aborts inside the transaction when local rows appear after the eligibility preview  422ms
+ ✓ |integration| tests/integration/constraints.test.ts (7 tests) 2669ms
+   ✓ habit_completions UNIQUE(habit_id, date_key) > two rapid increments through the real data layer produce one row, not a constraint violation  543ms
+   ✓ habit_completions UNIQUE(habit_id, date_key) > a bare INSERT violating UNIQUE(habit_id, date_key) is rejected by the engine  330ms
+   ✓ habit_completions UNIQUE(habit_id, date_key) > increment/decrement cycles keep a single row per (habit_id, date_key)  403ms
+   ✓ saved_meals COLLATE NOCASE unique index > meal names differing only by case collapse into one saved meal via the real add path  321ms
+   ✓ linked action execution unique indexes > (rule_id, source_event_id) rejects a second execution for the same source event  366ms
+   ✓ linked action execution unique indexes > (chain_id, rule_id, effect_fingerprint) rejects a duplicate-chain execution  595ms
+ ✓ |unit| tests/pomodoro.presets.test.ts (16 tests) 334ms
+   ✓ pomodoro.presets.store > returns built-ins when neither app_meta nor legacy storage has data  309ms
+stdout | tests/integration/portableLargeDataset.test.ts > portable large long-term dataset > exports and imports tens of thousands of rows with measured, bounded timings
+[portable-large] rows=18127 fileBytes=5474664 exportMs=2601 prepareMs=3011 importMs=2908
+
+ ✓ |integration| tests/integration/portableLargeDataset.test.ts (1 test) 15766ms
+   ✓ portable large long-term dataset > exports and imports tens of thousands of rows with measured, bounded timings  15762ms
+ ✓ |integration| tests/integration/portableExportImport.test.ts (6 tests) 18069ms
+   ✓ portable export > exports the complete recoverable scope read-only with a valid envelope  8551ms
+   ✓ portable export > records a one-way owner fingerprint when a durable owner binding exists  1936ms
+   ✓ portable import — source→import semantic equivalence > restores the complete scope atomically, without side effects  851ms
+   ✓ portable import — source→import semantic equivalence > blocks a second confirm (double-confirm cannot import twice)  1212ms
+   ✓ portable import — source→import semantic equivalence > keeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart  2038ms
+   ✓ portable import — cloud backup interaction > never claims cloud completeness and enqueues imported state for a compatible owner  3475ms
+ ❯ |integration| tests/integration/restore.test.ts (9 tests | 2 failed) 16401ms
+   × restore emptiness semantics (getLocalSyncBackedCounts) > a truly empty device with a restorable backup is eligible 5260ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   × restore emptiness semantics (getLocalSyncBackedCounts) > any live row in any sync-backed table blocks restore 5099ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ restore emptiness semantics (getLocalSyncBackedCounts) > a workout routine — excluded from phase-one imports — still counts as local data  1269ms
+   ✓ in-transaction re-check abort path > a todo written after the eligibility preview but before the import aborts the restore  851ms
+   ✓ applyRemote* import behaviour (INSERT OR REPLACE) > is idempotent: importing the same remote rows twice yields exactly one row each  549ms
+   ✓ applyRemote* import behaviour (INSERT OR REPLACE) > replaces an existing row keyed on id, including resurrecting a tombstone  853ms
+   ✓ applyRemote* import behaviour (INSERT OR REPLACE) > imports habits and calorie entries readable through the real read paths  506ms
+   ✓ CG-2: restore emptiness counts deleted rows > a device holding only soft-deleted todos is not empty — restore must be blocked (CG-2: fix-restore-emptiness-counts-deleted-rows)  1141ms
+   ✓ CG-2: restore emptiness counts deleted rows > an import never resurrects a locally-deleted todo whose deletion was not yet pushed (CG-2: fix-restore-emptiness-counts-deleted-rows)  869ms
+ ✓ |integration| tests/integration/portableOwnerRecovery.test.ts (9 tests) 21264ms
+   ✓ imported-owner recovery — Finding 1 dead end > REPRO (red before the fix): imported owner-backed dataset exposes matching-account recovery  10489ms
+   ✓ imported-owner recovery — real SQLite end to end > A: matching account binds the imported dataset, rows survive, backfill enqueues under A  1410ms
+   ✓ imported-owner recovery — real SQLite end to end > B: wrong account is signed out fail-closed and never binds the imported dataset  698ms
+   ✓ imported-owner recovery — real SQLite end to end > C/D: temporary-session remote footprint gates the switch; empty footprint allows it  785ms
+   ✓ imported-owner recovery — real SQLite end to end > E: remote unavailable keeps the dataset local and the recovery retryable  1197ms
+   ✓ imported-owner recovery — real SQLite end to end > F: a local-only import never gets the imported-owner exception  1340ms
+   ✓ imported-owner recovery — real SQLite end to end > G: arbitrary populated unbound local data (no import) has no switch exception  1122ms
+   ✓ imported-owner recovery — real SQLite end to end > I: matching account already authenticated after import binds automatically without recovery  2622ms
+   ✓ imported-owner recovery — real SQLite end to end > H: an owner-bound device blocks the source-owner file before import  1594ms
+ ✓ |integration| tests/integration/linkedActionEffectsExactlyOnce.test.ts (4 tests) 3593ms
+   ✓ linked-action deterministic effect replay > keeps todo completion idempotent across a replay  1909ms
+   ✓ linked-action deterministic effect replay > uses deterministic calorie IDs to make replay a single ledger row  444ms
+   ✓ linked-action deterministic effect replay > uses deterministic workout log IDs to make replay a single historical row  535ms
+   ✓ linked-action deterministic effect replay > uses deterministic pomodoro session IDs to make replay a single row  695ms
+stdout | tests/integration/backupPerformance.test.ts > backup v2 closure performance recording > records checkpoint capture at small and long-history scale, and restore end-to-end
+[perf] checkpoint capture (long: 2000 completions + 1 todo): 17268ms
+
+ ✓ |integration| tests/integration/migrations.test.ts (7 tests) 784ms
+stdout | tests/integration/backupPerformance.test.ts > backup v2 closure performance recording > records checkpoint capture at small and long-history scale, and restore end-to-end
+[perf] restore v2 (long: 2000 completions): 653ms
+
+ ✓ |integration| tests/integration/backupPerformance.test.ts (1 test) 24779ms
+   ✓ backup v2 closure performance recording > records checkpoint capture at small and long-history scale, and restore end-to-end  24776ms
+ ✓ |integration| tests/integration/savedMealUniqueness.test.ts (3 tests) 1024ms
+   ✓ saved-meal owner-scoped uniqueness — client contract > pushes the same food name as separate owner-scoped rows for different owners  445ms
+ ✓ |integration| tests/integration/linkedActions.test.ts (10 tests) 7307ms
+   ✓ full source → rule → effect → execution cycle > completing a todo once increments the target habit exactly once and records the execution  1460ms
+   ✓ re-fire suppression > deduplicates fresh source events for the same completion day  661ms
+   ✓ re-fire suppression > reprocessing the same source event is a duplicate: no new execution, no second increment  794ms
+   ✓ re-fire suppression > two rapid events sharing one chain only apply the first — the chain guard suppresses the second  1005ms
+   ✓ crash recovery and exactly-once receipts > coalesces concurrent execution creation for one stable source identity  504ms
+   ✓ crash recovery and exactly-once receipts > reclaims an execution after a crash between claim and effect, including a persisted restart  556ms
+   ✓ crash recovery and exactly-once receipts > does not increment a habit twice when the effect commits before finalization crashes  812ms
+   ✓ crash recovery and exactly-once receipts > marks an explicit effect failure retryable and successfully replays it  475ms
+   ✓ target_missing skips > a rule whose target habit is soft-deleted skips with target_missing and records the skip  491ms
+   ✓ target_missing skips > skips a todo.complete whose target todo is soft-deleted, leaving it untouched  540ms
+ ✓ |integration| tests/integration/commandCenterV2.test.ts (5 tests) 6626ms
+   ✓ Command Center V2 canonical SQLite execution > keeps supplied-nutrition rules while allowing a missing calorie correction  3880ms
+   ✓ Command Center V2 canonical SQLite execution > turns an ambiguous Todo choice into a ready review without writing  330ms
+   ✓ Command Center V2 canonical SQLite execution > blocks Habit logging on an effective off-day without writing progress  373ms
+   ✓ Command Center V2 canonical SQLite execution > keeps parse/review read-only and makes confirmed mutations idempotent  999ms
+   ✓ Command Center V2 canonical SQLite execution > reviews, gates, and executes model_proxy planning drafts end-to-end  1039ms
+stderr | tests/integration/backupCheckpoint.test.ts > backup completeness v2 checkpoint > drops a stale manifest intent when settings change after capture and recovers without looping
+[sync] dropping stale backup_manifest record: settings changed after capture; a newer checkpoint will certify the current settings.
+
+ ✓ |integration| tests/integration/todoReminderActions.test.ts (9 tests) 4500ms
+   ✓ todo reminder Mark done against real SQLite > completes once and survives a concurrent duplicate response  676ms
+   ✓ todo reminder Mark done against real SQLite > soft-deleted todo is a safe no-op  303ms
+   ✓ todo reminder Mark done against real SQLite > already-completed todo is a safe no-op  398ms
+   ✓ todo reminder Mark done against real SQLite > replays safely after reopening the same database file  974ms
+   ✓ todo reminder Mark done against real SQLite > runs a todo.completed Linked Action exactly once across response replay  755ms
+   ✓ todo reminder Mark done against real SQLite > spawns tomorrow instance for a daily recurring todo instead of dispatching linked actions  458ms
+   ✓ todo reminder Mark done against real SQLite > keeps two todos isolated by ID  452ms
+ ✓ |integration| tests/integration/backupCheckpoint.test.ts (9 tests) 4569ms
+   ✓ backup completeness v2 checkpoint > publishes a complete manifest after backfill and drain  708ms
+   ✓ backup completeness v2 checkpoint > keeps the previous complete manifest when a newer publication fails  363ms
+   ✓ backup completeness v2 checkpoint > does not loop: an idle cycle publishes nothing  464ms
+   ✓ backup completeness v2 checkpoint > publishes settings before the manifest and certifies their integrity  534ms
+   ✓ backup completeness v2 checkpoint > defers publication when a real mutation commits at the old final-check gap  574ms
+   ✓ backup completeness v2 checkpoint > defers publication when a mutation lands inside the capture transaction after the snapshot  649ms
+   ✓ backup completeness v2 checkpoint > drops a stale manifest intent when settings change after capture and recovers without looping  580ms
+   ✓ backup completeness v2 checkpoint > reconciles the last complete generation after a crash between remote push and the local marker  405ms
+ ✓ |integration| tests/integration/portableImportCorruption.test.ts (6 tests) 26576ms
+   ✓ corruption matrix > rejects every corrupted input and leaves the database unchanged  22326ms
+   ✓ owner compatibility matrix > BLOCKS an owner-A file on an owner-B device and changes nothing  911ms
+   ✓ owner compatibility matrix > allows an owner file on an unclaimed device, records the origin, and clears any provisional binding  1306ms
+   ✓ owner compatibility matrix > allows a local-only file on an owner-bound device with an explicit adoption disclosure  951ms
+   ✓ owner compatibility matrix > BLOCKS import on a populated device (complete emptiness guard)  985ms
+ ❯ |integration| tests/integration/planningRollups.test.ts (9 tests | 1 failed) 4249ms
+   ✓ project rollups (F8 / task 11.1) > getProjectRollup aggregates linked todos, goals, and habit completions  502ms
+   ✓ project rollups (F8 / task 11.1) > listProjectRollups covers every project without N+1 and skips unlinked rows  403ms
+   × goal rollups (F8 / task 11.1) > getGoalRollup bounds habit completions by the horizon window 696ms
+     → expected +0 to be 2 // Object.is equality
+   ✓ goal rollups (F8 / task 11.1) > listHabitsForGoal returns only non-deleted linked habits  609ms
+   ✓ F1 — planning mutations enqueue owner-scoped outbox records > project create/update/reorder/delete each land outbox rows; delete also enqueues cleared children  530ms
+   ✓ F1 — planning mutations enqueue owner-scoped outbox records > goal create/update/delete enqueue; delete reconciles children into the outbox  347ms
+   ✓ F1 — planning mutations enqueue owner-scoped outbox records > daily plan upsert/complete/delete enqueue create/update/delete  371ms
+   ✓ F6/F7 — daily-plan transactional writes > completed_at is set on entering completed and cleared on leaving (stable fact)  445ms
+   ✓ F6/F7 — daily-plan transactional writes > carryForwardFromPreviousDay merges inside the write transaction and is idempotent  341ms
+ ✓ |integration| tests/integration/todoReminderSnooze.test.ts (10 tests) 4853ms
+   ✓ todo reminder Snooze against real SQLite > schedules one fixed fifteen-minute replacement preserving the base occurrence  490ms
+   ✓ todo reminder Snooze against real SQLite > deduplicates a repeated tap into a single native request  673ms
+   ✓ todo reminder Snooze against real SQLite > completed todo cannot snooze  650ms
+   ✓ todo reminder Snooze against real SQLite > deleted todo cannot snooze  579ms
+   ✓ todo reminder Snooze against real SQLite > disabled-preference todo cannot snooze  441ms
+   ✓ todo reminder Snooze against real SQLite > returns unsupported without throwing when permission is denied  349ms
+   ✓ todo reminder Snooze against real SQLite > allows a snooze that crosses local midnight (documented divergence from habits)  434ms
+   ✓ todo reminder Snooze against real SQLite > refuses a stale payload whose occurrence no longer matches the current due moment  551ms
+   ✓ snooze lifecycle cancellation (audit F4 regression guard) > completing a todo cancels BOTH its base and snooze identifiers  349ms
+   ✓ snooze lifecycle cancellation (audit F4 regression guard) > deleting a todo cancels BOTH its base and snooze identifiers  306ms
+stderr | tests/integration/caloriesIntegrity.test.ts > calorie authoritative ledger integrity > reports success when saved-meal cache maintenance fails after the ledger commits
+[calories] saved-meal maintenance failed after add SqliteError: no such table: saved_meals
+    at Database.prepare (C:\Users\Michael Roy\Documents\super-habits\node_modules\better-sqlite3\lib\methods\wrappers.js:5:21)
+    at SqliteTestDatabase.getFirstAsync (C:\Users\Michael Roy\Documents\super-habits\tests\integration\helpers\db.ts:106:26)
+    at Object.mutate (C:\Users\Michael Roy\Documents\super-habits\features\calories\calories.data.ts:262:41)
+    at C:\Users\Michael Roy\Documents\super-habits\core\sync\syncedMutation.ts:82:32
+    at C:\Users\Michael Roy\Documents\super-habits\core\db\transactions.ts:38:22
+    at SqliteTestDatabase.withTransactionAsync (C:\Users\Michael Roy\Documents\super-habits\tests\integration\helpers\db.ts:121:13)
+    at C:\Users\Michael Roy\Documents\super-habits\core\db\transactions.ts:37:14
+    at processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  code: 'SQLITE_ERROR'
+}
+
+ ✓ |integration| tests/integration/caloriesIntegrity.test.ts (3 tests) 865ms
+   ✓ calorie authoritative ledger integrity > reports success when saved-meal cache maintenance fails after the ledger commits  484ms
+ ✓ |integration| tests/integration/syncAdapterProjection.test.ts (1 test) 1495ms
+   ✓ SupabaseSyncAdapter push projection > upserts only canonical columns when the local row carries an extra unknown column  1473ms
+ ✓ |unit| core/sync/__tests__/supabase.adapter.test.ts (18 tests) 2072ms
+ ✓ |integration| tests/integration/habitScheduling.test.ts (5 tests) 2925ms
+   ✓ real SQLite habit scheduling persistence > persists an initial schedule and effective target/schedule edits  1004ms
+   ✓ real SQLite habit scheduling persistence > persists, updates, disables, reloads, and soft-deletes reminder configuration  415ms
+   ✓ real SQLite habit scheduling persistence > keeps completion rows compatible while scheduled metrics ignore off-days  568ms
+   ✓ real SQLite habit scheduling persistence > keeps linked-action off-day increments neutral and deduplicated  434ms
+   ✓ real SQLite habit scheduling persistence > uses the effective historical target for completion pathways  499ms
+ ✓ |integration| tests/integration/deleteSyncAtomicity.test.ts (5 tests) 3158ms
+   ✓ local tombstone and sync intent atomicity > rolls a todo tombstone back when source linked-action cleanup fails  563ms
+   ✓ local tombstone and sync intent atomicity > rolls a todo tombstone back when target linked-action cleanup fails  470ms
+   ✓ local tombstone and sync intent atomicity > rolls back a todo tombstone when the durable delete intent cannot be written  465ms
+   ✓ local tombstone and sync intent atomicity > persists a committed todo tombstone and delete intent across restart  379ms
+   ✓ local tombstone and sync intent atomicity > applies the same atomic delete-intent boundary to habits and workout routines  1275ms
+ ✓ |integration| tests/integration/softDelete.test.ts (7 tests) 2313ms
+   ✓ soft-delete schema contract > payload tables have deleted_at; local-only log tables do not  313ms
+   ✓ todos soft delete > every todo read path excludes a soft-deleted row, the row survives, and revive restores it  613ms
+   ✓ habits soft delete > listHabits excludes deleted habits and incrementHabit no-ops on them without orphan completions  341ms
+   ✓ workout soft delete > deleteExercise tombstones that exercise and its sets  418ms
+ ✓ |unit| tests/workout.pr.test.ts (17 tests) 62ms
+ ❯ |integration| tests/integration/dateKeys.test.ts (8 tests | 2 failed) 1755ms
+   ✓ timezone enforcement > the real toDateKey honours the Manila offset set at the top of this file 74ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  537ms
+   × local date-key writes and reads > habit completions keep an explicit local date key and read back by it 287ms
+     → expected +0 to be 1 // Object.is equality
+   ✓ getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout_logs) > converts a local date-key range into the correct half-open UTC interval under Manila 4ms
+   ✓ getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout_logs) > pomodoro range queries include rows at the inclusive start and exclude the exclusive end 104ms
+   ✓ getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout_logs) > workout-log range queries respect the same half-open interval 135ms
+   × mixed corpus containing pre-cutover UTC date keys > rows written before the migration-5 cutover keep their UTC-era keys, unbackfilled 377ms
+     → expected [] to deeply equal [ '2026-06-29', '2026-07-01' ]
+   ✓ mixed corpus containing pre-cutover UTC date keys > a pre-cutover pomodoro session is found by its local day because started_at is a true UTC timestamp 232ms
+ ✓ |unit| tests/command.domain.test.ts (28 tests) 109ms
+ ✓ |integration| tests/integration/accountOwnershipTransition.test.ts (6 tests) 1521ms
+   ✓ real SQLite first-activity ownership transitions > session loss after first local-only data creates no new anonymous identity  390ms
+   ✓ real SQLite first-activity ownership transitions > owner binding, local content, and outbox owner survive restart and flush under owner A  513ms
+ ✓ |unit| tests/account.coordinator.test.ts (53 tests) 434ms
+ ✓ |integration| tests/integration/weeklyReviewExecutor.test.ts (6 tests) 7555ms
+   ✓ executeWeeklyReview idempotency (F3) > re-confirming the same week does not duplicate commitments  925ms
+   ✓ executeWeeklyReview idempotency (F3) > in-memory draft receipts cover a same-session retry after partial failure  683ms
+   ✓ executeWeeklyReview idempotency (F3) > a receipt whose Todo was soft-deleted is re-created, not skipped  1046ms
+   ✓ executeWeeklyReview idempotency (F3) > reschedule decisions are idempotent on re-run  508ms
+   ✓ applyNextWeekPlanSuggestions structured outcomes (F4) > reports added/skipped/truncated and applies across days in one transaction  3854ms
+   ✓ applyNextWeekPlanSuggestions structured outcomes (F4) > counts candidates truncated by the suggestion cap and records invalid days as failed  524ms
+ ✓ |unit| tests/simulation.behavior.test.ts (21 tests) 867ms
+   ✓ createSeededRng > next() stays in [0, 1)  521ms
+ ✓ |integration| tests/integration/backupBackfill.test.ts (4 tests) 1982ms
+   ✓ backup completeness v2 backfill > durably enqueues every existing row owner-scoped, including tombstones  434ms
+   ✓ backup completeness v2 backfill > is idempotent: a second run enqueues nothing new  330ms
+   ✓ backup completeness v2 backfill > resumes from per-entity markers after a restart mid-backfill  1005ms
+ ✓ |integration| tests/integration/workoutIntegrity.test.ts (4 tests) 1567ms
+   ✓ workout parent/child integrity > rejects orphan configuration writes and preserves historical logs after parent deletion  486ms
+   ✓ timed-session provenance (workout_session_sets + wall-clock timing) > persists per-set rows and timing, keeps legacy logs clean, and preserves history across routine deletion  322ms
+   ✓ timed-session provenance (workout_session_sets + wall-clock timing) > writes no log and no set rows when the target routine is missing  377ms
+   ✓ timed-session provenance (workout_session_sets + wall-clock timing) > seeds new default sets from the workout_rest_seconds preference instead of a hardcoded value  378ms
+ ✓ |integration| tests/integration/habitConcurrency.test.ts (3 tests) 1788ms
+   ✓ habit threshold concurrency > fires a target=1 threshold action once for two genuinely concurrent increments  883ms
+   ✓ habit threshold concurrency > fires a target=2 threshold action once when two concurrent increments reach it  378ms
+   ✓ habit threshold concurrency > keeps three concurrent increments lossless and crosses the threshold once  518ms
+ ✓ |unit| tests/notifications.test.ts (4 tests) 161ms
+ ✓ |integration| tests/integration/recurringExpansion.test.ts (1 test) 673ms
+   ✓ materializes one recurring instance and one outbox record per series/day  671ms
+ ✓ |unit| tests/sync.engine.test.ts (12 tests) 237ms
+ ✓ |unit| tests/habitLifecycle.store.test.ts (4 tests) 664ms
+   ✓ migrateLegacyHabitLifecycle > imports live paused/archived ids into the status column and retires the keys  477ms
+ ✓ |unit| tests/backupSettings.test.ts (14 tests) 24ms
+ ✓ |unit| tests/workout.data.test.ts (8 tests) 150ms
+ ✓ |unit| tests/habitReminders.domain.test.ts (30 tests) 465ms
+ ✓ |integration| tests/integration/habitInsights.test.ts (1 test) 885ms
+   ✓ real SQLite habit progress insight loading > reads active completion history once and excludes deleted habits from the shared list  883ms
+ ✓ |unit| tests/realCommandParser.test.ts (24 tests) 172ms
+ ✓ |unit| tests/portableExportSize.test.ts (2 tests) 961ms
+   ✓ portable export round-trip size contract > fails with reason too_large instead of producing a file beyond the V1 bound  896ms
+ ❯ |integration| tests/integration/backupRestore.test.ts (19 tests | 2 failed) 40416ms
+   × backup completeness v2 restore — settings integrity (closure) > blocks on a settings fetch error ({data: null, error: {...}}) and leaves the device untouched 5052ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   × backup completeness v2 restore — settings integrity (closure) > blocks when the settings row is missing despite the manifest 5018ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on a malformed settings payload  1988ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on a settings checksum mismatch  1371ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on an unsupported settings version  2286ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks a v2 manifest that does not certify settings integrity  2600ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > never issues a network call inside the import transaction (guarded full restore)  2510ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > reports BACKUP INVALID when the remote manifest lacks settings integrity metadata  2027ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > reports V2 COMPLETE with the certified settings integrity for a valid manifest  929ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > recognizes a known historical scope-3 backup (pre-planning) as complete V2, not invalid  1375ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > keeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart  1876ms
+   ✓ backup completeness v2 restore > restores the complete scope semantically and without side effects  1865ms
+   ✓ backup completeness v2 restore > blocks on checksum mismatch and leaves the device untouched  3321ms
+   ✓ backup completeness v2 restore > blocks on malformed rows  1074ms
+   ✓ backup completeness v2 restore > blocks on broken dependencies (orphan completion) even with a valid manifest  347ms
+   ✓ backup completeness v2 restore > blocks when local content appears after the preview (complete emptiness)  1194ms
+   ✓ backup completeness v2 restore > blocks with a clear failure when the remote fetch fails mid-way  2007ms
+   ✓ backup completeness v2 restore > imports the full scope-5 planning scope with truthful counts and resolvable references  1967ms
+   ✓ backup completeness v2 restore > rolls back weekly_reviews (and everything else) when a post-import write fails  1591ms
+ ✓ |integration| tests/integration/accountRecoverySqlite.test.ts (1 test) 606ms
+   ✓ SQLite account recovery boundaries > keeps a bound outbox owner through auth loss and resumes after the owner returns  603ms
+ ✓ |unit| tests/db.client.test.ts (17 tests) 475ms
+ ✓ |integration| tests/integration/syncOutbox.test.ts (2 tests) 455ms
+   ✓ SQLite sync outbox durability > keeps the newest revision and survives a real process restart  379ms
+ ✓ |unit| tests/simulation.model.test.ts (33 tests) 377ms
+ ✓ |unit| tests/todos.domain.test.ts (18 tests) 197ms
+ ✓ |unit| tests/quickCapture.test.ts (22 tests) 116ms
+ ✓ |unit| tests/calories.domain.test.ts (43 tests) 672ms
+   ✓ buildDailyTrend > returns 365 entries by default  339ms
+ ✓ |unit| tests/aiSecurity.test.ts (8 tests) 135ms
+ ✓ |unit| tests/planningSchemaConvergence.test.ts (10 tests) 1371ms
+   ✓ Supabase production schema convergence contract > validate-supabase-schema.mjs passes on the repository migration set  1249ms
+ ✓ |unit| tests/overview.test.ts (33 tests) 63ms
+ ✓ |unit| tests/goals.domain.test.ts (11 tests) 35ms
+ ✓ |unit| tests/ask.retrieval.test.ts (20 tests) 65ms
+ ✓ |integration| tests/integration/accountOwnership.test.ts (2 tests) 202ms
+ ✓ |unit| tests/pomodoro.domain.test.ts (59 tests) 76ms
+ ✓ |unit| tests/linkedActions.types.test.ts (9 tests) 16ms
+ ✓ |unit| tests/todoReminderScheduler.test.ts (9 tests) 160ms
+ ✓ |unit| tests/linkedActions.data.test.ts (11 tests) 73ms
+ ✓ |unit| tests/pomodoro.data.test.ts (15 tests) 48ms
+ ✓ |unit| tests/todos.data.test.ts (30 tests) 222ms
+ ✓ |unit| tests/portableFormat.test.ts (46 tests) 529ms
+ ✓ |unit| tests/calories.data.test.ts (22 tests) 60ms
+ ✓ |unit| tests/todoReminderReconcile.test.ts (8 tests) 80ms
+ ✓ |unit| tests/habits.data.test.ts (24 tests) 278ms
+ ✓ |unit| tests/associationInvariants.test.ts (18 tests) 373ms
+ ✓ |unit| tests/projects.domain.test.ts (14 tests) 37ms
+ ✓ |unit| tests/activityTimeline.test.ts (15 tests) 38ms
+ ✓ |unit| tests/autoModeRouter.test.ts (15 tests) 26ms
+ ✓ |unit| tests/linkedActionsTargetPicker.test.ts (4 tests) 12ms
+ ✓ |unit| tests/habits.domain.test.ts (48 tests) 136ms
+ ✓ |unit| tests/account.domain.test.ts (33 tests) 18ms
+ ✓ |unit| tests/habitInsights.domain.test.ts (13 tests) 110ms
+ ✓ |unit| tests/askParser.test.ts (12 tests) 92ms
+ ✓ |unit| tests/simulation.report.test.ts (18 tests) 91ms
+ ✓ |unit| tests/command.v2.contracts.test.ts (11 tests) 108ms
+ ✓ |unit| tests/dailyPlanReminderScheduler.test.ts (4 tests) 112ms
+ ✓ |unit| tests/accountSupabaseMock.contract.test.ts (10 tests) 15ms
+ ✓ |unit| tests/simulation.runner.test.ts (5 tests) 9ms
+ ✓ |unit| tests/simulation.repro.test.ts (19 tests) 32ms
+ ✓ |unit| tests/theme.registry.test.ts (20 tests) 33ms
+ ✓ |unit| tests/habitReminders.service.test.ts (8 tests) 119ms
+ ✓ |unit| tests/weeklyReview.domain.test.ts (37 tests) 115ms
+ ✓ |unit| tests/userAiAsk.normalize.test.ts (12 tests) 28ms
+ ✓ |unit| tests/checksum.test.ts (10 tests) 18ms
+ ✓ |unit| tests/linkedActionsEditor.model.test.ts (16 tests) 50ms
+ ✓ |unit| tests/simulation.anomaly.test.ts (32 tests) 231ms
+stderr | tests/linkedActions.engine.test.ts > core/linked-actions/linkedActions.engine > skips unsupported legacy target rules without executing effects
+Skipping unsupported linked action rule {
+  ruleId: 'link_legacy',
+  targetFeature: 'pomodoro',
+  targetEntityType: 'pomodoro_session',
+  effectType: 'pomodoro.log'
+}
+
+stderr | tests/linkedActions.engine.test.ts > core/linked-actions/linkedActions.engine > reports unsupported rules during plan mode too
+Skipping unsupported linked action rule {
+  ruleId: 'link_legacy',
+  targetFeature: 'pomodoro',
+  targetEntityType: 'pomodoro_session',
+  effectType: 'pomodoro.log'
+}
+
+ ✓ |unit| tests/linkedActions.engine.test.ts (9 tests) 119ms
+ ✓ |unit| tests/caloriesTargets.test.ts (11 tests) 165ms
+ ✓ |unit| tests/notificationResponseDispatcher.test.ts (17 tests) 25ms
+ ✓ |unit| tests/workout.domain.test.ts (26 tests) 324ms
+ ✓ |unit| tests/parseAiCommand.normalize.test.ts (26 tests) 49ms
+ ✓ |unit| tests/command.executor.test.ts (11 tests) 29ms
+ ✓ |unit| tests/supabaseOwnership.test.ts (5 tests) 16ms
+ ✓ |unit| tests/command.planning.executor.test.ts (9 tests) 28ms
+ ✓ |unit| tests/restore.helpers.test.ts (3 tests) 14ms
+ ✓ |unit| tests/portableNativeSize.test.ts (12 tests) 42ms
+ ✓ |unit| tests/command.planning.domain.test.ts (11 tests) 28ms
+ ✓ |unit| tests/simulation.backend.guard.test.ts (22 tests) 19ms
+ ✓ |unit| tests/commandParser.facade.test.ts (7 tests) 19ms
+ ✓ |unit| tests/commandRemoteParity.contract.test.ts (4 tests) 72ms
+ ✓ |unit| tests/workout.restPreferences.test.ts (10 tests) 17ms
+ ✓ |unit| tests/workout.duplicate.test.ts (2 tests) 19ms
+ ✓ |unit| tests/workout.draft.test.ts (7 tests) 35ms
+ ✓ |unit| tests/time.test.ts (5 tests) 14ms
+ ✓ |unit| tests/backupValidators.test.ts (14 tests) 19ms
+ ✓ |unit| tests/askConversationContext.test.ts (5 tests) 9ms
+ ✓ |unit| tests/pomodoro.stats.test.ts (11 tests) 37ms
+ ✓ |unit| tests/planningHub.guidedPlanning.test.ts (11 tests) 16ms
+ ✓ |unit| tests/commandModePreference.test.ts (5 tests) 94ms
+ ✓ |unit| tests/progress.test.ts (14 tests) 14ms
+ ✓ |unit| tests/appMeta.test.ts (4 tests) 49ms
+ ✓ |unit| tests/accountSupabaseMock.drift.test.ts (7 tests) 31ms
+ ✓ |unit| tests/validation.test.ts (27 tests) 13ms
+ ✓ |unit| tests/command.history.test.ts (6 tests) 11ms
+ ✓ |unit| tests/portableAccountGating.test.ts (9 tests) 10ms
+ ✓ |unit| tests/backupManifest.test.ts (12 tests) 13ms
+ ✓ |unit| tests/simulation.apileg.test.ts (9 tests) 13ms
+ ✓ |unit| tests/notifications.reminderPlanning.test.ts (8 tests) 10ms
+ ✓ |unit| tests/commandConfig.test.ts (4 tests) 10ms
+ ✓ |unit| tests/supabaseAuthOptions.test.ts (13 tests) 11ms
+ ✓ |unit| tests/dailyPlan.domain.test.ts (13 tests) 13ms
+ ✓ |unit| tests/syncPersistence.test.ts (3 tests) 10ms
+ ✓ |unit| tests/inAppNotices.test.ts (4 tests) 9ms
+ ✓ |unit| tests/GitHubHeatmap.test.ts (2 tests) 7ms
+ ✓ |unit| tests/settingsRuntimeValidation.test.ts (4 tests) 9ms
+ ✓ |unit| tests/sectionColors.test.ts (4 tests) 7ms
+ ✓ |unit| tests/settings.restorePreview.test.ts (3 tests) 9ms
+ ✓ |unit| tests/bootstrapErrorMessage.test.ts (4 tests) 7ms
+ ✓ |unit| tests/simulation.habitReminderActions.test.ts (3 tests) 9ms
+ ✓ |unit| tests/planningHub.briefing.test.ts (3 tests) 10ms
+ ✓ |unit| tests/ask.planningRetrieval.test.ts (7 tests) 8ms
+ ✓ |unit| tests/simulation.failure.test.ts (3 tests) 8ms
+ ✓ |unit| tests/dayRollover.test.ts (5 tests) 8ms
+ ✓ |unit| tests/id.test.ts (3 tests) 7ms
+ ✓ |unit| tests/restorePromptFlow.test.ts (3 tests) 7ms
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |integration| tests/integration/backupRestore.test.ts > backup completeness v2 restore — settings integrity (closure) > blocks on a settings fetch error ({data: null, error: {...}}) and leaves the device untouched
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/integration/backupRestore.test.ts:301:3
+    299| 
+    300| describe('backup completeness v2 restore — settings integrity (closure…
+    301|   it('blocks on a settings fetch error ({data: null, error: {...}}) an…
+       |   ^
+    302|     const remote = await publishSourceBackup();
+    303|     const serving = buildServingSupabase(remote, { failSettingsFetch: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  |integration| tests/integration/backupRestore.test.ts > backup completeness v2 restore — settings integrity (closure) > blocks when the settings row is missing despite the manifest
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/integration/backupRestore.test.ts:316:3
+    314|   });
+    315| 
+    316|   it('blocks when the settings row is missing despite the manifest', a…
+       |   ^
+    317|     const remote = await publishSourceBackup();
+    318|     remote.delete('user_backup_settings');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  |integration| tests/integration/dateKeys.test.ts > local date-key writes and reads > habit completions keep an explicit local date key and read back by it
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/dateKeys.test.ts:83:69
+     81|     await habits.incrementHabit(habitId, '2026-07-02');
+     82| 
+     83|     expect(await habits.getHabitCountByDate(habitId, '2026-07-01')).to…
+       |                                                                     ^
+     84|     expect(await habits.getHabitCountByDate(habitId, '2026-07-02')).to…
+     85|     expect(await habits.getHabitCountByDate(habitId, '2026-07-03')).to…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  |integration| tests/integration/dateKeys.test.ts > mixed corpus containing pre-cutover UTC date keys > rows written before the migration-5 cutover keep their UTC-era keys, unbackfilled
+AssertionError: expected [] to deeply equal [ '2026-06-29', '2026-07-01' ]
+
+- Expected
++ Received
+
+- [
+-   "2026-06-29",
+-   "2026-07-01",
+- ]
++ []
+
+ ❯ tests/integration/dateKeys.test.ts:226:44
+    224|     // string order — the app reads pre-cutover rows as-is.
+    225|     const history = await habits.getCompletionHistory(habitId, 60);
+    226|     expect(history.map((h) => h.date_key)).toEqual(['2026-06-29', '202…
+       |                                            ^
+    227| 
+    228|     // A summary spanning both eras shows both groups under their STOR…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  |integration| tests/integration/fixtures.test.ts > tests/integration/fixtures > TYPICAL spans thirty days of consistent use
+AssertionError: expected 4 to be greater than or equal to 30
+ ❯ tests/integration/fixtures.test.ts:46:76
+     44|   it('TYPICAL spans thirty days of consistent use', async () => {
+     45|     const db = await seedTypical();
+     46|     expect(await count(db, 'SELECT COUNT(*) AS n FROM habit_completion…
+       |                                                                            ^
+     47|       30,
+     48|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  |integration| tests/integration/fixtures.test.ts > tests/integration/fixtures > HEAVY spans three months at volume
+AssertionError: expected 15 to be greater than or equal to 1000
+ ❯ tests/integration/fixtures.test.ts:67:76
+     65|       await count(db, 'SELECT COUNT(*) AS n FROM todos WHERE deleted_a…
+     66|     ).toBeGreaterThanOrEqual(150);
+     67|     expect(await count(db, 'SELECT COUNT(*) AS n FROM habit_completion…
+       |                                                                            ^
+     68|       1000,
+     69|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  |integration| tests/integration/planningRollups.test.ts > goal rollups (F8 / task 11.1) > getGoalRollup bounds habit completions by the horizon window
+AssertionError: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ tests/integration/planningRollups.test.ts:121:51
+    119|     expect(yearRollup.todos.total).toBe(0);
+    120|     expect(yearRollup.habits.windowDays).toBe(365);
+    121|     expect(yearRollup.habits.completionsInWindow).toBe(2);
+       |                                                   ^
+    122|     expect(yearRollup.habits.habitCount).toBe(1);
+    123|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  |integration| tests/integration/restore.test.ts > restore emptiness semantics (getLocalSyncBackedCounts) > a truly empty device with a restorable backup is eligible
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/integration/restore.test.ts:150:3
+    148| 
+    149| describe('restore emptiness semantics (getLocalSyncBackedCounts)', () …
+    150|   it('a truly empty device with a restorable backup is eligible', asyn…
+       |   ^
+    151|     const { db, coordinator } = await load(AVAILABLE_REMOTE_TODOS);
+    152|     const todos = await import('@/features/todos/todos.data');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  |integration| tests/integration/restore.test.ts > restore emptiness semantics (getLocalSyncBackedCounts) > any live row in any sync-backed table blocks restore
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/integration/restore.test.ts:170:3
+    168|   });
+    169| 
+    170|   it('any live row in any sync-backed table blocks restore', async () …
+       |   ^
+    171|     const { db, coordinator } = await load(AVAILABLE_REMOTE_TODOS);
+    172|     const todos = await import('@/features/todos/todos.data');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+ FAIL  |unit| tests/accountRemoteFingerprint.test.ts > getRemoteFingerprint — missing remote table tolerance > treats a PGRST205 schema-cache miss as count 0 with a diagnostic
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/accountRemoteFingerprint.test.ts:51:3
+     49| 
+     50| describe('getRemoteFingerprint — missing remote table tolerance', () =…
+     51|   it('treats a PGRST205 schema-cache miss as count 0 with a diagnostic…
+       |   ^
+     52|     entityResults.clear();
+     53|     entityResults.set('weekly_reviews', {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯
+
+ FAIL  |unit| tests/restore.coordinator.test.ts > core/sync/restore.coordinator > marks the device as empty-device eligible only when all sync-backed tables are empty
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/restore.coordinator.test.ts:313:3
+    311|   });
+    312| 
+    313|   it('marks the device as empty-device eligible only when all sync-bac…
+       |   ^
+    314|     const { getRestorePreview } = await loadCoordinator({
+    315|       localCounts: {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'getFirstAsync')
+ ❯ core/sync/restore.coordinator.ts:127:28
+ ❯ getLocalSyncBackedCounts core/sync/restore.coordinator.ts:126:26
+ ❯ processTicksAndRejections node:internal/process/task_queues:103:5
+
+This error originated in "tests/restore.coordinator.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "blocks restore when local synced tables contain tombstones". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  7 failed | 136 passed (143)
+      Tests  11 failed | 1715 passed (1726)
+     Errors  1 error
+   Start at  07:28:41
+   Duration  78.44s (transform 115.48s, setup 11.66s, collect 140.56s, tests 299.05s, environment 99ms, prepare 132.12s)
+

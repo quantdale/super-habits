@@ -72,12 +72,8 @@ async function ensureCompletedShown(page: Page): Promise<void> {
 async function createTargetHabit(page: Page): Promise<void> {
   await switchSection(page, 'habits');
   await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
-  await page
-    .getByLabel('Habit groups')
-    .getByText('Add', { exact: true })
-    .first()
-    .locator('..')
-    .click({ force: true });
+  // Redesigned group tile exposes `Add {group} habit` as its accessible name.
+  await page.getByLabel('Habit groups').getByLabel('Add anytime habit').click({ force: true });
   await page.getByLabel('Habit name').fill(TARGET);
   await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
   await expect(page.getByText(TARGET, { exact: true }).first()).toBeVisible();

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
-import { expectRows } from '../helpers/oracles';
+import { expectRows, expectRowsEventually } from '../helpers/oracles';
 import { returnToApp } from '../helpers/dbHarness';
 import { fillCaloriesMacros } from '../helpers/forms';
 import { TAB_LABELS } from '../helpers/navigation';
@@ -178,7 +178,7 @@ defineJourney({
       name: 'Add a todo on Todos; Overview pending count rises (stale-aggregate catch)',
       run: async ({ page }) => {
         await switchTab(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByRole('button', { name: 'Add task' }).last().click();
         await page.getByPlaceholder(/Add a task/i).fill('Buy groceries');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });
@@ -368,6 +368,13 @@ defineJourney({
         // completes and is logged.
         await page.clock.fastForward(25 * 60 * 1000);
         await expect(page.getByText('Pause', { exact: true })).toBeHidden({ timeout: 5_000 });
+        // The session insert is fire-and-forget; the note prompt renders only
+        // after recordCompletedPomodoroSession CONFIRMS the row, so waiting
+        // for it guarantees the durable write before any row oracle below
+        // navigates to the DB harness (which destroys the app page).
+        await expect(page.getByPlaceholder('Optional note for this session…')).toBeVisible({
+          timeout: 15_000,
+        });
         // NOTE: the Focus section's own "Focus sessions" stat is NOT asserted
         // here — the completion path fires `void logPomodoroSession()` and
         // `void loadHistory()` concurrently, so the stat can lag one render
@@ -381,7 +388,8 @@ defineJourney({
         // session, no duplicate logging — the D11 / R5 regression guard). The
         // upper bound excludes the seeded "today" session, which is created at
         // 09:00 local — ~59 min after this session's 08:00 start.
-        await expectRows(page, 'SELECT COUNT(*) AS n FROM pomodoro_sessions', (rows) =>
+        // The completion path logs asynchronously; poll the durable row.
+        await expectRowsEventually(page, 'SELECT COUNT(*) AS n FROM pomodoro_sessions', (rows) =>
           expect(Number(rows[0]?.n)).toBe(getActingStore<number>('pomodoroBase') + 1),
         );
         const startUpperIso = new Date(

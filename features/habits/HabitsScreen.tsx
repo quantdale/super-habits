@@ -166,6 +166,11 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     Record<string, Record<string, number>>
   >({});
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
+  // Day rollover: the strip selection is captured at mount, so without this
+  // snap the ring/check-ins would keep targeting yesterday after midnight.
+  useEffect(() => {
+    setSelectedDateKey(toDateKey());
+  }, [dayGeneration]);
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);

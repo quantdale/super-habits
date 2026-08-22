@@ -8,10 +8,10 @@ import {
 import { TAB_LABELS } from './navigation';
 
 const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
-  // The redesigned Overview dashboard renders no "Overview" heading; its
-  // always-present hero subtitle is the stable per-section marker (the
-  // greeting varies by time of day and cards are user-customizable).
-  overview: 'Your day at a glance across plans, habits, focus, and health.',
+  // The redesigned Overview dashboard renders no "Overview" heading and its
+  // hero copy varies (time-of-day greeting); the dashboard-customize toggle
+  // is Overview-only chrome that is always rendered.
+  overview: 'Customize',
   todos: 'Todos',
   habits: 'Habits',
   pomodoro: 'Pomodoro',
@@ -53,6 +53,35 @@ export async function expectRows(
   } else {
     expect(rows, `rows for SQL:\n${sql}`).toEqual(expected);
   }
+}
+
+/**
+ * Polling variant for oracles over ASYNC writes (e.g. fire-and-forget session
+ * logging that races the assertion). Polls until `matcher` passes, then runs
+ * it once more against the final rows so a genuine failure reports exactly.
+ */
+export async function expectRowsEventually(
+  page: Page,
+  sql: string,
+  matcher: (rows: Record<string, unknown>[]) => void,
+  timeout = 10_000,
+): Promise<void> {
+  let lastRows: Record<string, unknown>[] = [];
+  await expect
+    .poll(
+      async () => {
+        lastRows = await queryRows(page, sql);
+        try {
+          matcher(lastRows);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout, intervals: [250, 500, 1_000] },
+    )
+    .toBe(true);
+  matcher(lastRows);
 }
 
 /** Shape of a durable `sync_outbox` record. */
@@ -140,7 +169,12 @@ export async function expectAcrossSurfaces(
  * reload would destroy in-memory state (e.g. a running Pomodoro).
  */
 export async function switchSection(page: Page, tab: keyof typeof TAB_LABELS): Promise<void> {
-  const tabButton = page.getByRole('button', { name: TAB_LABELS[tab], exact: true });
+  // Scope to the tab rail landmark: onboarding interest chips on Overview can
+  // duplicate a tab label (Habits/Focus/Workout), so an unscoped lookup
+  // strict-matches two buttons.
+  const tabButton = page
+    .getByRole('tablist', { name: 'Section tabs' })
+    .getByRole('button', { name: TAB_LABELS[tab], exact: true });
   await tabButton.click();
   // The six screens remain mounted behind the active one. Wait for the
   // navigation state itself before a caller queries a screen-specific control;

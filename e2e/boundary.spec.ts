@@ -70,7 +70,7 @@ test.describe('Todos — boundary inputs', () => {
     await goToTab(page, 'todos');
     for (let i = 1; i <= 30; i++) {
       // Fresh locator each iteration. Use scrollIntoView via evaluate — Playwright's scrollIntoViewIfNeeded waits for "stable" layout and can detach on RN Web.
-      const openCreate = page.getByRole('button', { name: 'Add task' }).first();
+      const openCreate = page.getByRole('button', { name: 'Add task' }).last(); // FAB renders last; quick-capture twin is first.
       await openCreate.evaluate((el) =>
         (el as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' }),
       );
@@ -79,7 +79,7 @@ test.describe('Todos — boundary inputs', () => {
       try {
         await titleInput.waitFor({ state: 'visible', timeout: 2_000 });
       } catch {
-        const retryOpen = page.getByRole('button', { name: 'Add task' }).first();
+        const retryOpen = page.getByRole('button', { name: 'Add task' }).last();
         await retryOpen.evaluate((el) =>
           (el as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' }),
         );
@@ -137,13 +137,10 @@ test.describe('Habits — boundary inputs', () => {
     await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
     for (let i = 0; i < 10; i++) {
       // Fresh locator chain each iteration — avoids stale handles after modal close / list reflow.
+      const groupNames = ['anytime', 'morning', 'afternoon', 'evening'] as const;
       await page
         .getByLabel('Habit groups')
-        .getByText('Add', { exact: true })
-        .nth(i % 4)
-        .locator('..')
-        .getByText('+', { exact: true })
-        .locator('..')
+        .getByLabel(`Add ${groupNames[i % 4]} habit`)
         .click({ force: true });
       await expect(page.getByLabel('Habit name')).toBeVisible({ timeout: 15_000 });
       await page.getByLabel('Habit name').fill(`Boundary habit ${i + 1}`);

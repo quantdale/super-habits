@@ -1,0 +1,2068 @@
+
+Running 71 tests using 1 worker
+
+(node:99788) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:99788) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 [chromium] › e2e\boundary.spec.ts:25:7 › Todos — boundary inputs › empty title is rejected — task is not created (1.0m)
+(node:41444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:41444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   2 [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break (1.0m)
+(node:125864) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125864) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   3 [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain (2.0m)
+(node:107924) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:107924) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   4 [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list (2.0m)
+(node:123576) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:123576) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   5 [chromium] › e2e\boundary.spec.ts:112:7 › Habits — boundary inputs › habit with target_per_day = 1 shows correct progress (5.5s)
+(node:46776) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:46776) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   6 [chromium] › e2e\boundary.spec.ts:134:7 › Habits — boundary inputs › creating 10 habits across groups renders all groups (6.7s)
+(node:110572) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:110572) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   7 [chromium] › e2e\boundary.spec.ts:160:7 › Habits — boundary inputs › overview grid renders with no habits (empty state) (7.1s)
+(node:123416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:123416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   8 [chromium] › e2e\boundary.spec.ts:173:7 › Calories — boundary inputs › empty food name is rejected (7.2s)
+  ✓   9 [chromium] › e2e\boundary.spec.ts:183:7 › Calories — boundary inputs › very large calorie value does not break chart (6.4s)
+  ✓  10 [chromium] › e2e\boundary.spec.ts:196:7 › Calories — boundary inputs › logging 20 entries in one day totals correctly (16.4s)
+  ✓  11 [chromium] › e2e\boundary.spec.ts:212:7 › Calories — boundary inputs › goal UI enforces minimum; screen has no bogus numeric text (6.5s)
+  ✓  12 [chromium] › e2e\boundary.spec.ts:224:7 › Workout — boundary inputs › empty routine name is rejected (5.1s)
+  ✘  13 [chromium] › e2e\boundary.spec.ts:231:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash (1.5m)
+(node:122844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:122844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  14 [chromium] › e2e\boundary.spec.ts:249:7 › Workout — boundary inputs › workout tab stays stable after navigation (4.7s)
+  ✓  15 [chromium] › e2e\boundary.spec.ts:261:7 › Pomodoro — boundary inputs › setting focus duration to 1 minute works correctly (4.9s)
+  ✓  16 [chromium] › e2e\boundary.spec.ts:274:7 › Pomodoro — boundary inputs › getNextMode never returns long_break at 0 sessions (4.7s)
+  ✓  17 [chromium] › e2e\boundary.spec.ts:281:7 › Pomodoro — boundary inputs › session counter dots reset after long break cycle (4.7s)
+  ✓  18 [chromium] › e2e\boundary.spec.ts:295:9 › Global — no NaN, undefined, or Error text anywhere › todos tab has no NaN or undefined in rendered text (4.8s)
+  ✓  19 [chromium] › e2e\boundary.spec.ts:295:9 › Global — no NaN, undefined, or Error text anywhere › habits tab has no NaN or undefined in rendered text (4.7s)
+  ✓  20 [chromium] › e2e\boundary.spec.ts:295:9 › Global — no NaN, undefined, or Error text anywhere › pomodoro tab has no NaN or undefined in rendered text (4.7s)
+  ✓  21 [chromium] › e2e\boundary.spec.ts:295:9 › Global — no NaN, undefined, or Error text anywhere › workout tab has no NaN or undefined in rendered text (4.6s)
+  ✓  22 [chromium] › e2e\boundary.spec.ts:295:9 › Global — no NaN, undefined, or Error text anywhere › calories tab has no NaN or undefined in rendered text (6.1s)
+  ✘  23 [chromium] › e2e\calories-day-navigation.spec.ts:48:7 › Calories diary day navigation › prev/next/jump-to-today with per-day totals header (11.0s)
+(node:125572) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125572) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  24 [chromium] › e2e\calories-day-navigation.spec.ts:79:7 › Calories diary day navigation › week strip shows logged-day dots and disables future days (10.2s)
+  ✘  25 [chromium] › e2e\calories-day-navigation.spec.ts:109:7 › Calories diary day navigation › copy-day end-to-end surfaces the structured outcome and repeat behavior (11.4s)
+(node:112660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:112660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  26 [chromium] › e2e\calories-day-navigation.spec.ts:140:7 › Calories diary day navigation › copy modal offers no candidates when no earlier day is logged (10.9s)
+  ✓  27 [chromium] › e2e\calories.spec.ts:17:7 › Calories › shows empty state on first load (6.7s)
+  ✓  28 [chromium] › e2e\calories.spec.ts:21:7 › Calories › does not add entry with empty food name (7.3s)
+  ✓  29 [chromium] › e2e\calories.spec.ts:29:7 › Calories › adds a calorie entry and updates daily total (7.5s)
+  ✓  30 [chromium] › e2e\calories.spec.ts:37:7 › Calories › selects different meal types (7.3s)
+  ✓  31 [chromium] › e2e\calories.spec.ts:45:7 › Calories › entry persists after reload (9.6s)
+  ✓  32 [chromium] › e2e\calories.spec.ts:69:7 › Calories › macro targets modal edits protein/carbs/fats only and re-renders the bars (8.9s)
+  ✓  33 [chromium] › e2e\calories.spec.ts:94:7 › Calories › macro targets modal rejects grams over 999 (7.2s)
+  ✓  34 [chromium] › e2e\calories.spec.ts:101:7 › Calories › goal modal save updates the goal line and progress bar (7.3s)
+  ✘  35 [chromium] › e2e\habits.spec.ts:37:7 › Habits › shows empty state when no habits exist (1.6s)
+(node:15020) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15020) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  36 [chromium] › e2e\habits.spec.ts:44:7 › Habits › does not add habit with empty name (1.6s)
+(node:98732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:98732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  37 [chromium] › e2e\habits.spec.ts:52:7 › Habits › adds a new habit (1.6s)
+(node:114396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:114396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  38 [chromium] › e2e\habits.spec.ts:59:7 › Habits › opens accessible progress insights for the exact habit (1.6s)
+(node:92952) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92952) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  39 [chromium] › e2e\habits.spec.ts:75:7 › Habits › increments habit completion (1.6s)
+(node:58556) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:58556) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  40 [chromium] › e2e\habits.spec.ts:88:7 › Habits › habit persists after reload (1.6s)
+(node:124748) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:124748) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  41 [chromium] › e2e\habits.spec.ts:100:7 › Habits › deletes a habit in edit mode after web confirmation (1.6s)
+(node:90968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  42 [chromium] › e2e\habits.spec.ts:122:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral (1.6s)
+(node:112116) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:112116) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  43 [chromium] › e2e\habits.spec.ts:157:7 › Scheduled habits › schedule edits remain visible after reload (1.7s)
+(node:112052) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:112052) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  44 [chromium] › e2e\habits.spec.ts:188:7 › Scheduled habits › reminder configuration persists and remains schedule-aware after reload (1.6s)
+(node:123424) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:123424) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  45 [chromium] › e2e\habits.spec.ts:216:7 › Scheduled habits › target edits keep a prior completed date complete (1.6s)
+(node:13148) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13148) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  46 [chromium] › e2e\pomodoro.spec.ts:12:7 › Pomodoro › shows idle state on first load (1.6s)
+(node:107636) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:107636) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  47 [chromium] › e2e\pomodoro.spec.ts:17:7 › Pomodoro › shows empty session history on first load (1.6s)
+(node:126348) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:126348) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  48 [chromium] › e2e\pomodoro.spec.ts:22:7 › Pomodoro › starts timer and shows running state (1.6s)
+(node:62132) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62132) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  49 [chromium] › e2e\pomodoro.spec.ts:29:7 › Pomodoro › resets timer (1.6s)
+(node:125288) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125288) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  50 [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope (1.0m)
+(node:124048) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:124048) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  51 [chromium] › e2e\portable-backup.spec.ts:93:7 › Portable data export & import › exports a large-enough representative file from many history rows (5.6s)
+  ✘  52 [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm (1.0m)
+(node:109996) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:109996) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  53 [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged (1.0m)
+(node:125296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  54 [chromium] › e2e\portable-backup.spec.ts:189:7 › Portable data export & import › rejects invalid JSON with a readable error (6.6s)
+  ✘  55 [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device (1.0m)
+(node:119056) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:119056) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  56 [chromium] › e2e\todos.spec.ts:13:7 › Todos › shows empty state when no todos exist (4.4s)
+  ✘  57 [chromium] › e2e\todos.spec.ts:17:7 › Todos › does not add todo with empty title (1.0m)
+(node:92800) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92800) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  58 [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo (1.0m)
+(node:123528) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:123528) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  59 [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo (1.0m)
+(node:115276) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:115276) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  60 [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo (1.0m)
+(node:76648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  61 [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload (1.0m)
+(node:104012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:104012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  62 [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo (1.0m)
+(node:96904) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96904) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  63 [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message (1.0m)
+(node:114080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:114080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  64 [chromium] › e2e\workout.spec.ts:14:7 › Workout › shows empty state when no routines exist (1.6s)
+(node:53052) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:53052) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  65 [chromium] › e2e\workout.spec.ts:19:7 › Workout › does not add routine with empty name (1.6s)
+(node:108732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:108732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  66 [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine (1.6s)
+(node:100268) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:100268) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  67 [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout (1.7s)
+(node:110644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:110644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  68 [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload (1.6s)
+(node:125704) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125704) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  69 [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation (1.7s)
+(node:104388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:104388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  70 [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record (1.6s)
+(node:116684) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:116684) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  71 [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions (1.6s)
+
+
+  1) [chromium] › e2e\boundary.spec.ts:25:7 › Todos — boundary inputs › empty title is rejected — task is not created 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    93 × waiting for element to be visible, enabled and stable[22m
+    [2m       - element is not enabled[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /** FAB opens new todo — no visible "Make a Task" copy; use accessible name. */
+      16 | export async function openNewTodoModal(page: Page) {
+    > 17 |   await page.getByRole('button', { name: 'Add task' }).first().click();
+         |                                                                ^
+      18 | }
+      19 |
+      20 | /**
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:27:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--22fd5-ected-—-task-is-not-created-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--22fd5-ected-—-task-is-not-created-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--22fd5-ected-—-task-is-not-created-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--22fd5-ected-—-task-is-not-created-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    106 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /** FAB opens new todo — no visible "Make a Task" copy; use accessible name. */
+      16 | export async function openNewTodoModal(page: Page) {
+    > 17 |   await page.getByRole('button', { name: 'Add task' }).first().click();
+         |                                                                ^
+      18 | }
+      19 |
+      20 | /**
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:38:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain 
+
+    [31mTest timeout of 120000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 120000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    221 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /** FAB opens new todo — no visible "Make a Task" copy; use accessible name. */
+      16 | export async function openNewTodoModal(page: Page) {
+    > 17 |   await page.getByRole('button', { name: 'Add task' }).first().click();
+         |                                                                ^
+      18 | }
+      19 |
+      20 | /**
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:47:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list 
+
+    [31mTest timeout of 120000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 120000ms exceeded.
+    Call log:
+    [2m  - waiting for getByText('Add task', { exact: true }).locator('..')[22m
+
+
+       at helpers\navigation.ts:27
+
+      25 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      26 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 27 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                   ^
+      28 |   if (options?.waitForClose) {
+      29 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      30 |   }
+        at submitTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:27:67)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:90:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › e2e\boundary.spec.ts:112:7 › Habits — boundary inputs › habit with target_per_day = 1 shows correct progress 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+      34 |   await page.goto('/', { waitUntil: 'domcontentloaded' });
+    > 35 |   await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+         |                                                                          ^
+      36 |   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
+      37 |   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
+      38 |   // hydration sets DOM values that React immediately overrides with controlled state.
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:113:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-b7c7e-ay-1-shows-correct-progress-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-b7c7e-ay-1-shows-correct-progress-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-b7c7e-ay-1-shows-correct-progress-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-b7c7e-ay-1-shows-correct-progress-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e\boundary.spec.ts:134:7 › Habits — boundary inputs › creating 10 habits across groups renders all groups 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+      34 |   await page.goto('/', { waitUntil: 'domcontentloaded' });
+    > 35 |   await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+         |                                                                          ^
+      36 |   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
+      37 |   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
+      38 |   // hydration sets DOM values that React immediately overrides with controlled state.
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:136:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-8e19e-s-groups-renders-all-groups-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-8e19e-s-groups-renders-all-groups-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-8e19e-s-groups-renders-all-groups-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-8e19e-s-groups-renders-all-groups-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › e2e\boundary.spec.ts:160:7 › Habits — boundary inputs › overview grid renders with no habits (empty state) 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+      34 |   await page.goto('/', { waitUntil: 'domcontentloaded' });
+    > 35 |   await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+         |                                                                          ^
+      36 |   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
+      37 |   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
+      38 |   // hydration sets DOM values that React immediately overrides with controlled state.
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:161:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-25dd2-with-no-habits-empty-state--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-25dd2-with-no-habits-empty-state--chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-25dd2-with-no-habits-empty-state--chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Habits-—-boundary-25dd2-with-no-habits-empty-state--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [chromium] › e2e\boundary.spec.ts:231:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash 
+
+    [31mTest timeout of 90000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+    [2m  - waiting for getByText('Big Routine')[22m
+
+
+      234 |     await fillRoutineName(page, 'Big Routine');
+      235 |     await page.getByText('Add routine', { exact: true }).click();
+    > 236 |     await page.getByText('Big Routine').click();
+          |                                         ^
+      237 |
+      238 |     for (let i = 1; i <= 10; i++) {
+      239 |       await page.getByPlaceholder(/e\.g\./).fill(`Exercise ${i}`);
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:236:41
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [chromium] › e2e\calories-day-navigation.spec.ts:48:7 › Calories diary day navigation › prev/next/jump-to-today with per-day totals header 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Yesterday oats')
+    Expected: visible
+    Error: strict mode violation: getByText('Yesterday oats') resolved to 2 elements:
+        1) <div dir="auto" class="css-146c3p1 text-sm font-medium">Yesterday oats</div> aka getByRole('button', { name: 'Log Yesterday oats, logged 1' })
+        2) <div dir="auto" class="css-146c3p1 text-sm font-semibold">Yesterday oats</div> aka getByText('Yesterday oats').nth(1)
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Yesterday oats')[22m
+
+
+      61 |     await expect(page.getByText('Yesterday', { exact: true }).first()).toBeVisible();
+      62 |     await expect(page.getByText(/300 kcal · P 10g · C 50g · F 6g/)).toBeVisible();
+    > 63 |     await expect(page.getByText('Yesterday oats')).toBeVisible();
+         |                                                    ^
+      64 |     await expect(next).toBeEnabled();
+      65 |
+      66 |     // Forward again lands back on today's (empty) log.
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\calories-day-navigation.spec.ts:63:52
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-e2d76--with-per-day-totals-header-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-e2d76--with-per-day-totals-header-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-e2d76--with-per-day-totals-header-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-e2d76--with-per-day-totals-header-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [chromium] › e2e\calories-day-navigation.spec.ts:109:7 › Calories diary day navigation › copy-day end-to-end surfaces the structured outcome and repeat behavior 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Copy source oats')
+    Expected: visible
+    Error: strict mode violation: getByText('Copy source oats') resolved to 2 elements:
+        1) <div dir="auto" class="css-146c3p1 text-sm font-medium">Copy source oats</div> aka getByRole('button', { name: 'Log Copy source oats, logged' })
+        2) <div dir="auto" class="css-146c3p1 text-sm font-semibold">Copy source oats</div> aka getByText('Copy source oats').nth(1)
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Copy source oats')[22m
+
+
+      126 |       timeout: 15_000,
+      127 |     });
+    > 128 |     await expect(page.getByText('Copy source oats')).toBeVisible();
+          |                                                      ^
+      129 |
+      130 |     // Repeated invocation duplicates by design — the status reports THIS
+      131 |     // invocation's copied count (1), while the list now holds both copies.
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\calories-day-navigation.spec.ts:128:54
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-6d54f-outcome-and-repeat-behavior-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-6d54f-outcome-and-repeat-behavior-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-6d54f-outcome-and-repeat-behavior-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\calories-day-navigation-Ca-6d54f-outcome-and-repeat-behavior-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  11) [chromium] › e2e\habits.spec.ts:37:7 › Habits › shows empty state when no habits exist ───────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-shows-empty-state-when-no-habits-exist-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-shows-empty-state-when-no-habits-exist-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-shows-empty-state-when-no-habits-exist-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-shows-empty-state-when-no-habits-exist-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  12) [chromium] › e2e\habits.spec.ts:44:7 › Habits › does not add habit with empty name ───────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-does-not-add-habit-with-empty-name-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-does-not-add-habit-with-empty-name-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-does-not-add-habit-with-empty-name-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-does-not-add-habit-with-empty-name-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  13) [chromium] › e2e\habits.spec.ts:52:7 › Habits › adds a new habit ─────────────────────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-adds-a-new-habit-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-adds-a-new-habit-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-adds-a-new-habit-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-adds-a-new-habit-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  14) [chromium] › e2e\habits.spec.ts:59:7 › Habits › opens accessible progress insights for the exact habit 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-opens-access-bf04b-nsights-for-the-exact-habit-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-opens-access-bf04b-nsights-for-the-exact-habit-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-opens-access-bf04b-nsights-for-the-exact-habit-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-opens-access-bf04b-nsights-for-the-exact-habit-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  15) [chromium] › e2e\habits.spec.ts:75:7 › Habits › increments habit completion ──────────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-increments-habit-completion-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-increments-habit-completion-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-increments-habit-completion-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-increments-habit-completion-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  16) [chromium] › e2e\habits.spec.ts:88:7 › Habits › habit persists after reload ──────────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-habit-persists-after-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-habit-persists-after-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-habit-persists-after-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-habit-persists-after-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  17) [chromium] › e2e\habits.spec.ts:100:7 › Habits › deletes a habit in edit mode after web confirmation 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:31:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-deletes-a-ha-1c53e-mode-after-web-confirmation-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Habits-deletes-a-ha-1c53e-mode-after-web-confirmation-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Habits-deletes-a-ha-1c53e-mode-after-web-confirmation-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Habits-deletes-a-ha-1c53e-mode-after-web-confirmation-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  18) [chromium] › e2e\habits.spec.ts:122:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:116:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  19) [chromium] › e2e\habits.spec.ts:157:7 › Scheduled habits › schedule edits remain visible after reload 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:116:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-sc-19dfd-remain-visible-after-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-sc-19dfd-remain-visible-after-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-sc-19dfd-remain-visible-after-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-sc-19dfd-remain-visible-after-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20) [chromium] › e2e\habits.spec.ts:188:7 › Scheduled habits › reminder configuration persists and remains schedule-aware after reload 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:116:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-re-681ba-schedule-aware-after-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-re-681ba-schedule-aware-after-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-re-681ba-schedule-aware-after-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-re-681ba-schedule-aware-after-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  21) [chromium] › e2e\habits.spec.ts:216:7 › Scheduled habits › target edits keep a prior completed date complete 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Habits', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByText('Habits')
+        2) <button tabindex="0" role="button" type="button" aria-label="Habits" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByText('Habits')
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Habits', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:116:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-ta-6392d-ior-completed-date-complete-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-ta-6392d-ior-completed-date-complete-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-ta-6392d-ior-completed-date-complete-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-ta-6392d-ior-completed-date-complete-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  22) [chromium] › e2e\pomodoro.spec.ts:12:7 › Pomodoro › shows idle state on first load ───────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Focus', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Focus' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Focus' }).nth(4)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Focus', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\pomodoro.spec.ts:7:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-idle-state-on-first-load-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-idle-state-on-first-load-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-idle-state-on-first-load-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-idle-state-on-first-load-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  23) [chromium] › e2e\pomodoro.spec.ts:17:7 › Pomodoro › shows empty session history on first load 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Focus', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Focus' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Focus' }).nth(4)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Focus', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\pomodoro.spec.ts:7:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-empty-session-history-on-first-load-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-empty-session-history-on-first-load-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-empty-session-history-on-first-load-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-shows-empty-session-history-on-first-load-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  24) [chromium] › e2e\pomodoro.spec.ts:22:7 › Pomodoro › starts timer and shows running state ─────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Focus', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Focus' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Focus' }).nth(4)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Focus', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\pomodoro.spec.ts:7:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-starts-timer-and-shows-running-state-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-starts-timer-and-shows-running-state-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-starts-timer-and-shows-running-state-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-starts-timer-and-shows-running-state-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  25) [chromium] › e2e\pomodoro.spec.ts:29:7 › Pomodoro › resets timer ─────────────────────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Focus', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Focus' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Focus" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Focus' }).nth(4)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Focus', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      34 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 35 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                          ^
+      36 |   if (options?.waitForClose) {
+      37 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      38 |   }
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\pomodoro.spec.ts:7:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-resets-timer-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-resets-timer-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-resets-timer-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\pomodoro-Pomodoro-resets-timer-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  26) [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    110 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:33:25)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:70:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  27) [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    110 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:33:25)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:119:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  28) [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    110 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:33:25)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:164:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  29) [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    107 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:33:25)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:201:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  30) [chromium] › e2e\todos.spec.ts:17:7 › Todos › does not add todo with empty title ─────────────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    107 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:18:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-does-not-add-todo-with-empty-title-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-does-not-add-todo-with-empty-title-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-does-not-add-todo-with-empty-title-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-does-not-add-todo-with-empty-title-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  31) [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo ────────────────────────────────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    108 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:24:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  32) [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo ───────────────────────────────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    108 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:31:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  33) [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo ─────────────────────────────────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    107 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit button shares the "Add task" label but is disabled
+         |                                                                ^
+      18 |  * while its input is empty, so select the enabled instance (the FAB).
+      19 |  */
+      20 | export async function openNewTodoModal(page: Page) {
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:48:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  34) [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload ────────────────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    108 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit shares the "Add task" label but is disabled while
+         |                                                                ^
+      18 |  * its input is empty, and react-native-web does not expose aria-disabled for
+      19 |  * it, so select by position: the FAB renders after all Screen content.
+      20 |  */
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:63:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  35) [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    108 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit shares the "Add task" label but is disabled while
+         |                                                                ^
+      18 |  * its input is empty, and react-native-web does not expose aria-disabled for
+      19 |  * it, so select by position: the FAB renders after all Screen content.
+      20 |  */
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:76:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  36) [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Add task' }).first()[22m
+    [2m    - locator resolved to <button disabled role="button" tabindex="-1" type="button" aria-disabled="true" aria-label="Add task" class="css-g5y9jx r-12vffkv h-12 w-12 items-center justify-center rounded-2xl">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not enabled[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    108 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is not enabled[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at helpers\navigation.ts:17
+
+      15 | /**
+      16 |  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+    > 17 |  * The quick-capture submit shares the "Add task" label but is disabled while
+         |                                                                ^
+      18 |  * its input is empty, and react-native-web does not expose aria-disabled for
+      19 |  * it, so select by position: the FAB renders after all Screen content.
+      20 |  */
+        at openNewTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:17:64)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:121:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  37) [chromium] › e2e\workout.spec.ts:14:7 › Workout › shows empty state when no routines exist ───
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-shows-empty-state-when-no-routines-exist-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-shows-empty-state-when-no-routines-exist-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-shows-empty-state-when-no-routines-exist-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-shows-empty-state-when-no-routines-exist-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  38) [chromium] › e2e\workout.spec.ts:19:7 › Workout › does not add routine with empty name ───────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-does-not-add-routine-with-empty-name-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-does-not-add-routine-with-empty-name-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-does-not-add-routine-with-empty-name-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-does-not-add-routine-with-empty-name-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  39) [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine ─────────────────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  40) [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout ────────────────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  41) [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload ──────────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  42) [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  43) [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  44) [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Workout', exact: true }) resolved to 2 elements:
+        1) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73">…</button> aka getByRole('button', { name: 'Workout' }).first()
+        2) <button tabindex="0" role="button" type="button" aria-label="Workout" class="css-g5y9jx r-1loqt21 r-1otgn73 min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 active:opacity-80">…</button> aka getByRole('button', { name: 'Workout' }).nth(3)
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Workout', exact: true })[22m
+
+
+       at helpers\navigation.ts:35
+
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+    > 35 |   }
+         |    ^
+      36 | }
+      37 |
+      38 | export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
+        at goToTab (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:35:74)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  44 failed
+    [chromium] › e2e\boundary.spec.ts:25:7 › Todos — boundary inputs › empty title is rejected — task is not created 
+    [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break 
+    [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain 
+    [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list 
+    [chromium] › e2e\boundary.spec.ts:112:7 › Habits — boundary inputs › habit with target_per_day = 1 shows correct progress 
+    [chromium] › e2e\boundary.spec.ts:134:7 › Habits — boundary inputs › creating 10 habits across groups renders all groups 
+    [chromium] › e2e\boundary.spec.ts:160:7 › Habits — boundary inputs › overview grid renders with no habits (empty state) 
+    [chromium] › e2e\boundary.spec.ts:231:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash 
+    [chromium] › e2e\calories-day-navigation.spec.ts:48:7 › Calories diary day navigation › prev/next/jump-to-today with per-day totals header 
+    [chromium] › e2e\calories-day-navigation.spec.ts:109:7 › Calories diary day navigation › copy-day end-to-end surfaces the structured outcome and repeat behavior 
+    [chromium] › e2e\habits.spec.ts:37:7 › Habits › shows empty state when no habits exist ─────────
+    [chromium] › e2e\habits.spec.ts:44:7 › Habits › does not add habit with empty name ─────────────
+    [chromium] › e2e\habits.spec.ts:52:7 › Habits › adds a new habit ───────────────────────────────
+    [chromium] › e2e\habits.spec.ts:59:7 › Habits › opens accessible progress insights for the exact habit 
+    [chromium] › e2e\habits.spec.ts:75:7 › Habits › increments habit completion ────────────────────
+    [chromium] › e2e\habits.spec.ts:88:7 › Habits › habit persists after reload ────────────────────
+    [chromium] › e2e\habits.spec.ts:100:7 › Habits › deletes a habit in edit mode after web confirmation 
+    [chromium] › e2e\habits.spec.ts:122:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral 
+    [chromium] › e2e\habits.spec.ts:157:7 › Scheduled habits › schedule edits remain visible after reload 
+    [chromium] › e2e\habits.spec.ts:188:7 › Scheduled habits › reminder configuration persists and remains schedule-aware after reload 
+    [chromium] › e2e\habits.spec.ts:216:7 › Scheduled habits › target edits keep a prior completed date complete 
+    [chromium] › e2e\pomodoro.spec.ts:12:7 › Pomodoro › shows idle state on first load ─────────────
+    [chromium] › e2e\pomodoro.spec.ts:17:7 › Pomodoro › shows empty session history on first load ──
+    [chromium] › e2e\pomodoro.spec.ts:22:7 › Pomodoro › starts timer and shows running state ───────
+    [chromium] › e2e\pomodoro.spec.ts:29:7 › Pomodoro › resets timer ───────────────────────────────
+    [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope 
+    [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm 
+    [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged 
+    [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device 
+    [chromium] › e2e\todos.spec.ts:17:7 › Todos › does not add todo with empty title ───────────────
+    [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo ──────────────────────────────────
+    [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo ─────────────────────────────────
+    [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo ───────────────────────────────────
+    [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload ──────────────────
+    [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo 
+    [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message 
+    [chromium] › e2e\workout.spec.ts:14:7 › Workout › shows empty state when no routines exist ─────
+    [chromium] › e2e\workout.spec.ts:19:7 › Workout › does not add routine with empty name ─────────
+    [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine ───────────────────────────
+    [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout ──────────────────────────
+    [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload ────────────────
+    [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation 
+    [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record 
+    [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions 
+  27 passed (24.0m)

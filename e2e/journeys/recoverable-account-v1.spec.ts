@@ -325,7 +325,7 @@ defineJourney({
 
         // First synced write on the fresh anonymous install.
         await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
-        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByRole('button', { name: 'Add task' }).last().click();
         await page.getByPlaceholder(/Add a task/i).fill('First synced todo');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });
@@ -372,7 +372,7 @@ defineJourney({
 
         // The user keeps using the app while the OTP is pending.
         await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
-        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByRole('button', { name: 'Add task' }).last().click();
         await page.getByPlaceholder(/Add a task/i).fill('Todo while code pending');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });

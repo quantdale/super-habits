@@ -12,27 +12,45 @@ export const TAB_LABELS = {
 /**
  * Click a top-tab button to switch sections in the single-page layout.
  */
-/** FAB opens new todo — no visible "Make a Task" copy; use accessible name. */
+/**
+ * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
+ * The quick-capture submit shares the "Add task" label but is disabled while
+ * its input is empty, and react-native-web does not expose aria-disabled for
+ * it, so select by position: the FAB renders after all Screen content.
+ */
 export async function openNewTodoModal(page: Page) {
-  await page.getByRole('button', { name: 'Add task' }).first().click();
+  await page.getByRole('button', { name: 'Add task' }).last().click();
 }
 
 /**
- * Primary action in the new-todo modal. The FAB has no visible "Add task" text (icon + a11y label only),
- * so `getByText("Add task")` resolves to the modal button. Force avoids pointer interception on long lists.
+ * Primary action in the new-todo modal. Scope to the open dialog: the
+ * quick-capture input's placeholder ("Quick add a task...") also matches a
+ * bare /Add a task/i lookup, so fills must target the modal exactly.
  */
 export async function submitTodoModal(page: Page, options?: { waitForClose?: boolean }) {
-  const titleInput = page.getByPlaceholder(/Add a task/i);
+  const dialog = page.getByRole('dialog');
+  const titleInput = dialog.getByPlaceholder('Add a task...', { exact: true });
   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
-  await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+  await dialog.getByText('Add task', { exact: true }).locator('..').click({ force: true });
   if (options?.waitForClose) {
     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
   }
 }
 
+/** The open new/edit-todo dialog, for specs that fill modal fields directly. */
+export async function openTodoDialog(page: Page) {
+  return page.getByRole('dialog');
+}
+
 export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+  // Scope to the tab rail landmark: the first-run onboarding card on Overview
+  // exposes interest chips whose labels can equal a tab label (Habits, Focus,
+  // Workout), so an unscoped lookup strict-matches two buttons.
+  await page
+    .getByRole('tablist', { name: 'Section tabs' })
+    .getByRole('button', { name: TAB_LABELS[tab], exact: true })
+    .click();
   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
   // hydration sets DOM values that React immediately overrides with controlled state.

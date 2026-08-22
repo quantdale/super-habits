@@ -64,7 +64,7 @@ export async function fillCaloriesMacros(
  */
 export async function fillRoutineName(page: Page, name: string) {
   const input = inputAfterLabel(page, 'Routine name');
-  await input.click();
-  await input.fill('');
-  await input.type(name, { delay: 15 });
+  // fill() commits the value in ONE input event; char-by-char type() drops
+  // characters on the heavier redesigned screen (controlled-input race).
+  await input.fill(name);
 }

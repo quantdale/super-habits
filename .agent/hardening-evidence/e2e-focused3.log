@@ -1,0 +1,144 @@
+
+Running 55 tests using 1 worker
+
+(node:115732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:115732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e\boundary.spec.ts:25:7 › Todos — boundary inputs › empty title is rejected — task is not created (5.8s)
+  ✓   2 [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break (6.2s)
+  ✓   3 [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain (9.5s)
+  ✘   4 [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list (23.0s)
+(node:53224) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:53224) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 [chromium] › e2e\boundary.spec.ts:112:7 › Habits — boundary inputs › habit with target_per_day = 1 shows correct progress (7.0s)
+  ✓   6 [chromium] › e2e\boundary.spec.ts:134:7 › Habits — boundary inputs › creating 10 habits across groups renders all groups (12.6s)
+  ✓   7 [chromium] › e2e\boundary.spec.ts:157:7 › Habits — boundary inputs › overview grid renders with no habits (empty state) (5.7s)
+  ✓   8 [chromium] › e2e\boundary.spec.ts:170:7 › Calories — boundary inputs › empty food name is rejected (6.8s)
+  ✓   9 [chromium] › e2e\boundary.spec.ts:180:7 › Calories — boundary inputs › very large calorie value does not break chart (7.1s)
+  ✓  10 [chromium] › e2e\boundary.spec.ts:193:7 › Calories — boundary inputs › logging 20 entries in one day totals correctly (19.4s)
+  ✓  11 [chromium] › e2e\boundary.spec.ts:209:7 › Calories — boundary inputs › goal UI enforces minimum; screen has no bogus numeric text (6.6s)
+  ✓  12 [chromium] › e2e\boundary.spec.ts:221:7 › Workout — boundary inputs › empty routine name is rejected (5.2s)
+  ✓  13 [chromium] › e2e\boundary.spec.ts:228:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash (7.8s)
+  ✓  14 [chromium] › e2e\boundary.spec.ts:246:7 › Workout — boundary inputs › workout tab stays stable after navigation (4.9s)
+  ✓  15 [chromium] › e2e\boundary.spec.ts:258:7 › Pomodoro — boundary inputs › setting focus duration to 1 minute works correctly (5.7s)
+  ✓  16 [chromium] › e2e\boundary.spec.ts:271:7 › Pomodoro — boundary inputs › getNextMode never returns long_break at 0 sessions (5.0s)
+  ✓  17 [chromium] › e2e\boundary.spec.ts:278:7 › Pomodoro — boundary inputs › session counter dots reset after long break cycle (5.0s)
+  ✓  18 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › todos tab has no NaN or undefined in rendered text (5.0s)
+  ✓  19 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › habits tab has no NaN or undefined in rendered text (5.4s)
+  ✓  20 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › pomodoro tab has no NaN or undefined in rendered text (4.9s)
+  ✓  21 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › workout tab has no NaN or undefined in rendered text (5.2s)
+  ✓  22 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › calories tab has no NaN or undefined in rendered text (6.5s)
+  ✓  23 [chromium] › e2e\habits.spec.ts:34:7 › Habits › shows empty state when no habits exist (4.7s)
+  ✓  24 [chromium] › e2e\habits.spec.ts:41:7 › Habits › does not add habit with empty name (5.1s)
+  ✓  25 [chromium] › e2e\habits.spec.ts:49:7 › Habits › adds a new habit (5.5s)
+  ✓  26 [chromium] › e2e\habits.spec.ts:56:7 › Habits › opens accessible progress insights for the exact habit (5.3s)
+  ✓  27 [chromium] › e2e\habits.spec.ts:72:7 › Habits › increments habit completion (5.1s)
+  ✓  28 [chromium] › e2e\habits.spec.ts:85:7 › Habits › habit persists after reload (5.6s)
+  ✓  29 [chromium] › e2e\habits.spec.ts:97:7 › Habits › deletes a habit in edit mode after web confirmation (5.4s)
+  ✓  30 [chromium] › e2e\habits.spec.ts:119:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral (6.3s)
+  ✓  31 [chromium] › e2e\habits.spec.ts:154:7 › Scheduled habits › schedule edits remain visible after reload (6.2s)
+  ✓  32 [chromium] › e2e\habits.spec.ts:185:7 › Scheduled habits › reminder configuration persists and remains schedule-aware after reload (6.2s)
+  ✓  33 [chromium] › e2e\habits.spec.ts:213:7 › Scheduled habits › target edits keep a prior completed date complete (6.5s)
+  ✓  34 [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope (6.0s)
+  ✓  35 [chromium] › e2e\portable-backup.spec.ts:93:7 › Portable data export & import › exports a large-enough representative file from many history rows (6.2s)
+  ✓  36 [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm (14.3s)
+  ✓  37 [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged (9.2s)
+  ✓  38 [chromium] › e2e\portable-backup.spec.ts:189:7 › Portable data export & import › rejects invalid JSON with a readable error (6.9s)
+  ✓  39 [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device (5.3s)
+  ✓  40 [chromium] › e2e\todos.spec.ts:13:7 › Todos › shows empty state when no todos exist (4.4s)
+  ✓  41 [chromium] › e2e\todos.spec.ts:17:7 › Todos › does not add todo with empty title (4.8s)
+  ✓  42 [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo (5.1s)
+  ✘  43 [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo (5.5s)
+(node:100468) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:100468) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  44 [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo (6.2s)
+  ✓  45 [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload (5.6s)
+  ✓  46 [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo (7.2s)
+  ✓  47 [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message (4.5s)
+  ✓  48 [chromium] › e2e\workout.spec.ts:14:7 › Workout › shows empty state when no routines exist (4.6s)
+  ✓  49 [chromium] › e2e\workout.spec.ts:19:7 › Workout › does not add routine with empty name (4.6s)
+  ✓  50 [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine (4.6s)
+  ✓  51 [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout (4.7s)
+  ✓  52 [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload (5.3s)
+  ✓  53 [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation (5.7s)
+  ✓  54 [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record (15.5s)
+  ✓  55 [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions (5.9s)
+
+
+  1) [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list 
+
+    TimeoutError: locator.waitFor: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i) to be visible[22m
+
+
+      85 |         );
+      86 |         await retryOpen.click({ force: true });
+    > 87 |         await titleInput.waitFor({ state: 'visible', timeout: 15_000 });
+         |                          ^
+      88 |       }
+      89 |       await titleInput.fill(`Task ${i}`);
+      90 |       await submitTodoModal(page, { waitForClose: true });
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:87:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo ────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveAttribute[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: getByRole('checkbox', { name: 'Mark incomplete: Read a book' })
+    Expected: [32m"true"[39m
+    Error: strict mode violation: getByRole('checkbox', { name: 'Mark incomplete: Read a book' }) resolved to 2 elements:
+        1) <div tabindex="0" role="checkbox" aria-checked="true" class="css-g5y9jx r-1loqt21 r-1otgn73" aria-label="Mark incomplete: Read a book">…</div> aka locator('[id="3"]').getByRole('checkbox', { name: 'Mark incomplete: Read a book' })
+        2) <div tabindex="0" role="checkbox" aria-checked="true" class="css-g5y9jx r-1loqt21 r-1otgn73" aria-label="Mark incomplete: Read a book">…</div> aka getByRole('checkbox', { name: 'Mark incomplete: Read a book' }).nth(1)
+
+    Call log:
+    [2m  - Expect "toHaveAttribute" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('checkbox', { name: 'Mark incomplete: Read a book' })[22m
+
+
+      41 |     await expect(
+      42 |       page.getByRole('checkbox', { name: 'Mark incomplete: Read a book' }),
+    > 43 |     ).toHaveAttribute('aria-checked', 'true');
+         |       ^
+      44 |     await expect(page.getByText('Read a book')).toBeVisible();
+      45 |   });
+      46 |
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:43:7
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list 
+    [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo ─────────────────────────────────
+  53 passed (6.4m)

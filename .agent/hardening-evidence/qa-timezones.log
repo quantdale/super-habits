@@ -1,0 +1,106 @@
+
+> superhabits@1.0.0 qa:timezones
+> node scripts/qa-timezones.mjs
+
+
+[timezone] Asia/Manila
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ ✓ |unit| tests/time.test.ts (5 tests) 14ms
+ ✓ |unit| tests/habitReminders.domain.test.ts (30 tests) 34ms
+ ✓ |integration| tests/integration/dateKeys.test.ts (8 tests) 1310ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  524ms
+   ✓ local date-key writes and reads > habit completions keep an explicit local date key and read back by it  447ms
+
+ Test Files  3 passed (3)
+      Tests  43 passed (43)
+   Start at  12:31:34
+   Duration  3.23s (transform 793ms, setup 225ms, collect 852ms, tests 1.36s, environment 1ms, prepare 2.37s)
+
+
+[timezone] UTC
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ ✓ |unit| tests/time.test.ts (5 tests) 9ms
+ ✓ |unit| tests/habitReminders.domain.test.ts (30 tests) 32ms
+ ✓ |integration| tests/integration/dateKeys.test.ts (8 tests) 1052ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  357ms
+   ✓ local date-key writes and reads > habit completions keep an explicit local date key and read back by it  405ms
+
+ Test Files  3 passed (3)
+      Tests  43 passed (43)
+   Start at  04:31:38
+   Duration  1.80s (transform 610ms, setup 113ms, collect 264ms, tests 1.09s, environment 1ms, prepare 506ms)
+
+
+[timezone] America/New_York
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ ✓ |unit| tests/time.test.ts (5 tests) 13ms
+ ✓ |unit| tests/habitReminders.domain.test.ts (30 tests) 42ms
+ ✓ |integration| tests/integration/dateKeys.test.ts (8 tests) 2029ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  350ms
+   ✓ local date-key writes and reads > habit completions keep an explicit local date key and read back by it  1131ms
+
+ Test Files  3 passed (3)
+      Tests  43 passed (43)
+   Start at  00:31:43
+   Duration  2.84s (transform 1.30s, setup 142ms, collect 379ms, tests 2.08s, environment 1ms, prepare 565ms)
+
+
+[timezone] Pacific/Honolulu
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ ✓ |unit| tests/time.test.ts (5 tests) 15ms
+ ✓ |unit| tests/habitReminders.domain.test.ts (30 tests) 61ms
+ ✓ |integration| tests/integration/dateKeys.test.ts (8 tests) 2012ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  641ms
+   ✓ local date-key writes and reads > habit completions keep an explicit local date key and read back by it  835ms
+
+ Test Files  3 passed (3)
+      Tests  43 passed (43)
+   Start at  18:31:51
+   Duration  3.66s (transform 1.70s, setup 446ms, collect 609ms, tests 2.09s, environment 1ms, prepare 855ms)
+
+
+[timezone] Pacific/Kiritimati
+
+> superhabits@1.0.0 test
+> vitest run tests/time.test.ts tests/integration/dateKeys.test.ts tests/habitReminders.domain.test.ts
+
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ ✓ |unit| tests/time.test.ts (5 tests) 12ms
+ ✓ |unit| tests/habitReminders.domain.test.ts (30 tests) 36ms
+ ✓ |integration| tests/integration/dateKeys.test.ts (8 tests) 1229ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  390ms
+   ✓ local date-key writes and reads > habit completions keep an explicit local date key and read back by it  442ms
+
+ Test Files  3 passed (3)
+      Tests  43 passed (43)
+   Start at  18:31:56
+   Duration  1.99s (transform 711ms, setup 168ms, collect 282ms, tests 1.28s, environment 1ms, prepare 602ms)
+
+
+Timezone matrix passed: Asia/Manila, UTC, America/New_York, Pacific/Honolulu, Pacific/Kiritimati

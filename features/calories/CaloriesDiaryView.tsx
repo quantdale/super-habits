@@ -409,7 +409,7 @@ export function CaloriesDiaryView({
         onManualAdd={onManualAdd}
       />
 
-      <ScreenSection>
+      <ScreenSection accessibilityLabel="Daily log">
         <View className="mb-3">
           <DiaryDayNavigator
             selectedDateKey={selectedDateKey}

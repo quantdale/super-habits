@@ -46,7 +46,7 @@ export function TodoQuickCapture({ onSubmit }: Props) {
         }}
         value={title}
         onChangeText={setTitle}
-        placeholder="Quick add a task..."
+        placeholder="Quick add"
         placeholderTextColor={tokens.textMuted}
         returnKeyType="done"
         onSubmitEditing={() => void handleSubmit()}

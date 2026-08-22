@@ -56,11 +56,13 @@ test.describe('Calories diary day navigation', () => {
     await expect(next).toBeDisabled();
     await expect(jumpToday).toBeDisabled();
 
-    // Past day shows the navigator header totals and its entries.
+    // Past day shows the navigator header totals and its entries. Scope to
+    // the daily-log region: the same food name also renders as a Frequent
+    // re-log chip outside it.
     await prev.click();
     await expect(page.getByText('Yesterday', { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/300 kcal · P 10g · C 50g · F 6g/)).toBeVisible();
-    await expect(page.getByText('Yesterday oats')).toBeVisible();
+    await expect(page.getByLabel('Daily log').getByText('Yesterday oats')).toBeVisible();
     await expect(next).toBeEnabled();
 
     // Forward again lands back on today's (empty) log.
@@ -121,11 +123,12 @@ test.describe('Calories diary day navigation', () => {
     // Candidate rows are filtered to earlier logged days only.
     await page.getByRole('button', { name: /into Yesterday$/ }).click();
 
-    // Structured outcome surfaced as inline status text; copied entry appears.
+    // Structured outcome surfaced as inline status text; copied entry appears
+    // in the Daily log region (the name also renders as a Frequent chip).
     await expect(page.getByLabel('Copy day status')).toContainText(/Copied 1 entry into/, {
       timeout: 15_000,
     });
-    await expect(page.getByText('Copy source oats')).toBeVisible();
+    await expect(page.getByLabel('Daily log').getByText('Copy source oats')).toBeVisible();
 
     // Repeated invocation duplicates by design — the status reports THIS
     // invocation's copied count (1), while the list now holds both copies.
@@ -134,7 +137,7 @@ test.describe('Calories diary day navigation', () => {
     await expect(page.getByLabel('Copy day status')).toContainText(/Copied 1 entry into/, {
       timeout: 15_000,
     });
-    await expect(page.getByText('Copy source oats')).toHaveCount(2);
+    await expect(page.getByLabel('Daily log').getByText('Copy source oats')).toHaveCount(2);
   });
 
   test('copy modal offers no candidates when no earlier day is logged', async ({ page }) => {

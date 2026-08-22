@@ -1,0 +1,158 @@
+
+> superhabits@1.0.0 e2e:sync
+> cross-env E2E_BASE_URL=http://localhost:8082 E2E_DIST_DIR=dist-sync playwright test --project=journeys-sync
+
+
+Running 46 tests using 1 worker
+
+(node:97552) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:97552) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 1. reset, install a blocking 503, and create a todo + habit through the UI (outbox enqueues both) @p5 @sync (3.9s)
+  ✓   2 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 2. 503: flush fails, both records requeue, Settings shows the Failing state @p5 @sync (6.8s)
+  ✓   3 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 3. malformed: 200 + invalid JSON is treated as a failure and requeues @p5 @sync (5.1s)
+  ✓   4 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 4. timeout: a stalled request is treated as a failure and requeues @p5 @sync (8.6s)
+  ✓   5 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 5. partial failure: only the failed entity requeues, the successful one is dropped @p5 @sync (4.8s)
+  ✓   6 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 6. backoff: interval flush respects nextRetryAt, reconnect bypasses it, success clears the state @p5 @sync (50.9s)
+  ✓   7 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 1. reset and install the deterministic Ask boundary @ask-v2 @sync (2.4s)
+  ✓   8 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 2. answers pending Todo questions from bounded facts @ask-v2 @sync (930ms)
+  ✓   9 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 3. answers calorie summary questions from bounded facts @ask-v2 @sync (862ms)
+  ✓  10 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 4. answers Habit progress questions with insight-shaped facts @ask-v2 @sync (861ms)
+  ✓  11 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 5. answers Workout summary questions from bounded logs @ask-v2 @sync (893ms)
+  ✓  12 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 6. answers Focus summary questions from bounded history @ask-v2 @sync (771ms)
+  ✓  13 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 7. answers a cross-feature daily overview from normalized facts @ask-v2 @sync (889ms)
+  ✓  14 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 1. restore is blocked when the manifest lacks settings integrity metadata @sync (5.5s)
+  ✓  15 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 2. restore is blocked when the settings row is missing @sync (3.7s)
+  ✓  16 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 3. restore is blocked when the settings checksum mismatches @sync (3.5s)
+  ✓  17 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 4. restore succeeds when the settings row verifies against the manifest @sync (5.4s)
+  ✓  18 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (complete backup) — restore a COMPLETE V2 backup onto a pristine device and verify semantic equivalence, no side-effect replay, and continued sync › P6 — Jordan, the New Device Migrator (complete backup) — 1. empty device detects the V2 restore boundary @p6 @sync (3.5s)
+  ✓  19 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (complete backup) — restore a COMPLETE V2 backup onto a pristine device and verify semantic equivalence, no side-effect replay, and continued sync › P6 — Jordan, the New Device Migrator (complete backup) — 2. accept the restore and verify full semantic equivalence @p6 @sync (1.5s)
+  ✓  20 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (complete backup) — restore a COMPLETE V2 backup onto a pristine device and verify semantic equivalence, no side-effect replay, and continued sync › P6 — Jordan, the New Device Migrator (complete backup) — 3. new activity syncs normally and the restored rule fires exactly once @p6 @sync (33.9s)
+  ✓  21 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 1. reset to an empty device and detect whether this build has a remote restore boundary @p6 @sync (4.2s)
+  ✓  22 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 2. dismiss the restore prompt ("Not now") @p6 @sync (73ms)
+  ✓  23 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 3. reload: the dismissed prompt does not reappear, restore stays available in Settings @p6 @sync (2.4s)
+  ✓  24 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 4. add a todo → restore is now blocked (device non-empty) @p6 @sync (4.2s)
+  ✘  25 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync (17.6s)
+  -  26 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 6. what did NOT come back: no completions, saved meals, pomodoro sessions or workout logs; streaks read 0 @p6 @sync
+  -  27 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 7. CG-2: a device holding only soft-deleted rows is not empty (decided contract) @p6 @sync
+(node:51660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:51660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  28 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Portable owner recovery (matching account) — import an owner-backed file on a fresh device and bind it by authenticating the matching account › A — Portable owner recovery (matching account) — 1. protect the source owner and export an owner-backed portable file @portable-owner @sync (5.1s)
+  ✓  29 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Portable owner recovery (matching account) — import an owner-backed file on a fresh device and bind it by authenticating the matching account › A — Portable owner recovery (matching account) — 2. import on a fresh device, then bind the matching protected account @portable-owner @sync (5.4s)
+  ✓  30 [journeys-sync] › e2e\helpers\journey.ts:138:11 › B — Portable owner recovery (wrong account) — prove a nonmatching account cannot claim an imported owner-backed dataset › B — Portable owner recovery (wrong account) — 1. protect the source owner and export an owner-backed portable file @portable-owner @sync (6.2s)
+  ✓  31 [journeys-sync] › e2e\helpers\journey.ts:138:11 › B — Portable owner recovery (wrong account) — prove a nonmatching account cannot claim an imported owner-backed dataset › B — Portable owner recovery (wrong account) — 2. a wrong account is signed out and cannot claim the imported dataset @portable-owner @sync (8.1s)
+  ✓  32 [journeys-sync] › e2e\helpers\journey.ts:138:11 › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — prove A export → T import → T weekly_reviews footprint → matching A recovery is production-blocked with imported dataset intact › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — 1. export owner-backed file for A @portable-owner @sync (6.0s)
+  ✓  33 [journeys-sync] › e2e\helpers\journey.ts:138:11 › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — prove A export → T import → T weekly_reviews footprint → matching A recovery is production-blocked with imported dataset intact › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — 2. T imports A and acquires remote weekly_reviews state; matching A recovery is blocked by production safety @portable-owner @sync (11.1s)
+  ✓  34 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 1. protect the anonymous backup with email @account-v1 @sync (6.6s)
+  ✘  35 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync (15.2s)
+  -  36 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 3. session loss pauses remote backup but permits owner recovery @account-v1 @sync
+  -  37 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 4. a different authenticated owner is blocked without local reassignment @account-v1 @sync
+  -  38 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 5. first synced activity is durably owned by the anonymous account @account-v1 @sync
+  -  39 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 6. protection succeeds while the user keeps writing and sync keeps flushing @account-v1 @sync
+  -  40 [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 7. a populated device cannot switch to a different account after local-only activity @account-v1 @sync
+(node:126312) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:126312) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  41 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 1. reset the device, boot the app, and assert the outbox starts empty @p5 @sync (5.4s)
+  ✓  42 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 2. online baseline: create a todo (Commute ride) @p5 @sync (464ms)
+  ✓  43 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 3. go offline and create/edit/delete across todos, habits and calories @p5 @sync (4.7s)
+  ✓  44 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 4. offline: outbox grew to one record per (entity, id) and persisted durably @p5 @sync (1.2s)
+  ✓  45 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 5. full reload: durable sync_outbox survived (hydrate restored it) @p5 @sync (5.3s)
+  ✓  46 [journeys-sync] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 6. reconnect: each outbox record is pushed exactly once @p5 @sync (1.3s)
+
+
+  1) [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeHidden[2m([22m[2m)[22m failed
+
+    Locator:  getByText('A remote backup is available and this device is still empty for user data.')
+    Expected: hidden
+    Received: visible
+    Timeout:  15000ms
+
+    Call log:
+    [2m  - Expect "toBeHidden" with timeout 15000ms[22m
+    [2m  - waiting for getByText('A remote backup is available and this device is still empty for user data.')[22m
+    [2m    18 × locator resolved to <div dir="auto" class="css-146c3p1 r-8akbws r-krxsd3 r-dnmrzs r-1qsk4np r-1udbk01 mt-0.5 text-sm">A remote backup is available and this device is s…</div>[22m
+    [2m       - unexpected value "visible"[22m
+
+
+       at journeys\new-phone.spec.ts:424
+
+      422 |         await page.getByRole('button', { name: 'Restore backup', exact: true }).first().click();
+      423 |         // On success the prompt closes (resolveRestorePromptOutcome dismisses).
+    > 424 |         await expect(page.getByText(PROMPT_SUBTITLE)).toBeHidden({ timeout: 15_000 });
+          |                                                       ^
+      425 |
+      426 |         // Row-level: exactly the backed-up rows were imported.
+      427 |         await expectRows(
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\new-phone.spec.ts:424:55)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\new-phone-P6-—-Jordan-the--80c17-erify-imported-rows-p6-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Restore is only available on an empty device')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for getByText('Restore is only available on an empty device')[22m
+
+
+       at journeys\recoverable-account-v1.spec.ts:272
+
+      270 |         await expect(
+      271 |           page.getByText('Restore is only available on an empty device', { exact: false }),
+    > 272 |         ).toBeVisible();
+          |           ^
+      273 |       },
+      274 |     },
+      275 |     {
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\recoverable-account-v1.spec.ts:272:11)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\recoverable-account-v1-A-—-ce1a1-ore-V1-data-account-v1-sync-journeys-sync\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [journeys-sync] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync 
+    [journeys-sync] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync 
+  7 did not run
+  37 passed (4.5m)

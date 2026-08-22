@@ -1,0 +1,63 @@
+
+Running 7 tests using 1 worker
+
+(node:116532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:116532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 1. Seed HEAVY and verify volumes @p2 (5.1s)
+  ✓  2 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 2. COLD START ≤ 5s: Overview interactive and populated at HEAVY, aggregates match the rows @p2 (867ms)
+  ✓  3 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 3. Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches) @p2 (5.6s)
+  ✓  4 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 4. Todos: 200+ rows rendered, list scrolls to the end, Show/Hide-completed filter @p2 (2.5s)
+  ✘  5 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 5. Habits: 364-day heatmap renders exactly 52 weeks (boundary), consistency matches Overview @p2 (2.3s)
+  -  6 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 6. Calories diary: meal groups, expand/collapse, persistence, filter-input response ≤ 500ms @p2
+  -  7 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 7. Row-level oracles: only the documented todo expansion was written; the walk changed nothing else @p2
+
+
+  1) [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 5. Habits: 364-day heatmap renders exactly 52 weeks (boundary), consistency matches Overview @p2 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Consistency', { exact: true })
+    Expected: visible
+    Error: strict mode violation: getByText('Consistency', { exact: true }) resolved to 2 elements:
+        1) <div dir="auto" class="css-146c3p1 mt-0.5 text-xs uppercase tracking-[0.6px]">Consistency</div> aka getByText('Consistency').nth(1)
+        2) <div dir="auto" class="css-146c3p1 text-base font-semibold">Consistency</div> aka getByText('Consistency').nth(2)
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for getByText('Consistency', { exact: true })[22m
+
+
+       at journeys\three-months-in.spec.ts:334
+
+      332 |           page.getByText(`${counts![1]} of ${counts![2]} scheduled`, { exact: true }).first(),
+      333 |         ).toBeVisible();
+    > 334 |         await expect(page.getByText('Consistency', { exact: true })).toBeVisible();
+          |                                                                      ^
+      335 |       },
+      336 |     },
+      337 |     {
+        at Object.run (C:\Users\Michael Roy\Documents\super-habits\e2e\journeys\three-months-in.spec.ts:334:70)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\journey.ts:158:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-3f4c6-istency-matches-Overview-p2-journeys\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-3f4c6-istency-matches-Overview-p2-journeys\error-context.md
+
+    Error Context: .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-3f4c6-istency-matches-Overview-p2-journeys\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-3f4c6-istency-matches-Overview-p2-journeys\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\three-months-in-P2-—-Tom-t-3f4c6-istency-matches-Overview-p2-journeys\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 5. Habits: 364-day heatmap renders exactly 52 weeks (boundary), consistency matches Overview @p2 
+  2 did not run
+  4 passed (19.6s)

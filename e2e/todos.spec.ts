@@ -38,10 +38,12 @@ test.describe('Todos', () => {
     const showCompleted = page.getByRole('button', { name: 'Show completed tasks' });
     await expect(showCompleted).toBeVisible();
     await showCompleted.click();
+    // The completed row can mount in more than one surface container once
+    // completed tasks are shown; assert the first instance's state.
     await expect(
-      page.getByRole('checkbox', { name: 'Mark incomplete: Read a book' }),
+      page.getByRole('checkbox', { name: 'Mark incomplete: Read a book' }).first(),
     ).toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByText('Read a book')).toBeVisible();
+    await expect(page.getByText('Read a book').first()).toBeVisible();
   });
 
   test('deletes a todo', async ({ page }) => {

@@ -108,11 +108,12 @@ async function swipeLeftOnRowRect(page: Page, rowRect: RowRect): Promise<void> {
   await page.waitForTimeout(500);
 }
 
-/** DraggableFlatList + ScaleDecorator may render a duplicate row node; prefer index 1 when two exist. */
+/** DraggableFlatList + ScaleDecorator may render duplicate row nodes, and the
+ * redesigned completion settle leaves a just-completed pending copy that
+ * detaches moments later. Anchor to the LAST visible match: locator resolution
+ * re-evaluates per action, so it always binds to the surviving row. */
 async function rowTitleAnchor(page: Page, rowText: string) {
-  const matches = page.getByText(rowText, { exact: true });
-  const count = await matches.count();
-  return count >= 2 ? matches.nth(1) : matches.first();
+  return page.getByText(rowText, { exact: true }).filter({ visible: true }).last();
 }
 
 /**

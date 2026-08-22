@@ -184,7 +184,7 @@ defineJourney({
       name: 'online baseline: create a todo (Commute ride)',
       run: async ({ page }) => {
         await switchSection(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByRole('button', { name: 'Add task' }).last().click();
         await page.getByPlaceholder(/Add a task/i).fill('Commute ride');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Commute ride').first()).toBeVisible();
@@ -197,7 +197,7 @@ defineJourney({
 
         // todos: create then complete (update) — must dedupe to one record.
         await switchSection(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).first().click();
+        await page.getByRole('button', { name: 'Add task' }).last().click();
         await page.getByPlaceholder(/Add a task/i).fill('Draft reply');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Draft reply').first()).toBeVisible();
@@ -218,9 +218,7 @@ defineJourney({
         await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
         await page
           .getByLabel('Habit groups')
-          .getByText('Add', { exact: true })
-          .first()
-          .locator('xpath=preceding-sibling::*[1]')
+          .getByLabel('Add anytime habit')
           .click({ force: true });
         await page.getByLabel('Habit name').fill('Stretch');
         await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });

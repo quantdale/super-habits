@@ -1,0 +1,159 @@
+
+ RUN  v3.2.7 C:/Users/Michael Roy/Documents/super-habits
+
+ DEPRECATED  'basic' reporter is deprecated and will be removed in Vitest v3.
+Remove 'basic' from 'reporters' option. To match 'basic' reporter 100%, use configuration:
+{
+  "test": {
+    "reporters": [
+      [
+        "default",
+        {
+          "summary": false
+        }
+      ]
+    ]
+  }
+}
+ ✓ |integration| tests/integration/backupRestore.test.ts (19 tests) 19019ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on a settings fetch error ({data: null, error: {...}}) and leaves the device untouched  2843ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks when the settings row is missing despite the manifest  1020ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on a malformed settings payload  1223ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on a settings checksum mismatch  1348ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks on an unsupported settings version  1306ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > blocks a v2 manifest that does not certify settings integrity  1166ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > never issues a network call inside the import transaction (guarded full restore)  1043ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > reports BACKUP INVALID when the remote manifest lacks settings integrity metadata  650ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > reports V2 COMPLETE with the certified settings integrity for a valid manifest  709ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > recognizes a known historical scope-3 backup (pre-planning) as complete V2, not invalid  782ms
+   ✓ backup completeness v2 restore — settings integrity (closure) > keeps a durable pending theme marker when AsyncStorage fails after commit, and retries on restart  850ms
+   ✓ backup completeness v2 restore > restores the complete scope semantically and without side effects  936ms
+   ✓ backup completeness v2 restore > blocks on checksum mismatch and leaves the device untouched  876ms
+   ✓ backup completeness v2 restore > blocks on malformed rows  692ms
+   ✓ backup completeness v2 restore > blocks when local content appears after the preview (complete emptiness)  606ms
+   ✓ backup completeness v2 restore > blocks with a clear failure when the remote fetch fails mid-way  774ms
+   ✓ backup completeness v2 restore > imports the full scope-5 planning scope with truthful counts and resolvable references  1034ms
+   ✓ backup completeness v2 restore > rolls back weekly_reviews (and everything else) when a post-import write fails  956ms
+ ❯ |integration| tests/integration/fixtures.test.ts (4 tests | 2 failed) 3144ms
+   ✓ tests/integration/fixtures > SMALL seeds a realistic single day through the real data layers  799ms
+   × tests/integration/fixtures > TYPICAL spans thirty days of consistent use 736ms
+     → expected 4 to be greater than or equal to 30
+   × tests/integration/fixtures > HEAVY spans three months at volume 1410ms
+     → expected 15 to be greater than or equal to 1000
+   ✓ tests/integration/fixtures > date keys are local-calendar and consistent with the injected clock 196ms
+ ❯ |integration| tests/integration/planningRollups.test.ts (9 tests | 1 failed) 2759ms
+   ✓ project rollups (F8 / task 11.1) > getProjectRollup aggregates linked todos, goals, and habit completions  403ms
+   ✓ project rollups (F8 / task 11.1) > listProjectRollups covers every project without N+1 and skips unlinked rows 239ms
+   × goal rollups (F8 / task 11.1) > getGoalRollup bounds habit completions by the horizon window 341ms
+     → expected +0 to be 2 // Object.is equality
+   ✓ goal rollups (F8 / task 11.1) > listHabitsForGoal returns only non-deleted linked habits 265ms
+   ✓ F1 — planning mutations enqueue owner-scoped outbox records > project create/update/reorder/delete each land outbox rows; delete also enqueues cleared children 286ms
+   ✓ F1 — planning mutations enqueue owner-scoped outbox records > goal create/update/delete enqueue; delete reconciles children into the outbox 291ms
+   ✓ F1 — planning mutations enqueue owner-scoped outbox records > daily plan upsert/complete/delete enqueue create/update/delete 253ms
+   ✓ F6/F7 — daily-plan transactional writes > completed_at is set on entering completed and cleared on leaving (stable fact) 300ms
+   ✓ F6/F7 — daily-plan transactional writes > carryForwardFromPreviousDay merges inside the write transaction and is idempotent  376ms
+ ❯ |integration| tests/integration/dateKeys.test.ts (8 tests | 2 failed) 2729ms
+   ✓ timezone enforcement > the real toDateKey honours the Manila offset set at the top of this file 9ms
+   ✓ local date-key writes and reads > a calorie entry written on a local key is only visible under that key  854ms
+   × local date-key writes and reads > habit completions keep an explicit local date key and read back by it 755ms
+     → expected +0 to be 1 // Object.is equality
+   ✓ getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout_logs) > converts a local date-key range into the correct half-open UTC interval under Manila 2ms
+   ✓ getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout_logs) > pomodoro range queries include rows at the inclusive start and exclude the exclusive end 184ms
+   ✓ getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout_logs) > workout-log range queries respect the same half-open interval 254ms
+   × mixed corpus containing pre-cutover UTC date keys > rows written before the migration-5 cutover keep their UTC-era keys, unbackfilled 504ms
+     → expected [] to deeply equal [ '2026-06-29', '2026-07-01' ]
+   ✓ mixed corpus containing pre-cutover UTC date keys > a pre-cutover pomodoro session is found by its local day because started_at is a true UTC timestamp 161ms
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |integration| tests/integration/dateKeys.test.ts > local date-key writes and reads > habit completions keep an explicit local date key and read back by it
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/dateKeys.test.ts:83:69
+     81|     await habits.incrementHabit(habitId, '2026-07-02');
+     82| 
+     83|     expect(await habits.getHabitCountByDate(habitId, '2026-07-01')).to…
+       |                                                                     ^
+     84|     expect(await habits.getHabitCountByDate(habitId, '2026-07-02')).to…
+     85|     expect(await habits.getHabitCountByDate(habitId, '2026-07-03')).to…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  |integration| tests/integration/dateKeys.test.ts > mixed corpus containing pre-cutover UTC date keys > rows written before the migration-5 cutover keep their UTC-era keys, unbackfilled
+AssertionError: expected [] to deeply equal [ '2026-06-29', '2026-07-01' ]
+
+- Expected
++ Received
+
+- [
+-   "2026-06-29",
+-   "2026-07-01",
+- ]
++ []
+
+ ❯ tests/integration/dateKeys.test.ts:226:44
+    224|     // string order — the app reads pre-cutover rows as-is.
+    225|     const history = await habits.getCompletionHistory(habitId, 60);
+    226|     expect(history.map((h) => h.date_key)).toEqual(['2026-06-29', '202…
+       |                                            ^
+    227| 
+    228|     // A summary spanning both eras shows both groups under their STOR…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  |integration| tests/integration/fixtures.test.ts > tests/integration/fixtures > TYPICAL spans thirty days of consistent use
+AssertionError: expected 4 to be greater than or equal to 30
+ ❯ tests/integration/fixtures.test.ts:46:76
+     44|   it('TYPICAL spans thirty days of consistent use', async () => {
+     45|     const db = await seedTypical();
+     46|     expect(await count(db, 'SELECT COUNT(*) AS n FROM habit_completion…
+       |                                                                            ^
+     47|       30,
+     48|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  |integration| tests/integration/fixtures.test.ts > tests/integration/fixtures > HEAVY spans three months at volume
+AssertionError: expected 15 to be greater than or equal to 1000
+ ❯ tests/integration/fixtures.test.ts:67:76
+     65|       await count(db, 'SELECT COUNT(*) AS n FROM todos WHERE deleted_a…
+     66|     ).toBeGreaterThanOrEqual(150);
+     67|     expect(await count(db, 'SELECT COUNT(*) AS n FROM habit_completion…
+       |                                                                            ^
+     68|       1000,
+     69|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  |integration| tests/integration/planningRollups.test.ts > goal rollups (F8 / task 11.1) > getGoalRollup bounds habit completions by the horizon window
+AssertionError: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ tests/integration/planningRollups.test.ts:121:51
+    119|     expect(yearRollup.todos.total).toBe(0);
+    120|     expect(yearRollup.habits.windowDays).toBe(365);
+    121|     expect(yearRollup.habits.completionsInWindow).toBe(2);
+       |                                                   ^
+    122|     expect(yearRollup.habits.habitCount).toBe(1);
+    123|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  3 failed | 1 passed (4)
+      Tests  5 failed | 35 passed (40)
+   Start at  07:31:13
+   Duration  38.37s (transform 2.62s, setup 234ms, collect 1.50s, tests 27.65s, environment 1ms, prepare 2.14s)
+

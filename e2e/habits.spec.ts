@@ -4,17 +4,14 @@ import { clearDatabase } from './helpers/db';
 import { advanceToNextDay, installClock } from './helpers/clock';
 import { expectRows } from './helpers/oracles';
 
-/** Opens add-habit modal via the first time-group + (scoped to Habit groups a11y region). */
+/** Opens add-habit modal via the first group's add tile (a11y label contract). */
 async function openAddHabitModal(page: Page) {
   await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
-  // Click the first group's Add tile instead of class-based wrappers.
+  // The redesigned group tile exposes `Add {group} habit` as its accessible
+  // name (no visible 'Add' text since the Warm Momentum redesign).
   for (let attempt = 0; attempt < 3; attempt++) {
-    const firstAddTile = page
-      .getByLabel('Habit groups')
-      .getByText('Add', { exact: true })
-      .first()
-      .locator('xpath=preceding-sibling::*[1]');
+    const firstAddTile = page.getByLabel('Habit groups').getByLabel('Add anytime habit');
     await firstAddTile.click({ force: true });
     try {
       await nameField.waitFor({ state: 'visible', timeout: 8_000 });

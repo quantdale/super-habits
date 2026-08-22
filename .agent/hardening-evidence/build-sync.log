@@ -1,0 +1,93 @@
+
+> superhabits@1.0.0 build:sync
+> node scripts/build-dist-sync.mjs
+
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Static rendering is enabled. Learn more: https://docs.expo.dev/router/web/static-rendering/
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:128544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web node_modules\expo-router\entry.js ▓▓▓░░░░░░░░░░░░░ 21.3% ( 7/16)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (29/44)
+Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 28.0% ( 17/105)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (48/77)
+Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 28.0% ( 93/252)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% ( 60/205)
+Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 28.0% (112/262)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (117/309)
+Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 28.7% (197/368)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (194/405)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 31.4% (250/446)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (252/516)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 34.1% (280/480)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (308/756)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 48.0% (401/677)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (421/849)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 48.0% (435/844)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% (433/874)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 48.0% (450/857)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% ( 624/1029)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 48.0% (450/857)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓░░░░░░░░░░ 43.4% ( 746/1137)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 48.0% (624/964)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 49.4% ( 855/1216)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 51.5% ( 819/1152)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 49.4% ( 855/1216)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 53.0% ( 853/1172)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 57.8% (1001/1330)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 53.0% ( 853/1172)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 62.8% (1147/1447)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.6% (1123/1368)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.2% (1214/1481)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.7% (1174/1396)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.7% (1363/1577)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.0% (1254/1460)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.5% (1466/1634)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 78.2% (1378/1558)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 85.3% (1540/1667)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 78.2% (1378/1558)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 86.2% (1591/1714)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.6% (1514/1676)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 88.5% (1636/1742)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 92.0% (1683/1755)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 93.8% (1729/1785)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.0% (1778/1835)
+λ node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 95.9% (1827/1866)
+λ Bundled 106604ms node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1893 modules)
+[expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect.
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1880/1880)
+Web Bundled 108381ms node_modules\expo-router\entry.js (1880 modules)
+
+› web bundles (4):
+_expo/static/css/web-4863a23082c754f9c7bc8118e1588a15.css (18KB)
+_expo/static/js/web/entry-1c80dcfc4ae6fe7c1067be8912be4247.js (4.5MB)
+_expo/static/js/web/todoNotificationActions-d52f7c0334057917731b9a171394ae69.js (2.8KB)
+_expo/static/js/web/worker-a092a54381483e0461f10bbafeb5f398.js (139KB)
+
+› Static routes (3):
+/ (index) (18KB)
+/_sitemap (18KB)
+/+not-found (18KB)
+
+Exported: dist-sync
+dist-sync/ carries the dummy Supabase env (https://dummy.supabase.co; non-routable host, no real credentials in any build).

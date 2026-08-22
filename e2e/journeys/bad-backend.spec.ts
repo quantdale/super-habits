@@ -93,7 +93,7 @@ async function readSyncStatus(page: Page): Promise<Record<string, unknown> | nul
 async function addTodoViaUi(page: Page, title: string): Promise<void> {
   await ensureAppContext(page);
   await switchSection(page, 'todos');
-  await page.getByRole('button', { name: 'Add task' }).first().click();
+  await page.getByRole('button', { name: 'Add task' }).last().click();
   await page.getByPlaceholder(/Add a task/i).fill(title);
   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
   await expect(page.getByText(title).first()).toBeVisible();
@@ -104,12 +104,7 @@ async function addHabitViaUi(page: Page, name: string): Promise<void> {
   await switchSection(page, 'habits');
   await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
-  const addTile = page
-    .getByLabel('Habit groups')
-    .getByText('Add', { exact: true })
-    .first()
-    .locator('xpath=preceding-sibling::*[1]');
-  await addTile.click({ force: true });
+  await page.getByLabel('Habit groups').getByLabel('Add anytime habit').click({ force: true });
   await nameField.waitFor({ state: 'visible', timeout: 8_000 });
   await nameField.fill(name);
   await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });

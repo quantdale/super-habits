@@ -85,12 +85,7 @@ async function rapidPress(locator: Locator, times: number): Promise<void> {
 async function createHabitViaUi(page: Page, name: string): Promise<void> {
   await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
-  const addTile = page
-    .getByLabel('Habit groups')
-    .getByText('Add', { exact: true })
-    .first()
-    .locator('xpath=preceding-sibling::*[1]');
-  await addTile.click({ force: true });
+  await page.getByLabel('Habit groups').getByLabel('Add anytime habit').click({ force: true });
   await nameField.waitFor({ state: 'visible', timeout: 8_000 });
   await nameField.fill(name);
   await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });

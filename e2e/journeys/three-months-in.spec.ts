@@ -323,14 +323,15 @@ defineJourney({
 
         // Cross-surface: the Habits screen's Today stat must agree with the
         // Overview habits card captured earlier (same completed/scheduled
-        // counts), and the year Consistency stat must still render.
+        // counts), and the year Consistency stat must still render. The count
+        // renders in the ring caption AND the Today stat detail; assert either.
         const overviewLine = storeOf<string>('overviewHabitsLine');
         const counts = /(\d+) of (\d+) complete/.exec(overviewLine);
         expect(counts, `overview habits line: "${overviewLine}"`).not.toBeNull();
         await expect(
-          page.getByText(`${counts![1]} of ${counts![2]} scheduled`, { exact: true }),
+          page.getByText(`${counts![1]} of ${counts![2]} scheduled`, { exact: true }).first(),
         ).toBeVisible();
-        await expect(page.getByText('Consistency', { exact: true })).toBeVisible();
+        await expect(page.getByText('Consistency', { exact: true }).first()).toBeVisible();
       },
     },
     {
@@ -521,7 +522,7 @@ const TAB_LABELS_NAMES: Record<SectionName, string> = {
 
 /** Unique, always-rendered content marker per section (used for switch completion). */
 const SECTION_MARKERS: Record<SectionName, string> = {
-  overview: 'Your day at a glance across plans, habits, focus, and health.',
+  overview: 'Customize',
   todos: 'Offline-first task manager.',
   habits: "Today's rhythm",
   pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',

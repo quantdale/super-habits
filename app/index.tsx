@@ -247,6 +247,8 @@ export default function Index() {
       style={{ backgroundColor: tokens.background, paddingTop: safeAreaTop }}
     >
       <View
+        accessibilityLabel="Section tabs"
+        accessibilityRole="tablist"
         style={{
           flexDirection: 'row',
           width: '100%',

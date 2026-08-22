@@ -1,0 +1,278 @@
+
+> superhabits@1.0.0 e2e
+> playwright test --project=chromium --project=journeys --project=simulation --project=pwa
+
+
+Running 226 tests using 1 worker
+
+(node:125688) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125688) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓    1 [chromium] › e2e\boundary.spec.ts:25:7 › Todos — boundary inputs › empty title is rejected — task is not created (9.4s)
+  ✓    2 [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break (12.3s)
+  ✓    3 [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain (19.3s)
+  ✓    4 [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list (51.5s)
+  ✓    5 [chromium] › e2e\boundary.spec.ts:112:7 › Habits — boundary inputs › habit with target_per_day = 1 shows correct progress (12.1s)
+  ✓    6 [chromium] › e2e\boundary.spec.ts:134:7 › Habits — boundary inputs › creating 10 habits across groups renders all groups (23.2s)
+  ✓    7 [chromium] › e2e\boundary.spec.ts:157:7 › Habits — boundary inputs › overview grid renders with no habits (empty state) (14.0s)
+  ✓    8 [chromium] › e2e\boundary.spec.ts:170:7 › Calories — boundary inputs › empty food name is rejected (17.6s)
+  ✓    9 [chromium] › e2e\boundary.spec.ts:180:7 › Calories — boundary inputs › very large calorie value does not break chart (21.1s)
+  ✓   10 [chromium] › e2e\boundary.spec.ts:193:7 › Calories — boundary inputs › logging 20 entries in one day totals correctly (50.9s)
+  ✓   11 [chromium] › e2e\boundary.spec.ts:209:7 › Calories — boundary inputs › goal UI enforces minimum; screen has no bogus numeric text (16.9s)
+  ✓   12 [chromium] › e2e\boundary.spec.ts:221:7 › Workout — boundary inputs › empty routine name is rejected (14.7s)
+  ✓   13 [chromium] › e2e\boundary.spec.ts:228:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash (23.7s)
+  ✓   14 [chromium] › e2e\boundary.spec.ts:246:7 › Workout — boundary inputs › workout tab stays stable after navigation (11.0s)
+  ✓   15 [chromium] › e2e\boundary.spec.ts:258:7 › Pomodoro — boundary inputs › setting focus duration to 1 minute works correctly (13.7s)
+  ✓   16 [chromium] › e2e\boundary.spec.ts:271:7 › Pomodoro — boundary inputs › getNextMode never returns long_break at 0 sessions (8.2s)
+  ✓   17 [chromium] › e2e\boundary.spec.ts:278:7 › Pomodoro — boundary inputs › session counter dots reset after long break cycle (8.5s)
+  ✓   18 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › todos tab has no NaN or undefined in rendered text (10.2s)
+  ✓   19 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › habits tab has no NaN or undefined in rendered text (10.2s)
+  ✓   20 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › pomodoro tab has no NaN or undefined in rendered text (9.8s)
+  ✓   21 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › workout tab has no NaN or undefined in rendered text (9.4s)
+  ✓   22 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › calories tab has no NaN or undefined in rendered text (6.3s)
+  ✓   23 [chromium] › e2e\calories-day-navigation.spec.ts:48:7 › Calories diary day navigation › prev/next/jump-to-today with per-day totals header (12.7s)
+  ✓   24 [chromium] › e2e\calories-day-navigation.spec.ts:81:7 › Calories diary day navigation › week strip shows logged-day dots and disables future days (18.9s)
+  ✓   25 [chromium] › e2e\calories-day-navigation.spec.ts:111:7 › Calories diary day navigation › copy-day end-to-end surfaces the structured outcome and repeat behavior (25.6s)
+  ✓   26 [chromium] › e2e\calories-day-navigation.spec.ts:143:7 › Calories diary day navigation › copy modal offers no candidates when no earlier day is logged (15.6s)
+  ✓   27 [chromium] › e2e\calories.spec.ts:17:7 › Calories › shows empty state on first load (7.2s)
+  ✓   28 [chromium] › e2e\calories.spec.ts:21:7 › Calories › does not add entry with empty food name (7.9s)
+  ✓   29 [chromium] › e2e\calories.spec.ts:29:7 › Calories › adds a calorie entry and updates daily total (8.9s)
+  ✓   30 [chromium] › e2e\calories.spec.ts:37:7 › Calories › selects different meal types (7.8s)
+  ✓   31 [chromium] › e2e\calories.spec.ts:45:7 › Calories › entry persists after reload (9.8s)
+  ✓   32 [chromium] › e2e\calories.spec.ts:69:7 › Calories › macro targets modal edits protein/carbs/fats only and re-renders the bars (8.9s)
+  ✓   33 [chromium] › e2e\calories.spec.ts:94:7 › Calories › macro targets modal rejects grams over 999 (11.2s)
+  ✓   34 [chromium] › e2e\calories.spec.ts:101:7 › Calories › goal modal save updates the goal line and progress bar (15.0s)
+  -   35 [chromium] › e2e\command.eval.internal.spec.ts:190:7 › Command evaluation (internal real-parser path) › shows metadata only after internal opt-in is enabled on the device
+  -   36 [chromium] › e2e\command.eval.internal.spec.ts:202:7 › Command evaluation (internal real-parser path) › captures parser matrix quality and semantic draft quality in internal mode
+[command-eval-mock] {
+  "artifactPath": "test-results/command-eval-mock.json",
+  "totalCases": 31,
+  "mismatchCount": 0,
+  "outcomeCounts": {
+    "ready": 11,
+    "needs_input": 4,
+    "unsupported": 16,
+    "unavailable": 0
+  },
+  "parserKindCounts": {
+    "mock_rules": 15,
+    "none": 16
+  },
+  "effectivePathCounts": {
+    "mock": 31
+  },
+  "warningFrequencyCounts": {
+    "todo_time_not_supported": 1,
+    "defaulted_field": 3
+  }
+}
+  ✓   37 [chromium] › e2e\command.eval.mock.spec.ts:360:7 › Command evaluation (mock/default path) › captures parser matrix quality and semantic draft quality in mock mode (41.4s)
+  ✓   38 [chromium] › e2e\command.eval.mock.spec.ts:425:7 › Command evaluation (mock/default path) › keeps todo drafts non-persistent until confirm (9.8s)
+  ✓   39 [chromium] › e2e\command.eval.mock.spec.ts:434:7 › Command evaluation (mock/default path) › keeps habit drafts non-persistent until confirm (12.8s)
+  -   40 [chromium] › e2e\command.observation.internal.spec.ts:56:7 › Command observation (internal real-parser path) › shows internal toggle and only reveals metadata when opted in on the device
+  -   41 [chromium] › e2e\command.observation.internal.spec.ts:76:7 › Command observation (internal real-parser path) › observes representative todo and habit outcomes under internal mode
+  -   42 [chromium] › e2e\command.observation.internal.spec.ts:124:7 › Command observation (internal real-parser path) › preserves parse -> preview -> confirm flow in internal mode
+  -   43 [chromium] › e2e\command.observation.internal.spec.ts:142:7 › Command observation (internal real-parser path) › records fallback metadata when remote parsing is unavailable
+  ✓   44 [chromium] › e2e\command.observation.mock.spec.ts:100:7 › Command observation (mock/default path) › table-driven parser outcomes stay within supported public classes (22.5s)
+  ✓   45 [chromium] › e2e\command.observation.mock.spec.ts:123:7 › Command observation (mock/default path) › keeps confirm-before-write for parsed commands (10.4s)
+  ✓   46 [chromium] › e2e\command.observation.mock.spec.ts:133:7 › Command observation (mock/default path) › confirms and saves one todo and one habit draft (8.2s)
+  ✓   47 [chromium] › e2e\command.observation.mock.spec.ts:149:7 › Command observation (mock/default path) › supports inline correction for a needs_input command before confirm (7.4s)
+  ✓   48 [chromium] › e2e\command.observation.mock.spec.ts:159:7 › Command observation (mock/default path) › stays coherent on public fallback identity (9.2s)
+  ✓   49 [chromium] › e2e\command.spec.ts:64:7 › Command shell › shows the global launcher on main tabs, hides it on settings, and closes the overlay cleanly (16.7s)
+  ✓   50 [chromium] › e2e\command.spec.ts:85:7 › Command shell › hides the launcher during an active pomodoro session and restores it after reset (8.3s)
+  ✓   51 [chromium] › e2e\command.spec.ts:111:7 › Command shell › parses todo, allows inline edits, and saves edited values on confirm (8.4s)
+  ✓   52 [chromium] › e2e\command.spec.ts:127:7 › Command shell › parses habit, allows inline edits, and saves edited values on confirm (5.9s)
+  ✓   53 [chromium] › e2e\command.spec.ts:144:7 › Command shell › keeps no-write-before-confirm behavior (5.2s)
+  ✓   54 [chromium] › e2e\command.spec.ts:153:7 › Command shell › allows inline correction for needs_input commands (4.6s)
+  ✓   55 [chromium] › e2e\command.spec.ts:163:7 › Command shell › keeps parse warnings visible after editing (4.0s)
+  ✓   56 [chromium] › e2e\command.spec.ts:177:7 › Command shell › keeps raw input unchanged while editing and reparse reseeds editable draft (4.4s)
+  ✓   57 [chromium] › e2e\command.spec.ts:201:7 › Command shell › keeps internal parser metadata hidden until internal rollout is enabled on the device (3.9s)
+  -   58 [chromium] › e2e\command.spec.ts:222:7 › Command shell internal rollout › shows internal metadata only when the device-local rollout toggle is enabled and rolls back to mock immediately when disabled
+  ✓   59 [chromium] › e2e\habits.spec.ts:34:7 › Habits › shows empty state when no habits exist (5.1s)
+  ✓   60 [chromium] › e2e\habits.spec.ts:41:7 › Habits › does not add habit with empty name (4.9s)
+  ✓   61 [chromium] › e2e\habits.spec.ts:49:7 › Habits › adds a new habit (6.6s)
+  ✓   62 [chromium] › e2e\habits.spec.ts:56:7 › Habits › opens accessible progress insights for the exact habit (5.4s)
+  ✓   63 [chromium] › e2e\habits.spec.ts:72:7 › Habits › increments habit completion (5.0s)
+  ✓   64 [chromium] › e2e\habits.spec.ts:85:7 › Habits › habit persists after reload (5.5s)
+  ✓   65 [chromium] › e2e\habits.spec.ts:97:7 › Habits › deletes a habit in edit mode after web confirmation (5.5s)
+  ✓   66 [chromium] › e2e\habits.spec.ts:119:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral (8.3s)
+  ✓   67 [chromium] › e2e\habits.spec.ts:154:7 › Scheduled habits › schedule edits remain visible after reload (5.9s)
+  ✓   68 [chromium] › e2e\habits.spec.ts:185:7 › Scheduled habits › reminder configuration persists and remains schedule-aware after reload (5.8s)
+  ✓   69 [chromium] › e2e\habits.spec.ts:213:7 › Scheduled habits › target edits keep a prior completed date complete (6.8s)
+  ✓   70 [chromium] › e2e\infrastructure.spec.ts:16:7 › Infrastructure › crossOriginIsolated is true (542ms)
+  ✓   71 [chromium] › e2e\infrastructure.spec.ts:23:7 › Infrastructure › SharedArrayBuffer is available (496ms)
+  ✓   72 [chromium] › e2e\infrastructure.spec.ts:30:7 › Infrastructure › COEP header is require-corp (852ms)
+  ✓   73 [chromium] › e2e\infrastructure.spec.ts:36:7 › Infrastructure › COOP header is same-origin (781ms)
+  ✓   74 [chromium] › e2e\infrastructure.spec.ts:42:7 › Infrastructure › service worker registers and controls the page (2.2s)
+  ✓   75 [chromium] › e2e\infrastructure.spec.ts:52:7 › Infrastructure › served /sw.js is fresh (matches public/sw.js) (1.2s)
+  ✓   76 [chromium] › e2e\infrastructure.spec.ts:73:7 › Infrastructure › stale v1 cache is not present (1.3s)
+  ✓   77 [chromium] › e2e\infrastructure.spec.ts:80:7 › Infrastructure › SW runtime-caches same-origin assets (dev bypass disabled for E2E) (2.4s)
+  ✓   78 [chromium] › e2e\infrastructure.spec.ts:103:7 › Infrastructure › second tab gets OPFS lock error when first is open (7.4s)
+  ✓   79 [chromium] › e2e\infrastructure.spec.ts:144:7 › Infrastructure › no DB init error on clean load (2.6s)
+  ✓   80 [chromium] › e2e\pomodoro.spec.ts:12:7 › Pomodoro › shows idle state on first load (9.4s)
+  ✓   81 [chromium] › e2e\pomodoro.spec.ts:17:7 › Pomodoro › shows empty session history on first load (9.0s)
+  ✓   82 [chromium] › e2e\pomodoro.spec.ts:22:7 › Pomodoro › starts timer and shows running state (11.0s)
+  ✓   83 [chromium] › e2e\pomodoro.spec.ts:29:7 › Pomodoro › resets timer (7.6s)
+  ✓   84 [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope (8.9s)
+  ✓   85 [chromium] › e2e\portable-backup.spec.ts:93:7 › Portable data export & import › exports a large-enough representative file from many history rows (6.2s)
+  ✓   86 [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm (13.5s)
+  ✓   87 [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged (8.9s)
+  ✓   88 [chromium] › e2e\portable-backup.spec.ts:189:7 › Portable data export & import › rejects invalid JSON with a readable error (7.0s)
+  ✓   89 [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device (5.6s)
+  ✓   90 [chromium] › e2e\settings.spec.ts:20:7 › Settings backup restore › shows the backup restore section on an empty device (3.9s)
+  ✓   91 [chromium] › e2e\settings.spec.ts:43:7 › Settings backup restore › blocks first-phase restore after synced local data exists (5.9s)
+  ✓   92 [chromium] › e2e\theming.spec.ts:30:7 › Theming › defaults to the Light theme in Light mode (4.0s)
+  ✓   93 [chromium] › e2e\theming.spec.ts:42:7 › Theming › selecting a night theme applies it immediately and persists across reload (4.1s)
+  ✓   94 [chromium] › e2e\theming.spec.ts:63:7 › Theming › mode chips show the correct slot theme without losing the other slot (4.4s)
+  ✓   95 [chromium] › e2e\todos.spec.ts:13:7 › Todos › shows empty state when no todos exist (4.4s)
+  ✓   96 [chromium] › e2e\todos.spec.ts:17:7 › Todos › does not add todo with empty title (5.6s)
+  ✓   97 [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo (5.1s)
+  ✓   98 [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo (5.6s)
+  ✓   99 [chromium] › e2e\todos.spec.ts:49:7 › Todos › deletes a todo (7.2s)
+  ✓  100 [chromium] › e2e\todos.spec.ts:64:7 › Todos › todo persists after hard reload (11.6s)
+  ✓  101 [chromium] › e2e\todos.spec.ts:77:7 › Todos › completing a linked source todo completes the target todo (14.0s)
+  ✓  102 [chromium] › e2e\todos.spec.ts:122:7 › Todos › recurring todos show linked-actions disabled message (10.4s)
+  ✓  103 [chromium] › e2e\workout.spec.ts:14:7 › Workout › shows empty state when no routines exist (9.5s)
+  ✓  104 [chromium] › e2e\workout.spec.ts:19:7 › Workout › does not add routine with empty name (13.1s)
+  ✓  105 [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine (10.1s)
+  ✓  106 [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout (11.7s)
+  ✓  107 [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload (14.2s)
+  ✓  108 [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation (14.1s)
+  ✓  109 [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record (21.5s)
+  ✓  110 [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions (8.3s)
+(node:105084) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:105084) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  111 [pwa] › e2e\pwa-update.spec.ts:90:7 › PWA update lifecycle › offline indicator appears when offline and clears when back online (2.4s)
+  ✓  112 [pwa] › e2e\pwa-update.spec.ts:107:7 › PWA update lifecycle › first visit claims control without reloading or showing the banner (3.1s)
+  ✓  113 [pwa] › e2e\pwa-update.spec.ts:120:7 › PWA update lifecycle › apply-update activates with exactly one reload; bystander tabs never reload (15.6s)
+  ✓  114 [pwa] › e2e\pwa-update.spec.ts:157:7 › PWA update lifecycle › dismissed update resurfaces on the next visit (2.4s)
+(node:93540) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:93540) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  115 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 1. Open on Overview: seeded aggregates match the persisted rows @p0 (6.9s)
+  ✓  116 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 2. Tick two habits on Habits; row oracle + negative oracle + Overview unchanged @p0 (7.2s)
+  ✓  117 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 3. Add a todo on Todos; Overview pending count rises (stale-aggregate catch) @p0 (6.7s)
+  ✓  118 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 4. Log breakfast in Calories; Overview daily total reflects it @p0 (10.8s)
+  ✓  119 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 5. Start a 25-minute focus session on Focus; timer is running @p0 (389ms)
+  ✓  120 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 6. Timer survives a detour through Todos; complete a todo mid-focus @p0 (5.5s)
+  ✓  121 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 7. Complete the focus session via the clock; exactly one session is logged @p0 (3.1s)
+  ✓  122 [journeys] › e2e\helpers\journey.ts:138:11 › P1 — Maya, the Daily Driver — One Tuesday from Overview → Habits → Todos → Calories → Pomodoro, with a focus timer surviving every section switch › P1 — Maya, the Daily Driver — 8. Reload: every aggregate survives on its section and rows persist @p0 (4.1s)
+  ✓  123 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 1. reset, install a blocking 503, and create a todo + habit through the UI (outbox enqueues both) @p5 @sync (6.9s)
+  -  124 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 2. 503: flush fails, both records requeue, Settings shows the Failing state @p5 @sync
+  -  125 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 3. malformed: 200 + invalid JSON is treated as a failure and requeues @p5 @sync
+  -  126 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 4. timeout: a stalled request is treated as a failure and requeues @p5 @sync
+  -  127 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 5. partial failure: only the failed entity requeues, the successful one is dropped @p5 @sync
+  -  128 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter — a broken backend: 503, malformed, timeout, partial failure; requeue scope, backoff, Settings failure state › P5 — Alex, the Commuter — 6. backoff: interval flush respects nextRetryAt, reconnect bypasses it, success clears the state @p5 @sync
+  ✓  129 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — habit increment linked action fires once per source completion day › P3 — Priya, the Power User — 1. setup: reset, create target habit, and author the increment rule (7.2s)
+  ✓  130 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — habit increment linked action fires once per source completion day › P3 — Priya, the Power User — 2. complete source: target habit increments exactly once (4.5s)
+  ✓  131 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — habit increment linked action fires once per source completion day › P3 — Priya, the Power User — 3. untick then tick: fresh source identity does not increment again (1.5s)
+  ✓  132 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — one linked action fires exactly once; the execution row exists; re-fire is suppressed; a deleted target skips with target_missing › P3 — Priya, the Power User — 1. setup: reset, boot, create source + target todos, author the linked rule (6.7s)
+  ✓  133 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — one linked action fires exactly once; the execution row exists; re-fire is suppressed; a deleted target skips with target_missing › P3 — Priya, the Power User — 2. complete the source: target completes exactly once, notice appears, execution row exists (4.3s)
+  ✓  134 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — one linked action fires exactly once; the execution row exists; re-fire is suppressed; a deleted target skips with target_missing › P3 — Priya, the Power User — 3. re-fire (untick then tick) does not double-apply the target effect (4.9s)
+  ✓  135 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — one linked action fires exactly once; the execution row exists; re-fire is suppressed; a deleted target skips with target_missing › P3 — Priya, the Power User — 4. deleting the target makes the next re-fire skip with target_missing (6.3s)
+  -  136 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 1. reset and install the deterministic Ask boundary @ask-v2 @sync
+  -  137 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 2. answers pending Todo questions from bounded facts @ask-v2 @sync
+  -  138 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 3. answers calorie summary questions from bounded facts @ask-v2 @sync
+  -  139 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 4. answers Habit progress questions with insight-shaped facts @ask-v2 @sync
+  -  140 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 5. answers Workout summary questions from bounded logs @ask-v2 @sync
+  -  141 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 6. answers Focus summary questions from bounded history @ask-v2 @sync
+  -  142 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Ask V2 deterministic boundary — all bounded Ask intents use local facts and safe phrase input › P6 — Ask V2 deterministic boundary — 7. answers a cross-feature daily overview from normalized facts @ask-v2 @sync
+  ✓  143 [journeys] › e2e\journeys\command-center-v2.spec.ts:47:7 › Command Center V2 journeys › @p0 completes one Todo only after confirmation (8.8s)
+  ✓  144 [journeys] › e2e\journeys\command-center-v2.spec.ts:63:7 › Command Center V2 journeys › @p0 keeps duplicate Todo names ambiguous until a choice is made (7.0s)
+  ✓  145 [journeys] › e2e\journeys\command-center-v2.spec.ts:97:7 › Command Center V2 journeys › @p0 logs Habit progress through the canonical current-day path (7.3s)
+  ✓  146 [journeys] › e2e\journeys\command-center-v2.spec.ts:115:7 › Command Center V2 journeys › @p0 logs supplied calories without estimating nutrition (5.1s)
+  ✓  147 [journeys] › e2e\journeys\command-center-v2.spec.ts:132:7 › Command Center V2 journeys › @p0 asks for missing calories and supports inline correction (5.3s)
+  ✓  148 [journeys] › e2e\journeys\command-center-v2.spec.ts:151:7 › Command Center V2 journeys › @p0 logs an existing Workout routine without inventing exercise details (7.1s)
+  ✓  149 [journeys] › e2e\journeys\command-center-v2.spec.ts:170:7 › Command Center V2 journeys › @p0 starts a focus session through the live timer bridge (3.6s)
+  ✓  150 [journeys] › e2e\journeys\command-center-v2.spec.ts:180:7 › Command Center V2 journeys › @p0 preserves no-write and rejects unsupported destructive actions (4.6s)
+  ✓  151 [journeys] › e2e\journeys\command-center-v2.spec.ts:192:7 › Command Center V2 journeys › @p0 does not duplicate a Todo when Confirm is double-clicked (6.4s)
+  ✓  152 [journeys] › e2e\journeys\command-center-v2.spec.ts:208:7 › Command Center V2 journeys › shows provider-unavailable Ask state without changing local data (3.8s)
+  ✓  153 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 1. reset to a clean device and confirm the empty baseline across all synced + local tables @p4 (2.7s)
+  ✓  154 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 2. empty title is rejected with a message and writes NO row @p4 (2.5s)
+  ✓  155 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 3. over-length title is rejected with a message and writes NO row @p4 (2.6s)
+  ✓  156 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 4. double-increment a habit: ONE completion row, count incremented twice (never two rows) @p4 (2.7s)
+  ✓  157 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 5. cancelling a habit delete leaves the row unchanged (negative oracle) @p4 (2.6s)
+  ✓  158 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 6. delete-the-wrong-item: confirming one delete leaves the neighbour untouched and soft-deletes the target @p4 (3.5s)
+  ✓  159 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 7. stale edit: editing a todo that another write-path changed updates in place, exactly one row (no duplicate) @p4 (4.3s)
+  ✓  160 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 8. reload mid-save: exactly one row or zero, never two; app still usable after reload @p4 (3.9s)
+  ✓  161 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 9. D11: reload mid-timer logs NO pomodoro_sessions row @p4 (5.9s)
+  ✓  162 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 10. D11: an abandoned workout session logs NO workout_logs row @p4 (6.3s)
+  ✓  163 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — fat-fingers: double-submit, double-increment, empty/over-length input, delete-cancel/wrong-item, stale edit, reload mid-save — one row or zero, never two › P4 — Sam, the Error-Prone User — 11. double-submit add-todo lands exactly ONE row (never two) @p4 (2.5s)
+  -  164 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 1. restore is blocked when the manifest lacks settings integrity metadata @sync
+  -  165 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 2. restore is blocked when the settings row is missing @sync
+  -  166 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 3. restore is blocked when the settings checksum mismatches @sync
+  -  167 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (settings integrity) — verify that Restore V2 blocks on any settings integrity failure and leaves the device untouched, then restores completely with valid settings › P6 — Jordan, the New Device Migrator (settings integrity) — 4. restore succeeds when the settings row verifies against the manifest @sync
+  ✓  168 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (complete backup) — restore a COMPLETE V2 backup onto a pristine device and verify semantic equivalence, no side-effect replay, and continued sync › P6 — Jordan, the New Device Migrator (complete backup) — 1. empty device detects the V2 restore boundary @p6 @sync (11.8s)
+  -  169 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (complete backup) — restore a COMPLETE V2 backup onto a pristine device and verify semantic equivalence, no side-effect replay, and continued sync › P6 — Jordan, the New Device Migrator (complete backup) — 2. accept the restore and verify full semantic equivalence @p6 @sync
+  -  170 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator (complete backup) — restore a COMPLETE V2 backup onto a pristine device and verify semantic equivalence, no side-effect replay, and continued sync › P6 — Jordan, the New Device Migrator (complete backup) — 3. new activity syncs normally and the restored rule fires exactly once @p6 @sync
+  ✓  171 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 1. reset to an empty device and detect whether this build has a remote restore boundary @p6 @sync (12.9s)
+  -  172 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 2. dismiss the restore prompt ("Not now") @p6 @sync
+  -  173 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 3. reload: the dismissed prompt does not reappear, restore stays available in Settings @p6 @sync
+  ✓  174 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 4. add a todo → restore is now blocked (device non-empty) @p6 @sync (5.7s)
+  -  175 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 5. second device: accept the restore and verify imported rows @p6 @sync
+  -  176 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 6. what did NOT come back: no completions, saved meals, pomodoro sessions or workout logs; streaks read 0 @p6 @sync
+  ✓  177 [journeys] › e2e\helpers\journey.ts:138:11 › P6 — Jordan, the New Device Migrator — restore prompt lifecycle: dismiss → no re-prompt → blocked after local data → accept restore and verify what does not come back › P6 — Jordan, the New Device Migrator — 7. CG-2: a device holding only soft-deleted rows is not empty (decided contract) @p6 @sync (7.2s)
+  ✓  178 [journeys] › e2e\journeys\past-midnight-freshness.spec.ts:50:7 › P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0 › 1. mount Habits + Calories and log the boundary day on both surfaces @p0 (7.5s)
+  ✓  179 [journeys] › e2e\journeys\past-midnight-freshness.spec.ts:72:7 › P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0 › 2. advance past midnight while both sections are mounted @p0 (248ms)
+  ✓  180 [journeys] › e2e\journeys\past-midnight-freshness.spec.ts:78:7 › P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0 › 3. the ACTIVE mounted section presents the new day, not a stale "Today" @p0 (609ms)
+  ✓  181 [journeys] › e2e\journeys\past-midnight-freshness.spec.ts:88:7 › P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0 › 4. an INACTIVE mounted section refreshes on activation instead of rendering held values @p0 (1.3s)
+  ✓  182 [journeys] › e2e\journeys\past-midnight-writes.spec.ts:72:7 › P1 — Maya, the Daily Driver — J2a past-midnight writes land on the new date_key @p0 › 1. seed SMALL on the boundary day under a non-UTC browser timezone @p0 (7.5s)
+  ✓  183 [journeys] › e2e\journeys\past-midnight-writes.spec.ts:92:7 › P1 — Maya, the Daily Driver — J2a past-midnight writes land on the new date_key @p0 › 2. ticks before midnight write the boundary-day date_key (twice over) @p0 (3.2s)
+  ✓  184 [journeys] › e2e\journeys\past-midnight-writes.spec.ts:119:7 › P1 — Maya, the Daily Driver — J2a past-midnight writes land on the new date_key @p0 › 3. after midnight a tick writes the NEW date_key; pre-boundary rows are untouched @p0 (4.8s)
+  ✓  185 [journeys] › e2e\journeys\past-midnight-writes.spec.ts:159:7 › P1 — Maya, the Daily Driver — J2a past-midnight writes land on the new date_key @p0 › 4. a reload agrees with what was written @p0 (4.4s)
+  -  186 [journeys] › e2e\helpers\journey.ts:138:11 › A — Portable owner recovery (matching account) — import an owner-backed file on a fresh device and bind it by authenticating the matching account › A — Portable owner recovery (matching account) — 1. protect the source owner and export an owner-backed portable file @portable-owner @sync
+  -  187 [journeys] › e2e\helpers\journey.ts:138:11 › A — Portable owner recovery (matching account) — import an owner-backed file on a fresh device and bind it by authenticating the matching account › A — Portable owner recovery (matching account) — 2. import on a fresh device, then bind the matching protected account @portable-owner @sync
+  -  188 [journeys] › e2e\helpers\journey.ts:138:11 › B — Portable owner recovery (wrong account) — prove a nonmatching account cannot claim an imported owner-backed dataset › B — Portable owner recovery (wrong account) — 1. protect the source owner and export an owner-backed portable file @portable-owner @sync
+  -  189 [journeys] › e2e\helpers\journey.ts:138:11 › B — Portable owner recovery (wrong account) — prove a nonmatching account cannot claim an imported owner-backed dataset › B — Portable owner recovery (wrong account) — 2. a wrong account is signed out and cannot claim the imported dataset @portable-owner @sync
+  -  190 [journeys] › e2e\helpers\journey.ts:138:11 › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — prove A export → T import → T weekly_reviews footprint → matching A recovery is production-blocked with imported dataset intact › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — 1. export owner-backed file for A @portable-owner @sync
+  -  191 [journeys] › e2e\helpers\journey.ts:138:11 › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — prove A export → T import → T weekly_reviews footprint → matching A recovery is production-blocked with imported dataset intact › C — Temporary account T with remote weekly_reviews state blocks imported-owner recovery — 2. T imports A and acquires remote weekly_reviews state; matching A recovery is blocked by production safety @portable-owner @sync
+  -  192 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 1. protect the anonymous backup with email @account-v1 @sync
+  -  193 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 2. recover the same account on an empty device and restore V1 data @account-v1 @sync
+  -  194 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 3. session loss pauses remote backup but permits owner recovery @account-v1 @sync
+  -  195 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 4. a different authenticated owner is blocked without local reassignment @account-v1 @sync
+  -  196 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 5. first synced activity is durably owned by the anonymous account @account-v1 @sync
+  -  197 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 6. protection succeeds while the user keeps writing and sync keeps flushing @account-v1 @sync
+  -  198 [journeys] › e2e\helpers\journey.ts:138:11 › A — Recoverable Account V1 — protect an anonymous owner, recover it on an empty device, and restore the backup › A — Recoverable Account V1 — 7. a populated device cannot switch to a different account after local-only activity @account-v1 @sync
+  ✓  199 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — settings changes ripple to their sections and survive a reload › P3 — Priya, the Power User — 1. reset and seed SMALL, then confirm the seeded baseline rows exist (8.2s)
+  ✓  200 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — settings changes ripple to their sections and survive a reload › P3 — Priya, the Power User — 2. change the daily calorie goal in Settings; it reaches Calories and survives reload (7.0s)
+  ✓  201 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — settings changes ripple to their sections and survive a reload › P3 — Priya, the Power User — 3. change Pomodoro defaults in Settings; the Focus section shows the new duration and keeps it after reload (4.9s)
+  ✓  202 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — settings changes ripple to their sections and survive a reload › P3 — Priya, the Power User — 4. change the theme in Settings; the AsyncStorage slot and a reload keep it (2.5s)
+  ✓  203 [journeys] › e2e\helpers\journey.ts:138:11 › P3 — Priya, the Power User — settings changes ripple to their sections and survive a reload › P3 — Priya, the Power User — 5. change Pomodoro defaults while a timer is paused: the paused session is untouched and no session is logged (7.9s)
+  ✓  204 [journeys] › e2e\helpers\journey.ts:138:11 › HARNESS — smoke — reset → seed TYPICAL → add a todo → assert the row + UI › HARNESS — smoke — 1. reset and seed TYPICAL, then assert seeded rows exist @smoke (4.7s)
+  ✓  205 [journeys] › e2e\helpers\journey.ts:138:11 › HARNESS — smoke — reset → seed TYPICAL → add a todo → assert the row + UI › HARNESS — smoke — 2. app shows the Todos tab and an empty-related UI state @smoke (1.4s)
+  ✓  206 [journeys] › e2e\helpers\journey.ts:138:11 › HARNESS — smoke — reset → seed TYPICAL → add a todo → assert the row + UI › HARNESS — smoke — 3. add a todo through the UI and assert it persists as a row @smoke (1.0s)
+  ✓  207 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 1. reset the device, boot the app, and assert the outbox starts empty @p5 @sync (4.1s)
+  ✓  208 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 2. online baseline: create a todo (Commute ride) @p5 @sync (392ms)
+  ✓  209 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 3. go offline and create/edit/delete across todos, habits and calories @p5 @sync (4.3s)
+  ✓  210 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 4. offline: outbox grew to one record per (entity, id) and persisted durably @p5 @sync (816ms)
+  ✓  211 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 5. full reload: durable sync_outbox survived (hydrate restored it) @p5 @sync (5.5s)
+  -  212 [journeys] › e2e\helpers\journey.ts:138:11 › P5 — Alex, the Commuter (offline user) — offline writes survive to the outbox, dedupe, reload, and reconnect push › P5 — Alex, the Commuter (offline user) — 6. reconnect: each outbox record is pushed exactly once @p5 @sync
+  ✓  213 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 1. Seed HEAVY and verify volumes @p2 (6.2s)
+  ✓  214 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 2. COLD START ≤ 5s: Overview interactive and populated at HEAVY, aggregates match the rows @p2 (993ms)
+  ✓  215 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 3. Mount all six sections; section-switch latency ≤ 800ms (max of 6 measured switches) @p2 (6.7s)
+  ✓  216 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 4. Todos: 200+ rows rendered, list scrolls to the end, Show/Hide-completed filter @p2 (4.7s)
+  ✓  217 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 5. Habits: 364-day heatmap renders exactly 52 weeks (boundary), consistency matches Overview @p2 (2.3s)
+  ✓  218 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 6. Calories diary: meal groups, expand/collapse, persistence, filter-input response ≤ 500ms @p2 (10.0s)
+[J8 baseline] coldOverview=829ms (limit 5000) | maxSwitch=719ms (limit 800): overview→todos=589, todos→habits=719, habits→focus=240, focus→workout=256, workout→calories=396, calories→overview=263 | diarySearch=340ms (limit 500) | pickerSearch=117ms (limit 500)
+  ✓  219 [journeys] › e2e\helpers\journey.ts:138:11 › P2 — Tom, the Weekend Returner — HEAVY device (90 days): cold start, aggregates, heatmap 364/52 boundaries, diary, 200+ todo list, and the D14 responsiveness ceilings › P2 — Tom, the Weekend Returner — 7. Row-level oracles: only the documented todo expansion was written; the walk changed nothing else @p2 (969ms)
+  ✓  220 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — a second tab surfaces the actionable bootstrap error, never a blank screen, and the first tab stays healthy and writable › P4 — Sam, the Error-Prone User — 1. tab one: reset, boot, and write a todo (2.9s)
+  ✓  221 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — a second tab surfaces the actionable bootstrap error, never a blank screen, and the first tab stays healthy and writable › P4 — Sam, the Error-Prone User — 2. tab two (same origin, same partition): the actionable bootstrap gate, not a blank screen (613ms)
+  ✓  222 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — a second tab surfaces the actionable bootstrap error, never a blank screen, and the first tab stays healthy and writable › P4 — Sam, the Error-Prone User — 3. contrast: a fresh context on the same origin loads cleanly (the lock, not the build, blocks tab two) (1.5s)
+  ✓  223 [journeys] › e2e\helpers\journey.ts:138:11 › P4 — Sam, the Error-Prone User — a second tab surfaces the actionable bootstrap error, never a blank screen, and the first tab stays healthy and writable › P4 — Sam, the Error-Prone User — 4. closing tab two leaves tab one healthy and writable (1.4s)
+(node:96932) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96932) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  224 [simulation] › simulation\runner\specs\repro.spec.ts:67:5 › 5.5 repro bundle: same-build replay reproduces, corrected expectation diverges (18.4s)
+  ✓  225 [simulation] › simulation\runner\specs\selfTest.spec.ts:32:5 › 3.5 deterministic mode is reproducible — identical action logs (1.3m)
+  ✓  226 [simulation] › simulation\runner\specs\selfTest.spec.ts:53:5 › 4.4 one run-report schema across lanes (scenario / seeded / repro) (2.2m)
+
+  Slow test file: [chromium] › e2e\boundary.spec.ts (6.2m)
+  Slow test file: [journeys] › e2e\helpers\journey.ts (5.3m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  43 skipped
+  183 passed (29.7m)

@@ -1,0 +1,901 @@
+
+Running 63 tests using 1 worker
+
+(node:113428) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:113428) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e\boundary.spec.ts:25:7 › Todos — boundary inputs › empty title is rejected — task is not created (7.0s)
+  ✘   2 [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break (5.4s)
+(node:123020) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:123020) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   3 [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain (5.5s)
+(node:110184) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:110184) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   4 [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list (2.0m)
+(node:125204) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125204) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 [chromium] › e2e\boundary.spec.ts:112:7 › Habits — boundary inputs › habit with target_per_day = 1 shows correct progress (5.3s)
+  ✓   6 [chromium] › e2e\boundary.spec.ts:134:7 › Habits — boundary inputs › creating 10 habits across groups renders all groups (11.2s)
+  ✓   7 [chromium] › e2e\boundary.spec.ts:157:7 › Habits — boundary inputs › overview grid renders with no habits (empty state) (4.8s)
+  ✓   8 [chromium] › e2e\boundary.spec.ts:170:7 › Calories — boundary inputs › empty food name is rejected (6.5s)
+  ✓   9 [chromium] › e2e\boundary.spec.ts:180:7 › Calories — boundary inputs › very large calorie value does not break chart (7.3s)
+  ✓  10 [chromium] › e2e\boundary.spec.ts:193:7 › Calories — boundary inputs › logging 20 entries in one day totals correctly (18.0s)
+  ✓  11 [chromium] › e2e\boundary.spec.ts:209:7 › Calories — boundary inputs › goal UI enforces minimum; screen has no bogus numeric text (6.1s)
+  ✓  12 [chromium] › e2e\boundary.spec.ts:221:7 › Workout — boundary inputs › empty routine name is rejected (5.0s)
+  ✘  13 [chromium] › e2e\boundary.spec.ts:228:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash (1.5m)
+(node:126876) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:126876) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  14 [chromium] › e2e\boundary.spec.ts:246:7 › Workout — boundary inputs › workout tab stays stable after navigation (5.5s)
+  ✓  15 [chromium] › e2e\boundary.spec.ts:258:7 › Pomodoro — boundary inputs › setting focus duration to 1 minute works correctly (5.9s)
+  ✓  16 [chromium] › e2e\boundary.spec.ts:271:7 › Pomodoro — boundary inputs › getNextMode never returns long_break at 0 sessions (5.3s)
+  ✓  17 [chromium] › e2e\boundary.spec.ts:278:7 › Pomodoro — boundary inputs › session counter dots reset after long break cycle (5.5s)
+  ✓  18 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › todos tab has no NaN or undefined in rendered text (5.2s)
+  ✓  19 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › habits tab has no NaN or undefined in rendered text (5.5s)
+  ✓  20 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › pomodoro tab has no NaN or undefined in rendered text (6.2s)
+  ✓  21 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › workout tab has no NaN or undefined in rendered text (5.8s)
+  ✓  22 [chromium] › e2e\boundary.spec.ts:292:9 › Global — no NaN, undefined, or Error text anywhere › calories tab has no NaN or undefined in rendered text (6.9s)
+  ✓  23 [chromium] › e2e\calories-day-navigation.spec.ts:48:7 › Calories diary day navigation › prev/next/jump-to-today with per-day totals header (13.1s)
+  ✓  24 [chromium] › e2e\calories-day-navigation.spec.ts:81:7 › Calories diary day navigation › week strip shows logged-day dots and disables future days (11.9s)
+  ✓  25 [chromium] › e2e\calories-day-navigation.spec.ts:111:7 › Calories diary day navigation › copy-day end-to-end surfaces the structured outcome and repeat behavior (13.0s)
+  ✓  26 [chromium] › e2e\calories-day-navigation.spec.ts:143:7 › Calories diary day navigation › copy modal offers no candidates when no earlier day is logged (14.0s)
+  ✓  27 [chromium] › e2e\habits.spec.ts:34:7 › Habits › shows empty state when no habits exist (4.8s)
+  ✓  28 [chromium] › e2e\habits.spec.ts:41:7 › Habits › does not add habit with empty name (5.2s)
+  ✓  29 [chromium] › e2e\habits.spec.ts:49:7 › Habits › adds a new habit (5.4s)
+  ✓  30 [chromium] › e2e\habits.spec.ts:56:7 › Habits › opens accessible progress insights for the exact habit (5.3s)
+  ✓  31 [chromium] › e2e\habits.spec.ts:72:7 › Habits › increments habit completion (5.5s)
+  ✓  32 [chromium] › e2e\habits.spec.ts:85:7 › Habits › habit persists after reload (5.8s)
+  ✓  33 [chromium] › e2e\habits.spec.ts:97:7 › Habits › deletes a habit in edit mode after web confirmation (5.7s)
+  ✘  34 [chromium] › e2e\habits.spec.ts:119:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral (11.4s)
+(node:122484) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:122484) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  35 [chromium] › e2e\habits.spec.ts:154:7 › Scheduled habits › schedule edits remain visible after reload (7.3s)
+  ✓  36 [chromium] › e2e\habits.spec.ts:185:7 › Scheduled habits › reminder configuration persists and remains schedule-aware after reload (6.6s)
+  ✓  37 [chromium] › e2e\habits.spec.ts:213:7 › Scheduled habits › target edits keep a prior completed date complete (6.4s)
+  ✓  38 [chromium] › e2e\pomodoro.spec.ts:12:7 › Pomodoro › shows idle state on first load (4.7s)
+  ✓  39 [chromium] › e2e\pomodoro.spec.ts:17:7 › Pomodoro › shows empty session history on first load (4.8s)
+  ✓  40 [chromium] › e2e\pomodoro.spec.ts:22:7 › Pomodoro › starts timer and shows running state (7.8s)
+  ✓  41 [chromium] › e2e\pomodoro.spec.ts:29:7 › Pomodoro › resets timer (5.3s)
+  ✘  42 [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope (6.5s)
+(node:103708) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:103708) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  43 [chromium] › e2e\portable-backup.spec.ts:93:7 › Portable data export & import › exports a large-enough representative file from many history rows (9.4s)
+  ✘  44 [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm (4.9s)
+(node:122228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:122228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  45 [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged (4.5s)
+(node:109884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:109884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  46 [chromium] › e2e\portable-backup.spec.ts:189:7 › Portable data export & import › rejects invalid JSON with a readable error (7.3s)
+  ✘  47 [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device (4.2s)
+(node:124868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:124868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  48 [chromium] › e2e\todos.spec.ts:13:7 › Todos › shows empty state when no todos exist (4.6s)
+  ✓  49 [chromium] › e2e\todos.spec.ts:17:7 › Todos › does not add todo with empty title (5.0s)
+  ✘  50 [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo (5.0s)
+(node:104976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:104976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  51 [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo (5.5s)
+(node:123296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:123296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  52 [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo (5.5s)
+(node:119264) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:119264) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  53 [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload (5.2s)
+(node:116672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:116672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  54 [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo (5.3s)
+(node:111416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:111416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  55 [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message (5.7s)
+(node:107160) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:107160) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  56 [chromium] › e2e\workout.spec.ts:14:7 › Workout › shows empty state when no routines exist (5.7s)
+  ✓  57 [chromium] › e2e\workout.spec.ts:19:7 › Workout › does not add routine with empty name (5.6s)
+  ✘  58 [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine (10.8s)
+(node:83016) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:83016) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  59 [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout (10.6s)
+(node:33956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  60 [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload (11.3s)
+(node:103756) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:103756) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  61 [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation (11.0s)
+(node:105028) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:105028) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  62 [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record (10.5s)
+(node:99308) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:99308) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  63 [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions (10.6s)
+
+
+  1) [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break 
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      37 |     const longTitle = 'A'.repeat(200);
+      38 |     await openNewTodoModal(page);
+    > 39 |     await page.getByPlaceholder(/Add a task/i).fill(longTitle);
+         |                                                ^
+      40 |     await submitTodoModal(page);
+      41 |     await expect(page.getByText('A'.repeat(20))).toBeVisible();
+      42 |   });
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:39:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--7741f-splays-without-layout-break-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain 
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      46 |     await goToTab(page, 'todos');
+      47 |     await openNewTodoModal(page);
+    > 48 |     await page.getByPlaceholder(/Add a task/i).fill('Daily chain test');
+         |                                                ^
+      49 |     await page.getByText('Repeat daily').click();
+      50 |     await submitTodoModal(page);
+      51 |     await expect(page.getByText('Daily chain test', { exact: true }).first()).toBeVisible({
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:48:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--b279f-5-times-creates-valid-chain-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list 
+
+    [31mTest timeout of 120000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 120000ms exceeded.
+    Call log:
+    [2m  - waiting for getByText('Add task', { exact: true }).locator('..')[22m
+
+
+       at helpers\navigation.ts:32
+
+      30 |   const titleInput = page.getByPlaceholder(/Add a task/i);
+      31 |   // Click the Pressable wrapper, not the inner Text node, so RN Web reliably fires onPress.
+    > 32 |   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
+         |                                                                   ^
+      33 |   if (options?.waitForClose) {
+      34 |     await titleInput.waitFor({ state: 'hidden', timeout: 15_000 });
+      35 |   }
+        at submitTodoModal (C:\Users\Michael Roy\Documents\super-habits\e2e\helpers\navigation.ts:32:67)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:90:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Todos-—-boundary--d1346-dos-does-not-crash-the-list-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e\boundary.spec.ts:228:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash 
+
+    [31mTest timeout of 90000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+    [2m  - waiting for getByText('Big Routine')[22m
+
+
+      231 |     await fillRoutineName(page, 'Big Routine');
+      232 |     await page.getByText('Add routine', { exact: true }).click();
+    > 233 |     await page.getByText('Big Routine').click();
+          |                                         ^
+      234 |
+      235 |     for (let i = 1; i <= 10; i++) {
+      236 |       await page.getByPlaceholder(/e\.g\./).fill(`Exercise ${i}`);
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\boundary.spec.ts:233:41
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\boundary-Workout-—-boundar-cccf7-detail-screen-without-crash-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › e2e\habits.spec.ts:119:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByRole('button', { name: 'Gym: not scheduled today. Rest day.' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Gym: not scheduled today. Rest day.' })[22m
+
+
+      136 |     await expect(
+      137 |       page.getByRole('button', { name: 'Gym: not scheduled today. Rest day.' }),
+    > 138 |     ).toBeVisible();
+          |       ^
+      139 |     await expect(page.getByText('Rest', { exact: true })).toBeVisible();
+      140 |
+      141 |     await advanceToNextDay(page);
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\habits.spec.ts:138:7
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\habits-Scheduled-habits-cr-6d5a0--treats-off-days-as-neutral-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope 
+
+    Error: locator.type: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      32 |   await goToTab(page, 'todos');
+      33 |   await openNewTodoModal(page);
+    > 34 |   await page.getByPlaceholder(/Add a task/i).type(title);
+         |                                              ^
+      35 |   await submitTodoModal(page, { waitForClose: true });
+      36 | }
+      37 |
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:34:46)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:70:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-c1d53-containing-the-seeded-scope-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm 
+
+    Error: locator.type: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      32 |   await goToTab(page, 'todos');
+      33 |   await openNewTodoModal(page);
+    > 34 |   await page.getByPlaceholder(/Add a task/i).type(title);
+         |                                              ^
+      35 |   await submitTodoModal(page, { waitForClose: true });
+      36 | }
+      37 |
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:34:46)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:119:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-bc4cc--preview-→-cancel-→-confirm-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged 
+
+    Error: locator.type: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      32 |   await goToTab(page, 'todos');
+      33 |   await openNewTodoModal(page);
+    > 34 |   await page.getByPlaceholder(/Add a task/i).type(title);
+         |                                              ^
+      35 |   await submitTodoModal(page, { waitForClose: true });
+      36 | }
+      37 |
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:34:46)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:164:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-00fee-aves-the-database-unchanged-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device 
+
+    Error: locator.type: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      32 |   await goToTab(page, 'todos');
+      33 |   await openNewTodoModal(page);
+    > 34 |   await page.getByPlaceholder(/Add a task/i).type(title);
+         |                                              ^
+      35 |   await submitTodoModal(page, { waitForClose: true });
+      36 | }
+      37 |
+        at addTodoViaUi (C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:34:46)
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\portable-backup.spec.ts:201:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\portable-backup-Portable-d-3639f-mport-on-a-populated-device-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo ────────────────────────────────
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      23 |   test('adds a new todo', async ({ page }) => {
+      24 |     await openNewTodoModal(page);
+    > 25 |     await page.getByPlaceholder(/Add a task/i).fill('Buy groceries');
+         |                                                ^
+      26 |     await submitTodoModal(page);
+      27 |     await expect(page.getByText('Buy groceries')).toBeVisible();
+      28 |   });
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:25:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-adds-a-new-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  11) [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo ───────────────────────────────
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      30 |   test('completes a todo', async ({ page }) => {
+      31 |     await openNewTodoModal(page);
+    > 32 |     await page.getByPlaceholder(/Add a task/i).fill('Read a book');
+         |                                                ^
+      33 |     await submitTodoModal(page);
+      34 |     const completionControl = page.getByRole('checkbox', { name: 'Mark complete: Read a book' });
+      35 |     await expect(completionControl).toBeVisible();
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:32:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-completes-a-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  12) [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo ─────────────────────────────────
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      47 |   test('deletes a todo', async ({ page }) => {
+      48 |     await openNewTodoModal(page);
+    > 49 |     await page.getByPlaceholder(/Add a task/i).fill('Delete me');
+         |                                                ^
+      50 |     await submitTodoModal(page);
+      51 |     await expect(page.getByText('Delete me')).toBeVisible();
+      52 |     await swipeLeftToRevealRowActions(page, 'Delete me');
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:49:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-deletes-a-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  13) [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload ────────────────
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      62 |   test('todo persists after hard reload', async ({ page }) => {
+      63 |     await openNewTodoModal(page);
+    > 64 |     await page.getByPlaceholder(/Add a task/i).fill('Persistent todo');
+         |                                                ^
+      65 |     await submitTodoModal(page);
+      66 |     await expect(page.getByText('Persistent todo').filter({ visible: true }).last()).toBeVisible();
+      67 |
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:64:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-todo-persists-after-hard-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  14) [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo 
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      75 |   test('completing a linked source todo completes the target todo', async ({ page }) => {
+      76 |     await openNewTodoModal(page);
+    > 77 |     await page.getByPlaceholder(/Add a task/i).fill('Linked target task');
+         |                                                ^
+      78 |     await submitTodoModal(page);
+      79 |     await expect(
+      80 |       page.getByText('Linked target task').filter({ visible: true }).last(),
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:77:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-completing-a-l-e1566-o-completes-the-target-todo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  15) [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message 
+
+    Error: locator.fill: Error: strict mode violation: getByPlaceholder(/Add a task/i) resolved to 2 elements:
+        1) <input rows="1" value="" dir="auto" autocorrect="on" autocomplete="on" spellcheck="true" enterkeyhint="done" autocapitalize="sentences" virtualkeyboardpolicy="auto" placeholder="Quick add a task..." aria-label="Quick add task title" class="css-11aywtz r-6taxm2 flex-1 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Quick add task title' })
+        2) <input rows="1" value="" dir="auto" type="text" autocorrect="on" autocomplete="on" spellcheck="true" aria-label="Title" autocapitalize="sentences" placeholder="Add a task..." virtualkeyboardpolicy="auto" class="css-11aywtz r-6taxm2 rounded-2xl border px-4 py-3 text-base"/> aka getByRole('textbox', { name: 'Title', exact: true })
+
+    Call log:
+    [2m  - waiting for getByPlaceholder(/Add a task/i)[22m
+
+
+      120 |   test('recurring todos show linked-actions disabled message', async ({ page }) => {
+      121 |     await openNewTodoModal(page);
+    > 122 |     await page.getByPlaceholder(/Add a task/i).fill('Recurring source todo');
+          |                                                ^
+      123 |     await page.getByText('Repeat daily', { exact: true }).click({ force: true });
+      124 |
+      125 |     await expect(
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\todos.spec.ts:122:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\todos-Todos-recurring-todo-10816-ed-actions-disabled-message-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  16) [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine ─────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Push day')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Push day')[22m
+
+
+      25 |     await fillRoutineName(page, 'Push day');
+      26 |     await page.getByText('Add routine', { exact: true }).click();
+    > 27 |     await expect(page.getByText('Push day')).toBeVisible();
+         |                                              ^
+      28 |   });
+      29 |
+      30 |   test('completes a workout', async ({ page }) => {
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:27:46
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-adds-a-new-routine-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  17) [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout ────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Pull day')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Pull day')[22m
+
+
+      31 |     await fillRoutineName(page, 'Pull day');
+      32 |     await page.getByText('Add routine', { exact: true }).click();
+    > 33 |     await expect(page.getByText('Pull day')).toBeVisible();
+         |                                              ^
+      34 |     await page.getByText('Complete workout', { exact: true }).first().click();
+      35 |     await expect(page.getByText('Workout history')).toBeVisible();
+      36 |   });
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:33:46
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-completes-a-workout-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  18) [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload ──────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Leg day')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Leg day')[22m
+
+
+      39 |     await fillRoutineName(page, 'Leg day');
+      40 |     await page.getByText('Add routine', { exact: true }).click();
+    > 41 |     await expect(page.getByText('Leg day')).toBeVisible();
+         |                                             ^
+      42 |
+      43 |     await page.reload();
+      44 |     await page.waitForLoadState('load');
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:41:45
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-routine-persists-after-reload-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  19) [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Leg press')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Leg press')[22m
+
+
+      50 |     await fillRoutineName(page, 'Leg press');
+      51 |     await page.getByText('Add routine', { exact: true }).click();
+    > 52 |     await expect(page.getByText('Leg press')).toBeVisible();
+         |                                               ^
+      53 |     await swipeLeftRevealWorkoutRoutineRow(page);
+      54 |     await clickSwipeDeleteAction(page, 'Leg press');
+      55 |     await page.getByText('Delete routine', { exact: true }).click({ force: true });
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:52:47
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-swipe-dele-4f246-tine-after-web-confirmation-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20) [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Push day')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Push day')[22m
+
+
+      62 |     await fillRoutineName(page, 'Push day');
+      63 |     await page.getByText('Add routine', { exact: true }).click();
+    > 64 |     await expect(page.getByText('Push day')).toBeVisible();
+         |                                              ^
+      65 |     await page.getByText('Push day', { exact: true }).first().click();
+      66 |     const dialog = page.getByRole('dialog');
+      67 |     await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:64:46
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-timed-sess-9fd28-g-and-a-new-personal-record-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  21) [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Push day')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Push day')[22m
+
+
+      113 |     await fillRoutineName(page, 'Push day');
+      114 |     await page.getByText('Add routine', { exact: true }).click();
+    > 115 |     await expect(page.getByText('Push day')).toBeVisible();
+          |                                              ^
+      116 |     await page.getByText('Push day', { exact: true }).first().click();
+      117 |     const dialog = page.getByRole('dialog');
+      118 |     await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
+        at C:\Users\Michael Roy\Documents\super-habits\e2e\workout.spec.ts:115:46
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace .cursor\playwright-output\e2e-failures\workout-Workout-quick-comp-96ad0-tinctly-from-timed-sessions-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  21 failed
+    [chromium] › e2e\boundary.spec.ts:35:7 › Todos — boundary inputs › very long title (200 chars) saves and displays without layout break 
+    [chromium] › e2e\boundary.spec.ts:44:7 › Todos — boundary inputs › recurring daily todo completed 5 times creates valid chain 
+    [chromium] › e2e\boundary.spec.ts:68:7 › Todos — boundary inputs › creating 30 todos does not crash the list 
+    [chromium] › e2e\boundary.spec.ts:228:7 › Workout — boundary inputs › routine with 10 exercises renders detail screen without crash 
+    [chromium] › e2e\habits.spec.ts:119:7 › Scheduled habits › creates an M/W/F habit and treats off-days as neutral 
+    [chromium] › e2e\portable-backup.spec.ts:69:7 › Portable data export & import › exports a downloadable portable file containing the seeded scope 
+    [chromium] › e2e\portable-backup.spec.ts:116:7 › Portable data export & import › imports the downloaded file on an empty device: preview → cancel → confirm 
+    [chromium] › e2e\portable-backup.spec.ts:163:7 › Portable data export & import › rejects a corrupt file and leaves the database unchanged 
+    [chromium] › e2e\portable-backup.spec.ts:200:7 › Portable data export & import › blocks import on a populated device 
+    [chromium] › e2e\todos.spec.ts:23:7 › Todos › adds a new todo ──────────────────────────────────
+    [chromium] › e2e\todos.spec.ts:30:7 › Todos › completes a todo ─────────────────────────────────
+    [chromium] › e2e\todos.spec.ts:47:7 › Todos › deletes a todo ───────────────────────────────────
+    [chromium] › e2e\todos.spec.ts:62:7 › Todos › todo persists after hard reload ──────────────────
+    [chromium] › e2e\todos.spec.ts:75:7 › Todos › completing a linked source todo completes the target todo 
+    [chromium] › e2e\todos.spec.ts:120:7 › Todos › recurring todos show linked-actions disabled message 
+    [chromium] › e2e\workout.spec.ts:24:7 › Workout › adds a new routine ───────────────────────────
+    [chromium] › e2e\workout.spec.ts:30:7 › Workout › completes a workout ──────────────────────────
+    [chromium] › e2e\workout.spec.ts:38:7 › Workout › routine persists after reload ────────────────
+    [chromium] › e2e\workout.spec.ts:49:7 › Workout › swipe delete removes the routine after web confirmation 
+    [chromium] › e2e\workout.spec.ts:59:7 › Workout › timed session records weight/reps, timing, and a new personal record 
+    [chromium] › e2e\workout.spec.ts:110:7 › Workout › quick-complete logs are labeled distinctly from timed sessions 
+  42 passed (11.3m)

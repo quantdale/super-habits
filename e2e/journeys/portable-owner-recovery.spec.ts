@@ -252,7 +252,7 @@ async function protectSourceOwner(page: Page): Promise<void> {
 async function seedPortableTodo(page: Page, title: string): Promise<void> {
   await page.getByRole('button', { name: 'Close settings', exact: true }).click();
   await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
-  await page.getByRole('button', { name: 'Add task' }).first().click();
+  await page.getByRole('button', { name: 'Add task' }).last().click();
   await page.getByPlaceholder(/Add a task/i).fill(title);
   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
   await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });
