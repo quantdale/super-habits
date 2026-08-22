@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
 export type ModalLayout = 'dialog' | 'drawer' | 'bottom-sheet';
 
@@ -31,6 +32,7 @@ export function Modal({
   layout = 'dialog',
 }: ModalProps) {
   const { tokens } = useAppTheme();
+  const closeFocusRing = useKeyboardFocusRing(tokens.accent);
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const isDrawer = layout === 'drawer';
   const isBottomSheet = layout === 'bottom-sheet';
@@ -103,8 +105,14 @@ export function Modal({
                 accessibilityRole="button"
                 accessibilityLabel="Close"
                 hitSlop={4}
+                onFocus={closeFocusRing.onFocus}
+                onBlur={closeFocusRing.onBlur}
                 className="h-11 w-11 items-center justify-center rounded-full"
-                style={{ backgroundColor: tokens.surfaceElevated }}
+                style={[
+                  { backgroundColor: tokens.surfaceElevated },
+                  // Visible keyboard-focus indication on web (Design DNA §15).
+                  closeFocusRing.focusRingStyle,
+                ]}
               >
                 <MaterialIcons name="close" size={24} color={tokens.iconMuted} />
               </Pressable>

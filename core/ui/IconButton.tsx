@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
 function withAlpha(color: string, opacity: number) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
@@ -31,6 +32,7 @@ export function IconButton({
   size = 22,
 }: IconButtonProps) {
   const { tokens } = useAppTheme();
+  const focusRing = useKeyboardFocusRing(tokens.accent);
   const resolvedAccent = accentColor ?? tokens.iconMuted;
 
   return (
@@ -39,16 +41,22 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
+      onFocus={focusRing.onFocus}
+      onBlur={focusRing.onBlur}
       className="h-11 w-11 items-center justify-center rounded-2xl border"
-      style={({ pressed }) => ({
-        borderColor: selected ? withAlpha(resolvedAccent, 0.28) : tokens.border,
-        backgroundColor:
-          selected && !pressed
-            ? withAlpha(resolvedAccent, 0.12)
-            : pressed
-              ? tokens.surfaceActive
-              : tokens.surface,
-      })}
+      style={({ pressed }) => [
+        {
+          borderColor: selected ? withAlpha(resolvedAccent, 0.28) : tokens.border,
+          backgroundColor:
+            selected && !pressed
+              ? withAlpha(resolvedAccent, 0.12)
+              : pressed
+                ? tokens.surfaceActive
+                : tokens.surface,
+        },
+        // Visible keyboard-focus indication on web (Design DNA §15).
+        focusRing.focusRingStyle,
+      ]}
     >
       <MaterialIcons name={icon} size={size} color={selected ? resolvedAccent : tokens.iconMuted} />
     </Pressable>

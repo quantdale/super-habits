@@ -46,6 +46,11 @@ export function TodayProgressStrip({
   const focusMinutesToday =
     focus.perDayMinutes.find((day) => day.dateKey === todayKey)?.minutes ?? 0;
   const workoutDoneToday = workout.lastWorkoutDateKey === todayKey;
+  // Current-day semantics: the Tasks fraction counts today's completions
+  // against today's actionable set (due today + overdue), not the whole open
+  // backlog — an undated someday task is not part of "today".
+  const tasksOpenToday = todos.overdueCount + todos.dueTodayCount;
+  const tasksTotalToday = todos.completedTodayCount + tasksOpenToday;
 
   const metrics: {
     /** Card registry id; also a valid section-accent key. */
@@ -57,11 +62,12 @@ export function TodayProgressStrip({
   }[] = [
     {
       id: 'todos',
-      value: `${todos.completedTodayCount}/${todos.completedTodayCount + todos.pendingCount}`,
+      value: tasksTotalToday > 0 ? `${todos.completedTodayCount}/${tasksTotalToday}` : '—',
       label: 'Tasks',
-      spoken: `Tasks: ${todos.completedTodayCount} of ${
-        todos.completedTodayCount + todos.pendingCount
-      } done`,
+      spoken:
+        tasksTotalToday > 0
+          ? `Tasks: ${todos.completedTodayCount} of ${tasksTotalToday} done`
+          : 'Tasks: nothing due today',
     },
     {
       id: 'habits',

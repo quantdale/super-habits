@@ -96,7 +96,7 @@ function rebuildRecentCapture(record: PersistedRecentCapture): RecentCapture | n
 }
 
 export function QuickCaptureOverlay() {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const { closeQuickCapture, setActiveSection } = useAppNavigation();
   const [mode, setMode] = useState<CaptureMode>('todo');
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
@@ -489,7 +489,7 @@ export function QuickCaptureOverlay() {
             </Text>
           ) : null}
           {saved ? (
-            <Text className="text-sm" style={{ color: SECTION_COLORS.habits }}>
+            <Text className="text-sm" style={{ color: sectionAccents.habits.text }}>
               Captured.
             </Text>
           ) : null}

@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
 type ButtonProps = {
   label: string;
@@ -21,6 +22,7 @@ export function Button({
   color,
 }: ButtonProps) {
   const { tokens } = useAppTheme();
+  const focusRing = useKeyboardFocusRing(tokens.accent);
   const useCustomPrimary = Boolean(color) && variant === 'primary';
   const inactive = disabled || loading;
 
@@ -36,6 +38,8 @@ export function Button({
       disabled={inactive}
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
+      onFocus={focusRing.onFocus}
+      onBlur={focusRing.onBlur}
       className={`min-h-[48px] rounded-2xl px-4 py-3 ${inactive ? 'opacity-40' : ''}`}
       style={({ pressed }) => [
         variant === 'ghost'
@@ -50,6 +54,8 @@ export function Button({
               elevation: inactive ? 0 : 1,
             }
           : undefined,
+        // Visible keyboard-focus indication on web (Design DNA §15).
+        focusRing.focusRingStyle,
       ]}
       onPress={onPress}
     >
