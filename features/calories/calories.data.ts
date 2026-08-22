@@ -115,16 +115,19 @@ export async function hasAnyCalorieEntries(): Promise<boolean> {
   return Boolean(row);
 }
 
-export async function addCalorieEntry(input: {
-  foodName: string;
-  calories: number;
-  protein?: number;
-  carbs?: number;
-  fats?: number;
-  fiber?: number;
-  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  consumedOn?: string;
-}): Promise<void> {
+export async function addCalorieEntry(
+  input: {
+    foodName: string;
+    calories: number;
+    protein?: number;
+    carbs?: number;
+    fats?: number;
+    fiber?: number;
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    consumedOn?: string;
+  },
+  opts?: { maintainSavedMeal?: boolean },
+): Promise<void> {
   const id = createId('cal');
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
@@ -152,24 +155,37 @@ export async function addCalorieEntry(input: {
       return { changed: true, value: undefined };
     },
   });
-  try {
-    await upsertSavedMeal({
-      foodName: input.foodName,
-      calories: input.calories,
-      protein: input.protein ?? 0,
-      carbs: input.carbs ?? 0,
-      fats: input.fats ?? 0,
-      fiber: input.fiber ?? 0,
-      mealType: input.mealType,
-    });
-  } catch (error) {
-    // The calorie ledger is authoritative. Saved meals are a local convenience
-    // index; a cache failure must not turn a committed ledger write into a
-    // reported failure that encourages a duplicate retry.
-    console.error('[calories] saved-meal maintenance failed after add', error);
+  // Default TRUE: the interactive form path keeps its implicit saved-meal
+  // catalog maintenance. One-off quick logs (kcal-only quick add, automated
+  // logging) pass FALSE so they never create/update a saved_meals row or
+  // inflate use_count / recent-frequent chips.
+  if (opts?.maintainSavedMeal ?? true) {
+    try {
+      await upsertSavedMeal({
+        foodName: input.foodName,
+        calories: input.calories,
+        protein: input.protein ?? 0,
+        carbs: input.carbs ?? 0,
+        fats: input.fats ?? 0,
+        fiber: input.fiber ?? 0,
+        mealType: input.mealType,
+      });
+    } catch (error) {
+      // The calorie ledger is authoritative. Saved meals are a local convenience
+      // index; a cache failure must not turn a committed ledger write into a
+      // reported failure that encourages a duplicate retry.
+      console.error('[calories] saved-meal maintenance failed after add', error);
+    }
   }
 }
 
+/**
+ * Edit an existing ledger entry. Saved-meal maintenance is deliberately
+ * skipped here: editing an existing entry is not a "use" of a meal, so it
+ * must never create a catalog row, bump use_count, or refresh last_used_at
+ * (same policy as copy-day). The catalog keeps the state from the original
+ * form-path add.
+ */
 export async function updateCalorieEntry(
   id: string,
   updates: {
@@ -218,20 +234,6 @@ export async function updateCalorieEntry(
       };
     },
   });
-  if (!result.changed) return result.value;
-  try {
-    await upsertSavedMeal({
-      foodName: updates.foodName,
-      calories,
-      protein: updates.protein,
-      carbs: updates.carbs,
-      fats: updates.fats,
-      fiber: updates.fiber,
-      mealType: updates.mealType,
-    });
-  } catch (error) {
-    console.error('[calories] saved-meal maintenance failed after update', error);
-  }
   return result.value;
 }
 
@@ -531,19 +533,10 @@ export async function addCalorieEntryFromLinkedAction(input: {
       producedEntityId: outcome.value.id,
     };
   }
-  try {
-    await upsertSavedMeal({
-      foodName: input.foodName,
-      calories: input.calories,
-      protein: input.protein,
-      carbs: input.carbs,
-      fats: input.fats,
-      fiber: input.fiber,
-      mealType: input.mealType,
-    });
-  } catch (error) {
-    console.error('[calories] saved-meal maintenance failed after linked add', error);
-  }
+  // Automated one-off logging never maintains the saved-meal catalog: a
+  // linked-action log is not an explicit "save this meal" choice, so it must
+  // not create/update a saved_meals row or inflate use_count. Replay
+  // idempotency above is unaffected.
 
   return {
     status: 'applied',

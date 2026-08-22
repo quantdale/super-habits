@@ -62,7 +62,7 @@ describe('calories.data', () => {
     });
   });
 
-  it('addCalorieEntry inserts the entry, saves the meal, and enqueues create', async () => {
+  it('addCalorieEntry inserts the entry and maintains the saved meal on the default form path', async () => {
     vi.mocked(createId).mockReturnValueOnce('cal_1').mockReturnValueOnce('smeal_1');
     db.getFirstAsync.mockResolvedValueOnce(null);
 
@@ -120,10 +120,85 @@ describe('calories.data', () => {
     );
   });
 
-  it('updateCalorieEntry recalculates calories, updates saved meals, and enqueues update', async () => {
-    vi.mocked(createId).mockReturnValueOnce('smeal_2');
-    db.getFirstAsync.mockResolvedValueOnce(null);
+  it('quick-add path (maintainSavedMeal: false) writes the ledger but never touches saved_meals', async () => {
+    vi.mocked(createId).mockReturnValueOnce('cal_quick');
 
+    await addCalorieEntry(
+      {
+        foodName: 'Quick add',
+        calories: 150,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+        mealType: 'snack',
+      },
+      { maintainSavedMeal: false },
+    );
+
+    // The one-off entry itself still commits and rides the sync outbox...
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO calorie_entries'),
+      [
+        'cal_quick',
+        'Quick add',
+        150,
+        0,
+        0,
+        0,
+        0,
+        'snack',
+        '2026-04-06',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06T10:00:00.000Z',
+      ],
+    );
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      {
+        entity: 'calorie_entries',
+        id: 'cal_quick',
+        updatedAt: '2026-04-06T10:00:00.000Z',
+        operation: 'create',
+        revision: 1,
+      },
+      { durablyPersisted: true },
+    );
+    // ...but a one-off quick log must not create/update the saved-meal
+    // catalog: no phantom "Quick add" row, no use_count inflation.
+    const savedMealStatements = db.getFirstAsync.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('saved_meals'),
+    );
+    expect(savedMealStatements).toHaveLength(0);
+  });
+
+  it('addCalorieEntryFromLinkedAction logs once without touching saved_meals', async () => {
+    const { addCalorieEntryFromLinkedAction } = await import('@/features/calories/calories.data');
+    db.getFirstAsync.mockResolvedValue(null);
+
+    const result = await addCalorieEntryFromLinkedAction({
+      id: 'cal_link_1',
+      foodName: 'Automated snack',
+      calories: 180,
+      protein: 4,
+      carbs: 20,
+      fats: 8,
+      fiber: 2,
+      mealType: 'snack',
+      consumedOn: '2026-04-06',
+    });
+
+    expect(result).toMatchObject({ status: 'applied', producedEntityId: 'cal_link_1' });
+    expect(db.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO calorie_entries'),
+      expect.arrayContaining(['cal_link_1', 'Automated snack']),
+    );
+    const savedMealStatements = db.getFirstAsync.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('saved_meals'),
+    );
+    expect(savedMealStatements).toHaveLength(0);
+  });
+
+  it('updateCalorieEntry recalculates calories, enqueues update, and never touches saved meals', async () => {
     await updateCalorieEntry('cal_1', {
       foodName: 'Protein oats',
       protein: 30,
@@ -138,21 +213,12 @@ describe('calories.data', () => {
       expect.stringContaining('UPDATE calorie_entries SET'),
       ['Protein oats', 360, 30, 40, 10, 5, 'breakfast', '2026-04-06T10:00:00.000Z', 'cal_1'],
     );
-    expect(db.getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO saved_meals'),
-      [
-        'smeal_2',
-        'Protein oats',
-        360,
-        30,
-        40,
-        10,
-        5,
-        'breakfast',
-        '2026-04-06T10:00:00.000Z',
-        '2026-04-06T10:00:00.000Z',
-      ],
+    // Editing an existing ledger entry is not a "use": no catalog statement
+    // may run at all, so use_count and last_used_at stay untouched.
+    const savedMealStatements = [...db.getFirstAsync.mock.calls, ...db.runAsync.mock.calls].filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('saved_meals'),
     );
+    expect(savedMealStatements).toHaveLength(0);
     expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
       {
         entity: 'calorie_entries',

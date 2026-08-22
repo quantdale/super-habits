@@ -521,19 +521,27 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
    * so a zero-macro entry needs no fabricated macros and no schema change;
    * it rides the same create path (sync/backup intents included) as the full
    * form and logs onto the diary's selected day (today in form mode).
+   *
+   * A one-off kcal log is not a reusable meal, so saved-meal catalog
+   * maintenance is skipped ({@link addCalorieEntry} `maintainSavedMeal:
+   * false`): no phantom "Quick add" row, no use_count inflation, no chip
+   * pollution.
    */
   const handleQuickAddKcal = useCallback(
     async (kcal: number) => {
-      await addCalorieEntry({
-        foodName: QUICK_ADD_FOOD_NAME,
-        calories: kcal,
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        fiber: 0,
-        mealType: 'snack',
-        consumedOn: selectedDateKey,
-      });
+      await addCalorieEntry(
+        {
+          foodName: QUICK_ADD_FOOD_NAME,
+          calories: kcal,
+          protein: 0,
+          carbs: 0,
+          fats: 0,
+          fiber: 0,
+          mealType: 'snack',
+          consumedOn: selectedDateKey,
+        },
+        { maintainSavedMeal: false },
+      );
       await refresh();
     },
     [refresh, selectedDateKey],
