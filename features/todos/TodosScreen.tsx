@@ -67,6 +67,7 @@ import {
   updateTodo,
   updateTodoOrder,
 } from '@/features/todos/todos.data';
+import type { BulkTodoOutcome } from '@/features/todos/todos.data';
 import { listProjects } from '@/features/projects/projects.data';
 import { listGoals } from '@/features/goals/goals.data';
 
@@ -118,6 +119,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const { width: screenWidth } = useWindowDimensions();
   const submitGuardRef = useRef(createSubmitGuard());
   const lastRecurrenceExpansionDateKeyRef = useRef<string | null>(null);
+  // Bumped whenever the edit form resets/changes target so a slow linked-action
+  // load for a previous edit can never land after resetForm().
+  const editLoadSeqRef = useRef(0);
   const gridColumns = screenWidth >= 1200 ? 4 : screenWidth >= 768 ? 3 : 2;
   const gridCardWidth = (screenWidth - 32 - 4 * (gridColumns * 2)) / gridColumns;
 
@@ -153,10 +157,16 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     [items, settlingIds],
   );
   const todayKey = getTodayDateKey();
+  // Boolean logic must not compare a string to a boolean (`(x && y) === true`
+  // is always false when x is a string), or priority/due-window-only views
+  // silently fall into the default branch — losing group headers/empty state
+  // and enabling drag-reorder on a filtered subset.
   const queryActive =
     search.trim().length > 0 ||
-    (filters.priority && filters.priority !== 'all') === true ||
-    (filters.dueWindow && filters.dueWindow !== 'all') === true ||
+    (filters.priority !== undefined && filters.priority !== 'all') ||
+    (filters.dueWindow !== undefined && filters.dueWindow !== 'all') ||
+    filters.projectId !== undefined ||
+    filters.goalId !== undefined ||
     sortMode !== 'manual';
   const visiblePending = useMemo(
     () => applyTodoListQuery(pendingTasks, { search, ...filters, sort: sortMode, todayKey }),
@@ -220,6 +230,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   useActiveForegroundRefresh(isActive, loadTodosOnFocus, dayGeneration);
 
   const resetForm = () => {
+    // Invalidate any in-flight linked-action load for a previous edit target
+    // so its setLinkedActionRows/setLinkedActionsError can never land after
+    // this reset (cancel-mid-load race).
+    editLoadSeqRef.current += 1;
     setTitle('');
     setNotes('');
     setDueDate(null);
@@ -339,15 +353,23 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         return;
       }
 
+      editLoadSeqRef.current += 1;
+      const loadSeq = editLoadSeqRef.current;
       try {
         const rules = await listTodoLinkedActionRules(todo.id);
-        setLinkedActionRows(await buildLinkedActionEditorRowsFromRules(rules));
+        const rows = await buildLinkedActionEditorRowsFromRules(rules);
+        // The form was reset or retargeted while loading; drop the stale result.
+        if (editLoadSeqRef.current !== loadSeq) return;
+        setLinkedActionRows(rows);
       } catch (error) {
+        if (editLoadSeqRef.current !== loadSeq) return;
         setLinkedActionsError(
           error instanceof Error ? error.message : 'Could not load linked actions for this task.',
         );
       } finally {
-        setLinkedActionsLoading(false);
+        if (editLoadSeqRef.current === loadSeq) {
+          setLinkedActionsLoading(false);
+        }
       }
     },
     [loadAssociationOptions],
@@ -415,10 +437,30 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     setSelectedIds([]);
   }, []);
 
+  /** Past-tense verb so the partial-outcome notice reads naturally per action. */
+  type BulkActionVerb = 'Completed' | 'Deleted' | 'Updated';
+
   const runBulkAction = useCallback(
-    async (action: () => Promise<unknown>) => {
+    async (action: () => Promise<BulkTodoOutcome>, appliedVerb: BulkActionVerb) => {
       try {
-        await action();
+        const outcome = await action();
+        // Surface partial applications (same spirit as CaloriesScreen's
+        // CopyDayResult handling): skipped rows were missing/tombstoned or
+        // already in the desired state, and staying silent would make a
+        // partially-applied batch look fully successful.
+        if (outcome.skipped > 0) {
+          const total = outcome.changed + outcome.skipped;
+          showNotice(
+            createLinkedActionsNotice({
+              message: `${appliedVerb} ${outcome.changed} of ${total} selected ${
+                total === 1 ? 'task' : 'tasks'
+              }; ${outcome.skipped} skipped.`,
+              reason: 'bulk_action_partial',
+              source: { feature: 'todos', entityType: 'todo' },
+              target: { feature: 'todos', entityType: 'todo' },
+            }),
+          );
+        }
       } catch (error) {
         // A failed bulk edit must never strand the screen in selection mode
         // with stale rows or escape as an unhandled rejection.
@@ -440,24 +482,30 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   );
 
   const handleBulkComplete = useCallback(
-    () => runBulkAction(() => bulkSetTodoCompletion(selectedIds, 1)),
+    () => runBulkAction(() => bulkSetTodoCompletion(selectedIds, 1), 'Completed'),
     [runBulkAction, selectedIds],
   );
-  const handleBulkReopen = useCallback(
-    () => runBulkAction(() => bulkSetTodoCompletion(selectedIds, 0)),
-    [runBulkAction, selectedIds],
-  );
-  const handleBulkDelete = useCallback(
-    () => runBulkAction(() => bulkRemoveTodos(selectedIds)),
-    [runBulkAction, selectedIds],
-  );
+  const handleBulkDelete = useCallback(async () => {
+    // Bulk delete gets the same guardrail as single-row swipe delete.
+    const confirmed = await confirm({
+      title: 'Delete tasks',
+      message: `Delete ${selectedIds.length} selected ${
+        selectedIds.length === 1 ? 'task' : 'tasks'
+      }?`,
+      confirmLabel: 'Delete',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    await runBulkAction(() => bulkRemoveTodos(selectedIds), 'Deleted');
+  }, [confirm, runBulkAction, selectedIds]);
   const handleBulkPriority = useCallback(
-    (priority: TodoPriority) => runBulkAction(() => bulkUpdateTodoPriority(selectedIds, priority)),
+    (priority: TodoPriority) =>
+      runBulkAction(() => bulkUpdateTodoPriority(selectedIds, priority), 'Updated'),
     [runBulkAction, selectedIds],
   );
   const handleBulkAssignProject = useCallback(
     (projectId: string | null) =>
-      runBulkAction(() => bulkAssignTodosProject(selectedIds, projectId)),
+      runBulkAction(() => bulkAssignTodosProject(selectedIds, projectId), 'Updated'),
     [runBulkAction, selectedIds],
   );
 
@@ -505,9 +553,22 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       toggleSelected,
     ],
   );
+  // Manual reorder is only meaningful when every pending row is visible in its
+  // true order. The render branches already keep DraggableFlatList out of
+  // selection/filtered views; this flag additionally gates the drag activation
+  // and persistence below so a filtered subset can never rewrite sort_order.
+  const canReorderManually =
+    !selectionMode && !queryActive && visiblePending.length === pendingTasks.length;
+  const pendingIdSet = useMemo(() => new Set(pendingTasks.map((t) => t.id)), [pendingTasks]);
   const handleDragBegin = useCallback(() => {}, []);
   const handleDragEnd = useCallback(
     async ({ data }: { data: Todo[] }) => {
+      // updateTodoOrder assigns ABSOLUTE sort_order 1..N to exactly the ids it
+      // receives, so persisting a reordered filtered subset would corrupt the
+      // global manual order. Persist only the full pending list.
+      const isFullPendingList =
+        data.length === pendingTasks.length && data.every((item) => pendingIdSet.has(item.id));
+      if (!isFullPendingList) return;
       setItems((prev) =>
         prev.map((item) => {
           const newIndex = data.findIndex((d) => d.id === item.id);
@@ -517,14 +578,14 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       await updateTodoOrder(data.map((d) => d.id));
       void refresh();
     },
-    [refresh],
+    [pendingIdSet, pendingTasks, refresh],
   );
   const renderTodoItem = useCallback(
     ({ item, drag, isActive }: RenderItemParams<Todo>) => (
       <ScaleDecorator>
         <TodoItem
           todo={item}
-          onLongPress={drag}
+          onLongPress={canReorderManually ? drag : () => {}}
           isActive={isActive}
           onToggle={() => handleToggleTodo(item)}
           onDelete={() => void requestDeleteTodo(item)}
@@ -536,7 +597,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         />
       </ScaleDecorator>
     ),
-    [gridCardWidth, handleToggleTodo, requestDeleteTodo, startEdit, viewMode],
+    [canReorderManually, gridCardWidth, handleToggleTodo, requestDeleteTodo, startEdit, viewMode],
   );
   const todoLinkedActionSource: LinkedActionEditorSourceOption = {
     key: TODO_LINKED_ACTION_SOURCE_KEY,
@@ -712,7 +773,6 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                     <TodoBulkBar
                       selectedCount={selectedIds.length}
                       onComplete={() => void handleBulkComplete()}
-                      onReopen={() => void handleBulkReopen()}
                       onDelete={() => void handleBulkDelete()}
                       onPriorityChange={(priority) => void handleBulkPriority(priority)}
                       projects={projectOptions}

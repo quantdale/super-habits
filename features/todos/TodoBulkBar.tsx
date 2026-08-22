@@ -5,12 +5,19 @@ import { PillChip } from '@/core/ui/PillChip';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type { TodoPriority } from './types';
 
+/**
+ * Action bar shown while a bulk multi-select is active.
+ *
+ * There is intentionally no Reopen action: selection rows are built from the
+ * pending list only, so completed items can never be selected in this mode
+ * (product decision — see TodosScreen's selection view).
+ */
+
 type ProjectOption = { id: string; name: string };
 
 type Props = {
   selectedCount: number;
   onComplete: () => void;
-  onReopen: () => void;
   onDelete: () => void;
   onPriorityChange: (priority: TodoPriority) => void;
   projects: ProjectOption[];
@@ -19,11 +26,9 @@ type Props = {
   accentColor: string;
 };
 
-/** Action bar shown while a bulk multi-select is active. */
 export function TodoBulkBar({
   selectedCount,
   onComplete,
-  onReopen,
   onDelete,
   onPriorityChange,
   projects,
@@ -64,7 +69,12 @@ export function TodoBulkBar({
             label={priority}
             active={false}
             color={accentColor}
-            onPress={() => onPriorityChange(priority)}
+            onPress={() => {
+              // Same 0-selected guard as Complete/Delete so a stray tap can't
+              // run a no-op batch that silently exits selection mode.
+              if (disabled) return;
+              onPriorityChange(priority);
+            }}
           />
         ))}
       </View>
@@ -74,7 +84,10 @@ export function TodoBulkBar({
             label="No project"
             active={false}
             color={accentColor}
-            onPress={() => onAssignProject(null)}
+            onPress={() => {
+              if (disabled) return;
+              onAssignProject(null);
+            }}
           />
           {projects.slice(0, 6).map((project) => (
             <PillChip
@@ -98,16 +111,6 @@ export function TodoBulkBar({
             }}
             disabled={disabled}
             color={accentColor}
-          />
-        </View>
-        <View className="flex-1">
-          <Button
-            label="Reopen"
-            variant="ghost"
-            onPress={() => {
-              if (!disabled) onReopen();
-            }}
-            disabled={disabled}
           />
         </View>
         <View className="flex-1">

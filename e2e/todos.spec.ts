@@ -51,7 +51,12 @@ test.describe('Todos', () => {
     await expect(page.getByText('Delete me')).toBeVisible();
     await swipeLeftToRevealRowActions(page, 'Delete me');
     await clickSwipeDeleteAction(page, 'Delete me');
-    await expect(page.getByText('Delete me')).not.toBeVisible();
+    // Swipe Delete opens the shared confirmation dialog; deleting requires an
+    // explicit confirm there.
+    const deleteDialog = page.getByRole('dialog');
+    await expect(deleteDialog.getByText('Delete "Delete me"?')).toBeVisible();
+    await deleteDialog.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(page.getByText('Delete me', { exact: true })).not.toBeVisible();
   });
 
   test('todo persists after hard reload', async ({ page }) => {
