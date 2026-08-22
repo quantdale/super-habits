@@ -739,6 +739,23 @@ req(
   "ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'",
 );
 
+// Daily-plan priority title snapshots (local counterpart: SQLite migration 21).
+// Strictly additive nullable column; legacy rows and pre-v21 backups stay valid.
+const titleSnapshotsMigrationName = migrationNames.find((name) =>
+  name.endsWith('_daily_plan_priority_title_snapshots.sql'),
+);
+if (!titleSnapshotsMigrationName)
+  failures.push('missing daily plan priority title snapshots migration');
+const titleSnapshotsMigration = titleSnapshotsMigrationName
+  ? read(`supabase/migrations/${titleSnapshotsMigrationName}`)
+  : '';
+req(
+  'daily plan title snapshots migration column',
+  titleSnapshotsMigration,
+  'ADD COLUMN IF NOT EXISTS top_todo_titles TEXT',
+);
+req('fixture daily_plans.top_todo_titles', fixture, 'top_todo_titles');
+
 // workout_session_sets: per-set load/reps provenance table with composite
 // owner FK, RLS, policies, grants, and fixture mirror.
 req(

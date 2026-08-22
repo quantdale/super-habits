@@ -396,6 +396,7 @@ export async function applyRemoteDailyPlans(
          date_key,
          intention,
          top_todo_ids,
+         top_todo_titles,
          focus_target_minutes,
          notes,
          reflection,
@@ -405,12 +406,13 @@ export async function applyRemoteDailyPlans(
          updated_at,
          deleted_at,
          completed_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.date_key,
         row.intention,
         row.top_todo_ids,
+        row.top_todo_titles ?? null,
         row.focus_target_minutes,
         row.notes,
         row.reflection,

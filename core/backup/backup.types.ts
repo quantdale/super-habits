@@ -242,6 +242,7 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'date_key',
     'intention',
     'top_todo_ids',
+    'top_todo_titles',
     'focus_target_minutes',
     'notes',
     'reflection',

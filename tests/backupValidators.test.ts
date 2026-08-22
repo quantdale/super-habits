@@ -46,11 +46,29 @@ const validCompletion = {
   updated_at: '2026-08-01T08:00:00.000Z',
 };
 
+const validDailyPlan = {
+  id: 'plan_1786782139450_31237563',
+  date_key: '2026-08-01',
+  intention: 'Deep work day',
+  top_todo_ids: JSON.stringify(['todo_1786782139450_31237563']),
+  top_todo_titles: JSON.stringify(['Test']),
+  focus_target_minutes: 90,
+  notes: null,
+  reflection: null,
+  energy_score: null,
+  status: 'draft',
+  created_at: '2026-08-01T06:00:00.000Z',
+  updated_at: '2026-08-01T06:00:00.000Z',
+  deleted_at: null,
+  completed_at: null,
+};
+
 describe('backup row validators', () => {
   it('accepts well-formed rows for every entity', () => {
     expect(validateBackupRow('todos', validTodo).ok).toBe(true);
     expect(validateBackupRow('habits', validHabit).ok).toBe(true);
     expect(validateBackupRow('habit_completions', validCompletion).ok).toBe(true);
+    expect(validateBackupRow('daily_plans', validDailyPlan).ok).toBe(true);
     expect(
       validateBackupRow('pomodoro_sessions', {
         id: 'pom_1',
@@ -342,5 +360,26 @@ describe('backup graph validation', () => {
       habits: [validHabit, { ...validHabit }],
     });
     expect(errors.some((e) => e.includes('habits duplicate id'))).toBe(true);
+  });
+});
+
+describe('daily_plans top_todo_titles snapshots', () => {
+  it('accepts a legacy pre-v21 row without the column', () => {
+    const { top_todo_titles: _omitted, ...legacy } = validDailyPlan;
+    expect(validateBackupRow('daily_plans', legacy).ok).toBe(true);
+  });
+
+  it('accepts a null snapshot', () => {
+    expect(validateBackupRow('daily_plans', { ...validDailyPlan, top_todo_titles: null }).ok).toBe(
+      true,
+    );
+  });
+
+  it('rejects a non-string snapshot', () => {
+    const result = validateBackupRow('daily_plans', {
+      ...validDailyPlan,
+      top_todo_titles: 42,
+    });
+    expect(result.ok).toBe(false);
   });
 });

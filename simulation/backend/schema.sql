@@ -486,6 +486,7 @@ CREATE TABLE IF NOT EXISTS public.daily_plans (
   date_key              TEXT NOT NULL,
   intention             TEXT NOT NULL DEFAULT '',
   top_todo_ids          TEXT NOT NULL DEFAULT '[]',
+  top_todo_titles       TEXT,
   focus_target_minutes  INTEGER NOT NULL DEFAULT 0,
   notes                 TEXT NOT NULL DEFAULT '',
   reflection            TEXT NOT NULL DEFAULT '',

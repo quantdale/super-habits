@@ -236,13 +236,13 @@ describe('tests/integration/migrations', () => {
     const file = path.join(dir, 'superhabits.db');
 
     try {
-      // Session 1: a fresh empty file gets bootstrapped + migrated to v20.
+      // Session 1: a fresh empty file gets bootstrapped + migrated to head.
       const session1 = await openDb({ filename: file });
       const v1 = await session1.getFirstAsync<{ value: string }>(
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('20');
+      expect(v1?.value).toBe('21');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -253,7 +253,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('20');
+      expect(v2?.value).toBe('21');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",

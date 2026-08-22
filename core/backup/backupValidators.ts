@@ -624,6 +624,9 @@ const DAILY_PLAN_RULES: FieldRule[] = [
   { required: (row) => checkField(row, 'date_key', isDateKey, 'date_key') },
   nullableTextRule('intention'),
   textRule('top_todo_ids', true),
+  // v21 historical title snapshots: absent on pre-v21/legacy rows, nullable on
+  // current rows. Append-only column, so absence must stay valid (no scope bump).
+  optionalColumnRule('top_todo_titles', (v) => v === null || isBoundedString(v, 'top_todo_titles')),
   intRule('focus_target_minutes', true, 0),
   nullableTextRule('notes'),
   nullableTextRule('reflection'),
