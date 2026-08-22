@@ -445,6 +445,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     // follows the actual durations instead of a stale selection.
     setStoredActivePresetIdState(null);
     void clearActivePresetId().catch(() => undefined);
+    // Saving durations mid-session abandons that session (running or paused):
+    // it is never logged, so cancel its OS notification and durable intent
+    // before resetting the timer, otherwise a reload would reconcile a ghost.
+    void cancelScheduledNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    void clearPomodoroActiveTimer().catch(() => undefined);
+    setStartedAt(null);
+    startedAtRef.current = null;
     const duration = getModeDuration(currentMode, newSettings);
     setTotalSeconds(duration);
     totalSecondsRef.current = duration;
@@ -574,6 +582,19 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setIsRunning(false);
     setIsPaused(true);
     setShowWarning(false);
+    // Persist the frozen countdown into the durable intent so a crash while
+    // paused reconciles as interrupted instead of phantom-logging a session
+    // whose clock never ran past its nominal deadline.
+    if (startedAtRef.current) {
+      void savePomodoroActiveTimer({
+        startedAtIso: startedAtRef.current.toISOString(),
+        mode: currentMode,
+        totalSeconds,
+        completedFocus: completedFocusRef.current,
+        notificationId: null,
+        pausedRemainingSeconds: remaining,
+      }).catch(() => undefined);
+    }
   };
 
   const resume = async () => {
@@ -584,13 +605,15 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setIsRunning(true);
     setIsPaused(false);
     if (startedAtRef.current) {
-      // Keep the durable intent's notification id current across pauses.
+      // Keep the durable intent's notification id current across pauses and
+      // clear the paused marker so reconciliation trusts the deadline again.
       void savePomodoroActiveTimer({
         startedAtIso: startedAtRef.current.toISOString(),
         mode: currentMode,
         totalSeconds,
         completedFocus: completedFocusRef.current,
         notificationId: id,
+        pausedRemainingSeconds: null,
       }).catch(() => undefined);
     }
   };
@@ -818,6 +841,12 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 onPress={() => {
                   if (isRunning) return;
                   clearAutoStartTimer();
+                  // Switching modes abandons any paused session: per contract
+                  // it is never logged, so drop its durable intent and cancel
+                  // any surviving OS notification with it.
+                  void cancelScheduledNotification(notificationIdRef.current);
+                  notificationIdRef.current = null;
+                  void clearPomodoroActiveTimer().catch(() => undefined);
                   setCompletionSummary(null);
                   setIsPaused(false);
                   setCurrentMode(mode);

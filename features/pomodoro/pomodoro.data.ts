@@ -403,6 +403,13 @@ function normalizeActiveTimerIntent(value: unknown): ActiveTimerIntent | null {
       typeof candidate.notificationId === 'string' && candidate.notificationId.length > 0
         ? candidate.notificationId
         : null,
+    // Optional paused marker: legacy running intents simply omit it.
+    pausedRemainingSeconds:
+      typeof candidate.pausedRemainingSeconds === 'number' &&
+      Number.isInteger(candidate.pausedRemainingSeconds) &&
+      candidate.pausedRemainingSeconds > 0
+        ? candidate.pausedRemainingSeconds
+        : null,
   };
 }
 

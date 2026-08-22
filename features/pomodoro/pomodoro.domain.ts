@@ -509,6 +509,11 @@ export type ActiveTimerIntent = {
   totalSeconds: number;
   completedFocus: number;
   notificationId: string | null;
+  /**
+   * Frozen countdown while the timer is paused; null while running. Legacy
+   * intents persisted before pausing was durable omit the field entirely.
+   */
+  pausedRemainingSeconds?: number | null;
 };
 
 export type ActiveTimerReconciliation =
@@ -519,6 +524,7 @@ export type ActiveTimerReconciliation =
 /**
  * Decide what happened to a session whose process died mid-run.
  * - Row already logged → completion survived; only cycle position needs restore.
+ * - Paused when the process died → interrupted; the frozen clock never elapsed.
  * - Focus countdown passed with no row → honor the completed focus.
  * - Anything else → interrupted mid-session; per product contract interrupted
  *   sessions are never logged, so surface a notice and cancel the orphan OS
@@ -530,6 +536,11 @@ export function planActiveTimerReconcile(
   nowMs: number,
 ): ActiveTimerReconciliation {
   if (hasLoggedRow) return { kind: 'already-logged', notificationId: intent.notificationId };
+  // A paused session's countdown was frozen when the process died, so its
+  // nominal deadline is meaningless: it can never be honored as complete.
+  if (intent.pausedRemainingSeconds != null) {
+    return { kind: 'interrupted', notificationId: intent.notificationId };
+  }
   const endMs = new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000;
   if (intent.mode === 'focus' && nowMs >= endMs) {
     return { kind: 'complete-unlogged', notificationId: intent.notificationId };

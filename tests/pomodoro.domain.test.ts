@@ -427,6 +427,34 @@ describe('planActiveTimerReconcile', () => {
     const breakIntent: ActiveTimerIntent = { ...intent, mode: 'short_break' };
     expect(planActiveTimerReconcile(breakIntent, false, endMs).kind).toBe('interrupted');
   });
+
+  it('never phantom-logs a paused focus whose nominal deadline passed', () => {
+    // The clock was frozen at pause; elapsed wall time while dead proves nothing.
+    const pausedIntent: ActiveTimerIntent = {
+      ...intent,
+      pausedRemainingSeconds: 600,
+    };
+    expect(planActiveTimerReconcile(pausedIntent, false, endMs)).toEqual({
+      kind: 'interrupted',
+      notificationId: 'notif-1',
+    });
+    expect(planActiveTimerReconcile(pausedIntent, false, endMs + 86_400_000).kind).toBe(
+      'interrupted',
+    );
+  });
+
+  it('still reports already-logged for a paused session whose row survived', () => {
+    const pausedIntent: ActiveTimerIntent = {
+      ...intent,
+      pausedRemainingSeconds: 1,
+    };
+    expect(planActiveTimerReconcile(pausedIntent, true, endMs).kind).toBe('already-logged');
+  });
+
+  it('treats an unpaused legacy intent (no paused field) as before', () => {
+    // Legacy intents persisted without the marker keep running-deadline logic.
+    expect(planActiveTimerReconcile({ ...intent }, false, endMs).kind).toBe('complete-unlogged');
+  });
 });
 
 // ---------------------------------------------------------------------------
