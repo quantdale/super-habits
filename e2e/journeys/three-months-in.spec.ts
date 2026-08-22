@@ -655,19 +655,31 @@ async function outboxRecords(
 /**
  * Drive the todos list to reveal `targetText` with real wheel input inside the
  * list body. The list is a virtualized DraggableFlatList: only a window of rows
- * exists in the DOM, and it grows as the list scrolls. Hover a mounted row so
- * wheel events target the list scroller (same proven pattern as
- * boundary.spec.ts) — container sniffing is unreliable while the section's
+ * exists in the DOM, and it grows as the list scrolls. Wheel-based like
+ * boundary.spec.ts — scrollIntoView cannot address rows that are not yet
+ * mounted, and container sniffing is unreliable while the section's
  * mount/opacity transition is still settling.
+ *
+ * Unlike a single pre-loop hover, the anchor is RE-TAKEN each sweep on the
+ * deepest currently-mounted todos-list row via its unique completion-checkbox
+ * name ("Mark complete: Task N" exists only in the Todos list body, so it is
+ * immune to Overview chip / suggested-card duplicates). A stale one-time
+ * anchor proved host-sensitive: when virtualization re-rendered under the
+ * cursor (or wheels were dropped under host contention), every subsequent
+ * wheel missed the list scroller and the loop made zero silent progress
+ * (observed 2026-08-22: list still at top rows after 100 wheels).
  */
 async function scrollTodosListUntilVisible(page: Page, targetText: string): Promise<void> {
-  // Anchor on the LAST 'Task 4' in the DOM: earlier copies can live in inert
-  // preview cards, while the real list row sits inside the scrollable body
-  // (same .last() anchoring as boundary.spec.ts).
-  const anchorRow = page.getByText('Task 4', { exact: true }).last();
-  await anchorRow.hover();
-  for (let i = 0; i < 100; i++) {
-    if ((await page.getByText(targetText, { exact: true }).count()) > 0) return;
+  const target = page.getByText(targetText, { exact: true });
+  for (let i = 0; i < 120; i++) {
+    if ((await target.count()) > 0) return;
+    await page
+      .getByRole('checkbox', { name: /Mark complete: Task \d+/ })
+      .last()
+      .hover()
+      .catch(() => {
+        /* transient detach during virtualization — wheel from last position */
+      });
     await page.mouse.wheel(0, 700);
     await page.waitForTimeout(40);
   }
