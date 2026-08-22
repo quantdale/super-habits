@@ -165,6 +165,23 @@ async function buildSeed(config: BuildSeedConfig): Promise<TestDatabase> {
     const id = await habitsData.addHabit(habitNames[i % habitNames.length], target);
     habitIds.push(id);
   }
+  // The corpus simulates habits that existed across the whole backfill
+  // window, so backdate each seeded habit to one day before the earliest
+  // history day. The lifecycle write gate (migration 20 semantics) would
+  // otherwise reject the historical completions below as pre-creation.
+  const { createHabitRule } = await import('@/features/habits/habits.domain');
+  clock.set(seedDayDate(config.days));
+  const historyStartIso = clock.nowIso();
+  const historyStartKey = clock.toDateKey();
+  for (let i = 0; i < habitIds.length; i++) {
+    const target = (i % 3) + 1;
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      historyStartIso,
+      JSON.stringify([createHabitRule(historyStartKey, [1, 2, 3, 4, 5, 6, 7], target)]),
+      habitIds[i],
+    ]);
+  }
+  clock.set(seedDayDate(0));
 
   // --- Workout routines (exercises + sets) ---
   const exerciseNames = [

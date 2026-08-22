@@ -93,7 +93,7 @@ describe('project rollups (F8 / task 11.1)', () => {
 
 describe('goal rollups (F8 / task 11.1)', () => {
   it('getGoalRollup bounds habit completions by the horizon window', async () => {
-    await freshDatabase();
+    const db = await freshDatabase();
     const goals = await import('@/features/goals/goals.data');
     const todos = await import('@/features/todos/todos.data');
     const habits = await import('@/features/habits/habits.data');
@@ -106,6 +106,14 @@ describe('goal rollups (F8 / task 11.1)', () => {
     await todos.addTodo({ title: 'g2 task', goalId: weekGoal });
 
     const habitId = await habits.addHabit('Journal', 1);
+    // Backdate the seed habit so the lifecycle write gate accepts the
+    // historical completions this test writes through incrementHabit.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -30)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -30), [1, 2, 3, 4, 5, 6, 7], 1)]),
+      habitId,
+    ]);
     await habits.setHabitProjectGoal(habitId, { goalId: yearGoal });
     await habits.incrementHabit(habitId, shiftKey(TODAY, -3)); // inside both windows
     await habits.incrementHabit(habitId, shiftKey(TODAY, -10)); // outside week, inside year

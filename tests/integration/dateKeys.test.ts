@@ -77,6 +77,15 @@ describe('local date-key writes and reads', () => {
     const habits = await import('@/features/habits/habits.data');
 
     const habitId = await habits.addHabit('Stretch', 3);
+    // The lifecycle write gate (migration 20 semantics) rejects check-ins
+    // before the habit existed, so backdate the seed habit to before the
+    // exercised dates; the increments below still run through incrementHabit.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      '2026-06-01T00:00:00.000Z',
+      JSON.stringify([createHabitRule('2026-07-01', [1, 2, 3, 4, 5, 6, 7], 3)]),
+      habitId,
+    ]);
     await habits.incrementHabit(habitId, '2026-07-01');
     await habits.incrementHabit(habitId, '2026-07-02');
 
@@ -198,6 +207,14 @@ describe('mixed corpus containing pre-cutover UTC date keys', () => {
     expect(format?.value).toBe('local');
 
     const habitId = await habits.addHabit('Old habit', 5);
+    // Backdate the seed habit so the lifecycle gate accepts the pre-cutover
+    // and cutover-era completions this test writes through incrementHabit.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      '2026-06-01T00:00:00.000Z',
+      JSON.stringify([createHabitRule('2026-06-01', [1, 2, 3, 4, 5, 6, 7], 5)]),
+      habitId,
+    ]);
     await habits.incrementHabit(habitId, '2026-06-29'); // UTC-era key
     await habits.incrementHabit(habitId, '2026-07-01'); // local-era key
 
