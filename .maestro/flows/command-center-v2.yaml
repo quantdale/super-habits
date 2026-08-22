@@ -9,6 +9,8 @@ tags:
 - extendedWaitUntil:
     visible: 'Overview'
     timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn: 'Open command center'
 - extendedWaitUntil:
     visible: 'Command center'

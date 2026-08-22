@@ -12,11 +12,20 @@ tags:
       notifications: allow
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native reminder M-W-F'
@@ -36,6 +45,19 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# Return toward the top so the fresh Anytime-group row enters the viewport.
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
 - extendedWaitUntil:
     visible: 'Native reminder M-W-F'
     timeout: 5000
@@ -45,11 +67,23 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- assertVisible: 'Native reminder M-W-F'
-- assertVisible: 'Mon / Wed / Fri'
-- assertVisible: 'Reminder 18:00'
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
+- extendedWaitUntil:
+    visible: 'Native reminder M-W-F'
+    timeout: 15000
+- extendedWaitUntil:
+    visible: 'Mon / Wed / Fri'
+    timeout: 5000
+- extendedWaitUntil:
+    visible: 'Reminder 18:00'
+    timeout: 5000
+

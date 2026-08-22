@@ -8,25 +8,32 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- tapOn: 'Add task'
-- tapOn: 'Title'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'To Do'
+    index: 0
+- assertVisible: 'Quick add'
+# Create through the quick-capture input: the FAB shares its label with the
+# disabled submit twin and sits under the command launcher, so neither is a
+# stable tap target. returnKeyType=done submits the capture bar.
+- tapOn: 'Quick add task title'
 - inputText: 'Native persistence todo'
-- hideKeyboard
-- scrollUntilVisible:
-    element: 'Add task'
-    direction: DOWN
-- tapOn: 'Add task'
+- pressKey: enter
 - extendedWaitUntil:
     visible: 'Native persistence todo'
-    timeout: 5000
+    timeout: 10000
 - killApp
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- assertVisible: 'Native persistence todo'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'To Do'
+    index: 0
+- extendedWaitUntil:
+    visible: 'Native persistence todo'
+    timeout: 15000

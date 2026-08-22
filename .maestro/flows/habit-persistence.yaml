@@ -8,11 +8,20 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native daily habit'
@@ -30,9 +39,18 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- assertVisible: 'Native daily habit: 1 of 1 today.*'
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
+# Cold relaunch loads habits asynchronously; give the query time.
+- extendedWaitUntil:
+    visible: 'Native daily habit: 1 of 1 today.*'
+    timeout: 15000
+

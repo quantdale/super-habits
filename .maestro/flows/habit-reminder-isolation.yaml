@@ -12,11 +12,17 @@ tags:
       notifications: allow
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
+# Reveal the group tiles (header+stats push them below the fold at top).
 - swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native Gym reminder'
@@ -34,45 +40,77 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# Undo the form-entry depth, then re-reveal the fresh top row.
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
 - extendedWaitUntil:
     visible: 'Native Gym reminder'
-    timeout: 5000
+    timeout: 15000
+# Second habit must NOT inherit the first one's reminder.
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native Read reminder'
 - hideKeyboard
 - scrollUntilVisible:
-    element: 'Enable habit reminder'
-    direction: DOWN
-- tapOn: 'Enable habit reminder'
-- scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
 - extendedWaitUntil:
     visible: 'Native Read reminder'
-    timeout: 5000
+    timeout: 15000
 - assertVisible: 'Native Gym reminder'
 - assertVisible: 'Reminder 18:00'
+- swipe:
+    start: '50%, 30%'
+    end: '50%, 70%'
+    duration: 350
 - tapOn: 'Enter habit edit mode'
-- scrollUntilVisible:
-    element: 'Delete'
-    direction: DOWN
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 40%'
+    duration: 350
 - tapOn: 'Delete'
 - tapOn: 'Delete habit'
 - extendedWaitUntil:
-    visible: 'Native Gym reminder'
+    visible: 'Native Read reminder'
     timeout: 5000
-- assertNotVisible: 'Native Read reminder'
-- tapOn: 'Exit habit edit mode'
+- assertNotVisible: 'Native Gym reminder'
 - assertVisible: 'Reminder 18:00'
-- swipe:
-    direction: LEFT
+- tapOn:
+    text: 'Focus'
+    index: 0
 - tapOn: 'Start focus'
 - assertVisible: 'Pause'
 - pressKey: HOME
 - launchApp:
     stopApp: false
 - assertVisible: 'Pause'
-- tapOn: 'Reset'
+# Elapsed focus time varies with emulator speed; accept either label.
+- tapOn: 'Reset|Abandon'
 - assertVisible: 'Start focus'

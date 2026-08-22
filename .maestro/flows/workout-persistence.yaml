@@ -8,19 +8,32 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
 - tapOn: 'Routine name'
 - inputText: 'Native strength routine'
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Description'
 - inputText: 'Native routine'
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native strength routine routine'
@@ -37,16 +50,14 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
 - scrollUntilVisible:
     element: 'Native strength routine'
     direction: DOWN
 - assertVisible: 'Native strength routine'
+

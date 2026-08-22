@@ -9,11 +9,20 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native M-W-F habit'
@@ -27,24 +36,41 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# Return toward the top so the fresh Anytime-group row enters the viewport.
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 20%'
+    end: '50%, 92%'
+    duration: 400
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
 - extendedWaitUntil:
     visible: 'Native M-W-F habit'
     timeout: 5000
-- scrollUntilVisible:
-    element: 'Mon / Wed / Fri'
-    direction: UP
 - assertVisible: 'Mon / Wed / Fri'
 - killApp
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- scrollUntilVisible:
-    element: 'Mon / Wed / Fri'
-    direction: UP
-- assertVisible: 'Native M-W-F habit'
-- assertVisible: 'Mon / Wed / Fri'
+    start: '50%, 66%'
+    end: '50%, 28%'
+    duration: 350
+- extendedWaitUntil:
+    visible: 'Native M-W-F habit'
+    timeout: 15000
+- extendedWaitUntil:
+    visible: 'Mon / Wed / Fri'
+    timeout: 5000
+

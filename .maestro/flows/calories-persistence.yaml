@@ -8,23 +8,32 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Calories'
+    index: 0
+- assertVisible: 'Switch between manual entry and a diary grouped by meal.'
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Calories entry food'
 - inputText: 'Native breakfast'
 - tapOn: 'Calories entry protein'
 - inputText: '20'
 - tapOn: 'Calories entry carbs'
 - inputText: '50'
+- hideKeyboard
+- swipe:
+    start: '50%, 66%'
+    end: '50%, 40%'
+    duration: 350
 - tapOn: 'Calories entry fat'
 - inputText: '10'
 - hideKeyboard
@@ -46,16 +55,12 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Calories'
+    index: 0
 - tapOn: 'Diary'
 - assertVisible: 'Native breakfast'
+

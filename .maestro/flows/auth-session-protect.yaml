@@ -11,7 +11,9 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 15000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn: 'Open settings'
 - scrollUntilVisible:
     element: 'Email for backup recovery'

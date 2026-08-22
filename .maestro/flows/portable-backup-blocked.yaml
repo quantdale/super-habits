@@ -11,7 +11,9 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 15000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn: 'Add task'
 - extendedWaitUntil:
     visible: 'Add a task'

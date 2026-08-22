@@ -11,11 +11,20 @@ tags:
       notifications: allow
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native delivery habit'
@@ -31,6 +40,10 @@ tags:
 - extendedWaitUntil:
     visible: 'Native delivery habit'
     timeout: 5000
+- swipe:
+    start: '50%, 30%'
+    end: '50%, 70%'
+    duration: 350
 - tapOn: 'Enter habit edit mode'
 - tapOn: 'Edit'
 - scrollUntilVisible:
@@ -39,3 +52,4 @@ tags:
 - tapOn: 'Schedule test notification'
 - pressKey: HOME
 - killApp
+

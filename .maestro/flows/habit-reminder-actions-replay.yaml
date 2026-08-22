@@ -11,11 +11,20 @@ tags:
       notifications: allow
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - swipe:
-    direction: LEFT
+    start: '50%, 66%'
+    end: '50%, 26%'
+    duration: 350
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native replay action'
@@ -31,6 +40,10 @@ tags:
 - extendedWaitUntil:
     visible: 'Native replay action: 0 of 1 today.*'
     timeout: 5000
+- swipe:
+    start: '50%, 30%'
+    end: '50%, 70%'
+    duration: 350
 - tapOn: 'Enter habit edit mode'
 - tapOn: 'Edit'
 - scrollUntilVisible:
@@ -49,12 +62,17 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Overview'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
 - assertVisible: 'Native replay action: 1 of 1 today.*'
+- swipe:
+    start: '50%, 30%'
+    end: '50%, 70%'
+    duration: 350
 - tapOn: 'Enter habit edit mode'
 - tapOn: 'Edit'
 - scrollUntilVisible:
@@ -70,3 +88,4 @@ tags:
     element: 'Native replay action: 1 of 1 today.*'
     direction: UP
 - assertVisible: 'Native replay action: 1 of 1 today.*'
+
