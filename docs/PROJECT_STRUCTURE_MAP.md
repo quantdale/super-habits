@@ -6,7 +6,7 @@
 - Validation is hard-reject; errors are surfaced to users.
 - See audit findings for more details.
 
-Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v15** is current; migration 15 adds the durable sync-outbox owner binding in `core/db/client.ts`. Migration 13 adds durable processed-notification-action state and migration 14 adds the durable SQLite sync outbox. The habit engine retains effective-dated weekly schedule/target history in `habits.rule_history`. Linked Actions, Backup Completeness V2 / Restore V2, and Recoverable Account V1 are live; **Portable Backup V1** (`core/portable/`) adds a user-controlled file export/import path that works without Supabase. Recoverable Account V1 adds a local-only `app_meta.account.owner_user_id` binding and fail-closed Auth recovery around that backup boundary.
+Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v21** is current in `core/db/client.ts`: migration 13 adds durable processed-notification-action state, 14 the durable SQLite sync outbox, 15 its enqueue-time owner binding, 16–19 the planning entities and habit schedule history, 20 the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), and 21 `daily_plans.top_todo_titles`. The habit engine retains effective-dated weekly schedule/target history in `habits.rule_history`. Linked Actions, Backup Completeness V2 / Restore V2, and Recoverable Account V1 are live; **Portable Backup V1** (`core/portable/`) adds a user-controlled file export/import path that works without Supabase. Recoverable Account V1 adds a local-only `app_meta.account.owner_user_id` binding and fail-closed Auth recovery around that backup boundary.
 
 Current shell truth:
 
@@ -53,11 +53,11 @@ Screens are mounted in the single-page shell `app/index.tsx` behind `NavigationC
 
 ## 3. Database & sync authority (single sources of truth)
 
-| Concern         | File                                                                                            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Persistence** | `core/db/client.ts`                                                                             | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()` (`if (version < N)` blocks; current v15). WAL native-only. `schema.sql` = hand-maintained reference snapshot **not** runtime; it includes the v14 durable sync outbox and v15 owner binding and must be kept aligned with the runtime DDL. `core/db/migrations/` holds remote/Supabase reference SQL only — local migrations never live there. |
-| **Row shapes**  | `core/db/types.ts`                                                                              | TypeScript entity types consumed by data layer.                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Sync**        | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/sync/restore.coordinator.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). Restore v1 preview/import lives beside the adapter and is intentionally narrower than full sync.                                                                                                                                               |
+| Concern         | File                                                                                            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Persistence** | `core/db/client.ts`                                                                             | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()` (`if (version < N)` blocks; current v21). WAL native-only. `schema.sql` = hand-maintained reference snapshot **not** runtime; it lags the runtime DDL (the runtime authority is `runMigrations()`); keep it aligned when touching tables it documents. `core/db/migrations/` holds remote/Supabase reference SQL only — local migrations never live there. |
+| **Row shapes**  | `core/db/types.ts`                                                                              | TypeScript entity types consumed by data layer.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Sync**        | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/sync/restore.coordinator.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). Restore v1 preview/import lives beside the adapter and is intentionally narrower than full sync.                                                                                                                                                           |
 
 Remote flush (30s interval / visibility hidden / NetInfo reconnect) when `isRemoteEnabled()` (`lib/supabase.ts`, default **enabled**) and the account coordinator has verified `current Auth UID = local owner binding = every pending outbox owner`. `AppProviders` runs the coordinator before sync hydration and Restore V1 preview; only an empty/unbound dataset may create a new anonymous session. Session loss and owner mismatch leave local use available but pause remote work.
 
@@ -139,15 +139,18 @@ Format: `{prefix}_{ms}_{rand8}` — rand8 from a CSPRNG (`expo-crypto` / `crypto
 
 ## 7. Sync enqueue (by entity string)
 
-Enqueued after writes: **todos**, **habits** (not completions), **calorie_entries**, **workout_routines** (+ bump after nested routine edits).
-
-**Backup Completeness V2** extends the sync scope to the complete
-recoverable set: `habit_completions`, `pomodoro_sessions`, `saved_meals`,
-`routine_exercises`, `routine_exercise_sets`, `workout_logs`,
-`workout_session_exercises`, `linked_action_rules`, plus synthetic
+Enqueued after writes: all 17 `BACKUP_ENTITIES` (`core/backup/backup.types.ts`) ride
+the durable outbox through `runSyncedMutation`/`runBackupMutation`: **todos**,
+**habits**, **habit_completions**, **calorie_entries**, **saved_meals**,
+**workout_routines**, **routine_exercises**, **routine_exercise_sets**,
+**workout_logs**, **workout_session_exercises**, **pomodoro_sessions**,
+**linked_action_rules**, **weekly_reviews**, **projects**, **goals**,
+**daily_plans**, **workout_session_sets** — plus synthetic
 `user_backup_settings` / `backup_manifest` records (hard-delete entities
 remote-delete; soft-delete tables push tombstones; nested workout edits
-enqueue their own rows).
+enqueue their own rows). Only local operational state stays unsynced:
+`linked_action_events`, `linked_action_executions`,
+`processed_notification_actions`.
 
 Restore V2 imports the full V2 scope atomically on a completely empty
 device (ALL user tables + outbox via `inspectLocalAccountDataState`) with

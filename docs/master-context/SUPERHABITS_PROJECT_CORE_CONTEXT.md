@@ -191,11 +191,11 @@ Main tables include:
 - pomodoro settings
 - date-key cutover markers
 
-Current runtime schema version: `15`
+Current runtime schema version: `21`
 
 Next migration slot:
 
-- add a new `if (version < 16)` block
+- add a new `if (version < 22)` block
 - never edit previous migration blocks
 
 ## Sync model

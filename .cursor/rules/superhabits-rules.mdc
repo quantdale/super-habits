@@ -12,7 +12,7 @@ Stack: React Native 0.83.10, Expo 55 (`~55.0.28`), TypeScript 5.9, expo-router, 
 (expo-sqlite WAL mode), NativeWind 4, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
-Current stored schema version: **15** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 16) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
+Current stored schema version: **21** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 22) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 Current product-shell facts to preserve:
 - The command center is a **global overlay** only; `/command` is not a route anymore.
@@ -30,10 +30,14 @@ Current product-shell facts to preserve:
    Hard delete = data loss with no recovery path.
 
 2. SYNC ENQUEUE ON EVERY WRITE
-   Every INSERT/UPDATE on main entities must call syncEngine.enqueue(record)
-   immediately after the DB operation.
-   Exceptions (intentionally not synced): pomodoro_sessions, workout_logs,
-   habit_completions.
+   Every write on synced entities must flow through runSyncedMutation /
+   runBackupMutation, which enqueue to the durable outbox. All 17
+   BACKUP_ENTITIES (core/backup/backup.types.ts) are synced — including
+   pomodoro_sessions, workout_logs, the nested workout tables, saved_meals,
+   linked_action_rules, and the planning entities. Only local operational
+   state stays unsynced: linked_action_events, linked_action_executions,
+   processed_notification_actions. (habit_completions rows are synced; the
+   count-1→0 decrement may hard-delete the row locally by design.)
    Missing enqueue = silent sync gap when cloud sync is enabled.
 
 3. DB SINGLETON MUST INITIALIZE BEFORE ANY DATA ACCESS
@@ -55,7 +59,7 @@ Current product-shell facts to preserve:
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always append a new `if (version < N) { ... }`
    block in `runMigrations()` in `core/db/client.ts` — there are no numbered migration
-   files. Current stored version: 15; the next block is `if (version < 16)`.
+   files. Current stored version: 21; the next block is `if (version < 22)`.
    schema.sql is a partial reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions
@@ -178,7 +182,7 @@ Implementation note: `nextPomodoroState` in `features/pomodoro/pomodoro.domain.t
 ## Web / PWA context (not application bugs)
 
 - **COEP / COOP:** `metro.config.js` and `app.json` set isolation headers for dev; production static web on **Vercel** uses root **`vercel.json`** (`Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Opener-Policy: same-origin`, SPA rewrite `/(.*)` → `/index.html`) so `crossOriginIsolated` holds for SQLite WASM on web.
-- **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v3` (`CACHE_VERSION = "v3"`). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
+- **Service worker:** `public/sw.js` uses cache name `superhabits-shell-v6` (`CACHE_VERSION = "v6"`; hand-bump on every shell-changing deploy). **Dev bypass:** requests to `localhost` / `127.0.0.1` use network-first `fetch` (no stale Metro cache).
 
 ## MCP tools (development)
 

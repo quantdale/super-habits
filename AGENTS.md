@@ -141,7 +141,7 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **20** (`app_meta.db_schema_version`), including durable processed-notification-action state, the SQLite sync outbox and its durable owner binding, the planning entities (16–19), and the hardening-wave-v2 durable-state promotion (20: habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns). Next migration: add a new `if (version < 21) { ... }` block.
+- Current stored schema version: **21** (`app_meta.db_schema_version`), including durable processed-notification-action state, the SQLite sync outbox and its durable owner binding, the planning entities (16–19), the hardening-wave-v2 durable-state promotion (20: habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), and migration 21 (`daily_plans.top_todo_titles`). Next migration: add a new `if (version < 22) { ... }` block.
 - `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v14 outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 

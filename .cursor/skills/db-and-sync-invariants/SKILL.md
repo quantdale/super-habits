@@ -17,7 +17,7 @@ Read this before writing any code that touches the database or data layer.
 
 ## Schema version
 - Current stored version: **15** (`app_meta.db_schema_version`)
-- Next migration number: **16** (add `if (version < 16) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Next migration number: **22** (add `if (version < 22) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations are append-only `if (version < N)` blocks inside `runMigrations()` in `core/db/client.ts` — there are no numbered migration files. `core/db/migrations/` holds only a Supabase reference SQL (`001_initial_supabase.sql`), never runtime code.
 - schema.sql is a partial REFERENCE ONLY snapshot — not executed at runtime; bootstrap DDL plus migrations are authoritative
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
