@@ -69,7 +69,9 @@ test.describe('Workout', () => {
     await expect(dialog.getByText('Start workout', { exact: true })).toBeVisible();
     await dialog.getByRole('textbox', { name: 'Active (seconds)' }).fill('8');
     // Wait until the shorter timing is committed and reflected back.
-    await expect(dialog.getByRole('textbox', { name: 'Active (seconds)' })).toHaveValue('8', { timeout: 10_000 });
+    await expect(dialog.getByRole('textbox', { name: 'Active (seconds)' })).toHaveValue('8', {
+      timeout: 10_000,
+    });
 
     await dialog.getByText('Start workout', { exact: true }).click({ force: true });
 

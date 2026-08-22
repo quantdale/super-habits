@@ -308,9 +308,7 @@ defineJourney({
         // End the session with Reset (no focus session completes). The control
         // is labelled "Reset (not logged)" — or "Abandon (not logged)" once a
         // focus session has ≥60s elapsed.
-        await page
-          .getByRole('button', { name: /^(?:Reset|Abandon) \(not logged\)$/ })
-          .click();
+        await page.getByRole('button', { name: /^(?:Reset|Abandon) \(not logged\)$/ }).click();
 
         // Live-section contract: after the paused session is reset, the
         // already-mounted idle timer must use the newly saved default before

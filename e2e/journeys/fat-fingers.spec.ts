@@ -2,7 +2,12 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { resetAll } from '../helpers/reset';
 import { returnToApp } from '../helpers/dbHarness';
-import { expectRows, expectUnchanged, switchSection, ACTIVE_SECTION_SELECTOR } from '../helpers/oracles';
+import {
+  expectRows,
+  expectUnchanged,
+  switchSection,
+  ACTIVE_SECTION_SELECTOR,
+} from '../helpers/oracles';
 import { openNewTodoModal, submitTodoModal } from '../helpers/navigation';
 import { swipeLeftToRevealRowActions } from '../helpers/gestures';
 

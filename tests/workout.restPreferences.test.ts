@@ -9,10 +9,7 @@ import {
 // The app_meta-backed load/save live in the data layer (they touch SQLite);
 // restTimerPreferences deliberately does not re-export them (import-cycle
 // safety for core/backup/backupSettings).
-import {
-  loadRestSecondsDefault,
-  saveRestSecondsDefault,
-} from '@/features/workout/workout.data';
+import { loadRestSecondsDefault, saveRestSecondsDefault } from '@/features/workout/workout.data';
 
 const { getItem, removeItem } = vi.hoisted(() => ({
   getItem: vi.fn(),
