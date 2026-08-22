@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
@@ -19,6 +19,13 @@ import {
   isGuidedPlanningDismissed,
   setGuidedPlanningDismissed,
 } from '@/features/planning-hub/guidedPlanning.storage';
+import {
+  applyCarriedForwardSelection,
+  buildGuidedPlanDraft,
+  buildGuidedSaveUpdates,
+  resolveUnfinishedPriorities,
+  type UnfinishedPriority,
+} from '@/features/planning-hub/guidedPlanning.model';
 
 type GuidedPlanningFlowProps = {
   /** Bump to refresh sibling surfaces after a guided save. */
@@ -40,7 +47,7 @@ function shiftDateKey(dateKey: string, days: number): string {
  * full DailyPlanView below remains the complete editor.
  */
 export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const todayKey = toDateKey();
   const yesterdayKey = shiftDateKey(todayKey, -1);
 
@@ -49,22 +56,31 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
   const [loading, setLoading] = useState(true);
 
   // Step 1 — carry-over review.
-  const [yesterdayUnfinished, setYesterdayUnfinished] = useState<string[]>([]);
+  const [yesterdayUnfinished, setYesterdayUnfinished] = useState<UnfinishedPriority[]>([]);
   const [carryingForward, setCarryingForward] = useState(false);
 
   // Step 2 — fixed commitments (read-only).
   const [overdueTodos, setOverdueTodos] = useState<Todo[]>([]);
   const [dueTodayTodos, setDueTodayTodos] = useState<Todo[]>([]);
 
-  // Step 3 — priority selection (writes only at confirm).
+  // Step 3 — priority selection (writes only at confirm). Seeded from today's
+  // existing plan so re-running the flow never silently drops prior choices.
   const [pendingTodos, setPendingTodos] = useState<
     { id: string; title: string; dueDate: string | null }[]
   >([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Today's plan ids as of flow open — the baseline the carry-forward delta
+  // is measured against so deliberate deselections are never resurrected.
+  const planIdsAtOpenRef = useRef<string[]>([]);
 
-  // Step 4/5 — focus + intention, then save.
+  // Step 4/5 — focus + intention, then save. notes/reflection/energyScore
+  // have no guided-flow inputs but ride along from today's existing plan so
+  // the save preserves them instead of resetting to empty defaults.
   const [focusMinutes, setFocusMinutes] = useState('25');
   const [intention, setIntention] = useState('');
+  const [draftNotes, setDraftNotes] = useState('');
+  const [draftReflection, setDraftReflection] = useState('');
+  const [draftEnergyScore, setDraftEnergyScore] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,21 +96,29 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
           setLoading(false);
           return;
         }
-        const [yesterdayPlan, todos] = await Promise.all([
+        const [yesterdayPlan, todayPlan, todos] = await Promise.all([
           getDailyPlan(yesterdayKey).catch(() => null),
+          getDailyPlan(todayKey).catch(() => null),
           listTodos(),
         ]);
         if (!active) return;
+        // Prefill the draft from today's existing plan (same semantics as the
+        // full editor): untouched fields pass through to the save verbatim.
+        const draft = buildGuidedPlanDraft(todayPlan);
+        setSelectedIds(draft.selectedIds);
+        planIdsAtOpenRef.current = draft.selectedIds;
+        setIntention(draft.intention);
+        setFocusMinutes(draft.focusMinutesText);
+        setDraftNotes(draft.notes);
+        setDraftReflection(draft.reflection);
+        setDraftEnergyScore(draft.energyScore);
         if (yesterdayPlan) {
-          const ids = parseTopTodoIds(yesterdayPlan.top_todo_ids);
-          const titles = parseTopTodoTitles(yesterdayPlan.top_todo_titles);
-          const completedIds = new Set(todos.filter((t) => t.completed === 1).map((t) => t.id));
           setYesterdayUnfinished(
-            ids
-              .filter((id) => !completedIds.has(id))
-              .map(
-                (id, i) => titles[i] ?? todos.find((t) => t.id === id)?.title ?? 'A past priority',
-              ),
+            resolveUnfinishedPriorities({
+              ids: parseTopTodoIds(yesterdayPlan.top_todo_ids),
+              titles: parseTopTodoTitles(yesterdayPlan.top_todo_titles),
+              todos,
+            }),
           );
         }
         const open = todos.filter((t) => t.completed === 0);
@@ -144,6 +168,17 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
     setError(null);
     try {
       await carryForwardFromPreviousDay(todayKey);
+      // Re-read what the canonical carry-forward actually wrote so the
+      // selection shown on later steps matches the persisted plan; only
+      // newly carried ids join the selection (deselected stays deselected).
+      const afterPlan = await getDailyPlan(todayKey).catch(() => null);
+      setSelectedIds((current) =>
+        applyCarriedForwardSelection({
+          selection: current,
+          planIdsBeforeCarry: planIdsAtOpenRef.current,
+          planIdsAfterCarry: parseTopTodoIds(afterPlan?.top_todo_ids ?? '[]'),
+        }),
+      );
       setStep(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not carry forward.');
@@ -156,15 +191,17 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
     setSaving(true);
     setError(null);
     try {
-      await upsertDailyPlan(todayKey, {
-        intention,
-        notes: '',
-        reflection: '',
-        energyScore: null,
-        focusTargetMinutes: Math.min(Number(focusMinutes.replace(/\D/g, '')) || 0, 24 * 60),
-        topTodoIds: selectedIds,
-        status: 'committed',
-      });
+      await upsertDailyPlan(
+        todayKey,
+        buildGuidedSaveUpdates({
+          draftNotes,
+          draftReflection,
+          draftEnergyScore,
+          intention,
+          focusMinutesText: focusMinutes,
+          selectedIds,
+        }),
+      );
       setSaved(true);
       onPlanSaved?.();
     } catch (e) {
@@ -172,10 +209,32 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
     } finally {
       setSaving(false);
     }
-  }, [todayKey, intention, focusMinutes, selectedIds, onPlanSaved]);
+  }, [
+    todayKey,
+    draftNotes,
+    draftReflection,
+    draftEnergyScore,
+    intention,
+    focusMinutes,
+    selectedIds,
+    onPlanSaved,
+  ]);
 
   if (dismissed || loading) {
     return null;
+  }
+
+  // Step 3 rows: the first ten open todos, plus any selected id that falls
+  // outside that window (e.g. carried-forward items) so everything that will
+  // be saved is visible and can be deselected deliberately.
+  const priorityRows: { id: string; title: string }[] = [...pendingTodos.slice(0, 10)];
+  for (const id of selectedIds) {
+    if (!priorityRows.some((t) => t.id === id)) {
+      priorityRows.push({
+        id,
+        title: pendingTodos.find((t) => t.id === id)?.title ?? 'Unavailable priority',
+      });
+    }
   }
 
   if (saved) {
@@ -184,7 +243,7 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
         className="rounded-2xl border p-4"
         style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
       >
-        <Text className="text-base font-semibold" style={{ color: SECTION_COLORS.todos }}>
+        <Text className="text-base font-semibold" style={{ color: sectionAccents.todos.text }}>
           {"Today's plan is set."}
         </Text>
         <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
@@ -240,16 +299,21 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
               <Text className="mb-2 text-sm" style={{ color: tokens.textMuted }}>
                 Still open from yesterday:
               </Text>
-              {yesterdayUnfinished.slice(0, 3).map((title) => (
+              {yesterdayUnfinished.slice(0, 3).map((item) => (
                 <Text
-                  key={title}
+                  key={item.id}
                   className="text-sm"
                   style={{ color: tokens.text }}
                   numberOfLines={1}
                 >
-                  • {title}
+                  • {item.title}
                 </Text>
               ))}
+              <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+                {
+                  "They start selected as today's priorities — you can drop any of them in the next steps."
+                }
+              </Text>
             </>
           )}
           <View className="mt-3 flex-row gap-2">
@@ -322,7 +386,7 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
             What matters most? Pick up to {MAX_TOP_PRIORITIES}. ({selectedIds.length}/
             {MAX_TOP_PRIORITIES})
           </Text>
-          {pendingTodos.slice(0, 10).map((t) => {
+          {priorityRows.map((t) => {
             const selected = selectedIds.includes(t.id);
             return (
               <Pressable
