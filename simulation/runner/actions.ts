@@ -380,9 +380,14 @@ export async function actionCreateHabit(
       .getByText('Target per day', { exact: true })
       .locator("xpath=ancestor::*[contains(@class,'mb-3')][1]//input")
       .first();
-    await input.click();
-    await input.fill('');
-    await input.type(String(step.targetPerDay), { delay: 15 });
+    const target = String(step.targetPerDay);
+    // NumberStepperField is a controlled React Native Web input. Clearing it
+    // and then typing can race a controlled-value re-render on CI, producing
+    // values such as `31` when the requested target is `3`. A single fill
+    // dispatches the intended value atomically; the assertion makes the
+    // harness fail at input synchronization rather than after persistence.
+    await input.fill(target);
+    await expect(input).toHaveValue(target);
   }
   await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
   await expect(activeScopedText(page, step.name)).toBeVisible({ timeout: 15_000 });
