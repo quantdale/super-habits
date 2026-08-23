@@ -43,11 +43,11 @@ WORKFLOW
 NON-NEGOTIABLES
 
 - Soft delete only — never DELETE FROM main entities
-- Every write calls syncEngine.enqueue() where applicable (local-only exceptions include pomodoro_sessions, workout_logs, habit_completions, saved_meals, and nested workout tables)
+- Every recoverable write calls syncEngine.enqueue() through the shared mutation helpers; only operational linked-action/notification state is local-only. Gym V2 custom exercises, plans, overrides, body weight, nested workout configuration, and modality-rich history are backup entities.
 - All IDs via createId(prefix) — never raw random/uuid
 - All timestamps via nowIso() — all date keys via toDateKey()
 - New columns require a new migration (never modify existing migrations)
-- Current schema version: **21** — next migration: new **`if (version < 22)`** block in `runMigrations()` in `core/db/client.ts` (when a schema change is introduced)
+- Current schema version: **22** — next migration: new **`if (version < 23)`** block in `runMigrations()` in `core/db/client.ts` (when a schema change is introduced)
 - schema.sql is reference only — never execute it
 - UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed exception to soft-delete — non-synced entity, no `syncEngine.enqueue()`. See `features/habits/habits.data.ts` ~63–66 for the explanatory comment.
 - All SELECT queries include WHERE deleted_at IS NULL

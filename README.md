@@ -42,13 +42,13 @@ Beyond cloud backup, users also get **Portable Backup V1**: a user-controlled fi
 2. Reads current rows from local SQLite by id
 3. Upserts those rows to matching Supabase tables (`onConflict: "id"`)
 
-The Backup Completeness V2 scope rides the same durable outbox: all 12 recoverable entity tables (todos, habits, habit completions, calorie entries, saved meals, full workout structure and history, pomodoro sessions, linked-action rules), plus the synthetic `user_backup_settings` and `backup_manifest` records that carry the certified settings snapshot and the versioned completeness checkpoint. Adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pull()` is still a stub (`[]`) today; empty-device recovery goes through the Restore V2 coordinator (with the legacy V1 path as the labeled fallback).
+The Backup Completeness V2 scope rides the same durable outbox: all 21 recoverable entity tables (including full Gym V2 routine/session structure, custom exercises, weekly plan/date overrides, body-weight entries, planning/review entities, and historical workout facts), plus the synthetic `user_backup_settings` and `backup_manifest` records that carry the certified settings snapshot and the versioned completeness checkpoint. Adapter sync mode is still one-way push backup. `SupabaseSyncAdapter.pull()` is still a stub (`[]`) today; empty-device recovery goes through the Restore V2 coordinator (with the legacy V1 path as the labeled fallback).
 
 ### Cloud Backup & Restore (Backup Completeness V2 / Restore V2)
 
 `core/backup/` implements the owner-scoped cloud backup and restore contract:
 
-- The recoverable scope is versioned (`backup.scope_version`, schema version 2): todos, habits, habit completions, calorie entries, saved meals, workout routines/exercises/sets, workout logs/session exercises, pomodoro sessions, linked-action rules, and the allowlisted recoverable settings (calorie goal, pomodoro defaults, theme).
+- The recoverable scope is versioned (`backup.scope_version = 6`, backup schema version 2): todos, habits, habit completions, calorie entries, saved meals, workout routines/exercises/sets, workout logs/session exercises/sets, custom exercises, weekly plan/date overrides, body-weight entries, planning/review entities, pomodoro sessions, linked-action rules, and the allowlisted recoverable settings (including workout effort scale, goal weight, and workout-day reminder).
 - A maintenance cycle publishes an owner-scoped `backup_manifest` (generation, per-entity counts + deterministic SHA-256 checksums, certified settings checksum) only after the durable outbox drains — one atomic local coherence boundary.
 - Restore V2 (`core/backup/backupRestore.ts`) prefetches and validates every row + the settings payload, verifies all checksums and the dependency graph, requires a completely empty device (all user tables + outbox), then imports everything in ONE SQLite transaction with no historical side effects (no linked-action replay, no notifications, no recurring-todo creation). Theme is staged durably and applied to AsyncStorage after commit with restart retry.
 - Legacy V1 backups remain restorable through the legacy path and are labeled `V1 LEGACY/PARTIAL`.
@@ -125,6 +125,13 @@ The app is a single-page experience: `app/` contains only `_layout.tsx` and `ind
 Settings is a full-screen modal (not a route). The Command Center is a global overlay only — there is no `/command` route. Old URLs `/settings`, `/command`, and `/(tabs)/*` no longer exist.
 
 The root layout mounts `GlobalCommandCenterHost`, so when `COMMAND_EXPERIMENT_ENABLED` is true the eligible sections show a floating launcher that opens a drawer on wide web and a bottom sheet elsewhere. The launcher is hidden while Settings is open and suppressed during active pomodoro/workout sessions.
+
+Workout is the Gym V2 training workspace inside that tab: users can choose
+built-in or custom exercises, build typed strength/bodyweight/timed/cardio
+routines, reorder and schedule them, train from Today with durable session
+drafts and previous-performance context, and review progression, PRs, trends,
+training totals, and body-weight history. Quick-complete logs remain a separate
+lightweight path for linked actions and fast entries.
 
 ## Command Shell
 

@@ -52,7 +52,7 @@ Companion docs in this folder:
 - Todos: task capture, priority, due dates, reorder, daily recurrence.
 - Habits: daily targets, categories, icons/colors, streaks, yearly consistency heatmap.
 - Pomodoro: configurable focus/break timer, session logging, yearly focus heatmap, notification scheduling.
-- Workout: routines, exercises, timed sets/rests, session logging, yearly workout heatmap.
+- Workout/Gym V2: built-in and custom exercise identity, typed strength/bodyweight/timed/cardio prescriptions, weekly planning/date overrides, guided durable sessions, progression, PR/history analytics, body weight, and the existing yearly workout heatmap.
 - Calories: macro entry, auto kcal calculation, saved meals, goals, charts, yearly heatmap.
 - Overview: read-only cross-feature dashboard aggregating all major modules.
 
@@ -157,7 +157,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `core/db/client.ts` includes linked actions, notification-action, durable sync-outbox, planning, and hardening-wave-v2 migrations through schema version `21`:
+- `core/db/client.ts` includes linked actions, notification-action, durable sync-outbox, planning, hardening-wave-v2, and Gym V2 migrations through schema version `22`:
   - `linked_action_rules`
   - `linked_action_events`
   - `linked_action_executions`
@@ -236,7 +236,7 @@ Companion docs in this folder:
 - `linked_action_events`
 - `linked_action_executions`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `21`; next migration slot is `if (version < 22)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding; planning entities arrived in migrations 16–19, hardening-wave-v2 durable-state promotion in migration 20, and `daily_plans.top_todo_titles` in migration 21.
+- Current runtime schema version is `22`; next migration slot is `if (version < 23)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding; planning entities arrived in migrations 16–19, hardening-wave-v2 durable-state promotion in migration 20, `daily_plans.top_todo_titles` in migration 21, and Gym V2 workout/catalog/planning/body-weight state in migration 22.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
@@ -272,12 +272,15 @@ Companion docs in this folder:
 ### Confirmed from code
 
 - SQLite is the source of truth.
-- Backup Completeness V2 (backup scope version 2) backs up the complete
+- Backup Completeness V2 (backup schema version 2, current recoverable scope
+  version 6) backs up the complete
   recoverable scope through the durable outbox: `todos`, `habits`,
   `habit_completions`, `calorie_entries`, `saved_meals`,
   `pomodoro_sessions`, `workout_routines`, `routine_exercises`,
   `routine_exercise_sets`, `workout_logs`, `workout_session_exercises`,
-  `linked_action_rules`, plus the synthetic `user_backup_settings` and
+  `workout_session_sets`, `custom_exercises`, `workout_weekly_plan`,
+  `workout_schedule_overrides`, `body_weight_entries`, `linked_action_rules`,
+  planning/review entities, plus the synthetic `user_backup_settings` and
   `backup_manifest` records.
 - Hard-delete entities (`habit_completions` at count 0, `saved_meals`)
   carry an owner-scoped remote DELETE intent; soft-delete tables push
@@ -306,7 +309,7 @@ Companion docs in this folder:
 | Todos    | Add/edit/delete, swipe actions, priority, due date, drag reorder, daily recurrence, completed toggle                                                                                                                                                                                                                                                                                                                                             |
 | Habits   | Create/edit/delete, time-of-day grouping, icon/color presets, increment/decrement counts, streaks, yearly consistency view                                                                                                                                                                                                                                                                                                                       |
 | Pomodoro | Focus/short/long break modes, configurable durations, notifications, yearly history heatmap, garden-style history                                                                                                                                                                                                                                                                                                                                |
-| Workout  | Routine CRUD, nested exercises/sets, timed session flow, workout logging, yearly workout history                                                                                                                                                                                                                                                                                                                                                 |
+| Workout  | Gym V2 routine/catalog builder, typed prescriptions, weekly plan/date overrides, modality-aware guided sessions, durable drafts, progression, PR/history/totals/body-weight analytics, quick-complete logging, and yearly workout history                                                                                                                                                                                                        |
 | Calories | Macro entry with auto kcal, meal types, saved meal reuse/search, goal setting, donut and trend charts, yearly history, plus `Form` / `Diary` modes with remembered last-view preference                                                                                                                                                                                                                                                          |
 | Settings | Six-bucket IA for Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal controls                                                                                                                                                                                                                                                                                       |
 | Command  | Experimental quick-command shell for a single `create_todo` or `create_habit` draft with parse -> review -> confirm flow; the entry is a global overlay launcher (`GlobalCommandCenterHost`) on the six sections. Default parser mode is `mock`; optional remote mode is `remote_with_fallback`, and the local parser remains the fallback guardrail. Internal rollout of the remote parser is gated by build config plus a device-local toggle. |
@@ -397,7 +400,7 @@ Companion docs in this folder:
 
 - `core/db/schema.sql` is a hand-maintained reference snapshot of the runtime
   bootstrap DDL plus migrations (it may lag the runtime chain — currently
-  schema version `21`); the next append-only slot is `if (version < 22)`.
+  schema version `22`); the next append-only slot is `if (version < 23)`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 

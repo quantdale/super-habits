@@ -70,12 +70,19 @@ If this file conflicts with current code, trust the code and document the confli
   `habit_completions`, `calorie_entries`, `saved_meals`,
   `pomodoro_sessions`, `workout_routines`, `routine_exercises`,
   `routine_exercise_sets`, `workout_logs`, `workout_session_exercises`,
-  `linked_action_rules`, plus the synthetic settings/manifest records.
-- Backup Completeness V2 (backup scope version 2) syncs the full recoverable
+  `linked_action_rules`, `weekly_reviews`, `projects`, `goals`, `daily_plans`,
+  `workout_session_sets`, `custom_exercises`, `workout_weekly_plan`,
+  `workout_schedule_overrides`, `body_weight_entries`, plus the synthetic
+  settings/manifest records.
+- Backup Completeness V2 (backup schema version 2; current scope version 6)
+  syncs the full recoverable
   scope: todos, habits, habit_completions, calorie_entries, saved_meals,
   pomodoro_sessions, workout_routines, routine_exercises,
   routine_exercise_sets, workout_logs, workout_session_exercises,
-  linked_action_rules, plus the synthetic `user_backup_settings` and
+  workout_session_sets, custom_exercises, workout_weekly_plan,
+  workout_schedule_overrides, body_weight_entries, linked_action_rules,
+  weekly_reviews, projects, goals, daily_plans, plus the synthetic
+  `user_backup_settings` and
   `backup_manifest` records.
 - Hard-delete entities (`habit_completions` at count 0, `saved_meals`)
   remote-delete; soft-delete tables push tombstones.
@@ -92,8 +99,8 @@ If this file conflicts with current code, trust the code and document the confli
 - Create IDs only with `createId(prefix)` from `lib/id.ts`.
 - Create day keys only with `toDateKey()` from `lib/time.ts`.
 - `toDateKey()` currently uses local calendar dates, not UTC.
-- Runtime schema version is `21`.
-- The next schema change belongs in a new `if (version < 16)` block in `core/db/client.ts`.
+- Runtime schema version is `22`.
+- The next schema change belongs in a new `if (version < 23)` block in `core/db/client.ts`.
 - Migrations are append-only. Never edit prior migration blocks.
 - `core/db/schema.sql` is reference-only but is maintained through the current
   runtime schema version; runtime migration code remains authoritative.

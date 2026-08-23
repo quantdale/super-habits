@@ -149,11 +149,12 @@ Read-only dashboard aggregating major module summaries:
 
 ### Workout
 
-- routine CRUD
-- nested exercises and sets
-- timed session flow
-- workout logging
-- yearly workout history
+- Gym V2 routine/catalog builder with built-in and custom exercise identity
+- typed strength/bodyweight/timed/cardio prescriptions, notes, supersets, and reorder
+- weekly plan plus date-specific rest/reschedule overrides and Today dashboard
+- guided modality-aware sessions with durable drafts, previous performance, effort, rest, and wake behavior
+- deterministic progression, PR/history/totals/body-area analytics, and body-weight trend/goal tracking
+- quick-complete logging and yearly workout history remain distinct
 
 ### Calories
 
@@ -183,6 +184,10 @@ Main tables include:
 - `calorie_entries`
 - `saved_meals`
 - `app_meta`
+- `custom_exercises`
+- `workout_weekly_plan`
+- `workout_schedule_overrides`
+- `body_weight_entries`
 
 `app_meta` stores schema version and app-level settings/metadata such as:
 
@@ -191,11 +196,11 @@ Main tables include:
 - pomodoro settings
 - date-key cutover markers
 
-Current runtime schema version: `21`
+Current runtime schema version: `22`
 
 Next migration slot:
 
-- add a new `if (version < 22)` block
+- add a new `if (version < 23)` block
 - never edit previous migration blocks
 
 ## Sync model
@@ -213,18 +218,14 @@ SuperHabits is local-first.
 
 ### Synced entities
 
-- `todos`
-- `habits`
-- `calorie_entries`
-- `workout_routines`
+- every `BACKUP_ENTITIES` member, including nested workout structure/history,
+  custom exercises, weekly plan/date overrides, body weight, and planning/review
+  rows; synthetic settings/manifest records use the same durable outbox
 
 ### Not synced
 
-- `pomodoro_sessions`
-- `habit_completions`
-- `workout_logs`
-- nested workout tables
-- `saved_meals`
+- local operational state only: linked-action events/executions and processed
+  notification actions
 
 ### Flush triggers
 
