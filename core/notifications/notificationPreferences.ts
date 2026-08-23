@@ -1,5 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseTimeOfDay, type TimeOfDay } from './reminderPlanning';
+import {
+  DEFAULT_WEEKLY_REVIEW_REMINDER,
+  WEEKLY_REVIEW_REMINDER_STORAGE_KEY,
+  decodeWeeklyReviewReminderPreference,
+  encodeWeeklyReviewReminderPreference,
+  type WeeklyReviewReminderPreference,
+} from '@/features/weekly-review/weeklyReviewReminder.domain';
 
 /**
  * Local notification preferences for reminders beyond habits. Stored in
@@ -67,4 +74,32 @@ export async function setDailyPlanReminderTime(time: TimeOfDay): Promise<void> {
 export function resetNotificationPreferenceCaches(): void {
   cachedTodoRemindersEnabled = null;
   cachedDailyPlanTime = null;
+  cachedWeeklyReviewReminder = null;
+}
+
+let cachedWeeklyReviewReminder: WeeklyReviewReminderPreference | null = null;
+
+export async function getWeeklyReviewReminder(): Promise<WeeklyReviewReminderPreference> {
+  if (cachedWeeklyReviewReminder !== null) return cachedWeeklyReviewReminder;
+  try {
+    const stored = await AsyncStorage.getItem(WEEKLY_REVIEW_REMINDER_STORAGE_KEY);
+    cachedWeeklyReviewReminder = decodeWeeklyReviewReminderPreference(stored);
+  } catch {
+    cachedWeeklyReviewReminder = { ...DEFAULT_WEEKLY_REVIEW_REMINDER };
+  }
+  return cachedWeeklyReviewReminder;
+}
+
+export async function setWeeklyReviewReminder(
+  preference: WeeklyReviewReminderPreference,
+): Promise<void> {
+  cachedWeeklyReviewReminder = preference;
+  try {
+    await AsyncStorage.setItem(
+      WEEKLY_REVIEW_REMINDER_STORAGE_KEY,
+      encodeWeeklyReviewReminderPreference(preference),
+    );
+  } catch (error) {
+    throw error;
+  }
 }

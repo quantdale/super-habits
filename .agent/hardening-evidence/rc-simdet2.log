@@ -1,0 +1,599 @@
+
+> superhabits@1.0.0 sim:run
+> tsc -p simulation/tsconfig.json && node simulation/.build/simulation/runner/cli.js run --mode deterministic
+
+simulation model: 13 persona(s) [daily-driver, weekend-returner, power-user, error-prone-user, commuter, new-device-migrator, recoverable-anonymous-user, lost-session-user, wrong-account-user, new-phone-recoverer, unknown-email-recoverer, long-term-user, smoke-driver], 7 workflow(s), 22 scenario(s) [command-v2-busy-worker, command-v2-fitness-tracker, command-v2-habit-edge-cases, command-v2-returning-user, first-run-onboarding, week-of-habit-tracking, settings-ripple-with-reload, new-device-migration, habit-reminders-v1, j1-a-tuesday, j2-past-midnight, j3-the-commute, j4-bad-backend, j7-fat-fingers, long-term-user-disaster-recovery, j5-new-phone, j6-chain-reaction, j8-three-months-in, j9-two-tabs, j10-settings-ripple, typical-device-walk, smoke]
+running 22 scenario(s), mode=deterministic...
+
+→ scenario 'command-v2-busy-worker' — Use Command Center for a morning focus block and a later Todo completion
+   [01] askQuestion → passed
+   [02] apiLeg → passed
+   [03] commandConfirm → passed
+   [04] commandConfirm → passed
+   PASS: simulation-output/run_mt4z7xpt_x9s034i0/run-report.json
+
+→ scenario 'command-v2-fitness-tracker' — Record fitness progress across Habits, Calories, and Workout through Command Center
+   [01] apiLeg → passed
+   [02] commandConfirm → passed
+   [03] commandConfirm → passed
+   [04] apiLeg → passed
+   [05] commandConfirm → passed
+   PASS: simulation-output/run_mt4z8f5k_d4278u7p/run-report.json
+
+→ scenario 'command-v2-habit-edge-cases' — Refuse to choose between duplicate Habit names without an explicit choice
+   [01] apiLeg → passed
+   [02] apiLeg → passed
+   [03] commandPreview → passed
+   [04] commandPreview → passed
+   PASS: simulation-output/run_mt4z93g7_6ut5f0vy/run-report.json
+
+→ scenario 'command-v2-returning-user' — Ask for a daily overview without changing accumulated local history
+   [01] askQuestion → passed
+   PASS: simulation-output/run_mt4z9rf1_s6qm60pk/run-report.json
+
+→ scenario 'first-run-onboarding' — A brand-new user creates their first habit, first todo, and first meal
+   [01] apiLeg → passed
+   [02] apiLeg → passed
+   [03] createTodo → passed
+   [04] apiLeg → passed
+   [05] reloadApp → passed
+   [06] expectOracle → passed
+   PASS: simulation-output/run_mt4z9wzf_6yqdxjw7/run-report.json
+
+→ scenario 'week-of-habit-tracking' — Track one habit across seven consecutive days, advancing the clock each day
+   [01] apiLeg → passed
+   [02] apiLeg → passed
+   [03] advanceClockToNextDay → passed
+   [04] apiLeg → passed
+   [05] advanceClockToNextDay → passed
+   [06] apiLeg → passed
+   [07] advanceClockToNextDay → passed
+   [08] apiLeg → passed
+   [09] advanceClockToNextDay → passed
+   [10] apiLeg → passed
+   [11] advanceClockToNextDay → passed
+   [12] apiLeg → passed
+   [13] advanceClockToNextDay → passed
+   [14] apiLeg → passed
+   [15] advanceClockToNextDay → passed
+   [16] expectOracle → passed
+   [17] expectOracle → passed
+   PASS: simulation-output/run_mt4zapod_xgnpf87b/run-report.json
+
+→ scenario 'settings-ripple-with-reload' — The settings surface opens, a mid-scenario reload happens, and it is still reachable with state intact
+   [01] openSettings → passed
+   [02] expectOracle → passed
+   [03] apiLeg → passed
+   [04] reloadApp → passed
+   [05] expectAcrossSurfaces → passed
+   [06] openSettings → passed
+   PASS: simulation-output/run_mt4zc1vg_grks3rcy/run-report.json
+
+→ scenario 'new-device-migration' — Migration: the old device corpus is written, then a fresh reload proves it is intact
+   [01] apiLeg → passed
+   [02] apiLeg → passed
+   [03] apiLeg → passed
+   [04] apiLeg → passed
+   [05] reloadApp → passed
+   [06] expectOracle → passed
+   [07] expectOracle → passed
+   PASS: simulation-output/run_mt4zcke4_lht2tzv1/run-report.json
+
+→ scenario 'habit-reminders-v1' — Persist representative reminder configurations without changing Habit V2 history
+   [01] apiLeg → passed
+   [02] apiLeg → passed
+   [03] apiLeg → passed
+   [04] apiLeg → passed
+   [05] apiLeg → passed
+   [06] expectOracle → passed
+   PASS: simulation-output/run_mt4zdh4m_ahqwh5td/run-report.json
+
+→ scenario 'j1-a-tuesday' — One Tuesday: tick a habit, add a todo, log a meal, run a focus session, reload
+   [01] createTodo → passed
+   [02] logCalories → passed
+   [03] apiLeg → passed
+   [04] tickHabit → passed
+   [05] startPomodoro → passed
+   [06] advanceClockToNextDay → passed
+   [07] waitThinkTime → passed
+   [08] expectOracle → passed
+   [09] expectAcrossSurfaces → passed
+   [10] reloadApp → passed
+   [11] expectOracle → passed
+   [12] expectOracle → passed
+   PASS: simulation-output/run_mt4zeau5_cp7xsqwo/run-report.json
+
+→ scenario 'j2-past-midnight' — Writes after midnight land on the new date_key; earlier rows are untouched
+   [01] apiLeg → passed
+   [02] tickHabit → passed
+   [03] advanceClockToNextDay → passed
+   [04] tickHabit → passed
+   [05] reloadApp → passed
+   PASS: simulation-output/run_mt4zfaxf_rzxujovf/run-report.json
+
+→ scenario 'j3-the-commute' — Offline writes survive to the outbox, persist across a reload, and nothing is lost
+   [01] switchSection → passed
+   [02] createTodo → passed
+   [03] goOffline → passed
+   [04] createTodo → passed
+   [05] logCalories → passed
+   [06] goOnline → passed
+   [07] expectOracle → passed
+   [08] reloadApp → passed
+   [09] expectOracle → passed
+   [10] expectOracle → passed
+   PASS: simulation-output/run_mt4zfwak_a5sv9n6a/run-report.json
+
+→ scenario 'j4-bad-backend' — A failed remote push never loses local data; the outbox keeps the record pending
+   [01] createTodo → passed
+   [02] injectFailure → passed
+   [03] expectOracle → passed
+   [04] reloadApp → passed
+   [05] injectFailure → passed
+   [06] expectOracle → passed
+   PASS: simulation-output/run_mt4zgjzx_88lejgpv/run-report.json
+
+→ scenario 'j7-fat-fingers' — Double-incrementing a habit yields ONE completion row (count 2), never two rows
+   [01] apiLeg → passed
+   [02] tickHabit → passed
+   [03] createTodo → passed
+   PASS: simulation-output/run_mt4zh5zz_h8bupogb/run-report.json
+
+→ scenario 'long-term-user-disaster-recovery' — months of ordinary usage produce continuous, replay-free history that a complete V2 backup must preserve
+   [01] createHabit → passed
+   [02] createTodo → passed
+   [03] setCalorieGoal → passed
+   [04] tickHabit → passed
+   [05] logCalories → passed
+   [06] startPomodoro → passed
+   [07] advanceClockToNextDay → passed
+   [08] tickHabit → passed
+   [09] logCalories → passed
+   [10] startPomodoro → passed
+   [11] advanceClockToNextDay → passed
+   [12] tickHabit → passed
+   [13] logCalories → passed
+   [14] startPomodoro → passed
+   [15] advanceClockToNextDay → passed
+   [16] tickHabit → passed
+   [17] logCalories → passed
+   [18] startPomodoro → passed
+   [19] advanceClockToNextDay → passed
+   [20] tickHabit → passed
+   [21] logCalories → passed
+   [22] startPomodoro → passed
+   [23] advanceClockToNextDay → passed
+   [24] tickHabit → passed
+   [25] logCalories → passed
+   [26] startPomodoro → passed
+   [27] advanceClockToNextDay → passed
+   [28] tickHabit → passed
+   [29] logCalories → passed
+   [30] startPomodoro → passed
+   [31] advanceClockToNextDay → passed
+   [32] tickHabit → passed
+   [33] logCalories → passed
+   [34] startPomodoro → passed
+   [35] advanceClockToNextDay → passed
+   [36] tickHabit → passed
+   [37] logCalories → passed
+   [38] startPomodoro → passed
+   [39] advanceClockToNextDay → passed
+   [40] tickHabit → passed
+   [41] logCalories → passed
+   [42] startPomodoro → passed
+   [43] advanceClockToNextDay → passed
+   [44] tickHabit → passed
+   [45] logCalories → passed
+   [46] startPomodoro → passed
+   [47] advanceClockToNextDay → passed
+   [48] tickHabit → passed
+   [49] logCalories → passed
+   [50] startPomodoro → passed
+   [51] advanceClockToNextDay → passed
+   [52] tickHabit → passed
+   [53] logCalories → passed
+   [54] startPomodoro → passed
+   [55] advanceClockToNextDay → passed
+   [56] tickHabit → passed
+   [57] logCalories → passed
+   [58] startPomodoro → passed
+   [59] advanceClockToNextDay → passed
+   [60] tickHabit → passed
+   [61] logCalories → passed
+   [62] startPomodoro → passed
+   [63] advanceClockToNextDay → passed
+   [64] tickHabit → passed
+   [65] logCalories → passed
+   [66] startPomodoro → passed
+   [67] advanceClockToNextDay → passed
+   [68] tickHabit → passed
+   [69] logCalories → passed
+   [70] startPomodoro → passed
+   [71] advanceClockToNextDay → passed
+   [72] tickHabit → passed
+   [73] logCalories → passed
+   [74] startPomodoro → passed
+   [75] advanceClockToNextDay → passed
+   [76] tickHabit → passed
+   [77] logCalories → passed
+   [78] startPomodoro → passed
+   [79] advanceClockToNextDay → passed
+   [80] tickHabit → passed
+   [81] logCalories → passed
+   [82] startPomodoro → passed
+   [83] advanceClockToNextDay → passed
+   [84] tickHabit → passed
+   [85] logCalories → passed
+   [86] startPomodoro → passed
+   [87] advanceClockToNextDay → passed
+   [88] tickHabit → passed
+   [89] logCalories → passed
+   [90] startPomodoro → passed
+   [91] advanceClockToNextDay → passed
+   [92] tickHabit → passed
+   [93] logCalories → passed
+   [94] startPomodoro → passed
+   [95] advanceClockToNextDay → passed
+   [96] tickHabit → passed
+   [97] logCalories → passed
+   [98] startPomodoro → passed
+   [99] advanceClockToNextDay → passed
+   [100] tickHabit → passed
+   [101] logCalories → passed
+   [102] startPomodoro → passed
+   [103] advanceClockToNextDay → passed
+   [104] tickHabit → passed
+   [105] logCalories → passed
+   [106] startPomodoro → passed
+   [107] advanceClockToNextDay → passed
+   [108] tickHabit → passed
+   [109] logCalories → passed
+   [110] startPomodoro → passed
+   [111] advanceClockToNextDay → passed
+   [112] tickHabit → passed
+   [113] logCalories → passed
+   [114] startPomodoro → passed
+   [115] advanceClockToNextDay → passed
+   [116] tickHabit → passed
+   [117] logCalories → passed
+   [118] startPomodoro → passed
+   [119] advanceClockToNextDay → passed
+   [120] tickHabit → passed
+   [121] logCalories → passed
+   [122] startPomodoro → passed
+   [123] advanceClockToNextDay → passed
+   [124] tickHabit → passed
+   [125] logCalories → passed
+   [126] startPomodoro → passed
+   [127] advanceClockToNextDay → passed
+   [128] tickHabit → passed
+   [129] logCalories → passed
+   [130] startPomodoro → passed
+   [131] advanceClockToNextDay → passed
+   [132] tickHabit → passed
+   [133] logCalories → passed
+   [134] startPomodoro → passed
+   [135] advanceClockToNextDay → passed
+   [136] tickHabit → passed
+   [137] logCalories → passed
+   [138] startPomodoro → passed
+   [139] advanceClockToNextDay → passed
+   [140] tickHabit → passed
+   [141] logCalories → passed
+   [142] startPomodoro → passed
+   [143] advanceClockToNextDay → passed
+   [144] tickHabit → passed
+   [145] logCalories → passed
+   [146] startPomodoro → passed
+   [147] advanceClockToNextDay → passed
+   [148] tickHabit → passed
+   [149] logCalories → passed
+   [150] startPomodoro → passed
+   [151] advanceClockToNextDay → passed
+   [152] tickHabit → passed
+   [153] logCalories → passed
+   [154] startPomodoro → passed
+   [155] advanceClockToNextDay → passed
+   [156] tickHabit → passed
+   [157] logCalories → passed
+   [158] startPomodoro → passed
+   [159] advanceClockToNextDay → passed
+   [160] tickHabit → passed
+   [161] logCalories → passed
+   [162] startPomodoro → passed
+   [163] advanceClockToNextDay → passed
+   [164] tickHabit → passed
+   [165] logCalories → passed
+   [166] startPomodoro → passed
+   [167] advanceClockToNextDay → passed
+   [168] tickHabit → passed
+   [169] logCalories → passed
+   [170] startPomodoro → passed
+   [171] advanceClockToNextDay → passed
+   [172] tickHabit → passed
+   [173] logCalories → passed
+   [174] startPomodoro → passed
+   [175] advanceClockToNextDay → passed
+   [176] tickHabit → passed
+   [177] logCalories → passed
+   [178] startPomodoro → passed
+   [179] advanceClockToNextDay → passed
+   [180] tickHabit → passed
+   [181] logCalories → passed
+   [182] startPomodoro → passed
+   [183] advanceClockToNextDay → passed
+   [184] tickHabit → passed
+   [185] logCalories → passed
+   [186] startPomodoro → passed
+   [187] advanceClockToNextDay → passed
+   [188] tickHabit → passed
+   [189] logCalories → passed
+   [190] startPomodoro → passed
+   [191] advanceClockToNextDay → passed
+   [192] tickHabit → passed
+   [193] logCalories → passed
+   [194] startPomodoro → passed
+   [195] advanceClockToNextDay → passed
+   [196] tickHabit → passed
+   [197] logCalories → passed
+   [198] startPomodoro → passed
+   [199] advanceClockToNextDay → passed
+   [200] tickHabit → passed
+   [201] logCalories → passed
+   [202] startPomodoro → passed
+   [203] advanceClockToNextDay → passed
+   [204] tickHabit → passed
+   [205] logCalories → passed
+   [206] startPomodoro → passed
+   [207] advanceClockToNextDay → passed
+   [208] tickHabit → passed
+   [209] logCalories → passed
+   [210] startPomodoro → passed
+   [211] advanceClockToNextDay → passed
+   [212] tickHabit → passed
+   [213] logCalories → passed
+   [214] startPomodoro → passed
+   [215] advanceClockToNextDay → passed
+   [216] tickHabit → passed
+   [217] logCalories → passed
+   [218] startPomodoro → passed
+   [219] advanceClockToNextDay → passed
+   [220] tickHabit → passed
+   [221] logCalories → passed
+   [222] startPomodoro → passed
+   [223] advanceClockToNextDay → passed
+   [224] tickHabit → passed
+   [225] logCalories → passed
+   [226] startPomodoro → passed
+   [227] advanceClockToNextDay → passed
+   [228] tickHabit → passed
+   [229] logCalories → passed
+   [230] startPomodoro → passed
+   [231] advanceClockToNextDay → passed
+   [232] tickHabit → passed
+   [233] logCalories → passed
+   [234] startPomodoro → passed
+   [235] advanceClockToNextDay → passed
+   [236] tickHabit → passed
+   [237] logCalories → passed
+   [238] startPomodoro → passed
+   [239] advanceClockToNextDay → passed
+   [240] tickHabit → passed
+   [241] logCalories → passed
+   [242] startPomodoro → passed
+   [243] advanceClockToNextDay → passed
+   [244] tickHabit → passed
+   [245] logCalories → passed
+   [246] startPomodoro → passed
+   [247] advanceClockToNextDay → passed
+   [248] tickHabit → passed
+   [249] logCalories → passed
+   [250] startPomodoro → passed
+   [251] advanceClockToNextDay → passed
+   [252] tickHabit → passed
+   [253] logCalories → passed
+   [254] startPomodoro → passed
+   [255] advanceClockToNextDay → passed
+   [256] tickHabit → passed
+   [257] logCalories → passed
+   [258] startPomodoro → passed
+   [259] advanceClockToNextDay → passed
+   [260] tickHabit → passed
+   [261] logCalories → passed
+   [262] startPomodoro → passed
+   [263] advanceClockToNextDay → passed
+   [264] tickHabit → passed
+   [265] logCalories → passed
+   [266] startPomodoro → passed
+   [267] advanceClockToNextDay → passed
+   [268] tickHabit → passed
+   [269] logCalories → passed
+   [270] startPomodoro → passed
+   [271] advanceClockToNextDay → passed
+   [272] tickHabit → passed
+   [273] logCalories → passed
+   [274] startPomodoro → passed
+   [275] advanceClockToNextDay → passed
+   [276] tickHabit → passed
+   [277] logCalories → passed
+   [278] startPomodoro → passed
+   [279] advanceClockToNextDay → passed
+   [280] tickHabit → passed
+   [281] logCalories → passed
+   [282] startPomodoro → passed
+   [283] advanceClockToNextDay → passed
+   [284] tickHabit → passed
+   [285] logCalories → passed
+   [286] startPomodoro → passed
+   [287] advanceClockToNextDay → passed
+   [288] tickHabit → passed
+   [289] logCalories → passed
+   [290] startPomodoro → passed
+   [291] advanceClockToNextDay → passed
+   [292] tickHabit → passed
+   [293] logCalories → passed
+   [294] startPomodoro → passed
+   [295] advanceClockToNextDay → passed
+   [296] tickHabit → passed
+   [297] logCalories → passed
+   [298] startPomodoro → passed
+   [299] advanceClockToNextDay → passed
+   [300] tickHabit → passed
+   [301] logCalories → passed
+   [302] startPomodoro → passed
+   [303] advanceClockToNextDay → passed
+   [304] tickHabit → passed
+   [305] logCalories → passed
+   [306] startPomodoro → passed
+   [307] advanceClockToNextDay → passed
+   [308] tickHabit → passed
+   [309] logCalories → passed
+   [310] startPomodoro → passed
+   [311] advanceClockToNextDay → passed
+   [312] tickHabit → passed
+   [313] logCalories → passed
+   [314] startPomodoro → passed
+   [315] advanceClockToNextDay → passed
+   [316] tickHabit → passed
+   [317] logCalories → passed
+   [318] startPomodoro → passed
+   [319] advanceClockToNextDay → passed
+   [320] tickHabit → passed
+   [321] logCalories → passed
+   [322] startPomodoro → passed
+   [323] advanceClockToNextDay → passed
+   [324] tickHabit → passed
+   [325] logCalories → passed
+   [326] startPomodoro → passed
+   [327] advanceClockToNextDay → passed
+   [328] tickHabit → passed
+   [329] logCalories → passed
+   [330] startPomodoro → passed
+   [331] advanceClockToNextDay → passed
+   [332] tickHabit → passed
+   [333] logCalories → passed
+   [334] startPomodoro → passed
+   [335] advanceClockToNextDay → passed
+   [336] tickHabit → passed
+   [337] logCalories → passed
+   [338] startPomodoro → passed
+   [339] advanceClockToNextDay → passed
+   [340] buildRoutine → passed
+   [341] advanceClockToNextDay → passed
+   [342] advanceClockToNextDay → passed
+   [343] advanceClockToNextDay → passed
+   [344] advanceClockToNextDay → passed
+   [345] advanceClockToNextDay → passed
+   [346] advanceClockToNextDay → passed
+   [347] advanceClockToNextDay → passed
+   [348] advanceClockToNextDay → passed
+   [349] advanceClockToNextDay → passed
+   [350] advanceClockToNextDay → passed
+   [351] createTodo → passed
+   [352] tickHabit → passed
+   [353] expectOracle → passed
+   [354] expectOracle → passed
+   [355] expectOracle → passed
+   [356] expectOracle → passed
+   PASS: simulation-output/run_mt4zhmpl_p2gbd9fo/run-report.json
+
+→ scenario 'j5-new-phone' — On a fresh device the first todo lands as exactly one row
+   [01] createTodo → passed
+   PASS: simulation-output/run_mt506q1d_hnm2z0p9/run-report.json
+
+→ scenario 'j6-chain-reaction' — The source + target todos of a linked action persist exactly once each
+   [01] createTodo → passed
+   [02] createTodo → passed
+   [03] expectOracle → passed
+   PASS: simulation-output/run_mt5071jj_tntly1wt/run-report.json
+
+→ scenario 'j8-three-months-in' — Walk every section of a populated device and check the seeded aggregates
+   [01] switchSection → passed
+   [02] switchSection → passed
+   [03] switchSection → passed
+   [04] switchSection → passed
+   [05] switchSection → passed
+   [06] switchSection → passed
+   [07] expectOracle → passed
+   [08] expectOracle → passed
+   [09] expectOracle → passed
+   [10] expectOracle → passed
+   PASS: simulation-output/run_mt507fu7_zgr60s4j/run-report.json
+
+→ scenario 'j9-two-tabs' — One tab writes two todos; each lands as exactly one persisted row
+   [01] createTodo → passed
+   [02] createTodo → passed
+   [03] expectOracle → passed
+   [04] expectOracle → passed
+   [05] expectOracle → passed
+   PASS: simulation-output/run_mt507x6w_ia4jef1a/run-report.json
+
+→ scenario 'j10-settings-ripple' — The settings surface opens, survives a reload, and the reload loses no device state
+   [01] openSettings → passed
+   [02] expectOracle → passed
+   [03] apiLeg → passed
+   [04] reloadApp → passed
+   [05] expectAcrossSurfaces → passed
+   [06] openSettings → passed
+   PASS: simulation-output/run_mt508ijp_rkr3cfuv/run-report.json
+
+→ scenario 'typical-device-walk' — Build a TYPICAL-equivalent device from API legs and walk it
+   [01] apiLeg → passed
+   [02] apiLeg → passed
+   [03] apiLeg → passed
+   [04] apiLeg → passed
+   [05] apiLeg → passed
+   [06] apiLeg → passed
+   [07] apiLeg → passed
+   [08] apiLeg → passed
+   [09] apiLeg → passed
+   [10] apiLeg → passed
+   [11] apiLeg → passed
+   [12] apiLeg → passed
+   [13] apiLeg → passed
+   [14] apiLeg → passed
+   [15] apiLeg → passed
+   [16] apiLeg → passed
+   [17] apiLeg → passed
+   [18] apiLeg → passed
+   [19] apiLeg → passed
+   [20] apiLeg → passed
+   [21] apiLeg → passed
+   [22] apiLeg → passed
+   [23] apiLeg → passed
+   [24] apiLeg → passed
+   [25] apiLeg → passed
+   [26] apiLeg → passed
+   [27] switchSection → passed
+   [28] switchSection → passed
+   PASS: simulation-output/run_mt5091py_6v4wxm93/run-report.json
+
+→ scenario 'smoke' — exercise every step kind deterministically against the local build
+   [01] switchSection → passed
+   [02] createTodo → passed
+   [03] toggleTodo → passed
+   [04] switchSection → passed
+   [05] createHabit → passed
+   [06] tickHabit → passed
+   [07] apiLeg → passed
+   [08] apiLeg → passed
+   [09] expectOracle → passed
+   [10] logCalories → passed
+   [11] buildRoutine → passed
+   [12] startPomodoro → passed
+   [13] openSettings → passed
+   [14] openCommand → passed
+   [15] waitThinkTime → passed
+   [16] maybeMakeMistake → passed
+   [17] abandonForm → passed
+   [18] goOffline → passed
+   [19] goOnline → passed
+   [20] advanceClockToNextDay → passed
+   [21] expectAcrossSurfaces → passed
+   [22] injectFailure → passed
+   [23] reloadApp → passed
+   [24] switchSection → passed
+   PASS: simulation-output/run_mt50crwr_ptgl33vd/run-report.json
+
+all 22 scenario(s) passed.

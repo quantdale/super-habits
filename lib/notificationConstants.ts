@@ -17,3 +17,7 @@ export const TODO_REMINDER_DATA_VERSION = 1;
 export const DAILY_PLAN_REMINDER_CHANNEL_ID = 'daily-plan-reminders';
 export const DAILY_PLAN_REMINDER_DATA_KIND = 'daily-plan-reminder';
 export const DAILY_PLAN_REMINDER_DATA_VERSION = 1;
+
+export const WEEKLY_REVIEW_REMINDER_CHANNEL_ID = 'weekly-review-reminders';
+export const WEEKLY_REVIEW_REMINDER_DATA_KIND = 'weekly-review-reminder';
+export const WEEKLY_REVIEW_REMINDER_DATA_VERSION = 1;

@@ -12,6 +12,7 @@ import {
   TODO_REMINDER_DATA_KIND,
   TODO_REMINDER_MARK_DONE_ACTION,
   TODO_REMINDER_SNOOZE_ACTION,
+  WEEKLY_REVIEW_REMINDER_DATA_KIND,
 } from '@/lib/notificationConstants';
 import { getTodoReminderActionKey, todoReminderIdentifier } from './reminderPlanning';
 
@@ -43,8 +44,17 @@ export type TodoReminderResponse = {
   snoozed: boolean;
 };
 
+export type WeeklyReviewReminderResponse = {
+  kind: 'weekly-review-reminder';
+  action: 'open';
+  actionIdentifier: string;
+};
+
 export type ClassifiedNotificationResponse =
-  HabitReminderResponse | TodoReminderResponse | { kind: 'unknown'; actionIdentifier: string };
+  | HabitReminderResponse
+  | TodoReminderResponse
+  | WeeklyReviewReminderResponse
+  | { kind: 'unknown'; actionIdentifier: string };
 
 export type NotificationResponseHandlers = {
   openHabit: (habitId: string) => void;
@@ -63,6 +73,7 @@ export type NotificationResponseHandlers = {
   openTodo: (todoId: string) => void;
   markDone: (input: { todoId: string; actionKey: string; occurrenceId: string }) => Promise<void>;
   snoozeTodo: (input: { todoId: string; actionKey: string; occurrenceId: string }) => Promise<void>;
+  openWeeklyReview: () => void;
 };
 
 export function classifyNotificationResponse(
@@ -104,6 +115,16 @@ export function classifyNotificationResponse(
       notificationIdentifier: response?.notification.request.identifier ?? '',
       snoozed: data.snoozed === true,
     };
+  }
+
+  if (data?.kind === WEEKLY_REVIEW_REMINDER_DATA_KIND) {
+    // Body tap opens the review; explicit unknown actions never mutate.
+    const action: 'open' | null =
+      actionIdentifier === DEFAULT_ACTION_IDENTIFIER || actionIdentifier.length === 0
+        ? 'open'
+        : null;
+    if (action === null) return { kind: 'unknown', actionIdentifier };
+    return { kind: 'weekly-review-reminder', action, actionIdentifier };
   }
 
   if (data?.kind !== HABIT_REMINDER_DATA_KIND) {
@@ -188,6 +209,11 @@ export async function dispatchNotificationResponse(
         occurrenceId: classified.occurrenceId,
       });
     }
+    return classified;
+  }
+
+  if (classified.kind === 'weekly-review-reminder') {
+    handlers.openWeeklyReview();
     return classified;
   }
 

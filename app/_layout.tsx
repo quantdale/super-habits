@@ -121,7 +121,7 @@ function ThemedRoot() {
  */
 function NotificationResponseHost() {
   const { authBootstrapReady } = useAppBootstrapState();
-  const { openHabit, setActiveSection } = useAppNavigation();
+  const { openHabit, setActiveSection, openWeeklyReview, closeSettings } = useAppNavigation();
   const { showNotice } = useInAppNotices();
   const handledFingerprints = useRef<string[]>([]);
   const responseQueue = useRef(Promise.resolve());
@@ -157,6 +157,10 @@ function NotificationResponseHost() {
               await snoozeTodoReminderAction(input);
               setActiveSection('todos');
             },
+            openWeeklyReview: () => {
+              closeSettings();
+              openWeeklyReview();
+            },
           });
         } catch (error) {
           console.error('[notifications] response dispatch failed', error);
@@ -170,7 +174,7 @@ function NotificationResponseHost() {
       });
       responseQueue.current = task.catch(() => undefined);
     },
-    [openHabit, setActiveSection, showNotice],
+    [openHabit, setActiveSection, showNotice, openWeeklyReview, closeSettings],
   );
 
   useEffect(() => {

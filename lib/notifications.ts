@@ -14,6 +14,7 @@ import {
   TODO_REMINDER_CHANNEL_ID,
   TODO_REMINDER_MARK_DONE_ACTION,
   TODO_REMINDER_SNOOZE_ACTION,
+  WEEKLY_REVIEW_REMINDER_CHANNEL_ID,
 } from '@/lib/notificationConstants';
 
 export const HABIT_REMINDER_CHANNEL_ID = 'habit-reminders';
@@ -353,6 +354,56 @@ export async function scheduleDailyPlanReminderNotification(input: {
       hour: input.hour,
       minute: input.minute,
       channelId: DAILY_PLAN_REMINDER_CHANNEL_ID,
+    },
+  });
+}
+
+export async function ensureWeeklyReviewReminderChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(WEEKLY_REVIEW_REMINDER_CHANNEL_ID, {
+    name: 'Weekly review reminders',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: 'default',
+    enableVibrate: true,
+  });
+}
+
+/**
+ * Schedules (or reschedules) the repeating weekly review reminder for a local
+ * weekday + time. `jsWeekday` follows the JS getDay() convention (0=Sunday);
+ * expo weekly triggers use 1=Sunday…7=Saturday, so the bridge converts.
+ * Web degrades silently by returning 'web'.
+ */
+export async function scheduleWeeklyReviewReminderNotification(input: {
+  identifier: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  jsWeekday: number;
+  hour: number;
+  minute: number;
+}): Promise<ScheduleReminderOutcome> {
+  if (Platform.OS === 'web') return 'web';
+  const allowed = await ensureNotificationPermission();
+  if (!allowed) return 'permission-denied';
+  if (Platform.OS === 'android') {
+    await ensureWeeklyReviewReminderChannel();
+  }
+  const expoWeekday = (((input.jsWeekday % 7) + 7) % 7) + 1; // 0=Sun→1 … 6=Sat→7
+  return Notifications.scheduleNotificationAsync({
+    identifier: input.identifier,
+    content: {
+      title: input.title,
+      body: input.body,
+      data: input.data,
+      sound: 'default',
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: expoWeekday,
+      hour: input.hour,
+      minute: input.minute,
+      channelId: WEEKLY_REVIEW_REMINDER_CHANNEL_ID,
     },
   });
 }

@@ -4,11 +4,15 @@ import { getNotificationPermissionState, requestTodoReminderPermission } from '@
 import {
   getDailyPlanReminderTime,
   getTodoRemindersEnabled,
+  getWeeklyReviewReminder,
   setDailyPlanReminderTime,
   setTodoRemindersEnabled,
+  setWeeklyReviewReminder,
 } from '@/core/notifications/notificationPreferences';
 import { normalizeTimeOfDayInput } from '@/core/notifications/reminderPlanning';
 import { syncDailyPlanReminder } from '@/core/notifications/dailyPlanReminderScheduler';
+import { syncWeeklyReviewReminder } from '@/core/notifications/weeklyReviewReminderScheduler';
+import type { WeeklyReviewWeekday } from '@/features/weekly-review/weeklyReviewReminder.domain';
 import { reconcileTodoReminders } from '@/core/notifications/todoReminderScheduler';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
@@ -18,6 +22,16 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { SettingsRow, SettingsSectionHeading, SettingsStatusPill } from './SettingsSharedUi';
 
 const ACCENT = SECTION_COLORS[POMODORO_SECTION_KEY];
+
+const WEEKDAY_LABELS: Record<WeeklyReviewWeekday, string> = {
+  0: 'Sun',
+  1: 'Mon',
+  2: 'Tue',
+  3: 'Wed',
+  4: 'Thu',
+  5: 'Fri',
+  6: 'Sat',
+};
 
 /**
  * Notification preferences beyond habits, in the Notifications / Timer
@@ -29,6 +43,9 @@ export function SettingsNotificationsSection() {
   const { tokens } = useAppTheme();
   const [todoRemindersEnabled, setTodoRemindersEnabledState] = useState(false);
   const [dailyPlanTimeInput, setDailyPlanTimeInput] = useState('08:00');
+  const [weeklyEnabled, setWeeklyEnabledState] = useState(false);
+  const [weeklyWeekday, setWeeklyWeekday] = useState<WeeklyReviewWeekday>(0);
+  const [weeklyTimeInput, setWeeklyTimeInput] = useState('18:00');
   const [permissionLabel, setPermissionLabel] = useState('Checking…');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,12 +55,18 @@ export function SettingsNotificationsSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [enabled, time, permission] = await Promise.all([
+      const [enabled, time, permission, weekly] = await Promise.all([
         getTodoRemindersEnabled(),
         getDailyPlanReminderTime(),
         getNotificationPermissionState(),
+        getWeeklyReviewReminder(),
       ]);
       setTodoRemindersEnabledState(enabled);
+      setWeeklyEnabledState(weekly.enabled);
+      setWeeklyWeekday(weekly.weekday);
+      setWeeklyTimeInput(
+        `${String(weekly.hour).padStart(2, '0')}:${String(weekly.minute).padStart(2, '0')}`,
+      );
       setDailyPlanTimeInput(
         `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`,
       );
@@ -154,6 +177,83 @@ export function SettingsNotificationsSection() {
     }
   };
 
+  const handleToggleWeeklyReminder = async (enabled: boolean) => {
+    setSaving(true);
+    setError(null);
+    setSavedNote(null);
+    try {
+      if (enabled) {
+        const permission = await requestTodoReminderPermission();
+        if (permission !== 'granted') {
+          setError(
+            permission === 'denied'
+              ? 'Notifications are blocked. Enable them in system settings, then turn the reminder on again.'
+              : 'Native reminders are available on Android and iOS only.',
+          );
+          return;
+        }
+      }
+      const parts = normalizeTimeOfDayInput(weeklyTimeInput);
+      const [hour, minute] = parts ? (parts.split(':').map(Number) as [number, number]) : [18, 0];
+      await setWeeklyReviewReminder({ enabled, weekday: weeklyWeekday, hour, minute });
+      setWeeklyEnabledState(enabled);
+      const result = await syncWeeklyReviewReminder();
+      const when = `${WEEKDAY_LABELS[weeklyWeekday]} ${parts ?? weeklyTimeInput}`;
+      if (result.status === 'scheduled') {
+        setSavedNote(`Weekly review reminder saved for ${when}.`);
+      } else if (result.status === 'cancelled') {
+        setSavedNote('Weekly review reminder off.');
+      } else if (result.reason === 'permission-denied') {
+        setError('Notification access is blocked in system settings.');
+      } else {
+        setSavedNote(`Saved for ${when}. Native reminders are unavailable here.`);
+      }
+    } catch (err) {
+      console.error('[SettingsNotificationsSection] weekly toggle failed', err);
+      setError('Unable to update the weekly review reminder right now.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveWeeklyTime = async () => {
+    const normalized = normalizeTimeOfDayInput(weeklyTimeInput);
+    if (!normalized) {
+      setError('Enter a valid time as HH:mm (24-hour), e.g. 18:00.');
+      return;
+    }
+    const [hour, minute] = normalized.split(':').map(Number) as [number, number];
+    setSaving(true);
+    setError(null);
+    setSavedNote(null);
+    try {
+      await setWeeklyReviewReminder({
+        enabled: true,
+        weekday: weeklyWeekday,
+        hour,
+        minute,
+      });
+      setWeeklyEnabledState(true);
+      setWeeklyTimeInput(normalized);
+      const result = await syncWeeklyReviewReminder();
+      const when = `${WEEKDAY_LABELS[weeklyWeekday]} ${normalized}`;
+      if (result.status === 'scheduled') {
+        setSavedNote(`Weekly review reminder saved for ${when}.`);
+      } else if (result.status === 'cancelled') {
+        setSavedNote(`Saved for ${when}. Turn the reminder on to schedule it.`);
+      } else if (result.reason === 'permission-denied') {
+        setError('Notification access is blocked in system settings.');
+      } else {
+        setSavedNote(`Saved for ${when}. Native reminders are unavailable here.`);
+      }
+    } catch (err) {
+      console.error('[SettingsNotificationsSection] save weekly time failed', err);
+      setError('Unable to save the weekly review reminder right now.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <ScreenSection>
       <SettingsSectionHeading
@@ -239,6 +339,89 @@ export function SettingsNotificationsSection() {
               </Text>
             </Pressable>
             <SettingsStatusPill label="Daily" tone="accent" accentColor={ACCENT} />
+          </View>
+        </View>
+
+        <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Weekly review reminder
+          </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            A weekly nudge to close out your week and plan the next one. Opening it goes straight to
+            the review.
+          </Text>
+          <View className="mt-2 flex-row items-center justify-between">
+            <Switch
+              accessibilityLabel="Weekly review reminder"
+              value={weeklyEnabled}
+              disabled={loading || saving}
+              onValueChange={(value) => void handleToggleWeeklyReminder(value)}
+              trackColor={{ true: ACCENT, false: tokens.surfaceElevated }}
+            />
+            <View className="flex-row gap-1">
+              {(Object.keys(WEEKDAY_LABELS) as unknown as WeeklyReviewWeekday[]).map((day) => {
+                const active = weeklyWeekday === day;
+                return (
+                  <Pressable
+                    key={day}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Weekly review on ${WEEKDAY_LABELS[day]}`}
+                    accessibilityState={{ selected: active }}
+                    onPress={() => {
+                      setError(null);
+                      setSavedNote(null);
+                      setWeeklyWeekday(day);
+                    }}
+                    className="rounded-lg border px-2 py-1"
+                    style={{
+                      borderColor: active ? ACCENT : tokens.border,
+                      backgroundColor: active ? `${ACCENT}18` : tokens.surfaceElevated,
+                    }}
+                  >
+                    <Text
+                      className="text-xs font-medium"
+                      style={{ color: active ? ACCENT : tokens.textMuted }}
+                    >
+                      {WEEKDAY_LABELS[day]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <View className="mt-2 flex-row items-center gap-2">
+            <TextInput
+              accessibilityLabel="Weekly review reminder time"
+              className="w-24 rounded-xl border px-3 py-2 text-sm"
+              style={{
+                borderColor: tokens.border,
+                backgroundColor: tokens.surfaceElevated,
+                color: tokens.text,
+              }}
+              value={weeklyTimeInput}
+              placeholder="18:00"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              editable={!loading && !saving}
+              onChangeText={(value) => {
+                setError(null);
+                setSavedNote(null);
+                setWeeklyTimeInput(value);
+              }}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save weekly review reminder time"
+              className="rounded-full px-4 py-2"
+              style={{ backgroundColor: `${ACCENT}18`, opacity: loading || saving ? 0.5 : 1 }}
+              disabled={loading || saving}
+              onPress={() => void handleSaveWeeklyTime()}
+            >
+              <Text className="text-sm font-semibold" style={{ color: ACCENT }}>
+                {saving ? 'Saving…' : 'Save'}
+              </Text>
+            </Pressable>
+            <SettingsStatusPill label="Weekly" tone="accent" accentColor={ACCENT} />
           </View>
         </View>
 

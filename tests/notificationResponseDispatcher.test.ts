@@ -97,18 +97,21 @@ describe('notification response dispatcher', () => {
       markComplete,
       snooze,
       ...todoHandlers,
+      openWeeklyReview: vi.fn(),
     });
     await dispatchNotificationResponse(response(normalData, HABIT_REMINDER_MARK_COMPLETE_ACTION), {
       openHabit,
       markComplete,
       snooze,
       ...todoHandlers,
+      openWeeklyReview: vi.fn(),
     });
     await dispatchNotificationResponse(response(normalData, HABIT_REMINDER_SNOOZE_ACTION), {
       openHabit,
       markComplete,
       snooze,
       ...todoHandlers,
+      openWeeklyReview: vi.fn(),
     });
 
     expect(openHabit).toHaveBeenCalledWith('habit_gym');
@@ -222,6 +225,7 @@ describe('todo reminder response classification', () => {
       openTodo,
       markDone,
       snoozeTodo,
+      openWeeklyReview: vi.fn(),
     };
 
     await dispatchNotificationResponse(response(todoData), handlers);
@@ -259,6 +263,7 @@ describe('todo reminder response classification', () => {
       openTodo,
       markDone,
       snoozeTodo,
+      openWeeklyReview: vi.fn(),
     });
 
     expect(classified).toMatchObject({ kind: 'unknown' });
