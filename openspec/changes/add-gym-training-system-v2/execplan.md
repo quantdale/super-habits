@@ -1,7 +1,7 @@
 # SuperHabits Gym V2 Full Training System
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -33,18 +33,18 @@ In scope: migration 22 and Workout model extensions; built-in/custom exercise id
 
 ## Current Checkpoint
 
-- Current milestone: Wave 5 certification — the Gym V2 implementation, recovery contracts, simulation seed/introspection, docs, focused journeys, and committed deterministic matrix are green; final delivery evidence remains.
+- Current milestone: Wave 5 certification and delivery — Gym V2 is implemented, validated, committed, pushed, and CI-certified.
 - Completed: Repository preflight and OpenSpec artifacts; migration 22; exercise catalog/custom identity; routine prescriptions and reorder data API; weekly plan/overrides/Today; guided strength/bodyweight/timed/cardio sessions; durable drafts; progression; body weight; progress/totals; reminder/wake behavior; owner/account, sync, Backup V2, Portable, Supabase, simulation, PWA, and documentation contracts.
-- In progress: Finish timezone QA, reconcile the final plan/tasks evidence, push the three committed milestones, and verify exact remote SHA/CI. The committed deterministic simulation is complete: 22/22 unique scenarios passed across 526 steps, all reports stamped with `f5bb709c90710589d168dac7322bd55dc343ece1`.
+- In progress: None — all required implementation, validation, delivery, and evidence work is complete.
 - Important modified files: `core/db`, `core/auth`, `core/backup`, `core/portable`, `core/notifications`, `features/workout`, `features/settings`, Supabase/simulation schemas, tests, E2E/QA maps, docs, and the OpenSpec change.
-- Last successful validation: Full Vitest (147 files / 1,759 tests); lint (0 errors, 13 warnings); typecheck; OpenSpec all 41 items; full web export; full browser/simulation matrix (233 listed, 190 passed, 43 expected skips, 0 failures); e2e:sync (46/46); timezone matrix (5 zones); themes (140/140); Supabase schema; QA impact validation; and focused Gym V2/legacy Workout (14/14).
+- Last successful validation: Full Vitest (147 files / 1,759 tests); lint (0 errors, 13 warnings); typecheck; OpenSpec all 41 items; committed web export; full browser matrix (233 listed, 190 passed, 43 expected skips, 0 failures); committed deterministic simulation (22/22 scenarios, 526/526 steps); e2e:sync (46/46); timezone matrix (5 zones); themes (140/140); Supabase schema; QA impact validation; focused Gym V2/legacy Workout (14/14); and CI success for `b626584a`.
 - Current failures: No known product, migration, data/backup, typecheck, lint, web, browser, simulation-spec, sync-lane, or schema failure. The first long-lived simulation attempt ended without a final report after the harness session-age limit; bounded canonical-8081 reruns completed the full committed matrix. A probe on port 8094 exposed an existing simulation-helper hardcoded 8081 assumption; it is a harness/environment issue, not a product failure.
-- Relevant quarantines: Port 8081 is occupied by an unrelated local dev server, so local browser runs use isolated E2E ports; native Android target is missing `com.dale16.superhabits`; native iOS is unavailable because Xcode `xcrun/simctl` is absent on Windows.
-- Blockers: None.
-- Condition required to unblock: None.
-- Exact resume action after unblock: Continue with the exact next action below.
-- Exact next action: Run timezone QA, update this checkpoint with final gate results, commit the completed plan/task evidence, push the branch, inspect CI, and verify local HEAD equals the remote branch with a clean tree.
-- Remaining definition of done: All mandatory Gym V2 user flows and recovery contracts validated; canonical gates run with honest native/CI classifications; final diff committed and pushed with exact SHA/tree/remote evidence.
+- Relevant quarantines: Native Android target is missing `com.dale16.superhabits`; native iOS is unavailable because Xcode `xcrun/simctl` is absent on Windows. The temporary canonical static server used for simulation was stopped after the run.
+- Blockers: No product blocker. Native platform evidence remains environment-blocked as documented; CI completed successfully.
+- Condition required to unblock: None for the delivered web/data product; native reruns require an installed Android e2e-test APK or a macOS/Xcode iOS target.
+- Exact resume action after unblock: None — task complete.
+- Exact next action: None — task complete.
+- Remaining definition of done: None — all mandatory Gym V2 definition-of-done items are validated, delivered, and synchronized.
 
 ## Progress
 
@@ -57,7 +57,7 @@ In scope: migration 22 and Workout model extensions; built-in/custom exercise id
 - [x] Implement Wave 2 guided session and progression.
 - [x] Implement Wave 3 body weight and progress.
 - [x] Implement Wave 4 tests, simulation, documentation, and shell reconciliation.
-- [ ] Complete Wave 5 certification, delivery, and exact-SHA evidence.
+- [x] Complete Wave 5 certification, delivery, and exact-SHA evidence.
 
 ## Surprises & Discoveries
 
@@ -92,7 +92,7 @@ In scope: migration 22 and Workout model extensions; built-in/custom exercise id
 | Workout E2E/simulation              | PASS                          | Focused Workout 14/14; committed deterministic simulation 22/22 unique scenarios and 526/526 steps passed with final SHA-stamped reports; full browser matrix 190 passed/43 expected skips. |
 | Typecheck/lint/build/full tests     | PASS                          | Typecheck, lint 0 errors/13 warnings, web export, and Vitest 1,759/1,759 pass.                                                                                                              |
 | Native Workout QA                   | PASS WITH ENVIRONMENT BLOCKER | Android smoke/targeted/lifecycle report missing installed APK; iOS report lacks Xcode xcrun/simctl.                                                                                         |
-| Exact remote SHA/CI                 | IN PROGRESS                   | Three commits are local through `f5bb709c`; push and inspect the matching GitHub Actions run next.                                                                                          |
+| Exact remote SHA/CI                 | PASS                          | Local HEAD and `origin/codex/add-gym-training-system-v2` both equal `b626584aab43945c87e970b78f7651a7174857de`; CI run 32673553567 succeeded.                                               |
 
 ## Changed Files / Areas
 
@@ -118,9 +118,23 @@ After compaction or a fresh session:
 
 ## Outcomes & Retrospective
 
-Complete only at delivery. Record final SHA, branch/remote equality, migration
-and scope versions, shipped user capabilities, validation results, CI/native
-evidence, deliberate debt, and whether the working tree is clean. Mark
-`Status: COMPLETED` only when the mandatory Gym V2 definition of done is
-actually satisfied; otherwise keep the plan ACTIVE or document a genuine
-environment blocker without claiming completion.
+- Final delivery tree: `codex/add-gym-training-system-v2` is pushed and clean;
+  local HEAD equals `origin/codex/add-gym-training-system-v2` at
+  `b626584aab43945c87e970b78f7651a7174857de` at the time of this closeout
+  record. The closeout metadata commit itself is documentation-only.
+- Persistence: runtime schema v22 via append-only migration 22; Backup scope 6;
+  Backup settings version 5; legacy scope snapshots remain restorable.
+- Shipped outcome: built-in/custom/legacy exercise identity; type-aware routine
+  prescriptions and reorder; weekly plan and date overrides; Today dashboard;
+  strength/bodyweight/timed/cardio guided sessions; durable drafts; rest/wake
+  behavior; effort; manual/linear/double progression; PR/history/totals/body
+  areas; body-weight trend/goal; notifications; owner-safe sync, Backup V2,
+  Restore V2, Portable Backup, Supabase contracts, and legacy quick-complete.
+- Evidence: full unit/integration, typecheck, lint, web export, OpenSpec,
+  themes, timezones, focused Workout E2E, full browser matrix, committed
+  deterministic simulation (22/22, 526 steps), e2e:sync (46/46), Supabase
+  schema, and QA-impact validation passed. CI run 32673553567 succeeded for
+  the pushed SHA.
+- Deliberate debt: native Android smoke/targeted/lifecycle lanes are blocked by
+  the missing installed `com.dale16.superhabits` APK; iOS is blocked by missing
+  Xcode `xcrun/simctl` on Windows. No native success is claimed for this wave.
