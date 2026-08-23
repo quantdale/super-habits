@@ -1,7 +1,7 @@
 # ExecPlan: Weekly Review Cadence Loop
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -23,18 +23,18 @@ Pure occurrence math → preference persistence → native scheduler bridge → 
 
 ## Current Checkpoint
 
-- Current milestone: Weekly Review implementation, Settings V4 persistence, web/sync journey proof, deterministic simulation proof, and HEAVY performance-gate measurement fix are complete; exact CI then exposed a simulation-harness numeric-input race, which is corrected locally and now awaits final commit/push certification.
+- Current milestone: Weekly Review implementation, Settings V4 persistence, web/sync journey proof, deterministic simulation proof, HEAVY performance-gate measurement fix, and exact pushed-SHA CI certification are complete.
 - Completed: Core reminder wave is implemented: pure occurrence math + codec, AsyncStorage preference store, native cancel-then-schedule bridge, notification response routing into the Weekly Review surface, and the Notifications settings row with honest web/native-only copy. Settings V4 now captures live AsyncStorage preferences, restores them through the durable post-commit marker, and preserves frozen V3 canonicalization.
-- In progress: Run the post-fix focused and broad gates, finalize OpenSpec/ExecPlan evidence, serialize the coherent commit, push it, and certify the exact SHA.
-- Important modified files: `core/backup/backup.types.ts`, `core/backup/backupRestore.ts`, `core/backup/backupSettings.ts`, `core/portable/portableFormat.ts`, `core/notifications/notificationPreferences.ts`, `core/notifications/weeklyReviewReminderScheduler.ts`, `features/settings/SettingsNotificationsSection.tsx`, `features/weekly-review/weeklyReviewReminder.domain.ts`, `simulation/runner/actions.ts`, simulation report/runner files, `e2e/journeys/settings-ripple.spec.ts`, and the new focused tests.
-- Last successful validation: fresh `npm run build:web` PASS; corrected deterministic reproducibility passes 3/3 on `E2E_PORT=8083`; `npm run qa:simulation -- --all --mode deterministic` passes all 22 scenarios; and the complete four-project E2E run passes 183/227 with 44 expected skips and 0 failures. The full run includes Weekly Review journey test 204, simulation self-test 3.5, and schema test 4.4; HEAVY section-switch maximum was 766 ms against the unchanged 800 ms ceiling. Prior typecheck/lint/unit/integration/timezone/OpenSpec/impact/theme/schema, focused settings-ripple 6/6, P0 journeys 25/25, sync E2E 46/46, and HEAVY 10/10 evidence remain green, all on `TZ=Asia/Manila` using isolated ports.
-- Failures: GitHub run `32635670615` at `5f6f062` had quality PASS and e2e FAIL with 182 passed/44 skipped/1 failed in self-test 3.5. Artifact `simulation-output/run_mt5q8j9f_udl3xlcl/run-report.json` showed the first scenario run's requested `target=3` persisted as `target_per_day=31` during `createHabit`; this was traced to the controlled React Native Web input racing between `fill('')` and delayed `type('3')`, not a Weekly Review or product data failure. The harness now uses one fill plus `toHaveValue`. Native smoke/persistence/lifecycle remain ENVIRONMENT-blocked because no e2e-test APK is installed. Repository-wide `format:check` still reports 68 pre-existing non-campaign markdown/YAML files; touched files pass targeted formatting.
+- In progress: None. The completed change is ready for archival when requested.
+- Important modified files: `core/backup/backup.types.ts`, `core/backup/backupRestore.ts`, `core/backup/backupSettings.ts`, `core/portable/portableFormat.ts`, `core/notifications/notificationPreferences.ts`, `core/notifications/weeklyReviewReminderScheduler.ts`, `features/settings/SettingsNotificationsSection.tsx`, `features/weekly-review/weeklyReviewReminder.domain.ts`, `simulation/runner/actions.ts`, simulation report/runner files, `e2e/journeys/settings-ripple.spec.ts`, and the focused tests.
+- Last successful validation: fresh `npm run build:web` PASS; corrected deterministic reproducibility passes 3/3 on `E2E_PORT=8083`; `npm run qa:simulation -- --all --mode deterministic` passes all 22 scenarios; and the complete four-project E2E run passes 183/227 with 44 expected skips and 0 failures. The full run includes Weekly Review journey test 204, simulation self-test 3.5, and schema test 4.4; HEAVY section-switch maximum was 766 ms against the unchanged 800 ms ceiling. Exact GitHub run `32641380303` for `e6c540d` records quality success, main E2E success, 22/22 deterministic scenarios, dist-sync success, and 46/46 remote-boundary tests, with all artifacts uploaded. Prior typecheck/lint/unit/integration/timezone/OpenSpec/impact/theme/schema, focused settings-ripple 6/6, P0 journeys 25/25, and HEAVY 10/10 evidence remain green, all on `TZ=Asia/Manila` using isolated ports.
+- Failures: Historical run `32635670615` at `5f6f062` exposed and localized the resolved harness race where requested `target=3` became `target_per_day=31`; the corrected exact SHA has no CI failures. Native smoke/persistence/lifecycle remain ENVIRONMENT-blocked because no e2e-test APK is installed. Repository-wide `format:check` still reports 68 pre-existing non-campaign markdown/YAML files; touched files pass targeted formatting.
 - Relevant quarantines: None.
-- Blockers: None for local investigation; GitHub job-log re-run/access is external and will be verified after the root-cause fix is pushed.
+- Blockers: None for campaign completion. Native smoke/persistence/lifecycle evidence remains environment-blocked and is recorded honestly.
 - Condition required to unblock: N/A.
 - Exact resume action after unblock: N/A.
-- Exact next action: Inspect the final diff and validators, commit/push the corrected harness, and verify the exact SHA's remote branch and GitHub Actions status.
-- Remaining definition of done: default E2E + sync evidence, final OpenSpec/ExecPlan reconciliation, final commit/push, and exact-SHA CI certification as far as the available GitHub access allows; native lanes remain an explicit environment blocker until an installed e2e-test APK is available.
+- Exact next action: None; preserve the exact-SHA evidence and archive this completed change when requested.
+- Remaining definition of done: Complete — default E2E + sync evidence, final OpenSpec/ExecPlan reconciliation, final commit/push, and exact-SHA CI certification are recorded; native lanes remain an explicit environment blocker until an installed e2e-test APK is available.
 
 ## Progress
 
@@ -77,6 +77,7 @@ Pure occurrence math → preference persistence → native scheduler bridge → 
 - 2026-08-23 — Corrected deterministic reproducibility test, `--repeat-each=3` on `E2E_PORT=8083` — PASS — 3/3 after input synchronization fix.
 - 2026-08-23 — `npm run qa:simulation -- --all --mode deterministic` — PASS — fresh web export and 22/22 deterministic scenarios.
 - 2026-08-23 — corrected full `npm run e2e` on `TZ=Asia/Manila`, `E2E_PORT=8083` — PASS — 183 passed, 44 expected skips, 0 failures across 227 tests; Weekly Review settings journey, self-test 3.5, schema test 4.4, and HEAVY section switching all passed.
+- 2026-08-23 — GitHub Actions run `32641380303` @ `e6c540ddcd838e7e261ab83b5ed9d3e082ebe1ce` — PASS — quality, main E2E, 22/22 deterministic scenarios, dist-sync, and 46/46 sync-boundary journeys succeeded; e2e-report, simulation-output, and dist-sync artifacts uploaded.
 
 ## Changed Files / Areas
 
@@ -90,4 +91,4 @@ Pure occurrence math → preference persistence → native scheduler bridge → 
 
 ## Outcomes & Retrospective
 
-- Status: Active.
+- Status: Completed.

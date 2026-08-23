@@ -1,7 +1,7 @@
 # ExecPlan: Release Candidate Native Performance Closure
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -9,7 +9,7 @@ Certify SuperHabits at a release-candidate-quality baseline on the exact current
 
 ## Context
 
-- Repository `quantdale/super-habits`; the latest pushed campaign commit is `5f6f062b15de332a3f06156f04c1802e68756a5f` on `main`, equal to `origin/main`; the follow-up simulation-harness fix is currently uncommitted and is being validated.
+- Repository `quantdale/super-habits`; the certified pushed HEAD is `e6c540ddcd838e7e261ab83b5ed9d3e082ebe1ce` on `main`, equal to `origin/main`.
 - CI run 32577614654 at that SHA failed: quality job "Validate versioned ExecPlans" step; e2e skipped downstream.
 - Actual schema truth: migrations through v21 (`daily_plans.top_todo_titles`); next free version >=22.
 - Docs drift: `.cursorrules`/rules.mdc say v15; PROJECT_STRUCTURE_MAP says v15; AGENTS.md says v20.
@@ -33,17 +33,17 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 
 ## Current Checkpoint
 
-- Current milestone: The pushed campaign commit passed local broad validation, but exact GitHub CI on `5f6f062` exposed a real simulation harness input race; the follow-up correction is locally verified and awaits final commit/push certification.
-- Completed: Historical RC milestones M1–M10 are preserved in this plan; Weekly Review cadence, V4 backup compatibility, focused web journey, P0 journeys, integration, deterministic simulation, fresh web/sync builds, full local E2E, and HEAVY performance gates are green. The CI failure is now attributed to a controlled React Native Web numeric input being cleared and typed into across a CI re-render, producing `31` for requested target `3`.
-- In progress: Run the post-fix broad gates, serialize the simulation-harness correction with these evidence updates, push it, and verify its exact SHA.
-- Important modified files: `simulation/runner/actions.ts`, Weekly Review backup/settings/scheduler/UI/tests, simulation report/runner diagnostics, the settings-ripple journey, and the two active ExecPlans.
-- Last successful validation: Node `v22.23.2` matches `.nvmrc`; fresh `npm run build:web` PASS; all 22 deterministic simulation scenarios PASS; the isolated deterministic reproducibility test passes 3/3 on `E2E_PORT=8083`; and the complete four-project E2E run passes 183/227 with 44 expected skips and 0 failures. In that full run, self-test 3.5 passed in 2.1 minutes and schema test 4.4 passed in 3.0 minutes after replacing clear-plus-type with one `fill` followed by `toHaveValue`; prior typecheck/lint/unit/integration/timezone/OpenSpec/impact/theme/schema, `e2e:sync` 46/46, deterministic smoke, and HEAVY N=10 evidence remain green.
-- Failures: GitHub run `32635670615` at `5f6f062` had quality PASS and e2e FAIL: 182 passed, 44 skipped, and one failure in `simulation/runner/specs/selfTest.spec.ts` test 3.5. The first deterministic run (`run_mt5q8j9f_udl3xlcl`, scenario lane) failed at `createHabit name="Drink water" target=3`; the report `simulation-output/run_mt5q8j9f_udl3xlcl/run-report.json` recorded `target_per_day: 31` instead of `3`. Browser errors were absent; the only server diagnostic was an incidental aborted HEAD request. Native smoke/persistence/lifecycle are ENVIRONMENT-blocked because no e2e-test APK is installed. One full `qa:fast` invocation had a transient restore-coordinator module-lifecycle timeout; a subsequent full unit rerun passed. Repository-wide `format:check` reports 68 pre-existing non-campaign markdown/YAML files; touched files pass targeted formatting.
+- Current milestone: Release-candidate closure and the Weekly Review Cadence Loop are complete and certified on the exact pushed HEAD.
+- Completed: Historical RC milestones M1–M10 are preserved in this plan; the controlled React Native Web numeric-input race is fixed with one atomic `fill` plus a value assertion; local broad validation is green; and GitHub Actions run `32641380303` is green for this exact SHA across quality, main E2E, full deterministic scenarios, dist-sync, and the 46-test sync-boundary lane.
+- In progress: None. The completed campaign is ready for archival when requested.
+- Important modified files: `simulation/runner/actions.ts`, Weekly Review backup/settings/scheduler/UI/tests, simulation report/runner diagnostics, the settings-ripple journey, and the two ExecPlans.
+- Last successful validation: Node `v22.23.2` matches `.nvmrc`; fresh `npm run build:web` PASS; all 22 deterministic simulation scenarios PASS; the isolated deterministic reproducibility test passes 3/3 on `E2E_PORT=8083`; the complete four-project E2E run passes 183/227 with 44 expected skips and 0 failures; and the exact remote run records quality success, main E2E success, 22/22 scenario success, dist-sync success, and 46/46 sync success. In the local full run, self-test 3.5 passed in 2.1 minutes and schema test 4.4 passed in 3.0 minutes after replacing clear-plus-type with one `fill` followed by `toHaveValue`; the remote run uploaded e2e, simulation, and dist-sync artifacts successfully.
+- Failures: Historical run `32635670615` at `5f6f062` exposed the resolved race: requested `target=3` became `target_per_day=31` during `createHabit`. The corrected exact SHA has no CI failures. Native smoke/persistence/lifecycle remain ENVIRONMENT-blocked because no e2e-test APK is installed. Repository-wide `format:check` reports 68 pre-existing non-campaign markdown/YAML files; touched files pass targeted formatting.
 - Relevant quarantines: None for the current investigation; prior CI classifications are historical evidence and will be replaced or confirmed with fresh runs.
-- Blockers: None for local reproduction. External GitHub job re-run/log access may still be needed for final exact-SHA certification.
+- Blockers: None for campaign completion. Native smoke/persistence/lifecycle evidence remains environment-blocked and is recorded honestly.
 - Condition required to unblock: N/A.
 - Exact resume action after unblock: N/A.
-- Exact next action: Inspect the final diff and validators, commit/push the corrected harness, and query the exact SHA's branch and GitHub Actions status.
+- Exact next action: None; preserve the exact-SHA evidence and archive this completed change when requested.
 - Remaining definition of done: completed Weekly Review OpenSpec tasks, default E2E + sync evidence, reconciled plans/docs, coherent push, and exact pushed-SHA quality/e2e verification as far as GitHub access permits; native environment blockers must remain recorded honestly.
 
 ## Progress
@@ -60,7 +60,7 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 - [x] 7.x Documentation truth sweep (tasks 7.1–7.3)
 - [x] 8.x Repository hygiene audit (tasks 8.1–8.2)
 - [x] 9.x Recovery invariant re-proof (tasks 9.1–9.2)
-- [ ] 10.x Commit/push/exact-SHA CI verification; next-campaign selection + start (tasks 10.1–10.4; push/certification still pending)
+- [x] 10.x Commit/push/exact-SHA CI verification; next-campaign selection + start (tasks 10.1–10.4; certified by run `32641380303` on `e6c540d`)
 
 ## Surprises & Discoveries
 
@@ -90,6 +90,7 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 - 2026-08-23 — Corrected deterministic reproducibility test, `--repeat-each=3` on `E2E_PORT=8083` — PASS — 3/3 after single-fill input synchronization and an explicit value assertion.
 - 2026-08-23 — `npm run qa:simulation -- --all --mode deterministic` — PASS — fresh web export, 22/22 deterministic scenarios, including smoke and long-term history/recovery paths.
 - 2026-08-23 — corrected full `npm run e2e` on `TZ=Asia/Manila`, `E2E_PORT=8083` — PASS — 183 passed, 44 expected skips, 0 failures across 227 tests; self-test 3.5 and 4.4 both passed in the full suite, and the HEAVY section-switch maximum was 766 ms against the unchanged 800 ms ceiling.
+- 2026-08-23 — GitHub Actions run `32641380303` @ `e6c540ddcd838e7e261ab83b5ed9d3e082ebe1ce` — PASS — quality, main E2E, full deterministic scenario library (22/22), dist-sync build, and remote-boundary E2E (46/46) all succeeded; e2e-report, simulation-output, and dist-sync artifacts uploaded successfully.
 
 - 2026-08-22 — `git fetch --all --prune` + `git status/log/branch` — PASS — HEAD `6cc4172`, clean, main-only.
 - 2026-08-22 — `npm run agent:plans` — PASS — 35 plans discovered, all COMPLETED.
@@ -112,6 +113,6 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: CI closure diagnostics, Weekly Review completion, backup/settings V4 compatibility, performance measurement stabilization, and broad local certification are complete. Exact CI exposed and localized a numeric-input race in the simulation harness; the single-fill correction is locally green and final exact-SHA push/certification remains.
-- Follow-up: Commit/push the correction and record the exact remote branch and GitHub Actions result without overstating unavailable native or admin-gated evidence.
+- Status: Completed.
+- Summary: CI closure diagnostics, Weekly Review completion, backup/settings V4 compatibility, performance measurement stabilization, broad local certification, and exact remote certification are complete on `e6c540ddcd838e7e261ab83b5ed9d3e082ebe1ce`.
+- Follow-up: Archive this change when requested; native environment limitations remain documented rather than represented as passes.
