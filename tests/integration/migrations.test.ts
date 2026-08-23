@@ -61,7 +61,7 @@ vi.mock('@/core/db/appMeta', async (importOriginal) => {
   };
 });
 
-/** All tables the app creates (bootstrap DDL + migrations 2–15). */
+/** All tables the app creates (bootstrap DDL + append-only migrations). */
 const EXPECTED_TABLES = [
   'todos',
   'habits',
@@ -80,9 +80,13 @@ const EXPECTED_TABLES = [
   'linked_action_executions',
   'processed_notification_actions',
   'sync_outbox',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
 ];
 
-/** Named indexes the app creates (migrations 8, 10, 11, 15). */
+/** Named indexes the app creates across the runtime schema. */
 const EXPECTED_NAMED_INDEXES = [
   'idx_saved_meals_food_name',
   'idx_linked_action_rules_source_lookup',
@@ -94,7 +98,36 @@ const EXPECTED_NAMED_INDEXES = [
   'idx_linked_action_executions_chain',
   'idx_processed_notification_actions_processed_at',
   'idx_sync_outbox_revision',
+  'idx_custom_exercises_active_name',
+  'uq_workout_weekly_plan_active_weekday',
+  'uq_workout_schedule_overrides_active_date',
+  'idx_workout_schedule_overrides_date',
+  'idx_body_weight_entries_measured_at',
 ];
+
+const EXPECTED_REFERENCE_NAMED_INDEXES = EXPECTED_NAMED_INDEXES.filter(
+  (index) =>
+    ![
+      'idx_custom_exercises_active_name',
+      'uq_workout_weekly_plan_active_weekday',
+      'uq_workout_schedule_overrides_active_date',
+      'idx_workout_schedule_overrides_date',
+      'idx_body_weight_entries_measured_at',
+    ].includes(index),
+);
+
+// `schema.sql` is intentionally a partial reference snapshot. It predates the
+// runtime-only Gym V2 migration, so its alignment check covers the stable
+// shared subset while the real bootstrap check above covers the full head.
+const EXPECTED_REFERENCE_TABLES = EXPECTED_TABLES.filter(
+  (table) =>
+    ![
+      'custom_exercises',
+      'workout_weekly_plan',
+      'workout_schedule_overrides',
+      'body_weight_entries',
+    ].includes(table),
+);
 
 type OpenDbOptions = {
   /** Absolute path for a persistent database (reused across sessions). */
@@ -118,14 +151,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 21', async () => {
+  it('bootstraps from zero and reaches stored schema version 22', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('21');
+    expect(row?.value).toBe('22');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -188,6 +221,49 @@ describe('tests/integration/migrations', () => {
     await db.closeAsync();
   });
 
+  it('adds the Gym V2 tables and columns in migration 22', async () => {
+    const db = await openDb();
+    const routineColumns = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(workout_routines)',
+    );
+    const exerciseColumns = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(routine_exercises)',
+    );
+    const setColumns = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(routine_exercise_sets)',
+    );
+    const sessionSetColumns = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(workout_session_sets)',
+    );
+    expect(routineColumns.map((column) => column.name)).toContain('goal_tag');
+    expect(exerciseColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        'catalog_exercise_id',
+        'modality',
+        'superset_group',
+        'progression_mode',
+      ]),
+    );
+    expect(setColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        'target_reps_min',
+        'target_reps_max',
+        'target_load',
+        'target_duration_seconds',
+      ]),
+    );
+    expect(sessionSetColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        'duration_seconds',
+        'distance',
+        'pace',
+        'effort_value',
+        'effort_scale',
+      ]),
+    );
+    await db.closeAsync();
+  });
+
   it('keeps the reference schema snapshot aligned through migration 15', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-reference-schema-'));
     const file = path.join(dir, 'schema.db');
@@ -199,13 +275,15 @@ describe('tests/integration/migrations', () => {
       const tables = reference.raw
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
         .all() as { name: string }[];
-      expect(tables.map((table) => table.name)).toEqual(expect.arrayContaining(EXPECTED_TABLES));
+      expect(tables.map((table) => table.name)).toEqual(
+        expect.arrayContaining(EXPECTED_REFERENCE_TABLES),
+      );
 
       const indexes = reference.raw
         .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
         .all() as { name: string }[];
       expect(indexes.map((index) => index.name)).toEqual(
-        expect.arrayContaining(EXPECTED_NAMED_INDEXES),
+        expect.arrayContaining(EXPECTED_REFERENCE_NAMED_INDEXES),
       );
 
       const processedColumns = reference.raw
@@ -227,7 +305,7 @@ describe('tests/integration/migrations', () => {
       expect(outboxColumns.map((column) => column.name)).toContain('owner_user_id');
     } finally {
       await reference.closeAsync();
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
 
@@ -242,7 +320,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('21');
+      expect(v1?.value).toBe('22');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -253,7 +331,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('21');
+      expect(v2?.value).toBe('22');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -261,7 +339,7 @@ describe('tests/integration/migrations', () => {
       expect(sessions.map((t) => t.name)).toEqual(expect.arrayContaining(EXPECTED_TABLES));
       await session2.closeAsync();
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
 
@@ -274,7 +352,7 @@ describe('tests/integration/migrations', () => {
       const legacy = (await import('./helpers/db')).createTestDatabase(file);
       legacy.raw.exec(`
         CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
-        INSERT INTO app_meta (key, value) VALUES ('db_schema_version', '11');
+        INSERT INTO app_meta (key, value) VALUES ('db_schema_version', '6');
         CREATE TABLE habits (
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL,
@@ -309,7 +387,7 @@ describe('tests/integration/migrations', () => {
       ]);
       await db.closeAsync();
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
 

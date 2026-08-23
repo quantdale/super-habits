@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS public.workout_routines (
   user_id     UUID NOT NULL DEFAULT auth.uid(),
   name        TEXT NOT NULL,
   description TEXT,
+  goal_tag    TEXT,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   deleted_at  TEXT
@@ -182,6 +183,14 @@ CREATE TABLE IF NOT EXISTS public.routine_exercises (
   routine_id TEXT NOT NULL,
   name       TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  catalog_exercise_id TEXT,
+  modality   TEXT NOT NULL DEFAULT 'timed',
+  notes      TEXT,
+  superset_group TEXT,
+  progression_mode TEXT NOT NULL DEFAULT 'none',
+  progression_increment REAL,
+  progression_min_reps INTEGER,
+  progression_max_reps INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT
@@ -194,6 +203,12 @@ CREATE TABLE IF NOT EXISTS public.routine_exercise_sets (
   set_number     INTEGER NOT NULL,
   active_seconds INTEGER NOT NULL DEFAULT 40,
   rest_seconds   INTEGER NOT NULL DEFAULT 20,
+  target_reps_min INTEGER,
+  target_reps_max INTEGER,
+  target_load REAL,
+  target_duration_seconds INTEGER,
+  target_distance REAL,
+  target_pace REAL,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL,
   deleted_at     TEXT
@@ -208,7 +223,8 @@ CREATE TABLE IF NOT EXISTS public.workout_logs (
   created_at       TEXT NOT NULL,
   started_at       TEXT,
   ended_at         TEXT,
-  duration_seconds INTEGER
+  duration_seconds INTEGER,
+  routine_name     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.workout_session_exercises (
@@ -217,6 +233,8 @@ CREATE TABLE IF NOT EXISTS public.workout_session_exercises (
   log_id          TEXT NOT NULL,
   exercise_name   TEXT NOT NULL,
   sets_completed  INTEGER NOT NULL DEFAULT 0,
+  catalog_exercise_id TEXT,
+  modality        TEXT NOT NULL DEFAULT 'timed',
   created_at      TEXT NOT NULL
 );
 
@@ -627,6 +645,11 @@ CREATE TABLE IF NOT EXISTS public.workout_session_sets (
   reps                INTEGER,
   weight_unit         TEXT,
   completed           INTEGER NOT NULL DEFAULT 1,
+  duration_seconds   INTEGER,
+  distance           REAL,
+  pace               REAL,
+  effort_value       REAL,
+  effort_scale       TEXT,
   created_at          TEXT NOT NULL
 );
 
@@ -651,6 +674,139 @@ CREATE POLICY "sync_workout_session_sets_delete_owner" ON public.workout_session
 REVOKE ALL PRIVILEGES ON TABLE public.workout_session_sets FROM anon, PUBLIC;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.workout_session_sets
+  TO authenticated, service_role;
+
+-- ============================================================================
+-- GYM / TRAINING V2 TABLES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.custom_exercises (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id UUID NOT NULL DEFAULT auth.uid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  primary_area TEXT NOT NULL,
+  secondary_areas TEXT NOT NULL DEFAULT '[]',
+  equipment TEXT,
+  modality TEXT NOT NULL,
+  unilateral INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS public.workout_weekly_plan (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id UUID NOT NULL DEFAULT auth.uid(),
+  weekday INTEGER NOT NULL,
+  routine_id TEXT,
+  plan_kind TEXT NOT NULL,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS public.workout_schedule_overrides (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id UUID NOT NULL DEFAULT auth.uid(),
+  date_key TEXT NOT NULL,
+  override_kind TEXT NOT NULL,
+  routine_id TEXT,
+  moved_from_date_key TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS public.body_weight_entries (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id UUID NOT NULL DEFAULT auth.uid(),
+  measured_on TEXT NOT NULL,
+  measured_at TEXT NOT NULL,
+  weight REAL NOT NULL,
+  unit TEXT NOT NULL,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_exercises_user_id
+  ON public.custom_exercises (user_id, updated_at, id);
+CREATE INDEX IF NOT EXISTS idx_workout_weekly_plan_user_id
+  ON public.workout_weekly_plan (user_id, weekday, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_weekly_plan_owner_weekday
+  ON public.workout_weekly_plan (user_id, weekday) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_workout_schedule_overrides_user_date
+  ON public.workout_schedule_overrides (user_id, date_key, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_schedule_overrides_owner_date
+  ON public.workout_schedule_overrides (user_id, date_key) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_body_weight_entries_user_measured_at
+  ON public.body_weight_entries (user_id, measured_at, id);
+
+ALTER TABLE public.custom_exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workout_weekly_plan ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workout_schedule_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.body_weight_entries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "sync_custom_exercises_select_owner" ON public.custom_exercises
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_custom_exercises_insert_owner" ON public.custom_exercises
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_custom_exercises_update_owner" ON public.custom_exercises
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_custom_exercises_delete_owner" ON public.custom_exercises
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+CREATE POLICY "sync_workout_weekly_plan_select_owner" ON public.workout_weekly_plan
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_weekly_plan_insert_owner" ON public.workout_weekly_plan
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_weekly_plan_update_owner" ON public.workout_weekly_plan
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_weekly_plan_delete_owner" ON public.workout_weekly_plan
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+CREATE POLICY "sync_workout_schedule_overrides_select_owner" ON public.workout_schedule_overrides
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_schedule_overrides_insert_owner" ON public.workout_schedule_overrides
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_schedule_overrides_update_owner" ON public.workout_schedule_overrides
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_workout_schedule_overrides_delete_owner" ON public.workout_schedule_overrides
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+CREATE POLICY "sync_body_weight_entries_select_owner" ON public.body_weight_entries
+  FOR SELECT TO authenticated USING ((select auth.uid()) = user_id);
+CREATE POLICY "sync_body_weight_entries_insert_owner" ON public.body_weight_entries
+  FOR INSERT TO authenticated WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_body_weight_entries_update_owner" ON public.body_weight_entries
+  FOR UPDATE TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "sync_body_weight_entries_delete_owner" ON public.body_weight_entries
+  FOR DELETE TO authenticated USING ((select auth.uid()) = user_id);
+
+REVOKE ALL PRIVILEGES ON TABLE
+  public.custom_exercises,
+  public.workout_weekly_plan,
+  public.workout_schedule_overrides,
+  public.body_weight_entries
+  FROM anon, PUBLIC;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public.custom_exercises,
+  public.workout_weekly_plan,
+  public.workout_schedule_overrides,
+  public.body_weight_entries
   TO authenticated, service_role;
 
 -- Owner-pair uniqueness indexes required by composite (parent_id, user_id)

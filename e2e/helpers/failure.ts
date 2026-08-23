@@ -25,8 +25,27 @@ import { type Page } from '@playwright/test';
 export const SYNCABLE_ENTITIES = [
   'todos',
   'habits',
+  'habit_completions',
   'calorie_entries',
+  'saved_meals',
   'workout_routines',
+  'routine_exercises',
+  'routine_exercise_sets',
+  'workout_logs',
+  'workout_session_exercises',
+  'pomodoro_sessions',
+  'linked_action_rules',
+  'weekly_reviews',
+  'projects',
+  'goals',
+  'daily_plans',
+  'workout_session_sets',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
+  'user_backup_settings',
+  'backup_manifest',
 ] as const;
 
 export type SyncEntity = (typeof SYNCABLE_ENTITIES)[number];

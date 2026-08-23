@@ -112,7 +112,7 @@ export const syncUpsertRoundTrip = defineScenario({
         fats: 5,
         mealType: 'breakfast',
       },
-      note: `LOCAL oracle: exactly one calorie row. ${REMOTE_VERIFY} Note: addCalorieEntry also upserts a saved_meal locally — saved_meals is NOT a sync entity and must NOT appear remotely (remote tables for it do not exist in schema.sql).`,
+      note: `LOCAL oracle: exactly one calorie row. ${REMOTE_VERIFY} Note: addCalorieEntry also upserts a saved_meal locally; Backup V2 covers that durable row, but this focused legacy sync probe does not assert its backup payload.`,
       oracles: [
         {
           kind: 'rows',
@@ -127,7 +127,7 @@ export const syncUpsertRoundTrip = defineScenario({
       args: { name: 'Push day' },
       note:
         'LOCAL oracle: exactly one routine row. ' +
-        `${REMOTE_VERIFY} Only the parent workout_routines row is synced; nested exercises/sets stay local-only.`,
+        `${REMOTE_VERIFY} This focused probe writes only the parent routine. Gym V2 nested exercises/sets and planning/body-weight rows are covered by the Gym V2 fixture and scope-6 round-trip contracts.`,
       oracles: [
         {
           kind: 'rows',
@@ -140,7 +140,7 @@ export const syncUpsertRoundTrip = defineScenario({
       kind: 'apiLeg',
       functionName: 'engine:flush',
       note:
-        'The engine must push all four entities (upsert onConflict id). ' +
+        'The engine must push the four entities written by this legacy probe (upsert onConflict id); the production adapter also accepts the complete Backup V2/Gym V2 entity set. ' +
         `${REMOTE_VERIFY} After this step remote todos/habits/calorie_entries/workout_routines each contain exactly ONE row for the written ids — no duplicates.`,
       oracles: [
         { kind: 'outbox' },
@@ -470,7 +470,7 @@ export const restoreLifecycleRoundTrip = defineScenario({
   mode: 'deterministic',
   tags: [DISPOSABLE_LANE_TAG],
   description:
-    'Phase A: empty device, empty remote → preview blocked (remote_backup_unavailable). Phase B: device A publishes a backup (todo+habit+calorie+workout routine). Phase C: empty device B previews (eligible, startupPromptEligible) and imports — todo/habit/calorie land locally, workout_routines stays at 0 locally though present remotely, habit_completions stays local-only. Phase D: after import the device is non-empty → preview blocked (local_data_present).',
+    'Legacy Restore V1 compatibility probe. Phase A: empty device, empty remote → preview blocked (remote_backup_unavailable). Phase B: device A publishes a V1-shaped backup (todo+habit+calorie+workout routine). Phase C: empty device B previews (eligible, startupPromptEligible) and imports only the V1 phase-one entities — todo/habit/calorie land locally, workout_routines remains excluded by the legacy coordinator. Phase D: after import the device is non-empty → preview blocked (local_data_present). Backup Completeness V2/Gym V2 restore is covered by the scope-6 integration and portable round-trip suites.',
   steps: [
     {
       kind: 'apiLeg',
@@ -531,7 +531,7 @@ export const restoreLifecycleRoundTrip = defineScenario({
       kind: 'apiLeg',
       functionName: 'data:workout/addRoutine',
       args: { name: 'Not-restorable routine' },
-      note: 'PHASE B — workout_routines is SYNCED but OUT of restore scope (restore.types.ts RESTORE_SCOPED_ENTITIES excludes it). LOCAL oracle: one routine row.',
+      note: 'PHASE B — legacy V1 compatibility: workout_routines is synced but OUT of the phase-one restore scope (restore.types.ts RESTORE_SCOPED_ENTITIES excludes it). LOCAL oracle: one routine row.',
       oracles: [
         {
           kind: 'rows',
@@ -556,7 +556,7 @@ export const restoreLifecycleRoundTrip = defineScenario({
     {
       kind: 'apiLeg',
       functionName: 'restore:getRestorePreview',
-      note: "PHASE C — empty device B (runner: fresh context, clearDatabase + reload; remote still holds the backup). Runner asserts: eligibility.kind === 'empty_device', remoteAvailable === true, startupPromptEligible === true (freshnessSignature non-null and not dismissed), entityStatuses.todos.remoteState === 'available' with rowCount 1, entityStatuses.workout_routines.phaseOneStatus === 'excluded_in_phase_one'. LOCAL oracle: all synced tables still empty on this device.",
+      note: "PHASE C — empty device B (runner: fresh context, clearDatabase + reload; remote still holds the legacy V1 backup). Runner asserts: eligibility.kind === 'empty_device', remoteAvailable === true, startupPromptEligible === true (freshnessSignature non-null and not dismissed), entityStatuses.todos.remoteState === 'available' with rowCount 1, entityStatuses.workout_routines.phaseOneStatus === 'excluded_in_phase_one'. LOCAL oracle: all phase-one tables still empty on this device.",
       oracles: [
         {
           kind: 'rows',
@@ -606,7 +606,7 @@ export const restoreLifecycleRoundTrip = defineScenario({
         sql: 'SELECT COUNT(*) AS n FROM workout_routines WHERE deleted_at IS NULL',
         expected: [{ n: 0 }],
       },
-      note: 'PHASE C — NON-RESTORED ENTITY: workout_routines has a row on the REMOTE (the backup pushed it) but restore excludes it, so the local count stays 0. `[remote]` Runner asserts the remote workout_routines still holds its 1 row (import must not delete it either — push-only backup, no two-way sync).',
+      note: 'PHASE C — LEGACY V1 NON-RESTORED ENTITY: workout_routines has a row on the REMOTE (the V1 backup pushed it) but phase-one restore excludes it, so the local count stays 0. Scope-6 Restore V2 restores routines and their Gym V2 dependencies after validation.',
     },
     {
       kind: 'expectOracle',
@@ -615,7 +615,7 @@ export const restoreLifecycleRoundTrip = defineScenario({
         sql: 'SELECT COUNT(*) AS n FROM habit_completions',
         expected: [{ n: 0 }],
       },
-      note: 'PHASE C — LOCAL-ONLY entity: habit_completions has no remote table at all (schema.sql covers only the four synced tables); restore leaves it alone. Runner asserts zero habit_completions were imported.',
+      note: 'PHASE C — LEGACY V1 OUT-OF-PHASE entity: habit_completions is not part of the phase-one import assertion. Scope-6 Backup/Restore V2 includes its recoverable history.',
     },
     {
       kind: 'apiLeg',

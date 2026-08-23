@@ -12,7 +12,8 @@
  * Honest scope (the parent seeds with raw SQL and the integration seeders with
  * injected-clock data-layer calls; compare):
  * - The `apiLeg` registry exposes `createTodo`, `createHabit`, `tickHabit`,
- *   `logCalories`, `createWorkoutRoutine` only. It cannot express soft-deleted
+ *   `logCalories`, `createWorkoutRoutine`, and a compact `seedGymTrainingState`
+ *   fixture seam. It cannot express soft-deleted
  *   rows, saved meals, pomodoro sessions, or past-day history, so the fixture
  *   counts below are approximations of the parent's volumes at a scale that is
  *   practical to replay as browser steps.
@@ -124,6 +125,22 @@ export function routineStep(name: string): SemanticStep {
   );
 }
 
+/** Seed a compact Gym V2 shape after a routine exists. */
+export function gymTrainingStep(routineName: string): SemanticStep {
+  return apiStep(
+    'seedGymTrainingState',
+    { routineName },
+    {
+      kind: 'rows',
+      sql: `SELECT
+        (SELECT COUNT(*) FROM custom_exercises WHERE name = 'Cable Y raise' AND deleted_at IS NULL) AS custom_exercises,
+        (SELECT COUNT(*) FROM workout_weekly_plan wp JOIN workout_routines wr ON wr.id = wp.routine_id WHERE wr.name = '${esc(routineName)}' AND wp.deleted_at IS NULL) AS weekly_plan,
+        (SELECT COUNT(*) FROM body_weight_entries WHERE note = 'Simulation morning' AND deleted_at IS NULL) AS body_weight_entries`,
+      expected: [{ custom_exercises: 1, weekly_plan: 1, body_weight_entries: 1 }],
+    },
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Parent-seed compositions                                            */
 /* ------------------------------------------------------------------ */
@@ -172,6 +189,7 @@ export function typicalPreamble(): SemanticStep[] {
   ];
   for (const [food, kcal, mealType] of meals) steps.push(calorieStep(food, kcal, mealType));
   steps.push(routineStep('Routine 1 — Upper body'));
+  steps.push(gymTrainingStep('Routine 1 — Upper body'));
   steps.push(routineStep('Routine 2 — Lower body'));
   return steps;
 }

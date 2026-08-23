@@ -527,7 +527,7 @@ const SECTION_MARKERS: Record<SectionName, string> = {
   habits: "Today's rhythm",
   pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',
   workout:
-    'Create simple routines, update exercises, and mark completions without leaving the tab.',
+    'Plan your week, build prescriptions, train with guidance, and review progress in one place.',
   calories: 'Switch between manual entry and a diary grouped by meal.',
 };
 

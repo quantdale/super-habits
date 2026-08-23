@@ -2,8 +2,8 @@
 
 Applies to `simulation/backend/schema.sql`, the disposable-lane compatibility
 fixture for the repository-managed Supabase migration contract. It covers the
-four synced tables (`todos`, `habits`, `calorie_entries`,
-`workout_routines`) plus their RLS.
+the complete owner-scoped Backup V2 surface, including Gym V2 tables, plus
+their RLS.
 
 ## Why this file exists
 
@@ -17,7 +17,11 @@ The drift procedure below makes that divergence a finding, never a quiet edit.
 
 ## Current snapshot
 
-- Tables: `todos`, `habits`, `calorie_entries`, `workout_routines`.
+- Tables: the four core sync tables, Backup Completeness V2 entities,
+  planning/weekly-review entities, `workout_session_sets`, and Gym V2's
+  `custom_exercises`, `workout_weekly_plan`, `workout_schedule_overrides`,
+  and `body_weight_entries`. The checked-in snapshot is authoritative for this
+  disposable lane.
 - The v12 habit contract includes `habits.rule_history`, an effective-dated
   JSON rule array containing local ISO-weekday schedules and historical daily
   targets. The live Supabase dashboard must receive this additive column before
@@ -32,10 +36,11 @@ The drift procedure below makes that divergence a finding, never a quiet edit.
   `authenticated`, using `((select auth.uid()) = user_id)` and explicit
   update `USING`/`WITH CHECK`; the unauthenticated `anon` role has no backup
   CRUD grant or policy.
-- Non-synced tables intentionally have **no** remote counterpart:
-  `habit_completions`, `pomodoro_sessions`, `saved_meals`, `workout_logs`,
-  `routine_exercises`, `routine_exercise_sets`, `workout_session_exercises`,
-  `linked_action_*`.
+- Local operational tables intentionally have **no** remote counterpart:
+  `linked_action_events`, `linked_action_executions`, and
+  `processed_notification_actions`. Recoverable workout history, nested
+  routine/session rows, body weight, custom exercises, and plan rows do have
+  owner-scoped remote counterparts.
 
 ## Procedure
 

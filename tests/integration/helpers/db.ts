@@ -65,8 +65,10 @@ export interface TestDatabase {
 
 class SqliteTestDatabase implements TestDatabase {
   readonly raw: Database;
+  private readonly filename: string;
 
   constructor(filenameOrMemory: string) {
+    this.filename = filenameOrMemory;
     this.raw = new Database(filenameOrMemory === ':memory:' ? ':memory:' : filenameOrMemory, {
       // Keep the file-backed build (used by the migration rerun test) hermetic.
       timeout: 5000,
@@ -127,6 +129,13 @@ class SqliteTestDatabase implements TestDatabase {
   }
 
   async closeAsync(): Promise<void> {
+    // Windows can keep WAL/SHM handles alive long enough for the migration
+    // tests' temporary-directory cleanup to observe EBUSY. Checkpoint and
+    // switch file-backed fixtures back to the rollback journal before closing
+    // so the test harness releases every sidecar deterministically.
+    if (this.filename !== ':memory:') {
+      this.raw.exec('PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode = DELETE;');
+    }
     this.raw.close();
   }
 

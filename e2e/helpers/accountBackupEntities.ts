@@ -30,6 +30,10 @@ export const BACKUP_REST_ENTITIES = [
   'projects',
   'goals',
   'daily_plans',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
   'user_backup_settings',
   'backup_manifest',
 ] as const;

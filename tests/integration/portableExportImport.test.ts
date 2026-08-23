@@ -77,6 +77,10 @@ const ALL_TABLES = [
   'workout_logs',
   'workout_session_exercises',
   'workout_session_sets',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
   'pomodoro_sessions',
   'linked_action_rules',
   'weekly_reviews',
@@ -244,8 +248,26 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
     "SELECT id FROM workout_routines WHERE name = 'Push day'",
   );
   const routineId = routineRow?.id ?? '';
-  const exerciseId = await workout.addExercise({ routineId, name: 'Bench press' });
-  await workout.addSet({ exerciseId, setNumber: 1, activeSeconds: 40, restSeconds: 20 });
+  const exerciseId = await workout.addExercise({
+    routineId,
+    name: 'Bench press',
+    catalogExerciseId: 'builtin_barbell_bench_press',
+    modality: 'weighted_strength',
+    notes: 'Controlled eccentric.',
+    progressionMode: 'linear',
+    progressionIncrement: 2.5,
+    progressionMinReps: 8,
+    progressionMaxReps: 10,
+  });
+  await workout.addSet({
+    exerciseId,
+    setNumber: 1,
+    activeSeconds: 40,
+    restSeconds: 20,
+    targetRepsMin: 8,
+    targetRepsMax: 10,
+    targetLoad: 60,
+  });
   await workout.addSet({ exerciseId, setNumber: 2, activeSeconds: 40, restSeconds: 20 });
   await workout.addSet({ exerciseId, setNumber: 3, activeSeconds: 35, restSeconds: 25 });
   const secondExerciseId = await workout.addExercise({ routineId, name: 'Overhead press' });
@@ -282,6 +304,36 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
       overheadSessionExercise?.id ?? '',
     ],
   );
+  await workout.createCustomExercise({
+    name: 'Cable Y Raise',
+    primaryArea: 'shoulders',
+    secondaryAreas: ['upper back'],
+    equipment: 'cable',
+    modality: 'weighted_strength',
+    unilateral: false,
+  });
+  await workout.upsertWeeklyPlanEntry({
+    weekday: 1,
+    routineId,
+    planKind: 'workout',
+    note: 'Push focus',
+  });
+  await workout.setWorkoutScheduleOverride({
+    dateKey: '2026-08-04',
+    overrideKind: 'rest',
+    note: 'Recovery day',
+  });
+  await workout.addBodyWeightEntry({
+    weight: 80,
+    unit: 'kg',
+    measuredAt: '2026-08-03T07:00:00.000Z',
+    note: 'Morning',
+  });
+  await workout.saveWorkoutPreferences({
+    effortScale: 'rpe',
+    goalWeight: { value: 78, unit: 'kg' },
+    workoutReminder: { enabled: false, time: { hour: 7, minute: 30 } },
+  });
   await dailyPlan.upsertDailyPlan('2026-08-03', {
     intention: 'Deep work',
     topTodoIds: [todoId],
@@ -421,6 +473,10 @@ describe('portable import — source→import semantic equivalence', () => {
     expect(outcome.preview.counts.daily_plans).toBe(1);
     expect(outcome.preview.counts.weekly_reviews).toBe(1);
     expect(outcome.preview.counts.workout_session_sets).toBe(3);
+    expect(outcome.preview.counts.custom_exercises).toBe(1);
+    expect(outcome.preview.counts.workout_weekly_plan).toBe(1);
+    expect(outcome.preview.counts.workout_schedule_overrides).toBe(1);
+    expect(outcome.preview.counts.body_weight_entries).toBe(1);
     expect(outcome.preview.ownerVerdict).toBe('local_only_source');
 
     // NO-WRITE-BEFORE-CONFIRM: the destination is still completely empty —
@@ -525,6 +581,8 @@ describe('portable import — source→import semantic equivalence', () => {
     const exercises = await workout.listExercises(routines[0].id);
     expect(exercises).toHaveLength(2);
     expect(exercises.map((exercise) => exercise.name)).toEqual(['Bench press', 'Overhead press']);
+    expect(exercises[0].catalog_exercise_id).toBe('builtin_barbell_bench_press');
+    expect(exercises[0].progression_mode).toBe('linear');
     const sets = await workout.listSets(exercises[0].id);
     expect(sets).toHaveLength(3);
     const logs = await workout.listWorkoutLogs(10);
@@ -534,6 +592,11 @@ describe('portable import — source→import semantic equivalence', () => {
       'SELECT * FROM workout_session_exercises ORDER BY id ASC',
     );
     expect(sessionExercises).toHaveLength(2);
+    expect((await workout.listCustomExercises())[0].name).toBe('Cable Y Raise');
+    expect((await workout.listWeeklyPlan())[0].routine_id).toBe(routines[0].id);
+    expect((await workout.resolveWorkoutScheduleForDate('2026-08-04')).planKind).toBe('rest');
+    expect((await workout.listBodyWeightEntries())[0]).toMatchObject({ weight: 80, unit: 'kg' });
+    expect((await workout.getWorkoutPreferences()).effortScale).toBe('rpe');
 
     // Linked actions: rules restored; ledgers NOT restored; no side effects.
     const linked = await import('@/core/linked-actions/linkedActions.data');

@@ -79,24 +79,28 @@ test.describe('Calories diary day navigation', () => {
   });
 
   test('week strip shows logged-day dots and disables future days', async ({ page }) => {
-    await seedPastDayEntry(page, dateKeyOffset(-1), 'Yesterday oats');
-
-    // At least one strip cell carries a logged dot (non-transparent marker).
-    const loggedDots = await page.evaluate(() => {
-      let colored = 0;
-      for (const cell of Array.from(document.querySelectorAll('[aria-label^="Select "]'))) {
-        for (const dot of Array.from(cell.querySelectorAll('div[style]'))) {
-          const bg = (dot as HTMLElement).style.backgroundColor;
-          if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') colored += 1;
-        }
-      }
-      return colored;
-    });
-    expect(loggedDots).toBeGreaterThanOrEqual(1);
-
-    // Tomorrow's cell (when inside the Monday-start strip) must be disabled.
     const now = new Date();
     const mondayOffset = (now.getDay() + 6) % 7;
+    // On Monday, yesterday belongs to the previous Monday-start strip. Seed
+    // today instead so the assertion remains inside the rendered week.
+    const loggedDateOffset = mondayOffset === 0 ? 0 : -1;
+    await seedPastDayEntry(page, dateKeyOffset(loggedDateOffset), 'Logged oats');
+
+    // At least one strip cell carries a logged dot (non-transparent marker).
+    const countLoggedDots = () =>
+      page.evaluate(() => {
+        let colored = 0;
+        for (const cell of Array.from(document.querySelectorAll('[aria-label^="Select "]'))) {
+          for (const dot of Array.from(cell.querySelectorAll('div[style]'))) {
+            const bg = (dot as HTMLElement).style.backgroundColor;
+            if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') colored += 1;
+          }
+        }
+        return colored;
+      });
+    await expect.poll(countLoggedDots, { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+
+    // Tomorrow's cell (when inside the Monday-start strip) must be disabled.
     test.skip(mondayOffset === 6, 'Sunday start leaves no future day in the week strip');
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);

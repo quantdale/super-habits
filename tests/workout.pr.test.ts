@@ -138,6 +138,7 @@ describe('buildVolumePerWeek', () => {
         { completedAt: '2026-07-29T10:00:00.000Z', totalSets: 20 },
       ],
       4,
+      new Date('2026-08-20T12:00:00'),
     );
     expect(points).toHaveLength(4);
     expect(points[3].weekStartKey).toBe('2026-08-17');

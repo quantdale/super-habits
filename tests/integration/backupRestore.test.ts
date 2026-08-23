@@ -461,7 +461,16 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
     if (manifestRow) {
       delete manifestRow.backup_scope_version;
       const metadata = (manifestRow as Record<string, Record<string, unknown>>).entity_metadata;
-      for (const dropped of ['projects', 'goals', 'daily_plans', 'workout_session_sets']) {
+      for (const dropped of [
+        'projects',
+        'goals',
+        'daily_plans',
+        'workout_session_sets',
+        'custom_exercises',
+        'workout_weekly_plan',
+        'workout_schedule_overrides',
+        'body_weight_entries',
+      ]) {
         delete metadata[dropped];
       }
     }

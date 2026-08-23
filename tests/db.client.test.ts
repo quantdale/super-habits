@@ -152,7 +152,7 @@ describe('core/db/client', () => {
     expect(cutoverCall?.[1]).toEqual(['date_key_cutover', expect.any(String)]);
   });
 
-  it('applies migrations from version 0 and records the v15 owner-binding write (final version is 21)', async () => {
+  it('applies migrations from version 0 and records the v15 owner-binding write (final version is 22)', async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
@@ -295,13 +295,42 @@ describe('core/db/client', () => {
     ).toBe(true);
   });
 
+  it('adds Gym V2 workout columns and owner-scoped tables in migration 22', async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: '21' });
+
+    await client.getDatabase();
+
+    const sqlCalls = db.execAsync.mock.calls.map(([sql]) => String(sql));
+    expect(
+      sqlCalls.some((sql) => sql.includes('CREATE TABLE IF NOT EXISTS custom_exercises')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((sql) => sql.includes('CREATE TABLE IF NOT EXISTS workout_weekly_plan')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((sql) => sql.includes('CREATE TABLE IF NOT EXISTS workout_schedule_overrides')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((sql) => sql.includes('CREATE TABLE IF NOT EXISTS body_weight_entries')),
+    ).toBe(true);
+    expect(
+      db.runAsync.mock.calls.some(
+        ([sql, args]) =>
+          String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
+          Array.isArray(args) &&
+          args[0] === 'db_schema_version' &&
+          args[1] === '22',
+      ),
+    ).toBe(true);
+  });
+
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 through v21 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(12);
+    // v10 through v22 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(13);
 
-    const upToDate = await loadDbClient({ schemaVersion: '21' });
+    const upToDate = await loadDbClient({ schemaVersion: '22' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });

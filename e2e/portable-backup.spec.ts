@@ -78,9 +78,9 @@ test.describe('Portable data export & import', () => {
     expect(file.format).toBe('superhabits-portable-backup');
     expect(file.formatVersion).toBe(2);
     expect(file.backupSchemaVersion).toBe(2);
-    // Scope V5 (hardening wave v2): workout_session_sets joined the
-    // recoverable scope alongside the planning entities.
-    expect(file.backupScopeVersion).toBe(5);
+    // Scope V6 adds the Gym V2 exercise identity, planning, and body-weight
+    // entities while retaining the complete scope-V5 workout history.
+    expect(file.backupScopeVersion).toBe(6);
     expect(typeof file.exportedAt).toBe('string');
     const entities = file.entities as Record<string, unknown[]>;
     expect(entities.todos).toHaveLength(1);
