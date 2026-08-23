@@ -385,13 +385,15 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   }
 
   // Settings: runtime validation, contract version, canonical checksum.
-  // Historical V2 payloads verify against the frozen V2 canonical text; the
-  // current version canonicalizes with the V3 field set.
+  // Historical V2/V3 payloads verify against their frozen canonical texts; the
+  // current version canonicalizes with the live field set.
   const settings = integrity.settings as Record<string, unknown>;
   const settingsVersion = settings.version;
   const isCurrentSettingsVersion = settingsVersion === BACKUP_SETTINGS_VERSION;
   const isHistoricalSettingsV2 = settingsVersion === 2;
-  if (!isCurrentSettingsVersion && !isHistoricalSettingsV2) {
+  const isHistoricalSettingsV3 = settingsVersion === 3;
+  const historicalVersion = isHistoricalSettingsV2 ? 2 : isHistoricalSettingsV3 ? 3 : undefined;
+  if (!isCurrentSettingsVersion && !isHistoricalSettingsV2 && !isHistoricalSettingsV3) {
     errors.push(`The file carries an unsupported settings version ${String(settings.version)}.`);
   }
   if (typeof settings.checksum !== 'string' || !HEX64.test(settings.checksum)) {
@@ -402,7 +404,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   } else {
     const normalizedSettings = normalizeRecoverableSettings(input.settings);
     const actualSettingsChecksum = canonicalizeSettingsPayload(normalizedSettings, {
-      settingsVersion: isHistoricalSettingsV2 ? 2 : BACKUP_SETTINGS_VERSION,
+      settingsVersion: historicalVersion ?? BACKUP_SETTINGS_VERSION,
     });
     if (typeof settings.checksum === 'string' && settings.checksum !== actualSettingsChecksum) {
       errors.push('The file\u2019s settings failed integrity verification.');
@@ -423,7 +425,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     const actualPayloadChecksum = computePortablePayloadChecksum(candidate, {
       entities: scopeEntities,
       columns: scopeColumns,
-      settingsVersion: isHistoricalSettingsV2 ? 2 : BACKUP_SETTINGS_VERSION,
+      settingsVersion: historicalVersion ?? BACKUP_SETTINGS_VERSION,
     });
     if (actualPayloadChecksum !== integrity.payloadChecksum) {
       errors.push(

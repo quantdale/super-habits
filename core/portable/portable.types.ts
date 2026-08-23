@@ -80,7 +80,7 @@ export type PortableBackupFile = {
   source: PortableSourceInfo;
   /** All recoverable entities for this file's scope; rows are stored sorted by id. */
   entities: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
-  /** Recoverable settings allowlist payload (calorie goal, pomodoro, theme, V3 preferences). */
+  /** Recoverable settings allowlist payload (calorie goal, pomodoro, theme, V4 preferences). */
   settings: RecoverableSettingsV2 | RecoverableSettingsV3;
   integrity: PortableIntegrity;
 };

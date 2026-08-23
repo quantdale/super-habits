@@ -22,8 +22,21 @@ import {
 } from '@/features/calories/calories.domain';
 import type { CalorieGoal } from '@/features/calories/types';
 import { clampRestSeconds } from '@/features/workout/restTimerPreferences';
-import { DEFAULT_DAILY_PLAN_REMINDER_TIME } from '@/core/notifications/notificationPreferences';
-import { parseTimeOfDay, type TimeOfDay } from '@/core/notifications/reminderPlanning';
+import {
+  DEFAULT_DAILY_PLAN_REMINDER_TIME,
+  DAILY_PLAN_REMINDER_TIME_KEY,
+  TODO_REMINDERS_ENABLED_KEY,
+} from '@/core/notifications/notificationPreferences';
+import {
+  formatTimeOfDay,
+  parseTimeOfDay,
+  type TimeOfDay,
+} from '@/core/notifications/reminderPlanning';
+import {
+  WEEKLY_REVIEW_REMINDER_STORAGE_KEY,
+  normalizeRecoverableWeeklyReviewReminder,
+  type RecoverableWeeklyReviewReminder,
+} from '@/features/weekly-review/weeklyReviewReminder.domain';
 import { sha256Hex } from '@/lib/checksum';
 import { BACKUP_SETTINGS_VERSION, type RecoverableSettingsV3 } from '@/core/backup/backup.types';
 
@@ -38,17 +51,20 @@ export type RecoverablePomodoroPresets = {
   activePresetId: string | null;
 };
 
-/** Todo/daily-plan reminder preferences as carried in the recoverable payload. */
+/** Todo/daily-plan/weekly-review reminder preferences as carried in the payload. */
 export type RecoverableNotificationPreferences = {
   todoRemindersEnabled: boolean;
   dailyPlanReminderTime: TimeOfDay;
+  /** Settings V4; null in historical V3 payloads and when never configured. */
+  weeklyReviewReminder: RecoverableWeeklyReviewReminder | null;
 };
 
 /**
  * The recoverable settings allowlist. Only these keys are ever backed up or
- * restored; auth/sync/system/device state never enters the payload. The V3
+ * restored; auth/sync/system/device state never enters the payload. The V3/V4
  * additions are SQLite-backed (app_meta) so they join the restore import
- * transaction; theme remains AsyncStorage-backed and stages separately.
+ * transaction; theme and live reminder preferences remain AsyncStorage-backed
+ * and stage separately where needed.
  */
 export function buildRecoverableSettings(input: {
   calorieGoal: CalorieGoal | null;
@@ -96,18 +112,41 @@ function normalizeRecoverableNotificationPreferences(
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
   const todoRemindersEnabled = candidate.todoRemindersEnabled === true;
+  const rawTime = candidate.dailyPlanReminderTime;
+  const rawHour =
+    rawTime && typeof rawTime === 'object' ? (rawTime as Record<string, unknown>).hour : undefined;
+  const rawMinute =
+    rawTime && typeof rawTime === 'object'
+      ? (rawTime as Record<string, unknown>).minute
+      : undefined;
+  const objectTime =
+    typeof rawHour === 'number' &&
+    typeof rawMinute === 'number' &&
+    Number.isInteger(rawHour) &&
+    Number.isInteger(rawMinute) &&
+    rawHour >= 0 &&
+    rawHour <= 23 &&
+    rawMinute >= 0 &&
+    rawMinute <= 59
+      ? { hour: rawHour, minute: rawMinute }
+      : null;
   const dailyPlanReminderTime =
-    typeof candidate.dailyPlanReminderTime === 'string'
-      ? (parseTimeOfDay(candidate.dailyPlanReminderTime) ?? DEFAULT_DAILY_PLAN_REMINDER_TIME)
-      : DEFAULT_DAILY_PLAN_REMINDER_TIME;
-  return { todoRemindersEnabled, dailyPlanReminderTime };
+    typeof rawTime === 'string'
+      ? (parseTimeOfDay(rawTime) ?? DEFAULT_DAILY_PLAN_REMINDER_TIME)
+      : (objectTime ?? DEFAULT_DAILY_PLAN_REMINDER_TIME);
+  return {
+    todoRemindersEnabled,
+    dailyPlanReminderTime,
+    weeklyReviewReminder: normalizeRecoverableWeeklyReviewReminder(candidate.weeklyReviewReminder),
+  };
 }
 
 /**
  * Validate and normalize an untrusted settings payload. Unknown keys are
  * dropped; malformed known keys fall back to defaults via the feature
- * normalizers so a poisoned payload cannot corrupt local settings. V2
- * payloads (without the V3 keys) normalize cleanly — absent keys become null.
+ * normalizers so a poisoned payload cannot corrupt local settings. V2/V3
+ * payloads (without the newer V3/V4 keys) normalize cleanly — absent keys
+ * become null.
  */
 export function normalizeRecoverableSettings(input: unknown): RecoverableSettingsV3 {
   const candidate = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
@@ -222,8 +261,8 @@ export function canonicalizeSettingsPayload(
  *
  * Versioned canonicalization: `settingsVersion: 2` reproduces the frozen V2
  * text (three original fields only) so historical payloads verify byte-stably
- * after the V3 keys were appended; the current version appends the V3 fields
- * at the END of the canonical object, keeping the V2 prefix stable.
+ * after the V3/V4 keys were appended; the current version appends the V3/V4
+ * fields at the END of the canonical object, keeping the V2 prefix stable.
  */
 export function canonicalSettingsPayloadText(
   payload: unknown,
@@ -286,15 +325,41 @@ export function canonicalSettingsPayloadText(
     : null;
   canonical.workoutRestSeconds =
     normalized.workoutRestSeconds === null ? null : normalized.workoutRestSeconds;
-  canonical.notificationPreferences = normalized.notificationPreferences
-    ? {
-        todoRemindersEnabled: normalized.notificationPreferences.todoRemindersEnabled,
-        dailyPlanReminderTime: {
-          hour: normalized.notificationPreferences.dailyPlanReminderTime.hour,
-          minute: normalized.notificationPreferences.dailyPlanReminderTime.minute,
-        },
-      }
-    : null;
+  const notificationPrefs = normalized.notificationPreferences;
+  if (!notificationPrefs) {
+    canonical.notificationPreferences = null;
+    return JSON.stringify(canonical);
+  }
+  if (requestedVersion < 4) {
+    // Frozen V3 canonical text — byte-identical to the pre-V4 form so every
+    // historical V3 snapshot/file still verifies against the checksum its
+    // capturing device computed.
+    canonical.notificationPreferences = {
+      todoRemindersEnabled: notificationPrefs.todoRemindersEnabled,
+      dailyPlanReminderTime: {
+        hour: notificationPrefs.dailyPlanReminderTime.hour,
+        minute: notificationPrefs.dailyPlanReminderTime.minute,
+      },
+    };
+    return JSON.stringify(canonical);
+  }
+  // V4 appends the weekly-review reminder INSIDE notificationPreferences as
+  // the last field; the V3 prefix above stays stable.
+  canonical.notificationPreferences = {
+    todoRemindersEnabled: notificationPrefs.todoRemindersEnabled,
+    dailyPlanReminderTime: {
+      hour: notificationPrefs.dailyPlanReminderTime.hour,
+      minute: notificationPrefs.dailyPlanReminderTime.minute,
+    },
+    weeklyReviewReminder: notificationPrefs.weeklyReviewReminder
+      ? {
+          enabled: notificationPrefs.weeklyReviewReminder.enabled,
+          weekday: notificationPrefs.weeklyReviewReminder.weekday,
+          hour: notificationPrefs.weeklyReviewReminder.hour,
+          minute: notificationPrefs.weeklyReviewReminder.minute,
+        }
+      : null,
+  };
   return JSON.stringify(canonical);
 }
 
@@ -328,6 +393,57 @@ async function readThemeSnapshot(): Promise<{
   return { mode, slots };
 }
 
+/**
+ * Live AsyncStorage values for the reminder preferences. The runtime source of
+ * truth for these is AsyncStorage (schedulers read it directly), while the
+ * snapshot historically read the app_meta copy — which only restore writes.
+ * Without this overlay, a fresh device's backups would silently capture stale
+ * or empty notification preferences. Raw-null means "unset here" and falls
+ * back to the app_meta value so a restored preference survives until the user
+ * changes it locally.
+ */
+async function readLiveNotificationPreferenceOverrides(): Promise<{
+  todoRemindersEnabled?: boolean;
+  dailyPlanReminderTime?: TimeOfDay;
+  weeklyReviewReminder?: RecoverableWeeklyReviewReminder | null;
+}> {
+  const overrides: {
+    todoRemindersEnabled?: boolean;
+    dailyPlanReminderTime?: TimeOfDay;
+    weeklyReviewReminder?: RecoverableWeeklyReviewReminder | null;
+  } = {};
+  try {
+    const rawToggle = await AsyncStorage.getItem(TODO_REMINDERS_ENABLED_KEY);
+    if (rawToggle !== null) overrides.todoRemindersEnabled = rawToggle === 'enabled';
+  } catch {
+    // Unreadable AsyncStorage keeps the app_meta fallback for this field.
+  }
+  try {
+    const rawTime = await AsyncStorage.getItem(DAILY_PLAN_REMINDER_TIME_KEY);
+    if (rawTime !== null) {
+      const parsed = parseTimeOfDay(rawTime);
+      if (parsed) overrides.dailyPlanReminderTime = parsed;
+    }
+  } catch {
+    // Same fallback rule as above.
+  }
+  try {
+    const rawWeekly = await AsyncStorage.getItem(WEEKLY_REVIEW_REMINDER_STORAGE_KEY);
+    if (rawWeekly !== null) {
+      try {
+        overrides.weeklyReviewReminder = normalizeRecoverableWeeklyReviewReminder(
+          JSON.parse(rawWeekly),
+        );
+      } catch {
+        // Malformed JSON keeps the app_meta fallback.
+      }
+    }
+  } catch {
+    // Same fallback rule as above.
+  }
+  return overrides;
+}
+
 /** Read the current allowlisted settings snapshot (used at push time). */
 export async function readRecoverableSettings(
   db: SQLite.SQLiteDatabase,
@@ -339,6 +455,7 @@ export async function readRecoverableSettings(
     pomodoroPresets,
     workoutRestSeconds,
     notificationPreferences,
+    liveNotificationOverrides,
     theme,
   ] = await Promise.all([
     getAppMetaJsonOrDefault<CalorieGoal>(
@@ -374,8 +491,35 @@ export async function readRecoverableSettings(
       null,
       normalizeRecoverableNotificationPreferences,
     ),
+    readLiveNotificationPreferenceOverrides(),
     readThemeSnapshot(),
   ]);
+  // Overlay the LIVE AsyncStorage preferences over the app_meta copy so the
+  // snapshot reflects what the user actually configured on this device.
+  let mergedNotificationPreferences = notificationPreferences;
+  if (liveNotificationOverrides.todoRemindersEnabled !== undefined) {
+    mergedNotificationPreferences = {
+      todoRemindersEnabled: liveNotificationOverrides.todoRemindersEnabled,
+      dailyPlanReminderTime:
+        mergedNotificationPreferences?.dailyPlanReminderTime ?? DEFAULT_DAILY_PLAN_REMINDER_TIME,
+      weeklyReviewReminder: mergedNotificationPreferences?.weeklyReviewReminder ?? null,
+    };
+  }
+  if (liveNotificationOverrides.dailyPlanReminderTime !== undefined) {
+    mergedNotificationPreferences = {
+      todoRemindersEnabled: mergedNotificationPreferences?.todoRemindersEnabled ?? false,
+      dailyPlanReminderTime: liveNotificationOverrides.dailyPlanReminderTime,
+      weeklyReviewReminder: mergedNotificationPreferences?.weeklyReviewReminder ?? null,
+    };
+  }
+  if (liveNotificationOverrides.weeklyReviewReminder !== undefined) {
+    mergedNotificationPreferences = {
+      todoRemindersEnabled: mergedNotificationPreferences?.todoRemindersEnabled ?? false,
+      dailyPlanReminderTime:
+        mergedNotificationPreferences?.dailyPlanReminderTime ?? DEFAULT_DAILY_PLAN_REMINDER_TIME,
+      weeklyReviewReminder: liveNotificationOverrides.weeklyReviewReminder,
+    };
+  }
   return buildRecoverableSettings({
     calorieGoal,
     pomodoroSettings,
@@ -384,18 +528,18 @@ export async function readRecoverableSettings(
     macroTargets,
     pomodoroPresets,
     workoutRestSeconds,
-    notificationPreferences,
+    notificationPreferences: mergedNotificationPreferences,
   });
 }
 
 /**
  * Apply the SQLite-backed recoverable settings to app_meta — restore import
- * path, called INSIDE the import transaction. Theme settings live in
- * AsyncStorage and cannot join the SQLite transaction; stage them with
+ * path, called INSIDE the import transaction. Theme and live reminder settings
+ * live in AsyncStorage and cannot join the SQLite transaction; stage them with
  * `stagePendingThemeApplication` in the same transaction and apply after
- * commit with restart reconciliation. V3 keys are only written when present
- * in the payload, so restoring a legacy V2 payload never clears local V3
- * preferences.
+ * commit with restart reconciliation. Newer keys are only written when
+ * present in the payload, so restoring a legacy V2/V3 payload never clears
+ * local newer preferences.
  */
 export async function applyRecoverableSettingsToSqlite(
   db: SQLite.SQLiteDatabase,
@@ -431,12 +575,18 @@ export type PendingThemeApplication = {
   mode: string | null;
   slots: Record<string, string> | null;
   signature: string;
+  /** Settings V4: reminder preferences to replay into AsyncStorage after commit. */
+  notifications?: {
+    todoRemindersEnabled?: boolean;
+    dailyPlanReminderTime?: TimeOfDay;
+    weeklyReviewReminder?: RecoverableWeeklyReviewReminder | null;
+  } | null;
 };
 
 /**
- * Durably stage the validated theme settings so AsyncStorage can be updated
- * AFTER the import transaction commits (SQLite cannot transactionally commit
- * AsyncStorage). The marker survives crashes; `applyPendingThemeApplication`
+ * Durably stage the validated AsyncStorage-backed settings so they can be
+ * updated AFTER the import transaction commits (SQLite cannot transactionally
+ * commit AsyncStorage). The marker survives crashes; `applyPendingThemeApplication`
  * retries it until successful and only then clears it.
  */
 export async function stagePendingThemeApplication(
@@ -449,6 +599,13 @@ export async function stagePendingThemeApplication(
     mode: normalized.theme.mode,
     slots: normalized.theme.slots,
     signature,
+    notifications: normalized.notificationPreferences
+      ? {
+          todoRemindersEnabled: normalized.notificationPreferences.todoRemindersEnabled,
+          dailyPlanReminderTime: normalized.notificationPreferences.dailyPlanReminderTime,
+          weeklyReviewReminder: normalized.notificationPreferences.weeklyReviewReminder,
+        }
+      : null,
   } satisfies PendingThemeApplication);
 }
 
@@ -473,10 +630,10 @@ export async function readPendingThemeApplication(
 }
 
 /**
- * Apply a staged theme application to AsyncStorage and clear the durable
- * marker ONLY on success. Returns true when nothing is pending or the
- * application completed; false when the marker remains and must be retried
- * (bootstrap maintenance retries until it succeeds).
+ * Apply staged AsyncStorage-backed settings and clear the durable marker ONLY
+ * on success. Returns true when nothing is pending or the application
+ * completed; false when the marker remains and must be retried (bootstrap
+ * maintenance retries until it succeeds).
  */
 export async function applyPendingThemeApplication(): Promise<boolean> {
   const db = await getDatabase();
@@ -489,7 +646,28 @@ export async function applyPendingThemeApplication(): Promise<boolean> {
     if (pending.slots !== null) {
       await AsyncStorage.setItem(THEME_SLOTS_STORAGE_KEY, JSON.stringify(pending.slots));
     }
-    // Marker cleared only after both AsyncStorage writes succeeded.
+    if (pending.notifications) {
+      const n = pending.notifications;
+      if (n.todoRemindersEnabled !== undefined) {
+        await AsyncStorage.setItem(
+          TODO_REMINDERS_ENABLED_KEY,
+          n.todoRemindersEnabled ? 'enabled' : 'disabled',
+        );
+      }
+      if (n.dailyPlanReminderTime !== undefined) {
+        await AsyncStorage.setItem(
+          DAILY_PLAN_REMINDER_TIME_KEY,
+          formatTimeOfDay(n.dailyPlanReminderTime),
+        );
+      }
+      if (n.weeklyReviewReminder !== undefined && n.weeklyReviewReminder !== null) {
+        await AsyncStorage.setItem(
+          WEEKLY_REVIEW_REMINDER_STORAGE_KEY,
+          JSON.stringify(n.weeklyReviewReminder),
+        );
+      }
+    }
+    // Marker cleared only after every AsyncStorage write succeeded.
     await setAppMetaText(db, appMetaKeys.backupPendingThemeApply, 'null');
     return true;
   } catch {

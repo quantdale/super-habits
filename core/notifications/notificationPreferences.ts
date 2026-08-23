@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { parseTimeOfDay, type TimeOfDay } from './reminderPlanning';
+import { formatTimeOfDay, parseTimeOfDay, type TimeOfDay } from './reminderPlanning';
 import {
   DEFAULT_WEEKLY_REVIEW_REMINDER,
   WEEKLY_REVIEW_REMINDER_STORAGE_KEY,
@@ -37,11 +37,10 @@ export async function getTodoRemindersEnabled(): Promise<boolean> {
 export async function setTodoRemindersEnabled(enabled: boolean): Promise<void> {
   cachedTodoRemindersEnabled = enabled;
   try {
-    if (enabled) {
-      await AsyncStorage.setItem(TODO_REMINDERS_ENABLED_KEY, 'enabled');
-    } else {
-      await AsyncStorage.removeItem(TODO_REMINDERS_ENABLED_KEY);
-    }
+    // Explicit 'disabled' (not removal) so the backup capture overlay can
+    // distinguish "user turned this off" from "never configured" — removal
+    // would silently fall back to the restored app_meta copy.
+    await AsyncStorage.setItem(TODO_REMINDERS_ENABLED_KEY, enabled ? 'enabled' : 'disabled');
   } catch (error) {
     // Keep the runtime cache in sync with the user's last selection even if
     // persistence fails; surface the error to the caller for UI feedback.
@@ -64,7 +63,7 @@ export async function getDailyPlanReminderTime(): Promise<TimeOfDay> {
 export async function setDailyPlanReminderTime(time: TimeOfDay): Promise<void> {
   cachedDailyPlanTime = time;
   try {
-    await AsyncStorage.setItem(DAILY_PLAN_REMINDER_TIME_KEY, `${time.hour}:${time.minute}`);
+    await AsyncStorage.setItem(DAILY_PLAN_REMINDER_TIME_KEY, formatTimeOfDay(time));
   } catch (error) {
     throw error;
   }

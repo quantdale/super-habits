@@ -469,6 +469,13 @@ function readEnvironment(baseUrl: string): RunReport['environment'] {
   return { browser: 'chromium', platform: 'web', baseUrl, appVersion, commit };
 }
 
+/** Keep failure diagnostics useful without allowing a noisy page to grow them unbounded. */
+function pushDiagnostic(target: string[], value: string): void {
+  const normalized = value.trim();
+  if (!normalized || target.includes(normalized) || target.length >= 20) return;
+  target.push(normalized);
+}
+
 /**
  * Execute one scenario against the live build. Throws only on setup failures;
  * scenario (step) failures are captured in the report with `outcome: 'failed'`.
@@ -520,6 +527,8 @@ export async function executeScenario(
   const startedAt = new Date().toISOString();
   const screenshots: string[] = [];
   const consoleLines: string[] = [];
+  const browserErrors: string[] = [];
+  const serverErrors: string[] = [];
 
   const ownedBrowser = !opts.browser;
   const browser: Browser = opts.browser ?? (await chromium.launch());
@@ -530,11 +539,29 @@ export async function executeScenario(
     viewport: { width: 1280, height: 720 },
   });
   const page = await context.newPage();
+  page.on('pageerror', (error) => {
+    pushDiagnostic(browserErrors, `pageerror: ${error.name}: ${error.message}`);
+  });
   page.on('console', (msg) => {
     const t = msg.type();
-    if (t === 'error' || t === 'warning' || t === 'log') {
-      consoleLines.push(`[${t}] ${msg.text()}`);
+    const message = msg.text();
+    if (t === 'error') {
+      pushDiagnostic(browserErrors, `console.error: ${message}`);
     }
+    if (t === 'error' || t === 'warning' || t === 'log') {
+      consoleLines.push(`[${t}] ${message}`);
+    }
+  });
+  page.on('response', (res) => {
+    if (res.status() >= 500) {
+      pushDiagnostic(serverErrors, `HTTP ${res.status()} ${res.request().method()} ${res.url()}`);
+    }
+  });
+  page.on('requestfailed', (req) => {
+    pushDiagnostic(
+      serverErrors,
+      `requestfailed ${req.method()} ${req.url()} (${req.failure()?.errorText ?? 'unknown'})`,
+    );
   });
   // Network capture is only needed by the repro-bundle failure hook (task 5.2);
   // keep it off for ordinary runs so they pay no listener overhead.
@@ -600,10 +627,13 @@ export async function executeScenario(
         failure = {
           stepIndex: resolved.stepIndex,
           stepKind: step.kind,
+          action: report.actionLog[resolved.stepIndex] ?? step.kind,
           error: entry?.error ?? 'step failed',
           expected: oracleExpectationText(step),
           actual: oracleActualText(entry?.oracles),
           stateSummary: await captureStateSummary(page).catch(() => undefined),
+          browserErrors: browserErrors.length > 0 ? [...browserErrors] : undefined,
+          serverErrors: serverErrors.length > 0 ? [...serverErrors] : undefined,
         };
         outcome = 'failed';
         break;
@@ -615,8 +645,11 @@ export async function executeScenario(
     failure = {
       stepIndex: -1,
       stepKind: 'setup',
+      action: 'setup',
       error: (err as Error).message,
       stateSummary: String((err as Error).stack ?? ''),
+      browserErrors: browserErrors.length > 0 ? [...browserErrors] : undefined,
+      serverErrors: serverErrors.length > 0 ? [...serverErrors] : undefined,
     };
   }
 

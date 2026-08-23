@@ -481,13 +481,15 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // Settings version gate (epoch-aware): the row, the manifest, and the
   // manifest's settings metadata must agree on ONE supported contract version.
   // The current version canonicalizes with the live field set; a historical V2
-  // payload verifies against the frozen V2 canonical text. Anything else fails
-  // closed as unsupported_version.
+  // payload verifies against the frozen V2 canonical text, a historical V3
+  // payload against the frozen V3 text. Anything else fails closed as
+  // unsupported_version.
   const settingsVersion = settingsRow.settings_version;
   const isCurrentSettingsVersion = settingsVersion === BACKUP_SETTINGS_VERSION;
   const isHistoricalSettingsV2 = settingsVersion === 2;
+  const isHistoricalSettingsV3 = settingsVersion === 3;
   if (
-    (!isCurrentSettingsVersion && !isHistoricalSettingsV2) ||
+    (!isCurrentSettingsVersion && !isHistoricalSettingsV2 && !isHistoricalSettingsV3) ||
     settingsRow.settings_version !== manifest.settingsVersion ||
     settingsRow.settings_version !== manifest.settingsMetadata.version
   ) {
@@ -511,8 +513,13 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
   const normalizedSettings = normalizeRecoverableSettings(settingsRow.payload);
+  const historicalSettingsVersion = isHistoricalSettingsV2
+    ? 2
+    : isHistoricalSettingsV3
+      ? 3
+      : undefined;
   const settingsChecksum = canonicalizeSettingsPayload(normalizedSettings, {
-    settingsVersion: isHistoricalSettingsV2 ? 2 : BACKUP_SETTINGS_VERSION,
+    settingsVersion: historicalSettingsVersion ?? BACKUP_SETTINGS_VERSION,
   });
   if (settingsChecksum !== manifest.settingsMetadata.checksum) {
     return {

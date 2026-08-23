@@ -692,15 +692,29 @@ async function scrollTodosListUntilVisible(page: Page, targetText: string): Prom
  * never distinguish them.
  */
 async function measureSwitch(page: Page, tab: SectionName, marker: string): Promise<number> {
-  const t0 = Date.now();
+  const t0 = await page.evaluate(() => performance.now());
   await goToSection(page, tab);
-  await expect
-    .poll(() => sectionOpacity(page, marker), {
-      timeout: 5_000,
-      intervals: [50, 100, 200, 400],
-    })
-    .toBeGreaterThan(0.5);
-  return Date.now() - t0;
+  await page.waitForFunction(
+    (markerText) => {
+      const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
+      const leaf = all.find(
+        (el) => el.children.length === 0 && el.textContent?.trim() === markerText,
+      );
+      if (!leaf) return false;
+      let current: HTMLElement | null = leaf;
+      while (current && current !== document.body) {
+        if (current.style.position === 'absolute') {
+          return Number(getComputedStyle(current).opacity) > 0.5;
+        }
+        current = current.parentElement;
+      }
+      return false;
+    },
+    marker,
+    { timeout: 5_000, polling: 'raf' },
+  );
+  const elapsed = await page.evaluate((startedAt) => performance.now() - startedAt, t0);
+  return Math.round(elapsed);
 }
 
 /**

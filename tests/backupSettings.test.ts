@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildRecoverableSettings,
   canonicalizeSettingsPayload,
+  canonicalSettingsPayloadText,
   normalizeRecoverableSettings,
   isValidRecoverableSettings,
 } from '@/core/backup/backupSettings';
@@ -113,6 +114,7 @@ describe('recoverable settings allowlist', () => {
       notificationPreferences: {
         todoRemindersEnabled: true,
         dailyPlanReminderTime: '7:30',
+        weeklyReviewReminder: { enabled: true, weekday: 3, hour: 8, minute: 30 },
       },
       // Malformed V3 values fall back to null rather than poisoning.
       badMacroTargets: { protein: 'lots' },
@@ -128,7 +130,17 @@ describe('recoverable settings allowlist', () => {
     expect(normalized.notificationPreferences).toEqual({
       todoRemindersEnabled: true,
       dailyPlanReminderTime: { hour: 7, minute: 30 },
+      weeklyReviewReminder: { enabled: true, weekday: 3, hour: 8, minute: 30 },
     });
+    // A malformed weekly payload falls back to null instead of poisoning.
+    const badWeekly = normalizeRecoverableSettings({
+      notificationPreferences: {
+        todoRemindersEnabled: false,
+        dailyPlanReminderTime: '8:00',
+        weeklyReviewReminder: { enabled: true, weekday: 9, hour: 8, minute: 0 },
+      },
+    });
+    expect(badWeekly.notificationPreferences?.weeklyReviewReminder).toBeNull();
     expect('badMacroTargets' in normalized).toBe(false);
   });
 });
@@ -181,6 +193,35 @@ describe('canonicalizeSettingsPayload (settings integrity)', () => {
     expect(canonicalizeSettingsPayload(withV3Keys, { settingsVersion: 2 })).toBe(v2Digest);
     // And the current-version digest differs once V3 keys carry values.
     expect(canonicalizeSettingsPayload(withV3Keys)).not.toBe(v2Digest);
+  });
+
+  it('freezes the V3 canonical text against the V4 weekly-review field', () => {
+    const withV3Notifications = {
+      ...sample,
+      notificationPreferences: {
+        todoRemindersEnabled: true,
+        dailyPlanReminderTime: { hour: 7, minute: 30 },
+      },
+    };
+    const withV4Field = {
+      ...withV3Notifications,
+      notificationPreferences: {
+        ...withV3Notifications.notificationPreferences,
+        weeklyReviewReminder: { enabled: true, weekday: 0, hour: 18, minute: 0 },
+      },
+    };
+    // Historical V3 canonicalization ignores the V4 field entirely…
+    expect(canonicalizeSettingsPayload(withV4Field, { settingsVersion: 3 })).toBe(
+      canonicalizeSettingsPayload(withV3Notifications, { settingsVersion: 3 }),
+    );
+    // …while the current version includes it as notificationPreferences' last field.
+    const v4Text = canonicalSettingsPayloadText(withV4Field);
+    expect(v4Text.indexOf('"weeklyReviewReminder"')).toBeGreaterThan(
+      v4Text.indexOf('"dailyPlanReminderTime"'),
+    );
+    expect(canonicalizeSettingsPayload(withV4Field)).not.toBe(
+      canonicalizeSettingsPayload(withV3Notifications),
+    );
   });
 
   it('drops unknown/poisoned keys before hashing', () => {

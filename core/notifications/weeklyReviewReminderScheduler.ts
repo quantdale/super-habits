@@ -28,6 +28,10 @@ export async function syncWeeklyReviewReminder(): Promise<WeeklyReviewReminderSy
     return { status: 'cancelled' };
   }
 
+  // Cancel first so changing the weekday/time can never leave an old weekly
+  // trigger alongside the new one, even on native versions that do not treat
+  // a caller-supplied identifier as an upsert key.
+  await cancelScheduledNotification(WEEKLY_REVIEW_REMINDER_IDENTIFIER);
   const scheduled = await scheduleWeeklyReviewReminderNotification({
     identifier: WEEKLY_REVIEW_REMINDER_IDENTIFIER,
     title: 'Weekly review',

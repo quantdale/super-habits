@@ -81,6 +81,39 @@ export function encodeWeeklyReviewReminderPreference(
   return JSON.stringify(preference);
 }
 
+/** The recoverable-payload shape carried inside backup settings snapshots. */
+export interface RecoverableWeeklyReviewReminder {
+  enabled: boolean;
+  weekday: WeeklyReviewWeekday;
+  hour: number;
+  minute: number;
+}
+
+/**
+ * Validate/normalize an untrusted recoverable payload field. Absent or
+ * malformed input normalizes to null (the restore-apply layer then leaves the
+ * local preference untouched), mirroring how sibling optional settings keys
+ * behave in `normalizeRecoverableSettings`.
+ */
+export function normalizeRecoverableWeeklyReviewReminder(
+  value: unknown,
+): RecoverableWeeklyReviewReminder | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const weekday = candidate.weekday;
+  const hour = candidate.hour;
+  const minute = candidate.minute;
+  if (!isValidWeekday(weekday) || typeof minute !== 'number' || !isValidWallClock(hour, minute)) {
+    return null;
+  }
+  return {
+    enabled: candidate.enabled === true,
+    weekday,
+    hour,
+    minute,
+  };
+}
+
 /** Malformed payloads fall back to the default instead of throwing. */
 export function decodeWeeklyReviewReminderPreference(
   raw: string | null,

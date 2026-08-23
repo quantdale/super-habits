@@ -364,5 +364,58 @@ defineJourney({
         });
       },
     },
+    {
+      name: 'enable the Weekly Review cadence on web; preference persists with honest native-only copy',
+      run: async ({ page }) => {
+        await ensureAppContext(page);
+        await switchSection(page, 'overview');
+        await page.getByRole('button', { name: 'Open settings' }).click();
+        await expect(page.getByText('Weekly review reminder', { exact: true })).toBeVisible();
+        await expect(
+          page.getByText(
+            'Saved on this device. Native notification delivery is unavailable on web.',
+            { exact: true },
+          ),
+        ).toBeVisible();
+
+        await page.getByRole('button', { name: 'Weekly review on Fri' }).click();
+        const weeklyTime = page.getByRole('textbox', { name: 'Weekly review reminder time' });
+        await weeklyTime.fill('17:45');
+        await page.getByRole('button', { name: 'Save weekly review reminder time' }).click();
+        await expect(
+          page.getByText('Saved for Fri 17:45. Native reminders are unavailable here.', {
+            exact: true,
+          }),
+        ).toBeVisible();
+
+        const stored = await page.evaluate(() =>
+          window.localStorage.getItem('superhabits.notifications.weekly-review-reminder'),
+        );
+        expect(stored).not.toBeNull();
+        expect(JSON.parse(stored as string)).toEqual({
+          enabled: true,
+          weekday: 5,
+          hour: 17,
+          minute: 45,
+        });
+
+        await page.getByRole('button', { name: 'Close settings' }).click();
+        await returnToApp(page);
+        await switchSection(page, 'overview');
+        await page.getByRole('button', { name: 'Open settings' }).click();
+        await expect(
+          page.getByRole('textbox', { name: 'Weekly review reminder time' }),
+        ).toHaveValue('17:45');
+        const restored = await page.evaluate(() =>
+          window.localStorage.getItem('superhabits.notifications.weekly-review-reminder'),
+        );
+        expect(JSON.parse(restored as string)).toEqual({
+          enabled: true,
+          weekday: 5,
+          hour: 17,
+          minute: 45,
+        });
+      },
+    },
   ],
 });

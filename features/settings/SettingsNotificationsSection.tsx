@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { getNotificationPermissionState, requestTodoReminderPermission } from '@/lib/notifications';
 import {
   getDailyPlanReminderTime,
@@ -32,6 +32,7 @@ const WEEKDAY_LABELS: Record<WeeklyReviewWeekday, string> = {
   5: 'Fri',
   6: 'Sat',
 };
+const WEEKDAYS: WeeklyReviewWeekday[] = [0, 1, 2, 3, 4, 5, 6];
 
 /**
  * Notification preferences beyond habits, in the Notifications / Timer
@@ -182,7 +183,7 @@ export function SettingsNotificationsSection() {
     setError(null);
     setSavedNote(null);
     try {
-      if (enabled) {
+      if (enabled && Platform.OS !== 'web') {
         const permission = await requestTodoReminderPermission();
         if (permission !== 'granted') {
           setError(
@@ -350,6 +351,11 @@ export function SettingsNotificationsSection() {
             A weekly nudge to close out your week and plan the next one. Opening it goes straight to
             the review.
           </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            {Platform.OS === 'web'
+              ? 'Saved on this device. Native notification delivery is unavailable on web.'
+              : 'Native apps schedule this reminder; notification access is controlled by the system.'}
+          </Text>
           <View className="mt-2 flex-row items-center justify-between">
             <Switch
               accessibilityLabel="Weekly review reminder"
@@ -359,7 +365,7 @@ export function SettingsNotificationsSection() {
               trackColor={{ true: ACCENT, false: tokens.surfaceElevated }}
             />
             <View className="flex-row gap-1">
-              {(Object.keys(WEEKDAY_LABELS) as unknown as WeeklyReviewWeekday[]).map((day) => {
+              {WEEKDAYS.map((day) => {
                 const active = weeklyWeekday === day;
                 return (
                   <Pressable

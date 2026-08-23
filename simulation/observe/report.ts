@@ -109,6 +109,8 @@ export interface FailureSummary {
   stepIndex: number;
   /** Kind of the first failed step; `setup`/`teardown` cover pre-loop failures. */
   stepKind: SemanticStepName | 'setup' | 'teardown';
+  /** Concrete action-log label for the failed step, when one was dispatched. */
+  action?: string;
   /** The thrown error message. */
   error: string;
   /** Expected (oracle) text, when the failure was an oracle mismatch. */
@@ -117,6 +119,10 @@ export interface FailureSummary {
   actual?: string;
   /** Free-text state summary (e.g. row counts at failure). */
   stateSummary?: string;
+  /** Browser console/page errors observed before the failure. */
+  browserErrors?: string[];
+  /** HTTP 5xx and request-failure diagnostics observed before the failure. */
+  serverErrors?: string[];
   /** Relative path to the failure digest, when written (task 4.3). */
   digestPath?: string;
 }
@@ -350,6 +356,24 @@ export function validateRunReport(report: unknown): ReportValidationIssue[] {
   }
   if (report.failure !== undefined && !isRecord(report.failure)) {
     push(issues, 'failure', 'must be an object');
+  } else if (isRecord(report.failure)) {
+    if (report.failure.action !== undefined && typeof report.failure.action !== 'string') {
+      push(issues, 'failure.action', 'must be a string when present');
+    }
+    for (const field of ['browserErrors', 'serverErrors'] as const) {
+      const values = report.failure[field];
+      if (values !== undefined) {
+        if (!Array.isArray(values)) {
+          push(issues, `failure.${field}`, 'must be an array when present');
+        } else {
+          values.forEach((value, index) => {
+            if (typeof value !== 'string') {
+              push(issues, `failure.${field}[${index}]`, 'must be a string');
+            }
+          });
+        }
+      }
+    }
   }
   if (report.triage !== undefined) {
     for (const issue of validateFailureTriage(report.triage)) {
@@ -445,4 +469,36 @@ export function finalizeRunReport(
     report.failure = input.failure;
   }
   return report;
+}
+
+/**
+ * Render the minimum actionable context for a failed run. This is intentionally
+ * pure so Playwright assertions, CLI output, and tests can use the same
+ * diagnostic without reading the report file or guessing which lane failed.
+ */
+export function formatRunFailureDiagnostics(report: RunReport): string {
+  const failure = report.failure;
+  const action =
+    failure?.action ??
+    (failure && failure.stepIndex >= 0 ? report.actionLog[failure.stepIndex] : undefined) ??
+    '*none captured*';
+  const list = (values: string[] | undefined): string =>
+    values && values.length > 0 ? values.join(' | ') : 'none captured';
+  return [
+    `lane=${report.lane}`,
+    `runId=${report.runId}`,
+    `mode=${report.mode}`,
+    `seed=${report.seed ?? 'none'}`,
+    `action=${action}`,
+    `step=${failure ? `${failure.stepIndex}:${failure.stepKind}` : 'none'}`,
+    `classification=${report.triage?.classification ?? 'UNTRIAGED'}`,
+    `report=${report.artifacts.report}`,
+    `digest=${failure?.digestPath ?? report.artifacts.digest ?? 'none'}`,
+    `error=${failure?.error ?? 'none captured'}`,
+    `oracleExpected=${failure?.expected ?? 'none captured'}`,
+    `oracleActual=${failure?.actual ?? 'none captured'}`,
+    `state=${failure?.stateSummary ?? 'none captured'}`,
+    `browserErrors=${list(failure?.browserErrors)}`,
+    `serverErrors=${list(failure?.serverErrors)}`,
+  ].join('\n');
 }

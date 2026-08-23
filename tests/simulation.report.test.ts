@@ -8,6 +8,7 @@ import { buildFailureDigest } from '../simulation/observe/digest';
 import {
   createRunReport,
   finalizeRunReport,
+  formatRunFailureDiagnostics,
   isRunReportValid,
   parseRunReport,
   RUN_REPORT_SCHEMA_VERSION,
@@ -193,13 +194,42 @@ describe('validateRunReport', () => {
     report.failure = {
       stepIndex: 0,
       stepKind: 'createTodo',
+      action: 'createTodo title="Pay rent"',
       error: 'boom',
       expected: '1 row',
       actual: '0 rows',
       stateSummary: 'todos: 0',
+      browserErrors: ['console.error: hydration failed'],
+      serverErrors: ['HTTP 503 POST http://localhost:8081/api'],
     };
     finalizeRunReport(report, { outcome: 'failed', startedAt: '2026-08-04T06:00:00.000Z' });
     expect(validateRunReport(report)).toEqual([]);
+  });
+
+  it('formats lane-level diagnostics for a failed run', () => {
+    const report = validReport();
+    report.failure = {
+      stepIndex: 0,
+      stepKind: 'createTodo',
+      action: 'createTodo title="Pay rent"',
+      error: 'oracle failed',
+      expected: '[{"title":"Pay rent"}]',
+      actual: '0 rows',
+      stateSummary: 'todos=0',
+      browserErrors: ['console.error: hydration failed'],
+      serverErrors: ['HTTP 503 POST http://localhost:8081/api'],
+    };
+    finalizeRunReport(report, { outcome: 'failed', startedAt: '2026-08-04T06:00:00.000Z' });
+    const diagnostics = formatRunFailureDiagnostics(report);
+    expect(diagnostics).toContain('lane=scenario');
+    expect(diagnostics).toContain('runId=run_20260804_abcd1234');
+    expect(diagnostics).toContain('seed=smoke-fixed-seed');
+    expect(diagnostics).toContain('action=createTodo title="Pay rent"');
+    expect(diagnostics).toContain('classification=UNTRIAGED');
+    expect(diagnostics).toContain('report=simulation-output/run_20260804_abcd1234/run-report.json');
+    expect(diagnostics).toContain('oracleActual=0 rows');
+    expect(diagnostics).toContain('browserErrors=console.error: hydration failed');
+    expect(diagnostics).toContain('serverErrors=HTTP 503 POST http://localhost:8081/api');
   });
 
   it('rejects unknown oracle kinds', () => {
@@ -243,10 +273,13 @@ describe('buildFailureDigest (4.3)', () => {
     report.failure = {
       stepIndex: 0,
       stepKind: 'createTodo',
+      action: 'createTodo title="Pay rent"',
       error: 'timeout waiting for row',
       expected: 'todos count = 1',
       actual: 'todos count = 0',
       stateSummary: 'todos: 0 rows, outbox: empty',
+      browserErrors: ['console.error: hydration failed'],
+      serverErrors: ['HTTP 503 POST http://localhost:8081/api'],
       digestPath: 'simulation-output/run_x/digest.md',
     };
     report.steps[0].status = 'failed';
@@ -261,11 +294,14 @@ describe('buildFailureDigest (4.3)', () => {
     expect(md).toContain('Maya, the Daily Driver');
     expect(md).toContain('smoke');
     expect(md).toContain('`createTodo`');
+    expect(md).toContain('createTodo title="Pay rent"');
     expect(md).toContain('smoke-fixed-seed');
     expect(md).toContain('todos count = 1');
     expect(md).toContain('todos count = 0');
     expect(md).toContain('simulation-output/run_x/artifacts/video.webm');
     expect(md).toContain('simulation-output/run_x/artifacts/trace.zip');
+    expect(md).toContain('console.error: hydration failed');
+    expect(md).toContain('HTTP 503 POST http://localhost:8081/api');
     expect(md).toContain('run-report.json');
     expect(md).toContain('Replay exactly with');
   });

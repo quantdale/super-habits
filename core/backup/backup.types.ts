@@ -1,11 +1,12 @@
 import type { CalorieGoal } from '@/features/calories/types';
 import type { PomodoroPreset, PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
+import type { WeeklyReviewWeekday } from '@/features/weekly-review/weeklyReviewReminder.domain';
 import type { TimeOfDay } from '@/core/notifications/reminderPlanning';
 
 /** Versioned backup contract. Bump only with a coordinated schema migration. */
 export const BACKUP_SCHEMA_VERSION = 2;
 /** Version of the recoverable-settings payload contract. */
-export const BACKUP_SETTINGS_VERSION = 3;
+export const BACKUP_SETTINGS_VERSION = 4;
 /**
  * Versioned *recoverable scope* marker — the exact set of entities covered by
  * a backup. Bumped from 3 → 4 when Projects/Goals/Daily Plans (and the new
@@ -796,10 +797,17 @@ export type RecoverableSettingsV3 = RecoverableSettingsV2 & {
   } | null;
   /** Default rest between workout sets, in seconds (clamped 5–600). */
   workoutRestSeconds: number | null;
-  /** Todo/daily-plan reminder preferences. */
+  /** Todo/daily-plan/weekly-review reminder preferences. */
   notificationPreferences: {
     todoRemindersEnabled: boolean;
     dailyPlanReminderTime: TimeOfDay;
+    /** Settings V4; absent (null) in historical V3 payloads. */
+    weeklyReviewReminder: {
+      enabled: boolean;
+      weekday: WeeklyReviewWeekday;
+      hour: number;
+      minute: number;
+    } | null;
   } | null;
 };
 

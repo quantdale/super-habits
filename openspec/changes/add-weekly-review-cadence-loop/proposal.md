@@ -13,7 +13,7 @@ Every other ritual in SuperHabits nudges the user — todo due-date reminders, s
 1. DST-safe local-calendar weekly occurrence math (pure, unit-tested).
 2. Single-identifier replace-not-duplicate scheduler bridge.
 3. Tap-through entry into Weekly Review on native; honest native-only copy on web.
-4. Preference rides the append-only settings V3 snapshot through Restore V2 and Portable import.
+4. Preference rides the append-only settings V4 snapshot through Restore V2 and Portable import while preserving V3 compatibility.
 
 ## Non-goals
 

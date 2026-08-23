@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { normalizeRecoverableSettings } from '@/core/backup/backupSettings';
 import { appMetaKeys, getAppMetaJsonOrDefault } from '@/core/db/appMeta';
 import { DEFAULT_CALORIE_GOAL, normalizeCalorieGoal } from '@/features/calories/calories.domain';
 import { DEFAULT_SETTINGS, normalizePomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
@@ -71,5 +72,29 @@ describe('persisted app_meta runtime normalization', () => {
       longBreakMinutes: 20,
       sessionsBeforeLongBreak: 5,
     });
+  });
+
+  it('normalizes weekly-review reminder settings and preserves valid wall-clock values', () => {
+    expect(
+      normalizeRecoverableSettings({
+        notificationPreferences: {
+          todoRemindersEnabled: true,
+          dailyPlanReminderTime: { hour: 9, minute: 5 },
+          weeklyReviewReminder: { enabled: true, weekday: 3, hour: 18, minute: 30 },
+        },
+      }).notificationPreferences,
+    ).toEqual({
+      todoRemindersEnabled: true,
+      dailyPlanReminderTime: { hour: 9, minute: 5 },
+      weeklyReviewReminder: { enabled: true, weekday: 3, hour: 18, minute: 30 },
+    });
+
+    expect(
+      normalizeRecoverableSettings({
+        notificationPreferences: {
+          weeklyReviewReminder: { enabled: true, weekday: 7, hour: 25, minute: 60 },
+        },
+      }).notificationPreferences?.weeklyReviewReminder,
+    ).toBeNull();
   });
 });

@@ -10,12 +10,12 @@ Follow the proven `dailyPlanReminderScheduler` shape end-to-end:
 2. **Bridge (`core/notifications/weeklyReviewReminderScheduler.ts`)** — single repeating identifier `weekly-review-reminder:weekly`; on enable/change cancel-then-schedule via `setNotificationHandler`-safe calendar trigger; disable cancels. Mirrors `dailyPlanReminderScheduler` incl. native-only guard.
 3. **Entry** — notification data carries `{kind:'weekly-review-reminder'}`; response dispatcher routes to opening the Planning Hub's Review surface (same routing style as habit reminders opening their section).
 4. **Settings UI** — Notifications bucket gains "Weekly review" row: toggle + weekday chips + time picker; on web renders with the established native-only availability note while still persisting preference.
-5. **Backup** — append `{weeklyReviewReminder}` last to the V3 canonical settings text; validators updated; restore/portable tests assert round-trip and version compatibility.
+5. **Backup** — append `{weeklyReviewReminder}` last to the V4 canonical settings text; validators updated; restore/portable tests assert round-trip and V3 compatibility.
 
 ## Risks / mitigations
 
 - Duplicate notifications on preference churn → single fixed identifier + cancel-before-schedule.
-- Settings version drift → append-only rule keeps V3; canonical checksum covers new tail automatically.
+- Settings version drift → V4 appends the new field while the frozen V3 canonical form remains byte-stable; the canonical checksum covers the new tail automatically.
 - Web promise-breaking → explicit copy + no scheduling call.
 
 ## Validation

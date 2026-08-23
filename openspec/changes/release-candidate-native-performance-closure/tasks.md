@@ -64,4 +64,4 @@
 - [x] 10.1 Serialize coherent commits with meaningful messages; push.
 - [x] 10.2 (quality PASS both SHAs; e2e classified FLAKY_TEST/ENVIRONMENT with local-equivalence proof; re-run admin-gated — see ExecPlan blockers) Verify GitHub `quality` + `e2e` on the exact pushed SHA via API.
 - [x] 10.3 Reconcile ExecPlan; mark COMPLETED with evidence.
-- [ ] 10.4 Post-RC gap audit → select next product campaign → separate OpenSpec change + ExecPlan → begin implementation.
+- [x] 10.4 Post-RC gap audit → select the Weekly Review Cadence Loop as the next product campaign; its OpenSpec change and ExecPlan are active and implementation is complete.

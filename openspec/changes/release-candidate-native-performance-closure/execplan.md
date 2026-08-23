@@ -1,7 +1,7 @@
 # ExecPlan: Release Candidate Native Performance Closure
 
 Plan-Version: 2
-Status: BLOCKED
+Status: ACTIVE
 
 ## Purpose / User Outcome
 
@@ -9,7 +9,7 @@ Certify SuperHabits at a release-candidate-quality baseline on the exact current
 
 ## Context
 
-- Repository `quantdale/super-habits`; starting HEAD `6cc4172f4292839fa0b28d8289ee0c1a81e43899` ("unfinished progress"), clean tree, main-only, synced with origin.
+- Repository `quantdale/super-habits`; current synchronized HEAD is `fda168cac9eb3624b00b0fb0e363ee0a87ef0145` on `main`, equal to `origin/main`, with legitimate uncommitted Weekly Review backup/settings work preserved.
 - CI run 32577614654 at that SHA failed: quality job "Validate versioned ExecPlans" step; e2e skipped downstream.
 - Actual schema truth: migrations through v21 (`daily_plans.top_todo_titles`); next free version >=22.
 - Docs drift: `.cursorrules`/rules.mdc say v15; PROJECT_STRUCTURE_MAP says v15; AGENTS.md says v20.
@@ -33,18 +33,18 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 
 ## Current Checkpoint
 
-- Current milestone: M10 certification recorded; blocked only on the CI e2e runner verdict.
-- Completed: M1–M9 as recorded. Certification pushes: (a) `a97fb7e` — CI run 32601150911: quality **PASS**; e2e failed at the full deterministic-sim step + downstream artifact upload. Classified FLAKY_TEST/ENVIRONMENT against preserved local proof: the identical lane passed 22/22 twice on this host against that commit (rc-simdet.log pre-push; rc-simdet2.log post-push), quality-green includes the full Vitest matrix, and no simulation/source-affecting file changed after the earlier green library run. Job logs are admin-gated (no GH token) so CI-side attribution beyond step names is not retrievable. (b) Follow-up wave `69bc1ff` (weekly-review cadence core) pushed as the new final tree; CI run 32607777040 in progress at checkpoint time.
-- In progress: none — awaiting the external CI re-run.
-- Important modified files: openspec/changes/harden-parallel-completion-wave-v2/execplan.md; openspec/changes/release-candidate-native-performance-closure/**; e2e/journeys/three-months-in.spec.ts; .maestro/flows/*.yaml (24 files); ~17 documentation files; features/weekly-review/weeklyReview.data.ts; tests/db.client.test.ts; .agent/hardening-evidence/{rc-perf-distributions.log,rc-simdet.log,rc-simdet2.log}; plus the weekly-review cadence wave (see its own plan).
-- Last successful validation: local full deterministic library 22/22 at `a97fb7e` post-push (rc-simdet2.log); typecheck/lint clean at `69bc1ff`; targeted suites 29/29; earlier M2–M3 stack (Vitest 1726/1726, e2e 179+10×journey reruns, e2e:sync 46/46).
-- Failures: CI e2e failed on BOTH pushed SHAs at DIFFERENT steps (a97fb7e: deterministic-library step; 69bc1ff: combined full-suite step), each contradicted by complete local reproduction of that exact lane on the same tree; job logs admin-gated so runner-side attribution is unavailable. Classified FLAKY_TEST/ENVIRONMENT (shared CI runner); evidence under .agent/hardening-evidence/ and simulation-output/.
-- Relevant quarantines: none new (CG-4/CG-5 historically closed).
-- Blockers: the failed e2e job of run 32607777040 (SHA 69bc1ff) cannot be re-run or log-inspected without repository admin (no GH token on this host).
-- Condition required to unblock: an authorized user re-runs that e2e job (or shares Actions log access); green ⇒ certification completes, or a runner-side artifact identifies a concrete repository-caused defect ⇒ it becomes this campaign's fix list.
-- Exact resume action after unblock: record the new e2e conclusion for 69bc1ff in the Validation Ledger; if green, flip this plan to COMPLETED citing quality-green + e2e-green on 69bc1ff; otherwise fix at root cause and re-certify on the newer SHA.
-- Exact next action: None — external CI re-run required (see Blockers). The weekly-review cadence campaign proceeds independently under its own ACTIVE plan.
-- Remaining definition of done: Complete except the external e2e re-run verdict; every locally runnable gate is green on the final tree and the next product campaign is ACTIVE with its core wave landed.
+- Current milestone: Local CI closure and the Weekly Review Cadence Loop campaign are complete; only final commit/push and exact-SHA certification remain.
+- Completed: Historical RC milestones M1–M10 are preserved in this plan; `main`/`origin/main` synchronization is verified at `fda168c`; Weekly Review cadence, V4 backup compatibility, focused web journey, P0 journeys, integration, deterministic simulation, fresh web/sync builds, full E2E, and HEAVY performance gates are green.
+- In progress: Serialize the coherent commit, push it, and verify its exact pushed SHA.
+- Important modified files: Weekly Review backup/settings/scheduler/UI/tests, simulation report/runner diagnostics, the settings-ripple journey, and the two active ExecPlans.
+- Last successful validation: Node `v22.23.2` matches `.nvmrc`; typecheck PASS; lint PASS (0 errors/12 warnings); `npm test` 146 files/1,745 tests PASS; integration 36 files/206 tests PASS; timezone 5-zone matrix PASS; OpenSpec 40/40 PASS; impact/theme/schema checks PASS; `qa:affected` selected the full affected ladder and broad regression; exact web E2E 183 passed/44 skipped/0 failures; `e2e:sync` 46/46 PASS; deterministic simulation validation + smoke PASS; HEAVY performance N=10 PASS with max switch 758 ms after browser-frame measurement stabilization.
+- Failures: GitHub run `32607777040` at `69bc1ff` had quality PASS and one substantive E2E failure in `simulation/runner/specs/selfTest.spec.ts`; local repeated scenario/seeded/repro runs pass with new lane/action/report diagnostics. The first combined local E2E run reached 178 passed/44 skipped/4 not run and exposed one P2 HEAVY switch at 934 ms; controlled N=10 repetition showed the old coarse polling was the source of near-threshold jitter, and the unchanged 800 ms gate passes 10/10 with RAF/performance.now measurement. Native smoke/persistence/lifecycle are ENVIRONMENT-blocked because no e2e-test APK is installed. One full `qa:fast` invocation had a transient restore-coordinator module-lifecycle timeout; a subsequent full unit rerun passed. Repository-wide `format:check` reports 68 pre-existing non-campaign markdown/YAML files; touched files pass targeted formatting.
+- Relevant quarantines: None for the current investigation; prior CI classifications are historical evidence and will be replaced or confirmed with fresh runs.
+- Blockers: None for local reproduction. External GitHub job re-run/log access may still be needed for final exact-SHA certification.
+- Condition required to unblock: N/A.
+- Exact resume action after unblock: N/A.
+- Exact next action: Inspect the final diff, run the plan validators once more, commit/push, and query the exact SHA's branch and GitHub Actions status.
+- Remaining definition of done: completed Weekly Review OpenSpec tasks, default E2E + sync evidence, reconciled plans/docs, coherent push, and exact pushed-SHA quality/e2e verification as far as GitHub access permits; native environment blockers must remain recorded honestly.
 
 ## Progress
 
@@ -52,15 +52,15 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 - [x] 1.2 Reproduce CI plan-validation failure locally
 - [x] 1.3 Repair checkpoint drift; all plans validate
 - [x] 1.4 Campaign OpenSpec artifacts created
-- [ ] 2.x Fresh static/unit/integration/timezone/QA-config baselines (tasks 2.1–2.4)
-- [ ] 3.x Fresh web/sync builds + full e2e + deterministic simulation + e2e:sync (tasks 3.1–3.5)
-- [ ] 4.x HEAVY performance distributions, attribution, stable gate (tasks 4.1–4.5)
-- [ ] 5.x Android native current-build validation; iOS honest status (tasks 5.1–5.4)
-- [ ] 6.x Supabase ledger/function/advisor audit (tasks 6.1–6.3)
-- [ ] 7.x Documentation truth sweep (tasks 7.1–7.3)
-- [ ] 8.x Repository hygiene audit (tasks 8.1–8.2)
-- [ ] 9.x Recovery invariant re-proof (tasks 9.1–9.2)
-- [ ] 10.x Commit/push/exact-SHA CI verification; next-campaign selection + start (tasks 10.1–10.4)
+- [x] 2.x Fresh static/unit/integration/timezone/QA-config baselines (tasks 2.1–2.4)
+- [x] 3.x Fresh web/sync builds + full E2E + deterministic simulation + e2e:sync
+- [x] 4.x HEAVY performance distributions, attribution, and stable gate (tasks 4.1–4.5)
+- [x] 5.x Android native current-build validation; iOS honest status (tasks 5.1–5.4; Android lanes explicitly ENVIRONMENT-blocked)
+- [x] 6.x Supabase ledger/function/advisor audit (tasks 6.1–6.3; credential-gated items recorded honestly)
+- [x] 7.x Documentation truth sweep (tasks 7.1–7.3)
+- [x] 8.x Repository hygiene audit (tasks 8.1–8.2)
+- [x] 9.x Recovery invariant re-proof (tasks 9.1–9.2)
+- [ ] 10.x Commit/push/exact-SHA CI verification; next-campaign selection + start (tasks 10.1–10.4; push/certification still pending)
 
 ## Surprises & Discoveries
 
@@ -79,7 +79,13 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 
 - 2026-08-23 — GitHub run 32601150911 @ a97fb7e — quality PASS; e2e FAIL (deterministic-library step + upload cascade) — CLASSIFIED FLAKY_TEST/ENVIRONMENT vs local identical-lane proof 22/22 twice (rc-simdet.log, rc-simdet2.log).
 - 2026-08-23 — GitHub run 32607777040 @ 69bc1ff (final tree) — quality **PASS**; e2e FAIL (combined full-suite step) — CLASSIFIED FLAKY_TEST/ENVIRONMENT vs local full-e2e counts (179 pass + fixed-step 10/10 reruns), e2e:sync 46/46, deterministic 22/22 ×2; logs admin-gated.
+- 2026-08-23 — Local fresh-tree CI closure — PASS/ENVIRONMENT — typecheck, lint, unit 1,539/1,539, integration 206/206, P0 journeys 25/25, deterministic smoke 24/24; native smoke/persistence/lifecycle blocked because the Android package is not installed.
+- 2026-08-23 — exact combined `npm run e2e` — PARTIAL/CLASSIFIED — 178 passed, 44 skipped, 4 did not run; one P2 HEAVY switch measurement observed 934 ms.
+- 2026-08-23 — P2 HEAVY controlled repetition — PASS — N=10; RAF/performance.now measurement retained the 800 ms assertion and all repetitions passed (max switch 758 ms).
 - 2026-08-23 — Deployment status — INFO — Vercel auto-deploy from main assumed per vercel.json; deployment-health verification requires dashboard/token access (access-gated, not fabricated).
+- 2026-08-23 — `npm run qa:affected -- --files ...` — PASS — impact map selected the complete affected ladder and broad regression; all runnable gates were executed and native blockers were preserved as ENVIRONMENT.
+- 2026-08-23 — Fresh `npm run build:sync` + `npm run e2e:sync` — PASS — 46/46 sync-boundary tests on a fresh dummy-credential export.
+- 2026-08-23 — Fresh `npm run build:web` + exact `npm run e2e` — PASS — 183 passed, 44 expected skips, 0 failures across 227 tests; final P2 max switch 693 ms.
 
 - 2026-08-22 — `git fetch --all --prune` + `git status/log/branch` — PASS — HEAD `6cc4172`, clean, main-only.
 - 2026-08-22 — `npm run agent:plans` — PASS — 35 plans discovered, all COMPLETED.
@@ -103,5 +109,5 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Campaign created; CI-blocking plan drift repaired; baseline phase starting.
-- Follow-up: Execute tasks 2–10 in order; keep checkpoint current at each milestone.
+- Summary: CI closure diagnostics, Weekly Review completion, backup/settings V4 compatibility, performance measurement stabilization, and local certification are complete; final exact-SHA push/certification remains.
+- Follow-up: Commit/push the coherent campaign and record the exact remote branch and GitHub Actions result without overstating unavailable native or admin-gated evidence.

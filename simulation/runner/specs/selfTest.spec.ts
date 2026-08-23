@@ -22,11 +22,18 @@
 import { test, expect } from '@playwright/test';
 import { executeScenario } from '../execute';
 import { selfTestModel } from '../selfTest';
-import { validateRunReport } from '../../observe/report';
+import { formatRunFailureDiagnostics, validateRunReport } from '../../observe/report';
 
 const smoke = selfTestModel.scenarios.find((s) => s.id === 'smoke');
 if (!smoke) {
   throw new Error('self-test model is missing the smoke scenario');
+}
+
+function expectPassed(label: string, result: Awaited<ReturnType<typeof executeScenario>>): void {
+  expect(
+    result.report.outcome,
+    `${label} run-report failure diagnostics:\n${formatRunFailureDiagnostics(result.report)}`,
+  ).toBe('passed');
 }
 
 test('3.5 deterministic mode is reproducible — identical action logs', async ({ browser }) => {
@@ -37,14 +44,14 @@ test('3.5 deterministic mode is reproducible — identical action logs', async (
     mode: 'deterministic',
     browser,
   });
-  expect(r1.report.outcome).toBe('passed');
+  expectPassed('deterministic-1', r1);
   const r2 = await executeScenario({
     scenario: smoke,
     model: selfTestModel,
     mode: 'deterministic',
     browser,
   });
-  expect(r2.report.outcome).toBe('passed');
+  expectPassed('deterministic-2', r2);
   expect(r2.actionLog).toEqual(r1.actionLog);
   expect(validateRunReport(r1.report)).toEqual([]);
   expect(validateRunReport(r2.report)).toEqual([]);
@@ -74,8 +81,12 @@ test('4.4 one run-report schema across lanes (scenario / seeded / repro)', async
     lane: 'repro',
     browser,
   });
-  for (const r of [scenario, seeded, repro]) {
-    expect(r.report.outcome).toBe('passed');
+  for (const [label, r] of [
+    ['scenario', scenario],
+    ['seeded', seeded],
+    ['repro', repro],
+  ] as const) {
+    expectPassed(label, r);
     expect(validateRunReport(r.report)).toEqual([]);
   }
   expect(seeded.report.lane).toBe('seeded');

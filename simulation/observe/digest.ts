@@ -66,6 +66,8 @@ export function buildFailureDigest(report: RunReport, ctx: DigestContext = {}): 
     lines.push('');
     lines.push(`Step **#${f.stepIndex}** — \`${f.stepKind}\``);
     lines.push('');
+    lines.push('- **Action**: `' + codeOrText(f.action) + '`');
+    lines.push('');
     lines.push('### Expected vs. actual');
     lines.push('');
     lines.push('- **Expected**: ' + codeOrText(f.expected));
@@ -75,6 +77,11 @@ export function buildFailureDigest(report: RunReport, ctx: DigestContext = {}): 
     lines.push('### State summary');
     lines.push('');
     lines.push(codeOrText(ctx.stateSummary ?? f.stateSummary));
+    lines.push('');
+    lines.push('### Browser/server diagnostics');
+    lines.push('');
+    lines.push('- **Browser errors**: ' + codeOrText(f.browserErrors?.join(' | ')));
+    lines.push('- **Server errors**: ' + codeOrText(f.serverErrors?.join(' | ')));
     lines.push('');
   } else {
     lines.push('## No failure recorded');

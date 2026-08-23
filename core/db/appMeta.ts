@@ -55,7 +55,7 @@ export const appMetaKeys = {
   /** Durable in-progress workout session draft for resume after restart.
    *  Local operational state — never backed up. */
   workoutActiveSessionDraft: defineJsonKey('workout.active_session_draft', 'workout'),
-  /** Todo/daily-plan reminder preferences (recoverable-settings V3 source). */
+  /** Todo/daily-plan/weekly-review reminder preferences (recoverable-settings source). */
   notificationPreferences: defineJsonKey('notification_preferences', 'notifications'),
   backupScopeVersion: defineTextKey('backup.scope_version', 'sync'),
   backupBackfillStatus: defineTextKey('backup.backfill_status', 'sync'),
