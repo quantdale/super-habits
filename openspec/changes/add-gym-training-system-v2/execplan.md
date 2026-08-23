@@ -33,17 +33,17 @@ In scope: migration 22 and Workout model extensions; built-in/custom exercise id
 
 ## Current Checkpoint
 
-- Current milestone: Wave 5 certification — the Gym V2 implementation, recovery contracts, simulation seed/introspection, docs, and focused journeys are in place; final delivery evidence remains.
+- Current milestone: Wave 5 certification — the Gym V2 implementation, recovery contracts, simulation seed/introspection, docs, focused journeys, and committed deterministic matrix are green; final delivery evidence remains.
 - Completed: Repository preflight and OpenSpec artifacts; migration 22; exercise catalog/custom identity; routine prescriptions and reorder data API; weekly plan/overrides/Today; guided strength/bodyweight/timed/cardio sessions; durable drafts; progression; body weight; progress/totals; reminder/wake behavior; owner/account, sync, Backup V2, Portable, Supabase, simulation, PWA, and documentation contracts.
-- In progress: Re-run the remaining deterministic simulation scenarios in shorter groups after commit; the first fresh run reached the `j1-a-tuesday` action stream but the long-lived harness exited before writing its report. Then finish final diff/commit/push/CI evidence; all other local gates, including e2e:sync, are green.
+- In progress: Finish timezone QA, reconcile the final plan/tasks evidence, push the three committed milestones, and verify exact remote SHA/CI. The committed deterministic simulation is complete: 22/22 unique scenarios passed across 526 steps, all reports stamped with `f5bb709c90710589d168dac7322bd55dc343ece1`.
 - Important modified files: `core/db`, `core/auth`, `core/backup`, `core/portable`, `core/notifications`, `features/workout`, `features/settings`, Supabase/simulation schemas, tests, E2E/QA maps, docs, and the OpenSpec change.
 - Last successful validation: Full Vitest (147 files / 1,759 tests); lint (0 errors, 13 warnings); typecheck; OpenSpec all 41 items; full web export; full browser/simulation matrix (233 listed, 190 passed, 43 expected skips, 0 failures); e2e:sync (46/46); timezone matrix (5 zones); themes (140/140); Supabase schema; QA impact validation; and focused Gym V2/legacy Workout (14/14).
-- Current failures: No known product, migration, data/backup, typecheck, lint, web, browser, simulation-spec, sync-lane, or schema failure. One standalone simulation attempt ended without a final report after roughly the harness session-age limit; the smaller-run workaround is in progress. A probe on port 8094 also exposed an existing simulation-helper hardcoded 8081 assumption; it is a harness/environment issue, not a product failure, and the final runs will use the repository's canonical 8081 setup.
+- Current failures: No known product, migration, data/backup, typecheck, lint, web, browser, simulation-spec, sync-lane, or schema failure. The first long-lived simulation attempt ended without a final report after the harness session-age limit; bounded canonical-8081 reruns completed the full committed matrix. A probe on port 8094 exposed an existing simulation-helper hardcoded 8081 assumption; it is a harness/environment issue, not a product failure.
 - Relevant quarantines: Port 8081 is occupied by an unrelated local dev server, so local browser runs use isolated E2E ports; native Android target is missing `com.dale16.superhabits`; native iOS is unavailable because Xcode `xcrun/simctl` is absent on Windows.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: Continue with the exact next action below.
-- Exact next action: Review the final source diff, commit the coherent implementation, start the canonical static server on 8081, run deterministic simulation groups against the committed export, then verify exact local/remote SHA plus CI status.
+- Exact next action: Run timezone QA, update this checkpoint with final gate results, commit the completed plan/task evidence, push the branch, inspect CI, and verify local HEAD equals the remote branch with a clean tree.
 - Remaining definition of done: All mandatory Gym V2 user flows and recovery contracts validated; canonical gates run with honest native/CI classifications; final diff committed and pushed with exact SHA/tree/remote evidence.
 
 ## Progress
@@ -83,16 +83,16 @@ In scope: migration 22 and Workout model extensions; built-in/custom exercise id
 
 ## Validation Ledger
 
-| Check                               | Status                        | Evidence / next action                                                                                                           |
-| ----------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Git baseline/status/branch/origin   | PASS                          | Starting SHA verified; branch created; all current edits are campaign-scoped.                                                    |
-| OpenSpec artifacts                  | IN PROGRESS                   | Proposal/design/spec/tasks/plan written; reconcile checkboxes and validate after final gates.                                    |
-| Migration/domain focused tests      | PASS                          | Migration 22 integration 8/8; Workout domain/integrity/reminder 40/40.                                                           |
-| Backup/portable/account integration | PASS                          | Scope-6 Backup/Portable/owner recovery suites and e2e:sync 46/46 are green; invalid/corrupt/reference rejection remains covered. |
-| Workout E2E/simulation              | IN PROGRESS                   | Full browser matrix 190 passed/43 expected skips; focused Workout 14/14; standalone 22-scenario API simulation still running.    |
-| Typecheck/lint/build/full tests     | PASS                          | Typecheck, lint 0 errors/13 warnings, web export, and Vitest 1,759/1,759 pass.                                                   |
-| Native Workout QA                   | PASS WITH ENVIRONMENT BLOCKER | Android smoke/targeted/lifecycle report missing installed APK; iOS report lacks Xcode xcrun/simctl.                              |
-| Exact remote SHA/CI                 | PENDING                       | Commit/push only after local gates and final diff review.                                                                        |
+| Check                               | Status                        | Evidence / next action                                                                                                                                                                      |
+| ----------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Git baseline/status/branch/origin   | PASS                          | Starting SHA verified; branch created; all current edits are campaign-scoped.                                                                                                               |
+| OpenSpec artifacts                  | PASS                          | Proposal/design/spec/tasks/plan written; 41/41 repository OpenSpec items validate and Gym V2 task 5.2 is complete.                                                                          |
+| Migration/domain focused tests      | PASS                          | Migration 22 integration 8/8; Workout domain/integrity/reminder 40/40.                                                                                                                      |
+| Backup/portable/account integration | PASS                          | Scope-6 Backup/Portable/owner recovery suites and e2e:sync 46/46 are green; invalid/corrupt/reference rejection remains covered.                                                            |
+| Workout E2E/simulation              | PASS                          | Focused Workout 14/14; committed deterministic simulation 22/22 unique scenarios and 526/526 steps passed with final SHA-stamped reports; full browser matrix 190 passed/43 expected skips. |
+| Typecheck/lint/build/full tests     | PASS                          | Typecheck, lint 0 errors/13 warnings, web export, and Vitest 1,759/1,759 pass.                                                                                                              |
+| Native Workout QA                   | PASS WITH ENVIRONMENT BLOCKER | Android smoke/targeted/lifecycle report missing installed APK; iOS report lacks Xcode xcrun/simctl.                                                                                         |
+| Exact remote SHA/CI                 | IN PROGRESS                   | Three commits are local through `f5bb709c`; push and inspect the matching GitHub Actions run next.                                                                                          |
 
 ## Changed Files / Areas
 

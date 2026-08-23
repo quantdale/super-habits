@@ -38,6 +38,6 @@
 ## Wave 5 — certification
 
 - [x] 5.1 Run focused gates after each coherent wave and fix repository-caused failures.
-- [ ] 5.2 Run canonical typecheck, lint, unit/integration, OpenSpec/plan/impact validation, build, Workout/P0 E2E, simulation, timezone, sync, schema, and diff checks.
+- [x] 5.2 Run canonical typecheck, lint, unit/integration, OpenSpec/plan/impact validation, build, Workout/P0 E2E, simulation, timezone, sync, schema, and diff checks.
 - [x] 5.3 Run available native Workout QA; record exact environment blockers when a required target is unavailable.
 - [ ] 5.4 Review the final diff, commit coherent milestones, push under repository governance, verify exact remote SHA/CI, clean tree, and mark the ExecPlan completed only when the definition of done is satisfied.
