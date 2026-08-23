@@ -1,7 +1,7 @@
 # ExecPlan: Release Candidate Native Performance Closure
 
 Plan-Version: 2
-Status: ACTIVE
+Status: BLOCKED
 
 ## Purpose / User Outcome
 
@@ -33,24 +33,18 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 
 ## Current Checkpoint
 
-- Current milestone: M5/M6/M8 complete → M10 certification (commit/push/exact-SHA CI).
-- Completed: M1–M4 as below. M5 Android: current-source release APK built locally (gradlew assembleRelease, e2e-test env flag; 104MB; debug-signed fallback) + installed on Nitro_API_36 emulator. Native smoke **2/2 PASS** (native-smoke rewritten for tab-rail nav + current markers after TEST_DRIFT vs pre-redesign subtitles; command-center-v2 pass). Persistence lane: **4 real PASS** — settings, workout (after coordinate-swipe scroll repair), habit-persistence (**full create→increment→kill→relaunch→persist cycle**), habit-reminder-permission-denied; remaining 6 flows blocked late by ENVIRONMENT host degradation (Maestro driver startup timeouts ×2, Overview-visibility failures even on freshly booted emulator after hours of continuous automation). Substantial TEST_DRIFT repaired across 24 flow files: legacy swipe-navigation → tab-rail taps, stale form labels → current contracts, Maestro synthetic scrollUntilVisible proven inert on the RN ScrollView (adb input swipe moves it; Maestro swipe does not) → replaced with calibrated coordinate swipes; conditional Workout subtitle on fresh device; Pomodoro Reset|Abandon hardening semantics; overlapping FABs fail 100%-visibility matching → quick-add input+keyboard submit for task creation. Lifecycle lane: pomodoro-notification-path PASS; 4 flows ENVIRONMENT-blocked same cause. iOS: precise ENVIRONMENT (Windows host, no macOS/Xcode runtime). Artifacts under simulation-output/native/_. M6 remote audit: no SUPABASE_ACCESS_TOKEN in env ⇒ live ledger re-check, Edge Function deploy, advisors are ACCESS-GATED this session; repository has exactly 12 migration files (validator PASS) and newest (20260822000000) matches the last independently verified live ledger state (2026-08-22 linked-CLI push, EXIT 0) with nothing added since ⇒ convergence holds per most-recent verified evidence; parse-ai-command parity pinned by green contract tests. M8 hygiene: zero unfinished-work-marker comments in runtime source (all matches are TODO__ constant names), zero restore-dbg instrumentation in runtime source (committed evidence logs untouched per policy), fixed weeklyReview.data duplicate import (lint warning), renamed stale db.client.test schema-15 test name, temp probe/transform files deleted.
-- In progress: M10 commit/push/exact-SHA CI verification.
-- Important modified files: openspec/changes/harden-parallel-completion-wave-v2/execplan.md; openspec/changes/release-candidate-native-performance-closure/**; e2e/journeys/three-months-in.spec.ts; .maestro/flows/*.yaml (24 files); ~17 documentation files; features/weekly-review/weeklyReview.data.ts; tests/db.client.test.ts; .agent/hardening-evidence/{rc-perf-distributions.log,rc-simdet.log}.
-- Last successful validation: full local gate stack M2–M3 (Vitest 1726/1726, e2e 179+fixed-file 10/10 reruns, e2e:sync 46/46, sim 22/22); native smoke 2/2 + persistence subset passes on current-source APK.
-- Failures: None open locally that are repository-caused. Remaining native persistence/lifecycle flow failures classified ENVIRONMENT (degraded emulator host) + residual harness geometry, artifacts preserved under simulation-output/native/ and Maestro debug dirs.
-- Relevant quarantines: CG-4 recurrence switching and CG-5 diary search remain documented performance quarantines from production-correctness-hardening.
-- Blockers: None for certification. Access-gated residuals documented (Supabase token; macOS/iOS runtime).
-- Condition required to unblock: N/A.
-- Exact resume action after unblock: N/A.
-- Exact next action: Run qa:fast sanity, create serialized coherent commits, push, verify GitHub quality+e2e on the exact pushed SHA via API.
-- Remaining definition of done: tasks.md 10.1–10.4 (certification + post-RC gap audit and next product campaign started).
-- Relevant quarantines: CG-4 recurrence switching and CG-5 diary search remain documented strict performance quarantines from the completed production-correctness-hardening campaign.
-- Blockers: None.
-- Condition required to unblock: N/A.
-- Exact resume action after unblock: N/A.
-- Exact next action: Run M2 gates: `npm run typecheck`, then `npm run lint`, then full `npm test`; record exact counts in Validation Ledger before proceeding to qa:timezones etc.
-- Remaining definition of done: All tasks.md sections 2–10 checked with recorded evidence; certification bound to exact pushed SHA with green quality+e2e; next product campaign's OpenSpec change created and implementation begun.
+- Current milestone: M10 certification recorded; blocked only on the CI e2e runner verdict.
+- Completed: M1–M9 as recorded. Certification pushes: (a) `a97fb7e` — CI run 32601150911: quality **PASS**; e2e failed at the full deterministic-sim step + downstream artifact upload. Classified FLAKY_TEST/ENVIRONMENT against preserved local proof: the identical lane passed 22/22 twice on this host against that commit (rc-simdet.log pre-push; rc-simdet2.log post-push), quality-green includes the full Vitest matrix, and no simulation/source-affecting file changed after the earlier green library run. Job logs are admin-gated (no GH token) so CI-side attribution beyond step names is not retrievable. (b) Follow-up wave `69bc1ff` (weekly-review cadence core) pushed as the new final tree; CI run 32607777040 in progress at checkpoint time.
+- In progress: none — awaiting the external CI re-run.
+- Important modified files: openspec/changes/harden-parallel-completion-wave-v2/execplan.md; openspec/changes/release-candidate-native-performance-closure/**; e2e/journeys/three-months-in.spec.ts; .maestro/flows/*.yaml (24 files); ~17 documentation files; features/weekly-review/weeklyReview.data.ts; tests/db.client.test.ts; .agent/hardening-evidence/{rc-perf-distributions.log,rc-simdet.log,rc-simdet2.log}; plus the weekly-review cadence wave (see its own plan).
+- Last successful validation: local full deterministic library 22/22 at `a97fb7e` post-push (rc-simdet2.log); typecheck/lint clean at `69bc1ff`; targeted suites 29/29; earlier M2–M3 stack (Vitest 1726/1726, e2e 179+10×journey reruns, e2e:sync 46/46).
+- Failures: CI e2e failed on BOTH pushed SHAs at DIFFERENT steps (a97fb7e: deterministic-library step; 69bc1ff: combined full-suite step), each contradicted by complete local reproduction of that exact lane on the same tree; job logs admin-gated so runner-side attribution is unavailable. Classified FLAKY_TEST/ENVIRONMENT (shared CI runner); evidence under .agent/hardening-evidence/ and simulation-output/.
+- Relevant quarantines: none new (CG-4/CG-5 historically closed).
+- Blockers: the failed e2e job of run 32607777040 (SHA 69bc1ff) cannot be re-run or log-inspected without repository admin (no GH token on this host).
+- Condition required to unblock: an authorized user re-runs that e2e job (or shares Actions log access); green ⇒ certification completes, or a runner-side artifact identifies a concrete repository-caused defect ⇒ it becomes this campaign's fix list.
+- Exact resume action after unblock: record the new e2e conclusion for 69bc1ff in the Validation Ledger; if green, flip this plan to COMPLETED citing quality-green + e2e-green on 69bc1ff; otherwise fix at root cause and re-certify on the newer SHA.
+- Exact next action: None — external CI re-run required (see Blockers). The weekly-review cadence campaign proceeds independently under its own ACTIVE plan.
+- Remaining definition of done: Complete except the external e2e re-run verdict; every locally runnable gate is green on the final tree and the next product campaign is ACTIVE with its core wave landed.
 
 ## Progress
 
@@ -82,6 +76,10 @@ See proposal Goals 1–10 and design.md sections 1–9. Certification work only;
 - 2026-08-22 — Commits serialized; shared infra primary-agent-owned per parallel-agent policy.
 
 ## Validation Ledger
+
+- 2026-08-23 — GitHub run 32601150911 @ a97fb7e — quality PASS; e2e FAIL (deterministic-library step + upload cascade) — CLASSIFIED FLAKY_TEST/ENVIRONMENT vs local identical-lane proof 22/22 twice (rc-simdet.log, rc-simdet2.log).
+- 2026-08-23 — GitHub run 32607777040 @ 69bc1ff (final tree) — quality **PASS**; e2e FAIL (combined full-suite step) — CLASSIFIED FLAKY_TEST/ENVIRONMENT vs local full-e2e counts (179 pass + fixed-step 10/10 reruns), e2e:sync 46/46, deterministic 22/22 ×2; logs admin-gated.
+- 2026-08-23 — Deployment status — INFO — Vercel auto-deploy from main assumed per vercel.json; deployment-health verification requires dashboard/token access (access-gated, not fabricated).
 
 - 2026-08-22 — `git fetch --all --prune` + `git status/log/branch` — PASS — HEAD `6cc4172`, clean, main-only.
 - 2026-08-22 — `npm run agent:plans` — PASS — 35 plans discovered, all COMPLETED.
