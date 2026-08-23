@@ -3,6 +3,7 @@ import type {
   EntityIntegrityMetadata,
   RecoverableSettingsV2,
   RecoverableSettingsV3,
+  RecoverableSettingsV5,
 } from '@/core/backup/backup.types';
 
 /**
@@ -81,7 +82,7 @@ export type PortableBackupFile = {
   /** All recoverable entities for this file's scope; rows are stored sorted by id. */
   entities: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
   /** Recoverable settings allowlist payload (calorie goal, pomodoro, theme, V4 preferences). */
-  settings: RecoverableSettingsV2 | RecoverableSettingsV3;
+  settings: RecoverableSettingsV2 | RecoverableSettingsV3 | RecoverableSettingsV5;
   integrity: PortableIntegrity;
 };
 
@@ -104,6 +105,10 @@ export const PORTABLE_DOMAIN_LABELS: Record<BackupEntity, string> = {
   goals: 'Goals',
   daily_plans: 'Daily plans',
   workout_session_sets: 'Recorded sets',
+  custom_exercises: 'Custom exercises',
+  workout_weekly_plan: 'Weekly workout plan',
+  workout_schedule_overrides: 'Workout date overrides',
+  body_weight_entries: 'Body-weight history',
 };
 
 /** Import-eligibility owner verdicts surfaced in the preview. */

@@ -14,6 +14,8 @@ import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { MenuSheet } from '@/core/ui/MenuSheet';
+import { Modal } from '@/core/ui/Modal';
+import { PillChip } from '@/core/ui/PillChip';
 import type { WorkoutRoutine, RoutineWithExercises, WorkoutLog } from './types';
 import {
   addRoutine,
@@ -27,7 +29,22 @@ import {
   listSessionTotalsForRange,
   listWorkoutLogsForRange,
   duplicateRoutine,
+  listWeeklyPlan,
+  upsertWeeklyPlanEntry,
+  setWorkoutScheduleOverride,
+  rescheduleWorkoutDate,
+  resolveWorkoutScheduleForDate,
+  listBodyWeightEntries,
+  addBodyWeightEntry,
+  updateBodyWeightEntry,
+  deleteBodyWeightEntry,
+  listCustomExercises,
+  listWorkoutPerformanceRows,
+  getWorkoutPreferences,
+  saveWorkoutPreferences,
+  type WorkoutPerformanceRow,
   type WorkoutSessionDraft,
+  type WorkoutPreferences,
 } from '@/features/workout/workout.data';
 import {
   buildVolumePerWeek,
@@ -35,12 +52,22 @@ import {
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
   formatLastPerformedLabel,
+  computePersonalRecords,
+  computeTrainingTotals,
+  computeBodyAreaDistribution,
   type EnteredSetValues,
   type PhaseDisposition,
+  type ScheduleResolution,
 } from '@/features/workout/workout.domain';
+import type {
+  BodyWeightEntry,
+  CustomExercise,
+  WorkoutWeeklyPlanEntry,
+  WorkoutWeightUnit,
+} from '@/core/db/types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
-import { toDateKey } from '@/lib/time';
+import { isValidDateKey, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
 import { WorkoutSessionScreen, type SessionResume } from './WorkoutSessionScreen';
@@ -52,6 +79,14 @@ import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { validateRoutineName } from '@/lib/validation';
+import {
+  BodyWeightCard,
+  WorkoutProgressCard,
+  WorkoutTodayCard,
+  WorkoutTotalsCard,
+  WorkoutWeekCard,
+} from './WorkoutGymPanels';
+import { BUILT_IN_EXERCISES } from './exerciseCatalog';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -123,6 +158,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [workoutActivityDays, setWorkoutActivityDays] = useState<ActivityDay[]>([]);
   const [workoutHeatmapDays, setWorkoutHeatmapDays] = useState<HeatmapDay[]>([]);
   const [recentLogs, setRecentLogs] = useState<WorkoutLog[]>([]);
+  const [allLogs, setAllLogs] = useState<WorkoutLog[]>([]);
   const [weeklyVolume, setWeeklyVolume] = useState<ReturnType<typeof buildVolumePerWeek>>([]);
   const [detailLogId, setDetailLogId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>({ type: 'list' });
@@ -131,6 +167,24 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [draft, setDraft] = useState<WorkoutSessionDraft | null>(null);
   const [chooserVisible, setChooserVisible] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<Map<string, string>>(new Map());
+  const [todaySchedule, setTodaySchedule] = useState<ScheduleResolution | null>(null);
+  const [weeklyPlan, setWeeklyPlan] = useState<WorkoutWeeklyPlanEntry[]>([]);
+  const [todayRoutine, setTodayRoutine] = useState<RoutineWithExercises | null>(null);
+  const [bodyWeightEntries, setBodyWeightEntries] = useState<BodyWeightEntry[]>([]);
+  const [performanceRows, setPerformanceRows] = useState<WorkoutPerformanceRow[]>([]);
+  const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
+  const [selectedProgressExercise, setSelectedProgressExercise] = useState<string | null>(null);
+  const [weekEditorVisible, setWeekEditorVisible] = useState(false);
+  const [todayOverrideVisible, setTodayOverrideVisible] = useState(false);
+  const [rescheduleVisible, setRescheduleVisible] = useState(false);
+  const [rescheduleDateInput, setRescheduleDateInput] = useState('');
+  const [bodyWeightModalVisible, setBodyWeightModalVisible] = useState(false);
+  const [editingBodyWeight, setEditingBodyWeight] = useState<BodyWeightEntry | null>(null);
+  const [bodyWeightValue, setBodyWeightValue] = useState('');
+  const [bodyWeightUnit, setBodyWeightUnit] = useState<WorkoutWeightUnit>('kg');
+  const [bodyWeightNote, setBodyWeightNote] = useState('');
+  const [bodyWeightGoalValue, setBodyWeightGoalValue] = useState('');
+  const [workoutPreferences, setWorkoutPreferences] = useState<WorkoutPreferences | null>(null);
   useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
 
   const refresh = useCallback(async () => {
@@ -144,6 +198,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     const allLogs = await listWorkoutLogsForRange(startKey, endKey);
     setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 364));
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
+    setAllLogs(allLogs);
     setRecentLogs(allLogs.slice(0, 10));
 
     const volumeStart = new Date();
@@ -153,6 +208,22 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
 
     setLastPerformed(await getLastPerformedByRoutine());
     setDraft(await getWorkoutSessionDraft());
+    const todayKey = toDateKey(new Date());
+    const resolved = await resolveWorkoutScheduleForDate(todayKey);
+    setTodaySchedule(resolved);
+    setWeeklyPlan(await listWeeklyPlan());
+    setBodyWeightEntries(await listBodyWeightEntries());
+    setPerformanceRows(await listWorkoutPerformanceRows());
+    setCustomExercises(await listCustomExercises());
+    const preferences = await getWorkoutPreferences();
+    setWorkoutPreferences(preferences);
+    setBodyWeightGoalValue(preferences.goalWeight ? String(preferences.goalWeight.value) : '');
+    if (preferences.goalWeight) setBodyWeightUnit(preferences.goalWeight.unit);
+    if (resolved.routineId) {
+      setTodayRoutine(await getRoutineWithExercises(resolved.routineId));
+    } else {
+      setTodayRoutine(null);
+    }
   }, []);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
@@ -269,6 +340,64 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
   const workoutDaysCount = workoutActivityDays.filter((d) => d.active).length;
+  const personalRecords = computePersonalRecords(
+    performanceRows
+      .filter(
+        (row) =>
+          row.completed === 1 && (row.modality === null || row.modality === 'weighted_strength'),
+      )
+      .map((row) => ({ exerciseName: row.exerciseName, weight: row.weight, reps: row.reps })),
+  );
+  const performanceByLog = new Map<string, WorkoutPerformanceRow[]>();
+  for (const row of performanceRows) {
+    const bucket = performanceByLog.get(row.logId) ?? [];
+    bucket.push(row);
+    performanceByLog.set(row.logId, bucket);
+  }
+  const trainingTotals = computeTrainingTotals(
+    allLogs.map((log) => ({
+      completedAt: log.completed_at,
+      durationSeconds: log.duration_seconds,
+      sets: (performanceByLog.get(log.id) ?? []).map((row) => ({
+        completed: row.completed === 1,
+        weight: row.weight,
+        reps: row.reps,
+        modality: row.modality ?? undefined,
+      })),
+    })),
+  );
+  const catalogAreaById = new Map<string, string>([
+    ...BUILT_IN_EXERCISES.map((exercise) => [exercise.id, exercise.primaryArea] as const),
+    ...customExercises.map((exercise) => [exercise.id, exercise.primary_area] as const),
+  ]);
+  const bodyAreaDistribution = computeBodyAreaDistribution(
+    performanceRows
+      .filter((row) => row.completed === 1 && row.catalogExerciseId)
+      .map((row) => ({
+        primaryArea: catalogAreaById.get(row.catalogExerciseId ?? '') ?? '',
+        setsCompleted: 1,
+      })),
+  );
+
+  const openBodyWeightModal = (entry?: BodyWeightEntry) => {
+    setEditingBodyWeight(entry ?? null);
+    setBodyWeightValue(entry ? String(entry.weight) : '');
+    setBodyWeightUnit(entry?.unit ?? workoutPreferences?.goalWeight?.unit ?? 'kg');
+    setBodyWeightNote(entry?.note ?? '');
+    setBodyWeightModalVisible(true);
+  };
+
+  const handleDeleteBodyWeight = async (entry: BodyWeightEntry) => {
+    const confirmed = await confirm({
+      title: 'Delete body-weight entry',
+      message: `Delete the ${entry.weight} ${entry.unit} measurement?`,
+      confirmLabel: 'Delete entry',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    await deleteBodyWeightEntry(entry.id);
+    await refresh();
+  };
 
   if (currentView.type === 'session') {
     return (
@@ -293,6 +422,236 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
 
   return (
     <>
+      <Modal
+        visible={weekEditorVisible}
+        onClose={() => setWeekEditorVisible(false)}
+        title="Plan your week"
+        scroll
+      >
+        <Text className="mb-3 text-sm" style={{ color: tokens.textMuted }}>
+          This recurring template uses Monday–Sunday local calendar days. A date override never
+          edits these rows.
+        </Text>
+        <View className="gap-4">
+          {Array.from({ length: 7 }, (_, index) => index + 1).map((weekday) => (
+            <View key={weekday}>
+              <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
+                {
+                  ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][
+                    weekday - 1
+                  ]
+                }
+              </Text>
+              <View className="flex-row flex-wrap">
+                <PillChip
+                  label="Rest"
+                  active={
+                    weeklyPlan.find((entry) => entry.weekday === weekday)?.plan_kind === 'rest'
+                  }
+                  color={COLOR}
+                  onPress={() =>
+                    void upsertWeeklyPlanEntry({ weekday, planKind: 'rest', routineId: null }).then(
+                      refresh,
+                    )
+                  }
+                />
+                {routines.map((routine) => (
+                  <PillChip
+                    key={routine.id}
+                    label={routine.name}
+                    active={
+                      weeklyPlan.find((entry) => entry.weekday === weekday)?.routine_id ===
+                      routine.id
+                    }
+                    color={COLOR}
+                    onPress={() =>
+                      void upsertWeeklyPlanEntry({
+                        weekday,
+                        planKind: 'workout',
+                        routineId: routine.id,
+                      }).then(refresh)
+                    }
+                  />
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      </Modal>
+      <Modal
+        visible={todayOverrideVisible}
+        onClose={() => setTodayOverrideVisible(false)}
+        title="Change today"
+        scroll
+      >
+        <Text className="mb-3 text-sm" style={{ color: tokens.textMuted }}>
+          Choose a one-day override for {toDateKey(new Date())}. Your normal week remains unchanged.
+        </Text>
+        <View className="flex-row flex-wrap">
+          <PillChip
+            label="Rest today"
+            active={todaySchedule?.source === 'override' && todaySchedule.planKind === 'rest'}
+            color={COLOR}
+            onPress={() =>
+              void setWorkoutScheduleOverride({
+                dateKey: toDateKey(new Date()),
+                overrideKind: 'rest',
+              }).then(async () => {
+                setTodayOverrideVisible(false);
+                await refresh();
+              })
+            }
+          />
+          {routines.map((routine) => (
+            <PillChip
+              key={routine.id}
+              label={routine.name}
+              active={
+                todaySchedule?.source === 'override' && todaySchedule.routineId === routine.id
+              }
+              color={COLOR}
+              onPress={() =>
+                void setWorkoutScheduleOverride({
+                  dateKey: toDateKey(new Date()),
+                  overrideKind: 'workout',
+                  routineId: routine.id,
+                }).then(async () => {
+                  setTodayOverrideVisible(false);
+                  await refresh();
+                })
+              }
+            />
+          ))}
+        </View>
+      </Modal>
+      <Modal
+        visible={rescheduleVisible}
+        onClose={() => setRescheduleVisible(false)}
+        title="Move workout"
+      >
+        <Text className="mb-3 text-sm" style={{ color: tokens.textMuted }}>
+          Move this scheduled workout to a single date. The recurring week stays intact.
+        </Text>
+        <TextField
+          label="New date"
+          value={rescheduleDateInput}
+          onChangeText={setRescheduleDateInput}
+          placeholder="YYYY-MM-DD"
+        />
+        <Button
+          label="Move workout"
+          color={COLOR}
+          onPress={() => {
+            const fromDateKey = toDateKey(new Date());
+            const routineId = todaySchedule?.routineId ?? todayRoutine?.id;
+            if (!routineId || !isValidDateKey(rescheduleDateInput)) {
+              Alert.alert('Enter a date', 'Use a valid date as YYYY-MM-DD.');
+              return;
+            }
+            void rescheduleWorkoutDate({
+              fromDateKey,
+              toDateKey: rescheduleDateInput,
+              routineId,
+            }).then(async () => {
+              setRescheduleVisible(false);
+              await refresh();
+            });
+          }}
+        />
+      </Modal>
+      <Modal
+        visible={bodyWeightModalVisible}
+        onClose={() => setBodyWeightModalVisible(false)}
+        title={editingBodyWeight ? 'Edit body weight' : 'Log body weight'}
+      >
+        <TextField
+          label="Weight"
+          value={bodyWeightValue}
+          onChangeText={(value) => setBodyWeightValue(value.replace(/[^0-9.]/g, ''))}
+          placeholder="80.0"
+          keyboardType="numeric"
+        />
+        <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
+          Unit
+        </Text>
+        <View className="mb-3 flex-row">
+          <PillChip
+            label="kg"
+            active={bodyWeightUnit === 'kg'}
+            color={COLOR}
+            onPress={() => setBodyWeightUnit('kg')}
+          />
+          <PillChip
+            label="lb"
+            active={bodyWeightUnit === 'lb'}
+            color={COLOR}
+            onPress={() => setBodyWeightUnit('lb')}
+          />
+        </View>
+        <TextField
+          label="Note (optional)"
+          value={bodyWeightNote}
+          onChangeText={setBodyWeightNote}
+          placeholder="Morning, post-workout…"
+        />
+        <TextField
+          label="Goal weight (optional)"
+          value={bodyWeightGoalValue}
+          onChangeText={(value) => setBodyWeightGoalValue(value.replace(/[^0-9.]/g, ''))}
+          placeholder="75.0"
+          keyboardType="numeric"
+        />
+        <Button
+          label={editingBodyWeight ? 'Save changes' : 'Save weight and goal'}
+          color={COLOR}
+          onPress={() => {
+            const value = Number(bodyWeightValue);
+            const goal = Number(bodyWeightGoalValue);
+            const hasMeasurement = Number.isFinite(value) && value > 0;
+            const hasGoal =
+              bodyWeightGoalValue.trim() === '' || (Number.isFinite(goal) && goal > 0);
+            const clearingExistingGoal = workoutPreferences?.goalWeight != null;
+            if (!hasMeasurement && bodyWeightGoalValue.trim() === '' && !clearingExistingGoal) {
+              Alert.alert(
+                'Enter a weight or goal',
+                'Add a positive measurement, a goal weight, or both.',
+              );
+              return;
+            }
+            if (!hasGoal) {
+              Alert.alert('Enter a valid goal', 'Use a positive number for the goal weight.');
+              return;
+            }
+            void (async () => {
+              if (editingBodyWeight) {
+                await updateBodyWeightEntry(editingBodyWeight.id, {
+                  weight: value,
+                  unit: bodyWeightUnit,
+                  note: bodyWeightNote,
+                });
+              } else if (hasMeasurement) {
+                await addBodyWeightEntry({
+                  weight: value,
+                  unit: bodyWeightUnit,
+                  note: bodyWeightNote,
+                });
+              }
+              const nextPreferences: WorkoutPreferences = {
+                ...(workoutPreferences ?? { effortScale: 'off', workoutReminder: null }),
+                goalWeight:
+                  bodyWeightGoalValue.trim() === '' ? null : { value: goal, unit: bodyWeightUnit },
+              };
+              await saveWorkoutPreferences(nextPreferences);
+              setWorkoutPreferences(nextPreferences);
+              setBodyWeightValue('');
+              setBodyWeightNote('');
+              setEditingBodyWeight(null);
+              setBodyWeightModalVisible(false);
+              await refresh();
+            })();
+          }}
+        />
+      </Modal>
       <RoutineDetailModal
         visible={routineModal !== null}
         routineId={routineModal?.routineId ?? ''}
@@ -335,9 +694,50 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             title="Workout"
             subtitle={
               workoutStripHasActivity
-                ? 'Create simple routines, update exercises, and mark completions without leaving the tab.'
-                : 'Create simple routines and mark completions.'
+                ? 'Plan your week, build prescriptions, train with guidance, and review progress in one place.'
+                : 'Build a training plan, start a guided workout, and track your progress.'
             }
+          />
+        </ScreenSection>
+
+        <ScreenSection>
+          <WorkoutTodayCard
+            schedule={todaySchedule}
+            routine={todayRoutine}
+            lastPerformedAt={todayRoutine ? (lastPerformed.get(todayRoutine.id) ?? null) : null}
+            exerciseCount={todayRoutine?.exercises.length ?? 0}
+            setCount={
+              todayRoutine?.exercises.reduce(
+                (total, exercise) => total + exercise.sets.length,
+                0,
+              ) ?? 0
+            }
+            onStart={() => {
+              if (todayRoutine) void startRoutineById(todayRoutine.id);
+              else setChooserVisible(true);
+            }}
+            onPlanWeek={() => setWeekEditorVisible(true)}
+            onChangeToday={() => setTodayOverrideVisible(true)}
+            onReschedule={() => {
+              const next = new Date();
+              next.setDate(next.getDate() + 1);
+              setRescheduleDateInput(toDateKey(next));
+              setRescheduleVisible(true);
+            }}
+          />
+        </ScreenSection>
+
+        <ScreenSection>
+          <WorkoutWeekCard
+            entries={weeklyPlan}
+            routines={routines}
+            onSelect={(weekday, routineId) => {
+              void upsertWeeklyPlanEntry({
+                weekday,
+                planKind: routineId ? 'workout' : 'rest',
+                routineId,
+              }).then(refresh);
+            }}
           />
         </ScreenSection>
 
@@ -541,6 +941,30 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             })}
           </ScreenSection>
         ) : null}
+
+        <ScreenSection>
+          <WorkoutTotalsCard
+            sessions={trainingTotals.sessions}
+            sets={trainingTotals.completedSets}
+            durationSeconds={trainingTotals.durationSeconds}
+            volume={trainingTotals.measurableVolume}
+            trainingDays={trainingTotals.trainingDays}
+          />
+          <WorkoutProgressCard
+            rows={performanceRows}
+            records={personalRecords}
+            bodyAreas={bodyAreaDistribution}
+            selectedExercise={selectedProgressExercise}
+            onSelectExercise={setSelectedProgressExercise}
+          />
+          <BodyWeightCard
+            entries={bodyWeightEntries}
+            goalWeight={workoutPreferences?.goalWeight ?? null}
+            onAdd={() => openBodyWeightModal()}
+            onEdit={openBodyWeightModal}
+            onDelete={(entry) => void handleDeleteBodyWeight(entry)}
+          />
+        </ScreenSection>
 
         <ScreenSection className="mb-0">
           <Card

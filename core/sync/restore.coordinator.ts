@@ -9,6 +9,7 @@ import {
 import { applyRemoteCalorieEntries } from '@/features/calories/calories.data';
 import { applyRemoteHabits } from '@/features/habits/habits.data';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
+import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
 import { applyRemoteTodos } from '@/features/todos/todos.data';
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { nowIso } from '@/lib/time';
@@ -595,6 +596,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   }
 
   requestHabitReminderReconciliation();
+  requestWorkoutReminderReconciliation();
 
   return {
     status: 'restored',

@@ -14,6 +14,7 @@ import {
 } from './workout.domain';
 import { getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import type { WorkoutModality, WorkoutSessionSet } from '@/core/db/types';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -34,6 +35,39 @@ function formatSetLine(weight: number | null, reps: number | null): string {
   const weightText = weight === null ? '?' : String(weight);
   const repsText = reps === null ? '?' : String(reps);
   return `${weightText} × ${repsText}`;
+}
+
+function formatHistoricalSetLine(
+  set: WorkoutSessionSet,
+  modality: WorkoutModality | null | undefined,
+): string {
+  if (set.completed !== 1) return 'skipped';
+
+  const effort =
+    set.effort_value != null && set.effort_scale
+      ? ` · ${set.effort_scale.toUpperCase()} ${set.effort_value}`
+      : '';
+
+  if (modality === 'timed') {
+    return `${set.duration_seconds == null ? 'duration not recorded' : `${set.duration_seconds}s`}${effort}`;
+  }
+
+  if (modality === 'cardio') {
+    const details = [
+      set.duration_seconds == null ? null : `${set.duration_seconds}s`,
+      set.distance == null ? null : `${set.distance} distance`,
+      set.pace == null ? null : `pace ${set.pace}`,
+    ].filter((value): value is string => value !== null);
+    return `${details.length > 0 ? details.join(' · ') : 'not recorded'}${effort}`;
+  }
+
+  if (modality === 'bodyweight') {
+    const reps = set.reps == null ? 'reps not recorded' : `${set.reps} reps`;
+    const load = set.weight == null ? '' : ` · +${set.weight} ${set.weight_unit ?? ''}`.trimEnd();
+    return `${reps}${load}${effort}`;
+  }
+
+  return `${formatSetLine(set.weight, set.reps)}${effort}`;
 }
 
 /** Whole numbers stay bare; fractional totals keep one decimal. */
@@ -81,6 +115,9 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
   const exerciseNameById = new Map(
     (detail?.exercises ?? []).map((ex) => [ex.id, ex.exercise_name]),
   );
+  const modalityByExerciseId = new Map(
+    (detail?.exercises ?? []).map((ex) => [ex.id, ex.modality ?? null]),
+  );
   const loggedSets: LoggedSet[] = (detail?.sets ?? [])
     .filter((set) => set.completed === 1)
     .flatMap((set) => {
@@ -94,6 +131,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
       weight: set.weight,
       reps: set.reps,
       completed: set.completed === 1,
+      modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
     })),
   );
 
@@ -197,8 +235,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
                     <View className="mt-2">
                       {exerciseSets.map((set) => (
                         <Text key={set.id} className="text-xs" style={{ color: tokens.textMuted }}>
-                          Set {set.set_number}:{' '}
-                          {set.completed === 1 ? formatSetLine(set.weight, set.reps) : 'skipped'}
+                          Set {set.set_number}: {formatHistoricalSetLine(set, ex.modality)}
                         </Text>
                       ))}
                     </View>
@@ -222,8 +259,8 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
             </Text>
             {prs.length === 0 ? (
               <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                No weighted sets recorded yet. PR tracking activates once sets record weight and
-                reps.
+                No eligible strength sets recorded yet. PR tracking activates for weighted sets with
+                a valid load and rep count.
               </Text>
             ) : (
               prs.map((pr) => (

@@ -124,7 +124,14 @@ export type PomodoroSession = {
 export type WorkoutRoutine = BaseEntity & {
   name: string;
   description: string | null;
+  /** Optional user-facing training goal/tag (Gym V2). */
+  goal_tag?: string | null;
 };
+
+export type WorkoutModality = 'weighted_strength' | 'bodyweight' | 'timed' | 'cardio';
+export type WorkoutEffortScale = 'off' | 'rir' | 'rpe';
+export type WorkoutProgressionMode = 'none' | 'linear' | 'double';
+export type WorkoutWeightUnit = 'kg' | 'lb';
 
 export type WorkoutLog = {
   id: string;
@@ -137,12 +144,25 @@ export type WorkoutLog = {
   started_at?: string | null;
   ended_at?: string | null;
   duration_seconds?: number | null;
+  /** Snapshot added by Gym V2; legacy logs fall back to the live routine name. */
+  routine_name?: string | null;
+  /** `quick` keeps content-light linked/manual logs distinct from guided sessions. */
+  session_kind?: 'quick' | 'guided';
 };
 
 export type RoutineExercise = BaseEntity & {
   routine_id: string;
   name: string;
   sort_order: number;
+  /** Built-in or custom catalog id; NULL preserves legacy free-text rows. */
+  catalog_exercise_id?: string | null;
+  modality?: WorkoutModality;
+  notes?: string | null;
+  superset_group?: string | null;
+  progression_mode?: WorkoutProgressionMode;
+  progression_increment?: number | null;
+  progression_min_reps?: number | null;
+  progression_max_reps?: number | null;
 };
 
 export type RoutineExerciseSet = BaseEntity & {
@@ -150,6 +170,12 @@ export type RoutineExerciseSet = BaseEntity & {
   set_number: number;
   active_seconds: number;
   rest_seconds: number;
+  target_reps_min?: number | null;
+  target_reps_max?: number | null;
+  target_load?: number | null;
+  target_duration_seconds?: number | null;
+  target_distance?: number | null;
+  target_pace?: number | null;
 };
 
 export type WorkoutSessionExercise = {
@@ -158,6 +184,8 @@ export type WorkoutSessionExercise = {
   exercise_name: string;
   sets_completed: number;
   created_at: string;
+  catalog_exercise_id?: string | null;
+  modality?: WorkoutModality;
 };
 
 /** Per-set load/reps actually performed in a session (migration 20).
@@ -172,6 +200,46 @@ export type WorkoutSessionSet = {
   weight_unit: 'kg' | 'lb' | null;
   completed: 0 | 1;
   created_at: string;
+  duration_seconds?: number | null;
+  distance?: number | null;
+  pace?: number | null;
+  effort_value?: number | null;
+  effort_scale?: Exclude<WorkoutEffortScale, 'off'> | null;
+};
+
+export type CustomExercise = BaseEntity & {
+  name: string;
+  description: string | null;
+  primary_area: string;
+  secondary_areas: string;
+  equipment: string | null;
+  modality: WorkoutModality;
+  unilateral: 0 | 1;
+};
+
+export type WorkoutPlanKind = 'workout' | 'rest';
+
+export type WorkoutWeeklyPlanEntry = BaseEntity & {
+  weekday: number;
+  routine_id: string | null;
+  plan_kind: WorkoutPlanKind;
+  note: string | null;
+};
+
+export type WorkoutScheduleOverride = BaseEntity & {
+  date_key: string;
+  override_kind: WorkoutPlanKind;
+  routine_id: string | null;
+  moved_from_date_key: string | null;
+  note: string | null;
+};
+
+export type BodyWeightEntry = BaseEntity & {
+  measured_on: string;
+  measured_at: string;
+  weight: number;
+  unit: WorkoutWeightUnit;
+  note: string | null;
 };
 
 export type CalorieEntry = BaseEntity & {

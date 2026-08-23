@@ -5,9 +5,11 @@ import {
   BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
   BACKUP_SCOPE_V4_ENTITY_COLUMNS,
+  BACKUP_SCOPE_V5_ENTITY_COLUMNS,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET,
   PORTABLE_V1_ENTITY_COLUMNS,
   type BackupEntity,
 } from '@/core/backup/backup.types';
@@ -262,8 +264,8 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   // (formatVersion 1) are identified by their EXACT entity set; the known
   // historical epochs are the 12-entity pre-Weekly-Review scope, the 13-entity
   // Weekly-Review scope, and the 16-entity planning scope. FormatVersion-2
-  // files carry an explicit scope version and may be scope 4 (frozen V4
-  // columns) or the current scope — a future scope is rejected as requiring a
+  // files carry an explicit scope version and may be scope 4/5 (frozen
+  // historical columns) or the current scope — a future scope is rejected as requiring a
   // newer app. Any other/partial set is rejected — scope is never inferred
   // permissively ("missing table = empty").
   let scopeEntities: readonly BackupEntity[];
@@ -287,10 +289,12 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       explicitScope === BACKUP_SCOPE_VERSION;
     const isHistoricalScope4 =
       typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 4;
+    const isHistoricalScope5 =
+      typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 5;
     if (
       typeof explicitScope !== 'number' ||
       !Number.isInteger(explicitScope) ||
-      (!isCurrentScope && !isHistoricalScope4)
+      (!isCurrentScope && !isHistoricalScope4 && !isHistoricalScope5)
     ) {
       errors.push(
         `This file uses backup scope version ${String(input.backupScopeVersion)}, which this app cannot import.`,
@@ -299,7 +303,9 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     }
     const expectedEntities: readonly BackupEntity[] = isCurrentScope
       ? BACKUP_ENTITIES
-      : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
+      : isHistoricalScope5
+        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET
+        : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
     const missing = [...expectedEntities].filter((entity) => !(entity in entities));
     const unknown = entityKeys.filter(
       (key) => !(expectedEntities as readonly string[]).includes(key),
@@ -316,7 +322,9 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     scopeEntities = expectedEntities;
     scopeColumns = isCurrentScope
       ? BACKUP_ENTITY_COLUMNS
-      : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
+      : isHistoricalScope5
+        ? (BACKUP_SCOPE_V5_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>)
+        : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
   }
 
   for (const entity of scopeEntities) {
@@ -392,8 +400,20 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   const isCurrentSettingsVersion = settingsVersion === BACKUP_SETTINGS_VERSION;
   const isHistoricalSettingsV2 = settingsVersion === 2;
   const isHistoricalSettingsV3 = settingsVersion === 3;
-  const historicalVersion = isHistoricalSettingsV2 ? 2 : isHistoricalSettingsV3 ? 3 : undefined;
-  if (!isCurrentSettingsVersion && !isHistoricalSettingsV2 && !isHistoricalSettingsV3) {
+  const isHistoricalSettingsV4 = settingsVersion === 4;
+  const historicalVersion = isHistoricalSettingsV2
+    ? 2
+    : isHistoricalSettingsV3
+      ? 3
+      : isHistoricalSettingsV4
+        ? 4
+        : undefined;
+  if (
+    !isCurrentSettingsVersion &&
+    !isHistoricalSettingsV2 &&
+    !isHistoricalSettingsV3 &&
+    !isHistoricalSettingsV4
+  ) {
     errors.push(`The file carries an unsupported settings version ${String(settings.version)}.`);
   }
   if (typeof settings.checksum !== 'string' || !HEX64.test(settings.checksum)) {

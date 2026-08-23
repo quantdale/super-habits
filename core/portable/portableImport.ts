@@ -29,8 +29,11 @@ import {
 import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 import { nowIso } from '@/lib/time';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
+import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
 import type {
   CalorieEntry,
+  BodyWeightEntry,
+  CustomExercise,
   DailyPlan,
   Goal,
   Habit,
@@ -45,6 +48,8 @@ import type {
   WorkoutRoutine,
   WorkoutSessionExercise,
   WorkoutSessionSet,
+  WorkoutScheduleOverride,
+  WorkoutWeeklyPlanEntry,
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
@@ -65,6 +70,10 @@ import {
   applyRemoteWorkoutRoutines,
   applyRemoteWorkoutSessionExercises,
   applyRemoteWorkoutSessionSets,
+  applyRemoteBodyWeightEntries,
+  applyRemoteCustomExercises,
+  applyRemoteWorkoutScheduleOverrides,
+  applyRemoteWorkoutWeeklyPlan,
 } from '@/features/workout/workout.data';
 import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
 import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
@@ -312,6 +321,7 @@ export async function confirmPortableImport(input: {
       );
       await applyRemoteCalorieEntries(transactionDb, typed<CalorieEntry[]>('calorie_entries'));
       await applyRemoteSavedMeals(transactionDb, typed<SavedMeal[]>('saved_meals'));
+      await applyRemoteCustomExercises(transactionDb, typed<CustomExercise[]>('custom_exercises'));
       await applyRemoteWorkoutRoutines(transactionDb, typed<WorkoutRoutine[]>('workout_routines'));
       await applyRemoteRoutineExercises(
         transactionDb,
@@ -329,6 +339,18 @@ export async function confirmPortableImport(input: {
       await applyRemoteWorkoutSessionSets(
         transactionDb,
         typed<WorkoutSessionSet[]>('workout_session_sets'),
+      );
+      await applyRemoteWorkoutWeeklyPlan(
+        transactionDb,
+        typed<WorkoutWeeklyPlanEntry[]>('workout_weekly_plan'),
+      );
+      await applyRemoteWorkoutScheduleOverrides(
+        transactionDb,
+        typed<WorkoutScheduleOverride[]>('workout_schedule_overrides'),
+      );
+      await applyRemoteBodyWeightEntries(
+        transactionDb,
+        typed<BodyWeightEntry[]>('body_weight_entries'),
       );
       await applyRemotePomodoroSessions(
         transactionDb,
@@ -393,6 +415,7 @@ export async function confirmPortableImport(input: {
   // then ONLY current/future reminder scheduling.
   await applyPendingThemeApplication();
   requestHabitReminderReconciliation();
+  requestWorkoutReminderReconciliation();
 
   // If a durable owner now exists, enqueue the imported state for that
   // owner's cloud backup (never claims completeness; the checkpoint cycle

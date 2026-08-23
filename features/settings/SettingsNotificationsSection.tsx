@@ -14,6 +14,13 @@ import { syncDailyPlanReminder } from '@/core/notifications/dailyPlanReminderSch
 import { syncWeeklyReviewReminder } from '@/core/notifications/weeklyReviewReminderScheduler';
 import type { WeeklyReviewWeekday } from '@/features/weekly-review/weeklyReviewReminder.domain';
 import { reconcileTodoReminders } from '@/core/notifications/todoReminderScheduler';
+import { reconcileWorkoutDayReminder } from '@/core/notifications/workoutReminderScheduler';
+import {
+  getWorkoutPreferences,
+  saveWorkoutPreferences,
+  type WorkoutPreferences,
+} from '@/features/workout/workout.data';
+import type { WorkoutEffortScale } from '@/core/db/types';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { ValidationError } from '@/core/ui/ValidationError';
@@ -47,6 +54,10 @@ export function SettingsNotificationsSection() {
   const [weeklyEnabled, setWeeklyEnabledState] = useState(false);
   const [weeklyWeekday, setWeeklyWeekday] = useState<WeeklyReviewWeekday>(0);
   const [weeklyTimeInput, setWeeklyTimeInput] = useState('18:00');
+  const [workoutReminderEnabled, setWorkoutReminderEnabled] = useState(false);
+  const [workoutReminderTimeInput, setWorkoutReminderTimeInput] = useState('07:00');
+  const [effortScale, setEffortScale] = useState<WorkoutEffortScale>('off');
+  const [workoutPreferences, setWorkoutPreferences] = useState<WorkoutPreferences | null>(null);
   const [permissionLabel, setPermissionLabel] = useState('Checking…');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,11 +67,12 @@ export function SettingsNotificationsSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [enabled, time, permission, weekly] = await Promise.all([
+      const [enabled, time, permission, weekly, workout] = await Promise.all([
         getTodoRemindersEnabled(),
         getDailyPlanReminderTime(),
         getNotificationPermissionState(),
         getWeeklyReviewReminder(),
+        getWorkoutPreferences(),
       ]);
       setTodoRemindersEnabledState(enabled);
       setWeeklyEnabledState(weekly.enabled);
@@ -70,6 +82,12 @@ export function SettingsNotificationsSection() {
       );
       setDailyPlanTimeInput(
         `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`,
+      );
+      setWorkoutPreferences(workout);
+      setEffortScale(workout.effortScale);
+      setWorkoutReminderEnabled(workout.workoutReminder?.enabled ?? false);
+      setWorkoutReminderTimeInput(
+        `${String(workout.workoutReminder?.time.hour ?? 7).padStart(2, '0')}:${String(workout.workoutReminder?.time.minute ?? 0).padStart(2, '0')}`,
       );
       setPermissionLabel(
         permission === 'granted'
@@ -255,6 +273,102 @@ export function SettingsNotificationsSection() {
     }
   };
 
+  const handleChangeEffortScale = async (nextScale: WorkoutEffortScale) => {
+    const current = workoutPreferences;
+    if (!current) return;
+    setSaving(true);
+    setError(null);
+    setSavedNote(null);
+    try {
+      const next = { ...current, effortScale: nextScale };
+      await saveWorkoutPreferences(next);
+      setWorkoutPreferences(next);
+      setEffortScale(nextScale);
+      setSavedNote(
+        nextScale === 'off'
+          ? 'Effort tracking off.'
+          : `${nextScale.toUpperCase()} tracking enabled.`,
+      );
+    } catch (err) {
+      console.error('[SettingsNotificationsSection] effort scale save failed', err);
+      setError('Unable to save the effort scale right now.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reconcileWorkoutReminder = async (enabled: boolean, timeInput: string) => {
+    const normalized = normalizeTimeOfDayInput(timeInput);
+    if (!normalized) {
+      setError('Enter a valid workout reminder time as HH:mm (24-hour), e.g. 07:00.');
+      return;
+    }
+    const [hour, minute] = normalized.split(':').map(Number) as [number, number];
+    const current = workoutPreferences;
+    if (!current) return;
+    const next: WorkoutPreferences = {
+      ...current,
+      workoutReminder: { enabled, time: { hour, minute } },
+    };
+    await saveWorkoutPreferences(next);
+    setWorkoutPreferences(next);
+    setWorkoutReminderEnabled(enabled);
+    setWorkoutReminderTimeInput(normalized);
+    const result = await reconcileWorkoutDayReminder();
+    if (result.status === 'permission_denied') {
+      setError('Notification access is blocked in system settings.');
+    } else if (result.status === 'unsupported') {
+      setSavedNote('Saved on this device. Native workout reminders are unavailable on web.');
+    } else if (result.status === 'disabled') {
+      setSavedNote('Workout-day reminders off.');
+    } else {
+      setSavedNote(
+        result.scheduled > 0
+          ? `Workout-day reminders on. ${result.scheduled} upcoming reminder(s) scheduled.`
+          : 'Workout-day reminders on. No upcoming training days are in the scheduling window.',
+      );
+    }
+  };
+
+  const handleToggleWorkoutReminder = async (enabled: boolean) => {
+    setSaving(true);
+    setError(null);
+    setSavedNote(null);
+    try {
+      if (enabled && Platform.OS !== 'web') {
+        const permission = await requestTodoReminderPermission();
+        if (permission !== 'granted') {
+          setError(
+            permission === 'denied'
+              ? 'Notifications are blocked. Enable them in system settings, then turn the workout reminder on again.'
+              : 'Native reminders are available on Android and iOS only.',
+          );
+          return;
+        }
+      }
+      await reconcileWorkoutReminder(enabled, workoutReminderTimeInput);
+    } catch (err) {
+      console.error('[SettingsNotificationsSection] workout reminder toggle failed', err);
+      setError('Unable to update the workout-day reminder right now.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveWorkoutReminderTime = async () => {
+    setSaving(true);
+    setError(null);
+    setSavedNote(null);
+    try {
+      await reconcileWorkoutReminder(workoutReminderEnabled, workoutReminderTimeInput);
+    } catch (err) {
+      console.error('[SettingsNotificationsSection] workout reminder time save failed', err);
+      setError('Unable to save the workout-day reminder time right now.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <ScreenSection>
       <SettingsSectionHeading
@@ -428,6 +542,105 @@ export function SettingsNotificationsSection() {
               </Text>
             </Pressable>
             <SettingsStatusPill label="Weekly" tone="accent" accentColor={ACCENT} />
+          </View>
+        </View>
+
+        <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Workout-day reminder
+          </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            Optional reminders follow your weekly plan and date overrides. Rest days never schedule
+            a reminder.
+          </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            {Platform.OS === 'web'
+              ? 'Saved locally, but browser notification delivery is unavailable here.'
+              : 'Native apps schedule upcoming training days; notification access is controlled by the system.'}
+          </Text>
+          <View className="mt-2 flex-row items-center justify-between">
+            <Switch
+              accessibilityLabel="Workout-day reminder"
+              value={workoutReminderEnabled}
+              disabled={loading || saving || workoutPreferences === null}
+              onValueChange={(value) => void handleToggleWorkoutReminder(value)}
+              trackColor={{ true: ACCENT, false: tokens.surfaceElevated }}
+            />
+            <SettingsStatusPill
+              label={workoutReminderEnabled ? 'On' : 'Off'}
+              tone={workoutReminderEnabled ? 'accent' : 'neutral'}
+              accentColor={ACCENT}
+            />
+          </View>
+          <View className="mt-2 flex-row items-center gap-2">
+            <TextInput
+              accessibilityLabel="Workout reminder time"
+              className="w-24 rounded-xl border px-3 py-2 text-sm"
+              style={{
+                borderColor: tokens.border,
+                backgroundColor: tokens.surfaceElevated,
+                color: tokens.text,
+              }}
+              value={workoutReminderTimeInput}
+              placeholder="07:00"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              editable={!loading && !saving && workoutPreferences !== null}
+              onChangeText={(value) => {
+                setError(null);
+                setSavedNote(null);
+                setWorkoutReminderTimeInput(value);
+              }}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save workout reminder time"
+              className="rounded-full px-4 py-2"
+              style={{ backgroundColor: `${ACCENT}18`, opacity: loading || saving ? 0.5 : 1 }}
+              disabled={loading || saving || workoutPreferences === null}
+              onPress={() => void handleSaveWorkoutReminderTime()}
+            >
+              <Text className="text-sm font-semibold" style={{ color: ACCENT }}>
+                {saving ? 'Saving…' : 'Save'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Set effort scale
+          </Text>
+          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            Choose an optional scale to record with each guided set. Historical entries keep their
+            scale.
+          </Text>
+          <View className="mt-2 flex-row flex-wrap gap-2">
+            {(['off', 'rir', 'rpe'] as WorkoutEffortScale[]).map((scale) => {
+              const active = effortScale === scale;
+              return (
+                <Pressable
+                  key={scale}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Set effort scale ${scale.toUpperCase()}`}
+                  accessibilityState={{ selected: active }}
+                  disabled={loading || saving || workoutPreferences === null}
+                  onPress={() => void handleChangeEffortScale(scale)}
+                  className="rounded-xl border px-3 py-2"
+                  style={{
+                    borderColor: active ? ACCENT : tokens.border,
+                    backgroundColor: active ? `${ACCENT}18` : tokens.surfaceElevated,
+                  }}
+                >
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: active ? ACCENT : tokens.textMuted }}
+                  >
+                    {scale === 'off' ? 'Off' : scale.toUpperCase()}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 

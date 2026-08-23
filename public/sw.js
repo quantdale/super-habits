@@ -20,7 +20,7 @@
 // fail the install loudly instead of silently producing an offline-dead
 // shell.
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `superhabits-shell-${CACHE_VERSION}`;
 
 // E2E hook: scripts/serve-e2e.js rewrites this constant to `true` when it

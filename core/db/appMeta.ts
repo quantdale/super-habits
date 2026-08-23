@@ -52,6 +52,8 @@ export const appMetaKeys = {
   pomodoroPendingLogs: defineJsonKey('pomodoro.pending_logs', 'pomodoro'),
   /** Default workout rest seconds (recoverable-settings V3 source). */
   workoutRestSeconds: defineJsonKey('workout_rest_seconds', 'workout'),
+  /** Gym V2 effort scale, body-weight goal, and workout-day reminder settings. */
+  workoutPreferences: defineJsonKey('workout_preferences', 'workout'),
   /** Durable in-progress workout session draft for resume after restart.
    *  Local operational state — never backed up. */
   workoutActiveSessionDraft: defineJsonKey('workout.active_session_draft', 'workout'),

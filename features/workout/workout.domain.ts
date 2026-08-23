@@ -1,5 +1,15 @@
 import type { WorkoutLog } from './types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import type {
+  BodyWeightEntry,
+  WorkoutEffortScale,
+  WorkoutModality,
+  WorkoutPlanKind,
+  WorkoutProgressionMode,
+  WorkoutScheduleOverride,
+  WorkoutWeeklyPlanEntry,
+  WorkoutWeightUnit,
+} from '@/core/db/types';
 import {
   buildDateRange,
   buildDateRangeOldestFirst,
@@ -87,15 +97,31 @@ export type TimerPhase = {
   totalSets: number;
   phase: 'active' | 'rest';
   durationSeconds: number;
+  modality?: WorkoutModality;
+  supersetGroup?: string | null;
+  targetRepsMin?: number | null;
+  targetRepsMax?: number | null;
+  targetLoad?: number | null;
+  targetDurationSeconds?: number | null;
+  targetDistance?: number | null;
+  targetPace?: number | null;
 };
 
 export function buildTimerSequence(
   exercises: {
     name: string;
+    modality?: WorkoutModality;
+    superset_group?: string | null;
     sets: {
       set_number: number;
       active_seconds: number;
       rest_seconds: number;
+      target_reps_min?: number | null;
+      target_reps_max?: number | null;
+      target_load?: number | null;
+      target_duration_seconds?: number | null;
+      target_distance?: number | null;
+      target_pace?: number | null;
     }[];
   }[],
 ): TimerPhase[] {
@@ -109,10 +135,31 @@ export function buildTimerSequence(
         setNumber: set.set_number,
         totalSets: exercise.sets.length,
         phase: 'active',
-        durationSeconds: set.active_seconds,
+        durationSeconds:
+          (exercise.modality === 'timed' || exercise.modality === 'cardio') &&
+          set.target_duration_seconds != null
+            ? set.target_duration_seconds
+            : set.active_seconds,
+        ...(exercise.modality ? { modality: exercise.modality } : {}),
+        ...(exercise.superset_group !== undefined
+          ? { supersetGroup: exercise.superset_group }
+          : {}),
+        ...(set.target_reps_min !== undefined ? { targetRepsMin: set.target_reps_min } : {}),
+        ...(set.target_reps_max !== undefined ? { targetRepsMax: set.target_reps_max } : {}),
+        ...(set.target_load !== undefined ? { targetLoad: set.target_load } : {}),
+        ...(set.target_duration_seconds !== undefined
+          ? { targetDurationSeconds: set.target_duration_seconds }
+          : {}),
+        ...(set.target_distance !== undefined ? { targetDistance: set.target_distance } : {}),
+        ...(set.target_pace !== undefined ? { targetPace: set.target_pace } : {}),
       });
+      const nextExercise = exercises[exIndex + 1];
+      const staysInsideSuperset =
+        set.set_number === exercise.sets.length &&
+        Boolean(exercise.superset_group) &&
+        nextExercise?.superset_group === exercise.superset_group;
       const isLastSet = exIndex === exercises.length - 1 && set.set_number === exercise.sets.length;
-      if (!isLastSet) {
+      if (!isLastSet && !staysInsideSuperset) {
         sequence.push({
           exerciseName: exercise.name,
           exerciseIndex: exIndex,
@@ -120,6 +167,10 @@ export function buildTimerSequence(
           totalSets: exercise.sets.length,
           phase: 'rest',
           durationSeconds: set.rest_seconds,
+          ...(exercise.modality ? { modality: exercise.modality } : {}),
+          ...(exercise.superset_group !== undefined
+            ? { supersetGroup: exercise.superset_group }
+            : {}),
         });
       }
     });
@@ -157,6 +208,9 @@ export type PersonalRecord = {
 export function estimate1RM(weight: number, reps: number): number {
   if (!Number.isFinite(weight) || !Number.isFinite(reps)) return 0;
   if (weight <= 0 || reps <= 0) return 0;
+  // Epley becomes noisy and deceptive at very high reps; keep PRs useful for
+  // normal strength work and leave endurance/timed metrics to their own views.
+  if (reps > 30) return 0;
   if (reps === 1) return weight;
   return weight * (1 + reps / 30);
 }
@@ -173,7 +227,8 @@ export function isValidLoggedSet(set: LoggedSet): set is ValidLoggedSet {
     Number.isFinite(set.weight) &&
     Number.isFinite(set.reps) &&
     set.weight > 0 &&
-    set.reps > 0
+    set.reps > 0 &&
+    set.reps <= 30
   );
 }
 
@@ -256,15 +311,69 @@ export function computeSessionTotalSets(sessionExercises: { setsCompleted: numbe
  * skipped — unknown contributes nothing rather than fabricating volume.
  */
 export function computeSessionTotalVolume(
-  sets: { weight: number | null; reps: number | null; completed: boolean }[],
+  sets: {
+    weight: number | null;
+    reps: number | null;
+    completed: boolean;
+    modality?: WorkoutModality;
+  }[],
 ): number {
   let total = 0;
   for (const set of sets) {
-    if (!set.completed || set.weight === null || set.reps === null) continue;
+    if (
+      !set.completed ||
+      set.weight === null ||
+      set.reps === null ||
+      (set.modality !== undefined &&
+        set.modality !== 'weighted_strength' &&
+        set.modality !== 'bodyweight')
+    )
+      continue;
     if (!Number.isFinite(set.weight) || !Number.isFinite(set.reps)) continue;
     total += set.weight * set.reps;
   }
   return total;
+}
+
+/** Modality-aware volume: only known load × reps is measurable. */
+export function computeModalityVolume(input: {
+  modality: WorkoutModality;
+  weight: number | null;
+  reps: number | null;
+  completed: boolean;
+}): number | null {
+  if (
+    !input.completed ||
+    input.weight === null ||
+    input.reps === null ||
+    !Number.isFinite(input.weight) ||
+    !Number.isFinite(input.reps) ||
+    input.weight < 0 ||
+    input.reps < 0 ||
+    (input.modality !== 'weighted_strength' && input.modality !== 'bodyweight')
+  ) {
+    return null;
+  }
+  // For bodyweight this is additional external load only; the app never
+  // pretends to know the user's body mass.
+  return input.weight * input.reps;
+}
+
+export type NormalizedEffort = {
+  scale: Exclude<WorkoutEffortScale, 'off'>;
+  value: number;
+} | null;
+
+export function normalizeEffort(
+  scale: string | null | undefined,
+  value: number | string | null | undefined,
+): NormalizedEffort {
+  if (scale !== 'rir' && scale !== 'rpe') return null;
+  const parsed = typeof value === 'string' ? Number(value.trim()) : value;
+  if (typeof parsed !== 'number' || !Number.isFinite(parsed)) return null;
+  if (scale === 'rir' && (parsed < 0 || parsed > 10)) return null;
+  if (scale === 'rpe' && (parsed < 1 || parsed > 10)) return null;
+  return { scale, value: Math.round(parsed * 10) / 10 };
 }
 
 export type WeeklyVolumePoint = {
@@ -289,9 +398,10 @@ function mondayDateKeyFor(timestampIso: string): string {
 export function buildVolumePerWeek(
   sessions: { completedAt: string; totalSets: number }[],
   weeks: number = 8,
+  asOf: Date = new Date(),
 ): WeeklyVolumePoint[] {
   const buckets = new Map<string, { totalSets: number; sessions: number }>();
-  const today = new Date();
+  const today = new Date(asOf);
   today.setDate(today.getDate() - ((today.getDay() + 6) % 7));
   const orderedWeekKeys: string[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
@@ -329,20 +439,42 @@ export function buildVolumePerWeek(
 export function applyRestDefault(
   exercises: {
     name: string;
+    modality?: WorkoutModality;
+    superset_group?: string | null;
     sets: {
       set_number: number;
       active_seconds: number;
       rest_seconds: number;
+      target_reps_min?: number | null;
+      target_reps_max?: number | null;
+      target_load?: number | null;
+      target_duration_seconds?: number | null;
+      target_distance?: number | null;
+      target_pace?: number | null;
     }[];
   }[],
   defaultRestSeconds: number,
 ): {
   name: string;
-  sets: { set_number: number; active_seconds: number; rest_seconds: number }[];
+  modality?: WorkoutModality;
+  superset_group?: string | null;
+  sets: {
+    set_number: number;
+    active_seconds: number;
+    rest_seconds: number;
+    target_reps_min?: number | null;
+    target_reps_max?: number | null;
+    target_load?: number | null;
+    target_duration_seconds?: number | null;
+    target_distance?: number | null;
+    target_pace?: number | null;
+  }[];
 }[] {
   if (!Number.isFinite(defaultRestSeconds) || defaultRestSeconds <= 0) return exercises;
   return exercises.map((ex) => ({
     name: ex.name,
+    ...(ex.modality !== undefined ? { modality: ex.modality } : {}),
+    ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
     sets: ex.sets.map((set) => ({
       ...set,
       rest_seconds: set.rest_seconds > 0 ? set.rest_seconds : Math.round(defaultRestSeconds),
@@ -357,8 +489,15 @@ export function applyRestDefault(
  */
 export type PhaseDisposition = 'completed' | 'skipped';
 
-/** Free-text weight/reps entry captured per active phase (raw input strings). */
-export type EnteredSetValues = { weight: string; reps: string };
+/** Free-text values captured per active phase (raw input strings). */
+export type EnteredSetValues = {
+  weight: string;
+  reps: string;
+  duration?: string;
+  distance?: string;
+  pace?: string;
+  effort?: string;
+};
 
 /** One recorded active phase, ready to persist as a workout_session_sets row. */
 export type SessionSetRecord = {
@@ -369,6 +508,11 @@ export type SessionSetRecord = {
   /** null = not recorded (unknown). */
   reps: number | null;
   completed: boolean;
+  durationSeconds?: number | null;
+  distance?: number | null;
+  pace?: number | null;
+  effortValue?: number | null;
+  effortScale?: Exclude<WorkoutEffortScale, 'off'> | null;
 };
 
 /**
@@ -415,19 +559,42 @@ export function collectSessionSetRecords(
   completedUpToIndex: number,
   dispositions: Readonly<Record<number, PhaseDisposition>>,
   enteredValues: Readonly<Record<number, EnteredSetValues>>,
+  effortScale: WorkoutEffortScale = 'off',
 ): SessionSetRecord[] {
   const records: SessionSetRecord[] = [];
   for (let i = 0; i <= completedUpToIndex; i++) {
     const phase = sequence[i];
     if (!phase || phase.phase !== 'active') continue;
     const entered = enteredValues[i];
-    records.push({
+    const isExplicitTimed = phase.modality === 'timed' || phase.modality === 'cardio';
+    const record: SessionSetRecord = {
       exerciseName: phase.exerciseName,
       setNumber: phase.setNumber,
-      weight: parseOptionalMeasurement(entered?.weight),
-      reps: parseOptionalMeasurement(entered?.reps),
+      // A missing modality is the legacy free-text compatibility path and is
+      // intentionally treated like the historic weighted entry flow. Known
+      // timed/cardio catalog exercises never get fabricated weight × reps.
+      weight: isExplicitTimed ? null : parseOptionalMeasurement(entered?.weight),
+      reps: isExplicitTimed ? null : parseOptionalMeasurement(entered?.reps),
       completed: dispositions[i] !== 'skipped',
-    });
+    };
+    if (isExplicitTimed) {
+      record.durationSeconds =
+        parseOptionalMeasurement(entered?.duration) ??
+        (record.completed ? Math.max(0, Math.round(phase.durationSeconds)) : null);
+    }
+    if (phase.modality === 'cardio') {
+      record.distance = parseOptionalMeasurement(entered?.distance);
+      record.pace = parseOptionalMeasurement(entered?.pace);
+    }
+    if (effortScale !== 'off') {
+      const effort = parseOptionalMeasurement(entered?.effort);
+      const normalized = normalizeEffort(effortScale, effort);
+      if (normalized !== null) {
+        record.effortValue = normalized.value;
+        record.effortScale = normalized.scale;
+      }
+    }
+    records.push(record);
   }
   return records;
 }
@@ -477,4 +644,319 @@ export function lookupPreviousSet(
     lookup.byExercise.get(exerciseName) ??
     null
   );
+}
+
+// ---------------------------------------------------------------------------
+// Gym V2 pure training domain
+// ---------------------------------------------------------------------------
+
+export type ScheduleResolution = {
+  dateKey: string;
+  source: 'override' | 'weekly' | 'rest';
+  planKind: WorkoutPlanKind;
+  routineId: string | null;
+  movedFromDateKey: string | null;
+  note: string | null;
+};
+
+function mondayWeekdayForDateKey(dateKey: string): number {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const value = new Date(year, month - 1, day, 12, 0, 0, 0);
+  return ((value.getDay() + 6) % 7) + 1;
+}
+
+/** Resolve one local-calendar date without mutating the recurring plan. */
+export function resolveWorkoutSchedule(
+  dateKey: string,
+  weeklyPlan: readonly WorkoutWeeklyPlanEntry[],
+  overrides: readonly WorkoutScheduleOverride[],
+): ScheduleResolution {
+  const override = overrides.find(
+    (entry) => entry.date_key === dateKey && entry.deleted_at === null,
+  );
+  if (override) {
+    return {
+      dateKey,
+      source: 'override',
+      planKind: override.override_kind,
+      routineId: override.routine_id,
+      movedFromDateKey: override.moved_from_date_key,
+      note: override.note,
+    };
+  }
+  const weekly = weeklyPlan.find(
+    (entry) => entry.weekday === mondayWeekdayForDateKey(dateKey) && entry.deleted_at === null,
+  );
+  if (!weekly) {
+    return {
+      dateKey,
+      source: 'rest',
+      planKind: 'rest',
+      routineId: null,
+      movedFromDateKey: null,
+      note: null,
+    };
+  }
+  return {
+    dateKey,
+    source: 'weekly',
+    planKind: weekly.plan_kind,
+    routineId: weekly.routine_id,
+    movedFromDateKey: null,
+    note: weekly.note,
+  };
+}
+
+export type ProgressionSet = {
+  completed: boolean;
+  weight: number | null;
+  reps: number | null;
+};
+
+export type ProgressionInput = {
+  mode: WorkoutProgressionMode;
+  currentLoad: number | null;
+  increment: number | null;
+  minReps: number | null;
+  maxReps: number | null;
+  latestSets: readonly ProgressionSet[];
+};
+
+export type ProgressionRecommendation = {
+  mode: WorkoutProgressionMode;
+  action: 'hold' | 'increase_load' | 'increase_reps';
+  nextLoad: number | null;
+  nextRepsMin: number | null;
+  nextRepsMax: number | null;
+  reasonCode:
+    | 'manual'
+    | 'insufficient_history'
+    | 'unknown_or_skipped'
+    | 'completed_prescription'
+    | 'range_not_capped';
+  explanation: string;
+};
+
+const holdRecommendation = (
+  input: ProgressionInput,
+  reasonCode: ProgressionRecommendation['reasonCode'],
+  explanation: string,
+): ProgressionRecommendation => ({
+  mode: input.mode,
+  action: 'hold',
+  nextLoad: input.currentLoad,
+  nextRepsMin: input.minReps,
+  nextRepsMax: input.maxReps,
+  reasonCode,
+  explanation,
+});
+
+/**
+ * Deterministic progression V1. `latestSets` is one completed session only;
+ * callers choose the latest immutable history before invoking this reducer.
+ */
+export function recommendProgression(input: ProgressionInput): ProgressionRecommendation {
+  if (input.mode === 'none') {
+    return holdRecommendation(
+      input,
+      'manual',
+      'Manual mode records history but proposes no change.',
+    );
+  }
+  if (input.latestSets.length === 0) {
+    return holdRecommendation(
+      input,
+      'insufficient_history',
+      'There is not enough completed history to recommend a change.',
+    );
+  }
+  if (
+    input.latestSets.some(
+      (set) =>
+        !set.completed ||
+        set.reps === null ||
+        !Number.isFinite(set.reps) ||
+        set.reps <= 0 ||
+        (input.mode === 'linear' && (set.weight === null || !Number.isFinite(set.weight))),
+    )
+  ) {
+    return holdRecommendation(
+      input,
+      'unknown_or_skipped',
+      'Progression is held because a set was skipped, incomplete, or recorded without enough information.',
+    );
+  }
+
+  if (input.mode === 'linear') {
+    const increment = input.increment;
+    const targetReps = input.minReps ?? input.maxReps;
+    const allMeetTarget =
+      targetReps === null || input.latestSets.every((set) => (set.reps ?? 0) >= targetReps);
+    if (!allMeetTarget || input.currentLoad === null || increment === null || increment <= 0) {
+      return holdRecommendation(
+        input,
+        'range_not_capped',
+        'The prescribed work was recorded, but the load increment or target is not configured yet.',
+      );
+    }
+    const nextLoad = Math.round((input.currentLoad + increment) * 100) / 100;
+    return {
+      ...holdRecommendation(
+        input,
+        'completed_prescription',
+        `All prescribed work was completed; next load increases by ${increment}.`,
+      ),
+      action: 'increase_load',
+      nextLoad,
+    };
+  }
+
+  const minReps = input.minReps;
+  const maxReps = input.maxReps;
+  if (minReps === null || maxReps === null || minReps <= 0 || maxReps < minReps) {
+    return holdRecommendation(
+      input,
+      'insufficient_history',
+      'Double progression needs a valid rep range.',
+    );
+  }
+  const allAtCeiling = input.latestSets.every((set) => (set.reps ?? 0) >= maxReps);
+  if (!allAtCeiling) {
+    const nextMin = Math.min(maxReps, minReps + 1);
+    const nextMax = Math.min(maxReps, maxReps + 1);
+    return {
+      ...holdRecommendation(
+        input,
+        'range_not_capped',
+        `The rep range is still building toward ${maxReps}; add one rep before adding load.`,
+      ),
+      action: 'increase_reps',
+      nextRepsMin: nextMin,
+      nextRepsMax: nextMax,
+    };
+  }
+  if (input.currentLoad === null || input.increment === null || input.increment <= 0) {
+    return holdRecommendation(
+      input,
+      'range_not_capped',
+      'The rep ceiling was reached, but no load increment is configured.',
+    );
+  }
+  return {
+    ...holdRecommendation(
+      input,
+      'completed_prescription',
+      `Every qualifying set reached ${maxReps} reps; load increases by ${input.increment}.`,
+    ),
+    action: 'increase_load',
+    nextLoad: Math.round((input.currentLoad + input.increment) * 100) / 100,
+    nextRepsMin: minReps,
+    nextRepsMax: maxReps,
+  };
+}
+
+export type BodyWeightTrend = {
+  first: BodyWeightEntry | null;
+  latest: BodyWeightEntry | null;
+  change: number | null;
+  direction: 'up' | 'down' | 'steady' | 'insufficient_data';
+};
+
+export function convertWeight(
+  value: number,
+  from: WorkoutWeightUnit,
+  to: WorkoutWeightUnit,
+): number {
+  if (from === to) return value;
+  return from === 'kg' ? value * 2.2046226218 : value / 2.2046226218;
+}
+
+export function computeBodyWeightTrend(entries: readonly BodyWeightEntry[]): BodyWeightTrend {
+  const ordered = [...entries]
+    .filter((entry) => Number.isFinite(entry.weight) && entry.weight > 0)
+    .sort((a, b) => a.measured_at.localeCompare(b.measured_at));
+  const first = ordered[0] ?? null;
+  const latest = ordered[ordered.length - 1] ?? null;
+  if (!first || !latest || first.id === latest.id) {
+    return { first, latest, change: null, direction: 'insufficient_data' };
+  }
+  const latestInFirstUnit = convertWeight(latest.weight, latest.unit, first.unit);
+  const change = latestInFirstUnit - first.weight;
+  const epsilon = 0.01;
+  return {
+    first,
+    latest,
+    change,
+    direction: change > epsilon ? 'up' : change < -epsilon ? 'down' : 'steady',
+  };
+}
+
+export type TrainingTotals = {
+  sessions: number;
+  completedSets: number;
+  durationSeconds: number;
+  measurableVolume: number;
+  trainingDays: number;
+  recentPrs: number;
+};
+
+export function computeTrainingTotals(
+  sessions: readonly {
+    completedAt: string;
+    durationSeconds?: number | null;
+    sets: readonly {
+      completed: boolean;
+      weight: number | null;
+      reps: number | null;
+      modality?: WorkoutModality;
+    }[];
+    isPr?: boolean;
+  }[],
+): TrainingTotals {
+  const days = new Set<string>();
+  let completedSets = 0;
+  let durationSeconds = 0;
+  let measurableVolume = 0;
+  let recentPrs = 0;
+  for (const session of sessions) {
+    days.add(timestampToLocalDateKey(session.completedAt));
+    if (typeof session.durationSeconds === 'number' && Number.isFinite(session.durationSeconds)) {
+      durationSeconds += Math.max(0, session.durationSeconds);
+    }
+    for (const set of session.sets) {
+      if (set.completed) completedSets += 1;
+      measurableVolume +=
+        computeModalityVolume({
+          modality: set.modality ?? 'weighted_strength',
+          weight: set.weight,
+          reps: set.reps,
+          completed: set.completed,
+        }) ?? 0;
+    }
+    if (session.isPr) recentPrs += 1;
+  }
+  return {
+    sessions: sessions.length,
+    completedSets,
+    durationSeconds,
+    measurableVolume,
+    trainingDays: days.size,
+    recentPrs,
+  };
+}
+
+export function computeBodyAreaDistribution(
+  exercises: readonly { primaryArea: string; setsCompleted: number }[],
+): { area: string; sets: number }[] {
+  const totals = new Map<string, number>();
+  for (const exercise of exercises) {
+    if (!exercise.primaryArea || exercise.setsCompleted <= 0) continue;
+    totals.set(
+      exercise.primaryArea,
+      (totals.get(exercise.primaryArea) ?? 0) + exercise.setsCompleted,
+    );
+  }
+  return [...totals.entries()]
+    .map(([area, sets]) => ({ area, sets }))
+    .sort((a, b) => b.sets - a.sets || a.area.localeCompare(b.area));
 }

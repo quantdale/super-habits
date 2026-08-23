@@ -51,7 +51,7 @@ import {
  * account safety gate must check every entity that can carry meaningful user
  * backup state — not just the original four V1 sync tables.
  *
- * Covers all `BACKUP_ENTITIES` (17 table-backed entities) plus
+ * Covers all `BACKUP_ENTITIES` (21 table-backed entities) plus
  * `BACKUP_SYNTHETIC_ENTITIES` (`user_backup_settings`, `backup_manifest`).
  * AI quota counters and implementation-only infrastructure tables are excluded
  * because they are not user recovery data.

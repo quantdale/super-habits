@@ -6,7 +6,7 @@ import type { TimeOfDay } from '@/core/notifications/reminderPlanning';
 /** Versioned backup contract. Bump only with a coordinated schema migration. */
 export const BACKUP_SCHEMA_VERSION = 2;
 /** Version of the recoverable-settings payload contract. */
-export const BACKUP_SETTINGS_VERSION = 4;
+export const BACKUP_SETTINGS_VERSION = 5;
 /**
  * Versioned *recoverable scope* marker — the exact set of entities covered by
  * a backup. Bumped from 3 → 4 when Projects/Goals/Daily Plans (and the new
@@ -15,6 +15,8 @@ export const BACKUP_SETTINGS_VERSION = 4;
  * Bumped from 4 → 5 when the hardening wave v2 promoted durable user-domain
  * state: habit lifecycle columns, Pomodoro session metadata, per-set workout
  * load/reps (`workout_session_sets`), and real workout session timing.
+ * Bumped from 5 → 6 for Gym V2 custom exercises, weekly plan entries, date
+ * overrides, and body-weight entries plus extended workout prescriptions.
  *
  * Scope is deliberately distinct from `BACKUP_SCHEMA_VERSION`: the row *shape*
  * stayed compatible (new columns are nullable), so the schema version did not
@@ -22,7 +24,7 @@ export const BACKUP_SETTINGS_VERSION = 4;
  *
  * Local marker: when `backup.scope_version` is below this, backfill runs.
  */
-export const BACKUP_SCOPE_VERSION = 5;
+export const BACKUP_SCOPE_VERSION = 6;
 
 /**
  * Every locally durable, user-owned table in the recoverable backup scope,
@@ -52,6 +54,10 @@ export const BACKUP_ENTITIES = [
   'goals',
   'daily_plans',
   'workout_session_sets',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
 ] as const;
 
 export type BackupEntity = (typeof BACKUP_ENTITIES)[number];
@@ -136,12 +142,28 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'last_used_at',
     'created_at',
   ],
-  workout_routines: ['id', 'name', 'description', 'created_at', 'updated_at', 'deleted_at'],
+  workout_routines: [
+    'id',
+    'name',
+    'description',
+    'goal_tag',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
   routine_exercises: [
     'id',
     'routine_id',
     'name',
     'sort_order',
+    'catalog_exercise_id',
+    'modality',
+    'notes',
+    'superset_group',
+    'progression_mode',
+    'progression_increment',
+    'progression_min_reps',
+    'progression_max_reps',
     'created_at',
     'updated_at',
     'deleted_at',
@@ -152,6 +174,12 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'set_number',
     'active_seconds',
     'rest_seconds',
+    'target_reps_min',
+    'target_reps_max',
+    'target_load',
+    'target_duration_seconds',
+    'target_distance',
+    'target_pace',
     'created_at',
     'updated_at',
     'deleted_at',
@@ -165,8 +193,17 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'started_at',
     'ended_at',
     'duration_seconds',
+    'routine_name',
   ],
-  workout_session_exercises: ['id', 'log_id', 'exercise_name', 'sets_completed', 'created_at'],
+  workout_session_exercises: [
+    'id',
+    'log_id',
+    'exercise_name',
+    'sets_completed',
+    'catalog_exercise_id',
+    'modality',
+    'created_at',
+  ],
   pomodoro_sessions: [
     'id',
     'started_at',
@@ -262,7 +299,57 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'reps',
     'weight_unit',
     'completed',
+    'duration_seconds',
+    'distance',
+    'pace',
+    'effort_value',
+    'effort_scale',
     'created_at',
+  ],
+  custom_exercises: [
+    'id',
+    'name',
+    'description',
+    'primary_area',
+    'secondary_areas',
+    'equipment',
+    'modality',
+    'unilateral',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  workout_weekly_plan: [
+    'id',
+    'weekday',
+    'routine_id',
+    'plan_kind',
+    'note',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  workout_schedule_overrides: [
+    'id',
+    'date_key',
+    'override_kind',
+    'routine_id',
+    'moved_from_date_key',
+    'note',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  body_weight_entries: [
+    'id',
+    'measured_on',
+    'measured_at',
+    'weight',
+    'unit',
+    'note',
+    'created_at',
+    'updated_at',
+    'deleted_at',
   ],
 };
 
@@ -608,6 +695,57 @@ export const KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET = [
   'daily_plans',
 ] as const;
 
+/** Scope immediately before Gym V2. */
+export const KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET = [
+  ...KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
+  'workout_session_sets',
+] as const;
+
+/** Canonical columns frozen at the end of scope 5, before Gym V2 extensions. */
+export const BACKUP_SCOPE_V5_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
+  workout_routines: ['id', 'name', 'description', 'created_at', 'updated_at', 'deleted_at'],
+  routine_exercises: [
+    'id',
+    'routine_id',
+    'name',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  routine_exercise_sets: [
+    'id',
+    'exercise_id',
+    'set_number',
+    'active_seconds',
+    'rest_seconds',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  workout_logs: [
+    'id',
+    'routine_id',
+    'notes',
+    'completed_at',
+    'created_at',
+    'started_at',
+    'ended_at',
+    'duration_seconds',
+  ],
+  workout_session_exercises: ['id', 'log_id', 'exercise_name', 'sets_completed', 'created_at'],
+  workout_session_sets: [
+    'id',
+    'session_exercise_id',
+    'set_number',
+    'weight',
+    'reps',
+    'weight_unit',
+    'completed',
+    'created_at',
+  ],
+};
+
 /** Current (hardened wave v2) recoverable scope epoch. */
 export const CURRENT_BACKUP_SCOPE_ENTITY_SET = BACKUP_ENTITIES;
 
@@ -635,6 +773,9 @@ export function resolveBackupScope(input: {
     if (input.backupScopeVersion === BACKUP_SCOPE_VERSION) {
       return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
     }
+    if (input.backupScopeVersion === 5) {
+      return { scope: 5, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET };
+    }
     if (input.backupScopeVersion === 4) {
       return { scope: 4, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET };
     }
@@ -647,6 +788,9 @@ export function resolveBackupScope(input: {
   const keys = Object.keys(input.entityMetadata);
   if (sortedEquals(keys, [...BACKUP_ENTITIES])) {
     return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
+  }
+  if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET])) {
+    return { scope: 5, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET };
   }
   if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET])) {
     return { scope: 4, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET };
@@ -664,7 +808,8 @@ export function resolveBackupScope(input: {
  * Canonical columns to use when verifying a manifest/file of the given scope.
  * Each epoch verifies against the frozen column snapshot that produced its
  * stored checksums: scopes below 4 use the Portable V1 snapshot, scope 4 uses
- * the V4 snapshot, and only the current scope uses the live columns.
+ * the V4 snapshot, scope 5 uses the pre-Gym snapshot, and only the current
+ * scope uses the live columns.
  */
 export function backupEntityColumnsForScope(
   scope: number,
@@ -675,7 +820,12 @@ export function backupEntityColumnsForScope(
   const historical: Record<BackupEntity, readonly string[]> = {
     ...BACKUP_ENTITY_COLUMNS,
   };
-  const snapshot = scope === 4 ? BACKUP_SCOPE_V4_ENTITY_COLUMNS : PORTABLE_V1_ENTITY_COLUMNS;
+  const snapshot =
+    scope === 5
+      ? BACKUP_SCOPE_V5_ENTITY_COLUMNS
+      : scope === 4
+        ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
+        : PORTABLE_V1_ENTITY_COLUMNS;
   for (const entity of Object.keys(historical) as BackupEntity[]) {
     const frozen = snapshot[entity];
     if (frozen) historical[entity] = frozen;
@@ -696,6 +846,10 @@ export const BACKUP_SOFT_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
   'projects',
   'goals',
   'daily_plans',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
 ]);
 
 /**
@@ -763,7 +917,7 @@ export type RemoteBackupManifestRow = {
 export type RemoteUserBackupSettingsRow = {
   user_id: string;
   settings_version: number;
-  payload: RecoverableSettingsV2 | RecoverableSettingsV3;
+  payload: RecoverableSettingsV2 | RecoverableSettingsV3 | RecoverableSettingsV5;
   updated_at: string;
 };
 
@@ -808,6 +962,15 @@ export type RecoverableSettingsV3 = RecoverableSettingsV2 & {
       hour: number;
       minute: number;
     } | null;
+  } | null;
+};
+
+/** Gym V2 additions to the recoverable-settings contract (version 5). */
+export type RecoverableSettingsV5 = RecoverableSettingsV3 & {
+  workoutPreferences: {
+    effortScale: 'off' | 'rir' | 'rpe';
+    goalWeight: { value: number; unit: 'kg' | 'lb' } | null;
+    workoutReminder: { enabled: boolean; time: TimeOfDay } | null;
   } | null;
 };
 
