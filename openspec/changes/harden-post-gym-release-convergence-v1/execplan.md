@@ -56,9 +56,10 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: native flow hardening is complete for the current
-  checkpoint and the last pre-certification source changes are being validated
-  before the final exact-source APK build.
+- Current milestone: the first final-SHA targeted runner completed; its four
+  remaining failures were reproduced, classified, and repaired in isolated
+  exact-APK replays. The last flow-only checkpoint is now ready for the final
+  exact-source build and runner certification.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -70,12 +71,12 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: source `762a9e3` was rebuilt and installed on the clean
-  `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. Isolated direct replay
-  now passes the repaired Gym V2, legacy Workout, Calories, habit, schedule,
-  reminder persistence, reminder disable, permission-denied, and reminder
-  isolation flows. The remaining active-session replay requires the final
-  source changes below in a rebuilt APK before runner certification.
+- In progress: source `386f2e2` was rebuilt and installed on the clean
+  `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. The focused active
+  session flow and smoke runner pass. The targeted runner reached 7/11; its
+  four deterministic selector/viewport failures are fixed in the working tree
+  and all four now pass isolated direct replay. A final commit/build is still
+  required before the aggregate targeted/lifecycle lanes can be certified.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
@@ -84,12 +85,12 @@ and records exact-source local/remote certification.
   `core/ui/NumberStepperField.tsx`, `features/workout/WorkoutSessionScreen.tsx`,
   and the two Workout exercise-toggle components. Generated `android/` and
   native reports remain ignored.
-- Last successful validation: source `762a9e3` was rebuilt in 7m11s, installed
+- Last successful validation: source `386f2e2` was rebuilt in 6m18s, installed
   on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and provenance-verified
   with package `com.dale16.superhabits` 1.0.0 / versionCode 1 and APK SHA-256
-  `BD8F14CD...2E33306825A29C0AC`. The prior exact-source aggregate smoke
-  lane passed 2/2 on `emulator-5554`; report:
-  `simulation-output/native/native-android-smoke-2026-08-24T093033141Z.json`.
+  `1CA37030...28664F`. The exact focused Gym session flow passed,
+  and the smoke runner passed 2/2 in
+  `simulation-output/native/native-android-smoke-2026-08-24T124526284Z.json`.
 - Current failures: first smoke replay findings are classified `TEST_BUG`:
   the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
   characters while typing into the controlled command field. The direct
@@ -117,12 +118,13 @@ and records exact-source local/remote certification.
   assertion has been removed. The smoke report is
   `simulation-output/native/native-android-all-2026-08-24T091755013Z.json`.
 - Exact-source targeted runner report
-  `simulation-output/native/native-android-persistence-2026-08-24T113235793Z.json`
-  recorded four flow passes before the emulator exited during cleanup and
-  seven failures. The report is retained as `ENVIRONMENT` evidence for the
-  lost `emulator-5554` target, while isolated replays on the clean
-  `emulator-5556` target reproduced the app-state/selector failures as
-  `TEST_BUG` and closed them without weakening persistence assertions.
+  `simulation-output/native/native-android-persistence-2026-08-24T130219831Z.json`
+  on exact source `386f2e2` recorded 7/11 passes. Its four failures were
+  deterministic `TEST_BUG` flow issues: the Calories keyboard covered the
+  below-Meal action, grouped reminder cards needed semantic Edit-mode scroll,
+  and the nested schedule form needed a state-directed scroll before Create.
+  The preceding `...113235793Z.json` report remains preserved as
+  `ENVIRONMENT` evidence for the lost `emulator-5554` target.
 - Direct native replay after those findings classified the flow defects as
   `TEST_BUG`: post-Gym Workout forms moved below the fold, native keyboards
   obscured sequential fields, the Diary row was below the summary, habit
@@ -137,6 +139,12 @@ and records exact-source local/remote certification.
   the Reps label and Reps input shared a selector, causing `6` to append to
   weight; a distinct accessibility label is now in the source and awaits the
   final rebuilt APK.
+- The four exact-APK targeted failures were then replayed independently and
+  fixed as `TEST_BUG`: `calories-persistence` now hides the visible IME before
+  tapping Add entry below Meal; reminder disable/isolation now use semantic
+  `scrollUntilVisible` for Enter habit edit mode; and both the schedule form
+  and the isolation form use a state-directed upward swipe before Create.
+  Calories, disable, isolation, and schedule all pass after these fixes.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
@@ -145,8 +153,8 @@ and records exact-source local/remote certification.
   checks, commit the final native hardening checkpoint, provision the exact
   new SHA on one verified API-36 x86_64 target, then run the required smoke,
   targeted, lifecycle, and focused Gym session lanes.
-- Exact next action: validate and commit the current flow/semantic-label/
-  runner changes, rebuild/install/provenance-verify that exact commit on
+- Exact next action: validate and commit the current flow-only repairs,
+  rebuild/install/provenance-verify that exact commit on
   `emulator-5556`, then run `npm run qa:native:android -- --serial
 emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
   `npm run qa:native:lifecycle -- --serial emulator-5556`, and the focused

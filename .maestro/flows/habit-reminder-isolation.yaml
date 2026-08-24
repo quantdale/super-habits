@@ -35,6 +35,10 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
@@ -66,6 +70,10 @@ tags:
 - tapOn: 'Habit name'
 - inputText: 'Native Read reminder'
 - hideKeyboard
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
@@ -87,10 +95,9 @@ tags:
     timeout: 15000
 - assertVisible: 'Native Gym reminder'
 - assertVisible: 'Reminder 18:00'
-- swipe:
-    start: '50%, 30%'
-    end: '50%, 70%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Enter habit edit mode'
+    direction: UP
 - tapOn: 'Enter habit edit mode'
 - swipe:
     start: '50%, 66%'

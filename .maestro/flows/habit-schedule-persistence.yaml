@@ -27,6 +27,10 @@ tags:
 - tapOn: 'Thursday scheduled'
 - tapOn: 'Saturday scheduled'
 - tapOn: 'Sunday scheduled'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
