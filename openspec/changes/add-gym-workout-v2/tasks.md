@@ -55,4 +55,4 @@
 - [x] 7.3 Update project maps, Workout/backup/provenance docs, QA impact map, and native-e2e documentation with truthful evidence and deferred P2 work.
 - [x] 7.4 Run typecheck, lint, Vitest/integration, OpenSpec validation, ExecPlan validation, schema/impact/timezone checks, web build, focused/full E2E, sync E2E, and deterministic simulation as applicable.
 - [x] 7.5 Run available native Android targeted persistence QA and record iOS/Android environment limitations precisely when unavailable.
-- [ ] 7.6 Inspect complete diff, run `git diff --check`, create meaningful commits, push according to repository workflow, and complete the ExecPlan only against validated evidence.
+- [x] 7.6 Inspect complete diff, run `git diff --check`, create meaningful commits, push according to repository workflow, and complete the ExecPlan only against validated evidence.

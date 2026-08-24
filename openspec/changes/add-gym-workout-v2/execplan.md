@@ -1,7 +1,7 @@
 # ExecPlan: SuperHabits Gym / Workout V2 Deep Expansion
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -49,8 +49,8 @@ backup/portable flows understand the result.
 
 ## Current Checkpoint
 
-- Current milestone: Implementation is integrated and the final source-state
-  QA wave is green; the campaign is at the final diff/commit/push checkpoint.
+- Current milestone: Implementation, source-state QA, coherent commits, and
+  remote delivery are complete; this is the final completed-state checkpoint.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, authoritative project/rule
   docs, Codex workflow, repository skills, current Workout implementation,
   existing Gym V2 OpenSpec/ExecPlan, completed UI/UX/product-roadmap campaign
@@ -79,9 +79,10 @@ backup/portable flows understand the result.
   `com.dale16.superhabits` target; iOS smoke cannot run because Xcode/simctl is
   unavailable on this Windows host. Reports and replay/remediation commands
   are recorded in the final handoff.
-- In progress: inspect the complete diff, create coherent commits, push the
-  branch, then update this plan to COMPLETED with the final SHA and exact QA
-  ledger.
+- Completed: inspected the complete diff, created coherent implementation,
+  recovery, and documentation commits, and pushed the branch. The exact final
+  HEAD SHA is recorded in the campaign handoff.
+- In progress: None; no implementation or delivery work remains.
 - Important modified files: `core/db/client.ts`, `core/db/types.ts`,
   `core/backup/backup.types.ts`, `features/workout/exerciseCatalog.ts`,
   `features/workout/workout.data.ts`, `features/workout/workout.domain.ts`,
@@ -100,16 +101,15 @@ backup/portable flows understand the result.
 - Condition required to unblock: None for web/local delivery; native evidence
   requires an installed e2e-test Android APK/device and a macOS/Xcode host for
   iOS.
-- Exact resume action after unblock: Inspect `git diff --stat`, `git diff
---check`, and the complete diff, then stage and commit the coherent source,
-  recovery, test, and campaign-artifact checkpoints.
-- Exact next action: Review the final diff and status, create commits, push
-  `codex/add-gym-training-system-v2`, record the final SHA, and validate this
-  plan in COMPLETED state.
-- Remaining definition of done: All applicable tasks are evidenced, the
-  repository remains buildable, V1/prior Gym V2 data and recovery contracts
-  remain compatible, and the final report truthfully separates PASS,
-  environment-only limitations, and deferred P2 work.
+- Exact resume action after unblock: No implementation action remains; if
+  remote CI or native targets become available, run the documented follow-up
+  validation commands and append evidence without changing the completed
+  contract.
+- Exact next action: No implementation action remains; final handoff only.
+- Remaining definition of done: Completed for the available environment. All
+  applicable tasks are evidenced, the repository remains buildable, V1/prior
+  Gym V2 data and recovery contracts remain compatible, and the final report
+  separates PASS, environment-only limitations, and deferred P2 work.
 
 ## Progress
 
@@ -126,7 +126,7 @@ backup/portable flows understand the result.
 - [x] Extend backup/portable/restore/Supabase contracts and validate scope 7.
 - [x] Extend new deep semantics into deterministic simulation observations.
 - [x] Add native evidence and finish affected/full QA.
-- [ ] Commit/push coherent checkpoints and complete final handoff evidence.
+- [x] Commit/push coherent checkpoints and complete final handoff evidence.
 
 ## Surprises & Discoveries
 
@@ -182,7 +182,7 @@ backup/portable flows understand the result.
   (24/24) and this change newly scaffolded.
 - 2026-08-24 — `openspec validate --changes add-gym-workout-v2` — PASS; all
   42 repository change items validated.
-- 2026-08-24 — `npm run agent:plan:validate -- --plan openspec/changes/add-gym-workout-v2/execplan.md` — PASS before the final checkpoint edit; rerun after this edit.
+- 2026-08-24 — `npm run agent:plan:validate -- --plan openspec/changes/add-gym-workout-v2/execplan.md` — PASS; final COMPLETED-state validation.
 - 2026-08-24 — `npx vitest run tests/workout.domain.test.ts tests/workout.pr.test.ts` — PASS; 61 tests.
 - 2026-08-24 — `npm test` — PASS; 147 files and 1,774 tests.
 - 2026-08-24 — `npm run typecheck` — PASS; zero TypeScript errors.
@@ -254,9 +254,8 @@ backup/portable flows understand the result.
 
 ## Outcomes & Retrospective
 
-- Status: Ready for final commit/push closure; all implementation and QA work
-  is complete. This section will be changed to `COMPLETED` after the coherent
-  commits are pushed and the final plan validation passes.
+- Status: COMPLETED. The implementation, validation, coherent commits, and
+  remote push are complete.
 - Summary: The campaign now has additive migration 23 semantics, identity-
   aware exercise metadata, modality-correct set logging and progression/PR
   behavior, crash-safe typed drafts, superset sequencing, Today/weekly-review
@@ -269,3 +268,6 @@ backup/portable flows understand the result.
 - Deferred P2: complete cardio-lab analytics, percentage/Greyskull programming,
   limb-specific performed-set rows, keep-screen-awake/equipment profiles, and
   richer analytics remain extension points rather than fragile partial work.
+- Commits: `9efacb6` (Workout semantics/session analytics), `d5e47ad`
+  (scope-7 backup/recovery), `438aaf0` (OpenSpec/maps/docs), followed by the
+  final plan-closure commit. The final HEAD SHA is reported by the handoff.
