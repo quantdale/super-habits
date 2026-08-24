@@ -57,11 +57,13 @@ and records exact-source local/remote certification.
 ## Current Checkpoint
 
 - Current milestone: source integration, recovery validation, sync validation,
-  simulation validation, and focused browser regressions are complete. Commit
-  `4d3f466` fixes two deterministic Playwright test defects. The complete
-  browser suite has one timing-only P2 miss (`workout→calories 827 ms`), while
-  the controlled full-journey probe passes 70/70 steps across ten HEAVY
-  repetitions without changing the 800 ms ceiling.
+  simulation validation, focused browser regressions, and the final pushed
+  checkpoint are complete. Commit `4d3f466` fixes two deterministic
+  Playwright test defects; commit `d80e653` fixes current native semantic and
+  viewport assumptions discovered on the final APK. The complete browser suite
+  has one timing-only P2 miss (`workout→calories 827 ms`), while the controlled
+  full-journey probe passes 70/70 steps across ten HEAVY repetitions without
+  changing the 800 ms ceiling.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -120,8 +122,8 @@ and records exact-source local/remote certification.
   `e2e/workout-gym-v2.spec.ts` and `e2e/journeys/a-tuesday.spec.ts`. Generated
   `android/`, dist output, and native/browser reports remain ignored or
   excluded by repository policy.
-- Last successful validation: the current committed source's focused browser
-  evidence is Gym 6/6, P1 8/8, and P2 70/70. The d484 source APK was built in
+- Last successful validation: before `d80e653`, focused browser evidence is
+  Gym 6/6, P1 8/8, and P2 70/70. The d484 source APK was built in
   8m30s, installed on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and
   provenance-verified with package `com.dale16.superhabits` 1.0.0 /
   versionCode 1 and APK SHA-256
@@ -144,6 +146,10 @@ and records exact-source local/remote certification.
   757 ms in the latest recorded run, so this is classified
   `FLAKY_TEST`/host scheduling sensitivity; no threshold or assertion is
   weakened.
+  The final a4db native targeted aggregate was 9/11: only the Calories and
+  Gym V2 flows failed, while legacy Workout passed in that run. Their
+  screenshot-backed causes are the `TEST_BUG` findings fixed in `d80e653`; the
+  final-source rebuild and corrected isolated replays are still pending.
   Aggregate
   targeted/lifecycle runner failures are classified `FLAKY_TEST`/`ENVIRONMENT`
   when the same exact flow passes in isolation and the failing flow changes
@@ -214,10 +220,15 @@ and records exact-source local/remote certification.
   reveals, and row-state scrolls; Pomodoro now targets `Reset (not logged)`.
   The four flows pass isolated exact-APK replay, including notification
   scheduling-path and durable action replay assertions.
-- The final Calories replay showed Maestro's `hideKeyboard` returning to the
-  Android launcher on this target, which made the below-Meal action impossible
-  to locate. The flow now uses `pressKey: BACK`; the final exact APK replay
-  passes the add/diary/kill/relaunch contract without weakening assertions.
+- The final-source-a4db targeted aggregate exposed two native flow defects:
+  Calories could lose the below-fold field/Diary path, and the Gym flow used
+  the old hidden `Plan week` route. A later replay also showed that an
+  unconditional `pressKey: BACK` can launch the Android home screen after the
+  IME has already closed. These are `TEST_BUG` findings fixed in `d80e653`:
+  Calories now uses state-directed scrolling, the existing `Diary view`
+  accessibility label, and a distinct `Save calorie entry` label; Gym assigns
+  Monday through the current per-day semantic routine control. The final
+  source APK must be rebuilt and these corrected flows rerun before closure.
 - Blockers: none known for local implementation. iOS is an `ENVIRONMENT`
   blocker on Windows (`xcrun/simctl` unavailable). Supabase remote state is an
   `EXTERNAL BLOCKER` because this checkout has no Supabase CLI or authenticated
@@ -229,9 +240,10 @@ and records exact-source local/remote certification.
 - Exact resume action after unblock: authenticate the relevant external service
   or move to its supported host, then run only the applicable remote/iOS
   verification; local implementation and hardening do not require new scope.
-- Exact next action: inspect remote Supabase/GitHub/Vercel access, commit and
-  push this plan/evidence checkpoint, then build and install the exact pushed
-  source SHA on `emulator-5556` for final native certification.
+- Exact next action: update the validation ledger for the `d80e653` native-flow
+  fixes, close and validate the final plan/evidence checkpoint, commit and push
+  it, then build and install that exact pushed source SHA on `emulator-5556`
+  for final native certification.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; valid timing evidence; affected and broad gates; exact
@@ -397,6 +409,14 @@ and records exact-source local/remote certification.
   project is available, and the Vercel CLI is not installed. No remote
   migration or destructive operation was attempted and no CI/Vercel pass is
   claimed.
+- 2026-08-25: final a4db native ladder — PASS/`TEST_BUG`: smoke 2/2; targeted
+  aggregate 9/11, with only Calories and Gym V2 flow misses; legacy Workout
+  passed. Screenshots and isolated replay evidence identified stale/unsafe
+  native selectors and viewport assumptions, fixed in `d80e653`.
+- 2026-08-25: native-flow hardening commit — PASS; `npm run typecheck` passed
+  after adding the semantic Calories submit label and current Gym/Calories
+  Maestro selectors. Final APK provisioning and corrected native replays are
+  intentionally still required from the pushed `d80e653` source.
 
 ## Changed Files / Areas
 
@@ -414,8 +434,10 @@ and records exact-source local/remote certification.
   `.maestro/flows/habit-reminder-delivery.yaml`, and
   `.maestro/flows/pomodoro-lifecycle.yaml` — current semantic native lifecycle
   selectors and viewport-safe assertions.
-- `.maestro/flows/calories-persistence.yaml` — Android `BACK` keyboard
-  dismissal for a stable below-Meal action.
+- `.maestro/flows/calories-persistence.yaml` — state-directed Calories
+  persistence selectors and the semantic submit control.
+- `core/ui/Button.tsx` and `features/calories/CaloriesFormView.tsx` — optional
+  button accessibility labels and the `Save calorie entry` native hook.
 
 ## Recovery / Resume Instructions
 
