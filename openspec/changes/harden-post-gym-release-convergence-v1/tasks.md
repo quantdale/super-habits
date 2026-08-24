@@ -10,7 +10,7 @@
 - [x] 2.1 Derive and test the integrated runtime schema version, next migration slot, current backup scope, settings/manifest versions, and Supabase migration ledger from executable sources.
 - [x] 2.2 Audit current-facing documentation, agent guides, maps, QA metadata, and simulation/backup/native references for stale schema, scope, entity, and Gym claims.
 - [x] 2.3 Reclassify historical Scope-6 fixtures/specs/evidence separately from current Scope-7 statements and update only current-truth prose.
-- [ ] 2.4 Run focused SQLite, backup, portable, restore, owner-binding, manifest, and Supabase-shape tests; fix any integration regression with contract coverage.
+- [x] 2.4 Run focused SQLite, backup, portable, restore, owner-binding, manifest, and Supabase-shape tests; fix any integration regression with contract coverage.
 
 ## 3. Android provisioning and identity
 
@@ -24,14 +24,14 @@
 - [x] 4.1 Add a semantic native Gym V2 routine/prescription persistence flow covering built-in or custom identity and relaunch.
 - [x] 4.2 Add a semantic native Gym V2 durable-session interruption/resume flow covering a typed measurement and explicit completion/history integrity.
 - [x] 4.3 Add or refine accessibility semantics required by the focused flows without introducing coordinate-only app interactions or arbitrary sleeps.
-- [ ] 4.4 Build/install the current source APK and run smoke, targeted persistence, lifecycle, and focused Gym flows; classify every result.
+- [ ] 4.4 Build/install the final source APK and run smoke, targeted persistence, lifecycle, and focused Gym flows; classify every result.
 
 ## 5. Timing, broad QA, and external boundaries
 
-- [ ] 5.1 Reproduce and classify any HEAVY section-switch timing miss with controlled repeated measurements while retaining the 800 ms contract.
-- [ ] 5.2 Reproduce and classify any portable-owner recovery sync timing miss with preserved artifacts and state-based synchronization evidence.
-- [ ] 5.3 Run affected QA, full local unit/integration/static/browser/sync/timezone/simulation/Supabase/OpenSpec/plan gates and fix repository-caused failures.
-- [ ] 5.4 Attempt authorized remote Supabase migration/schema verification and iOS/EAS execution when available; otherwise record precise external/environment blockers.
+- [x] 5.1 Reproduce and classify any HEAVY section-switch timing miss with controlled repeated measurements while retaining the 800 ms contract.
+- [x] 5.2 Reproduce and classify any portable-owner recovery sync timing miss with preserved artifacts and state-based synchronization evidence.
+- [x] 5.3 Run affected QA, full local unit/integration/static/browser/sync/timezone/simulation/Supabase/OpenSpec/plan gates and fix repository-caused failures.
+- [x] 5.4 Attempt authorized remote Supabase migration/schema verification and iOS/EAS execution when available; record the precise external/environment blockers when access is unavailable (Windows has no Xcode/simctl; this checkout has no Supabase/Vercel CLI or authenticated linked project; `gh` has no GitHub login).
 
 ## 6. Certification and closure
 

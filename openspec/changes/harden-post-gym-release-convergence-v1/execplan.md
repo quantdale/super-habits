@@ -56,10 +56,12 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: source integration and focused browser regressions are
-  complete. Commit `4d3f466` fixes two deterministic Playwright test defects,
-  and the valid full-journey P2 performance probe passed 70/70 steps across ten
-  HEAVY repetitions without changing the 800 ms ceiling.
+- Current milestone: source integration, recovery validation, sync validation,
+  simulation validation, and focused browser regressions are complete. Commit
+  `4d3f466` fixes two deterministic Playwright test defects. The complete
+  browser suite has one timing-only P2 miss (`workout→calories 827 ms`), while
+  the controlled full-journey probe passes 70/70 steps across ten HEAVY
+  repetitions without changing the 800 ms ceiling.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -86,15 +88,28 @@ and records exact-source local/remote certification.
   TodoItem settle transition; P1 passes 8/8. Both fixes are committed in
   `4d3f466`.
 - Completed timing investigation: the valid full P2 journey was run with
-  `--repeat-each=10` (70 steps, one worker). All ten strict checks passed; the
-  observed max section-switch values were 747, 773, 778, 782, 746, 769, 767,
-  754, 747, and 750 ms. The earlier 811 ms full-suite observation is therefore
-  classified `FLAKY_TEST`/host scheduling sensitivity, with the 800 ms contract
-  preserved and no arbitrary wait or threshold change.
-- In progress: run the broad source gates and sync lane against the committed
-  test fixes; inspect iOS/EAS and remote Supabase/CI availability; close the
-  OpenSpec/ExecPlan state; then provision/build/install the final source SHA on
-  the verified Android target and rerun final smoke plus focused Gym evidence.
+  `--repeat-each=10` (70 steps, one worker) both before and after the latest
+  full-suite observation. Both probes passed all 140 strict checks; the latest
+  observed max section-switch values were 771, 645, 685, 715, 682, 626, 734,
+  677, 757, and 724 ms. The full suite's isolated 827 ms
+  `workout→calories` sample, like the earlier 811 ms sample, is therefore
+  classified `FLAKY_TEST`/host scheduling sensitivity. The 800 ms contract is
+  preserved with no arbitrary wait or threshold change.
+- Completed broad source gates so far: typecheck, lint, Vitest, theme,
+  OpenSpec, plan, QA-impact, Supabase schema, timezone, web build, sync build,
+  sync E2E 46/46, simulation model validation, and deterministic simulation
+  22/22. The full browser suite completed 185 passed, 43 skipped, 4 not run,
+  and one P2 timing failure; focused Gym 6/6, P1 8/8, and controlled P2 70/70
+  remain passing evidence. iOS was attempted and correctly classified
+  `ENVIRONMENT` because Xcode/simctl is unavailable on Windows. Remote
+  Supabase live verification is unavailable because the Supabase CLI is not
+  installed and no authenticated project context is present. GitHub exact-head
+  CI inspection is unavailable because `gh auth status` reports no login;
+  Vercel status is likewise not locally inspectable because its CLI is absent.
+- In progress: inspect remote access and CI availability, commit/push this
+  evidence checkpoint, then provision/build/install the final committed source
+  SHA on the verified Android target and rerun the required native ladder plus
+  focused Gym evidence before closing the plan.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
@@ -113,7 +128,8 @@ and records exact-source local/remote certification.
   `FD0D0CBCE6A2C481C3D602C8929309E526CEB1940FF2187D61B73B1663BFFD31`.
   Its smoke runner passed 2/2; focused Gym V2 persistence and
   `workout-gym-v2-session-lifecycle.yaml` passed; aggregate-only misses and
-  isolated replays are recorded in the validation ledger.
+  isolated replays are recorded in the validation ledger. The latest controlled
+  P2 probe passed 70/70 after the full-suite 827 ms sample.
 - Current failures: no product implementation failure is known. The final
   targeted aggregate report recorded only the legacy Workout aggregate miss;
   its exact isolated replay passes. The final lifecycle aggregate recorded
@@ -121,8 +137,13 @@ and records exact-source local/remote certification.
   aggregate-only results are `FLAKY_TEST`/`ENVIRONMENT` evidence, not product
   failures. The Calories `hideKeyboard` launcher defect was a native test
   defect and is fixed with `pressKey: BACK`; the complete Calories flow passes.
-  The earlier full Playwright failures were test defects fixed in `4d3f466`,
-  and the complete P2 timing probe now passes.
+  The earlier full Playwright failures were test defects fixed in `4d3f466`.
+  The complete browser suite later observed one `workout→calories 827 ms`
+  sample against the unchanged 800 ms ceiling. The controlled ten-repeat P2
+  probe was rerun after that observation and passed 70/70 with a maximum of
+  757 ms in the latest recorded run, so this is classified
+  `FLAKY_TEST`/host scheduling sensitivity; no threshold or assertion is
+  weakened.
   Aggregate
   targeted/lifecycle runner failures are classified `FLAKY_TEST`/`ENVIRONMENT`
   when the same exact flow passes in isolation and the failing flow changes
@@ -197,18 +218,20 @@ and records exact-source local/remote certification.
   Android launcher on this target, which made the below-Meal action impossible
   to locate. The flow now uses `pressKey: BACK`; the final exact APK replay
   passes the add/diary/kill/relaunch contract without weakening assertions.
-- Blockers: none known for local implementation. Supabase remote state,
-  iOS/EAS execution, and exact-head GitHub CI remain to be checked; any
-  unavailable credentials or platform capabilities must be reported as
-  `EXTERNAL BLOCKER`/`ENVIRONMENT`, not as a pass.
+- Blockers: none known for local implementation. iOS is an `ENVIRONMENT`
+  blocker on Windows (`xcrun/simctl` unavailable). Supabase remote state is an
+  `EXTERNAL BLOCKER` because this checkout has no Supabase CLI or authenticated
+  linked-project context; no remote project was guessed. Exact-head GitHub CI is
+  an `EXTERNAL BLOCKER` because `gh auth status` reports no login. Vercel status
+  is `NOT RUN`/`EXTERNAL BLOCKER` because the Vercel CLI is unavailable. None of
+  these blockers changes the local source or claims a pass.
 - Condition required to unblock: none.
-- Exact resume action after unblock: run the affected and broad source gates,
-  complete sync/iOS/remote checks, close and validate this plan, commit the
-  final plan/evidence checkpoint, push it, and provision that exact final SHA
-  before the last Android smoke/Gym replay.
-- Exact next action: run `npm run qa:affected`, then the remaining required
-  local gates and sync lane; update this checkpoint with every result before
-  final plan closure.
+- Exact resume action after unblock: authenticate the relevant external service
+  or move to its supported host, then run only the applicable remote/iOS
+  verification; local implementation and hardening do not require new scope.
+- Exact next action: inspect remote Supabase/GitHub/Vercel access, commit and
+  push this plan/evidence checkpoint, then build and install the exact pushed
+  source SHA on `emulator-5556` for final native certification.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; valid timing evidence; affected and broad gates; exact
@@ -228,12 +251,13 @@ and records exact-source local/remote certification.
 - [x] Implement Android build/install/identity provisioning.
 - [x] Add focused native Gym V2 flows and semantic hooks; direct Gym V2
       persistence and durable-session replays pass on the exact d484 APK.
-- [x] Investigate timing-sensitive gates without weakening assertions; the
-      valid ten-repeat P2 probe passes and the earlier full-suite miss is
-      classified `FLAKY_TEST`.
+- [x] Investigate timing-sensitive gates without weakening assertions; both
+      ten-repeat P2 probes pass and the full-suite 827 ms sample is classified
+      `FLAKY_TEST`.
+- [x] Run recovery, backup, sync, simulation, timezone, Supabase-shape, and
+      broad local gates; classify the one timing-only browser miss.
 - [ ] Rebuild the final committed source and close the targeted native lane on
       the exact final APK.
-- [ ] Run affected and full regression ladders; classify all failures.
 - [ ] Push final exact SHA, inspect CI, reconcile artifacts, and close plan.
 
 ## Surprises & Discoveries
@@ -347,6 +371,32 @@ and records exact-source local/remote certification.
   switch values 747/773/778/782/746/769/767/754/747/750 ms. The prior 811 ms
   full-suite observation is classified `FLAKY_TEST`/host scheduling, not a
   product regression.
+- 2026-08-25: post-failure P2 repeat — PASS; a second ten-repetition run
+  passed 70/70 after the full-suite `workout→calories 827 ms` sample, with max
+  switch values 771/645/685/715/682/626/734/677/757/724 ms. The 800 ms
+  contract remains unchanged and the full-suite sample remains classified
+  `FLAKY_TEST`/host scheduling.
+- 2026-08-25: final broad source gates — PASS; `qa:affected`, typecheck, lint
+  (zero errors), Vitest 148 files/1,777 tests, themes 140/140, OpenSpec 43/43,
+  all ExecPlans, QA impact 13/13, Supabase schema, timezone matrix (5 zones ×
+  43 tests), web build, sync build, sync E2E 46/46, simulation validation, and
+  deterministic simulation 22/22 all passed. The complete browser suite
+  completed 185 passed, 43 skipped, 4 not run, and one timing-only failure;
+  focused Gym 6/6 and P1 8/8 passed.
+- 2026-08-25: sync/remote-boundary campaign — PASS; Scope-7 restore, frozen
+  Scope-6 compatibility, owner recovery, portable-owner binding,
+  manifest/settings integrity, and exact-once outbox lanes passed 46/46. The
+  earlier portable-owner timeout remains preserved as `FLAKY_TEST` evidence;
+  no current recovery timeout reproduced.
+- 2026-08-25: iOS native attempt — `ENVIRONMENT`; the Windows host has no
+  Xcode `xcrun`/`simctl`. The repository report records the remediation path;
+  no iOS pass is claimed.
+- 2026-08-25: external access inspection — `EXTERNAL BLOCKER`/`NOT RUN`;
+  `git ls-remote` can read the public remote, but `gh auth status` reports no
+  GitHub login, the Supabase CLI is not installed and no authenticated linked
+  project is available, and the Vercel CLI is not installed. No remote
+  migration or destructive operation was attempted and no CI/Vercel pass is
+  claimed.
 
 ## Changed Files / Areas
 
