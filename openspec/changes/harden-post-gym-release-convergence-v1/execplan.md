@@ -56,11 +56,12 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: exact `d02ef40` Android smoke and focused Gym V2
-  lifecycle certification passed. Aggregate targeted/lifecycle runs exposed
-  only cross-flow viewport/selector instability; the affected reminder and
-  Pomodoro flows are now semantically hardened in the working tree and pass
-  isolated exact-APK replay.
+- Current milestone: final `ad2d1a8` Android smoke passed 2/2 and lifecycle
+  passed 6/6, including the focused Gym V2 durable-session flow. The final
+  targeted aggregate recorded 8/11 because Calories, Gym, and legacy Workout
+  hit viewport/driver failures; all three now pass isolated replay on the same
+  APK. Calories exposed one last Maestro `hideKeyboard` home-screen defect,
+  repaired in the working tree with Android `BACK`.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -72,14 +73,13 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: source `d02ef40` was provisioned and installed on the clean
+- In progress: source `ad2d1a8` was provisioned and installed on the clean
   `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. Smoke passed 2/2;
-  the first targeted aggregate passed 9/11 and the rerun passed 7/11 with
-  different viewport/settling failures, while every affected flow passed
-  isolated replay. The focused Gym session lifecycle passed. The lifecycle
-  aggregate passed 2/6 because four older reminder/Pomodoro selectors were
-  stale; their current-label/semantic-scroll repairs now pass isolated replay.
-  A final flow commit/build is still required before aggregate certification.
+  the targeted aggregate passed 8/11 with three viewport/settling failures,
+  while Calories, Gym V2, and legacy Workout each pass isolated replay. The
+  lifecycle aggregate passed 6/6 after the reminder/Pomodoro selector repairs.
+  A final Calories-flow commit/build is still required before final-source
+  certification.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
@@ -88,13 +88,23 @@ and records exact-source local/remote certification.
   `core/ui/NumberStepperField.tsx`, `features/workout/WorkoutSessionScreen.tsx`,
   and the two Workout exercise-toggle components. Generated `android/` and
   native reports remain ignored.
-- Last successful validation: source `386f2e2` was rebuilt in 6m18s, installed
+- Last successful validation: source `ad2d1a8` was rebuilt in 8m37s, installed
   on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and provenance-verified
   with package `com.dale16.superhabits` 1.0.0 / versionCode 1 and APK SHA-256
-  `1CA37030...28664F`. The exact focused Gym session flow passed,
-  and the smoke runner passed 2/2 in
-  `simulation-output/native/native-android-smoke-2026-08-24T124526284Z.json`.
-- Current failures: no current implementation failure is known. Aggregate
+  `0B56703B...BAE51AF`. The final smoke runner passed 2/2 in
+  `simulation-output/native/native-android-smoke-2026-08-25T152252063Z.json`,
+  and the final lifecycle runner passed 6/6 in
+  `simulation-output/native/native-android-lifecycle-2026-08-25T160132588Z.json`.
+- Current failures: no product implementation failure is known. The final
+  targeted aggregate report
+  `simulation-output/native/native-android-persistence-2026-08-25T154320679Z.json`
+  recorded Calories `Add entry`, Gym `Add routine`, and legacy Workout
+  `Open ... routine` failures. Their final exact-APK isolated replays pass;
+  the aggregate result is `FLAKY_TEST`/`ENVIRONMENT` evidence, not a product
+  failure. The Calories isolated replay additionally showed the emulator on
+  the Android home screen after Maestro `hideKeyboard`; replacing that test
+  command with `pressKey: BACK` made the complete Calories flow pass.
+  Aggregate
   targeted/lifecycle runner failures are classified `FLAKY_TEST`/`ENVIRONMENT`
   when the same exact flow passes in isolation and the failing flow changes
   between complete-file reruns. Preserved reports include
@@ -163,6 +173,10 @@ and records exact-source local/remote certification.
   reveals, and row-state scrolls; Pomodoro now targets `Reset (not logged)`.
   The four flows pass isolated exact-APK replay, including notification
   scheduling-path and durable action replay assertions.
+- The final Calories replay showed Maestro's `hideKeyboard` returning to the
+  Android launcher on this target, which made the below-Meal action impossible
+  to locate. The flow now uses `pressKey: BACK`; the final exact APK replay
+  passes the add/diary/kill/relaunch contract without weakening assertions.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
@@ -171,7 +185,7 @@ and records exact-source local/remote certification.
   checks, commit the final native hardening checkpoint, provision the exact
   new SHA on one verified API-36 x86_64 target, then run the required smoke,
   targeted, lifecycle, and focused Gym session lanes.
-- Exact next action: validate and commit the lifecycle flow hardening, push
+- Exact next action: validate and commit the final Calories flow repair, push
   the new source SHA, provision/install that exact SHA on `emulator-5556`,
   then rerun `npm run qa:native:android -- --serial
 emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
@@ -313,6 +327,8 @@ emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
   `.maestro/flows/habit-reminder-delivery.yaml`, and
   `.maestro/flows/pomodoro-lifecycle.yaml` — current semantic native lifecycle
   selectors and viewport-safe assertions.
+- `.maestro/flows/calories-persistence.yaml` — Android `BACK` keyboard
+  dismissal for a stable below-Meal action.
 
 ## Recovery / Resume Instructions
 

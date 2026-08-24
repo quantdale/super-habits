@@ -38,7 +38,7 @@ tags:
 - scrollUntilVisible:
     element: 'Meal'
     direction: DOWN
-- hideKeyboard
+- pressKey: BACK
 - tapOn:
     text: 'Add entry'
     below: 'Meal'
