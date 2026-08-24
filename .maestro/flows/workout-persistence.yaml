@@ -14,26 +14,19 @@ tags:
 - tapOn:
     text: 'Workout'
     index: 0
+- scrollUntilVisible:
+    element: 'Routine name'
+    direction: DOWN
 - tapOn: 'Routine name'
 - inputText: 'Native strength routine'
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Description'
+    direction: DOWN
 - tapOn: 'Description'
 - inputText: 'Native routine'
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add routine'
+    direction: DOWN
 - tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native strength routine routine'
@@ -44,6 +37,9 @@ tags:
 - tapOn: 'Open Native strength routine routine'
 - tapOn: 'Exercise name'
 - inputText: 'Native rows'
+- scrollUntilVisible:
+    element: 'Add'
+    direction: DOWN
 - tapOn: 'Add'
 - assertVisible: 'Native rows'
 - killApp
@@ -60,4 +56,3 @@ tags:
     element: 'Native strength routine'
     direction: DOWN
 - assertVisible: 'Native strength routine'
-

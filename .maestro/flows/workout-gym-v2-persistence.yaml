@@ -17,8 +17,15 @@ tags:
 - tapOn:
     text: 'Workout'
     index: 0
+- scrollUntilVisible:
+    element: 'Routine name'
+    direction: DOWN
 - tapOn: 'Routine name'
 - inputText: 'Native Gym V2 typed routine'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Add routine'
+    direction: DOWN
 - tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
@@ -28,19 +35,42 @@ tags:
 - extendedWaitUntil:
     visible: 'Exercise library'
     timeout: 5000
+- tapOn: 'Search exercises'
+- inputText: 'zzzz-native-custom'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Create custom exercise'
     direction: DOWN
 - tapOn: 'Name'
 - inputText: 'Native custom press'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Primary body area'
+    direction: DOWN
 - tapOn: 'Primary body area'
 - inputText: 'chest'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Equipment'
+    direction: DOWN
 - tapOn: 'Equipment'
 - inputText: 'barbell'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Search aliases (comma separated)'
+    direction: DOWN
 - tapOn: 'Search aliases (comma separated)'
 - inputText: 'incline press'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Instructions (optional)'
+    direction: DOWN
 - tapOn: 'Instructions (optional)'
 - inputText: 'Brace and press with a controlled descent'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Create and add'
+    direction: DOWN
 - tapOn: 'Create and add'
 - extendedWaitUntil:
     visible: 'Native custom press'
@@ -49,18 +79,39 @@ tags:
 - tapOn: 'Linear'
 - tapOn: 'Native custom press progression increment'
 - inputText: '2.5'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Native custom press minimum reps'
+    direction: DOWN
 - tapOn: 'Native custom press minimum reps'
 - inputText: '5'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Native custom press maximum reps'
+    direction: DOWN
 - tapOn: 'Native custom press maximum reps'
 - inputText: '8'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Target reps min'
+    direction: DOWN
 - tapOn: 'Target reps min'
 - inputText: '5'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Target reps max'
+    direction: DOWN
 - tapOn: 'Target reps max'
 - inputText: '8'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Target load'
+    direction: DOWN
 - tapOn: 'Target load'
 - inputText: '40'
+- hideKeyboard
 - assertVisible: 'Exercise setup'
-- tapOn: 'Close'
+- pressKey: BACK
 - swipe:
     direction: UP
 - scrollUntilVisible:
@@ -88,8 +139,14 @@ tags:
     element: 'Native Gym V2 typed routine'
     direction: DOWN
 - assertVisible: 'Monday Native Gym V2 typed routine'
+- scrollUntilVisible:
+    element: 'Open Native Gym V2 typed routine routine'
+    direction: DOWN
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'
+- scrollUntilVisible:
+    element: 'Target load'
+    direction: DOWN
 - assertVisible: 'Target load'
 - assertVisible: '40'
 - assertVisible: '5'

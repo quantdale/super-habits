@@ -992,6 +992,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                                     onPress={() => {
                                       void openEditModal(habit);
                                     }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Edit ${habit.name}`}
                                     className="rounded-full px-3 py-1.5"
                                     style={{ backgroundColor: COLOR }}
                                   >
@@ -1006,6 +1008,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                                     onPress={() => {
                                       void handleDeleteHabit(habit);
                                     }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Delete ${habit.name}`}
                                     className="rounded-full px-3 py-1.5"
                                     style={{ backgroundColor: tokens.dangerSolid }}
                                   >

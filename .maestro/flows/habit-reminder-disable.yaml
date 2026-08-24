@@ -17,14 +17,9 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native disable reminder'
@@ -59,7 +54,10 @@ tags:
     end: '50%, 70%'
     duration: 350
 - tapOn: 'Enter habit edit mode'
-- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Edit Native disable reminder'
+    direction: DOWN
+- tapOn: 'Edit Native disable reminder'
 - scrollUntilVisible:
     element: 'Enable habit reminder'
     direction: DOWN
@@ -89,8 +87,4 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 15000
-- extendedWaitUntil:
-    visible: 'Reminder 18:00'
-    timeout: 5000
 - assertNotVisible: 'Reminder 18:00'
-

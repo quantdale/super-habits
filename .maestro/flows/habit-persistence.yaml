@@ -14,14 +14,9 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native daily habit'
@@ -53,4 +48,3 @@ tags:
 - extendedWaitUntil:
     visible: 'Native daily habit: 1 of 1 today.*'
     timeout: 15000
-

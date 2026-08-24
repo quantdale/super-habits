@@ -15,39 +15,40 @@ tags:
     text: 'Calories'
     index: 0
 - assertVisible: 'Switch between manual entry and a diary grouped by meal.'
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Calories entry food'
+    direction: DOWN
 - tapOn: 'Calories entry food'
 - inputText: 'Native breakfast'
+- scrollUntilVisible:
+    element: 'Calories entry protein'
+    direction: DOWN
 - tapOn: 'Calories entry protein'
 - inputText: '20'
+- scrollUntilVisible:
+    element: 'Calories entry carbs'
+    direction: DOWN
 - tapOn: 'Calories entry carbs'
 - inputText: '50'
-- hideKeyboard
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 40%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Calories entry fat'
+    direction: DOWN
 - tapOn: 'Calories entry fat'
 - inputText: '10'
-- hideKeyboard
-- swipe:
-    direction: UP
+- scrollUntilVisible:
+    element: 'Meal'
+    direction: DOWN
 - tapOn:
     text: 'Add entry'
     below: 'Meal'
-    point: '50%,10%'
 - scrollUntilVisible:
     element:
       text: 'Diary'
     direction: UP
 - tapOn: 'Diary'
+- scrollUntilVisible:
+    element: 'Native breakfast'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Native breakfast'
     timeout: 5000
@@ -62,5 +63,9 @@ tags:
     text: 'Calories'
     index: 0
 - tapOn: 'Diary'
-- assertVisible: 'Native breakfast'
-
+- scrollUntilVisible:
+    element: 'Native breakfast'
+    direction: DOWN
+- extendedWaitUntil:
+    visible: 'Native breakfast'
+    timeout: 15000

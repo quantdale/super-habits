@@ -56,8 +56,8 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: native smoke is closed; running targeted/lifecycle and
-  focused Gym V2 Android qualification.
+- Current milestone: aggregate smoke is closed; targeted persistence flow
+  repairs are complete and the exact-source targeted lane is next.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -69,21 +69,24 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: the `d825c68` APK is installed and provenance-verified;
-  command-center and native smoke pass after the emulator reset. Run the
-  aggregate smoke lane, targeted/lifecycle lanes, then the two Gym V2 flows.
+- In progress: source `e92277d` APK is installed and provenance-verified;
+  command-center/native smoke pass 2/2 in the aggregate lane. Direct replay
+  now passes the Gym V2, legacy Workout, Calories, habit, reminder-persistence,
+  and permission-denied flows. The remaining reminder-disable and isolation
+  checks require the committed per-habit accessibility labels in a rebuilt
+  APK before the runner lane is certified.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
-  `.maestro/flows/workout-gym-v2-*.yaml`, `.eas/workflows/native-e2e.yml`, and
-  the two Workout exercise-toggle components. Generated `android/` and native
+  `.maestro/flows/workout-gym-v2-*.yaml`, the targeted persistence flows,
+  `.eas/workflows/native-e2e.yml`, `features/habits/HabitsScreen.tsx`, and the
+  two Workout exercise-toggle components. Generated `android/` and native
   reports remain ignored.
 - Last successful validation: the current-source Android APK was rebuilt in
-  7m37s, installed on `emulator-5554`, and provenance-verified at source
-  `d825c68` (API 36, x86_64, package `com.dale16.superhabits`, APK SHA-256
-  `3CFE4F57...F457FFD`). Native helper tests/typecheck/lint passed. The
-  corrected command-center flow passed directly; report:
-  `simulation-output/native/native-android-all-2026-08-24T085748953Z.json`.
+  8m02s, installed on `emulator-5554`, and provenance-verified at source
+  `e92277d` (API 36, x86_64, package `com.dale16.superhabits`, APK SHA-256
+  `CECE14D5...E9CC2C4`). The aggregate smoke lane passed 2/2; report:
+  `simulation-output/native/native-android-smoke-2026-08-24T093033141Z.json`.
 - Current failures: first smoke replay findings are classified `TEST_BUG`:
   the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
   characters while typing into the controlled command field. The direct
@@ -110,14 +113,34 @@ and records exact-source local/remote certification.
   `--reinstall-driver` per lane and section markers use state-based waits; no
   assertion has been removed. The smoke report is
   `simulation-output/native/native-android-all-2026-08-24T091755013Z.json`.
+- Targeted persistence report
+  `simulation-output/native/native-android-persistence-2026-08-24T094203528Z.json`
+  recorded 3/11 passing and 8/11 failing. The failures were calories field
+  discovery, habit form discovery/reminder denial state, and Workout routine
+  form discovery. The first hypotheses are missing state-based waits after
+  section navigation and selector drift; the underlying product assertions
+  remain intact until direct replay determines the classification.
+- Direct native replay after those findings classified the flow defects as
+  `TEST_BUG`: post-Gym Workout forms moved below the fold, native keyboards
+  obscured sequential fields, the Diary row was below the summary, habit
+  groups/forms reused scroll offsets, and the disable flow contained a
+  contradictory positive reminder wait. The corrected direct flows passed
+  Gym V2 persistence, legacy Workout persistence, Calories persistence,
+  habit persistence, reminder persistence, and permission-denied reminder
+  behavior. A separate Gboard Settings foreground during one optional
+  `hideKeyboard` call was classified `FLAKY_TEST`/`ENVIRONMENT`; scrolling
+  while the IME is present is now used where safe. The final two reminder
+  flows are pending the rebuilt APK containing the new per-habit labels.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
 - Condition required to unblock: none.
-- Exact resume action after unblock: run the aggregate smoke lane, then the
-  targeted/lifecycle and focused Gym V2 flows against the same verified APK.
-- Exact next action: run `npm run qa:native:android -- --serial
-emulator-5554`, preserving the aggregate smoke report and any artifacts.
+- Exact resume action after unblock: commit the targeted flow/semantic-label
+  checkpoint, provision the exact new SHA, then run the complete targeted
+  persistence lane against that APK.
+- Exact next action: run formatting/static checks, commit the targeted native
+  hardening, rebuild/install and provenance-verify that exact commit, and run
+  `npm run qa:native:targeted -- --serial emulator-5554`.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; timing investigation; affected and broad gates; exact
@@ -134,8 +157,10 @@ emulator-5554`, preserving the aggregate smoke report and any artifacts.
       subsystems.
 - [x] Reconcile runtime truth, docs, QA map, and recovery/Supabase contracts.
 - [x] Implement Android build/install/identity provisioning.
-- [x] Add focused native Gym V2 flows and semantic hooks; execution is pending
-      the current-source APK build.
+- [x] Add focused native Gym V2 flows and semantic hooks; direct Gym V2
+      persistence replay passes, with exact-runner certification pending the
+      rebuilt checkpoint.
+- [ ] Close the corrected targeted persistence lane on the exact rebuilt APK.
 - [ ] Investigate timing-sensitive gates without weakening assertions.
 - [ ] Run affected and full regression ladders; classify all failures.
 - [ ] Push final exact SHA, inspect CI, reconcile artifacts, and close plan.
@@ -198,6 +223,17 @@ emulator-5554`, preserving the aggregate smoke report and any artifacts.
   was not deterministic under the native controlled input. The original
   assertions/artifacts are preserved; fixes use current text and a semantic
   supported-example action, not weaker review assertions.
+- 2026-08-24 — targeted native replay — `TEST_BUG` fixes preserved all
+  persistence/reminder assertions while replacing stale viewport assumptions
+  with semantic scrolls and keyboard-safe progression. The exact Gym V2 flow
+  passed after kill/relaunch; Calories and habit/reminder direct replays also
+  passed. One Gboard Settings foreground during an already-hidden keyboard
+  dismissal is retained as `FLAKY_TEST`/`ENVIRONMENT` evidence, not a product
+  result.
+- 2026-08-24 — habit edit/delete semantic hardening — added per-habit
+  accessibility labels so native flows select the intended card in grouped
+  edit mode. The installed e92277d APK predates this label, so final native
+  classification waits for the exact rebuilt checkpoint.
 
 ## Changed Files / Areas
 

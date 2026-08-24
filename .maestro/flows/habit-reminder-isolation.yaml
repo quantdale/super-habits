@@ -19,10 +19,9 @@ tags:
     text: 'Habits'
     index: 0
 # Reveal the group tiles (header+stats push them below the fold at top).
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native Gym reminder'
@@ -57,11 +56,13 @@ tags:
     visible: 'Native Gym reminder'
     timeout: 15000
 # Second habit must NOT inherit the first one's reminder.
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
+- scrollUntilVisible:
+    element: 'Habit name'
+    direction: UP
 - tapOn: 'Habit name'
 - inputText: 'Native Read reminder'
 - hideKeyboard
@@ -95,8 +96,14 @@ tags:
     start: '50%, 66%'
     end: '50%, 40%'
     duration: 350
-- tapOn: 'Delete'
+- scrollUntilVisible:
+    element: 'Delete Native Gym reminder'
+    direction: DOWN
+- tapOn: 'Delete Native Gym reminder'
 - tapOn: 'Delete habit'
+- scrollUntilVisible:
+    element: 'Native Read reminder'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Native Read reminder'
     timeout: 5000
