@@ -29,6 +29,11 @@ tags:
     timeout: 15000
 - assertVisible: 'Nothing has been saved yet.'
 - scrollUntilVisible:
+    element: 'Ready to save'
+    direction: DOWN
+- assertVisible: 'Ready to save'
+- assertVisible: 'yes'
+- scrollUntilVisible:
     element: 'Confirm and save'
     direction: DOWN
 - assertVisible: 'Confirm and save'

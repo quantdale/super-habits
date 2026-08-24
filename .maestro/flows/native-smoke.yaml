@@ -12,35 +12,49 @@ tags:
     timeout: 8000
 # Current single-page shell: six sections behind the top tab rail.
 # Markers mirror e2e/journeys SECTION_MARKERS (kept in sync with web journeys).
-- assertVisible: 'Customize'
+- extendedWaitUntil:
+    visible: 'Customize'
+    timeout: 10000
 # index: 0 targets the tab-rail item — the rail renders before section
 # content, whose stats/onboarding chips can repeat labels like Habits/Focus.
 - tapOn:
     text: 'To Do'
     index: 0
-- assertVisible: 'Offline-first task manager.'
+- extendedWaitUntil:
+    visible: 'Offline-first task manager.'
+    timeout: 10000
 - tapOn:
     text: 'Habits'
     index: 0
-- assertVisible: "Today's rhythm"
+- extendedWaitUntil:
+    visible: "Today's rhythm"
+    timeout: 10000
 - tapOn:
     text: 'Focus'
     index: 0
-- assertVisible: 'Classic sequence: focus → short breaks → long break — durations saved on device.'
+- extendedWaitUntil:
+    visible: 'Classic sequence: focus → short breaks → long break — durations saved on device.'
+    timeout: 10000
 - tapOn:
     text: 'Workout'
     index: 0
 # Fresh device (clearState): the Workout subtitle's has-activity variant is
 # off, so the current Gym V2 onboarding copy renders.
-- assertVisible: 'Build a training plan, start a guided workout, and track your progress.'
+- extendedWaitUntil:
+    visible: 'Build a training plan, start a guided workout, and track your progress.'
+    timeout: 10000
 - tapOn:
     text: 'Calories'
     index: 0
-- assertVisible: 'Switch between manual entry and a diary grouped by meal.'
+- extendedWaitUntil:
+    visible: 'Switch between manual entry and a diary grouped by meal.'
+    timeout: 10000
 - tapOn:
     text: 'Overview'
     index: 0
-- assertVisible: 'Customize'
+- extendedWaitUntil:
+    visible: 'Customize'
+    timeout: 10000
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Close settings'

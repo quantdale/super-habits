@@ -56,8 +56,8 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: replaying the corrected Android smoke flows before the
-  focused Gym V2 native qualification flows.
+- Current milestone: native smoke is closed; running targeted/lifecycle and
+  focused Gym V2 Android qualification.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -69,21 +69,21 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: validate and commit the smoke/command-flow corrections, replay
-  command-center and native smoke directly, then run the aggregate smoke,
-  targeted/lifecycle, and focused Gym V2 flows against the installed APK.
+- In progress: the `d825c68` APK is installed and provenance-verified;
+  command-center and native smoke pass after the emulator reset. Run the
+  aggregate smoke lane, targeted/lifecycle lanes, then the two Gym V2 flows.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
   `.maestro/flows/workout-gym-v2-*.yaml`, `.eas/workflows/native-e2e.yml`, and
   the two Workout exercise-toggle components. Generated `android/` and native
   reports remain ignored.
-- Last successful validation: the current-source Android APK was built in
-  8m30s, installed on `emulator-5554`, and provenance-verified at source
-  `195a2ba` (API 36, x86_64, package `com.dale16.superhabits`). The native
-  parser tests passed 3/3; typecheck/lint/help/discovery/diff checks passed at
-  the prior milestone. The first smoke run was preserved as
-  `simulation-output/native/native-android-smoke-2026-08-24T082139539Z.json`.
+- Last successful validation: the current-source Android APK was rebuilt in
+  7m37s, installed on `emulator-5554`, and provenance-verified at source
+  `d825c68` (API 36, x86_64, package `com.dale16.superhabits`, APK SHA-256
+  `3CFE4F57...F457FFD`). Native helper tests/typecheck/lint passed. The
+  corrected command-center flow passed directly; report:
+  `simulation-output/native/native-android-all-2026-08-24T085748953Z.json`.
 - Current failures: first smoke replay findings are classified `TEST_BUG`:
   the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
   characters while typing into the controlled command field. The direct
@@ -91,25 +91,33 @@ and records exact-source local/remote certification.
   remained on its unsupported state. The corrected flow now selects an exact
   semantic supported-example button, and the stale marker is updated to the
   current user-visible Gym copy. The runner replay-command join bug is also
-  corrected so failure artifacts contain executable commands. These fixes are
-  Static validation of the corrections now passes; direct replay is next.
+  corrected so failure artifacts contain executable commands. Static validation
+  of the corrections passes. The first direct replay used the stale pre-fix
+  APK and could not find the new semantic label; this is not a new product
+  failure. The stale-build replay is superseded by the exact-source rebuild;
+  no command-center product failure remains. Subsequent smoke attempts exposed
+  `ENVIRONMENT`/driver instability: Maestro Android driver startup timed out on
+  two retries, and a later reinstalled-driver run stopped while the UI was
+  settling after opening Command center. The AVD was restarted from a clean
+  boot; the corrected native smoke then passed all section/settings checks.
 - Relevant classifications: the existing Windows/iOS limitation remains
   `ENVIRONMENT`; no native result is claimed until executed. The original
   smoke findings are `TEST_BUG`, not product failures. No arbitrary waits,
   coordinate-only app taps, production credentials, or historical Scope-6
   rewrites were introduced.
 - Relevant quarantines: none; the corrected flows retain the original review,
-  persistence, and lifecycle assertions.
+  persistence, and lifecycle assertions. The runner now requests
+  `--reinstall-driver` per lane and section markers use state-based waits; no
+  assertion has been removed. The smoke report is
+  `simulation-output/native/native-android-all-2026-08-24T091755013Z.json`.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
 - Condition required to unblock: none.
-- Exact resume action after unblock: run the focused static checks, then
-  `node scripts/qa-native.mjs --platform android --flow
-.maestro/flows/command-center-v2.yaml --serial emulator-5554
---no-provision` and the equivalent `native-smoke.yaml` replay.
-- Exact next action: replay the corrected command-center and native-smoke
-  Maestro flows on `emulator-5554`, preserving their reports and screenshots.
+- Exact resume action after unblock: run the aggregate smoke lane, then the
+  targeted/lifecycle and focused Gym V2 flows against the same verified APK.
+- Exact next action: run `npm run qa:native:android -- --serial
+emulator-5554`, preserving the aggregate smoke report and any artifacts.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; timing investigation; affected and broad gates; exact
