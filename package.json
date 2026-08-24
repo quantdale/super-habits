@@ -46,6 +46,7 @@
     "qa:simulation": "node scripts/qa-simulation.mjs",
     "qa:timezones": "node scripts/qa-timezones.mjs",
     "qa:native:smoke": "node scripts/qa-native.mjs --tag smoke",
+    "qa:native:provision": "node scripts/qa-native-provision.mjs",
     "qa:native:android": "node scripts/qa-native.mjs --platform android --tag smoke",
     "qa:native:ios": "node scripts/qa-native.mjs --platform ios --tag smoke",
     "qa:native:lifecycle": "node scripts/qa-native.mjs --platform android --tag lifecycle",

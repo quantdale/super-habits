@@ -1,0 +1,96 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - persistence
+  - workout
+  - gym-v2
+---
+# Gym V2 native persistence: a custom catalog-backed exercise, typed
+# prescription fields, and weekly planning survive a process restart.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
+- tapOn: 'Routine name'
+- inputText: 'Native Gym V2 typed routine'
+- tapOn: 'Add routine'
+- scrollUntilVisible:
+    element: 'Open Native Gym V2 typed routine routine'
+    direction: DOWN
+- tapOn: 'Open Native Gym V2 typed routine routine'
+- tapOn: 'Choose from exercise library'
+- extendedWaitUntil:
+    visible: 'Exercise library'
+    timeout: 5000
+- scrollUntilVisible:
+    element: 'Create custom exercise'
+    direction: DOWN
+- tapOn: 'Name'
+- inputText: 'Native custom press'
+- tapOn: 'Primary body area'
+- inputText: 'chest'
+- tapOn: 'Equipment'
+- inputText: 'barbell'
+- tapOn: 'Search aliases (comma separated)'
+- inputText: 'incline press'
+- tapOn: 'Instructions (optional)'
+- inputText: 'Brace and press with a controlled descent'
+- tapOn: 'Create and add'
+- extendedWaitUntil:
+    visible: 'Native custom press'
+    timeout: 10000
+- assertVisible: 'Strength'
+- tapOn: 'Linear'
+- tapOn: 'Native custom press progression increment'
+- inputText: '2.5'
+- tapOn: 'Native custom press minimum reps'
+- inputText: '5'
+- tapOn: 'Native custom press maximum reps'
+- inputText: '8'
+- tapOn: 'Target reps min'
+- inputText: '5'
+- tapOn: 'Target reps max'
+- inputText: '8'
+- tapOn: 'Target load'
+- inputText: '40'
+- assertVisible: 'Exercise setup'
+- tapOn: 'Close'
+- swipe:
+    direction: UP
+- scrollUntilVisible:
+    element: 'Plan week'
+    direction: UP
+- tapOn: 'Plan week'
+- extendedWaitUntil:
+    visible: 'Plan your week'
+    timeout: 5000
+- tapOn:
+    text: 'Native Gym V2 typed routine'
+    index: 0
+- tapOn: 'Close'
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
+- scrollUntilVisible:
+    element: 'Native Gym V2 typed routine'
+    direction: DOWN
+- assertVisible: 'Monday Native Gym V2 typed routine'
+- tapOn: 'Open Native Gym V2 typed routine routine'
+- tapOn: 'Configure Native custom press exercise'
+- assertVisible: 'Target load'
+- assertVisible: '40'
+- assertVisible: '5'
+- assertVisible: '8'

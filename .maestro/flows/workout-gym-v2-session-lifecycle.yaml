@@ -1,0 +1,110 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - lifecycle
+  - workout
+  - gym-v2
+---
+# Gym V2 durable active-session draft: entered measurements remain available
+# after a force-stop/relaunch and the resumed session writes typed history.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
+- tapOn: 'Routine name'
+- inputText: 'Native Gym V2 resume routine'
+- tapOn: 'Add routine'
+- scrollUntilVisible:
+    element: 'Open Native Gym V2 resume routine routine'
+    direction: DOWN
+- tapOn: 'Open Native Gym V2 resume routine routine'
+- tapOn: 'Choose from exercise library'
+- extendedWaitUntil:
+    visible: 'Exercise library'
+    timeout: 5000
+- scrollUntilVisible:
+    element: 'Create custom exercise'
+    direction: DOWN
+- tapOn: 'Name'
+- inputText: 'Native resume press'
+- tapOn: 'Primary body area'
+- inputText: 'chest'
+- tapOn: 'Create and add'
+- extendedWaitUntil:
+    visible: 'Native resume press'
+    timeout: 10000
+- scrollUntilVisible:
+    element: 'Start workout'
+    direction: DOWN
+- tapOn: 'Start workout'
+- extendedWaitUntil:
+    visible: 'Start'
+    timeout: 10000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible: 'Complete set'
+    timeout: 5000
+- tapOn: 'Weight'
+- inputText: '42'
+- tapOn: 'Reps'
+- inputText: '6'
+- waitForAnimationToEnd:
+    timeout: 5000
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
+- extendedWaitUntil:
+    visible: 'Workout in progress'
+    timeout: 15000
+- tapOn: 'Resume workout'
+- extendedWaitUntil:
+    visible: 'Complete set now'
+    timeout: 10000
+- assertVisible: '42'
+- assertVisible: '6'
+- tapOn: 'Complete set now'
+- extendedWaitUntil:
+    visible: 'Workout complete!'
+    timeout: 5000
+- tapOn: 'Save and finish'
+- extendedWaitUntil:
+    visible: 'Workout saved'
+    timeout: 15000
+- tapOn: 'Done'
+- scrollUntilVisible:
+    element: 'Recent sessions'
+    direction: DOWN
+- extendedWaitUntil:
+    visible: 'Recent sessions'
+    timeout: 15000
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Overview'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Workout'
+    index: 0
+- scrollUntilVisible:
+    element: 'Recent sessions'
+    direction: DOWN
+- assertVisible: 'Native Gym V2 resume routine'
+- scrollUntilVisible:
+    element: 'Progress'
+    direction: DOWN
+- assertVisible: 'Progress'

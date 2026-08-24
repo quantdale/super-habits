@@ -197,9 +197,22 @@ maestro --version
 npm run qa:native:android
 ```
 
-The runner reports `ENVIRONMENT` when Maestro, `adb`, a booted target, or an
-installed `e2e-test` build is missing. That is not a native pass. Install a
-credential-free EAS test build when local native validation is required:
+The runner selects the documented API-36 x86_64 target and automatically
+provisions the current credential-free local equivalent when the package is
+missing or its source/provenance is stale. To provision explicitly (or to get
+the build/install diagnostics before the lane), run:
+
+```bash
+npm run qa:native:provision -- --serial <serial>
+```
+
+The provisioner performs Expo prebuild, assembles the Android release APK,
+installs it on the verified serial, and records package/version/source-SHA
+metadata under the ignored `simulation-output/native/` directory. Missing
+Maestro, `adb`, a booted target, an unsupported API/ABI, or a build/install
+failure remains an `ENVIRONMENT` blocker with a replay command; it is not a
+native pass. The EAS cloud build remains available when local native validation
+is not possible:
 
 ```bash
 npx eas-cli@18.5.0 build -p android --profile e2e-test

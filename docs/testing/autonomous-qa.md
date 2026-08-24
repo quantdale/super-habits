@@ -53,9 +53,14 @@ E2E_REUSE_SERVER=1 npm run e2e:journeys:p0 # only for an intentionally prepared 
 
 The sync lane uses the repository's `dist-sync/` build on `:8082`.
 
-Native flows are in `.maestro/` and are run against an installed `e2e-test`
-build, not Expo Go. Local commands perform preflight and write focused reports
-under `simulation-output/native/` (gitignored). The cost-conscious cloud path
+Native flows are in `.maestro/` and are run against the credential-free
+current-source `e2e-test` equivalent, not Expo Go. On the supported Windows
+Android lane, the repository runner auto-provisions the APK when the verified
+API-36 x86_64 target is missing the package or has stale provenance; use
+`npm run qa:native:provision -- --serial <serial>` for an explicit build/install
+step. Local commands perform preflight and write focused reports under
+`simulation-output/native/` (gitignored). A missing toolchain, target, or build
+is an `ENVIRONMENT` blocker, never a native pass. The cost-conscious cloud path
 is `.eas/workflows/native-e2e.yml`; it runs only by manual dispatch or the
 explicit `native-e2e` pull-request label.
 

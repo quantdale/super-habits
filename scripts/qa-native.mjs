@@ -1,9 +1,9 @@
 /**
  * Run the focused Maestro native QA lane with actionable local preflight.
  *
- * This command intentionally does not build, install, submit, or publish an
- * app. A local target must already have the E2E build installed. EAS installs
- * the build for its Maestro job separately.
+ * Android runs auto-provision the current credential-free E2E APK when the
+ * selected target is missing or has stale provenance. iOS remains a
+ * preinstalled/cloud path because Windows cannot build it locally.
  *
  * Examples:
  *   npm run qa:native:android
@@ -11,14 +11,21 @@
  *   node scripts/qa-native.mjs --platform android --tag lifecycle
  *   node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  parseAndroidProperties,
+  parsePackageIdentity,
+  selectAndroidDevice,
+} from './native-qa-utils.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
 const REPORT_DIR = resolve(ROOT, 'simulation-output', 'native');
+const BUILD_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build.json');
+const E2E_ENV_NAME = 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST';
 const FAILURE_CLASSES = [
   'PRODUCT_BUG',
   'TEST_BUG',
@@ -29,15 +36,24 @@ const FAILURE_CLASSES = [
 ];
 
 function parseArgs(argv) {
-  const args = { platform: process.env.NATIVE_PLATFORM ?? 'android', tag: null, flow: null };
+  const args = {
+    platform: process.env.NATIVE_PLATFORM ?? 'android',
+    tag: null,
+    flow: null,
+    serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
+    provision: process.env.NATIVE_AUTO_PROVISION !== '0',
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--platform') args.platform = argv[++i];
     else if (arg === '--tag') args.tag = argv[++i];
     else if (arg === '--flow') args.flow = argv[++i];
+    else if (arg === '--serial') args.serial = argv[++i];
+    else if (arg === '--provision') args.provision = true;
+    else if (arg === '--no-provision') args.provision = false;
     else if (arg === '--help' || arg === '-h') {
       console.log(
-        'Usage: node scripts/qa-native.mjs [--platform android|ios|all] [--tag TAG] [--flow PATH]',
+        'Usage: node scripts/qa-native.mjs [--platform android|ios|all] [--tag TAG] [--flow PATH] [--serial SERIAL] [--no-provision]',
       );
       process.exit(0);
     } else {
@@ -154,6 +170,15 @@ function writeReport(report) {
   console.log(`Native QA report: ${path}`);
 }
 
+function readBuildMetadata() {
+  if (!existsSync(BUILD_METADATA_PATH)) return null;
+  try {
+    return JSON.parse(readFileSync(BUILD_METADATA_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 function blocked(platform, tag, replayCommand, reason, details) {
   const report = {
     schemaVersion: 1,
@@ -176,7 +201,24 @@ function blocked(platform, tag, replayCommand, reason, details) {
   return 2;
 }
 
-function checkTarget(platform) {
+function provisionAndroid(serial) {
+  const command = process.execPath;
+  const args = [resolve(ROOT, 'scripts/qa-native-provision.mjs'), '--serial', serial];
+  console.log(
+    `Android E2E package is absent or stale; provisioning current source with ${command} ${args.slice(1).join(' ')}`,
+  );
+  const result = run(command, args, { stdio: 'inherit' });
+  if (result.status !== 0) {
+    return {
+      blocked: `Current-source Android E2E provisioning failed with exit code ${result.status}.`,
+      remediation:
+        'Inspect the provisioning report under simulation-output/native and replay npm run qa:native:provision -- --serial <serial>.',
+    };
+  }
+  return null;
+}
+
+function checkTarget(platform, options) {
   const maestro = findCommand('maestro');
   if (!maestro) {
     return {
@@ -195,22 +237,103 @@ function checkTarget(platform) {
       };
     }
     const devices = run(adb, ['devices']);
-    const connected = devices.stdout.split(/\r?\n/).some((line) => line.endsWith('\tdevice'));
-    if (!connected) {
+    let selected;
+    try {
+      selected = selectAndroidDevice(devices.stdout, options.serial);
+    } catch (error) {
       return {
-        blocked: 'No booted Android emulator/device is available.',
+        blocked: error instanceof Error ? error.message : String(error),
         remediation:
-          'Start an Android E2E emulator, install the E2E APK, and rerun the same command.',
+          'Start one Android E2E emulator or set ANDROID_SERIAL/NATIVE_ANDROID_SERIAL to the intended target.',
       };
     }
-    const installed = run(adb, ['shell', 'pm', 'path', APP_ID]);
-    if (installed.status !== 0 || !installed.stdout.includes('package:')) {
+    const serial = selected.serial;
+    const targetProperties = run(adb, ['-s', serial, 'shell', 'getprop']);
+    if (targetProperties.status !== 0) {
       return {
-        blocked: `${APP_ID} is not installed on the connected Android target.`,
-        remediation: 'Build/install the e2e-test APK, then rerun the same command.',
+        blocked: `Could not inspect Android target '${serial}'.`,
+        remediation: `Replay adb -s ${serial} shell getprop and inspect the native environment.`,
       };
     }
-    return { command: maestro, target: 'android device' };
+    const properties = parseAndroidProperties(targetProperties.stdout);
+    const targetIdentity = {
+      serial,
+      api: properties['ro.build.version.sdk'] ?? null,
+      abi: properties['ro.product.cpu.abi'] ?? null,
+      avd: properties['ro.boot.qemu.avd_name'] ?? null,
+    };
+    if (targetIdentity.api !== '36' || targetIdentity.abi !== 'x86_64') {
+      return {
+        blocked: `The local Android qualification path requires API 36 x86_64; target '${serial}' reports API ${targetIdentity.api ?? 'unknown'} / ABI ${targetIdentity.abi ?? 'unknown'}.`,
+        remediation:
+          'Boot the documented Nitro_API_36 x86_64 emulator or use the EAS native-e2e workflow.',
+      };
+    }
+    const currentSha = gitSha();
+    let metadata = readBuildMetadata();
+    let installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
+    let packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
+    const metadataMatches = () =>
+      metadata?.status === 'PASS' &&
+      metadata.appId === APP_ID &&
+      metadata.sourceSha === currentSha &&
+      metadata.target?.serial === serial &&
+      metadata.target?.api === targetIdentity.api &&
+      metadata.target?.abi === targetIdentity.abi &&
+      metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true';
+    if ((!packageInstalled || !metadataMatches()) && options.provision) {
+      const provisioningBlock = provisionAndroid(serial);
+      if (provisioningBlock) return provisioningBlock;
+      metadata = readBuildMetadata();
+      installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
+      packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
+    }
+    if (!packageInstalled) {
+      return {
+        blocked: `${APP_ID} is not installed on Android target '${serial}'.`,
+        remediation:
+          'Run npm run qa:native:provision -- --serial <serial>, or allow automatic provisioning by omitting --no-provision.',
+      };
+    }
+    const packageDetails = run(adb, ['-s', serial, 'shell', 'dumpsys', 'package', APP_ID]);
+    const packageIdentity = parsePackageIdentity(packageDetails.stdout, APP_ID);
+    if (!packageIdentity.present) {
+      return {
+        blocked: `ADB could not verify the installed package identity for ${APP_ID} on '${serial}'.`,
+        remediation: 'Rebuild/install the current e2e-test equivalent and rerun the same command.',
+      };
+    }
+    if (!metadataMatches()) {
+      return {
+        blocked: `Installed Android build identity does not match current source ${currentSha ?? '<unknown SHA>'}.`,
+        remediation:
+          'Allow automatic provisioning or run npm run qa:native:provision -- --force --serial <serial>.',
+      };
+    }
+    if (metadata.versionName && metadata.versionName !== packageIdentity.versionName) {
+      return {
+        blocked: `Installed ${APP_ID} version ${packageIdentity.versionName ?? '<unknown>'} does not match provisioned version ${metadata.versionName}.`,
+        remediation: 'Rebuild/install the current e2e-test equivalent and rerun the same command.',
+      };
+    }
+    if (
+      metadata.versionCode !== null &&
+      metadata.versionCode !== undefined &&
+      metadata.versionCode !== packageIdentity.versionCode
+    ) {
+      return {
+        blocked: `Installed ${APP_ID} version code ${packageIdentity.versionCode ?? '<unknown>'} does not match provisioned version code ${metadata.versionCode}.`,
+        remediation: 'Rebuild/install the current e2e-test equivalent and rerun the same command.',
+      };
+    }
+    return {
+      command: maestro,
+      target: `android ${serial}`,
+      serial,
+      targetIdentity,
+      packageIdentity,
+      buildMetadata: metadata,
+    };
   }
 
   const xcrun = findCommand('xcrun');
@@ -256,7 +379,7 @@ function runPlatform(platform, options) {
     }
   }
 
-  const target = checkTarget(platform);
+  const target = checkTarget(platform, options);
   if (target.blocked) {
     return blocked(platform, options.tag, options.replayCommand, target.blocked, {
       flow: options.flow ?? '.maestro',
@@ -267,7 +390,16 @@ function runPlatform(platform, options) {
   const args = ['test', flow];
   if (options.tag) args.push(`--include-tags=${options.tag}`);
   console.log(`Running native ${platform} QA on ${target.target}: maestro ${args.join(' ')}`);
-  const result = run(target.command, args, { stdio: 'inherit' });
+  const result = run(target.command, args, {
+    stdio: 'inherit',
+    env: target.serial
+      ? {
+          ...process.env,
+          ANDROID_SERIAL: target.serial,
+          NATIVE_ANDROID_SERIAL: target.serial,
+        }
+      : undefined,
+  });
   const report = {
     schemaVersion: 1,
     status: result.status === 0 ? 'PASS' : 'FAILED_NEEDS_TRIAGE',
@@ -276,6 +408,9 @@ function runPlatform(platform, options) {
     platform,
     appId: APP_ID,
     target: target.target,
+    targetIdentity: target.targetIdentity ?? null,
+    packageIdentity: target.packageIdentity ?? null,
+    buildMetadata: target.buildMetadata ?? null,
     tag: options.tag,
     flow: options.flow ?? '.maestro',
     gitSha: gitSha(),
@@ -300,6 +435,8 @@ try {
   const command = ['npm run qa:native', `-- --platform ${options.platform}`];
   if (options.tag) command.push(`--tag ${options.tag}`);
   if (options.flow) command.push(`--flow ${options.flow}`);
+  if (options.serial) command.push(`--serial ${options.serial}`);
+  if (!options.provision) command.push('--no-provision');
   options.replayCommand = command.join('');
   let exitCode = 0;
   for (const platform of platforms) exitCode = Math.max(exitCode, runPlatform(platform, options));

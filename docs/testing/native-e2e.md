@@ -35,16 +35,19 @@ the Android API-36 navigation-bar boundary.
 | `habit-reminder-actions-replay.yaml`    | `native`, `lifecycle`, `notifications`, `habit-reminder-replay`   | Mark complete replay after kill/relaunch remains exactly once                            |
 | `calories-persistence.yaml`             | `native`, `persistence`, `calories`                               | Create a calorie entry and verify it after relaunch                                      |
 | `workout-persistence.yaml`              | `native`, `persistence`, `workout`                                | Create a routine/exercise and verify the routine after relaunch                          |
+| `workout-gym-v2-persistence.yaml`       | `native`, `persistence`, `workout`, `gym-v2`                      | Custom catalog exercise, typed prescription, and weekly plan survive relaunch            |
+| `workout-gym-v2-session-lifecycle.yaml` | `native`, `lifecycle`, `workout`, `gym-v2`                        | Typed measurement and durable active-session draft resume after force-stop               |
 | `settings-persistence.yaml`             | `native`, `persistence`, `settings`                               | Change theme mode and verify it after relaunch                                           |
 | `pomodoro-lifecycle.yaml`               | `native`, `lifecycle`, `pomodoro`                                 | Start, background, foreground, and reset a running timer                                 |
 | `pomodoro-notification-path.yaml`       | `native`, `lifecycle`, `notifications`, `pomodoro`                | Grant notification permission, start native timer scheduling path, background/foreground |
 
-Gym V2 keeps the native routine-builder path covered by the Workout persistence
-flow (including the legacy free-text compatibility path). The deeper catalog,
-prescription, weekly-plan, guided-modality, progression, and body-weight journey
-is deterministic web coverage in `e2e/workout-gym-v2.spec.ts`; native execution
-must use a built `e2e-test` APK and should be recorded separately rather than
-being inferred from web results.
+Gym V2 keeps the legacy free-text path covered by the original Workout
+persistence flow and adds a focused native layer for the higher-risk platform
+contracts: custom/catalog identity, typed prescription persistence, weekly
+planning, and durable active-session resume. The full catalog, modality,
+progression, body-weight, and history matrix remains in
+`e2e/workout-gym-v2.spec.ts` and the real-SQLite suites; native flows stay small
+and lifecycle-focused rather than duplicating that matrix.
 
 Run the workspace directly when Maestro is installed:
 
@@ -61,14 +64,31 @@ npm run qa:native:android
 npm run qa:native:lifecycle
 npm run qa:native:ios
 node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml
+```
+
+On the documented Windows Android lane, the runner selects the single booted
+API-36 x86_64 target, checks its package/provenance identity, and automatically
+builds and installs the current credential-free `e2e-test` equivalent when the
+APK is missing or stale:
+
+```bash
+npm run qa:native:provision -- --serial <serial>
+npm run qa:native:android -- --serial <serial>
+npm run qa:native:targeted -- --serial <serial>
+npm run qa:native:lifecycle -- --serial <serial>
+# Use --no-provision only when deliberately checking an already-installed build.
+node scripts/qa-native.mjs --platform android --tag smoke --serial <serial> --no-provision
 # Requires an e2e-test/native build with EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true.
 node scripts/qa-native-delivery.mjs
 ```
 
-The local runner does not build or install an app. Install the `e2e-test`
-profile build on a booted target first. Missing Maestro, `adb`, Xcode/simctl,
-a booted target, or the installed app returns `ENVIRONMENT` and a focused JSON
-report under `simulation-output/native/`; it is not reported as a pass.
+The local Android provisioner runs Expo prebuild with
+`EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, assembles the x86_64 release APK
+without production credentials, installs it on the verified serial, and writes
+ignored provenance metadata under `simulation-output/native/`. Missing Maestro,
+`adb`, Xcode/simctl, a booted target, or a supported API-36 x86_64 target
+returns `ENVIRONMENT` with a replay command and focused JSON report; it is not
+reported as a pass. EAS remains the cloud build/install path for iOS.
 
 ## Nitro validation evidence (2026-08-10)
 

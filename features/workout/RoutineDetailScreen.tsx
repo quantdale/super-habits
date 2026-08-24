@@ -370,6 +370,7 @@ export function RoutineDetailModal({
                       onPress={() => toggleExpanded(ex.id)}
                       className="min-w-0 flex-1 flex-row items-center gap-2"
                       accessibilityRole="button"
+                      accessibilityLabel={`Configure ${ex.name} exercise`}
                       accessibilityState={{ expanded: isOpen }}
                     >
                       <View className="min-w-0 flex-1">

@@ -31,6 +31,8 @@ jobs:
         - .maestro/flows/habit-reminder-actions-replay.yaml
         - .maestro/flows/calories-persistence.yaml
         - .maestro/flows/workout-persistence.yaml
+        - .maestro/flows/workout-gym-v2-persistence.yaml
+        - .maestro/flows/workout-gym-v2-session-lifecycle.yaml
         - .maestro/flows/settings-persistence.yaml
         - .maestro/flows/pomodoro-lifecycle.yaml
         - .maestro/flows/pomodoro-notification-path.yaml
@@ -56,6 +58,8 @@ jobs:
         - .maestro/flows/habit-reminder-actions-replay.yaml
         - .maestro/flows/calories-persistence.yaml
         - .maestro/flows/workout-persistence.yaml
+        - .maestro/flows/workout-gym-v2-persistence.yaml
+        - .maestro/flows/workout-gym-v2-session-lifecycle.yaml
         - .maestro/flows/settings-persistence.yaml
         - .maestro/flows/pomodoro-lifecycle.yaml
         - .maestro/flows/pomodoro-notification-path.yaml
