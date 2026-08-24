@@ -56,10 +56,9 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: the first final-SHA targeted runner completed; its four
-  remaining failures were reproduced, classified, and repaired in isolated
-  exact-APK replays. The last flow-only checkpoint is now ready for the final
-  exact-source build and runner certification.
+- Current milestone: the corrected targeted-flow repairs are committed and
+  pushed as `684d006`; the final exact-source Android build is now the next
+  certification checkpoint.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -71,12 +70,12 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: source `386f2e2` was rebuilt and installed on the clean
-  `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. The focused active
-  session flow and smoke runner pass. The targeted runner reached 7/11; its
-  four deterministic selector/viewport failures are fixed in the working tree
-  and all four now pass isolated direct replay. A final commit/build is still
-  required before the aggregate targeted/lifecycle lanes can be certified.
+- In progress: source `684d006` is the exact final native build target and has
+  not yet been provisioned. The prior `386f2e2` APK remains installed on the
+  clean `emulator-5556` API-36 x86_64 `CRBABot_API_36` target; its focused
+  active-session flow and smoke runner passed, and all four targeted failures
+  were repaired in isolated direct replay. Final aggregate targeted/lifecycle
+  certification is pending the new build.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
@@ -91,7 +90,8 @@ and records exact-source local/remote certification.
   `1CA37030...28664F`. The exact focused Gym session flow passed,
   and the smoke runner passed 2/2 in
   `simulation-output/native/native-android-smoke-2026-08-24T124526284Z.json`.
-- Current failures: first smoke replay findings are classified `TEST_BUG`:
+- Current failures: no current implementation failure is known. First smoke
+  replay findings are classified `TEST_BUG`:
   the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
   characters while typing into the controlled command field. The direct
   replay reproduced the latter with malformed text while the product parser
@@ -153,8 +153,7 @@ and records exact-source local/remote certification.
   checks, commit the final native hardening checkpoint, provision the exact
   new SHA on one verified API-36 x86_64 target, then run the required smoke,
   targeted, lifecycle, and focused Gym session lanes.
-- Exact next action: validate and commit the current flow-only repairs,
-  rebuild/install/provenance-verify that exact commit on
+- Exact next action: provision and install source `684d006` on
   `emulator-5556`, then run `npm run qa:native:android -- --serial
 emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
   `npm run qa:native:lifecycle -- --serial emulator-5556`, and the focused
