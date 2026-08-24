@@ -79,6 +79,11 @@ backup/portable flows understand the result.
   `com.dale16.superhabits` target; iOS smoke cannot run because Xcode/simctl is
   unavailable on this Windows host. Reports and replay/remediation commands
   are recorded in the final handoff.
+- Final sync evidence: the committed-tree `dist-sync` rebuild passed; the
+  full 46-test sync run had one non-reproducible portable-owner recovery label
+  timeout (45 passed, 1 failed), and the complete owner-recovery file rerun
+  passed 6/6. The failure artifact is preserved under
+  `.cursor/playwright-output/e2e-failures/portable-owner-recovery-A--f4b1f-account-portable-owner-sync-journeys-sync/`.
 - Completed: inspected the complete diff, created coherent implementation,
   recovery, and documentation commits, and pushed the branch. The exact final
   HEAD SHA is recorded in the campaign handoff.
@@ -209,6 +214,13 @@ backup/portable flows understand the result.
 --project=journeys` — PASS; complete seeded P2 journey 7/7, max
   section-switch latency 728ms.
 - 2026-08-24 — `npm run e2e:sync` — PASS; 46/46.
+- 2026-08-24 — `npm run build:sync` — PASS; fresh committed-tree `dist-sync`
+  export with dummy Supabase credentials.
+- 2026-08-24 — `npm run e2e:sync` fresh — FLAKY_TEST/host-timing
+  classification; 45 passed and one portable-owner recovery assertion timed
+  out waiting for `Protected`. Focused rerun below passed all six tests.
+- 2026-08-24 — `npm run e2e:sync -- e2e/journeys/portable-owner-recovery.spec.ts`
+  — PASS; 6/6 portable-owner recovery tests.
 - 2026-08-24 — `npm run sim:validate` and deterministic simulation — PASS; 22
   scenarios.
 - 2026-08-24 — Native Android smoke/targeted/lifecycle — ENVIRONMENT; no
@@ -269,5 +281,6 @@ backup/portable flows understand the result.
   limb-specific performed-set rows, keep-screen-awake/equipment profiles, and
   richer analytics remain extension points rather than fragile partial work.
 - Commits: `9efacb6` (Workout semantics/session analytics), `d5e47ad`
-  (scope-7 backup/recovery), `438aaf0` (OpenSpec/maps/docs), followed by the
-  final plan-closure commit. The final HEAD SHA is reported by the handoff.
+  (scope-7 backup/recovery), `438aaf0` (OpenSpec/maps/docs), and `f40d73b`
+  (completed ExecPlan closure), followed by this final evidence update. The
+  final HEAD SHA is reported by the handoff.
