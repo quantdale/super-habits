@@ -118,12 +118,25 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
   const modalityByExerciseId = new Map(
     (detail?.exercises ?? []).map((ex) => [ex.id, ex.modality ?? null]),
   );
+  const catalogExerciseIdByExerciseId = new Map(
+    (detail?.exercises ?? []).map((ex) => [ex.id, ex.catalog_exercise_id ?? null]),
+  );
   const loggedSets: LoggedSet[] = (detail?.sets ?? [])
     .filter((set) => set.completed === 1)
     .flatMap((set) => {
       const exerciseName = exerciseNameById.get(set.session_exercise_id);
       if (!exerciseName) return [];
-      return [{ exerciseName, weight: set.weight, reps: set.reps }];
+      return [
+        {
+          exerciseName,
+          catalogExerciseId: catalogExerciseIdByExerciseId.get(set.session_exercise_id) ?? null,
+          modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
+          weight: set.weight,
+          reps: set.reps,
+          durationSeconds: set.duration_seconds,
+          distance: set.distance,
+        },
+      ];
     });
   const prs = computePersonalRecords(loggedSets);
   const totalVolume = computeSessionTotalVolume(
@@ -226,6 +239,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
                   <View className="flex-row items-center justify-between">
                     <Text className="text-base font-medium" style={{ color: tokens.text }}>
                       {ex.exercise_name}
+                      {ex.unilateral === 1 ? ' · per side' : ''}
                     </Text>
                     <Text className="text-sm" style={{ color: tokens.textMuted }}>
                       {ex.sets_completed} set{ex.sets_completed === 1 ? '' : 's'}
@@ -259,8 +273,8 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
             </Text>
             {prs.length === 0 ? (
               <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                No eligible strength sets recorded yet. PR tracking activates for weighted sets with
-                a valid load and rep count.
+                No measurable performance recorded yet. Strength, timed, and cardio records appear
+                when the corresponding set data is present.
               </Text>
             ) : (
               prs.map((pr) => (
@@ -269,7 +283,19 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
                     {pr.exerciseName}
                   </Text>
                   <Text className="text-sm font-semibold" style={{ color: COLOR }}>
-                    est. 1RM {Math.round(pr.bestEstimated1RM)} · top {pr.bestTopSetWeight}
+                    {[
+                      pr.bestTimedDurationSeconds > 0
+                        ? `best ${formatWorkoutTime(pr.bestTimedDurationSeconds)}`
+                        : null,
+                      pr.bestEstimated1RM > 0
+                        ? `est. 1RM ${Math.round(pr.bestEstimated1RM)}`
+                        : null,
+                      pr.bestTopSetWeight > 0 ? `top ${pr.bestTopSetWeight}` : null,
+                      pr.bestRepSet ? `reps ${pr.bestRepSet.reps} @ ${pr.bestRepSet.weight}` : null,
+                      pr.bestCardioDistance > 0 ? `distance ${pr.bestCardioDistance}` : null,
+                    ]
+                      .filter((value): value is string => value !== null)
+                      .join(' · ')}
                   </Text>
                 </View>
               ))

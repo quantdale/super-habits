@@ -81,6 +81,12 @@ export type WorkoutSummary = {
   sessions: number;
   priorWeekSessions: number | null;
   routines: RoutineFrequencyItem[];
+  /** Number of scheduled workout days in the reviewed week, when planning data exists. */
+  scheduledSessions?: number;
+  /** Completed, non-skipped performed sets represented in session history. */
+  completedSets?: number;
+  /** Weight × reps only where the exercise modality makes that meaningful. */
+  measurableVolume?: number;
 };
 
 export type CalorieSummary = {

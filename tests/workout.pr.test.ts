@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   applyRestDefault,
   buildVolumePerWeek,
+  classifyPersonalRecordEvents,
   computePersonalRecords,
   computeSessionTotalSets,
+  E1RM_MAX_REPS,
   estimate1RM,
   findNewPersonalRecords,
   type LoggedSet,
@@ -24,6 +26,10 @@ describe('estimate1RM (Epley)', () => {
     expect(estimate1RM(100, -2)).toBe(0);
     expect(estimate1RM(Number.NaN, 5)).toBe(0);
     expect(estimate1RM(100, Number.POSITIVE_INFINITY)).toBe(0);
+  });
+  it(`does not extrapolate beyond the ${E1RM_MAX_REPS}-rep eligibility limit`, () => {
+    expect(estimate1RM(100, E1RM_MAX_REPS)).toBeGreaterThan(100);
+    expect(estimate1RM(100, E1RM_MAX_REPS + 1)).toBe(0);
   });
 });
 
@@ -85,6 +91,13 @@ describe('computePersonalRecords', () => {
     // 40x12 → 56; 52x3 → 57.2 → second wins.
     expect(records[0].best1RMSet).toEqual({ exerciseName: 'Curl', weight: 52, reps: 3 });
   });
+
+  it('keeps high-rep load history without using it for estimated 1RM', () => {
+    const records = computePersonalRecords([{ exerciseName: 'Press', weight: 100, reps: 15 }]);
+    expect(records[0].bestEstimated1RM).toBe(0);
+    expect(records[0].best1RMSet).toBeNull();
+    expect(records[0].bestTopSetWeight).toBe(100);
+  });
 });
 
 describe('findNewPersonalRecords', () => {
@@ -125,6 +138,78 @@ describe('findNewPersonalRecords', () => {
     expect(findNewPersonalRecords([{ exerciseName: 'Row', weight: 50, reps: 8 }], history)).toEqual(
       ['Row'],
     );
+  });
+});
+
+describe('classifyPersonalRecordEvents', () => {
+  it('matches durable exercise identity even when the display name changes', () => {
+    const events = classifyPersonalRecordEvents(
+      [{ exerciseName: 'Flat Press', catalogExerciseId: 'bench', weight: 105, reps: 5 }],
+      [{ exerciseName: 'Bench Press', catalogExerciseId: 'bench', weight: 100, reps: 5 }],
+    );
+    expect(events.some((event) => event.kind === 'estimated_1rm')).toBe(true);
+  });
+
+  it('reports timed duration PRs separately from strength PRs', () => {
+    const events = classifyPersonalRecordEvents(
+      [
+        {
+          exerciseName: 'Plank',
+          modality: 'timed',
+          weight: null,
+          reps: null,
+          durationSeconds: 45,
+        },
+      ],
+      [
+        {
+          exerciseName: 'Plank',
+          modality: 'timed',
+          weight: null,
+          reps: null,
+          durationSeconds: 30,
+        },
+      ],
+    );
+    expect(events).toContainEqual({
+      exerciseName: 'Plank',
+      kind: 'timed_duration',
+      value: 45,
+      previousValue: 30,
+      unit: 'seconds',
+    });
+  });
+
+  it('reports cardio distance PRs as a separate measurement', () => {
+    const events = classifyPersonalRecordEvents(
+      [
+        {
+          exerciseName: 'Treadmill',
+          modality: 'cardio',
+          weight: null,
+          reps: null,
+          durationSeconds: 1_800,
+          distance: 5.2,
+        },
+      ],
+      [
+        {
+          exerciseName: 'Treadmill',
+          modality: 'cardio',
+          weight: null,
+          reps: null,
+          durationSeconds: 1_800,
+          distance: 5,
+        },
+      ],
+    );
+    expect(events).toContainEqual({
+      exerciseName: 'Treadmill',
+      kind: 'cardio_distance',
+      value: 5.2,
+      previousValue: 5,
+      unit: 'distance',
+    });
   });
 });
 

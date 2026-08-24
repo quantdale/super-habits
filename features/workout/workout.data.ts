@@ -369,6 +369,8 @@ export async function addExercise(input: {
   sortOrder?: number;
   catalogExerciseId?: string | null;
   modality?: WorkoutModality;
+  unilateral?: boolean;
+  supportsExternalLoad?: boolean;
   notes?: string | null;
   supersetGroup?: string | null;
   progressionMode?: WorkoutProgressionMode;
@@ -389,10 +391,11 @@ export async function addExercise(input: {
       if (!routine) throw new Error('Routine not found.');
       await transactionDb.runAsync(
         `INSERT INTO routine_exercises
-           (id, routine_id, name, sort_order, catalog_exercise_id, modality, notes,
+           (id, routine_id, name, sort_order, catalog_exercise_id, modality, unilateral,
+            supports_external_load, notes,
             superset_group, progression_mode, progression_increment, progression_min_reps,
             progression_max_reps, created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           input.routineId,
@@ -400,6 +403,16 @@ export async function addExercise(input: {
           input.sortOrder ?? 0,
           input.catalogExerciseId ?? null,
           input.modality ?? 'timed',
+          input.unilateral ? 1 : 0,
+          input.supportsExternalLoad === undefined
+            ? input.catalogExerciseId
+              ? input.modality === 'weighted_strength'
+                ? 1
+                : 0
+              : 1
+            : input.supportsExternalLoad
+              ? 1
+              : 0,
           input.notes ?? null,
           input.supersetGroup ?? null,
           input.progressionMode ?? 'none',
@@ -879,6 +892,8 @@ export async function logWorkoutSession(input: {
     setsCompleted: number;
     catalogExerciseId?: string | null;
     modality?: WorkoutModality;
+    unilateral?: boolean;
+    supportsExternalLoad?: boolean;
     /** Per-set provenance rows persisted as workout_session_sets; omitted
      * when the caller has no per-set data (legacy shape still supported). */
     sets?: LoggedSessionSetInput[];
@@ -922,7 +937,12 @@ export async function logWorkoutSession(input: {
 
       for (const ex of input.exercises) {
         const exId = createId('wsex');
-        if (ex.catalogExerciseId === undefined && ex.modality === undefined) {
+        if (
+          ex.catalogExerciseId === undefined &&
+          ex.modality === undefined &&
+          ex.unilateral === undefined &&
+          ex.supportsExternalLoad === undefined
+        ) {
           await transactionDb.runAsync(
             `INSERT INTO workout_session_exercises
                (id, log_id, exercise_name, sets_completed, created_at)
@@ -930,10 +950,17 @@ export async function logWorkoutSession(input: {
             [exId, logId, ex.exerciseName, ex.setsCompleted, now],
           );
         } else {
+          const supportsExternalLoad =
+            ex.supportsExternalLoad === undefined
+              ? ex.catalogExerciseId
+                ? ex.modality === 'weighted_strength'
+                : true
+              : ex.supportsExternalLoad;
           await transactionDb.runAsync(
             `INSERT INTO workout_session_exercises
-               (id, log_id, exercise_name, sets_completed, catalog_exercise_id, modality, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+               (id, log_id, exercise_name, sets_completed, catalog_exercise_id, modality,
+                unilateral, supports_external_load, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               exId,
               logId,
@@ -941,6 +968,8 @@ export async function logWorkoutSession(input: {
               ex.setsCompleted,
               ex.catalogExerciseId ?? null,
               ex.modality ?? 'timed',
+              ex.unilateral ? 1 : 0,
+              supportsExternalLoad ? 1 : 0,
               now,
             ],
           );
@@ -1078,10 +1107,11 @@ export async function applyRemoteRoutineExercises(
   for (const row of rows) {
     await db.runAsync(
       `INSERT OR REPLACE INTO routine_exercises (
-         id, routine_id, name, sort_order, catalog_exercise_id, modality, notes, superset_group,
+         id, routine_id, name, sort_order, catalog_exercise_id, modality, unilateral,
+         supports_external_load, notes, superset_group,
          progression_mode, progression_increment, progression_min_reps, progression_max_reps,
          created_at, updated_at, deleted_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.routine_id,
@@ -1089,6 +1119,9 @@ export async function applyRemoteRoutineExercises(
         row.sort_order,
         row.catalog_exercise_id ?? null,
         row.modality ?? 'timed',
+        row.unilateral ?? 0,
+        row.supports_external_load ??
+          (row.catalog_exercise_id ? (row.modality === 'weighted_strength' ? 1 : 0) : 1),
         row.notes ?? null,
         row.superset_group ?? null,
         row.progression_mode ?? 'none',
@@ -1196,8 +1229,9 @@ export async function applyRemoteWorkoutSessionExercises(
   for (const row of rows) {
     await db.runAsync(
       `INSERT OR REPLACE INTO workout_session_exercises (
-         id, log_id, exercise_name, sets_completed, catalog_exercise_id, modality, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         id, log_id, exercise_name, sets_completed, catalog_exercise_id, modality,
+         unilateral, supports_external_load, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.log_id,
@@ -1205,6 +1239,9 @@ export async function applyRemoteWorkoutSessionExercises(
         row.sets_completed,
         row.catalog_exercise_id ?? null,
         row.modality ?? 'timed',
+        row.unilateral ?? 0,
+        row.supports_external_load ??
+          (row.catalog_exercise_id ? (row.modality === 'weighted_strength' ? 1 : 0) : 1),
         row.created_at,
       ],
     );
@@ -1278,6 +1315,7 @@ export async function getWorkoutLogDetail(logId: string): Promise<WorkoutLogDeta
 export async function listRecentLoggedSets(): Promise<
   {
     exerciseName: string;
+    catalogExerciseId: string | null;
     setNumber: number;
     weight: number;
     reps: number;
@@ -1286,6 +1324,7 @@ export async function listRecentLoggedSets(): Promise<
   const db = await getDatabase();
   return db.getAllAsync(
     `SELECT e.exercise_name AS exerciseName,
+            e.catalog_exercise_id AS catalogExerciseId,
             s.set_number AS setNumber,
             s.weight AS weight,
             s.reps AS reps
@@ -1307,11 +1346,15 @@ export type RecentWorkoutSetOutcome = {
   logId: string;
   completedAt: string;
   exerciseName: string;
+  catalogExerciseId: string | null;
+  modality: WorkoutModality | null;
   setNumber: number;
   weight: number | null;
   weightUnit: WorkoutWeightUnit | null;
   reps: number | null;
   completed: 0 | 1;
+  durationSeconds: number | null;
+  distance: number | null;
 };
 
 export async function listRecentWorkoutSetOutcomes(
@@ -1322,11 +1365,15 @@ export async function listRecentWorkoutSetOutcomes(
     `SELECT l.id AS logId,
             l.completed_at AS completedAt,
             e.exercise_name AS exerciseName,
+            e.catalog_exercise_id AS catalogExerciseId,
+            e.modality AS modality,
             s.set_number AS setNumber,
             s.weight AS weight,
             s.weight_unit AS weightUnit,
             s.reps AS reps,
-            s.completed AS completed
+            s.completed AS completed,
+            s.duration_seconds AS durationSeconds,
+            s.distance AS distance
      FROM workout_session_sets s
      INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
      INNER JOIN workout_logs l ON l.id = e.log_id
@@ -1344,20 +1391,30 @@ export async function listRecentWorkoutSetOutcomes(
  */
 export async function listLoggedSetsForExerciseNames(
   exerciseNames: string[],
-): Promise<{ exerciseName: string; weight: number; reps: number }[]> {
-  if (exerciseNames.length === 0) return [];
+  catalogExerciseIds: string[] = [],
+): Promise<
+  { exerciseName: string; catalogExerciseId: string | null; weight: number; reps: number }[]
+> {
+  if (exerciseNames.length === 0 && catalogExerciseIds.length === 0) return [];
   const db = await getDatabase();
-  const placeholders = exerciseNames.map(() => '?').join(', ');
+  const namePlaceholders = exerciseNames.map(() => '?').join(', ');
+  const catalogPlaceholders = catalogExerciseIds.map(() => '?').join(', ');
+  const identityClause =
+    catalogExerciseIds.length > 0
+      ? `(e.catalog_exercise_id IN (${catalogPlaceholders}) OR
+          (e.catalog_exercise_id IS NULL AND e.exercise_name IN (${namePlaceholders || "''"})))`
+      : `e.exercise_name IN (${namePlaceholders})`;
   return db.getAllAsync(
     `SELECT e.exercise_name AS exerciseName,
+            e.catalog_exercise_id AS catalogExerciseId,
             s.weight AS weight,
             s.reps AS reps
      FROM workout_session_sets s
      INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
      WHERE s.completed = 1 AND s.weight IS NOT NULL AND s.reps IS NOT NULL
-       AND e.exercise_name IN (${placeholders})
+       AND ${identityClause}
      ORDER BY s.created_at DESC, s.id DESC`,
-    exerciseNames,
+    catalogExerciseIds.length > 0 ? [...catalogExerciseIds, ...exerciseNames] : exerciseNames,
   );
 }
 
@@ -1423,6 +1480,13 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
       sortOrder: exercise.sort_order,
       catalogExerciseId: exercise.catalog_exercise_id,
       modality: exercise.modality,
+      unilateral: exercise.unilateral === 1,
+      supportsExternalLoad:
+        exercise.supports_external_load === undefined
+          ? exercise.catalog_exercise_id
+            ? exercise.modality === 'weighted_strength'
+            : true
+          : exercise.supports_external_load === 1,
       notes: exercise.notes,
       supersetGroup: exercise.superset_group,
       progressionMode: exercise.progression_mode,
@@ -1677,18 +1741,21 @@ export async function applyRemoteCustomExercises(
   for (const row of rows) {
     await db.runAsync(
       `INSERT OR REPLACE INTO custom_exercises
-       (id, name, description, primary_area, secondary_areas, equipment, modality, unilateral,
-        created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, name, description, aliases, instructions, primary_area, secondary_areas, equipment,
+        modality, unilateral, supports_external_load, created_at, updated_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.name,
         row.description,
+        row.aliases ?? '[]',
+        row.instructions ?? null,
         row.primary_area,
         row.secondary_areas,
         row.equipment,
         row.modality,
         row.unilateral,
+        row.supports_external_load ?? (row.modality === 'weighted_strength' ? 1 : 0),
         row.created_at,
         row.updated_at,
         row.deleted_at,
@@ -1776,12 +1843,24 @@ export async function applyRemoteBodyWeightEntries(
 export type CustomExerciseInput = {
   name: string;
   description?: string | null;
+  aliases?: string[];
+  instructions?: string | null;
   primaryArea: string;
   secondaryAreas?: string[];
   equipment?: string | null;
   modality: WorkoutModality;
   unilateral?: boolean;
+  supportsExternalLoad?: boolean;
 };
+
+function normalizeAliases(values: readonly string[] | undefined): string {
+  return JSON.stringify(
+    [...new Set((values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean))].slice(
+      0,
+      12,
+    ),
+  );
+}
 
 function normalizeSecondaryAreas(values: readonly string[] | undefined): string {
   return JSON.stringify(
@@ -1874,18 +1953,27 @@ export async function createCustomExercise(input: CustomExerciseInput): Promise<
     mutate: async (transactionDb, enqueue) => {
       await transactionDb.runAsync(
         `INSERT INTO custom_exercises
-         (id, name, description, primary_area, secondary_areas, equipment, modality, unilateral,
-          created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         (id, name, description, aliases, instructions, primary_area, secondary_areas, equipment,
+          modality, unilateral, supports_external_load, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           name,
           input.description?.trim() || null,
+          normalizeAliases(input.aliases),
+          input.instructions?.trim() || null,
           primaryArea,
           normalizeSecondaryAreas(input.secondaryAreas),
           input.equipment?.trim() || null,
           input.modality,
           input.unilateral ? 1 : 0,
+          input.supportsExternalLoad === undefined
+            ? input.modality === 'weighted_strength'
+              ? 1
+              : 0
+            : input.supportsExternalLoad
+              ? 1
+              : 0,
           now,
           now,
         ],
@@ -1913,25 +2001,42 @@ export async function updateCustomExercise(
   const nextSecondary = updates.secondaryAreas
     ? normalizeSecondaryAreas(updates.secondaryAreas)
     : current.secondary_areas;
+  const nextAliases = updates.aliases
+    ? normalizeAliases(updates.aliases)
+    : (current.aliases ?? '[]');
+  const nextInstructions =
+    updates.instructions === undefined
+      ? (current.instructions ?? null)
+      : updates.instructions?.trim() || null;
+  const nextSupportsExternalLoad =
+    updates.supportsExternalLoad === undefined
+      ? (current.supports_external_load ?? (current.modality === 'weighted_strength' ? 1 : 0))
+      : updates.supportsExternalLoad
+        ? 1
+        : 0;
   const now = nowIso();
   await runBackupMutation({
     db,
     mutate: async (transactionDb, enqueue) => {
       const result = await transactionDb.runAsync(
         `UPDATE custom_exercises
-         SET name = ?, description = ?, primary_area = ?, secondary_areas = ?, equipment = ?,
-             modality = ?, unilateral = ?, updated_at = ?
+         SET name = ?, description = ?, aliases = ?, instructions = ?, primary_area = ?,
+             secondary_areas = ?, equipment = ?, modality = ?, unilateral = ?,
+             supports_external_load = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
         [
           nextName,
           updates.description === undefined
             ? current.description
             : updates.description?.trim() || null,
+          nextAliases,
+          nextInstructions,
           nextArea,
           nextSecondary,
           updates.equipment === undefined ? current.equipment : updates.equipment?.trim() || null,
           updates.modality ?? current.modality,
           updates.unilateral === undefined ? current.unilateral : updates.unilateral ? 1 : 0,
+          nextSupportsExternalLoad,
           now,
           id,
         ],
@@ -1965,6 +2070,8 @@ export type RoutineExerciseUpdate = Partial<{
   name: string;
   catalogExerciseId: string | null;
   modality: WorkoutModality;
+  unilateral: boolean;
+  supportsExternalLoad: boolean;
   notes: string | null;
   supersetGroup: string | null;
   progressionMode: WorkoutProgressionMode;
@@ -1991,7 +2098,8 @@ export async function updateExercise(id: string, updates: RoutineExerciseUpdate)
       if (!current) return { changed: false, value: undefined };
       const result = await transactionDb.runAsync(
         `UPDATE routine_exercises
-         SET name = ?, catalog_exercise_id = ?, modality = ?, notes = ?, superset_group = ?,
+         SET name = ?, catalog_exercise_id = ?, modality = ?, unilateral = ?,
+             supports_external_load = ?, notes = ?, superset_group = ?,
              progression_mode = ?, progression_increment = ?, progression_min_reps = ?,
              progression_max_reps = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
@@ -2001,6 +2109,13 @@ export async function updateExercise(id: string, updates: RoutineExerciseUpdate)
             ? (current.catalog_exercise_id ?? null)
             : updates.catalogExerciseId,
           updates.modality ?? current.modality ?? 'timed',
+          updates.unilateral === undefined ? (current.unilateral ?? 0) : updates.unilateral ? 1 : 0,
+          updates.supportsExternalLoad === undefined
+            ? (current.supports_external_load ??
+              (current.catalog_exercise_id ? current.modality === 'weighted_strength' : 1))
+            : updates.supportsExternalLoad
+              ? 1
+              : 0,
           updates.notes === undefined ? (current.notes ?? null) : updates.notes?.trim() || null,
           updates.supersetGroup === undefined
             ? (current.superset_group ?? null)

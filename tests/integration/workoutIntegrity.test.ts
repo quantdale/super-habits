@@ -293,6 +293,8 @@ describe('Gym V2 durable model', () => {
       catalogExerciseId: 'builtin_barbell_bench_press',
       modality: 'weighted_strength',
       notes: 'Pause briefly on the chest.',
+      unilateral: true,
+      supportsExternalLoad: true,
       supersetGroup: 'push-a',
       progressionMode: 'double',
       progressionIncrement: 2.5,
@@ -314,6 +316,9 @@ describe('Gym V2 durable model', () => {
       secondaryAreas: ['upper back'],
       equipment: 'cable',
       modality: 'weighted_strength',
+      aliases: ['cable y'],
+      instructions: 'Pull toward the shoulders.',
+      supportsExternalLoad: true,
       unilateral: false,
     });
     await workout.upsertWeeklyPlanEntry({ weekday: 1, routineId, planKind: 'workout' });
@@ -362,21 +367,25 @@ describe('Gym V2 durable model', () => {
           "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
         )
       )?.value,
-    ).toBe('22');
+    ).toBe('23');
     expect(
       await db.getFirstAsync<{
         catalog_exercise_id: string;
         modality: string;
+        unilateral: number;
+        supports_external_load: number;
         notes: string;
         superset_group: string;
         progression_mode: string;
       }>(
-        'SELECT catalog_exercise_id, modality, notes, superset_group, progression_mode FROM routine_exercises WHERE id = ?',
+        'SELECT catalog_exercise_id, modality, unilateral, supports_external_load, notes, superset_group, progression_mode FROM routine_exercises WHERE id = ?',
         [exerciseId],
       ),
     ).toEqual({
       catalog_exercise_id: 'builtin_barbell_bench_press',
       modality: 'weighted_strength',
+      unilateral: 1,
+      supports_external_load: 1,
       notes: 'Pause briefly on the chest.',
       superset_group: 'push-a',
       progression_mode: 'double',
@@ -391,7 +400,12 @@ describe('Gym V2 durable model', () => {
         [setId],
       ),
     ).toEqual({ target_reps_min: 8, target_reps_max: 12, target_load: 80 });
-    expect((await workout.listCustomExercises())[0].id).toBe(customId);
+    expect((await workout.listCustomExercises())[0]).toMatchObject({
+      id: customId,
+      aliases: JSON.stringify(['cable y']),
+      instructions: 'Pull toward the shoulders.',
+      supports_external_load: 1,
+    });
     expect((await workout.resolveWorkoutScheduleForDate('2026-08-24')).planKind).toBe('rest');
     expect((await workout.resolveWorkoutScheduleForDate('2026-08-17')).routineId).toBe(routineId);
     expect((await workout.getWorkoutPreferences()).goalWeight).toEqual({ value: 75, unit: 'kg' });

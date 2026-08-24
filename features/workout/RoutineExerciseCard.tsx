@@ -89,6 +89,10 @@ export function RoutineExerciseCard({
 }: RoutineExerciseCardProps) {
   const { tokens } = useAppTheme();
   const modality = displayModality(ex);
+  const supportsExternalLoad =
+    ex.supports_external_load === undefined
+      ? modality === 'weighted_strength' || modality === null
+      : ex.supports_external_load === 1;
 
   return (
     <Card accentColor={COLOR} style={isActive ? { opacity: 0.88 } : undefined}>
@@ -190,12 +194,40 @@ export function RoutineExerciseCard({
                     void onUpdateExercise(ex.id, {
                       modality: option,
                       catalogExerciseId: ex.catalog_exercise_id ?? null,
+                      supportsExternalLoad:
+                        option === 'weighted_strength'
+                          ? true
+                          : option === 'bodyweight'
+                            ? ex.supports_external_load === 1
+                            : false,
                     }).then(onRefresh)
                   }
                 />
               ),
             )}
           </View>
+          {modality ? (
+            <View className="mb-3 flex-row flex-wrap">
+              <PillChip
+                label="Per side"
+                active={ex.unilateral === 1}
+                color={COLOR}
+                onPress={() =>
+                  void onUpdateExercise(ex.id, { unilateral: ex.unilateral !== 1 }).then(onRefresh)
+                }
+              />
+              <PillChip
+                label="External load"
+                active={supportsExternalLoad}
+                color={COLOR}
+                onPress={() =>
+                  void onUpdateExercise(ex.id, {
+                    supportsExternalLoad: !supportsExternalLoad,
+                  }).then(onRefresh)
+                }
+              />
+            </View>
+          ) : null}
           <TextInput
             accessibilityLabel={`${ex.name} notes`}
             value={ex.notes ?? ''}

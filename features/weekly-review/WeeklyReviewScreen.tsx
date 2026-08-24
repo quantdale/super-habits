@@ -414,6 +414,23 @@ function SummaryStep({ summary }: { summary: WeeklyReviewSummaryV1 }) {
 
       <Card headerTitle="Workouts" className="mb-3">
         <StatRow label="Sessions" value={summary.workouts.sessions} />
+        {summary.workouts.scheduledSessions !== undefined &&
+        summary.workouts.scheduledSessions > 0 ? (
+          <StatRow
+            label="Scheduled"
+            value={`${summary.workouts.sessions}/${summary.workouts.scheduledSessions}`}
+          />
+        ) : null}
+        {summary.workouts.completedSets !== undefined ? (
+          <StatRow label="Completed sets" value={summary.workouts.completedSets} />
+        ) : null}
+        {summary.workouts.measurableVolume !== undefined &&
+        summary.workouts.measurableVolume > 0 ? (
+          <StatRow
+            label="Measurable volume"
+            value={Math.round(summary.workouts.measurableVolume)}
+          />
+        ) : null}
         {summary.workouts.priorWeekSessions !== null && (
           <StatRow label="Prior week" value={summary.workouts.priorWeekSessions} />
         )}

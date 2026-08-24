@@ -336,17 +336,26 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const draftRoutineName = draft
     ? (routines.find((r) => r.id === draft.routineId)?.name ?? 'Workout')
     : null;
+  const todayKey = toDateKey(new Date());
+  const completedWorkoutToday = allLogs.some(
+    (log) => toDateKey(new Date(log.completed_at)) === todayKey,
+  );
 
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
   const workoutDaysCount = workoutActivityDays.filter((d) => d.active).length;
   const personalRecords = computePersonalRecords(
     performanceRows
-      .filter(
-        (row) =>
-          row.completed === 1 && (row.modality === null || row.modality === 'weighted_strength'),
-      )
-      .map((row) => ({ exerciseName: row.exerciseName, weight: row.weight, reps: row.reps })),
+      .filter((row) => row.completed === 1)
+      .map((row) => ({
+        exerciseName: row.exerciseName,
+        catalogExerciseId: row.catalogExerciseId,
+        modality: row.modality ?? undefined,
+        weight: row.weight,
+        reps: row.reps,
+        durationSeconds: row.durationSeconds,
+        distance: row.distance,
+      })),
   );
   const performanceByLog = new Map<string, WorkoutPerformanceRow[]>();
   for (const row of performanceRows) {
@@ -705,6 +714,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             schedule={todaySchedule}
             routine={todayRoutine}
             lastPerformedAt={todayRoutine ? (lastPerformed.get(todayRoutine.id) ?? null) : null}
+            completedToday={completedWorkoutToday}
+            draftRoutineName={draftRoutineName}
+            isResumable={draft !== null}
             exerciseCount={todayRoutine?.exercises.length ?? 0}
             setCount={
               todayRoutine?.exercises.reduce(
@@ -713,7 +725,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               ) ?? 0
             }
             onStart={() => {
-              if (todayRoutine) void startRoutineById(todayRoutine.id);
+              if (draft) void handleResumeDraft();
+              else if (todayRoutine) void startRoutineById(todayRoutine.id);
               else setChooserVisible(true);
             }}
             onPlanWeek={() => setWeekEditorVisible(true)}

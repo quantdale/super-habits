@@ -8,6 +8,12 @@ export type ExerciseCatalogItem = {
   secondaryAreas: string[];
   equipment: string;
   unilateral: boolean;
+  /** Search aliases are optional in source data and normalized by helpers. */
+  aliases?: readonly string[];
+  /** Repository-authored instructions; bundled media is intentionally absent. */
+  instructions?: string;
+  /** Explicit override for modalities such as bodyweight + added load. */
+  supportsExternalLoad?: boolean;
   description?: string;
 };
 
@@ -25,6 +31,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['triceps', 'shoulders'],
     equipment: 'barbell',
     unilateral: false,
+    aliases: ['bench', 'flat bench'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_dumbbell_bench_press',
@@ -34,6 +42,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['triceps', 'shoulders'],
     equipment: 'dumbbells',
     unilateral: false,
+    aliases: ['db bench'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_push_up',
@@ -43,6 +53,7 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['triceps', 'core'],
     equipment: 'bodyweight',
     unilateral: false,
+    supportsExternalLoad: false,
   },
   {
     id: 'builtin_incline_push_up',
@@ -61,6 +72,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['biceps', 'core'],
     equipment: 'barbell',
     unilateral: false,
+    aliases: ['bent-over row', 'barbell bent row'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_lat_pulldown',
@@ -79,6 +92,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['biceps', 'core'],
     equipment: 'pull-up bar',
     unilateral: false,
+    aliases: ['pullup'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_assisted_pull_up',
@@ -97,6 +112,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['biceps', 'core'],
     equipment: 'dumbbells',
     unilateral: true,
+    aliases: ['one-arm dumbbell row', 'db row'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_overhead_press',
@@ -106,6 +123,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['triceps', 'core'],
     equipment: 'barbell',
     unilateral: false,
+    aliases: ['military press', 'ohp'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_dumbbell_shoulder_press',
@@ -142,6 +161,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: [],
     equipment: 'barbell',
     unilateral: false,
+    aliases: ['barbell biceps curl'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_dumbbell_curl',
@@ -232,6 +253,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['glutes', 'back'],
     equipment: 'barbell',
     unilateral: false,
+    aliases: ['rdl'],
+    supportsExternalLoad: true,
   },
   {
     id: 'builtin_lying_leg_curl',
@@ -340,6 +363,8 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
     secondaryAreas: ['quads', 'calves'],
     equipment: 'treadmill',
     unilateral: false,
+    aliases: ['walking treadmill'],
+    supportsExternalLoad: false,
   },
   {
     id: 'builtin_treadmill_run',
@@ -407,6 +432,30 @@ export const BUILT_IN_EXERCISES: readonly ExerciseCatalogItem[] = [
 ] as const;
 
 const BUILT_IN_BY_ID = new Map(BUILT_IN_EXERCISES.map((exercise) => [exercise.id, exercise]));
+
+export function getExerciseAliases(exercise: ExerciseCatalogItem): string[] {
+  return [
+    ...new Set((exercise.aliases ?? []).map((alias) => alias.trim().toLowerCase()).filter(Boolean)),
+  ];
+}
+
+export function exerciseSupportsExternalLoad(exercise: ExerciseCatalogItem): boolean {
+  return exercise.supportsExternalLoad ?? exercise.modality === 'weighted_strength';
+}
+
+/** Stable, offline search text used by both bundled and custom catalog rows. */
+export function buildExerciseSearchText(exercise: ExerciseCatalogItem): string {
+  return [
+    exercise.name,
+    ...getExerciseAliases(exercise),
+    exercise.primaryArea,
+    ...exercise.secondaryAreas,
+    exercise.equipment,
+    exercise.modality,
+  ]
+    .join(' ')
+    .toLowerCase();
+}
 
 export function getBuiltInExercise(id: string | null | undefined): ExerciseCatalogItem | null {
   return id ? (BUILT_IN_BY_ID.get(id) ?? null) : null;

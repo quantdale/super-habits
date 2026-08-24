@@ -126,9 +126,13 @@ test.describe('Workout Gym V2', () => {
 
     await expect(page.getByText('Log this set (optional)')).toBeVisible();
     await expect(page.getByText('Progression guidance', { exact: true })).toBeVisible();
-    await page.getByRole('textbox', { name: 'Weight' }).fill('80');
+    const strengthWeight = page.getByRole('textbox', { name: 'Weight' });
+    await strengthWeight.fill('75');
+    await strengthWeight.fill('80');
+    await expect(strengthWeight).toHaveValue('80');
     await page.getByRole('textbox', { name: 'Reps' }).fill('8');
     await page.getByText('Start', { exact: true }).first().click();
+    await page.getByText('Complete set now', { exact: true }).click();
     await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 15_000 });
     await page.getByLabel('Notes (optional)').fill('Gym V2 strength session');
     await page.getByText('Save and finish', { exact: true }).click();
@@ -183,6 +187,10 @@ test.describe('Workout Gym V2', () => {
     await page.getByRole('button', { name: 'Resume workout · Draft Resume' }).click();
     await expect(page.getByRole('textbox', { name: 'Weight' })).toHaveValue('70');
     await expect(page.getByRole('textbox', { name: 'Reps' })).toHaveValue('8');
+    await page.getByText('Skip', { exact: true }).click();
+    await expect(page.getByText('Workout complete!')).toBeVisible();
+    await page.getByText('Save and finish', { exact: true }).click();
+    await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
   });
 
   test('runs bodyweight, timed, and cardio modalities with typed results', async ({ page }) => {
@@ -225,6 +233,9 @@ test.describe('Workout Gym V2', () => {
     await expect(page.getByText(/bodyweight · 8–12 reps/)).toBeVisible();
     await page.getByRole('textbox', { name: 'Reps' }).fill('10');
     await page.getByText('Start', { exact: true }).first().click();
+    // Typed bodyweight sets are manual events: the active timer is only a
+    // pacing aid and stops without fabricating completion.
+    await page.getByText('Complete set now', { exact: true }).click();
 
     await expect(page.getByText('Plank', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/timed · target/)).toBeVisible();
@@ -245,8 +256,8 @@ test.describe('Workout Gym V2', () => {
       .click();
     const detail = page.getByRole('dialog');
     await expect(detail.getByText('Push-up', { exact: true })).toBeVisible();
-    await expect(detail.getByText('Plank', { exact: true })).toBeVisible();
-    await expect(detail.getByText('Treadmill Walk', { exact: true })).toBeVisible();
+    await expect(detail.getByText('Plank', { exact: true }).first()).toBeVisible();
+    await expect(detail.getByText('Treadmill Walk', { exact: true }).first()).toBeVisible();
     await expect(detail.getByText(/3.2 distance/)).toBeVisible();
     await expect(detail.getByText(/pace 7.5/)).toBeVisible();
   });

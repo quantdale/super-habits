@@ -11,8 +11,18 @@ import type {
   WorkoutRoutine,
   WorkoutWeeklyPlanEntry,
 } from '@/core/db/types';
-import type { ScheduleResolution, BodyWeightTrend, PersonalRecord } from './workout.domain';
-import { computeBodyWeightTrend, convertWeight, formatWorkoutTime } from './workout.domain';
+import type {
+  ScheduleResolution,
+  BodyWeightTrend,
+  PersonalRecord,
+  ExerciseHistoryEntry,
+} from './workout.domain';
+import {
+  buildExerciseHistory,
+  computeBodyWeightTrend,
+  convertWeight,
+  formatWorkoutTime,
+} from './workout.domain';
 import type { WorkoutPerformanceRow } from './workout.data';
 
 const COLOR = SECTION_COLORS.workout;
@@ -30,6 +40,9 @@ export function WorkoutTodayCard({
   lastPerformedAt,
   exerciseCount,
   setCount,
+  completedToday,
+  draftRoutineName,
+  isResumable,
   onStart,
   onPlanWeek,
   onChangeToday,
@@ -40,6 +53,9 @@ export function WorkoutTodayCard({
   lastPerformedAt: string | null;
   exerciseCount: number;
   setCount: number;
+  completedToday: boolean;
+  draftRoutineName: string | null;
+  isResumable: boolean;
   onStart: () => void;
   onPlanWeek: () => void;
   onChangeToday: () => void;
@@ -55,7 +71,20 @@ export function WorkoutTodayCard({
       headerSubtitle="Your local training plan for this date."
       headerRight={<MaterialIcons name="today" size={20} color={tokens.textOnAccent} />}
     >
-      {restDay ? (
+      {isResumable ? (
+        <View>
+          <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+            Workout in progress
+          </Text>
+          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            {draftRoutineName ?? 'Your workout'} is paused and ready to resume. Your entered sets
+            are saved locally.
+          </Text>
+          <View className="mt-4">
+            <Button label="Resume workout" onPress={onStart} color={COLOR} />
+          </View>
+        </View>
+      ) : restDay ? (
         <View>
           <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
             Rest day
@@ -67,20 +96,26 @@ export function WorkoutTodayCard({
       ) : (
         <View>
           <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
-            {routine.name}
+            {completedToday ? 'Workout completed today' : routine.name}
           </Text>
           <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            {exerciseCount} exercises · {setCount} prescribed sets
+            {completedToday
+              ? `${routine.name} is logged. Train again whenever it suits you.`
+              : `${exerciseCount} exercises · ${setCount} prescribed sets`}
             {lastPerformedAt
               ? ` · Last ${new Date(lastPerformedAt).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`
               : ''}
           </Text>
           <View className="mt-4">
-            <Button label="Start today's workout" onPress={onStart} color={COLOR} />
+            <Button
+              label={completedToday ? 'Start another session' : "Start today's workout"}
+              onPress={onStart}
+              color={COLOR}
+            />
           </View>
         </View>
       )}
-      {!restDay ? (
+      {!restDay && !isResumable ? (
         <View className="mt-3">
           <Button label="Move workout to another day" variant="ghost" onPress={onReschedule} />
         </View>
@@ -190,7 +225,21 @@ export function WorkoutWeekCard({
 }
 
 function formatRecord(record: PersonalRecord): string {
-  return `est. 1RM ${Math.round(record.bestEstimated1RM)} · top ${record.bestTopSetWeight}`;
+  const metrics: string[] = [];
+  if (record.bestEstimated1RM > 0) {
+    metrics.push(`est. 1RM ${Math.round(record.bestEstimated1RM)}`);
+  }
+  if (record.bestTopSetWeight > 0) metrics.push(`top ${record.bestTopSetWeight}`);
+  if (record.bestRepSet) {
+    metrics.push(`best reps ${record.bestRepSet.reps} @ ${record.bestRepSet.weight}`);
+  }
+  if (record.bestTimedDurationSeconds > 0) {
+    metrics.push(`best ${formatWorkoutTime(record.bestTimedDurationSeconds)}`);
+  }
+  if (record.bestCardioDistance > 0) {
+    metrics.push(`best distance ${record.bestCardioDistance}`);
+  }
+  return metrics.join(' · ') || 'No measurable performance yet';
 }
 
 function formatPerformanceLine(row: WorkoutPerformanceRow): string {
@@ -230,10 +279,30 @@ export function WorkoutProgressCard({
 }) {
   const { tokens } = useAppTheme();
   const exerciseNames = [...new Set(rows.map((row) => row.exerciseName))];
+  const selectedExerciseRows = selectedExercise
+    ? rows.filter((row) => row.exerciseName === selectedExercise)
+    : [];
   const selectedRows = selectedExercise
     ? rows.filter((row) => row.exerciseName === selectedExercise).slice(0, 8)
     : [];
   const selectedRecord = records.find((record) => record.exerciseName === selectedExercise);
+  const selectedHistory = selectedExercise
+    ? buildExerciseHistory(
+        selectedExerciseRows.map((row): ExerciseHistoryEntry => ({
+          logId: row.logId,
+          completedAt: row.completedAt,
+          exerciseName: row.exerciseName,
+          catalogExerciseId: row.catalogExerciseId,
+          modality: row.modality ?? undefined,
+          weight: row.weight,
+          reps: row.reps,
+          durationSeconds: row.durationSeconds,
+          distance: row.distance,
+          completed: row.completed === 1,
+          setNumber: row.setNumber,
+        })),
+      )
+    : null;
   return (
     <Card
       accentColor={COLOR}
@@ -244,7 +313,7 @@ export function WorkoutProgressCard({
     >
       {records.length === 0 ? (
         <Text className="text-sm" style={{ color: tokens.textMuted }}>
-          Complete recorded strength sets to see personal records and trends.
+          Complete recorded sets to see personal records and trends.
         </Text>
       ) : (
         <View className="gap-2">
@@ -304,6 +373,28 @@ export function WorkoutProgressCard({
               {selectedRecord ? (
                 <Text className="mt-1 text-xs" style={{ color: COLOR }}>
                   {formatRecord(selectedRecord)}
+                </Text>
+              ) : null}
+              {selectedHistory ? (
+                <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+                  {selectedHistory.sessions} session
+                  {selectedHistory.sessions === 1 ? '' : 's'} · {selectedHistory.performedSets}{' '}
+                  performed sets
+                  {selectedHistory.measurableVolume > 0
+                    ? ` · volume ${Math.round(selectedHistory.measurableVolume)}`
+                    : ''}
+                  {selectedHistory.points.length > 1 &&
+                  selectedHistory.bestEstimated1RM > 0 &&
+                  selectedHistory.points[0]?.bestEstimated1RM !==
+                    selectedHistory.points[selectedHistory.points.length - 1]?.bestEstimated1RM
+                    ? ` · est. 1RM trend ${Math.round(selectedHistory.points[0]?.bestEstimated1RM ?? 0)} → ${Math.round(selectedHistory.points[selectedHistory.points.length - 1]?.bestEstimated1RM ?? 0)}`
+                    : ''}
+                  {selectedHistory.bestTimedDurationSeconds > 0
+                    ? ` · best timed ${formatWorkoutTime(selectedHistory.bestTimedDurationSeconds)}`
+                    : ''}
+                  {selectedHistory.bestCardioDistance > 0
+                    ? ` · best distance ${selectedHistory.bestCardioDistance}`
+                    : ''}
                 </Text>
               ) : null}
               {selectedRows.map((row) => (

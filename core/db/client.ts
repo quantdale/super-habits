@@ -850,6 +850,49 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       `);
     });
   }
+
+  // Migration 23: Gym / Training V2 semantic snapshots.
+  // The prior migration introduced identity and modality, but routine and
+  // historical session rows still had to infer unilateral and external-load
+  // meaning from the current catalog. These nullable/default-compatible
+  // columns snapshot that meaning without rewriting legacy measurements.
+  // Custom aliases/instructions remain user-owned recoverable metadata; the
+  // bundled catalog stays static application source.
+  if (version < 23) {
+    await applyMigration(db, 23, async () => {
+      await addColumnIfMissing(db, 'routine_exercises', 'unilateral', 'INTEGER NOT NULL DEFAULT 0');
+      await addColumnIfMissing(
+        db,
+        'routine_exercises',
+        'supports_external_load',
+        'INTEGER NOT NULL DEFAULT 1',
+      );
+      await addColumnIfMissing(
+        db,
+        'workout_session_exercises',
+        'unilateral',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await addColumnIfMissing(
+        db,
+        'workout_session_exercises',
+        'supports_external_load',
+        'INTEGER NOT NULL DEFAULT 1',
+      );
+      await addColumnIfMissing(db, 'custom_exercises', 'aliases', "TEXT NOT NULL DEFAULT '[]'");
+      await addColumnIfMissing(db, 'custom_exercises', 'instructions', 'TEXT');
+      await addColumnIfMissing(
+        db,
+        'custom_exercises',
+        'supports_external_load',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execAsync(
+        `CREATE INDEX IF NOT EXISTS idx_custom_exercises_active_search
+         ON custom_exercises (name COLLATE NOCASE, primary_area, equipment, updated_at);`,
+      );
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

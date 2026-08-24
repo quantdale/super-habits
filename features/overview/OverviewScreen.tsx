@@ -23,7 +23,12 @@ import {
 import { listProjects } from '@/features/projects/projects.data';
 import { listGoals } from '@/features/goals/goals.data';
 import { listTodos } from '@/features/todos/todos.data';
-import { listRoutines, listWorkoutLogsForRange } from '@/features/workout/workout.data';
+import {
+  getWorkoutSessionDraft,
+  listRoutines,
+  listWorkoutLogsForRange,
+  resolveWorkoutScheduleForDate,
+} from '@/features/workout/workout.data';
 
 import { CaloriesCard } from './cards/CaloriesCard';
 import { FocusCard } from './cards/FocusCard';
@@ -122,6 +127,8 @@ async function loadSummaries(): Promise<OverviewLoadResult> {
     projects,
     goals,
     focusTimerIntent,
+    todayWorkoutSchedule,
+    workoutDraft,
   ] = await Promise.all([
     listTodos(),
     getDailyPlan(today),
@@ -136,16 +143,37 @@ async function loadSummaries(): Promise<OverviewLoadResult> {
     listProjects(),
     listGoals(),
     getPomodoroActiveTimer(),
+    resolveWorkoutScheduleForDate(today),
+    getWorkoutSessionDraft(),
   ]);
 
   const routineNames = new Map(routines.map((routine) => [routine.id, routine.name]));
+  const completedWorkoutToday = weekLogs.some((log) => {
+    const completedAt = log.completed_at;
+    return completedAt ? timestampToLocalDateKey(completedAt) === today : false;
+  });
+  const plannedWorkoutName = todayWorkoutSchedule.routineId
+    ? (routineNames.get(todayWorkoutSchedule.routineId) ?? null)
+    : null;
+  const todayWorkoutState = workoutDraft
+    ? 'resumable'
+    : completedWorkoutToday
+      ? 'completed'
+      : todayWorkoutSchedule.planKind === 'workout' && todayWorkoutSchedule.routineId
+        ? 'planned'
+        : todayWorkoutSchedule.planKind === 'rest'
+          ? 'rest'
+          : 'unplanned';
 
   const summaries: OverviewSummaries = {
     plan: shapePlanProgressSummary(plan, todos),
     todos: shapeTodosSummary(todos, today),
     habits: shapeHabitsSummary(habits, completionsToday, today),
     focus: shapeFocusWeekSummary(weekSessions, weekKeys),
-    workout: shapeWorkoutSummary(weekLogs, routineNames, weekKeys),
+    workout: shapeWorkoutSummary(weekLogs, routineNames, weekKeys, {
+      state: todayWorkoutState,
+      plannedWorkoutName,
+    }),
     calories: shapeCaloriesSummary(calorieEntries, calorieGoal.calories),
     projects: shapeProjectsSummary(projects),
     goals: shapeGoalsSummary(goals),
@@ -270,6 +298,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     summaries.habits.scheduledToday > 0 ||
     summaries.focus.sessionCount > 0 ||
     summaries.workout.sessionsThisWeek > 0 ||
+    summaries.workout.todayState === 'planned' ||
+    summaries.workout.todayState === 'resumable' ||
     summaries.calories.consumed > 0 ||
     summaries.projects.activeCount > 0 ||
     summaries.goals.activeCount > 0;

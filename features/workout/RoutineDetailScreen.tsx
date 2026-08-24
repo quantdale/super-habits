@@ -22,7 +22,13 @@ import {
 } from './workout.data';
 import type { RoutineExercise, RoutineExerciseSet } from './types';
 import type { CustomExercise, WorkoutModality, WorkoutProgressionMode } from '@/core/db/types';
-import { BUILT_IN_EXERCISES, type ExerciseCatalogItem } from './exerciseCatalog';
+import {
+  BUILT_IN_EXERCISES,
+  buildExerciseSearchText,
+  exerciseSupportsExternalLoad,
+  getExerciseAliases,
+  type ExerciseCatalogItem,
+} from './exerciseCatalog';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { validateExerciseName, validateSetTiming } from '@/lib/validation';
@@ -97,12 +103,17 @@ export function RoutineDetailModal({
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
   const [pickerArea, setPickerArea] = useState<string | null>(null);
+  const [pickerEquipment, setPickerEquipment] = useState<string | null>(null);
   const [pickerModality, setPickerModality] = useState<WorkoutModality | null>(null);
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [customName, setCustomName] = useState('');
   const [customArea, setCustomArea] = useState('full-body');
   const [customEquipment, setCustomEquipment] = useState('');
   const [customModality, setCustomModality] = useState<WorkoutModality>('weighted_strength');
+  const [customAliases, setCustomAliases] = useState('');
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [customUnilateral, setCustomUnilateral] = useState(false);
+  const [customSupportsExternalLoad, setCustomSupportsExternalLoad] = useState(true);
   const pendingBuilderMutationsRef = useRef<Promise<void>>(Promise.resolve());
 
   const refresh = useCallback(async () => {
@@ -209,6 +220,8 @@ export function RoutineDetailModal({
       name: item.name,
       catalogExerciseId: item.id,
       modality: item.modality,
+      unilateral: item.unilateral,
+      supportsExternalLoad: exerciseSupportsExternalLoad(item),
       sortOrder: exercises.length + 1,
     });
     await queuedAddDefaultSet(exId);
@@ -228,6 +241,10 @@ export function RoutineDetailModal({
         primaryArea: customArea,
         equipment: customEquipment || null,
         modality: customModality,
+        aliases: customAliases.split(','),
+        instructions: customInstructions,
+        unilateral: customUnilateral,
+        supportsExternalLoad: customSupportsExternalLoad,
       });
       const created: ExerciseCatalogItem = {
         id,
@@ -236,11 +253,18 @@ export function RoutineDetailModal({
         secondaryAreas: [],
         equipment: customEquipment.trim() || 'other',
         modality: customModality,
-        unilateral: false,
+        unilateral: customUnilateral,
+        aliases: customAliases.split(','),
+        instructions: customInstructions.trim() || undefined,
+        supportsExternalLoad: customSupportsExternalLoad,
       };
       await handleAddCatalogExercise(created);
       setCustomName('');
       setCustomEquipment('');
+      setCustomAliases('');
+      setCustomInstructions('');
+      setCustomUnilateral(false);
+      setCustomSupportsExternalLoad(customModality === 'weighted_strength');
       setWorkoutError(null);
     } catch (error) {
       setWorkoutError(error instanceof Error ? error.message : 'Could not create exercise.');
@@ -258,15 +282,21 @@ export function RoutineDetailModal({
       equipment: exercise.equipment ?? 'other',
       modality: exercise.modality,
       unilateral: exercise.unilateral === 1,
+      aliases: exercise.aliases ? parseCustomAreas(exercise.aliases) : [],
+      instructions: exercise.instructions ?? undefined,
+      supportsExternalLoad:
+        exercise.supports_external_load === undefined
+          ? exercise.modality === 'weighted_strength'
+          : exercise.supports_external_load === 1,
     })),
   ].filter((exercise) => {
     const query = pickerQuery.trim().toLowerCase();
     return (
       (!query ||
-        `${exercise.name} ${exercise.primaryArea} ${exercise.equipment}`
-          .toLowerCase()
-          .includes(query)) &&
+        buildExerciseSearchText(exercise).includes(query) ||
+        getExerciseAliases(exercise).some((alias) => alias.includes(query))) &&
       (!pickerArea || exercise.primaryArea === pickerArea) &&
+      (!pickerEquipment || exercise.equipment === pickerEquipment) &&
       (!pickerModality || exercise.modality === pickerModality)
     );
   });
@@ -329,6 +359,10 @@ export function RoutineDetailModal({
             {exercises.map((ex) => {
               const isOpen = expandedId === ex.id;
               const modality = displayModality(ex);
+              const supportsExternalLoad =
+                ex.supports_external_load === undefined
+                  ? modality === 'weighted_strength' || modality === null
+                  : ex.supports_external_load === 1;
               return (
                 <Card key={ex.id} accentColor={COLOR}>
                   <View className="flex-row items-center justify-between">
@@ -435,11 +469,41 @@ export function RoutineDetailModal({
                               void queuedUpdateExercise(ex.id, {
                                 modality: option,
                                 catalogExerciseId: ex.catalog_exercise_id ?? null,
+                                supportsExternalLoad:
+                                  option === 'weighted_strength'
+                                    ? true
+                                    : option === 'bodyweight'
+                                      ? ex.supports_external_load === 1
+                                      : false,
                               }).then(refresh)
                             }
                           />
                         ))}
                       </View>
+                      {modality ? (
+                        <View className="mb-3 flex-row flex-wrap">
+                          <PillChip
+                            label="Per side"
+                            active={ex.unilateral === 1}
+                            color={COLOR}
+                            onPress={() =>
+                              void queuedUpdateExercise(ex.id, {
+                                unilateral: ex.unilateral !== 1,
+                              }).then(refresh)
+                            }
+                          />
+                          <PillChip
+                            label="External load"
+                            active={supportsExternalLoad}
+                            color={COLOR}
+                            onPress={() =>
+                              void queuedUpdateExercise(ex.id, {
+                                supportsExternalLoad: !supportsExternalLoad,
+                              }).then(refresh)
+                            }
+                          />
+                        </View>
+                      ) : null}
                       <TextInput
                         accessibilityLabel={`${ex.name} notes`}
                         value={ex.notes ?? ''}
@@ -942,6 +1006,31 @@ export function RoutineDetailModal({
           ))}
         </View>
         <Text className="mb-2 text-xs font-semibold uppercase" style={{ color: tokens.textMuted }}>
+          Equipment
+        </Text>
+        <View className="mb-2 flex-row flex-wrap">
+          {[
+            'all',
+            'barbell',
+            'dumbbells',
+            'cable',
+            'machine',
+            'bodyweight',
+            'pull-up bar',
+            'treadmill',
+            'bike',
+            'other',
+          ].map((equipment) => (
+            <PillChip
+              key={equipment}
+              label={equipment === 'all' ? 'All' : equipment}
+              active={(pickerEquipment ?? 'all') === equipment}
+              color={COLOR}
+              onPress={() => setPickerEquipment(equipment === 'all' ? null : equipment)}
+            />
+          ))}
+        </View>
+        <Text className="mb-2 text-xs font-semibold uppercase" style={{ color: tokens.textMuted }}>
           Modality
         </Text>
         <View className="mb-3 flex-row flex-wrap">
@@ -1012,6 +1101,18 @@ export function RoutineDetailModal({
             onChangeText={setCustomEquipment}
             placeholder="cable, barbell, none"
           />
+          <TextField
+            label="Search aliases (comma separated)"
+            value={customAliases}
+            onChangeText={setCustomAliases}
+            placeholder="close grip, narrow press"
+          />
+          <TextField
+            label="Instructions (optional)"
+            value={customInstructions}
+            onChangeText={setCustomInstructions}
+            placeholder="Short user-authored setup cue"
+          />
           <View className="mb-2 flex-row flex-wrap">
             {(['weighted_strength', 'bodyweight', 'timed', 'cardio'] as WorkoutModality[]).map(
               (modalityOption) => (
@@ -1020,10 +1121,31 @@ export function RoutineDetailModal({
                   label={MODALITY_LABELS[modalityOption]}
                   active={customModality === modalityOption}
                   color={COLOR}
-                  onPress={() => setCustomModality(modalityOption)}
+                  onPress={() => {
+                    setCustomModality(modalityOption);
+                    if (modalityOption !== 'bodyweight' && modalityOption !== 'weighted_strength') {
+                      setCustomSupportsExternalLoad(false);
+                    } else if (modalityOption === 'weighted_strength') {
+                      setCustomSupportsExternalLoad(true);
+                    }
+                  }}
                 />
               ),
             )}
+          </View>
+          <View className="mb-3 flex-row flex-wrap">
+            <PillChip
+              label="Per side"
+              active={customUnilateral}
+              color={COLOR}
+              onPress={() => setCustomUnilateral((value) => !value)}
+            />
+            <PillChip
+              label="External load"
+              active={customSupportsExternalLoad}
+              color={COLOR}
+              onPress={() => setCustomSupportsExternalLoad((value) => !value)}
+            />
           </View>
           <Button
             label="Create and add"

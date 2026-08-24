@@ -25,7 +25,12 @@ import {
 import { listTodos } from '@/features/todos/todos.data';
 import { listHabits, getAllHabitCompletionsForRange } from '@/features/habits/habits.data';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
-import { listWorkoutLogsForRange, getRoutineNamesByIds } from '@/features/workout/workout.data';
+import {
+  getRoutineNamesByIds,
+  listWorkoutLogsForRange,
+  listWorkoutPerformanceRows,
+  resolveWorkoutScheduleForDate,
+} from '@/features/workout/workout.data';
 import { getCalorieSummaryByRange, getCalorieGoal } from '@/features/calories/calories.data';
 
 // ── todos ────────────────────────────────────────────────────────────────────
@@ -163,11 +168,17 @@ async function summarizeFocus(week: ReviewWeek): Promise<FocusSummary> {
 // ── workouts ─────────────────────────────────────────────────────────────────
 
 async function summarizeWorkouts(week: ReviewWeek): Promise<WorkoutSummary> {
-  const weekLogs = await listWorkoutLogsForRange(week.startDateKey, week.endDateKey);
+  const [weekLogs, priorLogs, performanceRows] = await Promise.all([
+    listWorkoutLogsForRange(week.startDateKey, week.endDateKey),
+    listWorkoutLogsForRange(
+      shiftDateKeyByDays(week.startDateKey, -7),
+      shiftDateKeyByDays(week.endDateKey, -7),
+    ),
+    listWorkoutPerformanceRows(),
+  ]);
 
-  const priorLogs = await listWorkoutLogsForRange(
-    shiftDateKeyByDays(week.startDateKey, -7),
-    shiftDateKeyByDays(week.endDateKey, -7),
+  const scheduleRows = await Promise.all(
+    listWeekDateKeys(week.startDateKey, 7).map((dateKey) => resolveWorkoutScheduleForDate(dateKey)),
   );
 
   const routineMap = new Map<string, number>();
@@ -185,10 +196,31 @@ async function summarizeWorkouts(week: ReviewWeek): Promise<WorkoutSummary> {
     }
   }
 
+  const weekLogIds = new Set(weekLogs.map((log) => log.id));
+  const completedSets = performanceRows.filter(
+    (row) => weekLogIds.has(row.logId) && row.completed === 1,
+  );
+  const measurableVolume = completedSets.reduce((sum, row) => {
+    if (
+      row.weight === null ||
+      row.reps === null ||
+      row.modality === 'timed' ||
+      row.modality === 'cardio'
+    ) {
+      return sum;
+    }
+    return sum + row.weight * row.reps;
+  }, 0);
+
   return {
     sessions: weekLogs.length,
     priorWeekSessions: priorLogs.length > 0 ? priorLogs.length : null,
     routines,
+    scheduledSessions: scheduleRows.filter(
+      (schedule) => schedule.planKind === 'workout' && schedule.routineId !== null,
+    ).length,
+    completedSets: completedSets.length,
+    measurableVolume,
   };
 }
 

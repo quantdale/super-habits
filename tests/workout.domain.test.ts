@@ -10,6 +10,7 @@ import {
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
   computeBodyAreaDistribution,
+  buildExerciseHistory,
   computeBodyWeightTrend,
   computeModalityVolume,
   computeTrainingTotals,
@@ -72,6 +73,26 @@ describe('buildTimerSequence', () => {
 
   it('first phase is active', () => {
     expect(buildTimerSequence(exercises)[0].phase).toBe('active');
+  });
+
+  it('keeps adjacent superset exercises back-to-back and rests after the group', () => {
+    const sequence = buildTimerSequence([
+      {
+        name: 'Press',
+        superset_group: 'push-pull',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+      {
+        name: 'Row',
+        superset_group: 'push-pull',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+      {
+        name: 'Carry',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+    ]);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'active', 'rest', 'active']);
   });
 });
 
@@ -275,6 +296,75 @@ describe('buildPreviousSetLookup / lookupPreviousSet', () => {
     expect(lookupPreviousSet(lookup, 'Row', 1)).toBeNull();
     expect(lookupPreviousSet(null, 'Bench', 1)).toBeNull();
   });
+
+  it('prefers durable catalog identity before falling back to legacy name history', () => {
+    const lookup = buildPreviousSetLookup([
+      {
+        exerciseName: 'Bench',
+        catalogExerciseId: 'bench-v2',
+        setNumber: 1,
+        weight: 90,
+        reps: 5,
+      },
+      { exerciseName: 'Bench', setNumber: 1, weight: 80, reps: 8 },
+    ]);
+    expect(lookupPreviousSet(lookup, 'Bench', 1, 'bench-v2')?.weight).toBe(90);
+    expect(lookupPreviousSet(lookup, 'Bench', 1, 'other-bench')?.weight).toBe(80);
+  });
+});
+
+describe('buildExerciseHistory', () => {
+  it('keeps timed trends separate from load volume and skipped sets', () => {
+    const history = buildExerciseHistory([
+      {
+        logId: 'log-1',
+        completedAt: '2026-08-20T10:00:00.000Z',
+        exerciseName: 'Plank',
+        catalogExerciseId: 'plank',
+        modality: 'timed',
+        weight: null,
+        reps: null,
+        durationSeconds: 30,
+        completed: true,
+        setNumber: 1,
+      },
+      {
+        logId: 'log-2',
+        completedAt: '2026-08-21T10:00:00.000Z',
+        exerciseName: 'Plank',
+        catalogExerciseId: 'plank',
+        modality: 'timed',
+        weight: null,
+        reps: null,
+        durationSeconds: 45,
+        completed: true,
+        setNumber: 1,
+      },
+      {
+        logId: 'log-2',
+        completedAt: '2026-08-21T10:00:00.000Z',
+        exerciseName: 'Plank',
+        catalogExerciseId: 'plank',
+        modality: 'timed',
+        weight: null,
+        reps: null,
+        durationSeconds: null,
+        completed: false,
+        setNumber: 2,
+      },
+    ]);
+    expect(history).toMatchObject({
+      sessions: 2,
+      performedSets: 2,
+      measurableVolume: 0,
+      bestEstimated1RM: 0,
+      bestTimedDurationSeconds: 45,
+      points: [
+        { performedSets: 1, bestTimedDurationSeconds: 30 },
+        { performedSets: 1, bestTimedDurationSeconds: 45 },
+      ],
+    });
+  });
 });
 
 describe('Gym V2 training domain', () => {
@@ -376,6 +466,63 @@ describe('Gym V2 training domain', () => {
       ],
     });
     expect(load).toMatchObject({ action: 'increase_load', nextLoad: 52.5 });
+  });
+
+  it('progresses timed work by duration and explains the target change', () => {
+    expect(
+      recommendProgression({
+        mode: 'linear',
+        modality: 'timed',
+        currentLoad: null,
+        increment: null,
+        minReps: null,
+        maxReps: null,
+        currentDurationSeconds: 30,
+        durationIncrementSeconds: 5,
+        latestSets: [
+          { completed: true, weight: null, reps: null, durationSeconds: 30 },
+          { completed: true, weight: null, reps: null, durationSeconds: 31 },
+        ],
+      }),
+    ).toMatchObject({
+      action: 'increase_duration',
+      nextDurationSeconds: 35,
+      reasonCode: 'completed_prescription',
+    });
+  });
+
+  it('progresses unloaded bodyweight work with reps instead of fake load', () => {
+    expect(
+      recommendProgression({
+        mode: 'double',
+        modality: 'bodyweight',
+        supportsExternalLoad: false,
+        currentLoad: null,
+        increment: 1,
+        minReps: 8,
+        maxReps: 10,
+        latestSets: [
+          { completed: true, weight: null, reps: 10 },
+          { completed: true, weight: null, reps: 10 },
+        ],
+      }),
+    ).toMatchObject({ action: 'increase_reps', nextRepsMin: 9, nextRepsMax: 11 });
+  });
+
+  it('holds timed progression when a required duration is missing', () => {
+    expect(
+      recommendProgression({
+        mode: 'linear',
+        modality: 'timed',
+        currentLoad: null,
+        increment: null,
+        minReps: null,
+        maxReps: null,
+        currentDurationSeconds: 30,
+        durationIncrementSeconds: 5,
+        latestSets: [{ completed: true, weight: null, reps: null }],
+      }),
+    ).toMatchObject({ action: 'hold', reasonCode: 'unknown_or_skipped' });
   });
 
   it('keeps modality volume honest and preserves effort scale', () => {

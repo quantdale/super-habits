@@ -99,6 +99,7 @@ const EXPECTED_NAMED_INDEXES = [
   'idx_processed_notification_actions_processed_at',
   'idx_sync_outbox_revision',
   'idx_custom_exercises_active_name',
+  'idx_custom_exercises_active_search',
   'uq_workout_weekly_plan_active_weekday',
   'uq_workout_schedule_overrides_active_date',
   'idx_workout_schedule_overrides_date',
@@ -109,6 +110,7 @@ const EXPECTED_REFERENCE_NAMED_INDEXES = EXPECTED_NAMED_INDEXES.filter(
   (index) =>
     ![
       'idx_custom_exercises_active_name',
+      'idx_custom_exercises_active_search',
       'uq_workout_weekly_plan_active_weekday',
       'uq_workout_schedule_overrides_active_date',
       'idx_workout_schedule_overrides_date',
@@ -151,14 +153,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 22', async () => {
+  it('bootstraps from zero and reaches stored schema version 23', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('22');
+    expect(row?.value).toBe('23');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -221,7 +223,7 @@ describe('tests/integration/migrations', () => {
     await db.closeAsync();
   });
 
-  it('adds the Gym V2 tables and columns in migration 22', async () => {
+  it('adds the Gym V2 tables and columns in migrations 22 and 23', async () => {
     const db = await openDb();
     const routineColumns = await db.getAllAsync<{ name: string }>(
       'PRAGMA table_info(workout_routines)',
@@ -240,6 +242,8 @@ describe('tests/integration/migrations', () => {
       expect.arrayContaining([
         'catalog_exercise_id',
         'modality',
+        'unilateral',
+        'supports_external_load',
         'superset_group',
         'progression_mode',
       ]),
@@ -261,6 +265,38 @@ describe('tests/integration/migrations', () => {
         'effort_scale',
       ]),
     );
+    const customColumns = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(custom_exercises)',
+    );
+    expect(customColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(['aliases', 'instructions', 'supports_external_load']),
+    );
+
+    await db.runAsync(
+      `INSERT INTO workout_routines (id, name, description, created_at, updated_at, deleted_at)
+       VALUES ('routine_legacy', 'Legacy routine', NULL, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL)`,
+    );
+    await db.runAsync(
+      `INSERT INTO routine_exercises
+       (id, routine_id, name, sort_order, catalog_exercise_id, modality, notes,
+        superset_group, progression_mode, progression_increment, progression_min_reps,
+        progression_max_reps, created_at, updated_at, deleted_at)
+       VALUES ('exercise_legacy', 'routine_legacy', 'Old bench', 0, NULL, 'timed', NULL,
+        NULL, 'none', NULL, NULL, NULL, '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:00:00.000Z', NULL)`,
+    );
+    const legacyExercise = await db.getFirstAsync<{
+      name: string;
+      catalog_exercise_id: string | null;
+      unilateral: number;
+      supports_external_load: number;
+    }>('SELECT * FROM routine_exercises WHERE id = ?', ['exercise_legacy']);
+    expect(legacyExercise).toMatchObject({
+      name: 'Old bench',
+      catalog_exercise_id: null,
+      unilateral: 0,
+      supports_external_load: 1,
+    });
     await db.closeAsync();
   });
 
@@ -320,7 +356,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('22');
+      expect(v1?.value).toBe('23');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -331,7 +367,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('22');
+      expect(v2?.value).toBe('23');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",

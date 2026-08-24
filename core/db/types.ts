@@ -157,6 +157,10 @@ export type RoutineExercise = BaseEntity & {
   /** Built-in or custom catalog id; NULL preserves legacy free-text rows. */
   catalog_exercise_id?: string | null;
   modality?: WorkoutModality;
+  /** Snapshot of per-side intent; legacy rows default to 0 in the domain. */
+  unilateral?: 0 | 1;
+  /** Snapshot of whether an external load is meaningful for this exercise. */
+  supports_external_load?: 0 | 1;
   notes?: string | null;
   superset_group?: string | null;
   progression_mode?: WorkoutProgressionMode;
@@ -186,6 +190,10 @@ export type WorkoutSessionExercise = {
   created_at: string;
   catalog_exercise_id?: string | null;
   modality?: WorkoutModality;
+  /** Immutable snapshot of per-side semantics for historical display. */
+  unilateral?: 0 | 1;
+  /** Immutable snapshot of external-load semantics for historical display. */
+  supports_external_load?: 0 | 1;
 };
 
 /** Per-set load/reps actually performed in a session (migration 20).
@@ -210,11 +218,16 @@ export type WorkoutSessionSet = {
 export type CustomExercise = BaseEntity & {
   name: string;
   description: string | null;
+  /** JSON-serialized normalized aliases used by offline search. */
+  aliases?: string;
+  /** Optional user-authored instructions; not sourced from openGym. */
+  instructions?: string | null;
   primary_area: string;
   secondary_areas: string;
   equipment: string | null;
   modality: WorkoutModality;
   unilateral: 0 | 1;
+  supports_external_load?: 0 | 1;
 };
 
 export type WorkoutPlanKind = 'workout' | 'rest';
