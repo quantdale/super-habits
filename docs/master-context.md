@@ -157,7 +157,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `core/db/client.ts` includes linked actions, notification-action, durable sync-outbox, planning, hardening-wave-v2, and Gym V2 migrations through schema version `22`:
+- `core/db/client.ts` includes linked actions, notification-action, durable sync-outbox, planning, hardening-wave-v2, and Gym V2 migrations through schema version `23`:
   - `linked_action_rules`
   - `linked_action_events`
   - `linked_action_executions`
@@ -236,7 +236,7 @@ Companion docs in this folder:
 - `linked_action_events`
 - `linked_action_executions`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `22`; next migration slot is `if (version < 23)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding; planning entities arrived in migrations 16–19, hardening-wave-v2 durable-state promotion in migration 20, `daily_plans.top_todo_titles` in migration 21, and Gym V2 workout/catalog/planning/body-weight state in migration 22.
+- Current runtime schema version is `23`; next migration slot is `if (version < 24)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding; planning entities arrived in migrations 16–19, hardening-wave-v2 durable-state promotion in migration 20, `daily_plans.top_todo_titles` in migration 21, Gym V2 workout/catalog/planning/body-weight state in migration 22, and deep Gym V2 semantic metadata in migration 23.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
@@ -273,7 +273,7 @@ Companion docs in this folder:
 
 - SQLite is the source of truth.
 - Backup Completeness V2 (backup schema version 2, current recoverable scope
-  version 6) backs up the complete
+  version 7) backs up the complete
   recoverable scope through the durable outbox: `todos`, `habits`,
   `habit_completions`, `calorie_entries`, `saved_meals`,
   `pomodoro_sessions`, `workout_routines`, `routine_exercises`,
@@ -281,7 +281,9 @@ Companion docs in this folder:
   `workout_session_sets`, `custom_exercises`, `workout_weekly_plan`,
   `workout_schedule_overrides`, `body_weight_entries`, `linked_action_rules`,
   planning/review entities, plus the synthetic `user_backup_settings` and
-  `backup_manifest` records.
+  `backup_manifest` records. Gym V2 scope 7 adds aliases/instructions and
+  unilateral/external-load semantic snapshots while preserving scope-6
+  portable compatibility.
 - Hard-delete entities (`habit_completions` at count 0, `saved_meals`)
   carry an owner-scoped remote DELETE intent; soft-delete tables push
   tombstones.
@@ -400,7 +402,7 @@ Companion docs in this folder:
 
 - `core/db/schema.sql` is a hand-maintained reference snapshot of the runtime
   bootstrap DDL plus migrations (it may lag the runtime chain — currently
-  schema version `22`); the next append-only slot is `if (version < 23)`.
+  schema version `23`); the next append-only slot is `if (version < 24)`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 

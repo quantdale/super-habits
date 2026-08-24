@@ -44,7 +44,7 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 
 - `npm test`: 427 tests in 41 files
 - `npx playwright test --list`: 90 tests in 14 spec files
-- Runtime schema version: 22 (migration 22 adds Gym V2 routine/session fields plus custom exercise, weekly-plan, schedule-override, and body-weight tables; migration 21 adds `daily_plans.top_todo_titles`; 16–19 planning entities; 20 hardening-wave-v2 durable-state promotion)
+- Runtime schema version: 23 (migration 22 adds Gym V2 routine/session fields plus custom exercise, weekly-plan, schedule-override, and body-weight tables; migration 23 adds semantic aliases/instructions and unilateral/external-load snapshots; migration 21 adds `daily_plans.top_todo_titles`; 16–19 planning entities; 20 hardening-wave-v2 durable-state promotion)
 - Next migration slot: `if (version < 23)`
 
 ---

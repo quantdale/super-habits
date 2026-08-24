@@ -99,8 +99,8 @@ If this file conflicts with current code, trust the code and document the confli
 - Create IDs only with `createId(prefix)` from `lib/id.ts`.
 - Create day keys only with `toDateKey()` from `lib/time.ts`.
 - `toDateKey()` currently uses local calendar dates, not UTC.
-- Runtime schema version is `22`.
-- The next schema change belongs in a new `if (version < 23)` block in `core/db/client.ts`.
+- Runtime schema version is `23`.
+- The next schema change belongs in a new `if (version < 24)` block in `core/db/client.ts`.
 - Migrations are append-only. Never edit prior migration blocks.
 - `core/db/schema.sql` is reference-only but is maintained through the current
   runtime schema version; runtime migration code remains authoritative.

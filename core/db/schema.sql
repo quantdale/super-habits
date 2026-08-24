@@ -3,7 +3,7 @@
 -- ============================================================
 -- The authoritative schema is the bootstrapStatements array
 -- in core/db/client.ts, plus the runMigrations() cases.
--- Current stored schema version: 22 (this file is a partial reference snapshot and may lag the runtime DDL in core/db/client.ts, which is authoritative).
+-- Current stored schema version: 23 (this file is a partial reference snapshot and may lag the runtime DDL in core/db/client.ts, which is authoritative).
 -- This file is hand-maintained from core/db/client.ts — copy
 -- the bootstrap DDL and every `if (version < N)` block through
 -- v15. It is a documentation snapshot, not runtime migration code;

@@ -196,7 +196,7 @@ Main tables include:
 - pomodoro settings
 - date-key cutover markers
 
-Current runtime schema version: `22`
+Current runtime schema version: `23`
 
 Next migration slot:
 
