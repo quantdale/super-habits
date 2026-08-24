@@ -329,18 +329,18 @@ defineJourney({
         await switchTab(page, 'todos');
         // Complete the seeded pending todo 'Task 5' (sort 4: near the top of
         // the list and NOT in Overview's top-3, so its title is unique here).
-        // Its checkbox is the sibling before the title's wrapping
-        // View in the content row.
-        await page
-          .getByText('Task 5', { exact: true })
-          .first()
-          .locator('..')
-          .locator('..')
-          .locator('xpath=preceding-sibling::*[1]')
-          .click({ force: true });
-        // Completed todos leave the visible pending list (showCompleted=false),
-        // so the row-level completion is asserted in the next step's SQL.
-        await expect(page.getByText('Task 5', { exact: true })).toBeHidden();
+        // Use the row's semantic checkbox rather than relying on its DOM
+        // sibling order, which is intentionally free to change with the
+        // draggable list's action controls.
+        const pendingTask5 = page.getByRole('checkbox', {
+          name: 'Mark complete: Task 5',
+          exact: true,
+        });
+        await pendingTask5.click();
+        // The just-completed row may remain briefly for its settle animation,
+        // but its pending semantic control disappears immediately. The next
+        // step's SQL is the durable row-level completion oracle.
+        await expect(pendingTask5).toHaveCount(0, { timeout: 5_000 });
 
         // Return to Focus: the timer must still be running (Pause visible) and
         // actively counting. Advance the already-installed browser clock by

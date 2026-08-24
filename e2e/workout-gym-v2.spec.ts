@@ -13,6 +13,13 @@ async function tomorrowDateKey(page: Parameters<typeof goToTab>[0]): Promise<str
   });
 }
 
+async function currentWeekdayName(page: Parameters<typeof goToTab>[0]): Promise<string> {
+  return page.evaluate(() => {
+    const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return names[(new Date().getDay() + 6) % 7];
+  });
+}
+
 test.describe('Workout Gym V2', () => {
   test.beforeEach(async ({ page }) => {
     await goToTab(page, 'workout');
@@ -57,7 +64,12 @@ test.describe('Workout Gym V2', () => {
     await page.getByText('Plan week', { exact: true }).click();
     const plan = page.getByRole('dialog');
     await expect(plan.getByText('Plan your week', { exact: true })).toBeVisible();
-    await plan.getByText('Gym V2 Upper', { exact: true }).first().click();
+    const weekday = await currentWeekdayName(page);
+    await plan
+      .getByText(weekday, { exact: true })
+      .locator('..')
+      .getByRole('button', { name: 'Gym V2 Upper', exact: true })
+      .click();
     await plan.getByLabel('Close').click();
 
     await expect(page.getByText('Gym V2 Upper', { exact: true }).first()).toBeVisible();
