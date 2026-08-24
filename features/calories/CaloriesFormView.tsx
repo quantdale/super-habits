@@ -135,7 +135,14 @@ export function CaloriesFormView({
 }: CaloriesFormViewProps) {
   const { tokens } = useAppTheme();
 
-  const addEntryFooter = <Button label="Add entry" onPress={onAddEntry} color={accentColor} />;
+  const addEntryFooter = (
+    <Button
+      label="Add entry"
+      accessibilityLabel="Save calorie entry"
+      onPress={onAddEntry}
+      color={accentColor}
+    />
+  );
 
   return (
     <>

@@ -20,6 +20,7 @@ tags:
 - scrollUntilVisible:
     element: 'Routine name'
     direction: DOWN
+    visibilityPercentage: 50
 - tapOn: 'Routine name'
 - inputText: 'Native Gym V2 typed routine'
 - hideKeyboard
@@ -115,16 +116,9 @@ tags:
 - swipe:
     direction: UP
 - scrollUntilVisible:
-    element: 'Plan week'
-    direction: UP
-- tapOn: 'Plan week'
-- extendedWaitUntil:
-    visible: 'Plan your week'
-    timeout: 5000
-- tapOn:
-    text: 'Native Gym V2 typed routine'
-    index: 0
-- tapOn: 'Close'
+    element: 'Monday Native Gym V2 typed routine'
+    direction: DOWN
+- tapOn: 'Monday Native Gym V2 typed routine'
 - killApp
 - launchApp
 - extendedWaitUntil:

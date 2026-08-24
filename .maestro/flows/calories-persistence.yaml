@@ -15,6 +15,8 @@ tags:
     text: 'Calories'
     index: 0
 - assertVisible: 'Switch between manual entry and a diary grouped by meal.'
+- swipe:
+    direction: UP
 - scrollUntilVisible:
     element: 'Calories entry food'
     direction: DOWN
@@ -38,15 +40,12 @@ tags:
 - scrollUntilVisible:
     element: 'Meal'
     direction: DOWN
-- pressKey: BACK
-- tapOn:
-    text: 'Add entry'
-    below: 'Meal'
 - scrollUntilVisible:
-    element:
-      text: 'Diary'
-    direction: UP
-- tapOn: 'Diary'
+    element: 'Save calorie entry'
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn: 'Save calorie entry'
+- tapOn: 'Diary view'
 - scrollUntilVisible:
     element: 'Native breakfast'
     direction: DOWN
@@ -63,7 +62,7 @@ tags:
 - tapOn:
     text: 'Calories'
     index: 0
-- tapOn: 'Diary'
+- tapOn: 'Diary view'
 - scrollUntilVisible:
     element: 'Native breakfast'
     direction: DOWN

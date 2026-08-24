@@ -4,6 +4,7 @@ import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
 type ButtonProps = {
   label: string;
+  accessibilityLabel?: string;
   onPress: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
@@ -15,6 +16,7 @@ type ButtonProps = {
 
 export function Button({
   label,
+  accessibilityLabel,
   onPress,
   variant = 'primary',
   disabled = false,
@@ -37,6 +39,7 @@ export function Button({
     <Pressable
       disabled={inactive}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy: loading }}
       onFocus={focusRing.onFocus}
       onBlur={focusRing.onBlur}
