@@ -253,6 +253,8 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
     name: 'Bench press',
     catalogExerciseId: 'builtin_barbell_bench_press',
     modality: 'weighted_strength',
+    unilateral: true,
+    supportsExternalLoad: true,
     notes: 'Controlled eccentric.',
     progressionMode: 'linear',
     progressionIncrement: 2.5,
@@ -281,11 +283,18 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
     routineId,
     notes: 'Felt strong',
     exercises: [
-      { exerciseName: 'Bench press', setsCompleted: 3 },
+      {
+        exerciseName: 'Bench press',
+        setsCompleted: 3,
+        catalogExerciseId: 'builtin_barbell_bench_press',
+        modality: 'weighted_strength',
+        unilateral: true,
+        supportsExternalLoad: true,
+      },
       { exerciseName: 'Overhead press', setsCompleted: 1 },
     ],
   });
-  // Per-set session data (scope V5) attached to the logged session exercises.
+  // Per-set session data (scope V5+) attached to the logged session exercises.
   const sessionExercises = await db.getAllAsync<{ id: string; exercise_name: string }>(
     'SELECT id, exercise_name FROM workout_session_exercises ORDER BY id ASC',
   );
@@ -310,6 +319,9 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
     secondaryAreas: ['upper back'],
     equipment: 'cable',
     modality: 'weighted_strength',
+    aliases: ['cable y'],
+    instructions: 'Pull toward the shoulders.',
+    supportsExternalLoad: true,
     unilateral: false,
   });
   await workout.upsertWeeklyPlanEntry({
@@ -396,6 +408,13 @@ describe('portable export', () => {
       expect(Array.isArray(entities[table])).toBe(true);
       expect(entities[table].length).toBe(await countRows(sourceDb, table));
     }
+    expect((entities.routine_exercises[0] as Record<string, unknown>).unilateral).toBe(1);
+    expect((entities.routine_exercises[0] as Record<string, unknown>).supports_external_load).toBe(
+      1,
+    );
+    expect((entities.custom_exercises[0] as Record<string, unknown>).aliases).toBe(
+      JSON.stringify(['cable y']),
+    );
     // Excluded state must not appear in the file.
     expect((parsed.entities as Record<string, unknown>).sync_outbox).toBeUndefined();
     expect((parsed.entities as Record<string, unknown>).app_meta).toBeUndefined();
@@ -582,6 +601,8 @@ describe('portable import — source→import semantic equivalence', () => {
     expect(exercises).toHaveLength(2);
     expect(exercises.map((exercise) => exercise.name)).toEqual(['Bench press', 'Overhead press']);
     expect(exercises[0].catalog_exercise_id).toBe('builtin_barbell_bench_press');
+    expect(exercises[0].unilateral).toBe(1);
+    expect(exercises[0].supports_external_load).toBe(1);
     expect(exercises[0].progression_mode).toBe('linear');
     const sets = await workout.listSets(exercises[0].id);
     expect(sets).toHaveLength(3);
@@ -592,7 +613,16 @@ describe('portable import — source→import semantic equivalence', () => {
       'SELECT * FROM workout_session_exercises ORDER BY id ASC',
     );
     expect(sessionExercises).toHaveLength(2);
-    expect((await workout.listCustomExercises())[0].name).toBe('Cable Y Raise');
+    expect(sessionExercises.find((row) => row.exercise_name === 'Bench press')).toMatchObject({
+      unilateral: 1,
+      supports_external_load: 1,
+    });
+    expect((await workout.listCustomExercises())[0]).toMatchObject({
+      name: 'Cable Y Raise',
+      aliases: JSON.stringify(['cable y']),
+      instructions: 'Pull toward the shoulders.',
+      supports_external_load: 1,
+    });
     expect((await workout.listWeeklyPlan())[0].routine_id).toBe(routines[0].id);
     expect((await workout.resolveWorkoutScheduleForDate('2026-08-04')).planKind).toBe('rest');
     expect((await workout.listBodyWeightEntries())[0]).toMatchObject({ weight: 80, unit: 'kg' });

@@ -4,12 +4,14 @@ import {
   BACKUP_SCHEMA_VERSION,
   BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
+  backupEntityColumnsForScope,
   BACKUP_SCOPE_V4_ENTITY_COLUMNS,
   BACKUP_SCOPE_V5_ENTITY_COLUMNS,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
   PORTABLE_V1_ENTITY_COLUMNS,
   type BackupEntity,
 } from '@/core/backup/backup.types';
@@ -264,7 +266,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   // (formatVersion 1) are identified by their EXACT entity set; the known
   // historical epochs are the 12-entity pre-Weekly-Review scope, the 13-entity
   // Weekly-Review scope, and the 16-entity planning scope. FormatVersion-2
-  // files carry an explicit scope version and may be scope 4/5 (frozen
+  // files carry an explicit scope version and may be scope 4/5/6 (frozen
   // historical columns) or the current scope — a future scope is rejected as requiring a
   // newer app. Any other/partial set is rejected — scope is never inferred
   // permissively ("missing table = empty").
@@ -291,10 +293,12 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 4;
     const isHistoricalScope5 =
       typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 5;
+    const isHistoricalScope6 =
+      typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 6;
     if (
       typeof explicitScope !== 'number' ||
       !Number.isInteger(explicitScope) ||
-      (!isCurrentScope && !isHistoricalScope4 && !isHistoricalScope5)
+      (!isCurrentScope && !isHistoricalScope4 && !isHistoricalScope5 && !isHistoricalScope6)
     ) {
       errors.push(
         `This file uses backup scope version ${String(input.backupScopeVersion)}, which this app cannot import.`,
@@ -303,9 +307,11 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     }
     const expectedEntities: readonly BackupEntity[] = isCurrentScope
       ? BACKUP_ENTITIES
-      : isHistoricalScope5
-        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET
-        : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
+      : isHistoricalScope6
+        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET
+        : isHistoricalScope5
+          ? KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET
+          : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
     const missing = [...expectedEntities].filter((entity) => !(entity in entities));
     const unknown = entityKeys.filter(
       (key) => !(expectedEntities as readonly string[]).includes(key),
@@ -322,9 +328,11 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     scopeEntities = expectedEntities;
     scopeColumns = isCurrentScope
       ? BACKUP_ENTITY_COLUMNS
-      : isHistoricalScope5
-        ? (BACKUP_SCOPE_V5_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>)
-        : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
+      : isHistoricalScope6
+        ? backupEntityColumnsForScope(6)
+        : isHistoricalScope5
+          ? (BACKUP_SCOPE_V5_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>)
+          : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
   }
 
   for (const entity of scopeEntities) {

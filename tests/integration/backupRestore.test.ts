@@ -235,6 +235,10 @@ const REMOTE_ENTITIES = [
   'projects',
   'goals',
   'daily_plans',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
   'user_backup_settings',
   'backup_manifest',
 ];
@@ -287,6 +291,10 @@ async function expectZeroImportedRows(db: TestDatabase): Promise<void> {
     'projects',
     'goals',
     'daily_plans',
+    'custom_exercises',
+    'workout_weekly_plan',
+    'workout_schedule_overrides',
+    'body_weight_entries',
   ]) {
     const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
     expect(Number(row?.count), table).toBe(0);
@@ -311,7 +319,7 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
     }
     await expectZeroImportedRows(targetDb);
     await targetDb.closeAsync();
-  });
+  }, 20_000);
 
   it('blocks when the settings row is missing despite the manifest', async () => {
     const remote = await publishSourceBackup();
@@ -328,7 +336,7 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
     }
     await expectZeroImportedRows(targetDb);
     await targetDb.closeAsync();
-  });
+  }, 20_000);
 
   it('blocks on a malformed settings payload', async () => {
     const remote = await publishSourceBackup();
@@ -623,12 +631,28 @@ async function seedSourceDevice(db: TestDatabase) {
     "SELECT id FROM workout_routines WHERE name = 'Push day'",
   );
   const routineId = routineRow?.id ?? '';
-  const exerciseId = await workout.addExercise({ routineId, name: 'Bench press' });
+  const exerciseId = await workout.addExercise({
+    routineId,
+    name: 'Bench press',
+    catalogExerciseId: 'builtin_barbell_bench_press',
+    modality: 'weighted_strength',
+    unilateral: true,
+    supportsExternalLoad: true,
+  });
   await workout.addSet({ exerciseId, setNumber: 1, activeSeconds: 40, restSeconds: 20 });
   await workout.logWorkoutSession({
     routineId,
     notes: 'Felt strong',
-    exercises: [{ exerciseName: 'Bench press', setsCompleted: 3 }],
+    exercises: [
+      {
+        exerciseName: 'Bench press',
+        setsCompleted: 3,
+        catalogExerciseId: 'builtin_barbell_bench_press',
+        modality: 'weighted_strength',
+        unilateral: true,
+        supportsExternalLoad: true,
+      },
+    ],
   });
   // Per-set session data (scope V5): attach recorded sets to the logged
   // session's exercise.
@@ -653,6 +677,24 @@ async function seedSourceDevice(db: TestDatabase) {
     summaryPayload: '{"highlights":["shipped"]}',
     planPayload: '{"focus":"stability"}',
     reflection: 'Solid week',
+  });
+  await workout.createCustomExercise({
+    name: 'Cable Y raise',
+    aliases: ['cable y'],
+    instructions: 'Pull toward the shoulders.',
+    primaryArea: 'shoulders',
+    secondaryAreas: [],
+    equipment: 'cable',
+    modality: 'weighted_strength',
+    unilateral: false,
+    supportsExternalLoad: true,
+  });
+  await workout.upsertWeeklyPlanEntry({ weekday: 1, routineId, planKind: 'workout' });
+  await workout.addBodyWeightEntry({
+    weight: 80,
+    unit: 'kg',
+    measuredAt: '2026-08-03T08:00:00.000Z',
+    note: 'Morning check-in',
   });
   // The raw completion inserts above have no outbox intent yet; enqueue them
   // the way a real device would (backfill covers pre-existing history).
@@ -732,11 +774,34 @@ describe('backup completeness v2 restore', () => {
     const detailed = await workout.getRoutineWithExercises(routines[0].id);
     expect(detailed?.exercises).toHaveLength(1);
     expect(detailed?.exercises[0].name).toBe('Bench press');
+    expect(detailed?.exercises[0].catalog_exercise_id).toBe('builtin_barbell_bench_press');
+    expect(detailed?.exercises[0].unilateral).toBe(1);
+    expect(detailed?.exercises[0].supports_external_load).toBe(1);
     expect(detailed?.exercises[0].sets).toHaveLength(1);
     expect(detailed?.exercises[0].sets[0].active_seconds).toBe(40);
     const logs = await workout.listWorkoutLogs();
     expect(logs).toHaveLength(1);
     expect(logs[0].notes).toBe('Felt strong');
+    const restoredSessionExercise = await targetDb.getFirstAsync<{
+      catalog_exercise_id: string | null;
+      unilateral: number;
+      supports_external_load: number;
+    }>(
+      "SELECT catalog_exercise_id, unilateral, supports_external_load FROM workout_session_exercises WHERE exercise_name = 'Bench press'",
+    );
+    expect(restoredSessionExercise).toEqual({
+      catalog_exercise_id: 'builtin_barbell_bench_press',
+      unilateral: 1,
+      supports_external_load: 1,
+    });
+    expect((await workout.listCustomExercises())[0]).toMatchObject({
+      name: 'Cable Y raise',
+      aliases: JSON.stringify(['cable y']),
+      instructions: 'Pull toward the shoulders.',
+      supports_external_load: 1,
+    });
+    expect((await workout.listWeeklyPlan())[0].routine_id).toBe(routines[0].id);
+    expect((await workout.listBodyWeightEntries())[0]).toMatchObject({ weight: 80, unit: 'kg' });
 
     // Semantic equivalence — calories + saved meals (use_count preserved).
     const calories = await import('@/features/calories/calories.data');

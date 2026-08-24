@@ -133,10 +133,24 @@ export function gymTrainingStep(routineName: string): SemanticStep {
     {
       kind: 'rows',
       sql: `SELECT
-        (SELECT COUNT(*) FROM custom_exercises WHERE name = 'Cable Y raise' AND deleted_at IS NULL) AS custom_exercises,
+        (SELECT COUNT(*) FROM routine_exercises re JOIN workout_routines wr ON wr.id = re.routine_id
+          WHERE wr.name = '${esc(routineName)}' AND re.catalog_exercise_id = 'builtin_barbell_bench_press'
+            AND re.modality = 'weighted_strength' AND re.unilateral = 1
+            AND re.supports_external_load = 1 AND re.deleted_at IS NULL) AS semantic_prescription,
+        (SELECT COUNT(*) FROM custom_exercises
+          WHERE name = 'Cable Y raise' AND aliases = '["cable y"]'
+            AND instructions = 'Pull toward the shoulders.' AND supports_external_load = 1
+            AND deleted_at IS NULL) AS custom_exercises,
         (SELECT COUNT(*) FROM workout_weekly_plan wp JOIN workout_routines wr ON wr.id = wp.routine_id WHERE wr.name = '${esc(routineName)}' AND wp.deleted_at IS NULL) AS weekly_plan,
         (SELECT COUNT(*) FROM body_weight_entries WHERE note = 'Simulation morning' AND deleted_at IS NULL) AS body_weight_entries`,
-      expected: [{ custom_exercises: 1, weekly_plan: 1, body_weight_entries: 1 }],
+      expected: [
+        {
+          semantic_prescription: 1,
+          custom_exercises: 1,
+          weekly_plan: 1,
+          body_weight_entries: 1,
+        },
+      ],
     },
   );
 }

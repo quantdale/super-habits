@@ -78,9 +78,9 @@ test.describe('Portable data export & import', () => {
     expect(file.format).toBe('superhabits-portable-backup');
     expect(file.formatVersion).toBe(2);
     expect(file.backupSchemaVersion).toBe(2);
-    // Scope V6 adds the Gym V2 exercise identity, planning, and body-weight
-    // entities while retaining the complete scope-V5 workout history.
-    expect(file.backupScopeVersion).toBe(6);
+    // Scope V7 adds the deep Gym V2 exercise metadata while retaining the
+    // complete scope-V6 workout identity, planning, and body-weight state.
+    expect(file.backupScopeVersion).toBe(7);
     expect(typeof file.exportedAt).toBe('string');
     const entities = file.entities as Record<string, unknown[]>;
     expect(entities.todos).toHaveLength(1);

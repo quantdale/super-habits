@@ -456,6 +456,8 @@ const ROUTINE_EXERCISE_RULES: FieldRule[] = [
   optionalColumnRule('modality', (v) =>
     isEnum(v, ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
   ),
+  optionalColumnRule('unilateral', (v) => v === 0 || v === 1),
+  optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
   optionalColumnRule('notes', (v) => v === null || isBoundedString(v, 'notes')),
   optionalColumnRule('superset_group', (v) => v === null || isBoundedString(v, 'name')),
   optionalColumnRule('progression_mode', (v) => isEnum(v, ['none', 'linear', 'double'])),
@@ -522,6 +524,8 @@ const WORKOUT_SESSION_EXERCISE_RULES: FieldRule[] = [
   optionalColumnRule('modality', (v) =>
     isEnum(v, ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
   ),
+  optionalColumnRule('unilateral', (v) => v === 0 || v === 1),
+  optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
 ];
 
 const WORKOUT_SESSION_SET_RULES: FieldRule[] = [
@@ -563,11 +567,14 @@ const CUSTOM_EXERCISE_RULES: FieldRule[] = [
   idRule('id'),
   textRule('name', true),
   nullableTextRule('description'),
+  optionalColumnRule('aliases', (v) => v === null || isStringArrayJson(v)),
+  optionalColumnRule('instructions', (v) => v === null || isBoundedString(v, 'instructions')),
   textRule('primary_area', true),
   { required: (row) => checkField(row, 'secondary_areas', isStringArrayJson, 'secondary_areas') },
   nullableTextRule('equipment'),
   enumRule('modality', ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
   { required: (row) => checkField(row, 'unilateral', (v) => v === 0 || v === 1, 'unilateral') },
+  optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),

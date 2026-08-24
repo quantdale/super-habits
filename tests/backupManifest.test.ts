@@ -6,6 +6,7 @@ import {
   KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
   resolveBackupScope,
 } from '@/core/backup/backup.types';
 
@@ -98,7 +99,7 @@ describe('resolveBackupScope epoch matrix', () => {
     expect([...scope!.entitySet].sort()).toEqual([...BACKUP_ENTITIES].sort());
   });
 
-  it('resolves each explicit historical scope version (2/3/4)', () => {
+  it('resolves each explicit historical scope version (2/3/4/6)', () => {
     const v2 = resolveBackupScope({
       backupScopeVersion: 2,
       entityMetadata: metadataFor(KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET),
@@ -119,6 +120,15 @@ describe('resolveBackupScope epoch matrix', () => {
       entityMetadata: metadataFor(KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET),
     });
     expect(v4?.scope).toBe(4);
+
+    const v6 = resolveBackupScope({
+      backupScopeVersion: 6,
+      entityMetadata: metadataFor(KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET),
+    });
+    expect(v6?.scope).toBe(6);
+    expect([...v6!.entitySet].sort()).toEqual(
+      [...KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET].sort(),
+    );
   });
 
   it('returns null for a FUTURE scope version so restore reports unsupported_version', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AccountAuthEvidence } from '@/core/auth/account.types';
+import { BACKUP_SCOPE_VERSION } from '@/core/backup/backup.types';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 
@@ -273,7 +274,7 @@ describe('imported-owner recovery — real SQLite end to end', () => {
     const scope = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'backup.scope_version'",
     );
-    expect(scope?.value).toBe('6'); // BACKUP_SCOPE_VERSION (Gym V2 wave)
+    expect(scope?.value).toBe(String(BACKUP_SCOPE_VERSION));
     const backfillStatus = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'backup.backfill_status'",
     );

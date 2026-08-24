@@ -185,6 +185,8 @@ CREATE TABLE IF NOT EXISTS public.routine_exercises (
   sort_order INTEGER NOT NULL DEFAULT 0,
   catalog_exercise_id TEXT,
   modality   TEXT NOT NULL DEFAULT 'timed',
+  unilateral INTEGER NOT NULL DEFAULT 0,
+  supports_external_load INTEGER NOT NULL DEFAULT 1,
   notes      TEXT,
   superset_group TEXT,
   progression_mode TEXT NOT NULL DEFAULT 'none',
@@ -235,6 +237,8 @@ CREATE TABLE IF NOT EXISTS public.workout_session_exercises (
   sets_completed  INTEGER NOT NULL DEFAULT 0,
   catalog_exercise_id TEXT,
   modality        TEXT NOT NULL DEFAULT 'timed',
+  unilateral      INTEGER NOT NULL DEFAULT 0,
+  supports_external_load INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL
 );
 
@@ -690,6 +694,9 @@ CREATE TABLE IF NOT EXISTS public.custom_exercises (
   equipment TEXT,
   modality TEXT NOT NULL,
   unilateral INTEGER NOT NULL DEFAULT 0,
+  aliases TEXT NOT NULL DEFAULT '[]',
+  instructions TEXT,
+  supports_external_load INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT

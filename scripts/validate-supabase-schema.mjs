@@ -67,6 +67,9 @@ const remediationMigrationName = migrationNames.find((name) =>
 const gymMigrationName = migrationNames.find((name) =>
   /_add_gym_training_v2_backup_scope\.sql$/.test(name),
 );
+const deepGymMigrationName = migrationNames.find((name) =>
+  /_add_gym_workout_deep_expansion\.sql$/.test(name),
+);
 if (!ownershipMigrationName) {
   failures.push('missing secure sync ownership migration');
 }
@@ -77,6 +80,7 @@ if (!remediationMigrationName) {
   failures.push('missing backup v2 closure remediation migration');
 }
 if (!gymMigrationName) failures.push('missing Gym V2 backup scope migration');
+if (!deepGymMigrationName) failures.push('missing Gym Workout V2 deep expansion migration');
 if (migrationNames.join('\n') !== [...migrationNames].sort().join('\n')) {
   failures.push('migration filenames are not lexically ordered');
 }
@@ -91,6 +95,9 @@ const remediationMigration = remediationMigrationName
   ? read(`supabase/migrations/${remediationMigrationName}`)
   : '';
 const gymMigration = gymMigrationName ? read(`supabase/migrations/${gymMigrationName}`) : '';
+const deepGymMigration = deepGymMigrationName
+  ? read(`supabase/migrations/${deepGymMigrationName}`)
+  : '';
 const fixture = read('simulation/backend/schema.sql');
 const config = read('supabase/config.toml');
 const clientSource = [
@@ -839,6 +846,20 @@ for (const table of [
 req('Gym V2 migration no anon policy', gymMigration, 'FROM anon, PUBLIC');
 reqAbsent('Gym V2 migration no USING true', gymMigration, 'USING (true)');
 
+// Gym Workout V2 deep-expansion parity: migration 23/scope 7 metadata must
+// exist in the production ALTER migration and in the disposable fixture.
+const deepGymColumns = {
+  routine_exercises: ['unilateral', 'supports_external_load'],
+  workout_session_exercises: ['unilateral', 'supports_external_load'],
+  custom_exercises: ['aliases', 'instructions', 'supports_external_load'],
+};
+for (const [table, columns] of Object.entries(deepGymColumns)) {
+  for (const column of columns) {
+    req(`Gym Workout V2 deep migration ${table}.${column}`, deepGymMigration, column);
+    req(`Gym Workout V2 fixture ${table}.${column}`, fixture, column);
+  }
+}
+
 // Daily-plan priority title snapshots (local counterpart: SQLite migration 21).
 // Strictly additive nullable column; legacy rows and pre-v21 backups stay valid.
 const titleSnapshotsMigrationName = migrationNames.find((name) =>
@@ -983,7 +1004,7 @@ if (failures.length > 0) {
   console.log(
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
       `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
-      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6 closure; ' +
+      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 closure; ' +
       'private AI quota RPC).',
   );
 }

@@ -17,6 +17,8 @@ export const BACKUP_SETTINGS_VERSION = 5;
  * load/reps (`workout_session_sets`), and real workout session timing.
  * Bumped from 5 → 6 for Gym V2 custom exercises, weekly plan entries, date
  * overrides, and body-weight entries plus extended workout prescriptions.
+ * Bumped from 6 → 7 for durable exercise metadata and unilateral/external-load
+ * snapshots.
  *
  * Scope is deliberately distinct from `BACKUP_SCHEMA_VERSION`: the row *shape*
  * stayed compatible (new columns are nullable), so the schema version did not
@@ -24,7 +26,7 @@ export const BACKUP_SETTINGS_VERSION = 5;
  *
  * Local marker: when `backup.scope_version` is below this, backfill runs.
  */
-export const BACKUP_SCOPE_VERSION = 6;
+export const BACKUP_SCOPE_VERSION = 7;
 
 /**
  * Every locally durable, user-owned table in the recoverable backup scope,
@@ -158,6 +160,8 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'sort_order',
     'catalog_exercise_id',
     'modality',
+    'unilateral',
+    'supports_external_load',
     'notes',
     'superset_group',
     'progression_mode',
@@ -202,6 +206,8 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'sets_completed',
     'catalog_exercise_id',
     'modality',
+    'unilateral',
+    'supports_external_load',
     'created_at',
   ],
   pomodoro_sessions: [
@@ -310,11 +316,14 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'id',
     'name',
     'description',
+    'aliases',
+    'instructions',
     'primary_area',
     'secondary_areas',
     'equipment',
     'modality',
     'unilateral',
+    'supports_external_load',
     'created_at',
     'updated_at',
     'deleted_at',
@@ -746,7 +755,57 @@ export const BACKUP_SCOPE_V5_ENTITY_COLUMNS: Partial<Record<BackupEntity, readon
   ],
 };
 
-/** Current (hardened wave v2) recoverable scope epoch. */
+/**
+ * Canonical columns frozen at scope 6, before the deep-expansion metadata
+ * columns were added. Only changed entities need an override; all other
+ * entities inherit the current column contract byte-for-byte.
+ */
+export const BACKUP_SCOPE_V6_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
+  routine_exercises: [
+    'id',
+    'routine_id',
+    'name',
+    'sort_order',
+    'catalog_exercise_id',
+    'modality',
+    'notes',
+    'superset_group',
+    'progression_mode',
+    'progression_increment',
+    'progression_min_reps',
+    'progression_max_reps',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+  workout_session_exercises: [
+    'id',
+    'log_id',
+    'exercise_name',
+    'sets_completed',
+    'catalog_exercise_id',
+    'modality',
+    'created_at',
+  ],
+  custom_exercises: [
+    'id',
+    'name',
+    'description',
+    'primary_area',
+    'secondary_areas',
+    'equipment',
+    'modality',
+    'unilateral',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
+};
+
+/** Scope immediately before the deep-expansion metadata columns. */
+export const KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET = [...BACKUP_ENTITIES] as const;
+
+/** Current (deep-expanded Gym V2) recoverable scope epoch. */
 export const CURRENT_BACKUP_SCOPE_ENTITY_SET = BACKUP_ENTITIES;
 
 function sortedEquals(a: readonly string[], b: readonly string[]): boolean {
@@ -775,6 +834,9 @@ export function resolveBackupScope(input: {
     }
     if (input.backupScopeVersion === 5) {
       return { scope: 5, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET };
+    }
+    if (input.backupScopeVersion === 6) {
+      return { scope: 6, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET };
     }
     if (input.backupScopeVersion === 4) {
       return { scope: 4, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET };
@@ -809,7 +871,8 @@ export function resolveBackupScope(input: {
  * Each epoch verifies against the frozen column snapshot that produced its
  * stored checksums: scopes below 4 use the Portable V1 snapshot, scope 4 uses
  * the V4 snapshot, scope 5 uses the pre-Gym snapshot, and only the current
- * scope uses the live columns.
+ * scope 6 uses its pre-deep-expansion snapshot, and only the current scope
+ * uses the live columns.
  */
 export function backupEntityColumnsForScope(
   scope: number,
@@ -821,11 +884,13 @@ export function backupEntityColumnsForScope(
     ...BACKUP_ENTITY_COLUMNS,
   };
   const snapshot =
-    scope === 5
-      ? BACKUP_SCOPE_V5_ENTITY_COLUMNS
-      : scope === 4
-        ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
-        : PORTABLE_V1_ENTITY_COLUMNS;
+    scope === 6
+      ? BACKUP_SCOPE_V6_ENTITY_COLUMNS
+      : scope === 5
+        ? BACKUP_SCOPE_V5_ENTITY_COLUMNS
+        : scope === 4
+          ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
+          : PORTABLE_V1_ENTITY_COLUMNS;
   for (const entity of Object.keys(historical) as BackupEntity[]) {
     const frozen = snapshot[entity];
     if (frozen) historical[entity] = frozen;
