@@ -56,12 +56,10 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: final `ad2d1a8` Android smoke passed 2/2 and lifecycle
-  passed 6/6, including the focused Gym V2 durable-session flow. The final
-  targeted aggregate recorded 8/11 because Calories, Gym, and legacy Workout
-  hit viewport/driver failures; all three now pass isolated replay on the same
-  APK. Calories exposed one last Maestro `hideKeyboard` home-screen defect,
-  repaired in the working tree with Android `BACK`.
+- Current milestone: source integration and focused browser regressions are
+  complete. Commit `4d3f466` fixes two deterministic Playwright test defects,
+  and the valid full-journey P2 performance probe passed 70/70 steps across ten
+  HEAVY repetitions without changing the 800 ms ceiling.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -73,37 +71,58 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: source `ad2d1a8` was provisioned and installed on the clean
-  `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. Smoke passed 2/2;
-  the targeted aggregate passed 8/11 with three viewport/settling failures,
-  while Calories, Gym V2, and legacy Workout each pass isolated replay. The
-  lifecycle aggregate passed 6/6 after the reminder/Pomodoro selector repairs.
-  A final Calories-flow commit/build is still required before final-source
-  certification.
+- Completed native checkpoint: source `d484c9e1a442c7bd72ad6882532f88cf5b464938`
+  was provisioned and installed on the clean `emulator-5556` API-36 x86_64
+  `CRBABot_API_36` target. Smoke passed 2/2; focused Gym V2 persistence and
+  durable-session replays passed; the targeted aggregate passed 10/11 with
+  only the legacy Workout aggregate miss; and the lifecycle aggregate passed
+  5/6 with only the reminder replay missing. The legacy Workout and reminder
+  flows each pass exact isolated replay, so those aggregate-only results remain
+  `FLAKY_TEST`/`ENVIRONMENT` classifications.
+- Completed browser hardening: `e2e/workout-gym-v2.spec.ts` now selects the
+  current local weekday row and its semantically named routine button; the Gym
+  V2 file passes 6/6. `e2e/journeys/a-tuesday.spec.ts` now uses the semantic
+  pending-completion checkbox and waits for its disappearance after the
+  TodoItem settle transition; P1 passes 8/8. Both fixes are committed in
+  `4d3f466`.
+- Completed timing investigation: the valid full P2 journey was run with
+  `--repeat-each=10` (70 steps, one worker). All ten strict checks passed; the
+  observed max section-switch values were 747, 773, 778, 782, 746, 769, 767,
+  754, 747, and 750 ms. The earlier 811 ms full-suite observation is therefore
+  classified `FLAKY_TEST`/host scheduling sensitivity, with the 800 ms contract
+  preserved and no arbitrary wait or threshold change.
+- In progress: run the broad source gates and sync lane against the committed
+  test fixes; inspect iOS/EAS and remote Supabase/CI availability; close the
+  OpenSpec/ExecPlan state; then provision/build/install the final source SHA on
+  the verified Android target and rerun final smoke plus focused Gym evidence.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
   `.maestro/flows/workout-gym-v2-*.yaml`, the targeted persistence flows,
   `.eas/workflows/native-e2e.yml`, `features/habits/HabitsScreen.tsx`,
   `core/ui/NumberStepperField.tsx`, `features/workout/WorkoutSessionScreen.tsx`,
-  and the two Workout exercise-toggle components. Generated `android/` and
-  native reports remain ignored.
-- Last successful validation: source `ad2d1a8` was rebuilt in 8m37s, installed
-  on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and provenance-verified
-  with package `com.dale16.superhabits` 1.0.0 / versionCode 1 and APK SHA-256
-  `0B56703B...BAE51AF`. The final smoke runner passed 2/2 in
-  `simulation-output/native/native-android-smoke-2026-08-25T152252063Z.json`,
-  and the final lifecycle runner passed 6/6 in
-  `simulation-output/native/native-android-lifecycle-2026-08-25T160132588Z.json`.
+  and the two Workout exercise-toggle components, plus
+  `e2e/workout-gym-v2.spec.ts` and `e2e/journeys/a-tuesday.spec.ts`. Generated
+  `android/`, dist output, and native/browser reports remain ignored or
+  excluded by repository policy.
+- Last successful validation: the current committed source's focused browser
+  evidence is Gym 6/6, P1 8/8, and P2 70/70. The d484 source APK was built in
+  8m30s, installed on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and
+  provenance-verified with package `com.dale16.superhabits` 1.0.0 /
+  versionCode 1 and APK SHA-256
+  `FD0D0CBCE6A2C481C3D602C8929309E526CEB1940FF2187D61B73B1663BFFD31`.
+  Its smoke runner passed 2/2; focused Gym V2 persistence and
+  `workout-gym-v2-session-lifecycle.yaml` passed; aggregate-only misses and
+  isolated replays are recorded in the validation ledger.
 - Current failures: no product implementation failure is known. The final
-  targeted aggregate report
-  `simulation-output/native/native-android-persistence-2026-08-25T154320679Z.json`
-  recorded Calories `Add entry`, Gym `Add routine`, and legacy Workout
-  `Open ... routine` failures. Their final exact-APK isolated replays pass;
-  the aggregate result is `FLAKY_TEST`/`ENVIRONMENT` evidence, not a product
-  failure. The Calories isolated replay additionally showed the emulator on
-  the Android home screen after Maestro `hideKeyboard`; replacing that test
-  command with `pressKey: BACK` made the complete Calories flow pass.
+  targeted aggregate report recorded only the legacy Workout aggregate miss;
+  its exact isolated replay passes. The final lifecycle aggregate recorded
+  only the missing reminder replay; its exact isolated replay passes. Those
+  aggregate-only results are `FLAKY_TEST`/`ENVIRONMENT` evidence, not product
+  failures. The Calories `hideKeyboard` launcher defect was a native test
+  defect and is fixed with `pressKey: BACK`; the complete Calories flow passes.
+  The earlier full Playwright failures were test defects fixed in `4d3f466`,
+  and the complete P2 timing probe now passes.
   Aggregate
   targeted/lifecycle runner failures are classified `FLAKY_TEST`/`ENVIRONMENT`
   when the same exact flow passes in isolation and the failing flow changes
@@ -129,8 +148,9 @@ and records exact-source local/remote certification.
   settling after opening Command center. The AVD was restarted from a clean
   boot; the corrected native smoke then passed all section/settings checks.
 - Relevant classifications: the existing Windows/iOS limitation remains
-  `ENVIRONMENT`; no native result is claimed until executed. The original
-  smoke findings are `TEST_BUG`, not product failures. No arbitrary waits,
+  `ENVIRONMENT`; Android execution is recorded separately with exact APK
+  provenance and aggregate-only `FLAKY_TEST`/`ENVIRONMENT` results. The
+  original smoke findings are `TEST_BUG`, not product failures. No arbitrary waits,
   coordinate-only app taps, production credentials, or historical Scope-6
   rewrites were introduced.
 - Relevant quarantines: none; the corrected flows retain the original review,
@@ -158,8 +178,8 @@ and records exact-source local/remote certification.
   `FLAKY_TEST`/`ENVIRONMENT` evidence; scrolling while the IME is present is
   used where safe. The active-session flow exposed a test-selector issue:
   the Reps label and Reps input shared a selector, causing `6` to append to
-  weight; a distinct accessibility label is now in the source and awaits the
-  final rebuilt APK.
+  weight; a distinct accessibility label is now in the source, and the exact
+  d484 rebuilt APK flow passes.
 - The four exact-APK targeted failures were then replayed independently and
   fixed as `TEST_BUG`: `calories-persistence` now hides the visible IME before
   tapping Add entry below Meal; reminder disable/isolation now use semantic
@@ -177,24 +197,23 @@ and records exact-source local/remote certification.
   Android launcher on this target, which made the below-Meal action impossible
   to locate. The flow now uses `pressKey: BACK`; the final exact APK replay
   passes the add/diary/kill/relaunch contract without weakening assertions.
-- Blockers: none known for local implementation; Android target/toolchain,
-  Supabase remote access, iOS/EAS access, and exact-head CI remain to be
-  determined by their respective commands.
+- Blockers: none known for local implementation. Supabase remote state,
+  iOS/EAS execution, and exact-head GitHub CI remain to be checked; any
+  unavailable credentials or platform capabilities must be reported as
+  `EXTERNAL BLOCKER`/`ENVIRONMENT`, not as a pass.
 - Condition required to unblock: none.
-- Exact resume action after unblock: run formatting/typecheck/native helper
-  checks, commit the final native hardening checkpoint, provision the exact
-  new SHA on one verified API-36 x86_64 target, then run the required smoke,
-  targeted, lifecycle, and focused Gym session lanes.
-- Exact next action: validate and commit the final Calories flow repair, push
-  the new source SHA, provision/install that exact SHA on `emulator-5556`,
-  then rerun `npm run qa:native:android -- --serial
-emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
-  `npm run qa:native:lifecycle -- --serial emulator-5556`, and the focused
-  `workout-gym-v2-session-lifecycle.yaml` replay.
+- Exact resume action after unblock: run the affected and broad source gates,
+  complete sync/iOS/remote checks, close and validate this plan, commit the
+  final plan/evidence checkpoint, push it, and provision that exact final SHA
+  before the last Android smoke/Gym replay.
+- Exact next action: run `npm run qa:affected`, then the remaining required
+  local gates and sync lane; update this checkpoint with every result before
+  final plan closure.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
-  classifications; timing investigation; affected and broad gates; exact
-  final SHA pushed and CI status inspected; working tree clean.
+  classifications; valid timing evidence; affected and broad gates; exact
+  final SHA pushed and CI status inspected; OpenSpec/ExecPlan closure; working
+  tree clean.
 
 ## Progress
 
@@ -208,10 +227,12 @@ emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
 - [x] Reconcile runtime truth, docs, QA map, and recovery/Supabase contracts.
 - [x] Implement Android build/install/identity provisioning.
 - [x] Add focused native Gym V2 flows and semantic hooks; direct Gym V2
-      persistence replay passes, with exact-runner certification pending the
-      rebuilt checkpoint.
-- [ ] Close the corrected targeted persistence lane on the exact rebuilt APK.
-- [ ] Investigate timing-sensitive gates without weakening assertions.
+      persistence and durable-session replays pass on the exact d484 APK.
+- [x] Investigate timing-sensitive gates without weakening assertions; the
+      valid ten-repeat P2 probe passes and the earlier full-suite miss is
+      classified `FLAKY_TEST`.
+- [ ] Rebuild the final committed source and close the targeted native lane on
+      the exact final APK.
 - [ ] Run affected and full regression ladders; classify all failures.
 - [ ] Push final exact SHA, inspect CI, reconcile artifacts, and close plan.
 
@@ -308,8 +329,24 @@ emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
 - 2026-08-24 — active-session replay — `TEST_BUG` found; the flow entered `6`
   into the Weight field because visible `Reps` text and the input shared a
   selector, producing `426`. Added an optional distinct `Reps input`
-  accessibility label and updated the flow; exact rebuilt APK replay remains
-  pending.
+  accessibility label and updated the flow; the exact d484 rebuilt APK replay
+  passes.
+
+## Validation additions
+
+- 2026-08-25: final d484 native checkpoint — PASS/`FLAKY_TEST`: smoke 2/2;
+  Gym V2 persistence and durable-session isolated replays PASS; targeted
+  aggregate 10/11 with only legacy Workout aggregate-only miss; lifecycle
+  aggregate 5/6 with only reminder replay aggregate-only miss. Both aggregate
+  misses pass exact isolated replay on `emulator-5556`.
+- 2026-08-25: focused Playwright fixes — `TEST_BUG FIXED`; Gym V2 6/6 and
+  P1 journey 8/8 pass after replacing weekday/DOM-sibling selectors with
+  semantic current-day/routine and pending-checkbox selectors.
+- 2026-08-25: valid P2 timing campaign — PASS; ten complete HEAVY journey
+  repetitions (70/70 steps) passed the unchanged 800 ms ceiling with max
+  switch values 747/773/778/782/746/769/767/754/747/750 ms. The prior 811 ms
+  full-suite observation is classified `FLAKY_TEST`/host scheduling, not a
+  product regression.
 
 ## Changed Files / Areas
 
