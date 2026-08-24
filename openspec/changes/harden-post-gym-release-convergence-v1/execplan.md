@@ -56,40 +56,50 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: Git convergence and subsystem preservation audit are
-  complete; the convergence plan/artifacts are being committed and pushed.
+- Current milestone: current-truth documentation and Android native
+  provisioning/Gym qualification implementation are complete; focused static
+  validation is passing and the current source is ready for the first APK
+  build/install attempt.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
   proposal, two normative specs, design, tasks, and this Plan-Version 2
   ExecPlan. Created the convergence branch from `origin/main` and merged the
   Gym branch with merge commit `336f59e` (parents `3e2c8aa` and `f5e9678`).
-- In progress: Commit/push the convergence milestone, then begin the runtime
-  truth sweep.
-- Important modified files: `openspec/changes/harden-post-gym-release-convergence-v1/**`
-  is currently uncommitted; the merge commit contains the 109-file Gym diff
-  plus main's five adapter files. No conflict markers were reported.
-- Last successful validation: clean pre-merge status; normal `--no-ff` merge;
-  `git diff --stat origin/codex/add-gym-training-system-v2..HEAD` reports only
-  the five main-side adapter files; all 109 Gym-changed paths are represented
-  by that unchanged diff and major migration/backup/workout/recovery/
-  Supabase/simulation/E2E paths are present.
-- Current failures: none. The earlier missing `.agent/PLANNER_HANDOFF.md`
-  discrepancy was resolved by integrating current main.
-- Relevant quarantines: none introduced. Existing native/iOS and remote-access
-  limitations remain to be re-evaluated after integration.
-- Blockers: none for merge or local implementation. Android/iOS/Supabase/CI
-  availability is not yet known on the convergence branch.
+  Pushed planning milestone `62b789d`. Audited current schema/backup/portable/
+  Supabase/native prose while preserving historical Scope-6 fixtures. Added
+  `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
+  provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
+  configuration labels.
+- In progress: Commit/push the runtime/native hardening milestone, then build
+  and install the current Android source APK on the verified Nitro target.
+- Important modified files: current docs/agent maps, `package.json`,
+  `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
+  `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
+  `.maestro/flows/workout-gym-v2-*.yaml`, `.eas/workflows/native-e2e.yml`, and
+  the two Workout exercise-toggle components. Generated `android/` and native
+  reports remain ignored.
+- Last successful validation: `npx vitest run tests/qaNativeProvision.test.ts`
+  passed 3/3; `npm run typecheck` passed; both native scripts print valid help;
+  Maestro 2.8.0 is discoverable; `git diff --check` passed. An initial test
+  invocation exposed missing explicit Vitest imports and a JS default-parameter
+  type inference issue; both were fixed without weakening coverage.
+- Current failures: no product failure. The APK build/install and native flow
+  execution are not yet run at this source SHA.
+- Relevant classifications: the existing Windows/iOS limitation remains
+  `ENVIRONMENT`; no native result is claimed until executed. No arbitrary waits,
+  coordinate-only app taps, production credentials, or historical Scope-6
+  rewrites were introduced.
+- Blockers: none known for local implementation; Android target/toolchain,
+  Supabase remote access, iOS/EAS access, and exact-head CI remain to be
+  determined by their respective commands.
 - Condition required to unblock: none.
-- Exact resume action after unblock: none.
-- Exact next action: stage and commit the convergence OpenSpec/ExecPlan
-  artifacts, push the branch, verify remote equality, then inspect and patch
-  current runtime/documentation drift (starting with README and AGENTS Scope-6
-  statements).
-- Remaining definition of done: all OpenSpec tasks complete; integrated Gym
-  subsystems present; current docs/contracts coherent; native provisioning and
-  focused flows executed or precisely blocked; affected and broad gates run;
-  exact final SHA pushed and CI status inspected; working tree clean.
+- Exact resume action after unblock: run `npm run qa:native:provision --
+--serial <verified-serial>` and preserve the resulting provenance/report.
+- Remaining definition of done: focused recovery tests; current-source Android
+  provisioning and native smoke/targeted/lifecycle/Gym execution or precise
+  classifications; timing investigation; affected and broad gates; exact
+  final SHA pushed and CI status inspected; working tree clean.
 
 ## Progress
 
@@ -100,9 +110,10 @@ and records exact-source local/remote certification.
 - [x] Merge completed Gym branch and prove no subsystem loss.
 - [x] Compare integrated paths/content and verify major Gym/governance
       subsystems.
-- [ ] Reconcile runtime truth, docs, QA map, and recovery/Supabase contracts.
-- [ ] Implement Android build/install/identity provisioning.
-- [ ] Add and execute focused native Gym V2 flows.
+- [x] Reconcile runtime truth, docs, QA map, and recovery/Supabase contracts.
+- [x] Implement Android build/install/identity provisioning.
+- [x] Add focused native Gym V2 flows and semantic hooks; execution is pending
+      the current-source APK build.
 - [ ] Investigate timing-sensitive gates without weakening assertions.
 - [ ] Run affected and full regression ladders; classify all failures.
 - [ ] Push final exact SHA, inspect CI, reconcile artifacts, and close plan.
@@ -127,6 +138,14 @@ and records exact-source local/remote certification.
   prevents global replacement from corrupting frozen Scope-6 evidence.
 - 2026-08-24 — Add only focused native Gym flows and provisioning — covers
   platform-sensitive risk without duplicating the web suite.
+- 2026-08-24 — Auto-provision only the credential-free local Android
+  `e2e-test` equivalent, and require API 36/x86_64 plus source/package
+  provenance before Maestro runs — removes the recurring absent-APK blocker
+  without introducing production credentials or machine-specific paths.
+- 2026-08-24 — Use a custom catalog-backed weighted exercise for native Gym
+  qualification and keep the guided flow small — proves identity, typed
+  prescription, draft recovery, and explicit completion without duplicating the
+  full web matrix.
 
 ## Validation Ledger
 
@@ -146,6 +165,9 @@ and records exact-source local/remote certification.
 - 2026-08-24 — changed-path/subsystem audit — PASS; 109 Gym-changed paths are
   present, required source/spec/schema/test/native-governance paths are present,
   and no Gym file differs from the Gym tip.
+- 2026-08-24 — native helper test/typecheck/help/diff validation — PASS;
+  3/3 parser/selection tests, TypeScript, both CLI help paths, Maestro 2.8.0
+  discovery, and `git diff --check` passed before APK execution.
 
 ## Changed Files / Areas
 

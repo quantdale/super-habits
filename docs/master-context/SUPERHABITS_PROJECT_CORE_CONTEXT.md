@@ -200,7 +200,7 @@ Current runtime schema version: `23`
 
 Next migration slot:
 
-- add a new `if (version < 23)` block
+- add a new `if (version < 24)` block
 - never edit previous migration blocks
 
 ## Sync model
@@ -237,8 +237,8 @@ If remote mode is disabled, listeners are skipped and the in-memory queue can gr
 
 ## Auth model
 
-- `app_meta` defines a `guest_profile` key, but bootstrap no longer calls `ensureGuestProfile()`; there is no `core/auth/` module
-- if Supabase is configured, anonymous sign-in is attempted
+- `app_meta` defines a `guest_profile` key and local owner metadata; account ownership/recovery is coordinated by `core/auth/accountCoordinator.ts` and related account modules
+- if Supabase is configured, safe anonymous sign-in is attempted only for an empty/unbound dataset
 - if Supabase env vars are missing, app stays local-only and remote work safely no-ops
 
 ## Navigation

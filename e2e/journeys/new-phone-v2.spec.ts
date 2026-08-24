@@ -8,7 +8,7 @@ import { resetAll } from '../helpers/reset';
  * J5b — "New phone, complete backup" (Backup Completeness V2).
  *
  * The full disaster-recovery round trip: a source device's COMPLETE V2 backup
- * (all 12 recoverable entities + settings + integrity manifest) is served as
+ * (all 21 Scope-7 recoverable entities + settings + integrity manifest) is served as
  * the remote; a pristine device recovers it through the V2 restore path and
  * ends up semantically equivalent — habit history and streaks included, focus
  * history, workout structure + history, saved meals, linked-action rules, and

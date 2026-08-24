@@ -75,7 +75,7 @@ Current write entrypoints:
 Observations:
 
 - progress is stored in `habit_completions`, not on `habits`.
-- `incrementHabit()` and `decrementHabit()` are not synced and are keyed by `habit_id + date_key`.
+- `incrementHabit()` and `decrementHabit()` are keyed by `habit_id + date_key`; their completion row mutations enqueue durable `habit_completions` backup intents, including a remote delete intent when the count reaches zero.
 - decrementing from `1` hard-deletes the completion row by design.
 
 Recommended V1 trigger surface:

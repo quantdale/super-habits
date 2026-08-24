@@ -74,7 +74,8 @@ If this file conflicts with current code, trust the code and document the confli
   `workout_session_sets`, `custom_exercises`, `workout_weekly_plan`,
   `workout_schedule_overrides`, `body_weight_entries`, plus the synthetic
   settings/manifest records.
-- Backup Completeness V2 (backup schema version 2; current scope version 6)
+- Backup Completeness V2 (backup schema version 2; current scope version 7;
+  Scope 6 remains frozen compatibility)
   syncs the full recoverable
   scope: todos, habits, habit_completions, calorie_entries, saved_meals,
   pomodoro_sessions, workout_routines, routine_exercises,

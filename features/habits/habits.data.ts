@@ -476,9 +476,9 @@ export async function decrementHabit(habitId: string, dateKey = toDateKey()): Pr
   // Atomic decrement inside a transaction with a durable backup intent:
   // two rapid taps previously either SELECTed the same count and both wrote
   // count-1, losing a decrement (the same race incrementHabit was fixed
-  // for). The row is hard-deleted when the count reaches 0 (the documented
-  // non-synced toggle-off exception), and the outbox intent follows the
-  // actual row state (update vs delete).
+  // for). The row is hard-deleted locally when the count reaches 0 (the
+  // documented hard-delete exception), and the durable outbox intent follows
+  // the actual row state (update vs remote delete).
   await runBackupMutation({
     db,
     mutate: async (transactionDb, enqueue) => {

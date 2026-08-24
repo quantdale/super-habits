@@ -263,7 +263,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `app_meta` defines a `guest_profile` key (in `core/db/appMeta.ts`), but bootstrap no longer calls `ensureGuestProfile()`; there is no `core/auth/` module.
+- `app_meta` defines a `guest_profile` key (in `core/db/appMeta.ts`); account ownership and recovery are coordinated by `core/auth/accountCoordinator.ts` and related account modules.
 - If Supabase is configured, app startup attempts anonymous sign-in.
 - If Supabase env vars are missing, the app stays local-only and remote operations no-op safely.
 

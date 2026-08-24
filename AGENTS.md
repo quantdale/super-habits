@@ -77,7 +77,7 @@ Key product facts:
 - A local-only dataset owner binding (`app_meta.account.owner_user_id`) prevents session loss or wrong-account Auth state from silently rebinding local data; local use continues while remote sync/restore is paused.
 - The command center launches as a **global overlay** mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`; there is no `/command` route.
 - Calories supports **Form** and **Diary** modes and remembers the last selected view in AsyncStorage (`superhabits.calories.viewMode`).
-- Backup Completeness V2: backfill (`backup.scope_version = 6`), the
+- Backup Completeness V2: backfill (`backup.scope_version = 7`), the
   completeness checkpoint, and Restore V2 live in `core/backup/`; the sync
   adapter backs all 21 recoverable entity tables plus synthetic
   `user_backup_settings` / `backup_manifest` records, including Gym V2 custom
@@ -154,7 +154,7 @@ Key product facts:
 - The exported `syncEngine` uses `SupabaseSyncAdapter` (`core/sync/supabase.adapter.ts`), which groups records by entity, reads local rows, and upserts them to Supabase (`onConflict: "id"`).
 - `NoopSyncAdapter` is the constructor default for tests.
 - `AppProviders` registers `syncEngine.flush()` on a 30-second interval, web `visibilitychange` (hidden), and NetInfo reconnect events — but only when `isRemoteEnabled()` returns true (`remoteMode` defaults to `"enabled"`) and the account coordinator has verified current UID, local binding, and every outbox owner agree.
-- Restore v1 (`core/sync/restore.coordinator.ts`) remains the labeled legacy path; Backup Completeness V2 (`core/backup/backupRestore.ts`) previews and imports the complete scope-6 dataset only when every account table and outbox row is empty.
+- Restore v1 (`core/sync/restore.coordinator.ts`) remains the labeled legacy path; Backup Completeness V2 (`core/backup/backupRestore.ts`) previews and imports the complete current Scope-7 dataset only when every account table and outbox row is empty, while frozen Scope-6 payloads remain compatible.
 
 ### Bootstrap
 
@@ -219,7 +219,7 @@ Violating these can cause silent data corruption or break the app on cold start.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
 6. **Migrations are append-only.** Never edit existing migration blocks. Add a new `if (version < N+1) { ... }` block in `runMigrations()` in `core/db/client.ts`.
 7. **`schema.sql` is a reference-only partial snapshot** (not runtime authority) — the runtime truth is the bootstrap DDL + append-only migration blocks in `core/db/client.ts`; the snapshot records the current v14 outbox addition but may omit runtime-only details.
-8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`). Neither table is synced.
+8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0; the corresponding durable outbox delete intent is still synced. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`) and its remote delete intent is synced. These are local hard-delete exceptions, not unsynced entities.
 
 ## Feature Module Pattern
 
@@ -289,8 +289,9 @@ npm run e2e:report   # open HTML report
 npm run e2e:headed   # visible browser for debugging
 npm run e2e:debug    # Playwright inspector
 
-# Native E2E (requires a built app installed on a booted target)
+# Native E2E (Android can provision the current build on a booted target)
 npm run qa:native:android  # local Android smoke
+npm run qa:native:provision # build/install current credential-free API-36 x86_64 APK
 npm run qa:native:ios      # local macOS/iOS smoke when available
 npm run qa:native:lifecycle
 npm run qa:native:targeted
@@ -347,7 +348,11 @@ decision rule.
 - The dedicated EAS profile is `e2e-test`; it creates an Android APK or iOS
   simulator build without production credentials. Do not use Expo Go for native
   lifecycle validation.
-- `scripts/qa-native.mjs` performs preflight and writes reports under
+- `scripts/qa-native-provision.mjs` builds/installs the current credential-free
+  Android E2E equivalent on the documented API-36 x86_64 target and records
+  package/source provenance.
+- `scripts/qa-native.mjs` performs preflight, auto-provisions Android when
+  needed, and writes reports under
   `simulation-output/native/`. Missing Maestro, a booted target, or an
   installed app is an `ENVIRONMENT` blocker, not a pass.
 - Native UI/navigation changes require smoke. Native persistence/settings

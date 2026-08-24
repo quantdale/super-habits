@@ -61,12 +61,12 @@ Any component calling a `*.data.ts` function must be a descendant of `AppProvide
 ## Non-negotiable invariants (violating these silently corrupts data)
 
 1. **Soft delete only** on main entity tables — `UPDATE ... SET deleted_at = datetime('now')` and always `WHERE deleted_at IS NULL`. Never `DELETE FROM` synced tables.
-2. **Enqueue on every write** — call `syncEngine.enqueue(...)` immediately after INSERT/UPDATE on synced entities: `todos`, `habits`, `calorie_entries`, `workout_routines`. **Not** synced: `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `linked_action_rules`, `linked_action_events`, `linked_action_executions`, nested workout tables.
+2. **Enqueue on every write** — every recoverable `BACKUP_ENTITIES` write, including `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `linked_action_rules`, nested workout tables, planning entities, and Gym V2 metadata, goes through the durable outbox. Only `linked_action_events`, `linked_action_executions`, and `processed_notification_actions` are local operational state.
 3. **DB singleton** — `getDatabase()` in `core/db/client.ts` is the only entrypoint; every data function starts with `const db = await getDatabase()`. Never open a second connection.
 4. **IDs via `createId(prefix)`** from `lib/id.ts` (`{prefix}_{ms}_{rand8}`). Never `Math.random()`, `crypto.randomUUID()`, or bare `Date.now()`. Prefixes: `todo`, `habit`, `hcmp`, `cal`, `smeal`, `wrk`, `ex`, `eset`, `wsex`, `pom`, `rec`, `guest`.
 5. **Date keys via `toDateKey()`** from `lib/time.ts` — local-calendar `YYYY-MM-DD` since migration 5 (`app_meta.date_key_cutover`; old UTC rows are not backfilled).
-6. **Migrations are append-only** — never edit an existing block. Current stored schema version is **22**; add a new `if (version < 23) { ... }` block in `runMigrations()` in `core/db/client.ts`. `core/db/schema.sql` is a stale partial snapshot and reference-only — never executed at runtime; the runtime truth is `core/db/client.ts`.
-7. **Hard-delete exceptions** — `habit_completions`: SELECT existing `(habit_id, date_key)` → INSERT (`hcmp`) or UPDATE count; hard `DELETE` allowed only when decrementing from 1 to 0. `saved_meals` also hard-deletes by design (`deleteSavedMeal` in `features/calories/calories.data.ts`). Neither is synced.
+6. **Migrations are append-only** — never edit an existing block. Current stored schema version is **23**; add a new `if (version < 24) { ... }` block in `runMigrations()` in `core/db/client.ts`. `core/db/schema.sql` is a stale partial snapshot and reference-only — never executed at runtime; the runtime truth is `core/db/client.ts`.
+7. **Hard-delete exceptions** — `habit_completions`: SELECT existing `(habit_id, date_key)` → INSERT (`hcmp`) or UPDATE count; hard `DELETE` allowed only when decrementing from 1 to 0, with a durable remote delete intent. `saved_meals` also hard-deletes by design (`deleteSavedMeal` in `features/calories/calories.data.ts`) with the same remote-delete contract. Neither is unsynced.
 
 ## Conventions
 

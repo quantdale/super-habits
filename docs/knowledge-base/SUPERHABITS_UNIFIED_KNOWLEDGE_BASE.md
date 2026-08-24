@@ -65,9 +65,9 @@
 
 **Sync / backup:** synced writes commit their local mutation and a durable `sync_outbox` row in one SQLite transaction, then publish to the in-memory queue. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub), and revision matching prevents an old push from deleting a newer pending mutation. `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior; durable pending outbox rows remain available for a later flush. If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
-**Cloud backup & restore (Backup Completeness V2 / Restore V2):** `core/backup/` owns the owner-scoped cloud contract. The backup schema remains version 2 while the recoverable scope is now version 6: `todos`, `habits`, `habit_completions`, `calorie_entries`, `saved_meals`, full workout routines/exercises/sets/logs/session exercises/session sets, custom exercises, weekly plan/date overrides, body-weight entries, planning/review entities, `pomodoro_sessions`, `linked_action_rules`, and the allowlisted recoverable settings (including workout effort scale, goal weight, and workout-day reminder). A maintenance cycle (`backupCheckpoint.ts`) publishes an owner-scoped `backup_manifest` (generation, per-entity counts + deterministic SHA-256 checksums, certified settings checksum) only after the durable outbox drains. Restore V2 (`backupRestore.ts`) prefetches + validates every row and the settings payload, verifies checksums + dependency graph, requires a **completely empty** device (ALL user tables + outbox), then imports everything in ONE SQLite transaction with no historical side effects; theme is staged durably and applied to AsyncStorage after commit. Legacy V1 backups remain restorable and are labeled `V1 LEGACY/PARTIAL`.
+**Cloud backup & restore (Backup Completeness V2 / Restore V2):** `core/backup/` owns the owner-scoped cloud contract. The backup schema remains version 2 while the current recoverable scope is version 7: all 21 `BACKUP_ENTITIES`, including `todos`, `habits`, `habit_completions`, `calorie_entries`, `saved_meals`, full Gym V2 workout routines/exercises/sets/logs/session exercises/session sets, custom exercise metadata, weekly plan/date overrides, body-weight entries, planning/review entities, `pomodoro_sessions`, `linked_action_rules`, and the allowlisted recoverable settings. Scope 6 remains frozen compatibility. A maintenance cycle (`backupCheckpoint.ts`) publishes an owner-scoped `backup_manifest` (generation, per-entity counts + deterministic SHA-256 checksums, certified settings checksum) only after the durable outbox drains. Restore V2 (`backupRestore.ts`) prefetches + validates every row and the settings payload, verifies checksums + dependency graph, requires a **completely empty** device (ALL user tables + outbox), then imports everything in ONE SQLite transaction with no historical side effects; theme is staged durably and applied to AsyncStorage after commit. Legacy V1 backups remain restorable and are labeled `V1 LEGACY/PARTIAL`.
 
-**Portable Backup V1 (file export/import):** `core/portable/` adds a user-controlled FILE path that requires no Supabase. Export captures the current scope-6 recoverable entities + recoverable settings in one serialized read-only snapshot into a versioned JSON envelope (`superhabits-backup-*.json`) with per-entity checksums, a settings checksum, and a canonical payload checksum; no secrets (tokens, raw UUIDs, `sync_outbox`, internal `app_meta`) are included. Import validates everything before any write (envelope, format/domain versions, rows, settings, checksums, dependency graph, owner compatibility, complete emptiness), shows a human preview, requires explicit confirmation, and imports atomically through the side-effect-free Restore V2 apply paths. Owner fingerprints are one-way SHA-256 compatibility metadata; import-origin metadata (`app_meta portable.last_import_*`) fails closed in `decideAccountState` so an unrelated account cannot silently claim an imported dataset, and a file import never marks cloud backup complete (backfill markers reset + `backup.dirty`). The file is plain text and not encrypted — disclosed in the UI.
+**Portable Backup V1 (file export/import):** `core/portable/` adds a user-controlled FILE path that requires no Supabase. Export captures the current Scope-7 recoverable entity set + recoverable settings in one serialized read-only snapshot into a versioned JSON envelope (`superhabits-backup-*.json`) with per-entity checksums, a settings checksum, and a canonical payload checksum; no secrets (tokens, raw UUIDs, `sync_outbox`, internal `app_meta`) are included. Import validates everything before any write (envelope, format/domain versions, rows, settings, checksums, dependency graph, owner compatibility, complete emptiness), shows a human preview, requires explicit confirmation, and imports atomically through the side-effect-free Restore V2 apply paths. Frozen Scope-6 files remain recognized by their explicit historical scope. Owner fingerprints are one-way SHA-256 compatibility metadata; import-origin metadata (`app_meta portable.last_import_*`) fails closed in `decideAccountState` so an unrelated account cannot silently claim an imported dataset, and a file import never marks cloud backup complete (backfill markers reset + `backup.dirty`). The file is plain text and not encrypted — disclosed in the UI.
 
 **Recoverable Account V1:** `core/auth/accountCoordinator.ts` and `core/auth/account.data.ts` maintain the local-only dataset binding `app_meta.account.owner_user_id` plus typed inspection of all user-owned tables and durable outbox owners. An empty/unbound install may create an anonymous Auth session; a bound or populated dataset that loses Auth enters recovery-required state and never creates a replacement anonymous owner. A verified different UID enters owner-mismatch state. Settings can protect the current anonymous UUID with email-change OTP, requiring the verified result to retain that UUID, or recover an existing protected account with email OTP and `shouldCreateUser: false` on an empty device. Account merge, populated-device switching, transfer, and deletion remain unsupported.
 
@@ -107,7 +107,7 @@
 | Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay               |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                                      |
 | Schema version (stored) | **23** (`app_meta.db_schema_version`)                                                                                                               |
-| Next migration          | `23` (new `if (version < 23)` block in `runMigrations`)                                                                                             |
+| Next migration          | `24` (new `if (version < 24)` block in `runMigrations`)                                                                                             |
 | Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                              |
 | E2E tests               | **95** Chromium tests in **14** spec files; **`workers: 1` locally and in CI** (shared OPFS origin); static `dist/` via `node scripts/serve-e2e.js` |
 
@@ -323,12 +323,12 @@ No other features call `toDateKey()` directly.
 
 #### `syncEngine.enqueue()` usage
 
-| File                                 | Entity string      | Operations                                                       | Notes                                                                                           |
-| ------------------------------------ | ------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `features/todos/todos.data.ts`       | `todos`            | create, update, delete                                           | After every mutating write                                                                      |
-| `features/habits/habits.data.ts`     | `habits`           | create, update, delete                                           | Completions **not** enqueued                                                                    |
-| `features/calories/calories.data.ts` | `calorie_entries`  | create, update, delete                                           |                                                                                                 |
-| `features/workout/workout.data.ts`   | `workout_routines` | create, delete; `markWorkoutRoutineUpdated` after nested changes | `workout_logs` inserts ARE enqueued (all creation paths route through `insertWorkoutLogRecord`) |
+| File                                 | Entity string      | Operations                                                       | Notes                                                                                             |
+| ------------------------------------ | ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `features/todos/todos.data.ts`       | `todos`            | create, update, delete                                           | After every mutating write                                                                        |
+| `features/habits/habits.data.ts`     | `habits`           | create, update, delete                                           | Completion mutations enqueue `habit_completions` intents; count-zero toggles issue remote deletes |
+| `features/calories/calories.data.ts` | `calorie_entries`  | create, update, delete                                           |                                                                                                   |
+| `features/workout/workout.data.ts`   | `workout_routines` | create, delete; `markWorkoutRoutineUpdated` after nested changes | `workout_logs` inserts ARE enqueued (all creation paths route through `insertWorkoutLogRecord`)   |
 
 **Intentionally not synced:** `linked_action_events`, `linked_action_executions`, `processed_notification_actions`. Everything else in `BACKUP_ENTITIES` — including `pomodoro_sessions`, `workout_logs`, `habit_completions`, `saved_meals`, `workout_session_exercises`, `workout_session_sets`, and the planning entities — rides the durable outbox (see `core/backup/backup.types.ts`).
 
@@ -937,8 +937,8 @@ export function createId(prefix: string): string {
 
 **Hard delete exceptions (documented):**
 
-1. `habit_completions` — row DELETE when count goes to 0 (toggle-off semantics; not synced)
-2. `saved_meals` — `deleteSavedMeal` uses `DELETE FROM saved_meals` (local-only cache)
+1. `habit_completions` — row DELETE when count goes to 0 (toggle-off semantics); the durable outbox carries the remote delete intent
+2. `saved_meals` — `deleteSavedMeal` uses `DELETE FROM saved_meals`; the durable outbox carries the remote delete intent
 
 **Tables without soft delete:** `pomodoro_sessions`, `workout_logs`, `workout_session_exercises`, `habit_completions`, `saved_meals`
 
@@ -1007,7 +1007,7 @@ export interface SyncAdapter {
 
 #### `SupabaseSyncAdapter` (`core/sync/supabase.adapter.ts`)
 
-- `push(records)` — groups by `entity`, loads current SQLite rows for queued ids, **`upsert`**s into Supabase (`onConflict: "id"`) for the full Backup V2 scope (`todos`, `habits`, `habit_completions`, `calorie_entries`, `saved_meals`, workout structure + logs, `pomodoro_sessions`, `linked_action_rules`) plus the synthetic `user_backup_settings` and `backup_manifest` records (settings-before-manifest push ordering; hard-delete entities issue owner-scoped remote DELETEs). No-ops if `records` empty, **`supabase` client is null** (missing env), or entity unknown.
+- `push(records)` — groups by `entity`, loads current SQLite rows for queued ids, **`upsert`**s into Supabase (`onConflict: "id"`) for the complete current Scope-7 `BACKUP_ENTITIES` set (including Gym V2 structure/history, planning, custom exercise metadata, weekly plans, overrides, and body weight) plus the synthetic `user_backup_settings` and `backup_manifest` records (settings-before-manifest push ordering; hard-delete entities issue owner-scoped remote DELETEs). No-ops if `records` empty, **`supabase` client is null** (missing env), or entity unknown.
 - `pull` — returns `[]` (restore / multi-device pull not implemented; empty-device recovery goes through Restore V2 / the legacy V1 coordinator).
 
 #### `SyncEngine`
@@ -2218,7 +2218,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
 | Workflow        | Read → plan → approval → implement → typecheck + test → report                                                        |
 
-         | Schema          | Current version **15**, next migration `version < 16`                                                                 |
+         | Schema          | Current version **23**, next migration `version < 24`                                                                 |
 
 #### `feature-agent.md`
 
@@ -2299,8 +2299,8 @@ Tag phase completions: `git tag phaseN-complete`
 ### Sync invariants
 
 - **Shape:** `SyncRecord { entity, id, updatedAt, operation }`
-- **Enqueue after write** on: todos, habits, calorie_entries, workout_routines (including bump after nested workout structure changes)
-- **No enqueue:** pomodoro_sessions, workout_logs, habit_completions, saved_meals
+- **Enqueue after write** on every `BACKUP_ENTITIES` member, including pomodoro_sessions, workout_logs, habit_completions, saved_meals, linked_action_rules, nested workout structure, planning entities, and Gym V2 metadata; synthetic settings/manifest records use the same outbox
+- **No enqueue:** linked_action_events, linked_action_executions, processed_notification_actions (local operational state only)
 - **Remote `disabled`:** `AppProviders` does not register flush listeners — in-memory queue can grow until `setRemoteMode("enabled")` (documented tradeoff)
 - **Adapter:** Production `syncEngine` uses **`SupabaseSyncAdapter`**; **`NoopSyncAdapter`** remains for `SyncEngine` default ctor / tests
 
@@ -2309,7 +2309,7 @@ Tag phase completions: `git tag phaseN-complete`
 - Never change past `if (version < N)` blocks
 - Use try/catch around `ALTER TABLE` for idempotent re-runs
 - Update `db_schema_version` in same migration
-- Next block: `version < (currentStored + 1)` — currently next is **10**
+- Next block: `version < (currentStored + 1)` — currently next is **24**
 
 ### Domain purity
 
@@ -2390,7 +2390,7 @@ Tag phase completions: `git tag phaseN-complete`
 | GitHub-style grid (weeks as columns)                                                    | Yearly activity uses `GitHubHeatmap` across habits, pomodoro, workout, and calories         |
 | Local `date_key` (migration 5)                                                          | `date_key_format: 'local'` + cutover without backfill                                       |
 | Soft delete everywhere                                                                  | Recovery / sync compatibility                                                               |
-| `habit_completions` hard delete at zero                                                 | Toggle-off semantics; high-churn; not synced                                                |
+| `habit_completions` hard delete at zero                                                 | Toggle-off semantics; high-churn local delete with durable remote-delete intent             |
 | Avocation-style habits layout                                                           | Horizontal rows per time group, auto-wrap, always all groups visible                        |
 | Classic Pomodoro sequence                                                               | 4× focus → long break; configurable via `sessionsBeforeLongBreak`                           |
 | `getNextMode` guard (`completedFocusSessions > 0`)                                      | Prevents `0 % N === 0` long-break-at-start bug                                              |

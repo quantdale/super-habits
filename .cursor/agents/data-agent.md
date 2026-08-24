@@ -49,7 +49,7 @@ NON-NEGOTIABLES
 - New columns require a new migration (never modify existing migrations)
 - Current schema version: **23** — next migration: new **`if (version < 24)`** block in `runMigrations()` in `core/db/client.ts` (when a schema change is introduced)
 - schema.sql is reference only — never execute it
-- UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed exception to soft-delete — non-synced entity, no `syncEngine.enqueue()`. See `features/habits/habits.data.ts` ~63–66 for the explanatory comment.
+- UNIQUE(habit_id, date_key): use SELECT + INSERT (new row, count=1) or UPDATE (count+1) for increment; SELECT + UPDATE (count−1) or DELETE (when count was 1) for decrement; hard DELETE when count reaches 0 is the allowed local exception to soft-delete, but the durable delete intent still enqueues `habit_completions`. See `features/habits/habits.data.ts` for the implementation.
 - All SELECT queries include WHERE deleted_at IS NULL
 - 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` — never maintain a magic total count
 

@@ -162,7 +162,7 @@ UUID before entering this same preview/import path; it does not add
 merging or account switching.
 
 **Portable Backup V1** (`core/portable/`) is the user-controlled FILE path —
-no Supabase required. Export snapshots the current scope-6 recoverable entities +
+no Supabase required. Export snapshots the current Scope-7 recoverable entities +
 recoverable settings in one serialized read-only transaction into a
 versioned JSON envelope with per-entity checksums, a settings checksum, and
 a canonical payload checksum; import validates everything (envelope,
