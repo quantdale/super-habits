@@ -387,7 +387,9 @@ function runPlatform(platform, options) {
     });
   }
 
-  const args = ['test', '--reinstall-driver', flow];
+  const args = ['test', '--no-ansi', '--reinstall-driver'];
+  if (target.serial) args.push('--device', target.serial);
+  args.push(flow);
   if (options.tag) args.push(`--include-tags=${options.tag}`);
   console.log(`Running native ${platform} QA on ${target.target}: maestro ${args.join(' ')}`);
   const result = run(target.command, args, {

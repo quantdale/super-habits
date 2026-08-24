@@ -17,8 +17,15 @@ tags:
 - tapOn:
     text: 'Workout'
     index: 0
+- scrollUntilVisible:
+    element: 'Routine name'
+    direction: DOWN
 - tapOn: 'Routine name'
 - inputText: 'Native Gym V2 resume routine'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Add routine'
+    direction: DOWN
 - tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native Gym V2 resume routine routine'
@@ -28,13 +35,24 @@ tags:
 - extendedWaitUntil:
     visible: 'Exercise library'
     timeout: 5000
+- tapOn: 'Search exercises'
+- inputText: 'zzzz-native-resume'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Create custom exercise'
     direction: DOWN
 - tapOn: 'Name'
 - inputText: 'Native resume press'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Primary body area'
+    direction: DOWN
 - tapOn: 'Primary body area'
 - inputText: 'chest'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Create and add'
+    direction: DOWN
 - tapOn: 'Create and add'
 - extendedWaitUntil:
     visible: 'Native resume press'
@@ -52,7 +70,8 @@ tags:
     timeout: 5000
 - tapOn: 'Weight'
 - inputText: '42'
-- tapOn: 'Reps'
+- hideKeyboard
+- tapOn: 'Reps input'
 - inputText: '6'
 - waitForAnimationToEnd:
     timeout: 5000

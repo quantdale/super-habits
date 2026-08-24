@@ -1137,6 +1137,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   <View className={allowsExternalLoad ? 'min-w-0 flex-1' : 'min-w-0 w-full'}>
                     <NumberStepperField
                       label={currentPhase.unilateral ? 'Reps / side' : 'Reps'}
+                      inputAccessibilityLabel={
+                        currentPhase.unilateral ? 'Reps / side input' : 'Reps input'
+                      }
                       value={enteredSets[currentIndex]?.reps ?? ''}
                       onChange={(v) => updateEnteredValues(currentIndex, { reps: v })}
                       min={1}

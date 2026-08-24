@@ -48,6 +48,9 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
+- scrollUntilVisible:
+    element: 'Reminder 18:00'
+    direction: DOWN
 - assertVisible: 'Reminder 18:00'
 - swipe:
     start: '50%, 30%'
@@ -69,6 +72,10 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - assertNotVisible: 'Reminder 18:00'
 - killApp
 - launchApp
@@ -80,11 +87,14 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Native disable reminder'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 15000
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - assertNotVisible: 'Reminder 18:00'

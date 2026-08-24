@@ -3,6 +3,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 
 type NumberStepperFieldProps = {
   label: string;
+  inputAccessibilityLabel?: string;
   value: string;
   onChange: (value: string) => void;
   min?: number;
@@ -12,6 +13,7 @@ type NumberStepperFieldProps = {
 
 export function NumberStepperField({
   label,
+  inputAccessibilityLabel,
   value,
   onChange,
   min = 1,
@@ -57,7 +59,7 @@ export function NumberStepperField({
         </Pressable>
         <TextInput
           className="flex-1 border px-3 py-2 text-center text-base"
-          accessibilityLabel={label}
+          accessibilityLabel={inputAccessibilityLabel ?? label}
           style={{
             height: 48,
             borderColor: tokens.border,

@@ -56,8 +56,9 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: aggregate smoke is closed; targeted persistence flow
-  repairs are complete and the exact-source targeted lane is next.
+- Current milestone: native flow hardening is complete for the current
+  checkpoint and the last pre-certification source changes are being validated
+  before the final exact-source APK build.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -69,23 +70,25 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: source `e92277d` APK is installed and provenance-verified;
-  command-center/native smoke pass 2/2 in the aggregate lane. Direct replay
-  now passes the Gym V2, legacy Workout, Calories, habit, reminder-persistence,
-  and permission-denied flows. The remaining reminder-disable and isolation
-  checks require the committed per-habit accessibility labels in a rebuilt
-  APK before the runner lane is certified.
+- In progress: source `762a9e3` was rebuilt and installed on the clean
+  `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. Isolated direct replay
+  now passes the repaired Gym V2, legacy Workout, Calories, habit, schedule,
+  reminder persistence, reminder disable, permission-denied, and reminder
+  isolation flows. The remaining active-session replay requires the final
+  source changes below in a rebuilt APK before runner certification.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
   `.maestro/flows/workout-gym-v2-*.yaml`, the targeted persistence flows,
-  `.eas/workflows/native-e2e.yml`, `features/habits/HabitsScreen.tsx`, and the
-  two Workout exercise-toggle components. Generated `android/` and native
-  reports remain ignored.
-- Last successful validation: the current-source Android APK was rebuilt in
-  8m02s, installed on `emulator-5554`, and provenance-verified at source
-  `e92277d` (API 36, x86_64, package `com.dale16.superhabits`, APK SHA-256
-  `CECE14D5...E9CC2C4`). The aggregate smoke lane passed 2/2; report:
+  `.eas/workflows/native-e2e.yml`, `features/habits/HabitsScreen.tsx`,
+  `core/ui/NumberStepperField.tsx`, `features/workout/WorkoutSessionScreen.tsx`,
+  and the two Workout exercise-toggle components. Generated `android/` and
+  native reports remain ignored.
+- Last successful validation: source `762a9e3` was rebuilt in 7m11s, installed
+  on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and provenance-verified
+  with package `com.dale16.superhabits` 1.0.0 / versionCode 1 and APK SHA-256
+  `BD8F14CD...2E33306825A29C0AC`. The prior exact-source aggregate smoke
+  lane passed 2/2 on `emulator-5554`; report:
   `simulation-output/native/native-android-smoke-2026-08-24T093033141Z.json`.
 - Current failures: first smoke replay findings are classified `TEST_BUG`:
   the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
@@ -113,34 +116,41 @@ and records exact-source local/remote certification.
   `--reinstall-driver` per lane and section markers use state-based waits; no
   assertion has been removed. The smoke report is
   `simulation-output/native/native-android-all-2026-08-24T091755013Z.json`.
-- Targeted persistence report
-  `simulation-output/native/native-android-persistence-2026-08-24T094203528Z.json`
-  recorded 3/11 passing and 8/11 failing. The failures were calories field
-  discovery, habit form discovery/reminder denial state, and Workout routine
-  form discovery. The first hypotheses are missing state-based waits after
-  section navigation and selector drift; the underlying product assertions
-  remain intact until direct replay determines the classification.
+- Exact-source targeted runner report
+  `simulation-output/native/native-android-persistence-2026-08-24T113235793Z.json`
+  recorded four flow passes before the emulator exited during cleanup and
+  seven failures. The report is retained as `ENVIRONMENT` evidence for the
+  lost `emulator-5554` target, while isolated replays on the clean
+  `emulator-5556` target reproduced the app-state/selector failures as
+  `TEST_BUG` and closed them without weakening persistence assertions.
 - Direct native replay after those findings classified the flow defects as
   `TEST_BUG`: post-Gym Workout forms moved below the fold, native keyboards
   obscured sequential fields, the Diary row was below the summary, habit
-  groups/forms reused scroll offsets, and the disable flow contained a
-  contradictory positive reminder wait. The corrected direct flows passed
-  Gym V2 persistence, legacy Workout persistence, Calories persistence,
-  habit persistence, reminder persistence, and permission-denied reminder
-  behavior. A separate Gboard Settings foreground during one optional
-  `hideKeyboard` call was classified `FLAKY_TEST`/`ENVIRONMENT`; scrolling
-  while the IME is present is now used where safe. The final two reminder
-  flows are pending the rebuilt APK containing the new per-habit labels.
+  groups/forms reused scroll offsets, reminder assertions were outside the
+  visible card viewport, grouped delete needed a per-habit label, the
+  isolation flow asserted the opposite of its own no-inheritance contract,
+  and the Pomodoro selector used a stale `Reset|Abandon` expression. The
+  corrected direct flows pass those contracts. A separate Gboard Settings
+  foreground during one optional `hideKeyboard` call remains
+  `FLAKY_TEST`/`ENVIRONMENT` evidence; scrolling while the IME is present is
+  used where safe. The active-session flow exposed a test-selector issue:
+  the Reps label and Reps input shared a selector, causing `6` to append to
+  weight; a distinct accessibility label is now in the source and awaits the
+  final rebuilt APK.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
 - Condition required to unblock: none.
-- Exact resume action after unblock: commit the targeted flow/semantic-label
-  checkpoint, provision the exact new SHA, then run the complete targeted
-  persistence lane against that APK.
-- Exact next action: run formatting/static checks, commit the targeted native
-  hardening, rebuild/install and provenance-verify that exact commit, and run
-  `npm run qa:native:targeted -- --serial emulator-5554`.
+- Exact resume action after unblock: run formatting/typecheck/native helper
+  checks, commit the final native hardening checkpoint, provision the exact
+  new SHA on one verified API-36 x86_64 target, then run the required smoke,
+  targeted, lifecycle, and focused Gym session lanes.
+- Exact next action: validate and commit the current flow/semantic-label/
+  runner changes, rebuild/install/provenance-verify that exact commit on
+  `emulator-5556`, then run `npm run qa:native:android -- --serial
+emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
+  `npm run qa:native:lifecycle -- --serial emulator-5556`, and the focused
+  `workout-gym-v2-session-lifecycle.yaml` replay.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; timing investigation; affected and broad gates; exact
@@ -193,6 +203,13 @@ and records exact-source local/remote certification.
   qualification and keep the guided flow small — proves identity, typed
   prescription, draft recovery, and explicit completion without duplicating the
   full web matrix.
+- 2026-08-24 — Make the native runner pass `--no-ansi` and the explicit ADB
+  serial to Maestro — keeps one-command diagnostics tied to the preflight-
+  verified target and avoids terminal redraw ambiguity.
+- 2026-08-24 — Add an optional distinct input accessibility label to
+  `NumberStepperField` only where the active Workout flow has a duplicate
+  visible `Reps` label — gives Maestro and assistive technology a stable
+  target without changing the underlying value semantics.
 
 ## Validation Ledger
 
@@ -232,8 +249,27 @@ and records exact-source local/remote certification.
   result.
 - 2026-08-24 — habit edit/delete semantic hardening — added per-habit
   accessibility labels so native flows select the intended card in grouped
-  edit mode. The installed e92277d APK predates this label, so final native
-  classification waits for the exact rebuilt checkpoint.
+- edit mode. The exact `762a9e3` APK on `emulator-5556` then passed the
+  repaired disable and isolation replays; the remaining active-session flow
+  found a duplicate Reps selector and prompted a distinct input label.
+- 2026-08-24 — native target recovery — the first exact targeted aggregate lost
+  `emulator-5554` during Maestro cleanup. A clean `CRBABot_API_36` target came
+  online as `emulator-5556`; it passed API 36/x86_64 and package provenance
+  checks, so subsequent evidence uses the explicit serial rather than mixing
+  two emulator instances.
+- 2026-08-24 — exact-source provision on `emulator-5556` — PASS; clean Expo
+  prebuild, Gradle release build in 7m11s, streamed APK install, package
+  identity, source SHA, API/ABI, and E2E environment provenance all passed.
+- 2026-08-24 — isolated direct native replays on `emulator-5556` — PASS for
+  Gym V2 routine persistence, legacy Workout persistence, Calories, habit
+  persistence/schedule, reminder persistence/disable/permission-denied/
+  isolation, including Pomodoro background/resume. The targeted aggregate
+  report remains a preserved `ENVIRONMENT` result because its emulator exited.
+- 2026-08-24 — active-session replay — `TEST_BUG` found; the flow entered `6`
+  into the Weight field because visible `Reps` text and the input shared a
+  selector, producing `426`. Added an optional distinct `Reps input`
+  accessibility label and updated the flow; exact rebuilt APK replay remains
+  pending.
 
 ## Changed Files / Areas
 

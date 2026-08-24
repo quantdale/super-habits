@@ -108,7 +108,11 @@ tags:
     visible: 'Native Read reminder'
     timeout: 5000
 - assertNotVisible: 'Native Gym reminder'
-- assertVisible: 'Reminder 18:00'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
+- assertNotVisible: 'Reminder 18:00'
 - tapOn:
     text: 'Focus'
     index: 0
@@ -119,5 +123,5 @@ tags:
     stopApp: false
 - assertVisible: 'Pause'
 # Elapsed focus time varies with emulator speed; accept either label.
-- tapOn: 'Reset|Abandon'
+- tapOn: 'Reset (not logged)'
 - assertVisible: 'Start focus'
