@@ -56,9 +56,11 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: the corrected targeted-flow repairs are committed and
-  pushed as `684d006`; the final exact-source Android build is now the next
-  certification checkpoint.
+- Current milestone: exact `d02ef40` Android smoke and focused Gym V2
+  lifecycle certification passed. Aggregate targeted/lifecycle runs exposed
+  only cross-flow viewport/selector instability; the affected reminder and
+  Pomodoro flows are now semantically hardened in the working tree and pass
+  isolated exact-APK replay.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -70,12 +72,14 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: source `684d006` is the exact final native build target and has
-  not yet been provisioned. The prior `386f2e2` APK remains installed on the
-  clean `emulator-5556` API-36 x86_64 `CRBABot_API_36` target; its focused
-  active-session flow and smoke runner passed, and all four targeted failures
-  were repaired in isolated direct replay. Final aggregate targeted/lifecycle
-  certification is pending the new build.
+- In progress: source `d02ef40` was provisioned and installed on the clean
+  `emulator-5556` API-36 x86_64 `CRBABot_API_36` target. Smoke passed 2/2;
+  the first targeted aggregate passed 9/11 and the rerun passed 7/11 with
+  different viewport/settling failures, while every affected flow passed
+  isolated replay. The focused Gym session lifecycle passed. The lifecycle
+  aggregate passed 2/6 because four older reminder/Pomodoro selectors were
+  stale; their current-label/semantic-scroll repairs now pass isolated replay.
+  A final flow commit/build is still required before aggregate certification.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
@@ -90,7 +94,14 @@ and records exact-source local/remote certification.
   `1CA37030...28664F`. The exact focused Gym session flow passed,
   and the smoke runner passed 2/2 in
   `simulation-output/native/native-android-smoke-2026-08-24T124526284Z.json`.
-- Current failures: no current implementation failure is known. First smoke
+- Current failures: no current implementation failure is known. Aggregate
+  targeted/lifecycle runner failures are classified `FLAKY_TEST`/`ENVIRONMENT`
+  when the same exact flow passes in isolation and the failing flow changes
+  between complete-file reruns. Preserved reports include
+  `simulation-output/native/native-android-persistence-2026-08-24T135422955Z.json`,
+  `...141542313Z.json`, and
+  `simulation-output/native/native-android-lifecycle-2026-08-24T143039108Z.json`.
+  First smoke
   replay findings are classified `TEST_BUG`:
   the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
   characters while typing into the controlled command field. The direct
@@ -145,6 +156,13 @@ and records exact-source local/remote certification.
   `scrollUntilVisible` for Enter habit edit mode; and both the schedule form
   and the isolation form use a state-directed upward swipe before Create.
   Calories, disable, isolation, and schedule all pass after these fixes.
+- Lifecycle flow triage found the same current-UI drift in the older reminder
+  action/replay/delivery flows: they used generic `Edit`, coordinate-only row
+  reveals, and assertions before the row was in the viewport. They now use
+  per-habit `Edit <name>` labels, semantic scrolls, keyboard-safe Create
+  reveals, and row-state scrolls; Pomodoro now targets `Reset (not logged)`.
+  The four flows pass isolated exact-APK replay, including notification
+  scheduling-path and durable action replay assertions.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
@@ -153,8 +171,9 @@ and records exact-source local/remote certification.
   checks, commit the final native hardening checkpoint, provision the exact
   new SHA on one verified API-36 x86_64 target, then run the required smoke,
   targeted, lifecycle, and focused Gym session lanes.
-- Exact next action: provision and install source `684d006` on
-  `emulator-5556`, then run `npm run qa:native:android -- --serial
+- Exact next action: validate and commit the lifecycle flow hardening, push
+  the new source SHA, provision/install that exact SHA on `emulator-5556`,
+  then rerun `npm run qa:native:android -- --serial
 emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
   `npm run qa:native:lifecycle -- --serial emulator-5556`, and the focused
   `workout-gym-v2-session-lifecycle.yaml` replay.
@@ -290,6 +309,10 @@ emulator-5556`, `npm run qa:native:targeted -- --serial emulator-5556`,
   implementation/validation checklist.
 - `openspec/changes/harden-post-gym-release-convergence-v1/execplan.md` —
   resumable campaign state.
+- `.maestro/flows/habit-reminder-actions*.yaml`,
+  `.maestro/flows/habit-reminder-delivery.yaml`, and
+  `.maestro/flows/pomodoro-lifecycle.yaml` — current semantic native lifecycle
+  selectors and viewport-safe assertions.
 
 ## Recovery / Resume Instructions
 

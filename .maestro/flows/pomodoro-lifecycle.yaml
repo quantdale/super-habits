@@ -28,8 +28,7 @@ tags:
     start: '50%, 66%'
     end: '50%, 40%'
     duration: 350
-# Hardening wave made the abandon control conditional (Reset <60s / Abandon
-# after 60s of focus); accept whichever the elapsed time produces.
-- tapOn: 'Reset|Abandon'
+# The short native run remains below the 60-second abandon threshold, so the
+# current user-visible reset action is deterministic.
+- tapOn: 'Reset (not logged)'
 - assertVisible: 'Start focus'
-

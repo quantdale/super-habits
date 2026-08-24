@@ -33,6 +33,10 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
@@ -40,12 +44,14 @@ tags:
 - extendedWaitUntil:
     visible: 'Native replay action: 0 of 1 today.*'
     timeout: 5000
-- swipe:
-    start: '50%, 30%'
-    end: '50%, 70%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Enter habit edit mode'
+    direction: UP
 - tapOn: 'Enter habit edit mode'
-- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Edit Native replay action'
+    direction: DOWN
+- tapOn: 'Edit Native replay action'
 - scrollUntilVisible:
     element: 'Inject Mark complete response'
     direction: DOWN
@@ -54,10 +60,13 @@ tags:
     element: 'Cancel'
     direction: DOWN
 - tapOn: 'Cancel'
+- scrollUntilVisible:
+    element: 'Exit habit edit mode'
+    direction: UP
 - tapOn: 'Exit habit edit mode'
-- extendedWaitUntil:
-    visible: 'Native replay action: 1 of 1 today.*'
-    timeout: 5000
+- scrollUntilVisible:
+    element: 'Native replay action: 1 of 1 today.*'
+    direction: DOWN
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -68,13 +77,18 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
+- scrollUntilVisible:
+    element: 'Native replay action: 1 of 1 today.*'
+    direction: DOWN
 - assertVisible: 'Native replay action: 1 of 1 today.*'
-- swipe:
-    start: '50%, 30%'
-    end: '50%, 70%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Enter habit edit mode'
+    direction: UP
 - tapOn: 'Enter habit edit mode'
-- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Edit Native replay action'
+    direction: DOWN
+- tapOn: 'Edit Native replay action'
 - scrollUntilVisible:
     element: 'Inject Mark complete response'
     direction: DOWN
@@ -83,9 +97,11 @@ tags:
     element: 'Cancel'
     direction: DOWN
 - tapOn: 'Cancel'
+- scrollUntilVisible:
+    element: 'Exit habit edit mode'
+    direction: UP
 - tapOn: 'Exit habit edit mode'
 - scrollUntilVisible:
     element: 'Native replay action: 1 of 1 today.*'
-    direction: UP
+    direction: DOWN
 - assertVisible: 'Native replay action: 1 of 1 today.*'
-

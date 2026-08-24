@@ -33,6 +33,10 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 30%'
+    duration: 350
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
@@ -40,16 +44,17 @@ tags:
 - extendedWaitUntil:
     visible: 'Native delivery habit'
     timeout: 5000
-- swipe:
-    start: '50%, 30%'
-    end: '50%, 70%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Enter habit edit mode'
+    direction: UP
 - tapOn: 'Enter habit edit mode'
-- tapOn: 'Edit'
+- scrollUntilVisible:
+    element: 'Edit Native delivery habit'
+    direction: DOWN
+- tapOn: 'Edit Native delivery habit'
 - scrollUntilVisible:
     element: 'Schedule test notification'
     direction: DOWN
 - tapOn: 'Schedule test notification'
 - pressKey: HOME
 - killApp
-
