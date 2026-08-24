@@ -104,9 +104,17 @@ export function CommandInputCard({
             Supported examples
           </Text>
           {examples.map((example) => (
-            <Text key={example} className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-              {example}
-            </Text>
+            <Pressable
+              key={example}
+              accessibilityRole="button"
+              accessibilityLabel={`Use example: ${example}`}
+              onPress={() => onChangeText(example)}
+              className="mt-1"
+            >
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                {example}
+              </Text>
+            </Pressable>
           ))}
         </View>
 

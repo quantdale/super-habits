@@ -22,9 +22,7 @@ tags:
 - extendedWaitUntil:
     visible: 'Command input'
     timeout: 10000
-- tapOn: 'Command'
-- inputText: 'Add a todo to native command preview'
-- hideKeyboard
+- tapOn: 'Use example: Add a todo to call mom tomorrow'
 - tapOn: 'Parse command'
 - extendedWaitUntil:
     visible: 'Review before saving'

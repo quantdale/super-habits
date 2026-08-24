@@ -56,10 +56,8 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: current-truth documentation and Android native
-  provisioning/Gym qualification implementation are complete; focused static
-  validation is passing and the current source is ready for the first APK
-  build/install attempt.
+- Current milestone: replaying the corrected Android smoke flows before the
+  focused Gym V2 native qualification flows.
 - Completed: Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`
   after integration, project/rule/Codex/QA/native guidance, DB/RN skills, Gym
   OpenSpec ExecPlans, and current Git/OpenSpec state. Fetched all refs. Created
@@ -71,35 +69,47 @@ and records exact-source local/remote certification.
   `scripts/qa-native-provision.mjs`, pure native target parsers/tests, runner
   provenance checks, two focused Gym V2 Maestro flows, and semantic exercise
   configuration labels.
-- In progress: Commit/push the runtime/native hardening milestone, then build
-  and install the current Android source APK on the verified Nitro target.
+- In progress: validate and commit the smoke/command-flow corrections, replay
+  command-center and native smoke directly, then run the aggregate smoke,
+  targeted/lifecycle, and focused Gym V2 flows against the installed APK.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
   `.maestro/flows/workout-gym-v2-*.yaml`, `.eas/workflows/native-e2e.yml`, and
   the two Workout exercise-toggle components. Generated `android/` and native
   reports remain ignored.
-- Last successful validation: `npx vitest run tests/qaNativeProvision.test.ts`
-  passed 3/3; `npm run typecheck` passed; both native scripts print valid help;
-  Maestro 2.8.0 is discoverable; `git diff --check` passed. An initial test
-  invocation exposed missing explicit Vitest imports and a JS default-parameter
-  type inference issue; both were fixed without weakening coverage.
-- Current failures: the first provisioning attempt was blocked by a
-  repository-owned runner defect: the generated Gradle wrapper was launched
-  from the repository root instead of `android/`. Expo prebuild passed; the
-  preserved report is `simulation-output/native/native-android-provision-2026-08-24T080646187Z.json`.
-  The provisioner is patched to set the wrapper working directory and the exact
-  command is being rerun.
+- Last successful validation: the current-source Android APK was built in
+  8m30s, installed on `emulator-5554`, and provenance-verified at source
+  `195a2ba` (API 36, x86_64, package `com.dale16.superhabits`). The native
+  parser tests passed 3/3; typecheck/lint/help/discovery/diff checks passed at
+  the prior milestone. The first smoke run was preserved as
+  `simulation-output/native/native-android-smoke-2026-08-24T082139539Z.json`.
+- Current failures: first smoke replay findings are classified `TEST_BUG`:
+  the Workout marker asserted pre-Gym onboarding copy, and Maestro lost
+  characters while typing into the controlled command field. The direct
+  replay reproduced the latter with malformed text while the product parser
+  remained on its unsupported state. The corrected flow now selects an exact
+  semantic supported-example button, and the stale marker is updated to the
+  current user-visible Gym copy. The runner replay-command join bug is also
+  corrected so failure artifacts contain executable commands. These fixes are
+  Static validation of the corrections now passes; direct replay is next.
 - Relevant classifications: the existing Windows/iOS limitation remains
-  `ENVIRONMENT`; no native result is claimed until executed. No arbitrary waits,
+  `ENVIRONMENT`; no native result is claimed until executed. The original
+  smoke findings are `TEST_BUG`, not product failures. No arbitrary waits,
   coordinate-only app taps, production credentials, or historical Scope-6
   rewrites were introduced.
+- Relevant quarantines: none; the corrected flows retain the original review,
+  persistence, and lifecycle assertions.
 - Blockers: none known for local implementation; Android target/toolchain,
   Supabase remote access, iOS/EAS access, and exact-head CI remain to be
   determined by their respective commands.
 - Condition required to unblock: none.
-- Exact resume action after unblock: run `npm run qa:native:provision --
---serial <verified-serial>` and preserve the resulting provenance/report.
+- Exact resume action after unblock: run the focused static checks, then
+  `node scripts/qa-native.mjs --platform android --flow
+.maestro/flows/command-center-v2.yaml --serial emulator-5554
+--no-provision` and the equivalent `native-smoke.yaml` replay.
+- Exact next action: replay the corrected command-center and native-smoke
+  Maestro flows on `emulator-5554`, preserving their reports and screenshots.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; timing investigation; affected and broad gates; exact
@@ -175,6 +185,11 @@ and records exact-source local/remote certification.
 - 2026-08-24 — first current-source provisioning attempt — `PRODUCT_BUG`
   found in the new provisioner: Gradle wrapper cwd was repository root;
   Expo clean prebuild passed and the failure report was preserved.
+- 2026-08-24 — first Android smoke run — `TEST_BUG` findings; one selector was
+  stale against current Gym V2 onboarding copy, and command-center text-entry
+  was not deterministic under the native controlled input. The original
+  assertions/artifacts are preserved; fixes use current text and a semantic
+  supported-example action, not weaker review assertions.
 
 ## Changed Files / Areas
 

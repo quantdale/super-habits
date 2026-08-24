@@ -31,8 +31,8 @@ tags:
     text: 'Workout'
     index: 0
 # Fresh device (clearState): the Workout subtitle's has-activity variant is
-# off, so the empty-state copy renders (WorkoutScreen.tsx conditional).
-- assertVisible: 'Create simple routines and mark completions.'
+# off, so the current Gym V2 onboarding copy renders.
+- assertVisible: 'Build a training plan, start a guided workout, and track your progress.'
 - tapOn:
     text: 'Calories'
     index: 0

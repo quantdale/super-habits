@@ -437,7 +437,7 @@ try {
   if (options.flow) command.push(`--flow ${options.flow}`);
   if (options.serial) command.push(`--serial ${options.serial}`);
   if (!options.provision) command.push('--no-provision');
-  options.replayCommand = command.join('');
+  options.replayCommand = command.join(' ');
   let exitCode = 0;
   for (const platform of platforms) exitCode = Math.max(exitCode, runPlatform(platform, options));
   process.exit(exitCode);
