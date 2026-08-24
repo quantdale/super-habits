@@ -217,7 +217,11 @@ function main(args) {
   ];
   const gradleCommand = `${relative(ROOT, gradleWrapper)} ${gradleArgs.join(' ')}`;
   console.log(`Building credential-free native E2E APK: ${gradleCommand}`);
-  const gradle = run(gradleWrapper, gradleArgs, { env: buildEnv, stdio: 'inherit' });
+  const gradle = run(gradleWrapper, gradleArgs, {
+    cwd: resolve(ROOT, 'android'),
+    env: buildEnv,
+    stdio: 'inherit',
+  });
   requireSuccess(gradle, 'Gradle Android release build', gradleCommand);
 
   const apkPath = resolve(

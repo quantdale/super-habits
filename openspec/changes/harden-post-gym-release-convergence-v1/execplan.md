@@ -84,8 +84,12 @@ and records exact-source local/remote certification.
   Maestro 2.8.0 is discoverable; `git diff --check` passed. An initial test
   invocation exposed missing explicit Vitest imports and a JS default-parameter
   type inference issue; both were fixed without weakening coverage.
-- Current failures: no product failure. The APK build/install and native flow
-  execution are not yet run at this source SHA.
+- Current failures: the first provisioning attempt was blocked by a
+  repository-owned runner defect: the generated Gradle wrapper was launched
+  from the repository root instead of `android/`. Expo prebuild passed; the
+  preserved report is `simulation-output/native/native-android-provision-2026-08-24T080646187Z.json`.
+  The provisioner is patched to set the wrapper working directory and the exact
+  command is being rerun.
 - Relevant classifications: the existing Windows/iOS limitation remains
   `ENVIRONMENT`; no native result is claimed until executed. No arbitrary waits,
   coordinate-only app taps, production credentials, or historical Scope-6
@@ -168,6 +172,9 @@ and records exact-source local/remote certification.
 - 2026-08-24 — native helper test/typecheck/help/diff validation — PASS;
   3/3 parser/selection tests, TypeScript, both CLI help paths, Maestro 2.8.0
   discovery, and `git diff --check` passed before APK execution.
+- 2026-08-24 — first current-source provisioning attempt — `PRODUCT_BUG`
+  found in the new provisioner: Gradle wrapper cwd was repository root;
+  Expo clean prebuild passed and the failure report was preserved.
 
 ## Changed Files / Areas
 
