@@ -9,9 +9,17 @@ import {
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
+  computeBodyAreaDistribution,
+  buildExerciseHistory,
+  computeBodyWeightTrend,
+  computeModalityVolume,
+  computeTrainingTotals,
+  normalizeEffort,
+  recommendProgression,
+  resolveWorkoutSchedule,
 } from '@/features/workout/workout.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
-import type { WorkoutLog } from '@/core/db/types';
+import type { BodyWeightEntry, WorkoutLog } from '@/core/db/types';
 import { toDateKey } from '@/lib/time';
 
 function workoutLog(completedAt: string): WorkoutLog {
@@ -65,6 +73,26 @@ describe('buildTimerSequence', () => {
 
   it('first phase is active', () => {
     expect(buildTimerSequence(exercises)[0].phase).toBe('active');
+  });
+
+  it('keeps adjacent superset exercises back-to-back and rests after the group', () => {
+    const sequence = buildTimerSequence([
+      {
+        name: 'Press',
+        superset_group: 'push-pull',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+      {
+        name: 'Row',
+        superset_group: 'push-pull',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+      {
+        name: 'Carry',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+    ]);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'active', 'rest', 'active']);
   });
 });
 
@@ -267,5 +295,317 @@ describe('buildPreviousSetLookup / lookupPreviousSet', () => {
     const lookup = buildPreviousSetLookup(rows);
     expect(lookupPreviousSet(lookup, 'Row', 1)).toBeNull();
     expect(lookupPreviousSet(null, 'Bench', 1)).toBeNull();
+  });
+
+  it('prefers durable catalog identity before falling back to legacy name history', () => {
+    const lookup = buildPreviousSetLookup([
+      {
+        exerciseName: 'Bench',
+        catalogExerciseId: 'bench-v2',
+        setNumber: 1,
+        weight: 90,
+        reps: 5,
+      },
+      { exerciseName: 'Bench', setNumber: 1, weight: 80, reps: 8 },
+    ]);
+    expect(lookupPreviousSet(lookup, 'Bench', 1, 'bench-v2')?.weight).toBe(90);
+    expect(lookupPreviousSet(lookup, 'Bench', 1, 'other-bench')?.weight).toBe(80);
+  });
+});
+
+describe('buildExerciseHistory', () => {
+  it('keeps timed trends separate from load volume and skipped sets', () => {
+    const history = buildExerciseHistory([
+      {
+        logId: 'log-1',
+        completedAt: '2026-08-20T10:00:00.000Z',
+        exerciseName: 'Plank',
+        catalogExerciseId: 'plank',
+        modality: 'timed',
+        weight: null,
+        reps: null,
+        durationSeconds: 30,
+        completed: true,
+        setNumber: 1,
+      },
+      {
+        logId: 'log-2',
+        completedAt: '2026-08-21T10:00:00.000Z',
+        exerciseName: 'Plank',
+        catalogExerciseId: 'plank',
+        modality: 'timed',
+        weight: null,
+        reps: null,
+        durationSeconds: 45,
+        completed: true,
+        setNumber: 1,
+      },
+      {
+        logId: 'log-2',
+        completedAt: '2026-08-21T10:00:00.000Z',
+        exerciseName: 'Plank',
+        catalogExerciseId: 'plank',
+        modality: 'timed',
+        weight: null,
+        reps: null,
+        durationSeconds: null,
+        completed: false,
+        setNumber: 2,
+      },
+    ]);
+    expect(history).toMatchObject({
+      sessions: 2,
+      performedSets: 2,
+      measurableVolume: 0,
+      bestEstimated1RM: 0,
+      bestTimedDurationSeconds: 45,
+      points: [
+        { performedSets: 1, bestTimedDurationSeconds: 30 },
+        { performedSets: 1, bestTimedDurationSeconds: 45 },
+      ],
+    });
+  });
+});
+
+describe('Gym V2 training domain', () => {
+  it('resolves local weekly weekdays and lets a date override win without changing the plan', () => {
+    const weeklyPlan = [
+      {
+        id: 'plan-mon',
+        weekday: 1,
+        routine_id: 'push',
+        plan_kind: 'workout' as const,
+        note: null,
+        created_at: '2026-08-01T00:00:00.000Z',
+        updated_at: '2026-08-01T00:00:00.000Z',
+        deleted_at: null,
+      },
+    ];
+    const override = [
+      {
+        id: 'override-aug-24',
+        date_key: '2026-08-24',
+        override_kind: 'rest' as const,
+        routine_id: null,
+        moved_from_date_key: null,
+        note: 'Recovery day',
+        created_at: '2026-08-01T00:00:00.000Z',
+        updated_at: '2026-08-01T00:00:00.000Z',
+        deleted_at: null,
+      },
+    ];
+
+    expect(resolveWorkoutSchedule('2026-08-17', weeklyPlan, [])).toMatchObject({
+      source: 'weekly',
+      planKind: 'workout',
+      routineId: 'push',
+    });
+    expect(resolveWorkoutSchedule('2026-08-24', weeklyPlan, override)).toMatchObject({
+      source: 'override',
+      planKind: 'rest',
+      routineId: null,
+    });
+  });
+
+  it('gives linear progression an explicit successful-work explanation', () => {
+    expect(
+      recommendProgression({
+        mode: 'linear',
+        currentLoad: 80,
+        increment: 2.5,
+        minReps: 8,
+        maxReps: 8,
+        latestSets: [
+          { completed: true, weight: 80, reps: 8 },
+          { completed: true, weight: 80, reps: 9 },
+        ],
+      }),
+    ).toMatchObject({
+      action: 'increase_load',
+      nextLoad: 82.5,
+      reasonCode: 'completed_prescription',
+    });
+  });
+
+  it('holds progression for skipped or unknown work instead of treating it as a success', () => {
+    expect(
+      recommendProgression({
+        mode: 'linear',
+        currentLoad: 80,
+        increment: 2.5,
+        minReps: 8,
+        maxReps: 10,
+        latestSets: [{ completed: false, weight: 80, reps: 10 }],
+      }),
+    ).toMatchObject({ action: 'hold', reasonCode: 'unknown_or_skipped', nextLoad: 80 });
+  });
+
+  it('implements double progression as rep increases followed by a load increase', () => {
+    const reps = recommendProgression({
+      mode: 'double',
+      currentLoad: 50,
+      increment: 2.5,
+      minReps: 8,
+      maxReps: 12,
+      latestSets: [
+        { completed: true, weight: 50, reps: 10 },
+        { completed: true, weight: 50, reps: 11 },
+      ],
+    });
+    expect(reps).toMatchObject({ action: 'increase_reps', nextRepsMin: 9, nextRepsMax: 12 });
+
+    const load = recommendProgression({
+      mode: 'double',
+      currentLoad: 50,
+      increment: 2.5,
+      minReps: 8,
+      maxReps: 12,
+      latestSets: [
+        { completed: true, weight: 50, reps: 12 },
+        { completed: true, weight: 50, reps: 12 },
+      ],
+    });
+    expect(load).toMatchObject({ action: 'increase_load', nextLoad: 52.5 });
+  });
+
+  it('progresses timed work by duration and explains the target change', () => {
+    expect(
+      recommendProgression({
+        mode: 'linear',
+        modality: 'timed',
+        currentLoad: null,
+        increment: null,
+        minReps: null,
+        maxReps: null,
+        currentDurationSeconds: 30,
+        durationIncrementSeconds: 5,
+        latestSets: [
+          { completed: true, weight: null, reps: null, durationSeconds: 30 },
+          { completed: true, weight: null, reps: null, durationSeconds: 31 },
+        ],
+      }),
+    ).toMatchObject({
+      action: 'increase_duration',
+      nextDurationSeconds: 35,
+      reasonCode: 'completed_prescription',
+    });
+  });
+
+  it('progresses unloaded bodyweight work with reps instead of fake load', () => {
+    expect(
+      recommendProgression({
+        mode: 'double',
+        modality: 'bodyweight',
+        supportsExternalLoad: false,
+        currentLoad: null,
+        increment: 1,
+        minReps: 8,
+        maxReps: 10,
+        latestSets: [
+          { completed: true, weight: null, reps: 10 },
+          { completed: true, weight: null, reps: 10 },
+        ],
+      }),
+    ).toMatchObject({ action: 'increase_reps', nextRepsMin: 9, nextRepsMax: 11 });
+  });
+
+  it('holds timed progression when a required duration is missing', () => {
+    expect(
+      recommendProgression({
+        mode: 'linear',
+        modality: 'timed',
+        currentLoad: null,
+        increment: null,
+        minReps: null,
+        maxReps: null,
+        currentDurationSeconds: 30,
+        durationIncrementSeconds: 5,
+        latestSets: [{ completed: true, weight: null, reps: null }],
+      }),
+    ).toMatchObject({ action: 'hold', reasonCode: 'unknown_or_skipped' });
+  });
+
+  it('keeps modality volume honest and preserves effort scale', () => {
+    expect(
+      computeModalityVolume({
+        modality: 'weighted_strength',
+        weight: 80,
+        reps: 8,
+        completed: true,
+      }),
+    ).toBe(640);
+    expect(
+      computeModalityVolume({ modality: 'bodyweight', weight: 10, reps: 5, completed: true }),
+    ).toBe(50);
+    expect(
+      computeModalityVolume({ modality: 'bodyweight', weight: null, reps: 8, completed: true }),
+    ).toBeNull();
+    expect(
+      computeModalityVolume({ modality: 'timed', weight: 80, reps: 8, completed: true }),
+    ).toBeNull();
+    expect(normalizeEffort('rir', 2)).toEqual({ scale: 'rir', value: 2 });
+    expect(normalizeEffort('rpe', 11)).toBeNull();
+  });
+
+  it('computes body-weight trend across stored units without rewriting history', () => {
+    const entries: BodyWeightEntry[] = [
+      {
+        id: 'bw-1',
+        measured_on: '2026-08-20',
+        measured_at: '2026-08-20T08:00:00.000Z',
+        weight: 80,
+        unit: 'kg',
+        note: null,
+        created_at: '2026-08-20T08:00:00.000Z',
+        updated_at: '2026-08-20T08:00:00.000Z',
+        deleted_at: null,
+      },
+      {
+        id: 'bw-2',
+        measured_on: '2026-08-22',
+        measured_at: '2026-08-22T08:00:00.000Z',
+        weight: 174.16,
+        unit: 'lb',
+        note: null,
+        created_at: '2026-08-22T08:00:00.000Z',
+        updated_at: '2026-08-22T08:00:00.000Z',
+        deleted_at: null,
+      },
+    ];
+    expect(computeBodyWeightTrend(entries).direction).toBe('down');
+  });
+
+  it('summarizes training totals and body-area distribution deterministically', () => {
+    expect(
+      computeTrainingTotals([
+        {
+          completedAt: '2026-08-24T08:00:00.000Z',
+          durationSeconds: 600,
+          isPr: true,
+          sets: [
+            { completed: true, weight: 40, reps: 10, modality: 'weighted_strength' },
+            { completed: false, weight: 40, reps: 10, modality: 'weighted_strength' },
+            { completed: true, weight: null, reps: null, modality: 'timed' },
+          ],
+        },
+      ]),
+    ).toMatchObject({
+      sessions: 1,
+      completedSets: 2,
+      durationSeconds: 600,
+      measurableVolume: 400,
+      trainingDays: 1,
+      recentPrs: 1,
+    });
+    expect(
+      computeBodyAreaDistribution([
+        { primaryArea: 'chest', setsCompleted: 3 },
+        { primaryArea: 'chest', setsCompleted: 2 },
+        { primaryArea: 'legs', setsCompleted: 1 },
+      ]),
+    ).toEqual([
+      { area: 'chest', sets: 5 },
+      { area: 'legs', sets: 1 },
+    ]);
   });
 });

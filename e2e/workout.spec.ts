@@ -102,7 +102,7 @@ test.describe('Workout', () => {
     const detail = page.getByRole('dialog');
     await expect(detail.getByText('Bench Press').first()).toBeVisible();
     await expect(page.getByText(/80 × 8/)).toBeVisible();
-    await expect(page.getByText(/est\. 1RM 101/)).toBeVisible();
+    await expect(detail.getByText(/est\. 1RM 101/)).toBeVisible();
     await expect(page.getByText('Duration')).toBeVisible();
     await expect(page.getByText('Quick log — no exercises recorded.')).not.toBeVisible();
   });

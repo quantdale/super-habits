@@ -38,7 +38,7 @@ import {
   type RecoverableWeeklyReviewReminder,
 } from '@/features/weekly-review/weeklyReviewReminder.domain';
 import { sha256Hex } from '@/lib/checksum';
-import { BACKUP_SETTINGS_VERSION, type RecoverableSettingsV3 } from '@/core/backup/backup.types';
+import { BACKUP_SETTINGS_VERSION, type RecoverableSettingsV5 } from '@/core/backup/backup.types';
 
 const THEME_MODE_STORAGE_KEY = 'superhabits.theme.mode';
 const THEME_SLOTS_STORAGE_KEY = 'superhabits.theme.slots.v2';
@@ -59,6 +59,12 @@ export type RecoverableNotificationPreferences = {
   weeklyReviewReminder: RecoverableWeeklyReviewReminder | null;
 };
 
+export type RecoverableWorkoutPreferences = {
+  effortScale: 'off' | 'rir' | 'rpe';
+  goalWeight: { value: number; unit: 'kg' | 'lb' } | null;
+  workoutReminder: { enabled: boolean; time: TimeOfDay } | null;
+};
+
 /**
  * The recoverable settings allowlist. Only these keys are ever backed up or
  * restored; auth/sync/system/device state never enters the payload. The V3/V4
@@ -75,7 +81,8 @@ export function buildRecoverableSettings(input: {
   pomodoroPresets?: RecoverablePomodoroPresets | null;
   workoutRestSeconds?: number | null;
   notificationPreferences?: RecoverableNotificationPreferences | null;
-}): RecoverableSettingsV3 {
+  workoutPreferences?: RecoverableWorkoutPreferences | null;
+}): RecoverableSettingsV5 {
   return {
     calorieGoal: input.calorieGoal,
     pomodoroSettings: input.pomodoroSettings,
@@ -87,6 +94,7 @@ export function buildRecoverableSettings(input: {
     pomodoroPresets: input.pomodoroPresets ?? null,
     workoutRestSeconds: input.workoutRestSeconds ?? null,
     notificationPreferences: input.notificationPreferences ?? null,
+    workoutPreferences: input.workoutPreferences ?? null,
   };
 }
 
@@ -141,6 +149,71 @@ function normalizeRecoverableNotificationPreferences(
   };
 }
 
+function normalizeRecoverableWorkoutPreferences(
+  value: unknown,
+): RecoverableWorkoutPreferences | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const effortScale =
+    candidate.effortScale === 'rir' || candidate.effortScale === 'rpe'
+      ? candidate.effortScale
+      : 'off';
+  const rawGoal = candidate.goalWeight;
+  const goalWeight =
+    rawGoal && typeof rawGoal === 'object'
+      ? (() => {
+          const goal = rawGoal as Record<string, unknown>;
+          const value = goal.value;
+          const unit = goal.unit;
+          const normalizedUnit: 'kg' | 'lb' | null = unit === 'kg' || unit === 'lb' ? unit : null;
+          return typeof value === 'number' &&
+            Number.isFinite(value) &&
+            value > 0 &&
+            value <= 1_000 &&
+            normalizedUnit
+            ? { value, unit: normalizedUnit }
+            : null;
+        })()
+      : null;
+  const rawReminder = candidate.workoutReminder;
+  const workoutReminder =
+    rawReminder && typeof rawReminder === 'object'
+      ? (() => {
+          const reminder = rawReminder as Record<string, unknown>;
+          const rawTime = reminder.time;
+          const time =
+            rawTime && typeof rawTime === 'object'
+              ? {
+                  hour: (rawTime as Record<string, unknown>).hour,
+                  minute: (rawTime as Record<string, unknown>).minute,
+                }
+              : null;
+          return reminder.enabled === true &&
+            time &&
+            typeof time.hour === 'number' &&
+            Number.isInteger(time.hour) &&
+            time.hour >= 0 &&
+            time.hour <= 23 &&
+            typeof time.minute === 'number' &&
+            Number.isInteger(time.minute) &&
+            time.minute >= 0 &&
+            time.minute <= 59
+            ? { enabled: true, time: { hour: time.hour, minute: time.minute } }
+            : {
+                enabled: false,
+                time:
+                  time && typeof time.hour === 'number' && typeof time.minute === 'number'
+                    ? {
+                        hour: Math.max(0, Math.min(23, Math.round(time.hour))),
+                        minute: Math.max(0, Math.min(59, Math.round(time.minute))),
+                      }
+                    : { hour: 8, minute: 0 },
+              };
+        })()
+      : null;
+  return { effortScale, goalWeight, workoutReminder };
+}
+
 /**
  * Validate and normalize an untrusted settings payload. Unknown keys are
  * dropped; malformed known keys fall back to defaults via the feature
@@ -148,7 +221,7 @@ function normalizeRecoverableNotificationPreferences(
  * payloads (without the newer V3/V4 keys) normalize cleanly — absent keys
  * become null.
  */
-export function normalizeRecoverableSettings(input: unknown): RecoverableSettingsV3 {
+export function normalizeRecoverableSettings(input: unknown): RecoverableSettingsV5 {
   const candidate = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
   const calorieGoal =
     candidate.calorieGoal === null || candidate.calorieGoal === undefined
@@ -193,6 +266,10 @@ export function normalizeRecoverableSettings(input: unknown): RecoverableSetting
     candidate.notificationPreferences === null || candidate.notificationPreferences === undefined
       ? null
       : normalizeRecoverableNotificationPreferences(candidate.notificationPreferences);
+  const workoutPreferences =
+    candidate.workoutPreferences === null || candidate.workoutPreferences === undefined
+      ? null
+      : normalizeRecoverableWorkoutPreferences(candidate.workoutPreferences);
   return {
     calorieGoal,
     pomodoroSettings,
@@ -201,10 +278,11 @@ export function normalizeRecoverableSettings(input: unknown): RecoverableSetting
     pomodoroPresets,
     workoutRestSeconds,
     notificationPreferences,
+    workoutPreferences,
   };
 }
 
-export function isValidRecoverableSettings(input: unknown): input is RecoverableSettingsV3 {
+export function isValidRecoverableSettings(input: unknown): input is RecoverableSettingsV5 {
   if (!input || typeof input !== 'object') return false;
   const candidate = input as Record<string, unknown>;
   if (
@@ -222,6 +300,13 @@ export function isValidRecoverableSettings(input: unknown): input is Recoverable
     return false;
   }
   if ('theme' in candidate && candidate.theme !== null && typeof candidate.theme !== 'object') {
+    return false;
+  }
+  if (
+    'workoutPreferences' in candidate &&
+    candidate.workoutPreferences !== null &&
+    typeof candidate.workoutPreferences !== 'object'
+  ) {
     return false;
   }
   return true;
@@ -328,6 +413,10 @@ export function canonicalSettingsPayloadText(
   const notificationPrefs = normalized.notificationPreferences;
   if (!notificationPrefs) {
     canonical.notificationPreferences = null;
+    if (requestedVersion < 5) return JSON.stringify(canonical);
+    canonical.workoutPreferences = normalized.workoutPreferences
+      ? canonicalWorkoutPreferences(normalized.workoutPreferences)
+      : null;
     return JSON.stringify(canonical);
   }
   if (requestedVersion < 4) {
@@ -360,7 +449,29 @@ export function canonicalSettingsPayloadText(
         }
       : null,
   };
+  if (requestedVersion < 5) return JSON.stringify(canonical);
+  canonical.workoutPreferences = normalized.workoutPreferences
+    ? canonicalWorkoutPreferences(normalized.workoutPreferences)
+    : null;
   return JSON.stringify(canonical);
+}
+
+function canonicalWorkoutPreferences(preferences: RecoverableWorkoutPreferences) {
+  return {
+    effortScale: preferences.effortScale,
+    goalWeight: preferences.goalWeight
+      ? { value: preferences.goalWeight.value, unit: preferences.goalWeight.unit }
+      : null,
+    workoutReminder: preferences.workoutReminder
+      ? {
+          enabled: preferences.workoutReminder.enabled,
+          time: {
+            hour: preferences.workoutReminder.time.hour,
+            minute: preferences.workoutReminder.time.minute,
+          },
+        }
+      : null,
+  };
 }
 
 async function readThemeSnapshot(): Promise<{
@@ -447,7 +558,7 @@ async function readLiveNotificationPreferenceOverrides(): Promise<{
 /** Read the current allowlisted settings snapshot (used at push time). */
 export async function readRecoverableSettings(
   db: SQLite.SQLiteDatabase,
-): Promise<RecoverableSettingsV3> {
+): Promise<RecoverableSettingsV5> {
   const [
     calorieGoal,
     pomodoroSettings,
@@ -455,6 +566,7 @@ export async function readRecoverableSettings(
     pomodoroPresets,
     workoutRestSeconds,
     notificationPreferences,
+    workoutPreferences,
     liveNotificationOverrides,
     theme,
   ] = await Promise.all([
@@ -490,6 +602,12 @@ export async function readRecoverableSettings(
       appMetaKeys.notificationPreferences,
       null,
       normalizeRecoverableNotificationPreferences,
+    ),
+    getAppMetaJsonOrDefault<RecoverableWorkoutPreferences | null>(
+      db,
+      appMetaKeys.workoutPreferences,
+      null,
+      normalizeRecoverableWorkoutPreferences,
     ),
     readLiveNotificationPreferenceOverrides(),
     readThemeSnapshot(),
@@ -529,6 +647,7 @@ export async function readRecoverableSettings(
     pomodoroPresets,
     workoutRestSeconds,
     notificationPreferences: mergedNotificationPreferences,
+    workoutPreferences,
   });
 }
 
@@ -544,7 +663,7 @@ export async function readRecoverableSettings(
 export async function applyRecoverableSettingsToSqlite(
   db: SQLite.SQLiteDatabase,
   payload: unknown,
-): Promise<RecoverableSettingsV3> {
+): Promise<RecoverableSettingsV5> {
   const normalized = normalizeRecoverableSettings(payload);
   if (normalized.calorieGoal) {
     await setAppMetaJson(db, appMetaKeys.calorieGoal, normalized.calorieGoal);
@@ -567,6 +686,9 @@ export async function applyRecoverableSettingsToSqlite(
       appMetaKeys.notificationPreferences,
       normalized.notificationPreferences,
     );
+  }
+  if (normalized.workoutPreferences) {
+    await setAppMetaJson(db, appMetaKeys.workoutPreferences, normalized.workoutPreferences);
   }
   return normalized;
 }

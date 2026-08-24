@@ -397,10 +397,14 @@ async function captureStateSummary(page: Page): Promise<string> {
         (SELECT COUNT(*) FROM habit_completions) AS completions,
         (SELECT COUNT(*) FROM calorie_entries WHERE deleted_at IS NULL) AS calories,
         (SELECT COUNT(*) FROM pomodoro_sessions) AS pomodoro,
-        (SELECT COUNT(*) FROM workout_routines WHERE deleted_at IS NULL) AS routines`,
+        (SELECT COUNT(*) FROM workout_routines WHERE deleted_at IS NULL) AS routines,
+        (SELECT COUNT(*) FROM routine_exercises WHERE deleted_at IS NULL) AS routine_exercises,
+        (SELECT COUNT(*) FROM custom_exercises WHERE deleted_at IS NULL) AS custom_exercises,
+        (SELECT COUNT(*) FROM workout_weekly_plan WHERE deleted_at IS NULL) AS weekly_plan,
+        (SELECT COUNT(*) FROM body_weight_entries WHERE deleted_at IS NULL) AS body_weight_entries`,
     );
     const r = rows[0] ?? {};
-    return `todos=${String(r.todos)} habits=${String(r.habits)} completions=${String(r.completions)} calories=${String(r.calories)} pomodoro=${String(r.pomodoro)} routines=${String(r.routines)}`;
+    return `todos=${String(r.todos)} habits=${String(r.habits)} completions=${String(r.completions)} calories=${String(r.calories)} pomodoro=${String(r.pomodoro)} routines=${String(r.routines)} routine_exercises=${String(r.routine_exercises)} custom_exercises=${String(r.custom_exercises)} weekly_plan=${String(r.weekly_plan)} body_weight_entries=${String(r.body_weight_entries)}`;
   } catch (err) {
     return `state summary unavailable: ${(err as Error).message}`;
   }

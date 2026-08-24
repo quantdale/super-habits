@@ -7,6 +7,7 @@ import {
 } from '@/core/auth/account.data';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
+import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { nowIso } from '@/lib/time';
 import { checksumRows } from '@/lib/checksum';
@@ -33,6 +34,8 @@ import {
 } from '@/core/backup/backupSettings';
 import type {
   CalorieEntry,
+  BodyWeightEntry,
+  CustomExercise,
   DailyPlan,
   Goal,
   Habit,
@@ -47,6 +50,8 @@ import type {
   WorkoutRoutine,
   WorkoutSessionExercise,
   WorkoutSessionSet,
+  WorkoutScheduleOverride,
+  WorkoutWeeklyPlanEntry,
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
@@ -67,6 +72,10 @@ import {
   applyRemoteWorkoutRoutines,
   applyRemoteWorkoutSessionExercises,
   applyRemoteWorkoutSessionSets,
+  applyRemoteBodyWeightEntries,
+  applyRemoteCustomExercises,
+  applyRemoteWorkoutScheduleOverrides,
+  applyRemoteWorkoutWeeklyPlan,
 } from '@/features/workout/workout.data';
 import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
 import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
@@ -488,8 +497,12 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   const isCurrentSettingsVersion = settingsVersion === BACKUP_SETTINGS_VERSION;
   const isHistoricalSettingsV2 = settingsVersion === 2;
   const isHistoricalSettingsV3 = settingsVersion === 3;
+  const isHistoricalSettingsV4 = settingsVersion === 4;
   if (
-    (!isCurrentSettingsVersion && !isHistoricalSettingsV2 && !isHistoricalSettingsV3) ||
+    (!isCurrentSettingsVersion &&
+      !isHistoricalSettingsV2 &&
+      !isHistoricalSettingsV3 &&
+      !isHistoricalSettingsV4) ||
     settingsRow.settings_version !== manifest.settingsVersion ||
     settingsRow.settings_version !== manifest.settingsMetadata.version
   ) {
@@ -517,7 +530,9 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     ? 2
     : isHistoricalSettingsV3
       ? 3
-      : undefined;
+      : isHistoricalSettingsV4
+        ? 4
+        : undefined;
   const settingsChecksum = canonicalizeSettingsPayload(normalizedSettings, {
     settingsVersion: historicalSettingsVersion ?? BACKUP_SETTINGS_VERSION,
   });
@@ -574,6 +589,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     await applyRemoteHabitCompletions(transactionDb, typed<HabitCompletion[]>('habit_completions'));
     await applyRemoteCalorieEntries(transactionDb, typed<CalorieEntry[]>('calorie_entries'));
     await applyRemoteSavedMeals(transactionDb, typed<SavedMeal[]>('saved_meals'));
+    await applyRemoteCustomExercises(transactionDb, typed<CustomExercise[]>('custom_exercises'));
     await applyRemoteWorkoutRoutines(transactionDb, typed<WorkoutRoutine[]>('workout_routines'));
     await applyRemoteRoutineExercises(transactionDb, typed<RoutineExercise[]>('routine_exercises'));
     await applyRemoteRoutineExerciseSets(
@@ -588,6 +604,18 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     await applyRemoteWorkoutSessionSets(
       transactionDb,
       typed<WorkoutSessionSet[]>('workout_session_sets'),
+    );
+    await applyRemoteWorkoutWeeklyPlan(
+      transactionDb,
+      typed<WorkoutWeeklyPlanEntry[]>('workout_weekly_plan'),
+    );
+    await applyRemoteWorkoutScheduleOverrides(
+      transactionDb,
+      typed<WorkoutScheduleOverride[]>('workout_schedule_overrides'),
+    );
+    await applyRemoteBodyWeightEntries(
+      transactionDb,
+      typed<BodyWeightEntry[]>('body_weight_entries'),
     );
     await applyRemotePomodoroSessions(transactionDb, typed<PomodoroSession[]>('pomodoro_sessions'));
     await applyRemoteLinkedActionRules(
@@ -650,6 +678,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // then ONLY current/future reminder scheduling.
   await applyPendingThemeApplication();
   requestHabitReminderReconciliation();
+  requestWorkoutReminderReconciliation();
 
   const importedCounts = Object.fromEntries(
     BACKUP_ENTITIES.map((entity) => [entity, (rowsByEntity[entity] ?? []).length]),

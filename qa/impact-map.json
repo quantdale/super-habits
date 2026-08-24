@@ -30,6 +30,40 @@
       "broadRegression": false
     },
     {
+      "id": "workout-gym-v2",
+      "patterns": [
+        "features/workout/**",
+        "tests/workout.*",
+        "tests/integration/workout*",
+        "tests/workoutReminderScheduler.test.ts",
+        "e2e/workout*.spec.ts",
+        "core/notifications/WorkoutReminderHost.tsx",
+        "core/notifications/workoutReminder*.ts",
+        "lib/notifications.ts"
+      ],
+      "gates": [
+        "qa:fast",
+        "qa:integration",
+        "qa:timezones",
+        "qa:journeys",
+        "qa:simulation",
+        "qa:native:smoke",
+        "qa:native:targeted",
+        "qa:native:lifecycle",
+        "e2e:sync",
+        "qa:full"
+      ],
+      "tests": [
+        "tests/workout.domain.test.ts",
+        "tests/workout.data.test.ts",
+        "tests/integration/workoutIntegrity.test.ts",
+        "tests/integration/portableExportImport.test.ts",
+        "tests/workoutReminderScheduler.test.ts"
+      ],
+      "journeys": ["workout", "gym-v2", "@p0", "@sync", "native-persistence", "native-lifecycle"],
+      "broadRegression": true
+    },
+    {
       "id": "sync-and-restore",
       "patterns": [
         "core/sync/**",

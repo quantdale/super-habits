@@ -49,8 +49,35 @@ export type SurfaceName = SectionName | 'settings' | 'command';
  */
 export type FeatureName = SurfaceName;
 
-/** The four entities the sync engine pushes (matches `SYNCABLE_ENTITIES`). */
-export type SyncEntityName = 'todos' | 'habits' | 'calorie_entries' | 'workout_routines';
+/**
+ * Every entity that can ride the durable backup outbox. Keep this explicit so
+ * simulation failure injection and reports can name Gym V2 rows without
+ * importing runtime/core types into the tool-agnostic model layer.
+ */
+export type SyncEntityName =
+  | 'todos'
+  | 'habits'
+  | 'habit_completions'
+  | 'calorie_entries'
+  | 'saved_meals'
+  | 'workout_routines'
+  | 'routine_exercises'
+  | 'routine_exercise_sets'
+  | 'workout_logs'
+  | 'workout_session_exercises'
+  | 'pomodoro_sessions'
+  | 'linked_action_rules'
+  | 'weekly_reviews'
+  | 'projects'
+  | 'goals'
+  | 'daily_plans'
+  | 'workout_session_sets'
+  | 'custom_exercises'
+  | 'workout_weekly_plan'
+  | 'workout_schedule_overrides'
+  | 'body_weight_entries'
+  | 'user_backup_settings'
+  | 'backup_manifest';
 
 /** Fixture sizes, matching `FixtureSize` in `e2e/helpers/seed.ts`. */
 export type FixtureSize = 'SMALL' | 'TYPICAL' | 'HEAVY';

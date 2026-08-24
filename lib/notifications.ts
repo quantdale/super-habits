@@ -138,6 +138,31 @@ export async function scheduleTimerEndNotification(seconds: number, title: strin
   });
 }
 
+/** Schedule one deterministic workout-day reminder on native platforms. */
+export async function scheduleWorkoutDayReminderNotification(input: {
+  identifier: string;
+  title: string;
+  body: string;
+  fireAt: Date;
+}): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  const allowed = await ensureNotificationPermission();
+  if (!allowed) return null;
+  return Notifications.scheduleNotificationAsync({
+    identifier: input.identifier,
+    content: {
+      title: input.title,
+      body: input.body,
+      sound: 'default',
+      data: { kind: 'workout-day-reminder' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: input.fireAt,
+    },
+  });
+}
+
 export async function cancelScheduledNotification(id: string | null | undefined): Promise<void> {
   if (!id || Platform.OS === 'web') {
     return;

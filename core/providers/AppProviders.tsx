@@ -31,6 +31,7 @@ import { AppBootstrapStateContext } from '@/core/providers/appBootstrapContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
+import { WorkoutReminderHost } from '@/core/notifications/WorkoutReminderHost';
 import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroCommandBridge';
 
 export function AppProviders({ children }: PropsWithChildren) {
@@ -343,6 +344,7 @@ export function AppProviders({ children }: PropsWithChildren) {
                 <BootstrapGate dbError={dbError} authBootstrapReady={authBootstrapReady}>
                   {children}
                   <HabitReminderHost />
+                  <WorkoutReminderHost />
                   <RestorePrompt
                     preview={restorePreview}
                     visible={showRestorePrompt}

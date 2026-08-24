@@ -30,7 +30,7 @@ Sections are rendered inside `app/index.tsx` behind `NavigationContext.activeSec
 
 ## Sync and IDs
 
-After **every** mutating write on synced entities, ensure the code path goes through the canonical mutation helpers (`runSyncedMutation`/`runBackupMutation`) so **`syncEngine.enqueue`** fires immediately after the DB operation, matching existing `*.data.ts` patterns. All 17 `BACKUP_ENTITIES` (see `core/backup/backup.types.ts`) are synced — including `pomodoro_sessions`, `workout_logs`, nested workout tables, `saved_meals`, `linked_action_rules`, and the planning entities; only local operational state stays unsynced.
+After **every** mutating write on synced entities, ensure the code path goes through the canonical mutation helpers (`runSyncedMutation`/`runBackupMutation`) so **`syncEngine.enqueue`** fires immediately after the DB operation, matching existing `*.data.ts` patterns. All 21 `BACKUP_ENTITIES` (see `core/backup/backup.types.ts`) are synced — including `pomodoro_sessions`, `workout_logs`, nested workout tables, `saved_meals`, `linked_action_rules`, planning entities, custom exercises, weekly plan/date overrides, and body weight; only local operational state stays unsynced.
 
 All new row IDs: **`createId(prefix)`** from `lib/id.ts` with the correct entity prefix from `PROJECT_STRUCTURE_MAP.md`. Date keys for YYYY-MM-DD: **`toDateKey()`** from `lib/time.ts` where applicable.
 

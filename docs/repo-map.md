@@ -85,8 +85,15 @@ Use with:
 - `features/workout/WorkoutScreen.tsx`
 - `features/workout/RoutineDetailScreen.tsx`
 - `features/workout/WorkoutSessionScreen.tsx`
+- `features/workout/WorkoutGymPanels.tsx` - Today/Week/Progress/Body Weight panels
+- `features/workout/exerciseCatalog.ts` - repository-authored built-in exercise identity catalog
 - `features/workout/workout.data.ts`
 - `features/workout/workout.domain.ts`
+- Workout V2 data also owns custom exercises, typed prescriptions, supersets,
+  weekly plan/date overrides, body-weight history, performance reads, durable
+  drafts, and scope-6 backup enqueue behavior. The domain module owns schedule
+  resolution, modality-aware volume, progression, PR guards, trends, and
+  training totals.
 
 ### Calories
 

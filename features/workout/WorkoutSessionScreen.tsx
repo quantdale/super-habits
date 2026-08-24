@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { Animated, View, Text, Pressable, Alert, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Screen } from '@/core/ui/Screen';
 import { Button } from '@/core/ui/Button';
@@ -22,6 +23,7 @@ import {
   formatWorkoutTime,
   lookupPreviousSet,
   parseOptionalMeasurement,
+  recommendProgression,
   summarizeCompletedSets,
   type EnteredSetValues,
   type LoggedSet,
@@ -33,11 +35,14 @@ import {
   clearWorkoutSessionDraft,
   listLoggedSetsForExerciseNames,
   listRecentLoggedSets,
+  listRecentWorkoutSetOutcomes,
   logWorkoutSession,
   loadRestSecondsDefault,
+  getWorkoutPreferences,
   saveRestSecondsDefault,
   saveWorkoutSessionDraft,
 } from './workout.data';
+import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
 import {
   DEFAULT_REST_SECONDS,
   REST_SECONDS_MAX,
@@ -45,6 +50,7 @@ import {
   REST_SECONDS_STEP,
   clampRestSeconds,
 } from './restTimerPreferences';
+import type { WorkoutEffortScale } from '@/core/db/types';
 import type { RoutineWithExercises } from './types';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 
@@ -93,18 +99,42 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // persisted preference is only rewritten by "Save as default").
   const [restDefault, setRestDefault] = useState<number | null>(null);
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
+  const [effortScale, setEffortScale] = useState<WorkoutEffortScale>('off');
   const sequence = useMemo(
     () =>
       buildTimerSequence(
         applyRestDefault(
-          routine.exercises.map((ex) => ({
-            name: ex.name,
-            sets: ex.sets.map((s) => ({
-              set_number: s.set_number,
-              active_seconds: s.active_seconds,
-              rest_seconds: s.rest_seconds,
-            })),
-          })),
+          routine.exercises.map((ex) => {
+            const isLegacyFreeText = !ex.catalog_exercise_id;
+            return {
+              name: ex.name,
+              // Keep the old missing-catalog path modality-less so historic
+              // free-text exercises continue to offer weight/reps and PRs.
+              ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
+              ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
+              ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
+              ...(isLegacyFreeText
+                ? {}
+                : {
+                    supports_external_load:
+                      ex.supports_external_load === undefined
+                        ? ex.modality === 'weighted_strength'
+                        : ex.supports_external_load === 1,
+                  }),
+              ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
+              sets: ex.sets.map((s) => ({
+                set_number: s.set_number,
+                active_seconds: s.active_seconds,
+                rest_seconds: s.rest_seconds,
+                target_reps_min: s.target_reps_min,
+                target_reps_max: s.target_reps_max,
+                target_load: s.target_load,
+                target_duration_seconds: s.target_duration_seconds,
+                target_distance: s.target_distance,
+                target_pace: s.target_pace,
+              })),
+            };
+          }),
           restDefault ?? 0,
         ),
       ),
@@ -113,16 +143,22 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
 
   useEffect(() => {
     let cancelled = false;
-    void loadRestSecondsDefault().then((seconds) => {
-      if (!cancelled) {
-        setRestDefault(seconds);
-        setPersistedRestDefault(seconds);
-      }
-    });
-    // Seed per-set entry defaults from the most recent recorded values.
-    void listRecentLoggedSets()
-      .then((rows) => {
-        if (!cancelled) setPreviousLookup(buildPreviousSetLookup(rows));
+    void Promise.all([loadRestSecondsDefault(), getWorkoutPreferences()]).then(
+      ([seconds, preferences]) => {
+        if (!cancelled) {
+          setRestDefault(seconds);
+          setPersistedRestDefault(seconds);
+          setEffortScale(preferences.effortScale);
+        }
+      },
+    );
+    // Seed entry defaults and retain skipped/unknown outcomes for progression.
+    void Promise.all([listRecentLoggedSets(), listRecentWorkoutSetOutcomes()])
+      .then(([rows, outcomes]) => {
+        if (!cancelled) {
+          setPreviousLookup(buildPreviousSetLookup(rows));
+          setRecentSetOutcomes(outcomes);
+        }
       })
       .catch(() => {
         // Defaults stay empty when history cannot be read.
@@ -179,12 +215,109 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [isSaving, setIsSaving] = useState(false);
   const [savedOutcome, setSavedOutcome] = useState<{ newRecords: string[] } | null>(null);
   const [previousLookup, setPreviousLookup] = useState<PreviousSetLookup | null>(null);
+  const [recentSetOutcomes, setRecentSetOutcomes] = useState<
+    Awaited<ReturnType<typeof listRecentWorkoutSetOutcomes>>
+  >([]);
   // Wall-clock start captured on the FIRST Start press (not mount — users
   // idle before starting); null when the timer never ran. A resumed session
   // replays the draft's original start so logged duration stays truthful.
   const startedAtMsRef = useRef<number | null>(resume?.startedAtMs ?? null);
 
   const currentPhase: TimerPhase | undefined = sequence[currentIndex];
+
+  const progressionRecommendation = useMemo(() => {
+    if (!currentPhase || currentPhase.phase !== 'active') return null;
+    const exercise = routine.exercises[currentPhase.exerciseIndex];
+    if (!exercise) return null;
+    const mode = exercise.progression_mode ?? 'none';
+    if (mode === 'none') return null;
+    const exerciseHistory = recentSetOutcomes.filter((row) =>
+      currentPhase.catalogExerciseId
+        ? row.catalogExerciseId === currentPhase.catalogExerciseId
+        : row.catalogExerciseId === null && row.exerciseName === currentPhase.exerciseName,
+    );
+    const latestLogId = exerciseHistory[0]?.logId;
+    const history = latestLogId
+      ? exerciseHistory
+          .filter((row) => row.logId === latestLogId)
+          .map((row) => ({
+            completed: row.completed === 1,
+            weight: row.weight,
+            reps: row.reps,
+            durationSeconds: row.durationSeconds,
+            distance: row.distance,
+          }))
+      : [];
+    const previous = lookupPreviousSet(
+      previousLookup,
+      currentPhase.exerciseName,
+      currentPhase.setNumber,
+      currentPhase.catalogExerciseId,
+    );
+    return recommendProgression({
+      mode,
+      modality: currentPhase.modality,
+      supportsExternalLoad: currentPhase.supportsExternalLoad,
+      currentLoad:
+        currentPhase.supportsExternalLoad === false
+          ? null
+          : (currentPhase.targetLoad ?? previous?.weight ?? null),
+      increment: exercise.progression_increment ?? null,
+      minReps: currentPhase.targetRepsMin ?? exercise.progression_min_reps ?? null,
+      maxReps: currentPhase.targetRepsMax ?? exercise.progression_max_reps ?? null,
+      currentDurationSeconds:
+        currentPhase.targetDurationSeconds ??
+        (currentPhase.modality === 'timed' || currentPhase.modality === 'cardio'
+          ? currentPhase.durationSeconds
+          : null),
+      durationIncrementSeconds:
+        currentPhase.modality === 'timed' || currentPhase.modality === 'cardio'
+          ? (exercise.progression_increment ?? null)
+          : null,
+      latestSets: history,
+    });
+  }, [currentPhase, previousLookup, recentSetOutcomes, routine.exercises]);
+
+  const timerNotificationIdRef = useRef<string | null>(null);
+
+  // Best-effort native wake lock for the active workout. The tag is released
+  // on every transition away from an active session and on unmount; web uses
+  // the browser wake-lock implementation when available and otherwise no-ops.
+  useEffect(() => {
+    if (isRunning && !isComplete) {
+      void activateKeepAwakeAsync('superhabits-workout-session').catch(() => {});
+    } else {
+      void deactivateKeepAwake('superhabits-workout-session').catch(() => {});
+    }
+    return () => {
+      void deactivateKeepAwake('superhabits-workout-session').catch(() => {});
+    };
+  }, [isRunning, isComplete]);
+
+  // When a rest phase is running, schedule the existing timer-end notification
+  // seam. Native platforms may deliver it while backgrounded; web returns a
+  // truthful no-op rather than pretending browser notifications are active.
+  useEffect(() => {
+    let cancelled = false;
+    const previousId = timerNotificationIdRef.current;
+    timerNotificationIdRef.current = null;
+    if (previousId) void cancelScheduledNotification(previousId);
+    if (!isRunning || isComplete || currentPhase?.phase !== 'rest') return;
+    void scheduleTimerEndNotification(
+      Math.max(1, Math.round(remaining)),
+      'Rest complete',
+      `Next: ${sequence[currentIndex + 1]?.exerciseName ?? routine.name}`,
+    ).then((id) => {
+      if (!cancelled) timerNotificationIdRef.current = id;
+      else if (id) void cancelScheduledNotification(id);
+    });
+    return () => {
+      cancelled = true;
+      const id = timerNotificationIdRef.current;
+      timerNotificationIdRef.current = null;
+      if (id) void cancelScheduledNotification(id);
+    };
+  }, [currentIndex, currentPhase?.phase, isComplete, isRunning, routine.name, sequence]);
 
   const currentIndexRef = useRef(currentIndex);
   useEffect(() => {
@@ -211,8 +344,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     remainingRef.current = remaining;
   });
 
-  // Draft persistence: written on Start and on every phase transition so an
-  // app restart can offer to resume; cleared on finish/abandon/discard.
+  // Draft persistence: written on Start, measurement edits, and every phase
+  // transition so an app restart can offer to resume; cleared on
+  // finish/abandon/discard. Timer ticks do not write a row every second.
   const persistDraft = useCallback(
     (phaseIndex: number) => {
       const startedAtMs = startedAtMsRef.current;
@@ -263,11 +397,19 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEnteredSets((prev) => {
       if (prev[currentIndex]) return prev;
-      const prior = lookupPreviousSet(previousLookup, phase.exerciseName, phase.setNumber);
+      const prior = lookupPreviousSet(
+        previousLookup,
+        phase.exerciseName,
+        phase.setNumber,
+        phase.catalogExerciseId,
+      );
       if (!prior) return prev;
       return {
         ...prev,
-        [currentIndex]: { weight: String(prior.weight), reps: String(prior.reps) },
+        [currentIndex]: {
+          weight: phase.supportsExternalLoad === false ? '' : String(prior.weight),
+          reps: String(prior.reps),
+        },
       };
     });
   }, [currentIndex, sequence, previousLookup]);
@@ -335,7 +477,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       let history = prHistoryCacheRef.current.get(phase.exerciseName);
       if (!history) {
         try {
-          history = await listLoggedSetsForExerciseNames([phase.exerciseName]);
+          history = await listLoggedSetsForExerciseNames(
+            [phase.exerciseName],
+            phase.catalogExerciseId ? [phase.catalogExerciseId] : [],
+          );
         } catch {
           history = [];
         }
@@ -343,10 +488,22 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       }
 
       const records = findNewPersonalRecords(
-        [{ exerciseName: phase.exerciseName, weight, reps }],
+        [
+          {
+            exerciseName: phase.exerciseName,
+            catalogExerciseId: phase.catalogExerciseId,
+            weight,
+            reps,
+          },
+        ],
         [...history, ...sessionWeightedSetsRef.current],
       );
-      sessionWeightedSetsRef.current.push({ exerciseName: phase.exerciseName, weight, reps });
+      sessionWeightedSetsRef.current.push({
+        exerciseName: phase.exerciseName,
+        catalogExerciseId: phase.catalogExerciseId,
+        weight,
+        reps,
+      });
       if (records.length === 0) return;
       showPrNotice(phase.exerciseName, estimate1RM(weight, reps));
     },
@@ -376,6 +533,15 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     });
   };
 
+  // Measurements are user-authored session state. Persist them after the
+  // render settles so a background kill does not discard the last edit, while
+  // avoiding a database write on every countdown tick.
+  useEffect(() => {
+    if (startedAtMsRef.current === null || isComplete) return;
+    const id = setTimeout(() => persistDraft(currentIndexRef.current), 250);
+    return () => clearTimeout(id);
+  }, [enteredSets, isComplete, persistDraft]);
+
   useEffect(() => {
     if (!isRunning || isComplete) return;
     const id = setInterval(() => {
@@ -386,6 +552,33 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         // Phase just hit zero: advance immediately instead of waiting for
         // a second effect to notice `remaining === 0` on the next render.
         const finishedIndex = currentIndexRef.current;
+        const finishedPhase = sequence[finishedIndex];
+        // Weighted and bodyweight strength sets are manual logging events. A
+        // configured active duration is still shown as a pacing aid, but it
+        // must not silently turn an unconfirmed set into performed history.
+        // Legacy free-text routines remain timer-driven for V1 compatibility;
+        // typed timed/cardio modalities are also safe to complete at target.
+        if (
+          finishedPhase?.phase === 'active' &&
+          finishedPhase.modality !== undefined &&
+          finishedPhase.modality !== 'timed' &&
+          finishedPhase.modality !== 'cardio'
+        ) {
+          setIsRunning(false);
+          return 0;
+        }
+        if (
+          finishedPhase?.phase === 'active' &&
+          (finishedPhase.modality === 'timed' || finishedPhase.modality === 'cardio')
+        ) {
+          setEnteredSets((values) => ({
+            ...values,
+            [finishedIndex]: {
+              ...(values[finishedIndex] ?? { weight: '', reps: '' }),
+              duration: String(Math.max(0, Math.round(finishedPhase.durationSeconds))),
+            },
+          }));
+        }
         setDispositions((d) => ({ ...d, [finishedIndex]: 'completed' }));
         const nextIdx = finishedIndex + 1;
         if (nextIdx >= sequence.length) {
@@ -407,10 +600,23 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     setIsRunning(true);
   };
 
-  const handleSkip = () => {
+  const phaseRunsOnTimer = (phase: TimerPhase | undefined): boolean =>
+    phase?.phase === 'rest' ||
+    phase?.modality === undefined ||
+    phase?.modality === 'timed' ||
+    phase?.modality === 'cardio';
+
+  const advanceFromCurrent = (disposition: PhaseDisposition) => {
     const finishedIndex = currentIndexRef.current;
-    setDispositions((d) => ({ ...d, [finishedIndex]: 'skipped' }));
-    const nextIndex = finishedIndex + 1;
+    setDispositions((d) => ({ ...d, [finishedIndex]: disposition }));
+    let nextIndex = finishedIndex + 1;
+    // A zero-second rest is an intentional back-to-back transition, not a
+    // phase that should force a second Start tap or an empty timer screen.
+    while (nextIndex < sequence.length) {
+      const phase = sequence[nextIndex];
+      if (phase.phase !== 'rest' || phase.durationSeconds > 0) break;
+      nextIndex += 1;
+    }
     if (nextIndex >= sequence.length) {
       setIsRunning(false);
       setIsComplete(true);
@@ -419,6 +625,35 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     setCurrentIndex(nextIndex);
     currentIndexRef.current = nextIndex;
     setRemaining(sequence[nextIndex].durationSeconds);
+    setIsRunning(phaseRunsOnTimer(sequence[nextIndex]));
+  };
+
+  const handleSkip = () => {
+    advanceFromCurrent('skipped');
+  };
+
+  const handleCompleteSet = () => {
+    if (currentPhase?.phase !== 'active') return;
+    if (startedAtMsRef.current === null) startedAtMsRef.current = Date.now();
+    if (currentPhase.modality === 'timed' || currentPhase.modality === 'cardio') {
+      const existingDuration = parseOptionalMeasurement(
+        enteredSetsRef.current[currentIndexRef.current]?.duration,
+      );
+      if (existingDuration === null) {
+        const elapsedInPhase = isRunning
+          ? Math.max(0, currentPhase.durationSeconds - remainingRef.current)
+          : 0;
+        if (elapsedInPhase <= 0) return;
+        setEnteredSets((values) => ({
+          ...values,
+          [currentIndexRef.current]: {
+            ...(values[currentIndexRef.current] ?? { weight: '', reps: '' }),
+            duration: String(Math.round(elapsedInPhase)),
+          },
+        }));
+      }
+    }
+    advanceFromCurrent('completed');
   };
 
   const handleFinish = async () => {
@@ -428,7 +663,13 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     try {
       const endedAtMs = Date.now();
       const startedAtMs = startedAtMsRef.current;
-      const records = collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets);
+      const records = collectSessionSetRecords(
+        sequence,
+        currentIndex,
+        dispositions,
+        enteredSets,
+        effortScale,
+      );
       const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
 
       // Compare against PRIOR sessions only — queried before this log is
@@ -440,9 +681,18 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       let newRecords: string[] = [];
       if (weightedRecords.length > 0) {
         const names = Array.from(new Set(weightedRecords.map((r) => r.exerciseName)));
-        const historySets = await listLoggedSetsForExerciseNames(names);
+        const catalogExerciseIds = Array.from(
+          new Set(
+            weightedRecords
+              .map((r) => r.catalogExerciseId)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+        const historySets = await listLoggedSetsForExerciseNames(names, catalogExerciseIds);
         const sessionSets: LoggedSet[] = weightedRecords.map((r) => ({
           exerciseName: r.exerciseName,
+          catalogExerciseId: r.catalogExerciseId,
+          modality: r.modality,
           weight: r.weight,
           reps: r.reps,
         }));
@@ -452,18 +702,39 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       await logWorkoutSession({
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
-        exercises: summary.map((s) => ({
-          exerciseName: s.exerciseName,
-          setsCompleted: s.setsCompleted,
-          sets: records
-            .filter((r) => r.exerciseName === s.exerciseName)
-            .map((r) => ({
-              setNumber: r.setNumber,
-              weight: r.weight,
-              reps: r.reps,
-              completed: r.completed,
-            })),
-        })),
+        exercises: summary.map((s) => {
+          const exercise = routine.exercises.find((item) => item.name === s.exerciseName);
+          const isLegacyFreeText = !exercise?.catalog_exercise_id;
+          return {
+            exerciseName: s.exerciseName,
+            setsCompleted: s.setsCompleted,
+            ...(isLegacyFreeText
+              ? {}
+              : {
+                  catalogExerciseId: exercise?.catalog_exercise_id ?? null,
+                  modality: exercise?.modality ?? 'timed',
+                  unilateral: exercise?.unilateral === 1,
+                  supportsExternalLoad:
+                    exercise?.supports_external_load === undefined
+                      ? exercise?.modality === 'weighted_strength'
+                      : exercise.supports_external_load === 1,
+                }),
+            sets: records
+              .filter((r) => r.exerciseName === s.exerciseName)
+              .map((r) => ({
+                setNumber: r.setNumber,
+                weight: r.weight,
+                reps: r.reps,
+                completed: r.completed,
+                weightUnit: r.weight !== null ? ('kg' as const) : null,
+                durationSeconds: r.durationSeconds,
+                distance: r.distance,
+                pace: r.pace,
+                effortValue: r.effortValue,
+                effortScale: r.effortScale,
+              })),
+          };
+        }),
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,
         endedAt: new Date(endedAtMs).toISOString(),
         // Resumed sessions log active time, not wall-clock: the gap between the
@@ -500,7 +771,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
     const totalSets = computeSessionTotalSets(summary);
     const totalVolume = computeSessionTotalVolume(
-      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets),
+      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets, effortScale),
     );
     return (
       <Screen>
@@ -580,7 +851,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
     const totalSets = computeSessionTotalSets(summary);
     const totalVolume = computeSessionTotalVolume(
-      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets),
+      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets, effortScale),
     );
     return (
       <Screen>
@@ -669,13 +940,65 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   }
 
   const isActive = currentPhase.phase === 'active';
+  const isLegacyFreeText = currentPhase.modality === undefined;
+  const isLoadBased =
+    isLegacyFreeText ||
+    currentPhase.modality === 'weighted_strength' ||
+    currentPhase.modality === 'bodyweight';
+  const isBodyweight = currentPhase.modality === 'bodyweight';
+  const isCardio = currentPhase.modality === 'cardio';
+  const allowsExternalLoad = currentPhase.supportsExternalLoad !== false;
   const denom = currentPhase.durationSeconds > 0 ? currentPhase.durationSeconds : 1;
   const progress = 1 - remaining / denom;
   // Visible previous performance at the point of entry; the same values
   // silently pre-seed the inputs below.
   const previousForCurrentSet = isActive
-    ? lookupPreviousSet(previousLookup, currentPhase.exerciseName, currentPhase.setNumber)
+    ? lookupPreviousSet(
+        previousLookup,
+        currentPhase.exerciseName,
+        currentPhase.setNumber,
+        currentPhase.catalogExerciseId,
+      )
     : null;
+  const previousText = previousForCurrentSet
+    ? allowsExternalLoad
+      ? `Previous: ${previousForCurrentSet.weight}×${previousForCurrentSet.reps}`
+      : `Previous: ${previousForCurrentSet.reps} reps`
+    : 'Previous: —';
+  const targetText = isLoadBased
+    ? [
+        currentPhase.targetLoad != null ? `target ${currentPhase.targetLoad} kg` : null,
+        currentPhase.targetRepsMin != null || currentPhase.targetRepsMax != null
+          ? `${currentPhase.targetRepsMin ?? currentPhase.targetRepsMax}–${currentPhase.targetRepsMax ?? currentPhase.targetRepsMin} reps`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : isCardio
+      ? [
+          `target ${formatWorkoutTime(currentPhase.durationSeconds)}`,
+          currentPhase.targetDistance != null ? `${currentPhase.targetDistance} distance` : null,
+          currentPhase.targetPace != null ? `${currentPhase.targetPace} pace` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : `target ${formatWorkoutTime(currentPhase.durationSeconds)}`;
+  const progressionGuidance = progressionRecommendation ? (
+    <View
+      className="mt-2 rounded-xl border px-3 py-2"
+      style={{
+        borderColor: `${WORKOUT_COLOR}55`,
+        backgroundColor: `${WORKOUT_COLOR}12`,
+      }}
+    >
+      <Text className="text-xs font-semibold" style={{ color: WORKOUT_COLOR }}>
+        Progression guidance
+      </Text>
+      <Text className="mt-1 text-xs" style={{ color: tokens.text }}>
+        {progressionRecommendation.explanation}
+      </Text>
+    </View>
+  ) : null;
 
   return (
     <Screen>
@@ -746,6 +1069,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         <Text className="mt-1 text-center text-sm" style={{ color: tokens.textMuted }}>
           Set {currentPhase.setNumber} of {currentPhase.totalSets}
         </Text>
+        <Text className="mt-2 text-center text-xs" style={{ color: WORKOUT_COLOR }}>
+          {isLegacyFreeText ? 'Legacy strength entry' : currentPhase.modality?.replace('_', ' ')} ·{' '}
+          {targetText}
+        </Text>
 
         <Text className="my-8 text-center text-7xl font-semibold" style={{ color: tokens.text }}>
           {formatWorkoutTime(remaining)}
@@ -768,48 +1095,132 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
 
         {isActive ? (
           <View className="mb-5">
-            <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
-              Log this set (optional)
-            </Text>
-            <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-              {previousForCurrentSet
-                ? `Last: ${previousForCurrentSet.weight}×${previousForCurrentSet.reps}`
-                : 'Last: —'}
-            </Text>
-            <View className="mt-2 flex-row items-end gap-3">
-              <View className="min-w-0 flex-1">
-                <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-                  Weight
+            {progressionGuidance}
+            {isLoadBased ? (
+              <>
+                <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
+                  Log this set (optional)
                 </Text>
+                <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+                  {previousText}
+                  {isBodyweight ? ' · bodyweight is the movement basis' : ''}
+                  {currentPhase.unilateral ? ' · reps are recorded per side' : ''}
+                </Text>
+                <View className="mt-2 flex-row items-end gap-3">
+                  {allowsExternalLoad ? (
+                    <View className="min-w-0 flex-1">
+                      <Text
+                        className="mb-1.5 text-sm font-medium"
+                        style={{ color: tokens.textMuted }}
+                      >
+                        {isBodyweight ? 'Additional load' : 'Weight'}
+                      </Text>
+                      <TextInput
+                        accessibilityLabel={isBodyweight ? 'Additional load' : 'Weight'}
+                        className="rounded-xl border px-3 py-2 text-center text-base"
+                        style={{
+                          height: 48,
+                          borderColor: tokens.border,
+                          backgroundColor: tokens.surfaceElevated,
+                          color: tokens.text,
+                        }}
+                        value={enteredSets[currentIndex]?.weight ?? ''}
+                        onChangeText={(t) =>
+                          updateEnteredValues(currentIndex, { weight: t.replace(/[^0-9.]/g, '') })
+                        }
+                        placeholder={isBodyweight ? 'optional' : 'e.g. 60'}
+                        placeholderTextColor={tokens.textMuted}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  ) : null}
+                  <View className={allowsExternalLoad ? 'min-w-0 flex-1' : 'min-w-0 w-full'}>
+                    <NumberStepperField
+                      label={currentPhase.unilateral ? 'Reps / side' : 'Reps'}
+                      value={enteredSets[currentIndex]?.reps ?? ''}
+                      onChange={(v) => updateEnteredValues(currentIndex, { reps: v })}
+                      min={1}
+                      max={200}
+                      placeholder="—"
+                    />
+                  </View>
+                </View>
+              </>
+            ) : isCardio ? (
+              <>
+                <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
+                  Cardio result (optional)
+                </Text>
+                <NumberStepperField
+                  label="Duration (seconds)"
+                  value={enteredSets[currentIndex]?.duration ?? ''}
+                  onChange={(value) => updateEnteredValues(currentIndex, { duration: value })}
+                  min={1}
+                  max={86400}
+                  placeholder={String(Math.round(currentPhase.durationSeconds))}
+                />
                 <TextInput
-                  accessibilityLabel="Weight"
-                  className="rounded-xl border px-3 py-2 text-center text-base"
+                  accessibilityLabel="Distance"
+                  className="mt-2 rounded-xl border px-3 py-2 text-base"
                   style={{
                     height: 48,
                     borderColor: tokens.border,
                     backgroundColor: tokens.surfaceElevated,
                     color: tokens.text,
                   }}
-                  value={enteredSets[currentIndex]?.weight ?? ''}
-                  onChangeText={(t) =>
-                    updateEnteredValues(currentIndex, { weight: t.replace(/[^0-9.]/g, '') })
+                  value={enteredSets[currentIndex]?.distance ?? ''}
+                  onChangeText={(value) =>
+                    updateEnteredValues(currentIndex, { distance: value.replace(/[^0-9.]/g, '') })
                   }
-                  placeholder="e.g. 60"
+                  placeholder="Distance"
                   placeholderTextColor={tokens.textMuted}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                 />
-              </View>
-              <View className="min-w-0 flex-1">
+                <TextInput
+                  accessibilityLabel="Pace"
+                  className="mt-2 rounded-xl border px-3 py-2 text-base"
+                  style={{
+                    height: 48,
+                    borderColor: tokens.border,
+                    backgroundColor: tokens.surfaceElevated,
+                    color: tokens.text,
+                  }}
+                  value={enteredSets[currentIndex]?.pace ?? ''}
+                  onChangeText={(value) =>
+                    updateEnteredValues(currentIndex, { pace: value.replace(/[^0-9.]/g, '') })
+                  }
+                  placeholder="Pace / speed"
+                  placeholderTextColor={tokens.textMuted}
+                  keyboardType="decimal-pad"
+                />
+              </>
+            ) : (
+              <>
+                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  The work timer records the completed duration for this set.
+                </Text>
                 <NumberStepperField
-                  label="Reps"
-                  value={enteredSets[currentIndex]?.reps ?? ''}
-                  onChange={(v) => updateEnteredValues(currentIndex, { reps: v })}
+                  label="Duration (seconds)"
+                  value={enteredSets[currentIndex]?.duration ?? ''}
+                  onChange={(value) => updateEnteredValues(currentIndex, { duration: value })}
                   min={1}
-                  max={200}
+                  max={86400}
+                  placeholder={String(Math.round(currentPhase.durationSeconds))}
+                />
+              </>
+            )}
+            {effortScale !== 'off' ? (
+              <View className="mt-3">
+                <NumberStepperField
+                  label={effortScale === 'rir' ? 'RIR (reps in reserve)' : 'RPE (1–10)'}
+                  value={enteredSets[currentIndex]?.effort ?? ''}
+                  onChange={(value) => updateEnteredValues(currentIndex, { effort: value })}
+                  min={effortScale === 'rir' ? 0 : 1}
+                  max={10}
                   placeholder="—"
                 />
               </View>
-            </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -817,8 +1228,21 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           {!isRunning ? (
             <Button label="Start" onPress={handleStart} color={WORKOUT_COLOR} />
           ) : (
-            <Button label="Skip" variant="ghost" onPress={handleSkip} />
+            <Button
+              label={isActive ? 'Complete set' : 'Skip'}
+              variant={isActive ? 'primary' : 'ghost'}
+              onPress={isActive ? handleCompleteSet : handleSkip}
+              color={isActive ? WORKOUT_COLOR : undefined}
+            />
           )}
+          {isActive ? (
+            <>
+              {!isRunning ? (
+                <Button label="Complete set now" variant="ghost" onPress={handleCompleteSet} />
+              ) : null}
+              <Button label="Skip" variant="ghost" onPress={handleSkip} />
+            </>
+          ) : null}
           {!isActive ? (
             <View className="flex-row items-center justify-center gap-6">
               <Pressable

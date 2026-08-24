@@ -158,6 +158,13 @@ export const API_LEG_FUNCTIONS: Record<string, ApiLegFunctionSpec> = {
     description: 'features/workout/workout.data createRoutine — insert a workout routine row.',
     requiredArgs: ['name'],
   },
+  seedGymTrainingState: {
+    functionName: 'seedGymTrainingState',
+    resolution: 'db-harness',
+    description:
+      'Workout data-layer fixture seam — adds a catalog exercise, custom exercise, weekly plan, and body-weight measurement for an existing routine.',
+    requiredArgs: ['routineName'],
+  },
   // Supabase-client resolution is reserved for the disposable-backend lane
   // (task 8); a stub entry documents the seam.
   supabaseUpsert: {
@@ -418,12 +425,181 @@ export async function execCreateWorkoutRoutine(
   return `createWorkoutRoutine(${JSON.stringify(args.name)})`;
 }
 
+/** Seed a compact Gym V2 state through the same DB harness as other API legs. */
+export async function execSeedGymTrainingState(
+  page: Page,
+  args: Record<string, unknown>,
+): Promise<string> {
+  resolveSpec('seedGymTrainingState', args);
+  const routineName = String(args.routineName);
+  const routineRows = await queryRows(
+    page,
+    `SELECT id FROM workout_routines WHERE name = ${esc(routineName)} AND deleted_at IS NULL LIMIT 1`,
+  );
+  const routineId = routineRows[0]?.id as string | undefined;
+  if (!routineId) throw new Error(`Gym V2 fixture routine not found: ${routineName}`);
+  const now = new Date().toISOString();
+  const exerciseId = makeId('ex');
+  const setId = makeId('eset');
+  const customId = makeId('cex');
+  const planId = makeId('wplan');
+  const bodyWeightId = makeId('bw');
+  await withDb(
+    page,
+    [
+      insertSql(
+        'routine_exercises',
+        [
+          'id',
+          'routine_id',
+          'name',
+          'sort_order',
+          'catalog_exercise_id',
+          'modality',
+          'unilateral',
+          'supports_external_load',
+          'notes',
+          'superset_group',
+          'progression_mode',
+          'progression_increment',
+          'progression_min_reps',
+          'progression_max_reps',
+          'created_at',
+          'updated_at',
+          'deleted_at',
+        ],
+        [
+          esc(exerciseId),
+          esc(routineId),
+          esc('Barbell bench press'),
+          '1',
+          esc('builtin_barbell_bench_press'),
+          esc('weighted_strength'),
+          '1',
+          '1',
+          esc('Simulation starter prescription'),
+          'NULL',
+          esc('linear'),
+          '2.5',
+          '8',
+          '10',
+          esc(now),
+          esc(now),
+          'NULL',
+        ],
+      ),
+      insertSql(
+        'routine_exercise_sets',
+        [
+          'id',
+          'exercise_id',
+          'set_number',
+          'active_seconds',
+          'rest_seconds',
+          'target_reps_min',
+          'target_reps_max',
+          'target_load',
+          'created_at',
+          'updated_at',
+          'deleted_at',
+        ],
+        [esc(setId), esc(exerciseId), '1', '30', '60', '8', '10', '60', esc(now), esc(now), 'NULL'],
+      ),
+      insertSql(
+        'custom_exercises',
+        [
+          'id',
+          'name',
+          'description',
+          'aliases',
+          'instructions',
+          'primary_area',
+          'secondary_areas',
+          'equipment',
+          'modality',
+          'unilateral',
+          'supports_external_load',
+          'created_at',
+          'updated_at',
+          'deleted_at',
+        ],
+        [
+          esc(customId),
+          esc('Cable Y raise'),
+          'NULL',
+          esc('["cable y"]'),
+          esc('Pull toward the shoulders.'),
+          esc('shoulders'),
+          esc('[]'),
+          esc('cable'),
+          esc('weighted_strength'),
+          '0',
+          '1',
+          esc(now),
+          esc(now),
+          'NULL',
+        ],
+      ),
+      insertSql(
+        'workout_weekly_plan',
+        [
+          'id',
+          'weekday',
+          'routine_id',
+          'plan_kind',
+          'note',
+          'created_at',
+          'updated_at',
+          'deleted_at',
+        ],
+        [
+          esc(planId),
+          '1',
+          esc(routineId),
+          esc('workout'),
+          esc('Gym V2 simulation'),
+          esc(now),
+          esc(now),
+          'NULL',
+        ],
+      ),
+      insertSql(
+        'body_weight_entries',
+        [
+          'id',
+          'measured_on',
+          'measured_at',
+          'weight',
+          'unit',
+          'note',
+          'created_at',
+          'updated_at',
+          'deleted_at',
+        ],
+        [
+          esc(bodyWeightId),
+          esc(await pageDateKey(page)),
+          esc(now),
+          '80',
+          esc('kg'),
+          esc('Simulation morning'),
+          esc(now),
+          esc(now),
+          'NULL',
+        ],
+      ),
+    ].join('\n'),
+  );
+  return `seedGymTrainingState(${JSON.stringify(routineName)})`;
+}
+
 const HANDLERS: Record<string, (page: Page, args: Record<string, unknown>) => Promise<string>> = {
   createTodo: execCreateTodo,
   createHabit: execCreateHabit,
   tickHabit: execTickHabit,
   logCalories: execLogCalories,
   createWorkoutRoutine: execCreateWorkoutRoutine,
+  seedGymTrainingState: execSeedGymTrainingState,
 };
 
 /**

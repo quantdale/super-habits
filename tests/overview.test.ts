@@ -354,6 +354,18 @@ describe('shapeWorkoutSummary', () => {
     expect(summary.lastWorkoutName).toBeNull();
   });
 
+  it('carries the schedule-aware Today state without changing legacy log shaping', () => {
+    const summary = shapeWorkoutSummary([], new Map([['r1', 'Push Day']]), ['2026-03-09'], {
+      state: 'planned',
+      plannedWorkoutName: 'Push Day',
+    });
+    expect(summary).toMatchObject({
+      sessionsThisWeek: 0,
+      todayState: 'planned',
+      plannedWorkoutName: 'Push Day',
+    });
+  });
+
   it('falls back to created_at when date_key is absent', () => {
     const summary = shapeWorkoutSummary(
       [{ created_at: '2026-03-09T07:00:00.000Z', routine_id: 'r1' }],

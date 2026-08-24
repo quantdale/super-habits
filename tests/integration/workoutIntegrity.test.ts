@@ -277,3 +277,228 @@ describe('timed-session provenance (workout_session_sets + wall-clock timing)', 
     await db.closeAsync();
   });
 });
+
+describe('Gym V2 durable model', () => {
+  it('persists catalog identity, prescriptions, plans, modality sets, preferences, and body weight', async () => {
+    const db = await freshDatabase();
+    const workout = await import('@/features/workout/workout.data');
+
+    const routineId = await (async () => {
+      await workout.addRoutine('Upper body', 'Gym', 'strength');
+      return (await workout.listRoutines())[0].id;
+    })();
+    const exerciseId = await workout.addExercise({
+      routineId,
+      name: 'Bench Press',
+      catalogExerciseId: 'builtin_barbell_bench_press',
+      modality: 'weighted_strength',
+      notes: 'Pause briefly on the chest.',
+      unilateral: true,
+      supportsExternalLoad: true,
+      supersetGroup: 'push-a',
+      progressionMode: 'double',
+      progressionIncrement: 2.5,
+      progressionMinReps: 8,
+      progressionMaxReps: 12,
+    });
+    const setId = await workout.addSet({
+      exerciseId,
+      setNumber: 1,
+      activeSeconds: 30,
+      restSeconds: 90,
+      targetRepsMin: 8,
+      targetRepsMax: 12,
+      targetLoad: 80,
+    });
+    const customId = await workout.createCustomExercise({
+      name: 'Cable Y Raise',
+      primaryArea: 'shoulders',
+      secondaryAreas: ['upper back'],
+      equipment: 'cable',
+      modality: 'weighted_strength',
+      aliases: ['cable y'],
+      instructions: 'Pull toward the shoulders.',
+      supportsExternalLoad: true,
+      unilateral: false,
+    });
+    await workout.upsertWeeklyPlanEntry({ weekday: 1, routineId, planKind: 'workout' });
+    await workout.setWorkoutScheduleOverride({
+      dateKey: '2026-08-24',
+      overrideKind: 'rest',
+      note: 'Travel day',
+    });
+    await workout.saveWorkoutPreferences({
+      effortScale: 'rir',
+      goalWeight: { value: 75, unit: 'kg' },
+      workoutReminder: { enabled: false, time: { hour: 7, minute: 30 } },
+    });
+    await workout.addBodyWeightEntry({
+      weight: 80,
+      unit: 'kg',
+      measuredAt: '2026-08-24T07:00:00.000Z',
+      note: 'Morning',
+    });
+    await workout.logWorkoutSession({
+      routineId,
+      exercises: [
+        {
+          exerciseName: 'Plank',
+          setsCompleted: 1,
+          catalogExerciseId: 'builtin_plank',
+          modality: 'timed',
+          sets: [
+            {
+              setNumber: 1,
+              weight: null,
+              reps: null,
+              completed: true,
+              durationSeconds: 45,
+              effortValue: 2,
+              effortScale: 'rir',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(
+      (
+        await db.getFirstAsync<{ value: string }>(
+          "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
+        )
+      )?.value,
+    ).toBe('23');
+    expect(
+      await db.getFirstAsync<{
+        catalog_exercise_id: string;
+        modality: string;
+        unilateral: number;
+        supports_external_load: number;
+        notes: string;
+        superset_group: string;
+        progression_mode: string;
+      }>(
+        'SELECT catalog_exercise_id, modality, unilateral, supports_external_load, notes, superset_group, progression_mode FROM routine_exercises WHERE id = ?',
+        [exerciseId],
+      ),
+    ).toEqual({
+      catalog_exercise_id: 'builtin_barbell_bench_press',
+      modality: 'weighted_strength',
+      unilateral: 1,
+      supports_external_load: 1,
+      notes: 'Pause briefly on the chest.',
+      superset_group: 'push-a',
+      progression_mode: 'double',
+    });
+    expect(
+      await db.getFirstAsync<{
+        target_reps_min: number;
+        target_reps_max: number;
+        target_load: number;
+      }>(
+        'SELECT target_reps_min, target_reps_max, target_load FROM routine_exercise_sets WHERE id = ?',
+        [setId],
+      ),
+    ).toEqual({ target_reps_min: 8, target_reps_max: 12, target_load: 80 });
+    expect((await workout.listCustomExercises())[0]).toMatchObject({
+      id: customId,
+      aliases: JSON.stringify(['cable y']),
+      instructions: 'Pull toward the shoulders.',
+      supports_external_load: 1,
+    });
+    expect((await workout.resolveWorkoutScheduleForDate('2026-08-24')).planKind).toBe('rest');
+    expect((await workout.resolveWorkoutScheduleForDate('2026-08-17')).routineId).toBe(routineId);
+    expect((await workout.getWorkoutPreferences()).goalWeight).toEqual({ value: 75, unit: 'kg' });
+    expect((await workout.listBodyWeightEntries())[0]).toMatchObject({
+      weight: 80,
+      unit: 'kg',
+      note: 'Morning',
+    });
+    expect(
+      await db.getFirstAsync<{
+        duration_seconds: number;
+        effort_value: number;
+        effort_scale: string;
+      }>(
+        'SELECT duration_seconds, effort_value, effort_scale FROM workout_session_sets WHERE duration_seconds IS NOT NULL',
+      ),
+    ).toEqual({ duration_seconds: 45, effort_value: 2, effort_scale: 'rir' });
+
+    for (const entity of [
+      'custom_exercises',
+      'workout_weekly_plan',
+      'workout_schedule_overrides',
+      'body_weight_entries',
+    ] as const) {
+      expect(
+        await db.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM sync_outbox WHERE entity = ?',
+          [entity],
+        ),
+      ).toEqual({ count: 1 });
+    }
+    await db.closeAsync();
+  });
+
+  it('does not let concurrent builder edits overwrite each other', async () => {
+    const db = await freshDatabase();
+    const workout = await import('@/features/workout/workout.data');
+
+    await workout.addRoutine('Concurrent edits', '');
+    const routineId = (await workout.listRoutines())[0].id;
+    const exerciseId = await workout.addExercise({
+      routineId,
+      name: 'Bench Press',
+      catalogExerciseId: 'builtin_barbell_bench_press',
+      modality: 'weighted_strength',
+    });
+
+    await Promise.all([
+      workout.updateExercise(exerciseId, { progressionMode: 'linear' }),
+      workout.updateExercise(exerciseId, { progressionIncrement: 2.5 }),
+    ]);
+
+    expect(
+      await db.getFirstAsync<{
+        progression_mode: string;
+        progression_increment: number;
+      }>('SELECT progression_mode, progression_increment FROM routine_exercises WHERE id = ?', [
+        exerciseId,
+      ]),
+    ).toEqual({ progression_mode: 'linear', progression_increment: 2.5 });
+    await db.closeAsync();
+  });
+
+  it('merges concurrent timing and prescription edits for one set', async () => {
+    const db = await freshDatabase();
+    const workout = await import('@/features/workout/workout.data');
+
+    await workout.addRoutine('Concurrent set edits', '');
+    const routineId = (await workout.listRoutines())[0].id;
+    const exerciseId = await workout.addExercise({
+      routineId,
+      name: 'Bench Press',
+      catalogExerciseId: 'builtin_barbell_bench_press',
+      modality: 'weighted_strength',
+    });
+    const setId = await workout.addSet({
+      exerciseId,
+      setNumber: 1,
+      activeSeconds: 40,
+      restSeconds: 20,
+    });
+
+    await Promise.all([
+      workout.updateSet(setId, { activeSeconds: 5 }),
+      workout.updateSetPrescription(setId, { targetRepsMin: 8 }),
+    ]);
+
+    expect(
+      await db.getFirstAsync<{ active_seconds: number; target_reps_min: number }>(
+        'SELECT active_seconds, target_reps_min FROM routine_exercise_sets WHERE id = ?',
+        [setId],
+      ),
+    ).toEqual({ active_seconds: 5, target_reps_min: 8 });
+    await db.closeAsync();
+  });
+});

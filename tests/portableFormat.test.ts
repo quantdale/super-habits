@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BACKUP_ENTITIES, type BackupEntity } from '@/core/backup/backup.types';
+import {
+  BACKUP_ENTITIES,
+  backupEntityColumnsForScope,
+  type BackupEntity,
+} from '@/core/backup/backup.types';
 import {
   buildPortableBackupFile,
   canonicalPortablePayloadText,
@@ -11,7 +15,7 @@ import {
   PORTABLE_BACKUP_FORMAT_VERSION,
   type PortableBackupFile,
 } from '@/core/portable/portable.types';
-import { sha256Hex } from '@/lib/checksum';
+import { checksumRows, sha256Hex } from '@/lib/checksum';
 import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 
 const ISO = '2026-08-16T05:30:00.000Z';
@@ -98,6 +102,10 @@ function makeRow(
       routine_id: 'wrk_1',
       name: 'Bench press',
       sort_order: 0,
+      catalog_exercise_id: 'builtin_barbell_bench_press',
+      modality: 'weighted_strength',
+      unilateral: 0,
+      supports_external_load: 1,
       created_at: ISO,
       updated_at: ISO,
       deleted_at: null,
@@ -124,6 +132,10 @@ function makeRow(
       log_id: 'wrk_2',
       exercise_name: 'Bench press',
       sets_completed: 3,
+      catalog_exercise_id: 'builtin_barbell_bench_press',
+      modality: 'weighted_strength',
+      unilateral: 0,
+      supports_external_load: 1,
       created_at: ISO,
     },
     pomodoro_sessions: {
@@ -219,6 +231,54 @@ function makeRow(
       completed: 1,
       created_at: ISO,
     },
+    custom_exercises: {
+      id: 'cex_1',
+      name: 'Cable press',
+      description: null,
+      primary_area: 'chest',
+      secondary_areas: '[]',
+      equipment: 'cable',
+      modality: 'weighted_strength',
+      unilateral: 0,
+      aliases: '["cable press"]',
+      instructions: 'Control the eccentric.',
+      supports_external_load: 1,
+      created_at: ISO,
+      updated_at: ISO,
+      deleted_at: null,
+    },
+    workout_weekly_plan: {
+      id: 'wplan_1',
+      weekday: 1,
+      routine_id: 'wrk_1',
+      plan_kind: 'workout',
+      note: null,
+      created_at: ISO,
+      updated_at: ISO,
+      deleted_at: null,
+    },
+    workout_schedule_overrides: {
+      id: 'wover_1',
+      date_key: DATE_KEY,
+      override_kind: 'rest',
+      routine_id: null,
+      moved_from_date_key: null,
+      note: 'Recovery day',
+      created_at: ISO,
+      updated_at: ISO,
+      deleted_at: null,
+    },
+    body_weight_entries: {
+      id: 'bweight_1',
+      measured_on: DATE_KEY,
+      measured_at: ISO,
+      weight: 80,
+      unit: 'kg',
+      note: null,
+      created_at: ISO,
+      updated_at: ISO,
+      deleted_at: null,
+    },
   } as const;
   return { ...(base[entity] as Record<string, unknown>), ...overrides };
 }
@@ -258,7 +318,7 @@ function buildFixture(
 
 function expectValid(file: PortableBackupFile): void {
   const result = validatePortableBackupFile(JSON.parse(JSON.stringify(file)));
-  expect(result.ok).toBe(true);
+  expect(result.ok, result.ok ? undefined : result.errors.join('\n')).toBe(true);
 }
 
 function expectInvalid(file: unknown, matcher: RegExp | string): void {
@@ -301,6 +361,20 @@ describe('portableExportFileName', () => {
 describe('portable envelope build + validate round trip', () => {
   it('accepts a freshly built file', () => {
     expectValid(buildFixture());
+  });
+
+  it('verifies a frozen scope-6 file without hashing the new metadata columns', () => {
+    const file = buildFixture();
+    file.backupScopeVersion = 6;
+    const columns = backupEntityColumnsForScope(6);
+    for (const entity of BACKUP_ENTITIES) {
+      file.integrity.entities[entity] = checksumRows(file.entities[entity] ?? [], columns[entity]);
+    }
+    file.integrity.payloadChecksum = computePortablePayloadChecksum(file, {
+      entities: BACKUP_ENTITIES,
+      columns,
+    });
+    expectValid(file);
   });
 
   it('stores rows sorted by id', () => {
@@ -526,6 +600,19 @@ describe('row validation', () => {
       rows: { linked_action_rules: [makeRow('linked_action_rules', { effect_payload: '{' })] },
     });
     expectInvalid(file, /linked_action_rules/);
+  });
+
+  it('rejects malformed deep-expansion metadata', () => {
+    const aliases = buildFixture({
+      rows: { custom_exercises: [makeRow('custom_exercises', { aliases: '{not-json}' })] },
+    });
+    expectInvalid(aliases, /custom_exercises/);
+    const semantic = buildFixture({
+      rows: {
+        routine_exercises: [makeRow('routine_exercises', { unilateral: 2 })],
+      },
+    });
+    expectInvalid(semantic, /routine_exercises/);
   });
 
   it('rejects duplicate entity ids', () => {

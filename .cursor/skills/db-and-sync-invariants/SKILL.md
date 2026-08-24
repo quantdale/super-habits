@@ -16,8 +16,8 @@ Read this before writing any code that touches the database or data layer.
 - Migrations run sequentially via a version switch in core/db/client.ts.
 
 ## Schema version
-- Current stored version: **15** (`app_meta.db_schema_version`)
-- Next migration number: **22** (add `if (version < 22) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Current stored version: **23** (`app_meta.db_schema_version`)
+- Next migration number: **24** (add `if (version < 24) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations are append-only `if (version < N)` blocks inside `runMigrations()` in `core/db/client.ts` — there are no numbered migration files. `core/db/migrations/` holds only a Supabase reference SQL (`001_initial_supabase.sql`), never runtime code.
 - schema.sql is a partial REFERENCE ONLY snapshot — not executed at runtime; bootstrap DDL plus migrations are authoritative
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
@@ -46,9 +46,8 @@ After every INSERT or UPDATE on main entities, call:
   syncEngine.enqueue({ entity, id, updatedAt, operation })
   where operation is `"create" | "update" | "delete"` — `SyncRecord` shape in `core/sync/sync.engine.ts` is `{ entity: string; id: string; updatedAt: string; operation: ... }` (not `payload`, `table`, or `timestamp`).
 
-Entities that DO sync: todos, habits, calorie_entries, workout_routines (enqueue entity names match syncEngine usage in *.data.ts)
-Entities that do NOT sync: pomodoro_sessions, workout_logs, habit_completions, saved_meals, workout_session_exercises, routine_exercises, routine_exercise_sets
-(This is intentional — local-only data or nested workout structure handled by routine bumps.)
+Entities that DO sync: every `BACKUP_ENTITIES` member in `core/backup/backup.types.ts`, including the complete workout structure/history, planning entities, custom exercises, weekly plan/overrides, and body-weight entries. Synthetic `user_backup_settings` and `backup_manifest` records use the same outbox.
+Entities that do NOT sync: local operational state only — `linked_action_events`, `linked_action_executions`, and `processed_notification_actions`.
 
 The exported **`syncEngine`** uses **`SupabaseSyncAdapter`** (push upsert to Supabase when the client is configured). **`NoopSyncAdapter`** remains the `SyncEngine` constructor default for tests. **`enqueue()` always runs** — it fills the in-memory queue; never skip it on writes.
 
@@ -76,7 +75,7 @@ toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **loca
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 16) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 23) { ... }` today — bump to N+1 when version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/

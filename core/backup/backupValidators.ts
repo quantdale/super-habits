@@ -65,6 +65,10 @@ function isNonNegativeNumber(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
+function isPositiveNumber(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
 function isNullableString(value: unknown): boolean {
   return value === null || typeof value === 'string';
 }
@@ -260,6 +264,25 @@ function isNullableIdText(value: unknown): boolean {
   );
 }
 
+function nullableIdRule(field: string): FieldRule {
+  return {
+    required: (row) => checkField(row, field, isNullableIdText, field),
+  };
+}
+
+function isStringArrayJson(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length > 5_000) return false;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === 'string' && item.length <= 100)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Truly optional column rule: validates `value` when the column is present and
  * ignores it when absent. Used for the nullable `project_id`/`goal_id`/
@@ -418,6 +441,7 @@ const WORKOUT_ROUTINE_RULES: FieldRule[] = [
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
+  optionalColumnRule('goal_tag', (v) => v === null || isBoundedString(v, 'name')),
 ];
 
 const ROUTINE_EXERCISE_RULES: FieldRule[] = [
@@ -428,6 +452,24 @@ const ROUTINE_EXERCISE_RULES: FieldRule[] = [
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
+  optionalColumnRule('catalog_exercise_id', isNullableString),
+  optionalColumnRule('modality', (v) =>
+    isEnum(v, ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
+  ),
+  optionalColumnRule('unilateral', (v) => v === 0 || v === 1),
+  optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
+  optionalColumnRule('notes', (v) => v === null || isBoundedString(v, 'notes')),
+  optionalColumnRule('superset_group', (v) => v === null || isBoundedString(v, 'name')),
+  optionalColumnRule('progression_mode', (v) => isEnum(v, ['none', 'linear', 'double'])),
+  optionalColumnRule('progression_increment', (v) => v === null || isNonNegativeNumber(v)),
+  optionalColumnRule(
+    'progression_min_reps',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 1),
+  ),
+  optionalColumnRule(
+    'progression_max_reps',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 1),
+  ),
 ];
 
 const ROUTINE_EXERCISE_SET_RULES: FieldRule[] = [
@@ -439,6 +481,21 @@ const ROUTINE_EXERCISE_SET_RULES: FieldRule[] = [
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
+  optionalColumnRule(
+    'target_reps_min',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 1),
+  ),
+  optionalColumnRule(
+    'target_reps_max',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 1),
+  ),
+  optionalColumnRule('target_load', (v) => v === null || isNonNegativeNumber(v)),
+  optionalColumnRule(
+    'target_duration_seconds',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 0),
+  ),
+  optionalColumnRule('target_distance', (v) => v === null || isNonNegativeNumber(v)),
+  optionalColumnRule('target_pace', (v) => v === null || isNonNegativeNumber(v)),
 ];
 
 const WORKOUT_LOG_RULES: FieldRule[] = [
@@ -454,6 +511,7 @@ const WORKOUT_LOG_RULES: FieldRule[] = [
     'duration_seconds',
     (v) => v === null || (Number.isInteger(v) && Number(v) >= 0),
   ),
+  optionalColumnRule('routine_name', (v) => v === null || isBoundedString(v, 'name')),
 ];
 
 const WORKOUT_SESSION_EXERCISE_RULES: FieldRule[] = [
@@ -462,6 +520,12 @@ const WORKOUT_SESSION_EXERCISE_RULES: FieldRule[] = [
   textRule('exercise_name', true),
   intRule('sets_completed', true, 0),
   isoRule('created_at', true),
+  optionalColumnRule('catalog_exercise_id', isNullableString),
+  optionalColumnRule('modality', (v) =>
+    isEnum(v, ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
+  ),
+  optionalColumnRule('unilateral', (v) => v === 0 || v === 1),
+  optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
 ];
 
 const WORKOUT_SESSION_SET_RULES: FieldRule[] = [
@@ -489,6 +553,74 @@ const WORKOUT_SESSION_SET_RULES: FieldRule[] = [
     required: (row) => checkField(row, 'completed', (v) => v === 0 || v === 1, 'completed'),
   },
   isoRule('created_at', true),
+  optionalColumnRule(
+    'duration_seconds',
+    (v) => v === null || (Number.isInteger(v) && Number(v) >= 0),
+  ),
+  optionalColumnRule('distance', (v) => v === null || isNonNegativeNumber(v)),
+  optionalColumnRule('pace', (v) => v === null || isNonNegativeNumber(v)),
+  optionalColumnRule('effort_value', (v) => v === null || isNonNegativeNumber(v)),
+  optionalColumnRule('effort_scale', (v) => v === null || isEnum(v, ['rir', 'rpe'])),
+];
+
+const CUSTOM_EXERCISE_RULES: FieldRule[] = [
+  idRule('id'),
+  textRule('name', true),
+  nullableTextRule('description'),
+  optionalColumnRule('aliases', (v) => v === null || isStringArrayJson(v)),
+  optionalColumnRule('instructions', (v) => v === null || isBoundedString(v, 'instructions')),
+  textRule('primary_area', true),
+  { required: (row) => checkField(row, 'secondary_areas', isStringArrayJson, 'secondary_areas') },
+  nullableTextRule('equipment'),
+  enumRule('modality', ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
+  { required: (row) => checkField(row, 'unilateral', (v) => v === 0 || v === 1, 'unilateral') },
+  optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+];
+
+const WORKOUT_WEEKLY_PLAN_RULES: FieldRule[] = [
+  idRule('id'),
+  {
+    required: (row) =>
+      checkField(
+        row,
+        'weekday',
+        (v) => Number.isInteger(v) && Number(v) >= 1 && Number(v) <= 7,
+        'weekday',
+      ),
+  },
+  nullableIdRule('routine_id'),
+  enumRule('plan_kind', ['workout', 'rest']),
+  nullableTextRule('note'),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+];
+
+const WORKOUT_SCHEDULE_OVERRIDE_RULES: FieldRule[] = [
+  idRule('id'),
+  { required: (row) => checkField(row, 'date_key', isDateKey, 'date_key') },
+  enumRule('override_kind', ['workout', 'rest']),
+  nullableIdRule('routine_id'),
+  nullableDateKeyRule('moved_from_date_key'),
+  nullableTextRule('note'),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
+];
+
+const BODY_WEIGHT_ENTRY_RULES: FieldRule[] = [
+  idRule('id'),
+  { required: (row) => checkField(row, 'measured_on', isDateKey, 'measured_on') },
+  isoRule('measured_at', true),
+  { required: (row) => checkField(row, 'weight', isPositiveNumber, 'weight') },
+  enumRule('unit', ['kg', 'lb']),
+  nullableTextRule('note'),
+  isoRule('created_at', true),
+  isoRule('updated_at', true),
+  nullableIsoRule('deleted_at'),
 ];
 
 const POMODORO_SESSION_RULES: FieldRule[] = [
@@ -656,6 +788,10 @@ const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   projects: PROJECT_RULES,
   goals: GOAL_RULES,
   daily_plans: DAILY_PLAN_RULES,
+  custom_exercises: CUSTOM_EXERCISE_RULES,
+  workout_weekly_plan: WORKOUT_WEEKLY_PLAN_RULES,
+  workout_schedule_overrides: WORKOUT_SCHEDULE_OVERRIDE_RULES,
+  body_weight_entries: BODY_WEIGHT_ENTRY_RULES,
 };
 
 /**
@@ -699,6 +835,7 @@ export function validateBackupGraph(
   const routineIds = ids('workout_routines');
   const exerciseIds = ids('routine_exercises');
   const logIds = ids('workout_logs');
+  const customExerciseIds = ids('custom_exercises');
 
   // Habit completions: parent must exist (including tombstoned habits) and
   // (habit_id, date_key) must be unique.
@@ -731,6 +868,14 @@ export function validateBackupGraph(
   for (const row of rowsByEntity.routine_exercises ?? []) {
     if (typeof row.routine_id !== 'string' || !routineIds.has(row.routine_id)) {
       errors.push(`routine_exercises references missing routine: ${String(row.routine_id)}`);
+    }
+    if (typeof row.catalog_exercise_id === 'string') {
+      const isBuiltIn = /^builtin_[a-z0-9_]+$/.test(row.catalog_exercise_id);
+      if (!isBuiltIn && !customExerciseIds.has(row.catalog_exercise_id)) {
+        errors.push(
+          `routine_exercises references missing catalog exercise: ${row.catalog_exercise_id}`,
+        );
+      }
     }
   }
 
@@ -765,6 +910,41 @@ export function validateBackupGraph(
       errors.push(
         `workout_session_sets references missing session exercise: ${String(row.session_exercise_id)}`,
       );
+    }
+  }
+
+  // Gym V2 schedule relationships. Tombstoned routines/custom exercises are
+  // intentionally valid parents so historical plans and configuration remain
+  // restorable after an archive/delete.
+  for (const row of rowsByEntity.workout_weekly_plan ?? []) {
+    if (typeof row.routine_id === 'string' && !routineIds.has(row.routine_id)) {
+      errors.push(`workout_weekly_plan references missing routine: ${row.routine_id}`);
+    }
+  }
+  for (const row of rowsByEntity.workout_schedule_overrides ?? []) {
+    if (typeof row.routine_id === 'string' && !routineIds.has(row.routine_id)) {
+      errors.push(`workout_schedule_overrides references missing routine: ${row.routine_id}`);
+    }
+  }
+
+  const activeWeekdays = new Set<number>();
+  for (const row of rowsByEntity.workout_weekly_plan ?? []) {
+    if (row.deleted_at !== null && row.deleted_at !== undefined) continue;
+    if (typeof row.weekday === 'number') {
+      if (activeWeekdays.has(row.weekday)) {
+        errors.push(`workout_weekly_plan duplicate active weekday: ${row.weekday}`);
+      }
+      activeWeekdays.add(row.weekday);
+    }
+  }
+  const activeOverrideDates = new Set<string>();
+  for (const row of rowsByEntity.workout_schedule_overrides ?? []) {
+    if (row.deleted_at !== null && row.deleted_at !== undefined) continue;
+    if (typeof row.date_key === 'string') {
+      if (activeOverrideDates.has(row.date_key)) {
+        errors.push(`workout_schedule_overrides duplicate active date: ${row.date_key}`);
+      }
+      activeOverrideDates.add(row.date_key);
     }
   }
 

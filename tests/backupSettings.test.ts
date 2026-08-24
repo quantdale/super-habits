@@ -42,6 +42,7 @@ describe('recoverable settings allowlist', () => {
       pomodoroPresets: null,
       workoutRestSeconds: null,
       notificationPreferences: null,
+      workoutPreferences: null,
     });
   });
 
@@ -89,6 +90,7 @@ describe('recoverable settings allowlist', () => {
       pomodoroPresets: null,
       workoutRestSeconds: null,
       notificationPreferences: null,
+      workoutPreferences: null,
     });
   });
 

@@ -34,6 +34,11 @@ simulation/
   README.md
 ```
 
+The deterministic fixture seeders include a compact Gym V2 slice: a catalog-backed
+routine prescription, a custom exercise, a weekly-plan row, and a body-weight
+measurement. This keeps the simulation/introspection lane exercising the new
+recoverable Workout entities without importing a large external exercise dataset.
+
 ## Lane matrix (authoritative: `simulation/matrix.ts`)
 
 The execution lanes as configured in `simulation/matrix.ts` (task 9.1) — this

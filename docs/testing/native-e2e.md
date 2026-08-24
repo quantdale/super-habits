@@ -39,6 +39,13 @@ the Android API-36 navigation-bar boundary.
 | `pomodoro-lifecycle.yaml`               | `native`, `lifecycle`, `pomodoro`                                 | Start, background, foreground, and reset a running timer                                 |
 | `pomodoro-notification-path.yaml`       | `native`, `lifecycle`, `notifications`, `pomodoro`                | Grant notification permission, start native timer scheduling path, background/foreground |
 
+Gym V2 keeps the native routine-builder path covered by the Workout persistence
+flow (including the legacy free-text compatibility path). The deeper catalog,
+prescription, weekly-plan, guided-modality, progression, and body-weight journey
+is deterministic web coverage in `e2e/workout-gym-v2.spec.ts`; native execution
+must use a built `e2e-test` APK and should be recorded separately rather than
+being inferred from web results.
+
 Run the workspace directly when Maestro is installed:
 
 ```bash

@@ -735,6 +735,164 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       await addColumnIfMissing(db, 'daily_plans', 'top_todo_titles', 'TEXT');
     });
   }
+
+  // Migration 22: Gym / Training V2 durable model.
+  // Existing workout rows remain valid: missing catalog identity/modality is
+  // interpreted by the feature as legacy free-text/timed configuration. New
+  // user-owned tables are soft-deletable and enter the normal backup outbox.
+  if (version < 22) {
+    await applyMigration(db, 22, async () => {
+      await addColumnIfMissing(db, 'workout_routines', 'goal_tag', 'TEXT');
+
+      await addColumnIfMissing(db, 'routine_exercises', 'catalog_exercise_id', 'TEXT');
+      await addColumnIfMissing(
+        db,
+        'routine_exercises',
+        'modality',
+        "TEXT NOT NULL DEFAULT 'timed'",
+      );
+      await addColumnIfMissing(db, 'routine_exercises', 'notes', 'TEXT');
+      await addColumnIfMissing(db, 'routine_exercises', 'superset_group', 'TEXT');
+      await addColumnIfMissing(
+        db,
+        'routine_exercises',
+        'progression_mode',
+        "TEXT NOT NULL DEFAULT 'none'",
+      );
+      await addColumnIfMissing(db, 'routine_exercises', 'progression_increment', 'REAL');
+      await addColumnIfMissing(db, 'routine_exercises', 'progression_min_reps', 'INTEGER');
+      await addColumnIfMissing(db, 'routine_exercises', 'progression_max_reps', 'INTEGER');
+
+      await addColumnIfMissing(db, 'routine_exercise_sets', 'target_reps_min', 'INTEGER');
+      await addColumnIfMissing(db, 'routine_exercise_sets', 'target_reps_max', 'INTEGER');
+      await addColumnIfMissing(db, 'routine_exercise_sets', 'target_load', 'REAL');
+      await addColumnIfMissing(db, 'routine_exercise_sets', 'target_duration_seconds', 'INTEGER');
+      await addColumnIfMissing(db, 'routine_exercise_sets', 'target_distance', 'REAL');
+      await addColumnIfMissing(db, 'routine_exercise_sets', 'target_pace', 'REAL');
+
+      await addColumnIfMissing(db, 'workout_logs', 'routine_name', 'TEXT');
+      await addColumnIfMissing(db, 'workout_session_exercises', 'catalog_exercise_id', 'TEXT');
+      await addColumnIfMissing(
+        db,
+        'workout_session_exercises',
+        'modality',
+        "TEXT NOT NULL DEFAULT 'timed'",
+      );
+      await addColumnIfMissing(db, 'workout_session_sets', 'duration_seconds', 'INTEGER');
+      await addColumnIfMissing(db, 'workout_session_sets', 'distance', 'REAL');
+      await addColumnIfMissing(db, 'workout_session_sets', 'pace', 'REAL');
+      await addColumnIfMissing(db, 'workout_session_sets', 'effort_value', 'REAL');
+      await addColumnIfMissing(db, 'workout_session_sets', 'effort_scale', 'TEXT');
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS custom_exercises (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          primary_area TEXT NOT NULL,
+          secondary_areas TEXT NOT NULL DEFAULT '[]',
+          equipment TEXT,
+          modality TEXT NOT NULL,
+          unilateral INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_custom_exercises_active_name
+          ON custom_exercises (name, updated_at);
+
+        CREATE TABLE IF NOT EXISTS workout_weekly_plan (
+          id TEXT PRIMARY KEY NOT NULL,
+          weekday INTEGER NOT NULL,
+          routine_id TEXT,
+          plan_kind TEXT NOT NULL DEFAULT 'rest',
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_weekly_plan_active_weekday
+          ON workout_weekly_plan (weekday) WHERE deleted_at IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_workout_weekly_plan_routine
+          ON workout_weekly_plan (routine_id, weekday);
+
+        CREATE TABLE IF NOT EXISTS workout_schedule_overrides (
+          id TEXT PRIMARY KEY NOT NULL,
+          date_key TEXT NOT NULL,
+          override_kind TEXT NOT NULL DEFAULT 'rest',
+          routine_id TEXT,
+          moved_from_date_key TEXT,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_workout_schedule_overrides_active_date
+          ON workout_schedule_overrides (date_key) WHERE deleted_at IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_workout_schedule_overrides_date
+          ON workout_schedule_overrides (date_key, updated_at);
+
+        CREATE TABLE IF NOT EXISTS body_weight_entries (
+          id TEXT PRIMARY KEY NOT NULL,
+          measured_on TEXT NOT NULL,
+          measured_at TEXT NOT NULL,
+          weight REAL NOT NULL,
+          unit TEXT NOT NULL,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_body_weight_entries_measured_at
+          ON body_weight_entries (measured_at, id);
+        CREATE INDEX IF NOT EXISTS idx_body_weight_entries_measured_on
+          ON body_weight_entries (measured_on, id);
+      `);
+    });
+  }
+
+  // Migration 23: Gym / Training V2 semantic snapshots.
+  // The prior migration introduced identity and modality, but routine and
+  // historical session rows still had to infer unilateral and external-load
+  // meaning from the current catalog. These nullable/default-compatible
+  // columns snapshot that meaning without rewriting legacy measurements.
+  // Custom aliases/instructions remain user-owned recoverable metadata; the
+  // bundled catalog stays static application source.
+  if (version < 23) {
+    await applyMigration(db, 23, async () => {
+      await addColumnIfMissing(db, 'routine_exercises', 'unilateral', 'INTEGER NOT NULL DEFAULT 0');
+      await addColumnIfMissing(
+        db,
+        'routine_exercises',
+        'supports_external_load',
+        'INTEGER NOT NULL DEFAULT 1',
+      );
+      await addColumnIfMissing(
+        db,
+        'workout_session_exercises',
+        'unilateral',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await addColumnIfMissing(
+        db,
+        'workout_session_exercises',
+        'supports_external_load',
+        'INTEGER NOT NULL DEFAULT 1',
+      );
+      await addColumnIfMissing(db, 'custom_exercises', 'aliases', "TEXT NOT NULL DEFAULT '[]'");
+      await addColumnIfMissing(db, 'custom_exercises', 'instructions', 'TEXT');
+      await addColumnIfMissing(
+        db,
+        'custom_exercises',
+        'supports_external_load',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execAsync(
+        `CREATE INDEX IF NOT EXISTS idx_custom_exercises_active_search
+         ON custom_exercises (name COLLATE NOCASE, primary_area, equipment, updated_at);`,
+      );
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

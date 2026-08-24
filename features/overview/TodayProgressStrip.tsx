@@ -45,7 +45,11 @@ export function TodayProgressStrip({
 
   const focusMinutesToday =
     focus.perDayMinutes.find((day) => day.dateKey === todayKey)?.minutes ?? 0;
-  const workoutDoneToday = workout.lastWorkoutDateKey === todayKey;
+  const workoutState =
+    workout.todayState ?? (workout.lastWorkoutDateKey === todayKey ? 'completed' : undefined);
+  const workoutDoneToday = workoutState === 'completed';
+  const workoutResumable = workoutState === 'resumable';
+  const workoutPlanned = workoutState === 'planned';
   // Current-day semantics: the Tasks fraction counts today's completions
   // against today's actionable set (due today + overdue), not the whole open
   // backlog — an undated someday task is not part of "today".
@@ -83,17 +87,25 @@ export function TodayProgressStrip({
     },
     {
       id: 'workout',
-      value: workoutDoneToday
-        ? 'Done'
-        : workout.sessionsThisWeek > 0
-          ? `${workout.sessionsThisWeek}/wk`
-          : '—',
+      value: workoutResumable
+        ? 'Resume'
+        : workoutDoneToday
+          ? 'Done'
+          : workoutPlanned
+            ? 'Planned'
+            : workout.sessionsThisWeek > 0
+              ? `${workout.sessionsThisWeek}/wk`
+              : '—',
       label: 'Workout',
-      spoken: workoutDoneToday
-        ? 'Workout done today'
-        : workout.sessionsThisWeek > 0
-          ? `Workout: ${workout.sessionsThisWeek} sessions this week`
-          : 'Workout: none this week',
+      spoken: workoutResumable
+        ? 'Workout in progress and ready to resume'
+        : workoutDoneToday
+          ? 'Workout done today'
+          : workoutPlanned
+            ? `Workout planned today${workout.plannedWorkoutName ? `: ${workout.plannedWorkoutName}` : ''}`
+            : workout.sessionsThisWeek > 0
+              ? `Workout: ${workout.sessionsThisWeek} sessions this week`
+              : 'Workout: none this week',
     },
     {
       id: 'calories',

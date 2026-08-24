@@ -18,6 +18,10 @@ const backupTables = [
   'linked_action_rules',
   'user_backup_settings',
   'backup_manifest',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
 ];
 
 const failures = [];
@@ -60,6 +64,12 @@ const v2MigrationName = migrationNames.find((name) =>
 const remediationMigrationName = migrationNames.find((name) =>
   /_backup_v2_closure_remediation\.sql$/.test(name),
 );
+const gymMigrationName = migrationNames.find((name) =>
+  /_add_gym_training_v2_backup_scope\.sql$/.test(name),
+);
+const deepGymMigrationName = migrationNames.find((name) =>
+  /_add_gym_workout_deep_expansion\.sql$/.test(name),
+);
 if (!ownershipMigrationName) {
   failures.push('missing secure sync ownership migration');
 }
@@ -69,6 +79,8 @@ if (!v2MigrationName) {
 if (!remediationMigrationName) {
   failures.push('missing backup v2 closure remediation migration');
 }
+if (!gymMigrationName) failures.push('missing Gym V2 backup scope migration');
+if (!deepGymMigrationName) failures.push('missing Gym Workout V2 deep expansion migration');
 if (migrationNames.join('\n') !== [...migrationNames].sort().join('\n')) {
   failures.push('migration filenames are not lexically ordered');
 }
@@ -81,6 +93,10 @@ const ownership = ownershipMigrationName
 const v2Migration = v2MigrationName ? read(`supabase/migrations/${v2MigrationName}`) : '';
 const remediationMigration = remediationMigrationName
   ? read(`supabase/migrations/${remediationMigrationName}`)
+  : '';
+const gymMigration = gymMigrationName ? read(`supabase/migrations/${gymMigrationName}`) : '';
+const deepGymMigration = deepGymMigrationName
+  ? read(`supabase/migrations/${deepGymMigrationName}`)
   : '';
 const fixture = read('simulation/backend/schema.sql');
 const config = read('supabase/config.toml');
@@ -118,42 +134,50 @@ for (const table of syncTables) {
 requireText('ownership UUID owner column migration', ownership, /ADD COLUMN user_id UUID/i);
 
 for (const table of backupTables) {
+  const tableMigration = [
+    'custom_exercises',
+    'workout_weekly_plan',
+    'workout_schedule_overrides',
+    'body_weight_entries',
+  ].includes(table)
+    ? gymMigration
+    : v2Migration;
   requireText(
-    `v2 migration ${table}`,
-    v2Migration,
+    `backup migration ${table}`,
+    tableMigration,
     new RegExp(`CREATE TABLE public\\.${table}\\b`),
   );
   requireText(
-    `v2 migration ${table} RLS`,
-    v2Migration,
+    `backup migration ${table} RLS`,
+    tableMigration,
     new RegExp(`ALTER TABLE public\\.${table} ENABLE ROW LEVEL SECURITY`),
   );
   requireText(
-    `v2 migration ${table} owner FK`,
-    v2Migration,
+    `backup migration ${table} owner FK`,
+    tableMigration,
     new RegExp(
       `user_id UUID NOT NULL DEFAULT auth\\.uid\\(\\) REFERENCES auth\\.users\\(id\\) ON DELETE CASCADE`,
     ),
   );
   requireText(
-    `v2 migration ${table} owner predicate`,
-    v2Migration,
+    `backup migration ${table} owner predicate`,
+    tableMigration,
     new RegExp(
       `CREATE POLICY sync_${table}_[a-z]+_owner ON public\\.${table}[\\s\\S]*?\\(\\s*select\\s+auth\\.uid\\(\\)\\s*\\)\\s*=\\s*user_id`,
       'i',
     ),
   );
   requireText(
-    `v2 migration ${table} update USING`,
-    v2Migration,
+    `backup migration ${table} update USING`,
+    tableMigration,
     new RegExp(
       `CREATE POLICY sync_${table}_update_owner[\\s\\S]*?USING \\([\\s\\S]*?auth\\.uid\\(\\)[\\s\\S]*?user_id`,
       'i',
     ),
   );
   requireText(
-    `v2 migration ${table} update WITH CHECK`,
-    v2Migration,
+    `backup migration ${table} update WITH CHECK`,
+    tableMigration,
     new RegExp(
       `CREATE POLICY sync_${table}_update_owner[\\s\\S]*?WITH CHECK \\([\\s\\S]*?auth\\.uid\\(\\)[\\s\\S]*?user_id`,
       'i',
@@ -162,8 +186,8 @@ for (const table of backupTables) {
   for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
     const suffix = operation.toLowerCase();
     requireText(
-      `v2 migration ${table} ${operation} policy`,
-      v2Migration,
+      `backup migration ${table} ${operation} policy`,
+      tableMigration,
       new RegExp(
         `CREATE POLICY sync_${table}_${suffix}_owner ON public\\.${table}[\\s\\S]*?FOR ${operation} TO authenticated`,
         'i',
@@ -176,7 +200,11 @@ for (const table of backupTables) {
     new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}\\b`),
   );
   requireText(`fixture ${table}.user_id`, fixture, /user_id\s+UUID/i);
-  requireText(`v2 migration ${table} no anon grant`, v2Migration, /^(?![\s\S]*\bTO\s+anon\b)/i);
+  requireText(
+    `backup migration ${table} no anon grant`,
+    tableMigration,
+    /^(?![\s\S]*\bTO\s+anon\b)/i,
+  );
 }
 
 const backupOwnerIndexTables = [
@@ -188,9 +216,21 @@ const backupOwnerIndexTables = [
   'workout_session_exercises',
   'saved_meals',
   'linked_action_rules',
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
 ];
 for (const table of backupOwnerIndexTables) {
-  requireText(`v2 migration ${table} owner index`, v2Migration, new RegExp(`idx_${table}_user_id`));
+  const tableMigration = [
+    'custom_exercises',
+    'workout_weekly_plan',
+    'workout_schedule_overrides',
+    'body_weight_entries',
+  ].includes(table)
+    ? gymMigration
+    : v2Migration;
+  requireText(`backup migration ${table} owner index`, tableMigration, new RegExp(`idx_${table}`));
 }
 
 // ---- Backup V2 closure remediation contract ----
@@ -739,6 +779,87 @@ req(
   "ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'",
 );
 
+// Gym V2 scope-6 parity: additive workout prescription/session columns and
+// the four new owner-scoped user-data tables.
+const gymExtendedColumns = {
+  workout_routines: ['goal_tag'],
+  routine_exercises: [
+    'catalog_exercise_id',
+    'modality',
+    'notes',
+    'superset_group',
+    'progression_mode',
+    'progression_increment',
+    'progression_min_reps',
+    'progression_max_reps',
+  ],
+  routine_exercise_sets: [
+    'target_reps_min',
+    'target_reps_max',
+    'target_load',
+    'target_duration_seconds',
+    'target_distance',
+    'target_pace',
+  ],
+  workout_logs: ['routine_name'],
+  workout_session_exercises: ['catalog_exercise_id', 'modality'],
+  workout_session_sets: ['duration_seconds', 'distance', 'pace', 'effort_value', 'effort_scale'],
+};
+for (const [table, columns] of Object.entries(gymExtendedColumns)) {
+  for (const column of columns) {
+    req(`Gym V2 migration ${table}.${column}`, gymMigration, column);
+    req(`Gym V2 fixture ${table}.${column}`, fixture, column);
+  }
+}
+for (const table of [
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
+]) {
+  req(`Gym V2 migration ${table} table`, gymMigration, `CREATE TABLE public.${table} (`);
+  req(
+    `Gym V2 migration ${table} RLS`,
+    gymMigration,
+    `ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`,
+  );
+  req(`Gym V2 fixture ${table} table`, fixture, `CREATE TABLE IF NOT EXISTS public.${table} (`);
+  req(
+    `Gym V2 fixture ${table} RLS`,
+    fixture,
+    `ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`,
+  );
+  for (const operation of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+    const suffix = operation.toLowerCase();
+    req(
+      `Gym V2 migration ${table} ${operation} policy`,
+      gymMigration,
+      `CREATE POLICY sync_${table}_${suffix}_owner ON public.${table}`,
+    );
+    req(
+      `Gym V2 fixture ${table} ${operation} policy`,
+      fixture,
+      `CREATE POLICY "sync_${table}_${suffix}_owner" ON public.${table}`,
+    );
+  }
+}
+req('Gym V2 migration no anon policy', gymMigration, 'FROM anon, PUBLIC');
+reqAbsent('Gym V2 migration no USING true', gymMigration, 'USING (true)');
+
+// Gym Workout V2 deep-expansion parity: migration 23/scope 7 metadata must
+// exist in the production ALTER migration and in the disposable fixture.
+const deepGymColumns = {
+  routine_exercises: ['unilateral', 'supports_external_load'],
+  workout_session_exercises: ['unilateral', 'supports_external_load'],
+  custom_exercises: ['aliases', 'instructions', 'supports_external_load'],
+};
+for (const [table, columns] of Object.entries(deepGymColumns)) {
+  for (const column of columns) {
+    req(`Gym Workout V2 deep migration ${table}.${column}`, deepGymMigration, column);
+    req(`Gym Workout V2 fixture ${table}.${column}`, fixture, column);
+  }
+}
+
 // Daily-plan priority title snapshots (local counterpart: SQLite migration 21).
 // Strictly additive nullable column; legacy rows and pre-v21 backups stay valid.
 const titleSnapshotsMigrationName = migrationNames.find((name) =>
@@ -883,7 +1004,7 @@ if (failures.length > 0) {
   console.log(
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
       `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
-      'planning + weekly_reviews + workout_session_sets scope-V5 closure; ' +
+      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 closure; ' +
       'private AI quota RPC).',
   );
 }

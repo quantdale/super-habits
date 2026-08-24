@@ -313,12 +313,22 @@ export type WorkoutSummary = {
   sessionsThisWeek: number;
   lastWorkoutName: string | null;
   lastWorkoutDateKey: string | null;
+  todayState?: WorkoutTodayState;
+  plannedWorkoutName?: string | null;
+};
+
+export type WorkoutTodayState = 'planned' | 'resumable' | 'completed' | 'rest' | 'unplanned';
+
+export type WorkoutTodayContext = {
+  state: WorkoutTodayState;
+  plannedWorkoutName: string | null;
 };
 
 export function shapeWorkoutSummary(
   logs: readonly { created_at?: string; date_key?: string; routine_id?: string }[],
   routineNames: ReadonlyMap<string, string>,
   weekDateKeys: readonly string[],
+  today?: WorkoutTodayContext,
 ): WorkoutSummary {
   const weekKeys = new Set(weekDateKeys);
   const inWeek = logs.filter((log) => {
@@ -333,11 +343,16 @@ export function shapeWorkoutSummary(
     }))
     .filter((entry): entry is { key: string; name: string | null } => entry.key !== null)
     .sort((a, b) => b.key.localeCompare(a.key))[0];
-  return {
+  const summary: WorkoutSummary = {
     sessionsThisWeek: inWeek.length,
     lastWorkoutName: last?.name ?? null,
     lastWorkoutDateKey: last?.key ?? null,
   };
+  if (today) {
+    summary.todayState = today.state;
+    summary.plannedWorkoutName = today.plannedWorkoutName;
+  }
+  return summary;
 }
 
 export type CaloriesSummary = {
@@ -522,7 +537,7 @@ export type NextBestActionInput = {
   focus: Pick<FocusWeekSummary, 'sessionCount' | 'perDayMinutes'>;
   /** True when a Pomodoro timer intent exists for today (running/pausable). */
   focusTimerActive: boolean;
-  workout: Pick<WorkoutSummary, 'lastWorkoutDateKey'>;
+  workout: Pick<WorkoutSummary, 'lastWorkoutDateKey' | 'todayState' | 'plannedWorkoutName'>;
   /** Saved routines count — a routine counts as the user's planned workout. */
   workoutRoutineCount: number;
   calories: Pick<CaloriesSummary, 'consumed'>;
@@ -590,8 +605,29 @@ export function pickNextBestAction(input: NextBestActionInput): NextBestAction |
     };
   }
 
-  // 5. Planned-but-not-started workout today (routines exist, none logged today).
-  if (input.workoutRoutineCount > 0 && input.workout.lastWorkoutDateKey !== todayKey) {
+  // 5. Workout state is schedule-aware when available. Keep the routine-count
+  // fallback for callers and historical tests that predate the weekly plan.
+  if (input.workout.todayState === 'resumable') {
+    return {
+      sectionKey: 'workout',
+      title: "Resume today's workout",
+      reason: 'Workout in progress',
+    };
+  }
+  if (input.workout.todayState === 'planned') {
+    return {
+      sectionKey: 'workout',
+      title: input.workout.plannedWorkoutName
+        ? `Start ${input.workout.plannedWorkoutName}`
+        : "Start today's workout",
+      reason: 'Planned for today',
+    };
+  }
+  if (
+    input.workout.todayState === undefined &&
+    input.workoutRoutineCount > 0 &&
+    input.workout.lastWorkoutDateKey !== todayKey
+  ) {
     return {
       sectionKey: 'workout',
       title: "Start today's workout",

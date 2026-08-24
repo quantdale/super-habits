@@ -14,7 +14,9 @@ export function WorkoutCard({ summary, loading }: { summary: WorkoutSummary; loa
       meta={OVERVIEW_CARD_META.workout}
       loading={loading}
       empty={
-        summary.sessionsThisWeek === 0 && summary.lastWorkoutDateKey === null ? (
+        summary.sessionsThisWeek === 0 &&
+        summary.lastWorkoutDateKey === null &&
+        (summary.todayState === undefined || summary.todayState === 'unplanned') ? (
           <CardEmptyMessage
             title="No workouts yet"
             description="Log a session to see your week here."
@@ -38,6 +40,23 @@ export function WorkoutCard({ summary, loading }: { summary: WorkoutSummary; loa
         ) : summary.lastWorkoutDateKey ? (
           <Text className="text-sm" style={{ color: tokens.textMuted }}>
             Last session: {summary.lastWorkoutDateKey}
+          </Text>
+        ) : null}
+        {summary.todayState === 'resumable' ? (
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Workout in progress · ready to resume
+          </Text>
+        ) : summary.todayState === 'planned' ? (
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Today: {summary.plannedWorkoutName ?? 'planned workout'}
+          </Text>
+        ) : summary.todayState === 'completed' ? (
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Completed today
+          </Text>
+        ) : summary.todayState === 'rest' ? (
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+            Rest day today
           </Text>
         ) : null}
       </View>
