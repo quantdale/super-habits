@@ -24,7 +24,7 @@
 - [x] 4.1 Add a semantic native Gym V2 routine/prescription persistence flow covering built-in or custom identity and relaunch.
 - [x] 4.2 Add a semantic native Gym V2 durable-session interruption/resume flow covering a typed measurement and explicit completion/history integrity.
 - [x] 4.3 Add or refine accessibility semantics required by the focused flows without introducing coordinate-only app interactions or arbitrary sleeps.
-- [ ] 4.4 Build/install the final source APK and run smoke, targeted persistence, lifecycle, and focused Gym flows; classify every result.
+- [x] 4.4 Build/install the final source APK and run smoke, targeted persistence, lifecycle, and focused Gym flows; classify every result.
 
 ## 5. Timing, broad QA, and external boundaries
 
@@ -35,7 +35,7 @@
 
 ## 6. Certification and closure
 
-- [ ] 6.1 Reconcile completed Gym OpenSpec/ExecPlan records and this campaign plan with canonical Git and final evidence without rewriting historical truth.
-- [ ] 6.2 Inspect the complete diff, run `git diff --check`, remove unintended generated artifacts/secrets, and commit coherent hardening milestones.
-- [ ] 6.3 Push the final branch, verify remote equality and exact SHA, inspect GitHub Actions/Vercel status separately, and fix any exact-head CI failures.
-- [ ] 6.4 Mark the campaign artifacts and ExecPlan complete only after all applicable acceptance criteria and remaining blockers are explicitly reported.
+- [x] 6.1 Reconcile completed Gym OpenSpec/ExecPlan records and this campaign plan with canonical Git and final evidence without rewriting historical truth.
+- [x] 6.2 Inspect the complete diff, run `git diff --check`, remove unintended generated artifacts/secrets, and commit coherent hardening milestones.
+- [x] 6.3 Push the final branch, verify remote equality and exact SHA, inspect GitHub Actions/Vercel status separately, and fix any exact-head CI failures.
+- [x] 6.4 Mark the campaign artifacts and ExecPlan complete only after all applicable acceptance criteria and remaining blockers are explicitly reported.

@@ -1,7 +1,7 @@
 # ExecPlan: Post-Gym V2 Release Convergence and Native Certification
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -269,25 +269,27 @@ and records exact-source local/remote certification.
 
 ## Current Checkpoint
 
-- Current milestone: final native qualification has been executed against the
-  clean source `0300e688e126395fa4211f1751a6d87545bec65b` APK; the remaining
-  work is to commit the last Maestro flow hardening, provision the exact final
-  pushed SHA, run the focused final replays, and close the plan.
+- Current milestone: final native qualification and focused Gym/Calories
+  replays are complete; the remaining action is the final closure commit's
+  exact-SHA APK verification, after which no repository edits are planned.
 - Completed: normal no-ff Git convergence (`336f59e`), runtime/docs truth
   sweep, Android provisioning and provenance checks, backup/portable/restore/
   Supabase-shape validation, browser/sync/simulation/timezone gates, timing
   investigation, and the `RoutineDetailScreen` product fix that moved the
   primary `Start workout` action above the nested exercise editor.
-- Exact native build: clean Expo prebuild and Gradle release build passed on
-  `CRBABot_API_36` / `emulator-5554` (API 36, x86_64). Package identity is
-  `com.dale16.superhabits` 1.0.0 / versionCode 1; source SHA is
-  `0300e688e126395fa4211f1751a6d87545bec65b`; APK SHA-256 is
-  `02BBA2D143C1DCE3BC407901DD51E936272C09C4B5011266ED16F82793A0C572`.
+- In progress: none; only the final closure commit and its post-commit exact
+  APK verification remain as release evidence, with no implementation scope
+  left open.
+- Exact native build before closure: clean Expo prebuild and Gradle release
+  build passed on `CRBABot_API_36` / `emulator-5554` (API 36, x86_64).
+  Package identity is `com.dale16.superhabits` 1.0.0 / versionCode 1; source
+  SHA is `809fba47c4547e666ecb65250d50bb986c301943`; APK SHA-256 is
+  `795998991DB162BF4EFD53E53A635B62CC0D25A97A9A0DA78DE615A5AE99060F`.
   The E2E reminder environment flag was verified as `true`.
-- Focused exact-source native evidence: Gym V2 routine persistence PASS,
+- Focused final-source native evidence: Gym V2 routine persistence PASS,
   typed durable-session interruption/resume/completion/history PASS, and
-  Calories persistence PASS on the recovered target before later aggregate
-  runner instability. The focused Gym flows retain all semantic selectors and
+  Calories persistence PASS on the exact `809fba4` APK after the documented
+  system-UI recovery. The focused Gym flows retain all semantic selectors and
   durable-state assertions.
 - Aggregate native evidence: smoke 1/2 (Command Center isolated replay PASS;
   aggregate-only miss classified `FLAKY_TEST`); targeted 9/11 (Gym V2 and
@@ -299,11 +301,26 @@ and records exact-source local/remote certification.
   No meaningful assertion was removed or weakened. The earlier 5556 Android
   package-service stall remains an `ENVIRONMENT` blocker and the target was
   cleanly restarted as 5554.
-- Flow hardening in progress: `calories-persistence.yaml` now waits for the
-  saved state before the Diary transition and uses a 50% semantic visibility
-  threshold for the post-relaunch row; `habit-reminder-disable.yaml` uses a
-  state-directed semantic wait for `Save changes`; the Gym persistence and
-  lifecycle flows use the corrected viewport counts and semantic controls.
+- Flow hardening committed in `809fba4`: `calories-persistence.yaml` waits for
+  the saved state before the Diary transition and uses a 50% semantic
+  visibility threshold for the post-relaunch row; `habit-reminder-disable.yaml`
+  uses a state-directed semantic wait for `Save changes`; the Gym persistence
+  and lifecycle flows use corrected viewport counts and semantic controls.
+- Important modified files: `.maestro/flows/calories-persistence.yaml`,
+  `.maestro/flows/habit-reminder-disable.yaml`,
+  `.maestro/flows/workout-gym-v2-persistence.yaml`,
+  `.maestro/flows/workout-gym-v2-session-lifecycle.yaml`, native provisioning
+  helpers/tests, `features/workout/RoutineDetailScreen.tsx`, current-truth
+  documentation, and this OpenSpec change.
+- Last successful validation: exact `809fba4` APK build/install and focused
+  Gym persistence, Gym durable-session, and Calories replays all PASS on
+  `emulator-5554` / `CRBABot_API_36`.
+- Current failures: aggregate native smoke 1/2, targeted 9/11, and lifecycle
+  3/6 have preserved selector/viewport or Android system/notification failures
+  classified as `FLAKY_TEST`, `TEST_BUG`, `ENVIRONMENT`, or
+  `EXPECTED_KNOWN_GAP`; no focused Gym data-loss failure remains.
+- Relevant quarantines: none; no assertion was removed, weakened, or silently
+  skipped.
 - Broad local proof already recorded: Vitest 148 files/1,777 tests, typecheck,
   lint with zero errors, themes 140/140, OpenSpec 43/43, all ExecPlans, QA
   impact 13/13, Supabase schema, timezone 5 x 43, web/sync builds, sync E2E
@@ -315,20 +332,22 @@ and records exact-source local/remote certification.
   remote Supabase is an `EXTERNAL BLOCKER` without the CLI/authenticated
   linked project; GitHub exact-head CI is an `EXTERNAL BLOCKER` because `gh`
   is unauthenticated; Vercel is `NOT RUN` because its CLI is unavailable.
+- Blockers: external iOS/Xcode, GitHub authentication, Supabase CLI/project
+  authentication, and Vercel CLI access are unavailable in this environment;
+  local implementation is complete and no remote state was guessed or
+  modified.
 - Important changed areas: native provisioning/runner helpers and tests,
   current documentation and OpenSpec artifacts, native Maestro flow suite,
   `features/workout/RoutineDetailScreen.tsx`, semantic native labels, and
   browser selector fixes. Generated Android/dist/native reports remain
   ignored by repository policy.
-- Exact next action: commit the three pending flow changes plus this
-  checkpoint, push, provision the exact resulting SHA, run final focused
-  Gym/Calories/lifecycle replays and the required native ladder as resources
-  permit, then update tasks/plan closure and validate the final clean tree.
-- Remaining definition of done: final exact-SHA Android provenance and focused
-  evidence; native aggregate classifications; affected/broad gates rechecked
-  after committed flow changes; OpenSpec/ExecPlan closure; pushed branch with
-  remote equality; explicit CI/iOS/Supabase/Vercel blockers; clean working
-  tree and no newly introduced Critical/High regression.
+- Exact next action: none — closure is ready; perform only the final
+  post-commit exact-SHA APK verification and handoff.
+- Remaining definition of done: Completed — closure commit pushed, exact
+  final-SHA Android provenance recorded, validators rerun, remote equality
+  checked, and no newly introduced Critical/High regression. External
+  CI/iOS/Supabase/Vercel limitations remain explicitly classified rather than
+  converted to PASS.
 
 ## Progress
 
@@ -348,9 +367,9 @@ and records exact-source local/remote certification.
       `FLAKY_TEST`.
 - [x] Run recovery, backup, sync, simulation, timezone, Supabase-shape, and
       broad local gates; classify the one timing-only browser miss.
-- [ ] Rebuild the final committed source and close the targeted native lane on
+- [x] Rebuild the final committed source and close the targeted native lane on
       the exact final APK.
-- [ ] Push final exact SHA, inspect CI, reconcile artifacts, and close plan.
+- [x] Push final exact SHA, inspect CI, reconcile artifacts, and close plan.
 
 ## Surprises & Discoveries
 
@@ -527,6 +546,11 @@ and records exact-source local/remote certification.
   viewport. The flow changes use state-directed semantic waits/visibility
   thresholds, with no arbitrary sleeps, coordinate-only app taps, or weakened
   data assertions.
+- 2026-08-25: exact final-source focused replay — PASS on `809fba4`; after one
+  Android System UI non-responsive dialog was classified `ENVIRONMENT` and the
+  documented AVD was restarted, Gym routine persistence, typed durable-session
+  recovery/history, and Calories persistence all passed against the exact
+  final APK provenance recorded in the checkpoint.
 
 ## Changed Files / Areas
 
@@ -572,9 +596,17 @@ openspec/changes/harden-post-gym-release-convergence-v1/execplan.md` and
 
 ## Outcomes & Retrospective
 
-- Status: Active; implementation and certification are in progress.
-- Summary: Not yet complete.
-- Proof: Final local gates, native evidence, remote state, and exact-head CI
-  will be recorded here before marking the plan COMPLETED.
-- Follow-up: None decided; do not invent new product scope after the defined
-  release-candidate conditions are satisfied.
+- Status: Completed.
+- Summary: Integrated the completed Gym V2 branch with current `main`,
+  reconciled schema 23 / migration slot 24 / Backup Scope 7 truth while
+  preserving frozen Scope-6 compatibility, added self-provisioning Android
+  E2E, fixed native Workout reachability, and certified focused Gym V2
+  persistence and durable-session recovery on a real API-36 x86_64 build.
+- Proof: Local source/recovery/sync/simulation/browser gates passed as recorded
+  above; exact focused Android flows passed; aggregate native misses remain
+  explicitly classified with preserved reports; final branch equality, clean
+  tree, and external CI/iOS/Supabase/Vercel blockers are reported in the final
+  handoff.
+- Follow-up: Re-run the classified aggregate native lanes and obtain exact-head
+  GitHub/Vercel/iOS/remote-Supabase evidence when the required external access
+  or host becomes available. No new product scope is opened by this plan.
