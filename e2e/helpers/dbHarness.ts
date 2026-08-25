@@ -239,30 +239,24 @@ export async function installDbHarness(page: Page): Promise<void> {
 /** Unregister the app's service worker so page.route can intercept navigations. */
 export async function unregisterServiceWorker(page: Page): Promise<void> {
   try {
-    await page.evaluate(async () => {
+    const hadRegistration = await page.evaluate(async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((registration) => registration.unregister()));
+      return registrations.length > 0;
     });
+    if (!hadRegistration) return;
     await page.waitForFunction(
       async () => (await navigator.serviceWorker.getRegistrations()).length === 0,
       null,
       { timeout: 5_000 },
     );
-    // An unregistered worker can still control a same-origin document until it
-    // navigates. Move through the loopback alias when the local server permits
-    // it; this guarantees a new origin before the routed localhost harness
-    // navigation and avoids an intermittent SPA fallback after repeated
-    // service-worker registrations. `about:blank` remains the fallback for
-    // remote/custom E2E origins.
-    const escapeUrl = new URL(APP_BASE_URL);
-    if (escapeUrl.hostname === 'localhost' || escapeUrl.hostname === '127.0.0.1') {
-      escapeUrl.hostname = escapeUrl.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
-      escapeUrl.pathname = '/__sh__/e2e-escape';
-      escapeUrl.search = `?t=${Date.now()}`;
-      await page.goto(escapeUrl.href, { waitUntil: 'domcontentloaded' });
-    } else {
-      await page.goto('about:blank', { waitUntil: 'domcontentloaded' });
-    }
+    // An unregistered worker can still control the current document until it
+    // navigates. Leave the controlled document through about:blank before the
+    // routed harness/app navigation. Using a loopback alias here would create
+    // a new cross-origin renderer on every app ↔ harness cycle; long-running
+    // simulations perform hundreds of those cycles and can exhaust the host
+    // process budget before the application under test reaches its failure.
+    await page.goto('about:blank', { waitUntil: 'domcontentloaded' });
   } catch {
     // Page may already be gone or not service-worker-capable.
   }

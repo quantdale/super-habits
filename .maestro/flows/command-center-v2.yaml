@@ -23,7 +23,22 @@ tags:
     visible: 'Command input'
     timeout: 10000
 - tapOn: 'Use example: Add a todo to call mom tomorrow'
+# The command modal owns the outer ScrollView. Start in its lower blank area;
+# swipes beginning in the text field or example list are consumed by children.
+- swipe:
+    start: '5%, 88%'
+    end: '5%, 30%'
+    duration: 500
+- extendedWaitUntil:
+    visible: 'Parse command'
+    timeout: 10000
 - tapOn: 'Parse command'
+# Parsing appends the review card below the input card. Let Maestro wait for
+# the async result and scroll the now-overflowing modal to that card.
+- scrollUntilVisible:
+    element: 'Review before saving'
+    direction: UP
+    timeout: 20000
 - extendedWaitUntil:
     visible: 'Review before saving'
     timeout: 15000

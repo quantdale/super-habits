@@ -4,6 +4,7 @@ import {
   createHabitRule,
   serializeHabitLifecycleHistory,
 } from '@/features/habits/habits.domain';
+import { toDateKey } from '@/lib/time';
 import {
   buildMomentumGarden,
   buildMomentumSourceExplanations,
@@ -68,6 +69,14 @@ describe('buildMomentumWindow', () => {
   it('clamps a requested history to the supported bounded range', () => {
     expect(buildMomentumWindow(TODAY, 0).days).toHaveLength(1);
     expect(buildMomentumWindow(TODAY, 999).days).toHaveLength(28);
+  });
+
+  it('falls back safely when an injected today key is malformed', () => {
+    const window = buildMomentumWindow('2026-02-31', 3);
+
+    expect(window.todayKey).toBe(toDateKey());
+    expect(window.days).toHaveLength(3);
+    expect(window.endKey).toBe(window.todayKey);
   });
 });
 
@@ -274,5 +283,19 @@ describe('buildMomentumGarden', () => {
 
     expect(model.today.hasGrowth).toBe(false);
     expect(model.milestones).toEqual([]);
+  });
+
+  it('ignores malformed local date facts', () => {
+    const h = habit();
+    const model = buildMomentumGarden(
+      baseInput({
+        habits: [h],
+        habitCompletions: [{ habit_id: h.id, date_key: '2026-99-99', count: 1 }],
+        nutrition: [{ consumed_on: 'not-a-date' }],
+      }),
+    );
+
+    expect(model.activeDays).toBe(0);
+    expect(model.today.activeSources).toEqual([]);
   });
 });

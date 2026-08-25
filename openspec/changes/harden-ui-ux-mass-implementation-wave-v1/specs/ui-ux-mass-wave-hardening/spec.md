@@ -146,7 +146,8 @@ And unresolved requirements are not silently marked complete.
 
 ### Requirement: Full regression and exact-head CI are mandatory
 
-The implementation-only wave's typecheck/lint evidence is insufficient for production readiness.
+The implementation-only wave's typecheck/lint evidence MUST be supplemented
+before production readiness is claimed.
 
 #### Scenario: Final candidate is ready
 

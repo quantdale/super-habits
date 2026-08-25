@@ -309,6 +309,11 @@ helper or a runner-owned interaction (the full mapping is documented in
 `simulation/runner/execute.ts`). It is wired to the behavior engine
 (`simulation/behavior/`, task 2): think times and injections come from
 `buildRunPlan`, so a fixed seed replays a run bit-for-bit at the action level.
+The executor blocks service workers in its private browser contexts. This lane
+qualifies app behavior and SQLite persistence; PWA service-worker lifecycle is
+covered by the dedicated infrastructure and `pwa` Playwright projects. Keeping
+workers out of the repeated DB-harness round trips prevents Chromium renderer
+retention during long-history runs.
 
 ```
 simulation/runner/   execute.ts (scenario executor), actions.ts (step resolution),

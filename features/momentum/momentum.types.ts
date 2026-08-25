@@ -41,6 +41,7 @@ export const MOMENTUM_LIMITS = {
   planningCompletionsPerDay: 1,
   reviewCompletionsPerDay: 1,
   queryRowsPerTimestampSource: 500,
+  queryRowsPerHabitSource: 500,
   queryRowsPerHabitCompletionSource: 1_000,
 } as const;
 

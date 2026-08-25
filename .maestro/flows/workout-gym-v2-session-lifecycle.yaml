@@ -18,7 +18,9 @@ tags:
     text: 'Workout'
     index: 0
 - swipe:
-    direction: UP
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
 - scrollUntilVisible:
     element: 'Routine name'
     direction: DOWN
@@ -26,6 +28,10 @@ tags:
 - tapOn: 'Routine name'
 - inputText: 'Native Gym V2 resume routine'
 - hideKeyboard
+- swipe:
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
 - scrollUntilVisible:
     element: 'Add routine'
     direction: DOWN
@@ -55,9 +61,11 @@ tags:
 - inputText: 'chest'
 - hideKeyboard
 - scrollUntilVisible:
-    element: 'Equipment'
+    element: 'Search aliases (comma separated)'
     direction: DOWN
-- tapOn: 'Equipment'
+- tapOn:
+    text: 'Equipment'
+    index: 1
 - inputText: 'barbell'
 - hideKeyboard
 - scrollUntilVisible:
@@ -73,12 +81,18 @@ tags:
 - inputText: 'Brace and press with a controlled descent'
 - hideKeyboard
 - swipe:
-    direction: UP
-- swipe:
-    direction: UP
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
+- scrollUntilVisible:
+    element: 'Create and add'
+    direction: DOWN
 - tapOn: 'Create and add'
+- scrollUntilVisible:
+    element: 'Configure Native resume press exercise'
+    direction: UP
 - extendedWaitUntil:
-    visible: 'Native resume press'
+    visible: 'Configure Native resume press exercise'
     timeout: 10000
 - tapOn: 'Start workout'
 - extendedWaitUntil:
@@ -123,6 +137,8 @@ tags:
     visible: 'Workout saved'
     timeout: 15000
 - tapOn: 'Done'
+- swipe:
+    direction: UP
 - swipe:
     direction: UP
 - swipe:

@@ -71,6 +71,15 @@ test.describe('Momentum Garden', () => {
     await expect(page.getByText('Workout', { exact: true }).last()).toBeVisible();
     await expect(page.getByText('Nutrition', { exact: true }).last()).toBeVisible();
     await expect(page.getByText('Recent growth', { exact: true })).toBeVisible();
+
+    // Rapid window changes must leave the detail view on the latest request,
+    // even when the earlier bounded read resolves later.
+    const sevenDays = page.getByRole('button', { name: '7 days', exact: true });
+    const twentyEightDays = page.getByRole('button', { name: '28 days', exact: true });
+    await sevenDays.click();
+    await twentyEightDays.click();
+    await sevenDays.click();
+    await expect(page.getByText(/last 7 days ending/)).toBeVisible({ timeout: 20_000 });
   });
 
   test('is keyboard-operable, reduced-motion understandable, and read-only', async ({ page }) => {

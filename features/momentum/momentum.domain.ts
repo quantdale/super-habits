@@ -1,5 +1,5 @@
 import { buildDayCompletions, habitCreationDateKey } from '@/features/habits/habits.domain';
-import { dateKeyToLocalDate, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, isValidDateKey, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import {
   MOMENTUM_DEFAULT_DAYS,
   MOMENTUM_LIMITS,
@@ -35,7 +35,8 @@ export function buildMomentumWindow(
   requestedDays = MOMENTUM_DEFAULT_DAYS,
 ): MomentumWindow {
   const days = normalizeDays(requestedDays);
-  const end = dateKeyToLocalDate(todayKey);
+  const safeTodayKey = isValidDateKey(todayKey) ? todayKey : toDateKey();
+  const end = dateKeyToLocalDate(safeTodayKey);
   const keys: string[] = [];
   for (let offset = days - 1; offset >= 0; offset -= 1) {
     const date = new Date(end);
@@ -43,9 +44,9 @@ export function buildMomentumWindow(
     keys.push(toDateKey(date));
   }
   return {
-    todayKey,
-    startKey: keys[0] ?? todayKey,
-    endKey: keys[keys.length - 1] ?? todayKey,
+    todayKey: safeTodayKey,
+    startKey: keys[0] ?? safeTodayKey,
+    endKey: keys[keys.length - 1] ?? safeTodayKey,
     days: keys,
   };
 }
@@ -115,6 +116,7 @@ function collectHabitDates(input: MomentumDomainInput, window: MomentumWindow): 
   const dates: DateCountMap = new Map();
   const completionsByHabit = new Map<string, { date_key: string; count: number }[]>();
   for (const completion of input.habitCompletions) {
+    if (!isValidDateKey(completion.date_key)) continue;
     if (!isInWindow(completion.date_key, window)) continue;
     const rows = completionsByHabit.get(completion.habit_id) ?? [];
     rows.push({ date_key: completion.date_key, count: completion.count });
@@ -176,6 +178,7 @@ function collectNutritionDates(input: MomentumDomainInput, window: MomentumWindo
   const seen = new Set<string>();
   for (const entry of input.nutrition) {
     if (entry.deleted_at !== null && entry.deleted_at !== undefined) continue;
+    if (!isValidDateKey(entry.consumed_on)) continue;
     if (!isInWindow(entry.consumed_on, window) || seen.has(entry.consumed_on)) continue;
     seen.add(entry.consumed_on);
     addCount(dates, entry.consumed_on);
@@ -337,6 +340,7 @@ function emptyContributionMap(): Record<MomentumSource, MomentumContribution> {
 
 export function buildMomentumGarden(input: MomentumDomainInput): MomentumGardenModel {
   const window = buildMomentumWindow(input.todayKey, input.days);
+  const todayKey = window.todayKey;
 
   const sourceDates: Record<MomentumSource, DateCountMap> = {
     tasks: collectTaskDates(input, window),
@@ -356,7 +360,7 @@ export function buildMomentumGarden(input: MomentumDomainInput): MomentumGardenM
     const activeSources = MOMENTUM_SOURCES.filter((source) => contributions[source].level > 0);
     const day: MomentumDay = {
       dateKey,
-      isToday: dateKey === input.todayKey,
+      isToday: dateKey === todayKey,
       contributions,
       activeSources,
       hasGrowth: activeSources.length > 0,
@@ -367,7 +371,7 @@ export function buildMomentumGarden(input: MomentumDomainInput): MomentumGardenM
   });
 
   const today = days[days.length - 1] ?? {
-    dateKey: input.todayKey,
+    dateKey: todayKey,
     isToday: true,
     contributions: emptyContributionMap(),
     activeSources: [],
@@ -376,13 +380,13 @@ export function buildMomentumGarden(input: MomentumDomainInput): MomentumGardenM
   };
   const milestones = buildMilestones(input.milestones, window);
   return {
-    todayKey: input.todayKey,
+    todayKey,
     days,
     today,
     milestones,
     activeDays: days.filter((day) => day.hasGrowth).length,
     hasPriorGrowth: days.some((day) => !day.isToday && day.hasGrowth),
-    accessibilityLabel: formatRecentAccessibilityLabel(days, input.todayKey),
+    accessibilityLabel: formatRecentAccessibilityLabel(days, todayKey),
   };
 }
 

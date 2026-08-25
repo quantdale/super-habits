@@ -64,6 +64,9 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
+- scrollUntilVisible:
+    element: 'Save changes'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Save changes'
     timeout: 20000

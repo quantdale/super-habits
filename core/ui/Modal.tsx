@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   Modal as RNModal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -8,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
@@ -23,6 +25,11 @@ export type ModalProps = {
   layout?: ModalLayout;
 };
 
+// Android's native RNModal window does not always propagate the provider's
+// navigation-bar inset. Keep scrollable dialog actions above that bar when
+// the reported inset is zero.
+const ANDROID_MODAL_NAVIGATION_FALLBACK = 128;
+
 export function Modal({
   visible,
   onClose,
@@ -34,8 +41,13 @@ export function Modal({
   const { tokens } = useAppTheme();
   const closeFocusRing = useKeyboardFocusRing(tokens.accent);
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const { bottom: safeAreaBottom } = useSafeAreaInsets();
   const isDrawer = layout === 'drawer';
   const isBottomSheet = layout === 'bottom-sheet';
+  const scrollBottomPadding =
+    Platform.OS === 'android'
+      ? Math.max(safeAreaBottom, ANDROID_MODAL_NAVIGATION_FALLBACK) + 24
+      : safeAreaBottom + (isBottomSheet ? 24 : 0);
   const scrollMaxHeight = layout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92;
 
   const overlayStyle = isDrawer
@@ -90,7 +102,10 @@ export function Modal({
           className="absolute inset-0"
           onPress={onClose}
         />
-        <Pressable onPress={(e) => e.stopPropagation()} style={shellStyle}>
+        {/* Keep the sheet shell non-clickable so descendant ScrollViews can claim
+            vertical gestures on native. The backdrop is a sibling, so it still
+            owns outside taps without requiring an event-stopping Pressable here. */}
+        <View style={shellStyle}>
           <View style={surfaceStyle}>
             <View
               className={`flex-row items-center px-5 pb-4 pt-5 ${title ? 'justify-between' : 'justify-end'}`}
@@ -122,7 +137,10 @@ export function Modal({
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator
                 style={bodyContainerStyle ?? { maxHeight: scrollMaxHeight }}
-                contentContainerStyle={isDrawer ? { flexGrow: 1 } : undefined}
+                contentContainerStyle={[
+                  isDrawer ? { flexGrow: 1 } : null,
+                  scrollBottomPadding > 0 ? { paddingBottom: scrollBottomPadding } : null,
+                ]}
               >
                 <View className="px-5 pb-5">{children}</View>
               </ScrollView>
@@ -132,7 +150,7 @@ export function Modal({
               </View>
             )}
           </View>
-        </Pressable>
+        </View>
       </View>
     </RNModal>
   );

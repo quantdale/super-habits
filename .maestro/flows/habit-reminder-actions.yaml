@@ -17,14 +17,9 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native Gym action'
@@ -34,9 +29,9 @@ tags:
     direction: DOWN
 - tapOn: 'Enable habit reminder'
 - swipe:
-    start: '50%, 70%'
-    end: '50%, 30%'
-    duration: 350
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN

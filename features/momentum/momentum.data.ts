@@ -88,9 +88,25 @@ export async function getMomentumGarden(
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
-    // One bulk habit read supplies rule/lifecycle history to the pure
-    // canonical scheduler; no query is issued per habit.
-    db.getAllAsync<Habit>(`SELECT * FROM habits WHERE deleted_at IS NULL ORDER BY created_at ASC`),
+    // Only habits with a positive completion in the requested window can
+    // contribute to this read model. This keeps the canonical scheduler's
+    // bulk input bounded without issuing a query per habit.
+    db.getAllAsync<Habit>(
+      `SELECT h.*
+         FROM habits h
+         WHERE h.deleted_at IS NULL
+           AND EXISTS (
+             SELECT 1
+             FROM habit_completions hc
+             WHERE hc.habit_id = h.id
+               AND hc.date_key >= ?
+               AND hc.date_key <= ?
+               AND hc.count > 0
+           )
+         ORDER BY h.created_at ASC
+         LIMIT ?`,
+      [window.startKey, window.endKey, MOMENTUM_LIMITS.queryRowsPerHabitSource],
+    ),
     db.getAllAsync<HabitCompletionRead>(
       `SELECT habit_id, date_key, count
          FROM habit_completions
@@ -142,8 +158,9 @@ export async function getMomentumGarden(
            AND completed_at IS NOT NULL
            AND completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC`,
-      [startUtcIso, endUtcExclusiveIso],
+         ORDER BY completed_at ASC
+         LIMIT ?`,
+      [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
     db.getAllAsync<MomentumReviewFact>(
       `SELECT completed_at, status, deleted_at

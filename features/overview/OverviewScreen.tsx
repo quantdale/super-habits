@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
@@ -218,11 +218,23 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const [summaries, setSummaries] = useState<OverviewSummaries>(EMPTY_SUMMARIES);
   const [nextBestAction, setNextBestAction] = useState<NextBestAction | null>(null);
   const [momentum, setMomentum] = useState<MomentumGardenModel | null>(null);
+  const refreshRequestRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
+    const requestId = ++refreshRequestRef.current;
+    const isCurrent = () => mountedRef.current && refreshRequestRef.current === requestId;
     setIsRefreshing(true);
     try {
       const [nextLayout, nextLoad] = await Promise.all([loadCardLayout(), loadSummaries()]);
+      if (!isCurrent()) return;
       setLayout(nextLayout);
       setSummaries(nextLoad.summaries);
       setNextBestAction(nextLoad.nextBestAction);
@@ -232,16 +244,23 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       // dashboard facts so a bounded history query can never delay the
       // day-oriented shell or block switching into another section.
       void getMomentumGarden({ todayKey: toDateKey(), days: 1 })
-        .then(setMomentum)
-        .catch((err) => console.error('[OverviewScreen] momentum refresh failed', err));
+        .then((nextMomentum) => {
+          if (isCurrent()) setMomentum(nextMomentum);
+        })
+        .catch((err) => {
+          if (isCurrent()) console.error('[OverviewScreen] momentum refresh failed', err);
+        });
     } catch (err) {
+      if (!isCurrent()) return;
       // F7: a failed load must stay visible — per-card empty copy would read
       // as fake "all clear" data. The error panel below offers a retry.
       console.error('[OverviewScreen] refresh failed', err);
       setLoadError(err instanceof Error ? err.message : 'Could not load your dashboard.');
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (isCurrent()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, []);
 

@@ -55,13 +55,13 @@ tags:
 - inputText: 'chest'
 - hideKeyboard
 - scrollUntilVisible:
-    element: 'Equipment'
+    element: 'Search aliases (comma separated)'
     direction: DOWN
-- tapOn: 'Equipment'
+- tapOn:
+    text: 'Equipment'
+    index: 1
 - inputText: 'barbell'
 - hideKeyboard
-- swipe:
-    direction: UP
 - tapOn: 'Search aliases (comma separated)'
 - inputText: 'incline press'
 - hideKeyboard
@@ -71,12 +71,19 @@ tags:
 - tapOn: 'Instructions (optional)'
 - inputText: 'Brace and press with a controlled descent'
 - hideKeyboard
+- swipe:
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
 - scrollUntilVisible:
     element: 'Create and add'
     direction: DOWN
 - tapOn: 'Create and add'
+- scrollUntilVisible:
+    element: 'Configure Native custom press exercise'
+    direction: UP
 - extendedWaitUntil:
-    visible: 'Native custom press'
+    visible: 'Configure Native custom press exercise'
     timeout: 10000
 - assertVisible: 'Strength'
 - tapOn: 'Linear'
@@ -107,13 +114,17 @@ tags:
 - tapOn: 'Target reps max'
 - inputText: '8'
 - hideKeyboard
+- swipe:
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
 - tapOn: 'Target load'
 - inputText: '40'
 - hideKeyboard
-- assertVisible: 'Exercise setup'
+- assertVisible: 'Target load'
 - pressKey: BACK
 - swipe:
     direction: DOWN

@@ -41,7 +41,10 @@ tags:
     element: 'Add'
     direction: DOWN
 - tapOn: 'Add'
-- assertVisible: 'Native rows'
+- scrollUntilVisible:
+    element: 'Configure Native rows exercise'
+    direction: UP
+- assertVisible: 'Configure Native rows exercise'
 - killApp
 - launchApp
 - extendedWaitUntil:

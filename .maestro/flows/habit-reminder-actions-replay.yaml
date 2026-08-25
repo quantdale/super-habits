@@ -17,14 +17,9 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 26%'
-    duration: 350
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native replay action'
@@ -34,13 +29,16 @@ tags:
     direction: DOWN
 - tapOn: 'Enable habit reminder'
 - swipe:
-    start: '50%, 70%'
-    end: '50%, 30%'
-    duration: 350
+    start: '5%, 85%'
+    end: '5%, 50%'
+    duration: 500
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+- scrollUntilVisible:
+    element: 'Native replay action: 0 of 1 today.*'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Native replay action: 0 of 1 today.*'
     timeout: 5000

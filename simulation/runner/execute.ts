@@ -539,9 +539,17 @@ export async function executeScenario(
 
   const context = await browser.newContext({
     baseURL: baseUrl,
+    // Simulation scenarios exercise app behavior and SQLite persistence. The
+    // PWA service-worker lifecycle has dedicated infrastructure coverage; it
+    // must not be active here because repeated DB-harness navigations otherwise
+    // retain a renderer client per round-trip on Chromium/Windows.
+    serviceWorkers: 'block',
     recordVideo: { dir: path.join(root, 'artifacts', 'video') },
     viewport: { width: 1280, height: 720 },
   });
+  // Network capture is only needed by the repro-bundle failure hook (task 5.2);
+  // keep it off for ordinary runs so they pay no listener overhead.
+  const networkEvents: NetworkEvent[] = [];
   const page = await context.newPage();
   page.on('pageerror', (error) => {
     pushDiagnostic(browserErrors, `pageerror: ${error.name}: ${error.message}`);
@@ -567,9 +575,6 @@ export async function executeScenario(
       `requestfailed ${req.method()} ${req.url()} (${req.failure()?.errorText ?? 'unknown'})`,
     );
   });
-  // Network capture is only needed by the repro-bundle failure hook (task 5.2);
-  // keep it off for ordinary runs so they pay no listener overhead.
-  const networkEvents: NetworkEvent[] = [];
   if (opts.onFailure) {
     page.on('response', (res) => {
       try {
