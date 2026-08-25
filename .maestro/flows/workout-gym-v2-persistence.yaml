@@ -17,6 +17,8 @@ tags:
 - tapOn:
     text: 'Workout'
     index: 0
+- swipe:
+    direction: UP
 - scrollUntilVisible:
     element: 'Routine name'
     direction: DOWN
@@ -31,6 +33,7 @@ tags:
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: DOWN
+    visibilityPercentage: 50
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Choose from exercise library'
 - extendedWaitUntil:
@@ -114,10 +117,10 @@ tags:
 - assertVisible: 'Exercise setup'
 - pressKey: BACK
 - swipe:
-    direction: UP
-- scrollUntilVisible:
-    element: 'Monday Native Gym V2 typed routine'
     direction: DOWN
+- swipe:
+    direction: DOWN
+- assertVisible: 'Week'
 - tapOn: 'Monday Native Gym V2 typed routine'
 - killApp
 - launchApp
@@ -129,13 +132,16 @@ tags:
 - tapOn:
     text: 'Workout'
     index: 0
-- scrollUntilVisible:
-    element: 'Native Gym V2 typed routine'
-    direction: DOWN
 - assertVisible: 'Monday Native Gym V2 typed routine'
-- scrollUntilVisible:
-    element: 'Open Native Gym V2 typed routine routine'
-    direction: DOWN
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- assertVisible: 'Your routines'
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'
 - scrollUntilVisible:

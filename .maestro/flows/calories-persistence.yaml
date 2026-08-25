@@ -45,6 +45,12 @@ tags:
     direction: DOWN
     visibilityPercentage: 50
 - tapOn: 'Save calorie entry'
+- swipe:
+    direction: DOWN
+- scrollUntilVisible:
+    element: 'Diary view'
+    direction: UP
+    visibilityPercentage: 50
 - tapOn: 'Diary view'
 - scrollUntilVisible:
     element: 'Native breakfast'

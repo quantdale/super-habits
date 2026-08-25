@@ -57,10 +57,11 @@ and records exact-source local/remote certification.
 ## Current Checkpoint
 
 - Current milestone: source integration, recovery validation, sync validation,
-  simulation validation, focused browser regressions, and the final pushed
-  checkpoint are complete. Commit `4d3f466` fixes two deterministic
-  Playwright test defects; commit `d80e653` fixes current native semantic and
-  viewport assumptions discovered on the final APK. The complete browser suite
+  simulation validation, focused browser regressions, and final-source native
+  flow hardening are complete; exact final native certification is in progress.
+  Commit `4d3f466` fixes two deterministic Playwright test defects; commit
+  `d80e653` fixes native semantic and viewport assumptions; commit `14cdaf2`
+  records the resulting native classifications. The complete browser suite
   has one timing-only P2 miss (`workout→calories 827 ms`), while the controlled
   full-journey probe passes 70/70 steps across ten HEAVY repetitions without
   changing the 800 ms ceiling.
@@ -108,10 +109,10 @@ and records exact-source local/remote certification.
   installed and no authenticated project context is present. GitHub exact-head
   CI inspection is unavailable because `gh auth status` reports no login;
   Vercel status is likewise not locally inspectable because its CLI is absent.
-- In progress: inspect remote access and CI availability, commit/push this
-  evidence checkpoint, then provision/build/install the final committed source
-  SHA on the verified Android target and rerun the required native ladder plus
-  focused Gym evidence before closing the plan.
+- In progress: commit/push the final native-flow and Workout action-reachability
+  fix, then provision/build/install that exact source SHA on the verified
+  Android target and rerun the required native ladder plus focused Gym,
+  Calories, and durable-session evidence before closing the plan.
 - Important modified files: current docs/agent maps, `package.json`,
   `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`,
   `scripts/native-qa-utils.mjs`, `tests/qaNativeProvision.test.ts`,
@@ -121,9 +122,20 @@ and records exact-source local/remote certification.
   and the two Workout exercise-toggle components, plus
   `e2e/workout-gym-v2.spec.ts` and `e2e/journeys/a-tuesday.spec.ts`. Generated
   `android/`, dist output, and native/browser reports remain ignored or
-  excluded by repository policy.
-- Last successful validation: before `d80e653`, focused browser evidence is
-  Gym 6/6, P1 8/8, and P2 70/70. The d484 source APK was built in
+  excluded by repository policy. The current uncommitted native closure also
+  changes `features/workout/RoutineDetailScreen.tsx` and
+  `.maestro/flows/workout-gym-v2-session-lifecycle.yaml` so the primary
+  `Start workout` action is reachable above the nested exercise editor.
+- Last successful validation: source `14cdaf2d8de12a81f95c95eed4d02d7007f170d1`
+  was provisioned and installed in 6m08s on the verified API-36 x86_64 target;
+  its direct Calories persistence flow and Gym V2 routine persistence flow pass
+  with the current flow-only selectors. The APK package is
+  `com.dale16.superhabits` 1.0.0 / versionCode 1 with SHA-256
+  `ED2DB2E8FE713BEE1DF84725337C0759F59CD7B44EA6CAA7CF116391ECB9A1072`.
+  The lifecycle flow is not yet passing from this APK because its source still
+  places `Start workout` below a nested non-scrollable list; the next source
+  build includes the product fix. Earlier focused browser evidence is Gym 6/6,
+  P1 8/8, and P2 70/70. The d484 source APK was built in
   8m30s, installed on `emulator-5556` (`CRBABot_API_36`, API 36, x86_64), and
   provenance-verified with package `com.dale16.superhabits` 1.0.0 /
   versionCode 1 and APK SHA-256
@@ -132,7 +144,12 @@ and records exact-source local/remote certification.
   `workout-gym-v2-session-lifecycle.yaml` passed; aggregate-only misses and
   isolated replays are recorded in the validation ledger. The latest controlled
   P2 probe passed 70/70 after the full-suite 827 ms sample.
-- Current failures: no product implementation failure is known. The final
+- Current failures: the final native lifecycle replay exposed a product-level
+  Android reachability defect: `RoutineDetailScreen` placed the primary
+  `Start workout` action below a nested non-scrollable exercise list, so the
+  action was absent from the native accessibility viewport after custom-exercise
+  creation. The fix moves the action above the editor; the corrected lifecycle
+  flow and exact rebuilt APK are pending. The final
   targeted aggregate report recorded only the legacy Workout aggregate miss;
   its exact isolated replay passes. The final lifecycle aggregate recorded
   only the missing reminder replay; its exact isolated replay passes. Those
@@ -240,10 +257,10 @@ and records exact-source local/remote certification.
 - Exact resume action after unblock: authenticate the relevant external service
   or move to its supported host, then run only the applicable remote/iOS
   verification; local implementation and hardening do not require new scope.
-- Exact next action: update the validation ledger for the `d80e653` native-flow
-  fixes, close and validate the final plan/evidence checkpoint, commit and push
-  it, then build and install that exact pushed source SHA on `emulator-5556`
-  for final native certification.
+- Exact next action: validate, commit, and push the native-flow plus
+  `RoutineDetailScreen` reachability fix; then build/install that exact pushed
+  source SHA on `emulator-5556`, rerun the focused Gym/Calories/lifecycle
+  flows and required native ladder, record final evidence, and close the plan.
 - Remaining definition of done: focused recovery tests; current-source Android
   provisioning and native smoke/targeted/lifecycle/Gym execution or precise
   classifications; valid timing evidence; affected and broad gates; exact
@@ -417,6 +434,13 @@ and records exact-source local/remote certification.
   after adding the semantic Calories submit label and current Gym/Calories
   Maestro selectors. Final APK provisioning and corrected native replays are
   intentionally still required from the pushed `d80e653` source.
+- 2026-08-25: final native-flow replay — `TEST_BUG FIXED` for Calories/Gym
+  viewport and semantic selectors; the corrected direct Calories and Gym V2
+  persistence flows pass on the `14cdaf2` APK. The durable-session replay then
+  exposed `PRODUCT_BUG`: the primary `Start workout` action was below the
+  nested non-scrollable native exercise list and could not be reached by a
+  semantic scroll. The action is now moved above that editor and the lifecycle
+  flow taps the reachable control; final source rebuild and replay remain.
 
 ## Changed Files / Areas
 
@@ -438,6 +462,12 @@ and records exact-source local/remote certification.
   persistence selectors and the semantic submit control.
 - `core/ui/Button.tsx` and `features/calories/CaloriesFormView.tsx` — optional
   button accessibility labels and the `Save calorie entry` native hook.
+- `features/workout/RoutineDetailScreen.tsx` — moves the primary Gym action
+  above the nested exercise editor so Android users and semantic automation can
+  reach it reliably.
+- `.maestro/flows/workout-gym-v2-session-lifecycle.yaml` — taps the reachable
+  action while retaining durable draft, measurement, relaunch, and history
+  assertions.
 
 ## Recovery / Resume Instructions
 

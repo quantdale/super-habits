@@ -354,6 +354,16 @@ export function RoutineDetailModal({
           </Text>
         </View>
 
+        {exercises.length > 0 ? (
+          <View className="mb-6">
+            <Button
+              label="Start workout"
+              onPress={() => void waitForBuilderMutations()}
+              color={COLOR}
+            />
+          </View>
+        ) : null}
+
         {Platform.OS === 'web' ? (
           <View className="gap-3">
             {exercises.map((ex) => {
@@ -943,16 +953,6 @@ export function RoutineDetailModal({
             <Button label="Add" onPress={handleAddExercise} color={COLOR} />
           </View>
         </View>
-
-        {exercises.length > 0 ? (
-          <View className="mt-6">
-            <Button
-              label="Start workout"
-              onPress={() => void waitForBuilderMutations()}
-              color={COLOR}
-            />
-          </View>
-        ) : null}
 
         {exercises.length > 0 && onUseAsTemplate ? (
           <View className="mt-3">
