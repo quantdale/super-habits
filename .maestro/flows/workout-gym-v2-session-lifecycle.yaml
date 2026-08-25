@@ -129,8 +129,6 @@ tags:
     direction: UP
 - swipe:
     direction: UP
-- swipe:
-    direction: UP
 - extendedWaitUntil:
     visible: 'Recent sessions'
     timeout: 15000

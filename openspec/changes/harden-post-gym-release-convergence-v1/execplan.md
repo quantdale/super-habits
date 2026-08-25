@@ -54,7 +54,7 @@ and records exact-source local/remote certification.
 - No production secrets, destructive remote reset, copied external dataset, or
   user-specific absolute machine path.
 
-## Current Checkpoint
+## Historical Checkpoints (superseded; retained for audit)
 
 - Current milestone: source integration, recovery validation, sync validation,
   simulation validation, focused browser regressions, and final-source native
@@ -267,6 +267,69 @@ and records exact-source local/remote certification.
   final SHA pushed and CI status inspected; OpenSpec/ExecPlan closure; working
   tree clean.
 
+## Current Checkpoint
+
+- Current milestone: final native qualification has been executed against the
+  clean source `0300e688e126395fa4211f1751a6d87545bec65b` APK; the remaining
+  work is to commit the last Maestro flow hardening, provision the exact final
+  pushed SHA, run the focused final replays, and close the plan.
+- Completed: normal no-ff Git convergence (`336f59e`), runtime/docs truth
+  sweep, Android provisioning and provenance checks, backup/portable/restore/
+  Supabase-shape validation, browser/sync/simulation/timezone gates, timing
+  investigation, and the `RoutineDetailScreen` product fix that moved the
+  primary `Start workout` action above the nested exercise editor.
+- Exact native build: clean Expo prebuild and Gradle release build passed on
+  `CRBABot_API_36` / `emulator-5554` (API 36, x86_64). Package identity is
+  `com.dale16.superhabits` 1.0.0 / versionCode 1; source SHA is
+  `0300e688e126395fa4211f1751a6d87545bec65b`; APK SHA-256 is
+  `02BBA2D143C1DCE3BC407901DD51E936272C09C4B5011266ED16F82793A0C572`.
+  The E2E reminder environment flag was verified as `true`.
+- Focused exact-source native evidence: Gym V2 routine persistence PASS,
+  typed durable-session interruption/resume/completion/history PASS, and
+  Calories persistence PASS on the recovered target before later aggregate
+  runner instability. The focused Gym flows retain all semantic selectors and
+  durable-state assertions.
+- Aggregate native evidence: smoke 1/2 (Command Center isolated replay PASS;
+  aggregate-only miss classified `FLAKY_TEST`); targeted 9/11 (Gym V2 and
+  legacy Workout persistence PASS, Calories and reminder-disable aggregate
+  misses classified `FLAKY_TEST`/`TEST_BUG` after screenshot-backed replay);
+  lifecycle 3/6 (Pomodoro flows and reminder-actions PASS; reminder replay,
+  delivery, and aggregate Gym lifecycle misses classified
+  `FLAKY_TEST`/`EXPECTED_KNOWN_GAP`/`ENVIRONMENT` pending no product evidence).
+  No meaningful assertion was removed or weakened. The earlier 5556 Android
+  package-service stall remains an `ENVIRONMENT` blocker and the target was
+  cleanly restarted as 5554.
+- Flow hardening in progress: `calories-persistence.yaml` now waits for the
+  saved state before the Diary transition and uses a 50% semantic visibility
+  threshold for the post-relaunch row; `habit-reminder-disable.yaml` uses a
+  state-directed semantic wait for `Save changes`; the Gym persistence and
+  lifecycle flows use the corrected viewport counts and semantic controls.
+- Broad local proof already recorded: Vitest 148 files/1,777 tests, typecheck,
+  lint with zero errors, themes 140/140, OpenSpec 43/43, all ExecPlans, QA
+  impact 13/13, Supabase schema, timezone 5 x 43, web/sync builds, sync E2E
+  46/46, simulation validation and deterministic simulation 22/22. Full
+  browser evidence is 185 passed, 43 skipped, 4 not run, with one isolated
+  P2 timing miss; the controlled P2 rerun is 70/70 and the 800 ms ceiling is
+  unchanged. The portable-owner timeout remains classified `FLAKY_TEST`.
+- External status: iOS is `ENVIRONMENT` on Windows without Xcode/simctl;
+  remote Supabase is an `EXTERNAL BLOCKER` without the CLI/authenticated
+  linked project; GitHub exact-head CI is an `EXTERNAL BLOCKER` because `gh`
+  is unauthenticated; Vercel is `NOT RUN` because its CLI is unavailable.
+- Important changed areas: native provisioning/runner helpers and tests,
+  current documentation and OpenSpec artifacts, native Maestro flow suite,
+  `features/workout/RoutineDetailScreen.tsx`, semantic native labels, and
+  browser selector fixes. Generated Android/dist/native reports remain
+  ignored by repository policy.
+- Exact next action: commit the three pending flow changes plus this
+  checkpoint, push, provision the exact resulting SHA, run final focused
+  Gym/Calories/lifecycle replays and the required native ladder as resources
+  permit, then update tasks/plan closure and validate the final clean tree.
+- Remaining definition of done: final exact-SHA Android provenance and focused
+  evidence; native aggregate classifications; affected/broad gates rechecked
+  after committed flow changes; OpenSpec/ExecPlan closure; pushed branch with
+  remote equality; explicit CI/iOS/Supabase/Vercel blockers; clean working
+  tree and no newly introduced Critical/High regression.
+
 ## Progress
 
 - [x] Required orientation, Git fetch, branch/ref reconciliation.
@@ -441,6 +504,29 @@ and records exact-source local/remote certification.
   nested non-scrollable native exercise list and could not be reached by a
   semantic scroll. The action is now moved above that editor and the lifecycle
   flow taps the reachable control; final source rebuild and replay remain.
+
+- 2026-08-25: exact-source final provision on recovered target — PASS; clean
+  prebuild, Gradle release build, streamed install, package identity, source
+  SHA, API/ABI/AVD, and E2E environment verification passed on
+  `emulator-5554` / `CRBABot_API_36`. APK SHA-256 is
+  `02BBA2D143C1DCE3BC407901DD51E936272C09C4B5011266ED16F82793A0C572`.
+- 2026-08-25: exact-source focused Gym certification — PASS; routine typed
+  metadata/weekly schedule persisted across relaunch, active typed weight/reps
+  draft resumed after kill/relaunch, completion saved history/progress, and
+  the focused Calories persistence flow retained its entry across relaunch.
+- 2026-08-25: required native aggregate ladders — classified, not promoted to
+  PASS; smoke 1/2, targeted 9/11, lifecycle 3/6. Command Center and the
+  focused Gym flows pass in isolated replay. Aggregate-only selector/viewport
+  misses are `FLAKY_TEST`/`TEST_BUG`; notification delivery remains an
+  `EXPECTED_KNOWN_GAP`/`ENVIRONMENT` capability boundary where the system tray
+  is involved. Reports are preserved under `simulation-output/native/`.
+- 2026-08-25: final native flow replay triage — `TEST_BUG` evidence preserved;
+  screenshots and accessibility hierarchies show `Native breakfast`,
+  `Save changes`, and `Create habit` in the modal/content tree while Maestro's
+  scrolling helper intermittently fails to settle on the corresponding
+  viewport. The flow changes use state-directed semantic waits/visibility
+  thresholds, with no arbitrary sleeps, coordinate-only app taps, or weakened
+  data assertions.
 
 ## Changed Files / Areas
 

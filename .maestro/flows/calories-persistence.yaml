@@ -45,6 +45,10 @@ tags:
     direction: DOWN
     visibilityPercentage: 50
 - tapOn: 'Save calorie entry'
+- scrollUntilVisible:
+    element: 'Logged today'
+    direction: DOWN
+    visibilityPercentage: 50
 - swipe:
     direction: DOWN
 - scrollUntilVisible:
@@ -72,6 +76,7 @@ tags:
 - scrollUntilVisible:
     element: 'Native breakfast'
     direction: DOWN
+    visibilityPercentage: 50
 - extendedWaitUntil:
     visible: 'Native breakfast'
     timeout: 15000

@@ -60,9 +60,8 @@ tags:
 - tapOn: 'Equipment'
 - inputText: 'barbell'
 - hideKeyboard
-- scrollUntilVisible:
-    element: 'Search aliases (comma separated)'
-    direction: DOWN
+- swipe:
+    direction: UP
 - tapOn: 'Search aliases (comma separated)'
 - inputText: 'incline press'
 - hideKeyboard
@@ -133,8 +132,6 @@ tags:
     text: 'Workout'
     index: 0
 - assertVisible: 'Monday Native Gym V2 typed routine'
-- swipe:
-    direction: UP
 - swipe:
     direction: UP
 - swipe:
