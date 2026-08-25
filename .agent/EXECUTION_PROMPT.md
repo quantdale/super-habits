@@ -1,173 +1,225 @@
-# ACTIVE Campaign — Post–Momentum Garden Hardening & Qualification
+# ACTIVE Campaign — Whole-System Resilience, Migration & Long-Session Hardening
 
 Status: ACTIVE
-Planned-From: 0187b98cc48691ee0410cb84923571e355b97902
+Planned-From: d923cd0b4575bba3e5ead60bbf67430c5bc66e40
 Target-Branch: main
-Campaign-Type: Hardening / validation / regression repair
-Suggested-OpenSpec-Slug: harden-momentum-garden-v1
+Campaign-Type: System hardening / migration torture / durability / long-session qualification
+Suggested-OpenSpec-Slug: harden-whole-system-resilience-v1
 
 ## Mission
 
-Take the exact current `main` state after Momentum Garden V1 and close the remaining release-quality evidence gaps created or exposed by that campaign. This is not a new feature wave. The objective is to prove that Momentum Garden and its supporting bounded-read changes remain correct under long-running simulation, exhaustive browser journeys, and a clean current-source Android native lane; repair any repository-caused failures found; profile the new read paths and their whole-app impact; and leave the repository with reproducible evidence rather than optimistic claims.
+Take the exact current `main` after Momentum Garden V1 qualification and run the next meaningful repository-wide hardening campaign. Do **not** reopen Momentum Garden or repeat the just-completed qualification work. The previous campaign is terminal and already proved the normal unit/integration/browser/deterministic/Android lanes on current source.
 
-The predecessor campaign (`openspec/changes/add-momentum-garden-v1/`) is complete and must not be reopened or reimplemented. Its explicit remaining debt is authoritative starting context:
+The next objective is to attack the remaining **system-level failure modes that normal feature QA does not adequately exercise**: long-running resource growth, repeated lifecycle churn, historical SQLite upgrade paths, transactional recovery and corruption handling, backup/restore/portable-data failure atomicity, cross-feature date/time consistency, and native Android persistence/lifecycle endurance.
 
-1. the full long-term deterministic simulation repeatedly reaches approximately step 201 and then times out at step 202 while executing `Start focus`;
-2. Android native smoke/persistence was not proven for the Momentum Garden tree because concurrent Expo prebuild work collided and the smoke session terminated during APK packaging before install/Maestro execution;
-3. exhaustive browser/simulation/native performance qualification was intentionally deferred;
-4. the new bounded habit-window input and asynchronous Momentum reads need broader regression/performance proof across the rest of the application.
+This campaign must treat the application as one connected system. It is not enough to inspect recently changed files. Trace public contracts through direct and transitive callers, data ownership, migrations, providers, background/foreground lifecycle, sync/backup/restore, portable import/export, PWA/service-worker behavior, native surfaces, simulation infrastructure, and tests. A defect discovered far from the latest feature is in scope when the systemic audit proves it can affect durability, correctness, recovery, or long-session operation.
+
+The intended outcome is a repository that can survive sustained realistic use, repeated restart/foreground cycles, representative old-database upgrades, malformed/interrupted recovery operations, and broad cross-feature state transitions without silent data loss, duplicated writes, resource runaway, stale-day behavior, or dishonest test classifications.
+
+## Why This Is the Next Campaign
+
+The predecessor `openspec/changes/harden-momentum-garden-v1/` is `COMPLETED`. Its final evidence includes the full repository QA ladder, the deterministic library, repeated long-run recovery, focused Momentum coverage, full browser coverage, performance sampling, and current-source Android smoke/persistence/lifecycle. There is no justified reason to rerun that same campaign as if it were unfinished.
+
+The repository's remaining registered capability/depth gaps are now mostly systemic:
+
+- long-session/load/stress and memory/resource profiling are not covered by the normal HEAVY fixture;
+- migration-from-old-database testing lacks a durable historical fixture laboratory;
+- real pre-cutover/user-corpus date data remains unavailable, so fixture-based migration coverage must be clearly distinguished from real-corpus proof;
+- some platform boundaries remain external capability gaps, especially local iOS on Windows;
+- live Supabase round-trip/RLS proof requires an explicitly authorized target and must never be fabricated.
+
+This campaign should close everything that is **actually executable from the repository and available environment**, strengthen the test infrastructure where justified, and leave irreducible external gaps explicitly registered rather than pretending they passed.
 
 ## Startup and Reconciliation — Mandatory Before Editing
 
-1. Read `AGENTS.md`, `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`, `docs/PROJECT_STRUCTURE_MAP.md`, `docs/testing/autonomous-qa.md`, `docs/testing/native-e2e.md`, `qa/impact-map.json`, and all artifacts under `openspec/changes/add-momentum-garden-v1/`.
-2. Read the recent Git history and inspect the complete diff from `f0e293be906958ff933ca88dec996457cee30f9f` through `0187b98cc48691ee0410cb84923571e355b97902`, then inspect every directly and transitively affected caller around:
-   - `features/momentum/**`
-   - `features/habits/habits.domain.ts`
-   - `features/overview/OverviewScreen.tsx`
-   - `features/planning-hub/PlanningHubScreen.tsx`
-   - `simulation/runner/actions.ts`
-   - affected tests/E2E/QA infrastructure.
-3. Run `git fetch --all --prune`, inspect `git status --short`, branch/HEAD/origin parity, recent commits, and any legitimate remote advancement. Never reset, discard, force-push, or overwrite unrelated work.
-4. Run `npm run agent:plans` and confirm no separate ACTIVE task supersedes this campaign. Historical completed plans are evidence only.
-5. Create a fresh OpenSpec change for this campaign (prefer `harden-momentum-garden-v1` unless repository state provides a better non-conflicting slug) with proposal/design/tasks/spec as appropriate plus a Version-2 ExecPlan. Set the plan to `Status: ACTIVE`, give it a real `Exact next action`, and keep it current throughout the campaign.
-6. Run `npm run qa:affected -- --base <pre-campaign-baseline>` or the repository-equivalent impact command before deciding the final test ladder.
+1. Read `AGENTS.md` completely.
+2. Read `.agent/PLANS.md`, `.agent/PLANNER_HANDOFF.md`, this file, `docs/PROJECT_STRUCTURE_MAP.md`, `docs/testing/autonomous-qa.md`, `docs/testing/known-gaps.md`, `docs/testing/native-e2e.md`, `simulation/README.md`, `qa/impact-map.json`, and the complete predecessor artifacts under `openspec/changes/harden-momentum-garden-v1/`.
+3. Read the recent Git history far enough to understand the major architecture waves that produced the current database, backup/recovery, planning, Gym V2, reminders, simulation, and Momentum boundaries. Do not limit review to `d923cd0`'s changed files.
+4. Run `git fetch --all --prune`; inspect `git status --short`, current branch, local HEAD, `origin/main`, and legitimate remote advancement. Reconcile only with safe normal Git operations. Never reset away unrelated work, discard another task's changes, force-push, or rewrite public history.
+5. Run `npm run agent:plans`. Confirm there is no independent `ACTIVE` plan that supersedes this campaign. Historical completed plans are evidence, not current instructions.
+6. Create a fresh OpenSpec change for this campaign, preferably `harden-whole-system-resilience-v1` unless the current repository requires a non-conflicting slug. Create proposal/design/tasks/spec deltas as appropriate plus a Version-2 ExecPlan with `Status: ACTIVE` and one concrete `Exact next action`.
+7. Run `npm run qa:affected -- --base d923cd0b4575bba3e5ead60bbf67430c5bc66e40` after the initial campaign-doc creation, then expand the gate set based on the actual implementation areas touched.
+8. Establish a clean current-source baseline before invasive fault injection. Use existing fresh QA evidence where it is still exact/current, but rerun the narrow baseline needed to prove the new harnesses and experiments are not starting from a broken tree.
 
-Do not assume conversation history is correct. Git, current source, current OpenSpec, current tests, and freshly produced evidence win.
+Git, current source, current OpenSpec, current tests, current artifacts, and freshly reproduced evidence are authoritative. Conversation summaries are not.
 
-## Governing Product Invariants
+## Governing Invariants
 
-Preserve the shipped Momentum Garden architecture unless a demonstrated correctness defect requires a narrowly justified change:
+Preserve these unless a demonstrated defect and updated specification require change:
 
-- Momentum is a deterministic, derived, read-only model over authoritative local SQLite facts.
-- Do not add a `momentum_events` ledger, migration, second source of truth, Supabase entity, sync queue entity, backup entity, export entity, or durable Garden preference.
-- Do not introduce an opaque aggregate score, XP/currency, punishment/death state, negative nutrition judgment, streak punishment, random rewards, social/leaderboard mechanics, or feature expansion disguised as hardening.
-- Source semantics remain explicit and independently attributable: Tasks, Habits, Focus, Workout, Nutrition, Planning/Review, and dated Goal/Project milestones.
-- Habit schedule/lifecycle/off-day semantics must continue to come from the canonical habit resolver. A bounded Garden window must never alter the pre-existing full-history behavior used by streaks or Habit UI.
-- Date windows are local-calendar windows. Timestamp-backed reads must respect established UTC half-open interval helpers and timezone invariants.
-- Overview must remain useful before the Garden finishes loading. Garden failure/latency must not block or corrupt canonical dashboard facts.
-- Garden reads must not mutate source rows, sync outbox state, account/backup state, or feature state.
-- Accessibility, reduced-motion parity, semantic theme tokens, native-safe rendering, and keyboard/semantic interaction must remain intact.
+- SQLite is the local source of truth.
+- Database migrations are monotonic, explicit, idempotent under the repository's supported initialization semantics, and never silently discard user data.
+- A recovery/import operation must either validate and commit a coherent supported dataset or fail without partially mutating authoritative state.
+- Backup, restore, portable import/export, account ownership, and sync boundaries must not silently diverge in entity inventory or semantics.
+- Soft deletion/tombstone semantics remain intentional and must not resurrect deleted user intent.
+- Local calendar dates and timestamp-backed intervals must preserve established timezone semantics.
+- Repeated foreground/background, section switches, reloads, process death, and test-harness transitions must not create duplicate writes, stale async overwrites, leaked timers/listeners, runaway renderers/workers, or unbounded DB work.
+- Existing feature engines remain canonical. Hardening must not introduce a second timer, second habit engine, second workout ledger, second timeline ledger, duplicate source of truth, or speculative cache/persistence silo.
+- Do not weaken meaningful assertions, delete failing tests, increase timeouts without causal evidence, or classify a retry-pass as flakiness by itself.
+- No live remote mutation is allowed unless the environment clearly identifies an authorized disposable/test target and the repository's safety guidance permits it.
 
-## Workstream A — Deep Whole-Codebase Impact Audit
+## Workstream A — Deep Whole-Codebase System Audit
 
-Audit the latest Momentum Garden commit as a system change, not just a list of modified files.
+Before optimizing or adding harness code, map the whole system and inspect contract propagation.
 
-Trace each new/changed public function, data read, component mount, hook dependency, query boundary, and test helper into its callers and downstream behavior. Explicitly inspect:
+At minimum audit:
 
-- `buildDayCompletions(..., rangeStartDateKey)` and every call site, including default behavior when the new argument is omitted, malformed dates, history before/inside/after the bounded window, lifecycle pauses/archives, targets greater than one, rule-history transitions, timezone rollovers, and long histories;
-- Momentum SQLite queries for boundedness, indexes/query plans where meaningful, one-connection behavior, ordering, null/deleted-row handling, duplicate facts, timestamp/date-key conversion, and read-only guarantees;
-- Overview refresh, day rollover, foreground refresh, unmount/remount, rapid section switching, repeated Garden opening, stale async response races, error states, empty state, and database-reset/test harness interactions;
-- Planning Hub Progress integration and seven/28-day switching, including repeated toggles and large historical datasets;
-- SVG/native rendering and text/accessibility equivalents under light/dark themes, reduced motion, narrow screens, and repeated renders;
-- the shared simulation Calories locator correction and whether it affects scenarios outside Momentum Garden;
-- any cache, memoization, hook, navigation, SQLite, sync/backup, or provider behavior indirectly touched by the new reads.
+- `core/db/**`: bootstrap schema, every migration block, transaction boundaries, indexes, schema-version metadata, connection lifecycle, WAL/native behavior, web/OPFS behavior, and error paths;
+- `core/backup/**`, `core/sync/**`, `core/portable/**`, `core/auth/**`: entity inventories, tombstones, owner binding, restore emptiness, manifest/checksum validation, transaction atomicity, outbox semantics, replay/idempotency, settings allowlists, and cross-version compatibility;
+- all feature `*.data.ts` writers/readers and any cross-feature engines such as linked actions, planning/review, reminders, command execution, Momentum, Gym V2, and Overview aggregation;
+- `AppProviders`, navigation/providers, foreground/day-rollover hooks, timers/listeners, notification handlers, service-worker registration, and anything that persists across section switches or app lifecycle transitions;
+- simulation/E2E DB harnesses, static servers, service-worker isolation, native runners, repro tooling, QA impact mapping, and artifact retention;
+- current indexes and query shapes on the largest realistic user histories;
+- docs and tests that claim entity/schema completeness, ensuring those claims still match runtime source rather than stale snapshots.
 
-Do not stop at recently changed files. Follow impact across the full codebase and identify regressions caused by changed contracts even when the failure manifests elsewhere.
+For every new/changed public contract encountered, follow its direct and transitive callers. Search for duplicated assumptions, stale schema inventories, hard-coded version/entity lists, inconsistent date conversion, unbounded reads, missing cleanup, and failure paths that can leave partial state.
 
-For every real defect found, classify severity and root cause, add a regression test where practical, fix the source problem rather than masking the symptom, and rerun the narrowest proving lane followed by the required broader lane.
+Create a concise audit ledger in the campaign ExecPlan. Severity-classify findings. Critical/High correctness or durability defects are mandatory fixes. Medium issues directly affecting the campaign's resilience goals should be fixed when evidence is strong. Low/cosmetic unrelated cleanup should not turn this into an unbounded refactor.
 
-## Workstream B — Reproduce and Eliminate the Long-Run `Start focus` Timeout
+## Workstream B — Repeatable Long-Session / Resource Soak Qualification
 
-This is a required closure item, not optional debt.
+The normal HEAVY fixture is not a load test. Build or extend a **repeatable, bounded soak lane** that exercises realistic sustained usage without depending on manual DevTools operation.
 
-1. Reproduce the failure from a clean deterministic state using the full long-term/full-library simulation path that previously reached step ~202.
-2. Preserve the original report, action sequence, scenario/persona/seed where applicable, database evidence, screenshots/traces, and repro bundle before changing code.
-3. Determine whether the timeout is a `PRODUCT_BUG`, `TEST_BUG`, `FLAKY_TEST`, `ENVIRONMENT`, `EXPECTED_KNOWN_GAP`, or `SPEC_AMBIGUITY` using repository taxonomy. A passing retry alone is not enough to call it flaky.
-4. Instrument observability narrowly if necessary. Inspect the exact `Start focus` action, semantic launcher state, section navigation, timer state, app/database state after the preceding ~201 actions, focus controls, scroll/viewport behavior, and any accumulated async work or performance degradation.
-5. Fix the actual cause. Do not solve it by merely increasing an arbitrary timeout or fixed sleep. If an observable readiness condition exists, synchronize on that condition. If product state is wrong, repair the product.
-6. Add regression coverage that fails for the reproduced cause and passes after the fix.
-7. Rerun the exact failing sequence repeatedly enough to establish stability, then run the full deterministic simulation library from a fresh build. No late `Start focus` timeout may remain hidden behind a quarantine unless repository evidence proves it is a legitimate external capability gap; if so, document why and mark the campaign BLOCKED rather than falsely COMPLETE.
+The lane should stress the system through behavior, not synthetic tight loops that bypass product contracts. Cover combinations such as:
 
-## Workstream C — Clean Sequential Android Native Qualification
+- hundreds/thousands of section transitions over a long sequence;
+- repeated Overview refreshes and Planning Hub opens/toggles;
+- repeated Todo/Habit create/edit/complete/archive flows;
+- Focus start/pause/complete cycles using safe accelerated/test clocks where supported;
+- repeated Workout and Calories interactions on seeded history;
+- command/quick-capture open/close/execute cycles;
+- app reload/relaunch/foreground cycles;
+- PWA/service-worker registration/unregistration/update paths in the lane designed for them;
+- DB-harness transitions used by simulation;
+- long-history reads across Habits, Momentum, Timeline/Progress, Calories, Workout, backup inventory, and planning;
+- recovery from interrupted/failed test actions without leaving the next action poisoned.
 
-The previous Momentum campaign's native evidence is `ENVIRONMENT`, not PASS. Obtain fresh current-source proof using the supported Android lane.
+Measure what the environment can prove reliably. Candidate metrics include process/renderer count, JS heap where supported, active page/context count, outstanding timers/listeners when observable, SQLite/OPFS handle behavior, request/query counts, long-task timing, section-switch latency, repeated read latency, and final data-row invariants.
 
-Important: run native provisioning/build/install/test **sequentially**. Do not run competing Expo prebuild, Gradle packaging, provision, or Maestro lanes in parallel. The previous collision is specifically what must be avoided.
+Do **not** invent arbitrary green thresholds just to create a test. Derive ceilings from existing D14/product responsiveness contracts, known-good baselines, repeated distributions, or explicit documented rationale. Prefer trend assertions such as bounded growth/stabilization when absolute metrics are environment-sensitive.
 
-1. Preflight the documented Android requirements and verify the intended API-36 x86_64 target/package provenance.
-2. If the installed package is absent or stale, run the repository provisioner for the selected serial and allow it to complete fully before launching another native command.
-3. Run a clean current-source smoke flow.
-4. Run the persistence lane and verify at minimum the existing representative Todo, Habit, Calories, Workout, and Settings persistence contracts relevant to the current source.
-5. Run lifecycle coverage required by impact analysis. Do not expand native scope simply to duplicate the web matrix, but do test native platform realities that browser tests cannot prove.
-6. Add a focused Momentum Garden native flow only if the existing native suite cannot prove the new surface is reachable/renderable/semantically usable after a current-source build. Keep it small and semantic; no raw absolute-coordinate taps or arbitrary sleeps.
-7. Verify app relaunch/foreground behavior and that opening/viewing Momentum remains read-only. Where direct native DB assertions are not practical, pair native visual proof with real-SQLite tests rather than inventing unsupported claims.
-8. Preserve JSON/Maestro reports and record exact replay commands.
+The soak lane must produce a compact machine-readable report and a deterministic/replayable seed or action manifest when practical. Preserve failing artifacts before fixes.
 
-A missing toolchain/device is `ENVIRONMENT`, never PASS. If the supported Nitro/Windows Android environment is available, environmental setup issues that are repository-fixable must be repaired. iOS must remain honestly reported as local `ENVIRONMENT` on Windows unless an executable cloud/EAS path is actually run and evidenced.
+Acceptance for this workstream requires at least two clean repeated post-fix runs from fresh state with no unexplained monotonic resource runaway, no late-sequence product failure, and no data-integrity drift.
 
-## Workstream D — Exhaustive Browser and Real-User Regression
+## Workstream C — Historical SQLite Migration Fixture Laboratory
 
-Build a fresh static web export and exercise both Momentum-specific and whole-app journeys.
+Create durable automated coverage for upgrading representative historical databases instead of proving only migration-from-zero.
 
-At minimum prove:
+1. Inspect the actual runtime migration chain in `core/db/client.ts` and current schema version. Do not trust stale documentation.
+2. Identify meaningful historical boundaries: major entity introductions, ownership/outbox changes, planning entities, habit lifecycle/rule-history changes, Gym V2, and other high-risk schema transitions.
+3. Build representative historical SQLite fixture generators or committed compact fixtures using repository-safe, anonymized synthetic data. Do not claim they are real user corpora.
+4. For each selected historical boundary, exercise upgrade to current schema and verify:
+   - schema version advances correctly;
+   - required columns/tables/indexes exist;
+   - pre-existing rows survive with correct defaults/transformations;
+   - soft deletes remain deleted;
+   - date keys/timestamps retain intended semantics;
+   - foreign/association references degrade safely when nullable or missing by design;
+   - ownership/outbox/account safety state remains coherent;
+   - new feature readers can consume upgraded rows without crashes or silent coercion;
+   - running initialization again does not reapply destructive changes.
+5. Add failure-torture cases where supported: interrupted/throwing migration step under a test seam, malformed legacy metadata, unexpected but representable legacy values, and rollback proof.
 
-- empty-device Garden neutral state;
-- task-only, habit-only, focus-only, workout-only, nutrition-only, planning/review, and multi-domain attribution semantics where existing fixtures allow deterministic proof;
-- completion followed by Overview refresh and reload reconstruction;
-- seven-day and 28-day detail windows;
-- local-midnight/day-rollover behavior and lifecycle-masked Habit dates;
-- repeated Overview ↔ other-section switching while Garden loads;
-- rapid open/close/toggle interactions without stale results or duplicate work;
-- keyboard operation and semantic accessibility labels;
-- reduced-motion behavior and light/dark theme readability;
-- no writes/outbox mutations from simply viewing Garden;
-- canonical feature CRUD still works after Garden integration;
-- the P0 real-user journey set remains green;
-- broader E2E selected by `qa:affected`/impact mapping is green, including PWA/service-worker infrastructure if the impact map requires it.
+Do not falsify the known gap about a real legacy corpus. If this campaign adds only synthetic historical fixtures, update documentation to state precisely what moved from "untested" to "synthetic migration matrix covered" and what still requires a real anonymized corpus.
 
-Do not weaken selectors or assertions merely to make tests pass. Repair brittle test code only when product behavior is demonstrably correct and document the evidence.
+## Workstream D — Recovery, Backup, Restore & Portable Fault Injection
 
-## Workstream E — Performance & Resource Qualification
+Treat every recovery boundary as hostile input and verify transaction atomicity.
 
-The predecessor campaign deliberately deferred deeper performance proof. Measure before optimizing.
+Exercise representative failures across current Backup Completeness V2, Restore V2, portable export/import, account ownership, and sync/outbox integration:
 
-Profile the new paths on representative empty, typical, and long-history datasets. Include repeated operation, not only cold-start samples.
+- corrupted or mismatched manifest/checksum;
+- missing required entity sections;
+- duplicate IDs;
+- invalid enum/range/date fields;
+- deleted/tombstoned rows;
+- owner mismatch;
+- partial settings payloads and disallowed keys;
+- unsupported future schema/scope versions;
+- supported legacy versions;
+- interrupted validation/import transaction where a test seam can safely inject failure;
+- reattempt after failure;
+- repeated import/recovery attempts;
+- empty-device gate race/recheck;
+- restore/import interactions with outbox and local owner binding;
+- cross-entity references to missing/deleted optional parents;
+- export→import round-trip on a broad seeded dataset.
 
-Measure and investigate as applicable:
+For each failure, prove the final authoritative database state, not only a UI error message. A failed operation must not leave half-imported rows or a misleading success marker.
 
-- Overview time-to-canonical-content with the one-day Garden request present;
-- one-day Garden read latency distribution;
-- seven-day and 28-day detail read latency distribution;
-- query count and whether any per-habit/N+1 or accidental unbounded-history read occurs;
-- long-history behavior of `buildDayCompletions` with `rangeStartDateKey` versus the full-history pre-existing path;
-- repeated Overview refresh/foreground/day-rollover behavior for unnecessary duplicate DB work;
-- repeated Planning Hub 7/28 switching;
-- section-switch responsiveness compared with existing performance gates;
-- memory/resource growth during the long deterministic simulation and repeated Garden navigation, where tooling permits meaningful evidence;
-- Android perceived/observable responsiveness on the current-source build, without fabricating unavailable frame/memory metrics.
+Do not connect to or mutate a live Supabase project unless the environment is explicitly authorized for disposable testing. When a real remote is unavailable, fully exercise local validation, adapters/mappers, mocked boundary contracts, schema-validation tooling, and `dist-sync`/journeys-sync lanes that the repo already supports; keep the real-remote capability gap honest.
 
-Use repeated samples/distributions for variable timings rather than deciding from one run. Optimize only when evidence shows a real regression or material waste. Preserve readability and architecture; do not introduce speculative caches or new persistence solely for benchmark scores.
+## Workstream E — Cross-Feature Time, Lifecycle & Data-Integrity Stress
 
-## Workstream F — Data Integrity, Timezone, Sync/Backup Isolation, and Recovery Regression
+Stress the boundaries where individually correct features can disagree when combined.
 
-Re-prove that the Garden remains outside all mutation/recovery boundaries:
+Cover at minimum:
 
-- no new schema migration or schema-version bump unless an unrelated demonstrated defect absolutely requires one;
-- no Garden entity in sync outbox, Supabase adapters, backup manifests, restore mappings, portable export, account ownership, or remote restore logic;
-- read-only Momentum operations leave relevant source rows and outbox state unchanged;
-- deleted/archived/lifecycle-ineligible records do not leak into Garden facts;
-- timezone and local-date boundaries remain correct across the repository's five-zone matrix;
-- restore/sync/account flows still pass impacted regression lanes despite extra read activity in Overview;
-- day rollover and foreground refresh cannot surface yesterday's Garden as today or race a newer read with stale results.
+- local midnight/day rollover while the app remains mounted;
+- foreground after one or more day changes;
+- timezone matrix around DST/non-DST and UTC-offset extremes already represented by repo tooling;
+- habit schedule/rule-history/lifecycle transitions crossing planning and Momentum windows;
+- Todo/Habit project/goal associations across archive/delete/restore-like local operations;
+- Daily Plan and Weekly Review historical references to rows later deleted or archived;
+- Focus and Workout sessions that start/end around date boundaries;
+- Calories day aggregation at timestamp boundaries;
+- reminders/actions delivered after their source habit changes state;
+- Linked Actions replay/idempotency after reload/restart;
+- rapid overlapping refreshes where stale async results could overwrite newer state;
+- account/session-loss conditions where local use must continue but remote operations must pause safely.
 
-If the audit finds a pre-existing unrelated Critical/High defect that is exercised by this campaign and threatens correctness, fix it with regression proof. Do not turn the campaign into an unbounded cleanup wave for unrelated Medium/Low debt; document lower-severity unrelated findings separately.
+Use existing domain helpers rather than introducing ad hoc date logic in tests. Any newly discovered cross-feature invariant should get targeted regression proof at the narrowest stable layer plus the relevant integration/journey lane.
 
-## Workstream G — Documentation, OpenSpec, QA Mapping, and Durable State
+## Workstream F — Native Android Endurance & Lifecycle Proof
 
-Keep the new campaign's OpenSpec and ExecPlan synchronized with reality throughout implementation.
+Use the supported current-source Android lane when the environment provides it. All native provisioning/build/install/test operations must be sequential; never run competing Expo prebuild/Gradle/native runners against the same project/device.
 
-Update documentation only where the current source/evidence changed. In particular:
+After preflight and current-source provenance verification:
 
-- close the long-term simulation known gap only after exact proof;
-- record native evidence as PASS/FAIL/ENVIRONMENT precisely;
-- update `docs/testing/known-gaps.md` when a registered gap is genuinely added/removed/changed;
-- update `qa/impact-map.json` if Momentum's shared boundaries are not conservatively represented;
-- keep the predecessor `add-momentum-garden-v1` artifacts historically accurate rather than rewriting its completed evidence as though it happened in this campaign;
-- record command, outcome, classification, artifact/repro path, and date in the new ExecPlan Validation Ledger.
+- run smoke and targeted persistence as required by impact analysis;
+- exercise repeated kill/relaunch/foreground flows;
+- exercise representative persistence across Todos, Habits, Planning, Workout, Calories, settings, and any campaign-touched shared modal/navigation path;
+- replay notification/lifecycle paths selected by impact mapping;
+- run a bounded native endurance sequence when the harness can do so reliably;
+- verify no test-only seam changes production behavior outside guarded test mode;
+- preserve reports and classify every failure before retrying.
+
+Do not claim iOS PASS on Windows. If a real EAS/macOS lane is available and authorized, it may be run and evidenced; otherwise retain `ENVIRONMENT`/capability-gap status.
+
+## Workstream G — QA Infrastructure, Reproducibility & Observability Hardening
+
+Only add instrumentation that helps prove a real campaign question.
+
+Good additions include:
+
+- reusable historical DB fixture builders;
+- deterministic fault-injection seams that are impossible in production mode;
+- soak reports with action counts, resource samples, timing distributions, and final database oracles;
+- automatic repro bundle capture on long-run failures;
+- leak/resource diagnostics that stay test-only;
+- impact-map entries for newly shared infrastructure;
+- clearer classification output when a failure is `PRODUCT_BUG`, `TEST_BUG`, `FLAKY_TEST`, `ENVIRONMENT`, `EXPECTED_KNOWN_GAP`, or `SPEC_AMBIGUITY`.
+
+Avoid giant bespoke test frameworks, environment-specific hacks, coordinate-only native scripts, permanent sleeps, or instrumentation that materially changes the product behavior being measured.
+
+## Workstream H — Documentation, Known Gaps & Repository Truth
+
+Update only documentation justified by current source and fresh evidence.
+
+Reconcile:
+
+- `docs/testing/known-gaps.md` — close or narrow only gaps actually proven; distinguish synthetic migration fixtures from real historical-user corpus evidence;
+- `docs/testing/autonomous-qa.md` and native docs if new durable lanes are added;
+- `qa/impact-map.json` when new harnesses or shared boundaries require conservative escalation;
+- `docs/PROJECT_STRUCTURE_MAP.md`, `AGENTS.md`, and knowledge-base docs only if architecture or canonical commands truly changed;
+- OpenSpec tasks/spec and the campaign ExecPlan with actual evidence, failure classifications, artifact paths, and exact commands.
+
+Historical completed campaign docs must remain historically accurate. Do not rewrite old reports as if new evidence existed at the time.
 
 ## Failure Policy
 
-Use exactly the repository taxonomy after reproduction:
+Use the repository taxonomy only after reproduction and evidence:
 
 - `PRODUCT_BUG`
 - `TEST_BUG`
@@ -176,67 +228,111 @@ Use exactly the repository taxonomy after reproduction:
 - `EXPECTED_KNOWN_GAP`
 - `SPEC_AMBIGUITY`
 
-An untriaged failure remains untriaged. A retry pass is not proof of flakiness. Preserve original evidence and fix the root cause. Never delete, skip, loosen, or inflate timing on a meaningful test merely to obtain green output.
+Rules:
 
-Any Critical/High regression introduced or exposed by the Momentum Garden change must be fixed before campaign completion. Medium/Low unrelated issues may be recorded for a later campaign when fixing them would broaden scope materially.
+- A retry pass alone is not proof of flakiness.
+- Preserve the first failing artifact/repro before modification.
+- Fix root causes, not symptoms.
+- Never delete/skip/weaken a meaningful assertion merely to get green.
+- Never use arbitrary timeout inflation as the primary fix when an observable readiness condition exists.
+- Critical/High durability, corruption, data-loss, migration, ownership, or cross-feature correctness defects discovered by this campaign must be fixed before completion.
+- If an external capability is genuinely unavailable, record `ENVIRONMENT` or the existing known gap; do not fabricate proof.
+
+## Parallelization and Isolation Rules
+
+Parallel work is allowed only when it is safe and useful.
+
+- The primary agent owns the campaign ExecPlan and integration decisions.
+- Delegate non-overlapping audits/tests by subsystem when available, but record scope and expected output before delegation.
+- Do not let parallel workers mutate the same files or migrations without explicit ownership.
+- Do not run native prebuild/provision/build lanes concurrently.
+- Do not run multiple destructive/fault-injection DB tests against the same persistent database instance.
+- Use isolated temp databases, ports, browser contexts, output directories, emulator state, and worktrees when concurrency could otherwise collide.
+- Integrate findings into the primary ExecPlan before relying on them after context loss.
+
+The campaign must remain runnable by a single capable agent as well; do not make completion depend on a specific multi-agent framework, model, vendor, or slash-command implementation.
 
 ## Required Validation Ladder
 
-Use `qa:affected` to refine the exact ladder, but the campaign cannot be completed without fresh evidence for the following unless a command is genuinely unavailable and explicitly classified:
+Use `qa:affected` to add gates based on actual modified areas. Before `COMPLETED`, fresh evidence should include all applicable items below:
 
-1. `npm run qa:fast`
-2. `npm test`
-3. `npm run qa:integration`
-4. `npm run qa:timezones`
-5. `npm run validate:themes`
-6. `npm run build:web`
-7. targeted Momentum Garden Playwright spec
-8. `npm run e2e:journeys:p0`
-9. broader Playwright/E2E required by impact analysis; prefer the full `npm run e2e` / `npm run e2e:full` before completion because shared simulation/Overview/Habit infrastructure changed
-10. `npm run sim:validate`
-11. exact deterministic reproduction of the prior long-run timeout
-12. `npm run qa:simulation -- --all --mode deterministic`
-13. `npm run qa:native:provision -- --serial <verified-serial>` when provisioning is needed
-14. `npm run qa:native:android -- --serial <verified-serial>`
-15. `npm run qa:native:targeted -- --serial <verified-serial>` when selected by impact/native scope
-16. `npm run qa:native:lifecycle -- --serial <verified-serial>` when selected by impact/native scope
-17. strict validation of the new OpenSpec change
-18. `npm run agent:plan:validate -- --plan <new-execplan-path>`
-19. `npm run agent:plan:validate:all`
-20. `git diff --check`
+1. `npm run typecheck`
+2. `npm run lint`
+3. targeted unit/integration tests added by each workstream
+4. full `npm test`
+5. `npm run qa:integration`
+6. `npm run qa:timezones`
+7. `npm run validate:themes` when shared UI/theme surfaces are touched
+8. `npm run supabase:schema:validate` when backup/sync/schema contracts are touched
+9. `npm run build:web`
+10. targeted Playwright specs for changed product/harness boundaries
+11. `npm run e2e:journeys:p0`
+12. `npm run e2e` or `npm run e2e:full` when shared/browser infrastructure is touched
+13. `npm run e2e:sync` when remote-boundary mock/sync/restore paths are touched
+14. `npm run sim:validate`
+15. targeted deterministic/repro scenarios
+16. `npm run qa:simulation -- --all --mode deterministic`
+17. the new/extended long-session soak lane, repeated from fresh state at least twice after final fixes
+18. the historical migration matrix from each selected fixture boundary
+19. recovery/portable fault-injection matrix and broad round-trip proof
+20. current-source Android smoke/targeted/lifecycle lanes selected by impact analysis, sequentially, when the supported environment is available
+21. strict validation of the new OpenSpec change
+22. `npm run agent:plan:validate -- --plan <campaign-execplan>`
+23. `npm run agent:plan:validate:all`
+24. `npm run qa:impact:validate`
+25. `npm run format:check` or focused Prettier validation covering changed files
+26. `git diff --check`
+27. final `npm run qa:full` unless a more comprehensive explicitly documented superset has already run on the exact final tree
 
-Also inspect current CI/deployment checks on the exact pushed final SHA. A green Vercel deployment alone is not a substitute for repository QA. If GitHub Actions are configured only for PR triggers and no run exists for a direct-main commit, record that fact instead of fabricating a CI pass.
+Inspect GitHub Actions/deployment state for the exact final pushed SHA. If a workflow is not configured to run for that delivery mode, record that fact instead of inventing a CI PASS.
 
 ## Acceptance Gates
 
 This campaign is complete only when all of the following are true:
 
-1. The previously reproducible long-term `Start focus` failure has an evidence-backed root-cause classification and is either fixed with regression proof or the campaign is honestly BLOCKED by a real external limitation. It may not remain an unexplained timeout.
-2. The complete deterministic simulation library passes from a fresh build with no hidden late-sequence failure.
-3. Current-source Android provisioning/install and the required Maestro smoke/persistence/lifecycle lanes execute sequentially and produce real evidence, or an irreducible external environment blocker is explicitly documented. A collision caused by concurrently launched repo commands is not an acceptable final blocker.
-4. Momentum Garden source semantics, bounded local-date behavior, read-only guarantees, accessibility, reduced motion, and reconstruction are proven in targeted automated tests.
-5. The wider P0 and impact-selected browser regression suite is green; full E2E is green unless an explicitly classified external blocker prevents it.
-6. Performance measurements show no material unbounded/N+1 behavior, no persistent Overview responsiveness regression, and no unexplained resource degradation attributable to the new feature. Any real regression is repaired and remeasured.
-7. The new `rangeStartDateKey` parameter is proven not to change callers that rely on historical/full-range habit semantics.
-8. No Momentum state has leaked into migration/sync/backup/restore/export/account boundaries.
-9. All repository-caused Critical/High defects found by this campaign are fixed with regression coverage.
-10. OpenSpec, ExecPlan, testing docs/known gaps, and QA mapping match the final source and evidence.
-11. The final ExecPlan is `Status: COMPLETED` only after its full definition of done is proven; otherwise leave it `ACTIVE` or `BLOCKED` with a precise exact next action.
+1. A deep whole-codebase system audit was completed and material findings are recorded with severity/root-cause classification.
+2. No unresolved Critical/High repository-caused durability, migration, corruption, ownership, data-loss, lifecycle, or long-session defect remains.
+3. A repeatable long-session/resource soak lane exists or the repository already had an equivalent that was proven sufficient; it passes at least two fresh post-fix runs without unexplained resource runaway or data-integrity drift.
+4. Representative historical SQLite versions upgrade to current schema through automated fixture-based tests with row/schema/default/idempotency assertions. Documentation clearly states whether fixtures are synthetic or real.
+5. Migration/fault-injection tests prove failures do not silently leave partially upgraded authoritative state where transactional guarantees are expected.
+6. Backup/Restore V2 and portable-data malformed/interrupted inputs fail safely, and supported broad round-trip recovery preserves deterministic authoritative state.
+7. Cross-feature local-date/timezone/lifecycle stress is green across the affected domain/integration/journey matrix.
+8. Full browser and deterministic simulation regression remains green on the final source.
+9. Current-source Android lanes selected by impact analysis pass when the supported environment is available; unavailable iOS/remote environments remain honestly classified.
+10. The new OpenSpec artifacts and Version-2 ExecPlan are complete, validated, and contain exact reproducible evidence rather than generic claims.
+11. The final working tree is clean; local `main` and fetched `origin/main` are at the same exact final SHA after normal push.
+12. The final commit message contains a detailed session report: baseline, audit scope, root causes/classifications, implementation, tests/evidence, known external limitations, and delivery state.
 
-## Git and Delivery Requirements
+## Stop Conditions
 
-- Work from current `main` after safe reconciliation with `origin/main`.
-- Do not force-push or rewrite history.
-- Keep task state in the new task-specific ExecPlan, not in `AGENTS.md` or a second global progress file.
-- Commit coherent milestones as repository policy allows.
-- Before final delivery, fetch/reconcile remote advancement, inspect the complete diff, run required final validation, and ensure no unrelated generated artifacts/logs are accidentally committed.
-- Final campaign commit message must be a detailed session/campaign report summarizing: baseline SHA, root causes and classifications, implementation fixes, simulation evidence, browser evidence, native evidence, performance findings, remaining limitations, and exact validation results.
-- Push all campaign commits normally to `origin/main`.
-- Verify final local HEAD equals `origin/main` and the worktree is clean.
-- Inspect checks/workflow results for the exact pushed final SHA and repair actionable repository-caused failures before claiming completion.
+Do not stop merely because one workstream is green or because the first soak run passes.
 
-## Executor Behavior
+Continue through **AUDIT → REPRODUCE → FIX → REGRESSION TEST → STRESS → MIGRATION/RECOVERY TORTURE → FULL VALIDATION → DELIVERY** until the acceptance gates are proven.
 
-Proceed autonomously. Do not return a prompt for another agent to paste. This file is the durable campaign instruction.
+Stop early only when:
 
-When invoked through `/goal continue`, read repository instructions and this prompt, create/resume the campaign's task-specific ExecPlan, reconcile Git, and execute from the first genuinely incomplete requirement. Do not redo already-landed predecessor work. Keep going through audit → reproduction → root-cause repair → broad validation → native/performance qualification → documentation → commit/push → exact-SHA verification until the acceptance gates are met or a genuine external blocker requires `Status: BLOCKED`.
+- a genuine external blocker makes the remaining required proof impossible and the ExecPlan is accurately changed to `BLOCKED` with the exact condition needed to resume; or
+- the audit proves a proposed sub-workstream is already fully covered by current source/tests and fresh evidence, in which case record that proof and spend effort on the next unresolved systemic risk instead of manufacturing changes.
+
+If no meaningful repository-executable hardening work remains after evidence-driven audit, do not invent features or churn. Mark the campaign complete with proof and leave external capability gaps explicitly documented.
+
+## Final Delivery Protocol
+
+Before final delivery:
+
+1. Reconcile the campaign OpenSpec tasks/spec, ExecPlan Current Checkpoint, Validation Ledger, changed-file inventory, known gaps, and actual Git diff.
+2. Run the final applicable validation ladder on the exact candidate tree.
+3. Fetch `origin`, reconcile any legitimate remote advancement safely, and rerun affected checks if reconciliation changes code.
+4. Commit coherent final changes with a **full detailed session-report commit body**, not a one-line summary only.
+5. Push normally to `origin/main` without force.
+6. Fetch again and verify local `HEAD == origin/main` and the working tree is clean.
+7. Inspect exact-SHA CI/deployment results where configured.
+8. Set the campaign ExecPlan to `COMPLETED` only when the acceptance gates are proven. If an irreducible external blocker remains for a mandatory gate, use `BLOCKED`, not optimistic completion language.
+
+## Autonomous Continuation
+
+Proceed autonomously from repository state. Do not wait for conversational memory or ask the user to restate this campaign. The durable handoff is this file plus the task-specific OpenSpec/ExecPlan created during startup.
+
+After context loss or a fresh session: read `AGENTS.md`, `.agent/PLANS.md`, this campaign's ExecPlan, inspect Git, run the repository resume/impact commands, reconcile the checkpoint with actual files, then continue from its `Exact next action`.
+
+Do not output a replacement prompt for the user to paste elsewhere. Keep durable state in the repository and continue the campaign through the repository's normal agent/goal continuation mechanism when the active environment supports one.
