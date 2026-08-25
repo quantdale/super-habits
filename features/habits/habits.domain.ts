@@ -387,9 +387,15 @@ export function buildDayCompletions(
   fallbackEffectiveFromDate?: string,
   todayKey = toDateKey(),
   lifecycleHistory?: HabitLifecycleHistoryInput,
+  rangeStartDateKey?: string,
 ): DayCompletion[] {
   const rules = parseHabitRuleHistory(history);
-  const startDateKey = firstHistoryDate(rules, completions, fallbackEffectiveFromDate);
+  // Derived read models can provide a bounded local window without changing
+  // the full-history behavior used by streaks and the existing habit UI.
+  const startDateKey =
+    rangeStartDateKey && isDateKey(rangeStartDateKey)
+      ? rangeStartDateKey
+      : firstHistoryDate(rules, completions, fallbackEffectiveFromDate);
   const dateKeys =
     days === undefined
       ? buildDateKeysBetween(startDateKey, todayKey)

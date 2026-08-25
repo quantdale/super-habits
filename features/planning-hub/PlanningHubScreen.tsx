@@ -12,6 +12,7 @@ import { TodayBriefingView } from '@/features/planning-hub/TodayBriefingView';
 import { GuidedPlanningFlow } from '@/features/planning-hub/GuidedPlanningFlow';
 import { ActivityTimelineView } from '@/features/activity/ActivityTimelineView';
 import { ProgressInsightsView } from '@/features/progress/ProgressInsightsView';
+import { MomentumDetailView } from '@/features/momentum/MomentumDetailView';
 
 type PlanningHubScreenProps = {
   initialView: PlanningHubView;
@@ -87,7 +88,10 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
         ) : view === 'goals' ? (
           <GoalListView onOpenGoal={(id) => setDetail({ kind: 'goal', id })} />
         ) : view === 'progress' ? (
-          <ProgressInsightsView />
+          <View className="gap-3">
+            <MomentumDetailView />
+            <ProgressInsightsView />
+          </View>
         ) : (
           <ActivityTimelineView />
         )}

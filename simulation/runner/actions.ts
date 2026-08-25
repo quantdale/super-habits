@@ -441,8 +441,7 @@ export async function actionLogCalories(
       .click({ force: true });
   }
   await page
-    .locator('div[style*="pointer-events: auto"]')
-    .getByRole('button', { name: 'Add entry', exact: true })
+    .getByRole('button', { name: 'Save calorie entry', exact: true })
     .click({ force: true });
   await expect(activeScopedText(page, `${step.food} - ${cal} kcal`)).toBeVisible({
     timeout: 15_000,

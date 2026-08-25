@@ -179,6 +179,24 @@ describe('buildDayCompletions', () => {
     ]);
     expect(result.every((entry) => entry.eligible)).toBe(true);
   });
+
+  it('supports an explicit bounded window for derived read models', () => {
+    const result = buildDayCompletions(
+      [],
+      1,
+      undefined,
+      [createHabitRule('2020-01-01', ALL_HABIT_WEEKDAYS, 1)],
+      undefined,
+      '2026-08-20',
+      undefined,
+      '2026-08-18',
+    );
+    expect(result.map((entry) => entry.dateKey)).toEqual([
+      '2026-08-18',
+      '2026-08-19',
+      '2026-08-20',
+    ]);
+  });
 });
 
 describe('calculateCurrentStreak', () => {

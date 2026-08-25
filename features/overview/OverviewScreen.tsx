@@ -10,6 +10,9 @@ import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildDateRangeOldestFirst, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import { getMomentumGarden } from '@/features/momentum/momentum.data';
+import { MomentumCard } from '@/features/momentum/MomentumCard';
+import type { MomentumGardenModel } from '@/features/momentum/momentum.types';
 import {
   getCalorieGoal,
   listCalorieEntries,
@@ -214,6 +217,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<OverviewSummaries>(EMPTY_SUMMARIES);
   const [nextBestAction, setNextBestAction] = useState<NextBestAction | null>(null);
+  const [momentum, setMomentum] = useState<MomentumGardenModel | null>(null);
 
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -223,6 +227,13 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       setSummaries(nextLoad.summaries);
       setNextBestAction(nextLoad.nextBestAction);
       setLoadError(null);
+
+      // The Garden is a derived read model. Load it after the compact
+      // dashboard facts so a bounded history query can never delay the
+      // day-oriented shell or block switching into another section.
+      void getMomentumGarden({ todayKey: toDateKey(), days: 1 })
+        .then(setMomentum)
+        .catch((err) => console.error('[OverviewScreen] momentum refresh failed', err));
     } catch (err) {
       // F7: a failed load must stay visible — per-card empty copy would read
       // as fake "all clear" data. The error panel below offers a retry.
@@ -302,7 +313,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     summaries.workout.todayState === 'resumable' ||
     summaries.calories.consumed > 0 ||
     summaries.projects.activeCount > 0 ||
-    summaries.goals.activeCount > 0;
+    summaries.goals.activeCount > 0 ||
+    (momentum?.activeDays ?? 0) > 0;
   // Guided starter: primary CTA from the existing chain plus up to two
   // follow-up options (rendered only in the zero-data panel below).
   const starterCtas = listEmptyStateCtas(summaries);
@@ -431,6 +443,9 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 workout={summaries.workout}
                 calories={summaries.calories}
               />
+              {momentum ? (
+                <MomentumCard model={momentum} onViewGarden={() => openPlanningHub('progress')} />
+              ) : null}
             </View>
           ) : null}
 

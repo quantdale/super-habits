@@ -443,6 +443,21 @@ Preserve user customization while introducing a stable Today orientation layer.
 
 Connect meaningful actions from the redesigned modules to the selected living-progress metaphor.
 
+**Implementation status — shipped in Momentum Garden V1.** The artifact is a
+derived local read model, not a score or event ledger. Today and bounded recent
+history independently map active completed Todos, canonical scheduled Habit
+completions, completed Focus sessions with positive duration, completed
+Workout sessions, day-level Nutrition tracking, completed Daily Plans and
+Weekly Reviews, and dated Goal/Project completions. Tasks and Habits cap at
+three visual growth levels per day; Focus caps at two completed sessions;
+Workout, Nutrition, Planning, and Review use one factual day-level signal.
+Habit off-days and lifecycle-masked dates are neutral, calorie-target
+adherence never damages the Garden, and all source explanations remain visible.
+The compact Today Garden lives below the pinned Today Progress strip in
+Overview; bounded seven/28-day history lives inside the existing Progress
+Planning Hub view. It reconstructs offline from SQLite and adds no migration,
+sync, backup, export, or Supabase entity.
+
 ### Acceptance criteria
 
 - User can identify the next useful action within a few seconds.
