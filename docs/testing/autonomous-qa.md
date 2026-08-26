@@ -14,6 +14,7 @@ After understanding the changed architecture and invariants:
 3. Run `npm run qa:integration` for persistence, sync, restore, or cross-feature data changes.
 4. Run `npm run qa:journeys` for focused user-level PR journeys.
 5. Run `npm run qa:simulation` for the deterministic P0 scenario subset. Use `npm run qa:simulation -- --mode seeded --seed <seed>` only for report-only exploration.
+   For long-session/resource qualification run the deterministic soak scenario: `npm run sim:run -- --mode deterministic --scenario soak-sustained-use` (HEAVY fixture; twelve day-long cycles of full section tours, CRUD churn, focus starts, hard reloads, and midnight crossings with strict final integrity oracles). Acceptance requires two clean fresh-state runs with all oracles green and no late-sequence latency growth; per-step `durationMs` distributions live in each run's `simulation-output/run_*/run-report.json`.
 6. Run `npm run qa:full` when the impact plan marks broad regression, or when changing shared E2E/simulation/DB/time infrastructure.
 7. Run `npm run qa:native:smoke` when native UI/navigation, settings persistence, or EAS/native build configuration changes. On an Android-capable host, use `npm run qa:native:android`; use `npm run qa:native:ios` or the EAS workflow for iOS.
 8. Run `npm run qa:native:lifecycle` and the notification-path flow when changing Pomodoro timing, `AppState`, `expo-notifications`, or native lifecycle code. A missing device is an explicit `ENVIRONMENT` blocker, not a native pass.

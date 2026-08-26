@@ -71,8 +71,9 @@ repository-caused Critical/High defect found.
     **151 files / 1,798 tests passed** including the new hot-path index tests
     and the updated checkpoint test.
   - Created this OpenSpec change (proposal/design/tasks/spec) and this plan.
-- In progress: Committing the migration fixture laboratory; then Workstream
-  B soak lane.
+- In progress: Committing the soak lane; then remaining gates (qa:timezones,
+  validate:themes, browser/simulation regression, native availability
+  check) and delivery.
 - Important modified files: see `git status --short`; core areas are
   `core/db/client.ts`, `core/backup/**`, `core/sync/**`,
   `core/providers/AppProviders.tsx`, `features/{calories,overview,workout}/`,
@@ -84,8 +85,9 @@ repository-caused Critical/High defect found.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the historical-fixture milestone; then build the
-  Workstream B long-session soak lane.
+- Exact next action: Commit the soak lane; run qa:timezones +
+  validate:themes; then check Android emulator availability for sequential
+  native endurance (Workstream F) before the full ladder and delivery.
 - Remaining definition of done: All acceptance gates 1–12 in
   `.agent/EXECUTION_PROMPT.md`.
 
@@ -282,6 +284,19 @@ e2e:sync, e2e:journeys; broad regression required.
   the real chain to v24 with reopen-idempotency.
 - 2026-08-26 — docs/testing/known-gaps.md gap #5 updated: synthetic
   migration matrix covered; real-corpus proof remains explicitly open.
+- 2026-08-26 — soak lane fresh-state pass #1 — PASS; 132/132 steps
+  (12 day-cycles × section tours + CRUD churn, 4 focus starts, 3 hard
+  reloads, 12 midnight crossings over HEAVY); total 126,969ms; section-switch
+  latency thirds 348/341/321ms (no growth trend); report:
+  simulation-output/run_mt9gn2ms_4at18z4v/run-report.json.
+- 2026-08-26 — soak lane fresh-state pass #2 — PASS; 132/132 steps; total
+  124,778ms; switch thirds 354/338/327ms; report:
+  simulation-output/run_mt9gqlin_467b35zm/run-report.json. Acceptance
+  (two clean post-fix fresh runs, bounded latencies, integrity oracles)
+  MET. Rationale: absolute memory ceilings are not measurable in this
+  environment without a CDP harness; bounded-growth/stabilization is
+  asserted via per-step durationMs distributions plus full-sequence oracle
+  greenness — documented in simulation/scenarios/soakSustainedUse.ts.
 
 ## Changed Files / Areas
 

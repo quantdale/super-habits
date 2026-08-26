@@ -21,9 +21,9 @@
 
 ## 4. Long-session soak lane (Workstream B)
 
-- [ ] 4.1 Build the repeatable bounded soak lane driving realistic sustained behavior with machine-readable resource/report output.
-- [ ] 4.2 Derive assertion thresholds from existing contracts/baselines; document rationale.
-- [ ] 4.3 Produce two clean post-fix fresh-state runs with no unexplained resource runaway or data-integrity drift.
+- [x] 4.1 Build the repeatable bounded soak lane driving realistic sustained behavior with machine-readable resource/report output.
+- [x] 4.2 Derive assertion thresholds from existing contracts/baselines; document rationale.
+- [x] 4.3 Produce two clean post-fix fresh-state runs with no unexplained resource runaway or data-integrity drift.
 
 ## 5. Historical SQLite migration fixture laboratory (Workstream C)
 
