@@ -86,6 +86,7 @@ import {
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { validateHabit } from '@/lib/validation';
 import { ValidationError } from '@/core/ui/ValidationError';
 import {
@@ -158,6 +159,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const dayGeneration = useDayRolloverGeneration();
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
+  const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitsLoaded, setHabitsLoaded] = useState(false);
   // habitId → dateKey → count for every loaded completion row; today's and
@@ -207,15 +209,20 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   );
 
   const refresh = useCallback(async () => {
+    // Rollover/foreground races: an older run must never overwrite newer
+    // day-keyed state after a newer refresh started or the screen unmounted.
+    const isCurrent = beginRefresh();
     // One-time import of the pre-v20 AsyncStorage pause/archive sets.
     await migrateLegacyHabitLifecycle();
     const list = await listHabits();
+    if (!isCurrent()) return;
     setHabits(list);
     setHabitsLoaded(true);
     const todayKey = toDateKey();
     // F13: one full completion scan feeds the per-day counts, streaks (full
     // history), and the 364-day grid slice — no second overlapping query.
     const allHabitCompletions = await getAllHabitCompletions();
+    if (!isCurrent()) return;
     const completionsByHabit = new Map<string, typeof allHabitCompletions>();
     const nextCountsByHabitDate: Record<string, Record<string, number>> = {};
     for (const completion of allHabitCompletions) {
@@ -272,7 +279,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
 
     const bestStreak = Math.max(0, ...Object.values(streaks));
     setOverallStreak(bestStreak);
-  }, []);
+  }, [beginRefresh]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 

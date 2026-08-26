@@ -38,7 +38,8 @@ async function getRealDb(): Promise<RealDatabase> {
 
 /**
  * Minimal Supabase-chained-call stub implementing exactly the surface
- * `restore.coordinator` uses: head-counts, latest-updated_at, and paged rows.
+ * `restore.coordinator` uses: one combined count+latest-updated_at request per
+ * entity, plus paged rows for imports.
  */
 function buildSupabaseMock(
   remoteRowsByEntity: RemoteRowsByEntity,
@@ -52,29 +53,19 @@ function buildSupabaseMock(
     const activeRows = () => rows.filter((row) => deletedAt(row) == null);
 
     return {
-      select: vi.fn((_columns: string, queryOptions?: { head?: boolean }) => {
-        if (queryOptions?.head) {
-          const headQuery = {
-            eq: vi.fn(() => headQuery),
-            is: vi.fn(() =>
-              Promise.resolve({ data: null, count: activeRows().length, error: null }),
-            ),
-          };
-          return headQuery;
-        }
-
+      select: vi.fn((_columns: string, queryOptions?: { head?: boolean; count?: string }) => {
         const query = {
           eq: vi.fn(() => query),
           is: vi.fn(() => query),
           order: vi.fn(() => query),
           limit: vi.fn(() => {
-            const latest = [...activeRows()].sort((a, b) =>
-              updatedAt(b).localeCompare(updatedAt(a)),
-            )[0];
+            const active = activeRows();
+            const latest = [...active].sort((a, b) => updatedAt(b).localeCompare(updatedAt(a)))[0];
             return Promise.resolve({
               data: latest
                 ? [{ updated_at: (latest as { updated_at?: unknown }).updated_at ?? null }]
                 : [],
+              ...(queryOptions?.count === 'exact' ? { count: active.length } : {}),
               error: null,
             });
           }),

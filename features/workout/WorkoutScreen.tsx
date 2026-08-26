@@ -69,6 +69,7 @@ import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { isValidDateKey, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
 import { WorkoutSessionScreen, type SessionResume } from './WorkoutSessionScreen';
 import { WorkoutHistoryDetailModal } from './WorkoutHistoryDetail';
@@ -152,6 +153,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.workout.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
+  const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
@@ -188,43 +190,68 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
 
   const refresh = useCallback(async () => {
-    const r = await listRoutines();
-    setRoutines(r);
-
+    const isCurrent = beginRefresh();
     const start364 = new Date();
     start364.setDate(start364.getDate() - 363);
     const startKey = toDateKey(start364);
-    const endKey = toDateKey(new Date());
-    const allLogs = await listWorkoutLogsForRange(startKey, endKey);
+    const todayKey = toDateKey(new Date());
+    const volumeStart = new Date();
+    volumeStart.setDate(volumeStart.getDate() - 7 * 7 - ((volumeStart.getDay() + 6) % 7));
+
+    // Every read here is mutually independent, so they run as ONE concurrent
+    // batch instead of ~ten serialized round trips through the async SQLite
+    // bridge on each tab activation. Only the routine-detail fetch depends on
+    // another read (the resolved schedule) and stays sequential after.
+    const [
+      r,
+      allLogs,
+      totals,
+      lastPerformedMap,
+      sessionDraft,
+      resolved,
+      plan,
+      weightEntries,
+      performanceRowsLoaded,
+      customExercisesLoaded,
+      preferences,
+    ] = await Promise.all([
+      listRoutines(),
+      listWorkoutLogsForRange(startKey, todayKey),
+      listSessionTotalsForRange(toDateKey(volumeStart), todayKey),
+      getLastPerformedByRoutine(),
+      getWorkoutSessionDraft(),
+      resolveWorkoutScheduleForDate(todayKey),
+      listWeeklyPlan(),
+      listBodyWeightEntries(),
+      listWorkoutPerformanceRows(),
+      listCustomExercises(),
+      getWorkoutPreferences(),
+    ]);
+    if (!isCurrent()) return;
+
+    setRoutines(r);
     setWorkoutActivityDays(buildWorkoutActivityDays(allLogs, 364));
     setWorkoutHeatmapDays(buildWorkoutHeatmapDays(allLogs, 364));
     setAllLogs(allLogs);
     setRecentLogs(allLogs.slice(0, 10));
-
-    const volumeStart = new Date();
-    volumeStart.setDate(volumeStart.getDate() - 7 * 7 - ((volumeStart.getDay() + 6) % 7));
-    const totals = await listSessionTotalsForRange(toDateKey(volumeStart), endKey);
     setWeeklyVolume(buildVolumePerWeek(totals, 8));
-
-    setLastPerformed(await getLastPerformedByRoutine());
-    setDraft(await getWorkoutSessionDraft());
-    const todayKey = toDateKey(new Date());
-    const resolved = await resolveWorkoutScheduleForDate(todayKey);
+    setLastPerformed(lastPerformedMap);
+    setDraft(sessionDraft);
     setTodaySchedule(resolved);
-    setWeeklyPlan(await listWeeklyPlan());
-    setBodyWeightEntries(await listBodyWeightEntries());
-    setPerformanceRows(await listWorkoutPerformanceRows());
-    setCustomExercises(await listCustomExercises());
-    const preferences = await getWorkoutPreferences();
+    setWeeklyPlan(plan);
+    setBodyWeightEntries(weightEntries);
+    setPerformanceRows(performanceRowsLoaded);
+    setCustomExercises(customExercisesLoaded);
     setWorkoutPreferences(preferences);
     setBodyWeightGoalValue(preferences.goalWeight ? String(preferences.goalWeight.value) : '');
     if (preferences.goalWeight) setBodyWeightUnit(preferences.goalWeight.unit);
     if (resolved.routineId) {
+      if (!isCurrent()) return;
       setTodayRoutine(await getRoutineWithExercises(resolved.routineId));
     } else {
       setTodayRoutine(null);
     }
-  }, []);
+  }, [beginRefresh]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 

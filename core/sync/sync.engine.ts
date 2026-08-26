@@ -237,7 +237,15 @@ export class SyncEngine {
     try {
       await persistenceAtSelection;
     } catch (error) {
-      this.queue = [...snapshot, ...this.queue];
+      // Restore the snapshot ahead of anything enqueued while the persistence
+      // tail was pending — but if an enqueue for the same (entity,id) landed
+      // in this.queue during the await, keep that NEWER record instead of
+      // stacking a duplicate older entry behind it.
+      const currentKeys = new Set(this.queue.map(dedupeKey));
+      this.queue = [
+        ...snapshot.filter((record) => !currentKeys.has(dedupeKey(record))),
+        ...this.queue,
+      ];
       this.recordFailure(error);
       throw error;
     }

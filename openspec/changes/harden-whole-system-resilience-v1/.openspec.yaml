@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-08-26
+goal: Prove and repair whole-system resilience — long-session resource
+  behavior, historical SQLite upgrades, recovery fault atomicity,
+  cross-feature date/lifecycle consistency, and sequential native endurance —
+  without reopening completed feature campaigns.

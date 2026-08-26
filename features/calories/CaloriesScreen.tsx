@@ -47,6 +47,7 @@ import type { FrequentFood, MacroTargets } from '@/features/calories/calories.do
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
 import { CalorieGoalModal } from './CalorieGoalModal';
 import { loadMacroTargets, saveMacroTargets } from './caloriesTargets';
@@ -135,6 +136,7 @@ function ViewModeSwitch({
 export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const dayGeneration = useDayRolloverGeneration();
+  const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const colorText = sectionAccents.calories.text;
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
@@ -167,6 +169,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    const isCurrent = beginRefresh();
     const startYear = new Date();
     startYear.setDate(startYear.getDate() - 364);
     // Rolling 30-day window feeding the Frequent chips (most-logged foods).
@@ -187,6 +190,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     );
 
     const [recent, all] = await savedMealsPromise;
+    if (!isCurrent()) return;
     setRecentMeals(recent);
     setAllSavedMeals(all);
 
@@ -196,12 +200,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       goalPromise,
       frequentEntriesPromise,
     ]);
+    if (!isCurrent()) return;
 
     setEntries(nextEntries);
     setSummary364(rangeYear);
     setGoal(savedGoal);
     setFrequentFoods(buildFrequentFoods(windowEntries));
-  }, [selectedDateKey]);
+  }, [beginRefresh, selectedDateKey]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 

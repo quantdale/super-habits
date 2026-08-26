@@ -146,8 +146,6 @@ export type WorkoutLog = {
   duration_seconds?: number | null;
   /** Snapshot added by Gym V2; legacy logs fall back to the live routine name. */
   routine_name?: string | null;
-  /** `quick` keeps content-light linked/manual logs distinct from guided sessions. */
-  session_kind?: 'quick' | 'guided';
 };
 
 export type RoutineExercise = BaseEntity & {

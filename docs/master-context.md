@@ -236,7 +236,7 @@ Companion docs in this folder:
 - `linked_action_events`
 - `linked_action_executions`
 - `app_meta` stores schema version and app-level settings/metadata such as guest profile, calorie goal, pomodoro settings, and date-key cutover markers.
-- Current runtime schema version is `23`; next migration slot is `if (version < 24)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding; planning entities arrived in migrations 16–19, hardening-wave-v2 durable-state promotion in migration 20, `daily_plans.top_todo_titles` in migration 21, Gym V2 workout/catalog/planning/body-weight state in migration 22, and deep Gym V2 semantic metadata in migration 23.
+- Current runtime schema version is `24`; next migration slot is `if (version < 25)`. Habit rows include effective-dated weekly schedule and target history in `rule_history`; notification responses use durable `processed_notification_actions` state; synced mutations use the durable `sync_outbox` table with enqueue-time owner binding; planning entities arrived in migrations 16–19, hardening-wave-v2 durable-state promotion in migration 20, `daily_plans.top_todo_titles` in migration 21, Gym V2 workout/catalog/planning/body-weight state in migration 22, deep Gym V2 semantic metadata in migration 23, and hot-path range indexes in migration 24.
 - `toDateKey()` now uses local calendar dates, not UTC.
 
 ### Confirmed from docs
@@ -402,7 +402,7 @@ Companion docs in this folder:
 
 - `core/db/schema.sql` is a hand-maintained reference snapshot of the runtime
   bootstrap DDL plus migrations (it may lag the runtime chain — currently
-  schema version `23`); the next append-only slot is `if (version < 24)`.
+  schema version `24`); the next append-only slot is `if (version < 25)`.
 - Some docs still describe Linked Actions as "planned" even though editor flows, source dispatch, and in-app notices are already live on `main`.
 - Some docs still describe sync as push-only even though restore v1 preview/import is now shipped separately from adapter pull.
 

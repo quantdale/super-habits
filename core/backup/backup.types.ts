@@ -846,6 +846,13 @@ export function resolveBackupScope(input: {
     if (input.backupScopeVersion > BACKUP_SCOPE_VERSION) {
       return null;
     }
+    // Scope 1 was never a manifest-bearing epoch; an explicit stamp below 2
+    // is corruption, not a resolvable historical scope. The -1 sentinel means
+    // "no explicit stamp" (manifests that predate scope versioning) and must
+    // still fall through to exact entity-set matching.
+    if (input.backupScopeVersion >= 0 && input.backupScopeVersion < 2) {
+      return null;
+    }
   }
   const keys = Object.keys(input.entityMetadata);
   if (sortedEquals(keys, [...BACKUP_ENTITIES])) {
@@ -925,6 +932,18 @@ export const BACKUP_SOFT_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
 export const BACKUP_HARD_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
   'habit_completions',
   'saved_meals',
+]);
+
+/**
+ * Append-only history tables: rows are immutable once written and the
+ * product never deletes them locally. A queued `delete` operation for these
+ * entities is a defect upstream of the sync boundary, not data to forward.
+ */
+export const BACKUP_NEVER_DELETED_ENTITIES: ReadonlySet<BackupEntity> = new Set([
+  'workout_logs',
+  'workout_session_exercises',
+  'workout_session_sets',
+  'pomodoro_sessions',
 ]);
 
 export type BackupState = 'v2_complete' | 'v1_legacy' | 'in_progress' | 'invalid' | 'unavailable';

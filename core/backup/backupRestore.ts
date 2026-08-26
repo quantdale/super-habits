@@ -80,6 +80,61 @@ import {
 import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
 import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
 
+/**
+ * The complete V2 import sequence, keyed by entity in dependency order
+ * (parents before children; settings are staged separately below). The table
+ * is the single source of import coverage: a new BACKUP_ENTITIES member
+ * cannot silently skip its importer because the exported key list is asserted
+ * to equal BACKUP_ENTITIES exactly by the inventory coherence test.
+ */
+export const RESTORE_IMPORTERS: readonly [
+  BackupEntity,
+  (db: Parameters<typeof applyRemoteProjects>[0], rows: unknown[]) => Promise<void>,
+][] = [
+  ['projects', (db, rows) => applyRemoteProjects(db, rows as Project[])],
+  ['goals', (db, rows) => applyRemoteGoals(db, rows as Goal[])],
+  ['todos', (db, rows) => applyRemoteTodos(db, rows as Todo[])],
+  ['habits', (db, rows) => applyRemoteHabits(db, rows as Habit[])],
+  ['daily_plans', (db, rows) => applyRemoteDailyPlans(db, rows as DailyPlan[])],
+  ['habit_completions', (db, rows) => applyRemoteHabitCompletions(db, rows as HabitCompletion[])],
+  ['calorie_entries', (db, rows) => applyRemoteCalorieEntries(db, rows as CalorieEntry[])],
+  ['saved_meals', (db, rows) => applyRemoteSavedMeals(db, rows as SavedMeal[])],
+  ['custom_exercises', (db, rows) => applyRemoteCustomExercises(db, rows as CustomExercise[])],
+  ['workout_routines', (db, rows) => applyRemoteWorkoutRoutines(db, rows as WorkoutRoutine[])],
+  ['routine_exercises', (db, rows) => applyRemoteRoutineExercises(db, rows as RoutineExercise[])],
+  [
+    'routine_exercise_sets',
+    (db, rows) => applyRemoteRoutineExerciseSets(db, rows as RoutineExerciseSet[]),
+  ],
+  ['workout_logs', (db, rows) => applyRemoteWorkoutLogs(db, rows as WorkoutLog[])],
+  [
+    'workout_session_exercises',
+    (db, rows) => applyRemoteWorkoutSessionExercises(db, rows as WorkoutSessionExercise[]),
+  ],
+  [
+    'workout_session_sets',
+    (db, rows) => applyRemoteWorkoutSessionSets(db, rows as WorkoutSessionSet[]),
+  ],
+  [
+    'workout_weekly_plan',
+    (db, rows) => applyRemoteWorkoutWeeklyPlan(db, rows as WorkoutWeeklyPlanEntry[]),
+  ],
+  [
+    'workout_schedule_overrides',
+    (db, rows) => applyRemoteWorkoutScheduleOverrides(db, rows as WorkoutScheduleOverride[]),
+  ],
+  [
+    'body_weight_entries',
+    (db, rows) => applyRemoteBodyWeightEntries(db, rows as BodyWeightEntry[]),
+  ],
+  ['pomodoro_sessions', (db, rows) => applyRemotePomodoroSessions(db, rows as PomodoroSession[])],
+  [
+    'linked_action_rules',
+    (db, rows) => applyRemoteLinkedActionRules(db, rows as LinkedActionRuleRow[]),
+  ],
+  ['weekly_reviews', (db, rows) => applyRemoteWeeklyReviews(db, rows as WeeklyReview[])],
+];
+
 export type RestoreV2Result =
   | {
       status: 'restored';
@@ -147,6 +202,11 @@ export function parseManifestRow(row: unknown): BackupManifest | null {
     if (typeof meta.checksum !== 'string' || !/^[0-9a-f]{64}$/.test(meta.checksum)) {
       return null;
     }
+    // Unknown/future entity keys are not cast into the BackupEntity type:
+    // they are excluded here so scope resolution downstream still classifies
+    // the manifest honestly (unknown scopes fail closed) instead of this
+    // parser inventing entity names it does not understand.
+    if (!(BACKUP_ENTITIES as readonly string[]).includes(entity)) continue;
     metadata[entity as BackupEntity] = { count: meta.count, checksum: meta.checksum };
   }
   // Settings integrity metadata (closure contract). A v2 manifest without it
@@ -386,12 +446,17 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // Prefetch ONLY the scope's entities before any local write; validate and
   // verify everything. Limiting to the resolved scope also keeps historical
   // restores from querying planning tables that did not exist when the backup
-  // was taken.
+  // was taken. Entities are independent remote reads for the same owner and
+  // the device is guaranteed empty, so they fetch concurrently instead of
+  // paying ~21 sequential round-trip chains (each paginated).
   const rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>> = {};
   try {
-    for (const entity of scope.entitySet) {
-      rowsByEntity[entity] = await fetchRemoteRows(entity, ownerUserId);
-    }
+    const fetched = await Promise.all(
+      scope.entitySet.map((entity) => fetchRemoteRows(entity, ownerUserId)),
+    );
+    scope.entitySet.forEach((entity, index) => {
+      rowsByEntity[entity] = fetched[index];
+    });
   } catch (error) {
     return {
       status: 'invalid',
@@ -579,50 +644,10 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     // Todos/Habits → Daily Plans; workout_session_sets after its session
     // exercises); settings staged and applied after full validation (already
     // done above). Rows were runtime-validated and integrity-verified above;
-    // the casts apply the validated shapes.
-    const typed = <T>(entity: BackupEntity): T => (rowsByEntity[entity] ?? []) as unknown as T;
-    await applyRemoteProjects(transactionDb, typed<Project[]>('projects'));
-    await applyRemoteGoals(transactionDb, typed<Goal[]>('goals'));
-    await applyRemoteTodos(transactionDb, typed<Todo[]>('todos'));
-    await applyRemoteHabits(transactionDb, typed<Habit[]>('habits'));
-    await applyRemoteDailyPlans(transactionDb, typed<DailyPlan[]>('daily_plans'));
-    await applyRemoteHabitCompletions(transactionDb, typed<HabitCompletion[]>('habit_completions'));
-    await applyRemoteCalorieEntries(transactionDb, typed<CalorieEntry[]>('calorie_entries'));
-    await applyRemoteSavedMeals(transactionDb, typed<SavedMeal[]>('saved_meals'));
-    await applyRemoteCustomExercises(transactionDb, typed<CustomExercise[]>('custom_exercises'));
-    await applyRemoteWorkoutRoutines(transactionDb, typed<WorkoutRoutine[]>('workout_routines'));
-    await applyRemoteRoutineExercises(transactionDb, typed<RoutineExercise[]>('routine_exercises'));
-    await applyRemoteRoutineExerciseSets(
-      transactionDb,
-      typed<RoutineExerciseSet[]>('routine_exercise_sets'),
-    );
-    await applyRemoteWorkoutLogs(transactionDb, typed<WorkoutLog[]>('workout_logs'));
-    await applyRemoteWorkoutSessionExercises(
-      transactionDb,
-      typed<WorkoutSessionExercise[]>('workout_session_exercises'),
-    );
-    await applyRemoteWorkoutSessionSets(
-      transactionDb,
-      typed<WorkoutSessionSet[]>('workout_session_sets'),
-    );
-    await applyRemoteWorkoutWeeklyPlan(
-      transactionDb,
-      typed<WorkoutWeeklyPlanEntry[]>('workout_weekly_plan'),
-    );
-    await applyRemoteWorkoutScheduleOverrides(
-      transactionDb,
-      typed<WorkoutScheduleOverride[]>('workout_schedule_overrides'),
-    );
-    await applyRemoteBodyWeightEntries(
-      transactionDb,
-      typed<BodyWeightEntry[]>('body_weight_entries'),
-    );
-    await applyRemotePomodoroSessions(transactionDb, typed<PomodoroSession[]>('pomodoro_sessions'));
-    await applyRemoteLinkedActionRules(
-      transactionDb,
-      typed<LinkedActionRuleRow[]>('linked_action_rules'),
-    );
-    await applyRemoteWeeklyReviews(transactionDb, typed<WeeklyReview[]>('weekly_reviews'));
+    // the ordered importer table applies every scope entity exactly once.
+    for (const [entity, apply] of RESTORE_IMPORTERS) {
+      await apply(transactionDb, rowsByEntity[entity] ?? []);
+    }
 
     // Settings: the payload was fetched and integrity-verified ABOVE, before
     // this transaction began. SQLite-backed settings join the transaction
@@ -698,14 +723,13 @@ export async function getBackupStateSummary(
   ownerUserId: string | null,
 ): Promise<BackupStateSummary> {
   const db = await getDatabase();
-  const outboxCount = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) AS count FROM sync_outbox',
-  );
-  const backfill = await getBackfillStatusForSummary(db);
-  const dirty = await db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_meta WHERE key = ?',
-    [appMetaKeys.backupDirty.key],
-  );
+  const [outboxCount, backfill, dirty] = await Promise.all([
+    db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM sync_outbox'),
+    getBackfillStatusForSummary(db),
+    db.getFirstAsync<{ value: string }>('SELECT value FROM app_meta WHERE key = ?', [
+      appMetaKeys.backupDirty.key,
+    ]),
+  ]);
 
   const pendingChangeCount = (outboxCount?.count ?? 0) + (dirty?.value === '1' ? 1 : 0);
 

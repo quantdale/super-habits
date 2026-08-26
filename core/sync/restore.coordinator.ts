@@ -156,21 +156,28 @@ async function fetchRemoteEntityMeta(
     };
   }
 
-  const countResult = await supabase
+  // One round trip per entity: `count: exact` reports the full filtered row
+  // count while the ordered single-row payload carries the latest updated_at.
+  // (The previous two-request variant doubled preview latency and request
+  // count for every entity with data.)
+  const result = await supabase
     .from(entity)
-    .select('id', { count: 'exact', head: true })
+    .select('updated_at', { count: 'exact' })
     .eq('user_id', ownerUserId)
-    .is('deleted_at', null);
-  if (countResult.error) {
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (result.error) {
     return {
       remoteState: 'error',
       remoteRowCount: null,
       latestUpdatedAt: null,
-      errorMessage: countResult.error.message,
+      errorMessage: result.error.message,
     };
   }
 
-  const count = countResult.count ?? 0;
+  const count = result.count ?? 0;
   if (count === 0) {
     return {
       remoteState: 'empty',
@@ -180,24 +187,7 @@ async function fetchRemoteEntityMeta(
     };
   }
 
-  const latestResult = await supabase
-    .from(entity)
-    .select('updated_at')
-    .eq('user_id', ownerUserId)
-    .is('deleted_at', null)
-    .order('updated_at', { ascending: false })
-    .limit(1);
-
-  if (latestResult.error) {
-    return {
-      remoteState: 'error',
-      remoteRowCount: count,
-      latestUpdatedAt: null,
-      errorMessage: latestResult.error.message,
-    };
-  }
-
-  const latestRow = (latestResult.data?.[0] ?? null) as RemoteUpdatedRow | null;
+  const latestRow = (result.data?.[0] ?? null) as RemoteUpdatedRow | null;
 
   return {
     remoteState: 'available',
@@ -369,10 +359,15 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
 
   const ownerMatches = !localOwner || (ownerUserId !== null && localOwner === ownerUserId);
   const effectiveOwnerUserId = ownerMatches ? ownerUserId : null;
-  const entityStatuses = remoteEnabled
-    ? await getRemoteEntityStatuses(effectiveOwnerUserId)
-    : buildUnavailableEntityStatuses();
-  const backupSummary = await getBackupStateSummary(effectiveOwnerUserId);
+  // Remote entity metas and the backup-state summary are independent reads of
+  // remote state for the same owner — run them concurrently instead of paying
+  // the manifest round trip after all entity metas have settled.
+  const [entityStatuses, backupSummary] = await Promise.all([
+    remoteEnabled
+      ? getRemoteEntityStatuses(effectiveOwnerUserId)
+      : Promise.resolve(buildUnavailableEntityStatuses()),
+    getBackupStateSummary(effectiveOwnerUserId),
+  ]);
 
   const remoteAvailable =
     remoteEnabled &&

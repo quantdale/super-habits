@@ -104,6 +104,29 @@ export async function listCalorieEntriesInRange(
   );
 }
 
+/**
+ * Existence check for the same filter as `listCalorieEntriesInRange`, without
+ * materializing rows — callers that only need a boolean (e.g. the Overview
+ * "calories in use" signal) stop at the first matching row instead of
+ * loading a week of entries into memory.
+ */
+export async function hasCalorieEntriesInRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<boolean> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ id: string }>(
+    `SELECT id
+     FROM calorie_entries
+     WHERE deleted_at IS NULL
+       AND consumed_on >= ?
+       AND consumed_on <= ?
+     LIMIT 1`,
+    [startDateKey, endDateKey],
+  );
+  return Boolean(row);
+}
+
 export async function hasAnyCalorieEntries(): Promise<boolean> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ id: string }>(

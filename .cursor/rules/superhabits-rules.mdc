@@ -12,7 +12,7 @@ Stack: React Native 0.83.10, Expo 55 (`~55.0.28`), TypeScript 5.9, expo-router, 
 (expo-sqlite WAL mode), NativeWind 4, Vitest.
 Target: Web (PWA), iOS, Android.
 Status: Active MVP. **Web PWA** can be deployed to **Vercel** using root `vercel.json` (`npm run build:web` → `dist/`, COOP/COEP headers, SPA rewrites).
-Current stored schema version: **23** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 24) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
+Current stored schema version: **24** (see `app_meta.db_schema_version`). Next migration: add a new **`if (version < 25) { ... }`** block in `runMigrations()` in `core/db/client.ts` when a schema change lands.
 
 Current product-shell facts to preserve:
 - The command center is a **global overlay** only; `/command` is not a route anymore.
@@ -59,7 +59,7 @@ Current product-shell facts to preserve:
 6. MIGRATIONS ARE APPEND-ONLY AND MONOTONICALLY INCREASING
    Never modify an existing migration. Always append a new `if (version < N) { ... }`
    block in `runMigrations()` in `core/db/client.ts` — there are no numbered migration
-   files. Current stored version: 23; the next block is `if (version < 24)`.
+   files. Current stored version: 24; the next block is `if (version < 25)`.
    schema.sql is a partial reference doc only — it is NOT executed at runtime.
 
 7. UNIQUE(habit_id, date_key) on habit_completions

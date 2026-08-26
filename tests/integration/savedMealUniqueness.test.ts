@@ -30,9 +30,11 @@ function buildRecordingSupabase() {
       return { error: null };
     }),
     delete: vi.fn(() => ({
-      eq: vi.fn((column: string, value: string) => ({
+      in: vi.fn((column: string, values: string[]) => ({
         eq: vi.fn(async (_column2: string, _value2: string) => {
-          if (column === 'id') deleted.push({ entity, id: value });
+          if (column === 'id') {
+            for (const value of values) deleted.push({ entity, id: value });
+          }
           return { error: null };
         }),
       })),

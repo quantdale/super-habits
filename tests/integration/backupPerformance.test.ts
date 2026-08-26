@@ -23,7 +23,7 @@ function buildRecordingSupabase() {
       return { error: null };
     }),
     delete: vi.fn(() => ({
-      eq: vi.fn(() => ({
+      in: vi.fn(() => ({
         eq: vi.fn(async () => ({ error: null })),
       })),
     })),

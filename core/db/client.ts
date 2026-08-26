@@ -109,11 +109,12 @@ async function addColumnIfMissing(
   table: string,
   column: string,
   definition: string,
-): Promise<void> {
+): Promise<boolean> {
   assertSafeSqlIdentifier(table);
   assertSafeSqlIdentifier(column);
-  if (await hasColumn(db, table, column)) return;
+  if (await hasColumn(db, table, column)) return false;
   await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  return true;
 }
 
 /**
@@ -134,7 +135,11 @@ async function applyMigration(
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   const schemaVersion = await getAppMetaText(db, appMetaKeys.dbSchemaVersion);
-  const version = schemaVersion ? parseInt(schemaVersion, 10) : 0;
+  // A corrupted/non-numeric stored version must not silently skip every
+  // migration block: every block is idempotent, so re-running from 0 is the
+  // safe recovery instead of a cold start that crashes on missing columns.
+  const parsedVersion = schemaVersion ? parseInt(schemaVersion, 10) : 0;
+  const version = Number.isFinite(parsedVersion) ? parsedVersion : 0;
   if (version < 2) {
     await applyMigration(db, 2, async () => {
       await addColumnIfMissing(db, 'habits', 'category', "TEXT NOT NULL DEFAULT 'anytime'");
@@ -893,15 +898,79 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       );
     });
   }
+
+  // Migration 24: Range/index coverage for hot read paths on unbounded
+  // history tables.
+  // - pomodoro_sessions.started_at / workout_logs.completed_at back every
+  //   weekly/dashboard/progress/timeline range query; both tables grow one
+  //   row per session/workout forever but previously had no index, so each
+  //   range read was a full table scan.
+  // - habit_completions.date_key: the overview/momentum day-range readers
+  //   filter on date alone; the UNIQUE(habit_id, date_key) index cannot
+  //   serve a date-leading range.
+  // - todos partial index: listPendingTodos/countPendingTodos filter
+  //   `deleted_at IS NULL AND completed = 0` ordered by (sort_order,
+  //   created_at DESC); the partial index serves both the filter and the
+  //   exact sort while tombstoned/completed rows stay out of the index.
+  // All are append-mostly writes: a single extra index entry per insert.
+  if (version < 24) {
+    await applyMigration(db, 24, async () => {
+      // A v6-era database that predates migration 6's todos ordering columns
+      // (the version gate skips block 6 on upgrade) must still reach the same
+      // head shape before the partial pending index can be created. When the
+      // ordering column itself had to be added, rerun block 6's backfill so
+      // the repaired cohort keeps its creation-order intent instead of all
+      // collapsing to sort_order = 0.
+      const addedSortOrder = await addColumnIfMissing(
+        db,
+        'todos',
+        'sort_order',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await addColumnIfMissing(db, 'todos', 'due_date', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'priority', "TEXT NOT NULL DEFAULT 'normal'");
+      if (addedSortOrder) {
+        await db.runAsync(
+          `UPDATE todos SET sort_order = (
+             SELECT COUNT(*) FROM todos t2
+             WHERE t2.created_at <= todos.created_at
+               AND t2.deleted_at IS NULL
+           ) WHERE deleted_at IS NULL`,
+        );
+      }
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_pomodoro_sessions_started_at
+          ON pomodoro_sessions (started_at);
+        CREATE INDEX IF NOT EXISTS idx_workout_logs_completed_at
+          ON workout_logs (completed_at);
+        CREATE INDEX IF NOT EXISTS idx_habit_completions_date_key
+          ON habit_completions (date_key);
+        CREATE INDEX IF NOT EXISTS idx_todos_pending_sort
+          ON todos (sort_order, created_at DESC)
+          WHERE deleted_at IS NULL AND completed = 0;
+      `);
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
   const database = await SQLite.openDatabaseAsync('superhabits.db');
-  for (const statement of bootstrapStatements) {
-    await database.execAsync(statement);
+  try {
+    for (const statement of bootstrapStatements) {
+      await database.execAsync(statement);
+    }
+    await runMigrations(database);
+    return database;
+  } catch (error) {
+    // Release the opened handle so a retry cannot stack connections behind a
+    // half-initialized failure (web/OPFS holds one access handle per origin).
+    try {
+      await database.closeAsync();
+    } catch {
+      // The original failure matters more than close diagnostics.
+    }
+    throw error;
   }
-  await runMigrations(database);
-  return database;
 }
 
 export function getDatabase(): Promise<SQLite.SQLiteDatabase> {

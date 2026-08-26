@@ -109,7 +109,7 @@ function buildRecordingSupabase() {
         return { error: null };
       }),
       delete: vi.fn(() => ({
-        eq: vi.fn(() => ({
+        in: vi.fn(() => ({
           eq: vi.fn(async () => ({ error: null })),
         })),
       })),
@@ -206,12 +206,17 @@ function buildServingSupabase(
   return { supabase: { from } };
 }
 
-function installSupabaseMock(supabase: { from: ReturnType<typeof vi.fn> }) {
+function installSupabaseMock(
+  supabase: { from: ReturnType<typeof vi.fn> },
+  overrides: { remoteEnabled?: boolean; authUserId?: string } = {},
+) {
+  const remoteEnabled = overrides.remoteEnabled ?? true;
+  const authUserId = overrides.authUserId ?? 'user_a';
   vi.doMock('@/lib/supabase', () => ({
     supabase,
-    isRemoteEnabled: vi.fn(() => true),
-    getSupabaseAuthUserId: vi.fn().mockResolvedValue('user_a'),
-    getSupabaseSessionUserId: vi.fn().mockResolvedValue('user_a'),
+    isRemoteEnabled: vi.fn(() => remoteEnabled),
+    getSupabaseAuthUserId: vi.fn().mockResolvedValue(authUserId),
+    getSupabaseSessionUserId: vi.fn().mockResolvedValue(authUserId),
     setRemoteMode: vi.fn(),
     ensureAnonymousSession: vi.fn().mockResolvedValue(undefined),
   }));
@@ -1121,4 +1126,125 @@ describe('backup completeness v2 restore', () => {
     await expectZeroImportedRows(targetDb);
     await targetDb.closeAsync();
   });
+});
+
+describe('backup completeness v2 restore — fault-injection matrix', () => {
+  it('rejects a structurally corrupt manifest as manifest_malformed and leaves the device untouched', async () => {
+    const remote = await publishSourceBackup();
+    const manifestRow = remote.get('backup_manifest')?.[0];
+    expect(manifestRow).toBeDefined();
+    if (manifestRow) manifestRow.generation = null;
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('manifest_malformed');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  }, 20_000);
+
+  it('rejects a future backup schema version as unsupported_version', async () => {
+    const remote = await publishSourceBackup();
+    const manifestRow = remote.get('backup_manifest')?.[0];
+    if (manifestRow) manifestRow.backup_schema_version = 99;
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('unsupported_version');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  }, 20_000);
+
+  it('rejects an unrecognized entity scope instead of inferring one permissively', async () => {
+    const remote = await publishSourceBackup();
+    const manifestRow = remote.get('backup_manifest')?.[0];
+    if (manifestRow) {
+      delete (manifestRow as { backup_scope_version?: number }).backup_scope_version;
+      // Dropping todos breaks every known historical entity set, so no exact
+      // scope match is possible — restore must fail closed, never guess.
+      const metadata = manifestRow.entity_metadata as Record<string, unknown>;
+      delete metadata.todos;
+    }
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('unsupported_version');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  }, 20_000);
+
+  it('blocks duplicate row ids served through the cloud V2 pipeline before any write', async () => {
+    const remote = await publishSourceBackup();
+    const todoRows = remote.get('todos');
+    expect(todoRows?.length ?? 0).toBeGreaterThan(0);
+    // Same id twice: the served set no longer matches the manifest's
+    // certified per-entity checksum, so integrity verification must refuse
+    // before any validation or write. (The duplicate-id validator rule
+    // itself is separately unit-covered in tests/portableFormat.test.ts for
+    // payloads whose checksums were recomputed over duplicates.)
+    remote.set('todos', [...(todoRows ?? []), { ...(todoRows?.[0] as Record<string, unknown>) }]);
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('invalid');
+    if (result.status === 'invalid') {
+      expect(result.reason).toBe('integrity_mismatch');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  }, 20_000);
+
+  it('blocks with owner_mismatch when the verified account differs from the local dataset binding', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    // Remote data belongs to user_a; the TARGET device is durably bound to a
+    // different account. Restore must refuse without mutating anything.
+    installSupabaseMock(serving.supabase, { authUserId: 'user_a' });
+    const targetDb = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(targetDb as never, 'user_b');
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('blocked');
+    if (result.status === 'blocked') {
+      expect(result.reason).toBe('owner_mismatch');
+    }
+    await expectZeroImportedRows(targetDb);
+    const binding = await targetDb.getFirstAsync<{ value: string }>(
+      "SELECT value FROM app_meta WHERE key = 'account.owner_user_id'",
+    );
+    expect(binding?.value).toBe('user_b');
+    await targetDb.closeAsync();
+  }, 20_000);
+
+  it('reports remote_disabled without touching the device when remote mode is off', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase, { remoteEnabled: false });
+    const targetDb = await freshDatabase();
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result.status).toBe('blocked');
+    if (result.status === 'blocked') {
+      expect(result.reason).toBe('remote_disabled');
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  }, 20_000);
 });

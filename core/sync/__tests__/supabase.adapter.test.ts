@@ -317,6 +317,77 @@ describe('SupabaseSyncAdapter', () => {
     });
   });
 
+  it('batches hard-delete intents into one remote delete round trip per entity', async () => {
+    const deleteIntents: { ids: string[]; userId: string }[] = [];
+    const from = vi.fn((entity: string) =>
+      entity === 'saved_meals'
+        ? {
+            delete: vi.fn(() => ({
+              in: vi.fn((_column: string, ids: string[]) => ({
+                eq: vi.fn(async (_column2: string, userId: string) => {
+                  deleteIntents.push({ ids, userId });
+                  return { error: null };
+                }),
+              })),
+            })),
+          }
+        : {},
+    );
+    const { adapter, db } = await setupAdapter({ supabase: { from } });
+
+    const deleted = (id: string): SyncRecord => ({
+      entity: 'saved_meals',
+      id,
+      updatedAt: '2026-04-07T12:00:00.000Z',
+      operation: 'delete',
+      ownerUserId: 'user_a',
+    });
+
+    await adapter.push([deleted('smeal_1'), deleted('smeal_2'), deleted('smeal_1')]);
+
+    // One round trip total — not one per row — and duplicate intents coalesce.
+    expect(deleteIntents).toEqual([{ ids: ['smeal_1', 'smeal_2'], userId: 'user_a' }]);
+    expect(db.getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it('upserts surviving rows when a batch mixes hard deletes and updates', async () => {
+    const deleteIntents: string[][] = [];
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const from = vi.fn((entity: string) =>
+      entity === 'saved_meals'
+        ? {
+            delete: vi.fn(() => ({
+              in: vi.fn((_column: string, ids: string[]) => ({
+                eq: vi.fn(async () => {
+                  deleteIntents.push(ids);
+                  return { error: null };
+                }),
+              })),
+            })),
+            upsert,
+          }
+        : { upsert },
+    );
+    const { adapter, db } = await setupAdapter({ supabase: { from } });
+    db.getAllAsync.mockResolvedValue([{ id: 'smeal_2', food_name: 'Keep' }]);
+
+    await adapter.push([
+      {
+        entity: 'saved_meals',
+        id: 'smeal_1',
+        updatedAt: '2026-04-07T12:00:00.000Z',
+        operation: 'delete',
+        ownerUserId: 'user_a',
+      },
+      record('saved_meals', 'smeal_2'),
+    ]);
+
+    expect(deleteIntents).toEqual([['smeal_1']]);
+    expect(upsert).toHaveBeenCalledWith([{ id: 'smeal_2', food_name: 'Keep', user_id: 'user_a' }], {
+      onConflict: 'id',
+    });
+  });
+
   it('pull currently returns an empty array', async () => {
     const { adapter } = await setupAdapter({});
 

@@ -152,7 +152,7 @@ describe('core/db/client', () => {
     expect(cutoverCall?.[1]).toEqual(['date_key_cutover', expect.any(String)]);
   });
 
-  it('applies migrations from version 0 and records the v15 owner-binding write (final version is 23)', async () => {
+  it('applies migrations from version 0 and records the v15 owner-binding write (final version is 24)', async () => {
     const { client, db } = await loadDbClient({ schemaVersion: null });
 
     await client.getDatabase();
@@ -346,13 +346,34 @@ describe('core/db/client', () => {
     ).toBe(true);
   });
 
+  it('adds history-table range indexes in migration 24', async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: '23' });
+
+    await client.getDatabase();
+
+    const sqlCalls = db.execAsync.mock.calls.map(([sql]) => String(sql));
+    expect(sqlCalls.some((sql) => sql.includes('idx_pomodoro_sessions_started_at'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('idx_workout_logs_completed_at'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('idx_habit_completions_date_key'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('idx_todos_pending_sort'))).toBe(true);
+    expect(
+      db.runAsync.mock.calls.some(
+        ([sql, args]) =>
+          String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
+          Array.isArray(args) &&
+          args[0] === 'db_schema_version' &&
+          args[1] === '24',
+      ),
+    ).toBe(true);
+  });
+
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 through v23 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(14);
+    // v10 through v24 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(15);
 
-    const upToDate = await loadDbClient({ schemaVersion: '23' });
+    const upToDate = await loadDbClient({ schemaVersion: '24' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });
@@ -387,6 +408,46 @@ describe('core/db/client', () => {
         args[1] === '9',
     );
     expect(versionBump).toBeUndefined();
+  });
+
+  it('closes the opened handle when bootstrap fails so retries cannot stack connections', async () => {
+    vi.resetModules();
+    const db = buildDb('8');
+    db.runAsync.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('ADD COLUMN recurrence')) {
+        throw new Error('disk I/O error');
+      }
+      return undefined;
+    });
+    const openDatabaseAsync = vi.fn().mockResolvedValue(db);
+
+    vi.doMock('react-native', () => ({
+      Platform: {
+        OS: 'ios',
+        select: (obj: Record<string, unknown>) => obj.ios ?? obj.default,
+      },
+    }));
+    vi.doMock('expo-sqlite', () => ({ openDatabaseAsync }));
+
+    const client = await import('@/core/db/client');
+    await expect(client.getDatabase()).rejects.toThrow('disk I/O error');
+    expect(db.closeAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an unparsable stored schema version as 0 instead of silently skipping every migration', async () => {
+    const { client, db } = await loadDbClient({ schemaVersion: 'garbage' });
+
+    await client.getDatabase();
+
+    // Every block re-ran from the safe default, ending with the current head.
+    const versionBump = db.runAsync.mock.calls.find(
+      ([sql, args]) =>
+        String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
+        Array.isArray(args) &&
+        args[0] === 'db_schema_version' &&
+        args[1] === '24',
+    );
+    expect(versionBump).toBeDefined();
   });
 
   it('skips ALTER when the column already exists instead of swallowing errors', async () => {

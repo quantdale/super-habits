@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type { PlanningHubView } from '@/core/providers/navigationContext';
 import { ProjectListView } from '@/features/projects/ProjectListView';
@@ -35,6 +36,9 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
   // Bumped after a guided-flow save so the briefing and the full editor
   // remount with the fresh plan instead of showing stale state.
   const [todayVersion, setTodayVersion] = useState(0);
+  // A hub left open across local midnight must remount the Today views so
+  // they load the new day instead of rendering yesterday's briefing/plan.
+  const dayGeneration = useDayRolloverGeneration();
 
   const selectTab = useCallback((tab: PlanningHubView) => {
     setDetail(null);
@@ -80,8 +84,8 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
         ) : view === 'today' ? (
           <View className="gap-3">
             <GuidedPlanningFlow onPlanSaved={() => setTodayVersion((v) => v + 1)} />
-            <TodayBriefingView key={`briefing-${todayVersion}`} />
-            <DailyPlanView key={`plan-${todayVersion}`} />
+            <TodayBriefingView key={`briefing-${todayVersion}-${dayGeneration}`} />
+            <DailyPlanView key={`plan-${todayVersion}-${dayGeneration}`} />
           </View>
         ) : view === 'projects' ? (
           <ProjectListView onOpenProject={(id) => setDetail({ kind: 'project', id })} />

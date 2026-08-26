@@ -17,38 +17,16 @@ function buildSupabaseMock(
       const entityErrors = remoteErrorsByEntity[entity] ?? {};
 
       return {
-        select: vi.fn((columns: string, options?: { head?: boolean }) => {
+        select: vi.fn((columns: string, options?: { head?: boolean; count?: string }) => {
           const state = {
             onlyActiveRows: false,
           };
           const getRowsForQuery = () =>
             state.onlyActiveRows ? rows.filter((row) => row.deleted_at == null) : rows;
 
-          if (options?.head) {
-            const headQuery = {
-              eq: vi.fn((column: string, value: unknown) => {
-                if (column === 'user_id') ownerFilters.push({ entity, value });
-                return headQuery;
-              }),
-              is: vi.fn(() => {
-                state.onlyActiveRows = true;
-                if (entityErrors.countError) {
-                  return Promise.resolve({
-                    data: null,
-                    count: null,
-                    error: { message: entityErrors.countError },
-                  });
-                }
-                return Promise.resolve({
-                  data: null,
-                  count: getRowsForQuery().length,
-                  error: null,
-                });
-              }),
-            };
-            return headQuery;
-          }
-
+          // Production preview reads are ONE request per entity: count=exact
+          // plus an ordered limit(1) payload carries both the row count and
+          // the latest updated_at.
           const query = {
             eq: vi.fn((column: string, value: unknown) => {
               if (column === 'user_id') ownerFilters.push({ entity, value });
@@ -60,20 +38,25 @@ function buildSupabaseMock(
             }),
             order: vi.fn(() => query),
             limit: vi.fn(() => {
-              if (entityErrors.latestError) {
+              if (entityErrors.countError || entityErrors.latestError) {
                 return Promise.resolve({
                   data: null,
-                  error: { message: entityErrors.latestError },
+                  count: null,
+                  error: {
+                    message: entityErrors.countError ?? entityErrors.latestError,
+                  },
                 });
               }
 
+              const activeRows = getRowsForQuery();
               const latest =
-                [...getRowsForQuery()].sort((a, b) =>
+                [...activeRows].sort((a, b) =>
                   String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')),
                 )[0] ?? null;
 
               return Promise.resolve({
                 data: latest ? [{ updated_at: latest.updated_at ?? null }] : [],
+                ...(options?.count === 'exact' ? { count: activeRows.length } : {}),
                 error: null,
               });
             }),

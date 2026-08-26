@@ -30,7 +30,7 @@ function buildSupabaseMock(
       return { error: null };
     }),
     delete: vi.fn(() => ({
-      eq: vi.fn(() => ({
+      in: vi.fn(() => ({
         eq: vi.fn(async () => ({ error: null })),
       })),
     })),
@@ -73,6 +73,31 @@ async function outboxCount(db: TestDatabase): Promise<number> {
 }
 
 describe('backup completeness v2 checkpoint', () => {
+  it('reports whether a manifest was captured so callers can skip redundant refreshes', async () => {
+    const { checkpoint } = await load();
+
+    // First cycle settles backfill; nothing user-authored changed, so no
+    // manifest is captured.
+    await checkpoint.runBackupMaintenance();
+    await expect(checkpoint.runBackupMaintenance()).resolves.toEqual({
+      capturedManifest: false,
+    });
+
+    const { addTodo } = await import('@/features/todos/todos.data');
+    await addTodo({ title: 'dirty' });
+
+    // A real capture reports true — even if the follow-up push were to fail,
+    // the pending counts already differ from any earlier preview read.
+    await expect(checkpoint.runBackupMaintenance()).resolves.toEqual({
+      capturedManifest: true,
+    });
+
+    // Drained again: the next idle cycle captures nothing.
+    await expect(checkpoint.runBackupMaintenance()).resolves.toEqual({
+      capturedManifest: false,
+    });
+  });
+
   it('publishes a complete manifest after backfill and drain', async () => {
     const { db, supabaseMock, checkpoint } = await load();
     const { addTodo } = await import('@/features/todos/todos.data');

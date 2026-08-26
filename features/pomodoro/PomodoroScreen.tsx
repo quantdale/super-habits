@@ -34,6 +34,7 @@ import {
 import type { SessionAssociation } from './pomodoro.sessionMeta';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import type { PomodoroSession } from './types';
 import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
 import {
@@ -93,6 +94,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { register: registerCommandTimer } = usePomodoroCommandBridge();
   const dayGeneration = useDayRolloverGeneration();
+  const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
   const [currentMode, setCurrentMode] = useState<PomodoroMode>('focus');
@@ -164,7 +166,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   }, []);
 
   const loadSettings = useCallback(async () => {
+    const isCurrent = beginRefresh();
     const nextSettings = await getPomodoroSettings();
+    if (!isCurrent()) return;
     const nextTimer = applySettingsToTimerState(nextSettings, {
       currentMode,
       isRunning,
@@ -178,19 +182,21 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       applyRemaining(nextTimer.remaining);
       totalSecondsRef.current = nextTimer.totalSeconds;
     }
-  }, [applyRemaining, currentMode, isPaused, isRunning, remaining, totalSeconds]);
+  }, [applyRemaining, beginRefresh, currentMode, isPaused, isRunning, remaining, totalSeconds]);
 
   const loadHistory = useCallback(async () => {
+    const isCurrent = beginRefresh();
     const start364 = new Date();
     start364.setDate(start364.getDate() - 363);
     const startKey = toDateKey(start364);
     const endKey = toDateKey(new Date());
     const rows = await listPomodoroSessionsForDateRange(startKey, endKey);
+    if (!isCurrent()) return;
     // Break rows never reach the focus surfaces (count card, garden, heatmap).
     const focusOnly = rows.filter((row) => row.session_type === 'focus');
     setSessions(focusOnly);
     setPomodoroHeatmapDays(buildPomodoroHeatmapDays(focusOnly, 364));
-  }, []);
+  }, [beginRefresh]);
 
   const loadPresets = useCallback(async () => {
     const state = await getPomodoroPresetsState();

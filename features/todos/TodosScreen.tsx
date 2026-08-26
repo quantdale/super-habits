@@ -33,6 +33,7 @@ import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { validateTodo } from '@/lib/validation';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
@@ -85,6 +86,7 @@ const VIEW_MODE_OPTIONS: readonly {
 export function TodosScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const dayGeneration = useDayRolloverGeneration();
+  const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const colorText = sectionAccents.todos.text;
   const { showNotice } = useInAppNotices();
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -196,6 +198,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const refresh = useCallback(() => listTodos().then(setItemsIfChanged), [setItemsIfChanged]);
 
   const loadTodosOnFocus = useCallback(async () => {
+    const isCurrent = beginRefresh();
     const todayKey = getTodayDateKey();
     if (lastRecurrenceExpansionDateKeyRef.current !== todayKey) {
       const allTodos = await listAllActiveTodosForRecurrence();
@@ -224,8 +227,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       lastRecurrenceExpansionDateKeyRef.current = todayKey;
     }
     const list = await listTodos();
+    if (!isCurrent()) return;
     setItemsIfChanged(list);
-  }, [setItemsIfChanged]);
+  }, [beginRefresh, setItemsIfChanged]);
 
   useActiveForegroundRefresh(isActive, loadTodosOnFocus, dayGeneration);
 

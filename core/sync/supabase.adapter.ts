@@ -14,11 +14,12 @@ import {
   BACKUP_ENTITY_COLUMNS,
   BACKUP_HARD_DELETE_ENTITIES,
   BACKUP_MANIFEST_RECORD_ID,
+  BACKUP_NEVER_DELETED_ENTITIES,
   BACKUP_SETTINGS_RECORD_ID,
   BACKUP_SETTINGS_VERSION,
   type BackupManifest,
 } from '@/core/backup/backup.types';
-import { canonicalizeSettingsPayload, readRecoverableSettings } from '@/core/backup/backupSettings';
+import { canonicalizeSettingsPayload } from '@/core/backup/backupSettings';
 
 /**
  * SQLite entity names enqueued for remote backup — must match
@@ -26,21 +27,25 @@ import { canonicalizeSettingsPayload, readRecoverableSettings } from '@/core/bac
  * `user_backup_settings` and `backup_manifest` records that ride the same
  * durable outbox with push-time payload assembly.
  */
-const SYNCABLE_ENTITIES = [...BACKUP_ENTITIES, 'user_backup_settings', 'backup_manifest'] as const;
+export const SYNCABLE_ENTITIES = [
+  ...BACKUP_ENTITIES,
+  'user_backup_settings',
+  'backup_manifest',
+] as const;
 
 type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];
 
 const SYNCABLE_TABLES = new Set<string>(SYNCABLE_ENTITIES);
 
-function collectIdsByEntity(records: SyncRecord[]): Map<string, Set<string>> {
-  const map = new Map<string, Set<string>>();
+function collectRecordsByEntity(records: SyncRecord[]): Map<string, SyncRecord[]> {
+  const map = new Map<string, SyncRecord[]>();
   for (const r of records) {
-    let set = map.get(r.entity);
-    if (!set) {
-      set = new Set();
-      map.set(r.entity, set);
+    const bucket = map.get(r.entity);
+    if (bucket) {
+      bucket.push(r);
+    } else {
+      map.set(r.entity, [r]);
     }
-    set.add(r.id);
   }
   return map;
 }
@@ -88,7 +93,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       );
     }
     const client = supabase;
-    const byEntity = collectIdsByEntity(records);
+    const byEntity = collectRecordsByEntity(records);
     const failedRecords: SyncRecord[] = [];
     const errorMessages: string[] = [];
 
@@ -96,14 +101,13 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // network blip) must not block every other entity's records behind it —
     // push each entity independently and collect failures instead of
     // aborting the whole batch on the first error.
-    for (const [entity, idSet] of byEntity) {
-      const entityRecords = records.filter((record) => record.entity === entity);
+    for (const [entity, entityRecords] of byEntity) {
       try {
         if (!isSyncableEntity(entity)) {
           throw new Error(`Unknown entity in queue: ${entity}`);
         }
 
-        const ids = [...idSet];
+        const ids = [...new Set(entityRecords.map((record) => record.id))];
         if (ids.length === 0) continue;
 
         const unownedOrWrongSession = entityRecords.filter(
@@ -126,28 +130,40 @@ export class SupabaseSyncAdapter implements SyncAdapter {
           continue;
         }
 
+        const illegalDeleteRecords = BACKUP_NEVER_DELETED_ENTITIES.has(entity)
+          ? entityRecords.filter((record) => record.operation === 'delete')
+          : [];
+        if (illegalDeleteRecords.length > 0) {
+          // Append-only history tables are never locally deleted. A queued
+          // delete intent here is an upstream defect — fail loudly and keep
+          // the records queued rather than silently forwarding it.
+          throw new Error(
+            `Illegal delete intent for append-only entity ${entity} (${illegalDeleteRecords.length} rows).`,
+          );
+        }
+
         const hardDeleteRecords = BACKUP_HARD_DELETE_ENTITIES.has(entity)
           ? entityRecords.filter((record) => record.operation === 'delete')
           : [];
         if (hardDeleteRecords.length > 0) {
           // The product hard-deletes these rows locally (no tombstone), so a
           // delete intent must remove the remote row instead of upserting a
-          // row that no longer exists locally.
-          for (const record of hardDeleteRecords) {
-            const { error } = await client
-              .from(entity)
-              .delete()
-              .eq('id', record.id)
-              .eq('user_id', currentUserId);
-            if (error) {
-              throw new Error(
-                `Supabase delete failed for ${entity} ${record.id}: ${error.message}`,
-              );
-            }
+          // row that no longer exists locally. Deletes are batched into one
+          // round trip per entity (burst decrements/cleanups previously paid
+          // one request per row).
+          const hardDeleteIds = [...new Set(hardDeleteRecords.map((record) => record.id))];
+          const { error } = await client
+            .from(entity)
+            .delete()
+            .in('id', hardDeleteIds)
+            .eq('user_id', currentUserId);
+          if (error) {
+            throw new Error(
+              `Supabase delete failed for ${entity} (${hardDeleteIds.length} rows): ${error.message}`,
+            );
           }
-          const remainingIds = ids.filter(
-            (id) => !hardDeleteRecords.some((record) => record.id === id),
-          );
+          const hardDeleteIdSet = new Set(hardDeleteIds);
+          const remainingIds = ids.filter((id) => !hardDeleteIdSet.has(id));
           if (remainingIds.length === 0) continue;
           await this.upsertEntityRows(client, db, entity, remainingIds, currentUserId);
           continue;
@@ -220,18 +236,25 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // The payload is the snapshot stored at enqueue/capture time
     // (`backup.pending_settings`), never a fresh read at push time: the
     // manifest certifies exactly the snapshot that was captured with its
-    // generation, so the uploaded payload must be that snapshot. Continuous
-    // settings saves keep the stored snapshot current (outbox coalescing
-    // makes the latest record win).
+    // generation, so the uploaded payload must be that snapshot.
     const stored = await getAppMetaJsonOrDefault<unknown>(
       db,
       appMetaKeys.backupPendingSettings,
       null,
     );
-    const payload =
-      stored && typeof stored === 'object' && 'payload' in stored
-        ? stored.payload
-        : await readRecoverableSettings(db);
+    if (!stored || typeof stored !== 'object' || !('payload' in stored)) {
+      // No certifiable snapshot exists for this queued settings record
+      // (corruption or a pre-closure artifact). Pushing a fresh live read
+      // would upload a payload certified by no manifest checksum, so the
+      // next restore would fail integrity verification. Dropping the stale
+      // intent is the only non-looping resolution: the next maintenance
+      // cycle captures a fresh snapshot and enqueues a replacement record.
+      console.error(
+        '[sync] dropping queued user_backup_settings record: no pending settings snapshot.',
+      );
+      return;
+    }
+    const payload = stored.payload;
     const latestUpdatedAt = records
       .map((record) => record.updatedAt)
       .sort((a, b) => b.localeCompare(a))[0];

@@ -136,6 +136,14 @@ async function computeEntityMetadata(
   return metadata;
 }
 
+/** Outcome of one maintenance cycle — lets callers skip follow-up work when nothing was captured. */
+export type BackupMaintenanceResult = {
+  /** True only when a new manifest snapshot was atomically captured this cycle
+   *  (its publication intent is queued regardless of push outcome, so remote
+   *  state and/or pendingChangeCount may now differ from any earlier read). */
+  capturedManifest: boolean;
+};
+
 /**
  * Full maintenance cycle: backfill → flush data → recheck → capture (ONE
  * atomic local coherence boundary) → publish manifest (as an outbox record)
@@ -149,11 +157,11 @@ export async function runBackupMaintenance(options?: {
   skipFlush?: boolean;
   /** Test-only deterministic race barriers (see BackupMaintenanceHooks). */
   hooks?: BackupMaintenanceHooks;
-}): Promise<void> {
-  if (maintenanceRunning) return;
+}): Promise<BackupMaintenanceResult> {
+  if (maintenanceRunning) return { capturedManifest: false };
   maintenanceRunning = true;
   try {
-    await runMaintenanceCycle(options);
+    return await runMaintenanceCycle(options);
   } finally {
     maintenanceRunning = false;
   }
@@ -162,28 +170,28 @@ export async function runBackupMaintenance(options?: {
 async function runMaintenanceCycle(options?: {
   skipFlush?: boolean;
   hooks?: BackupMaintenanceHooks;
-}): Promise<void> {
+}): Promise<BackupMaintenanceResult> {
   const db = await getDatabase();
   const backfillResult = await ensureBackupBackfill();
-  if (backfillResult === 'waiting') return;
+  if (backfillResult === 'waiting') return { capturedManifest: false };
 
   // 1. Push everything currently queued (data and any pending manifest).
   //    When the caller owns pushing, skip this and defer when anything is
   //    still queued (the caller's next flush will drain it, then the cycle
   //    runs again with an empty queue).
   if (options?.skipFlush) {
-    if ((await durableOutboxCount(db)) > 0) return;
+    if ((await durableOutboxCount(db)) > 0) return { capturedManifest: false };
   } else {
     try {
       await syncEngine.flush();
     } catch {
       // Records stay queued; retry on the next cycle. Previous manifest intact.
-      return;
+      return { capturedManifest: false };
     }
   }
 
   // 2. Anything enqueued during the flush? Defer — coherence boundary.
-  if ((await durableOutboxCount(db)) > 0) return;
+  if ((await durableOutboxCount(db)) > 0) return { capturedManifest: false };
 
   // 3. If a manifest snapshot was already pushed, record it as the last
   //    complete generation (e.g. a previous cycle published it but crashed
@@ -199,7 +207,7 @@ async function runMaintenanceCycle(options?: {
   }
 
   // 4. Nothing changed since the last manifest → stay quiet.
-  if (!(await isBackupDirty(db))) return;
+  if (!(await isBackupDirty(db))) return { capturedManifest: false };
 
   // Test barrier: a real mutation may commit here, between the cycle's
   // checks and the capture transaction. The in-transaction rechecks below
@@ -299,7 +307,7 @@ async function runMaintenanceCycle(options?: {
       };
     },
   );
-  if (!captured) return; // deferred: previous manifest stays authoritative
+  if (!captured) return { capturedManifest: false }; // deferred: previous manifest stays authoritative
   syncEngine.enqueuePrepared(captured.settingsPrepared, { durablyPersisted: true });
   syncEngine.enqueuePrepared(captured.manifestPrepared, { durablyPersisted: true });
 
@@ -311,7 +319,7 @@ async function runMaintenanceCycle(options?: {
   try {
     await syncEngine.flush();
   } catch {
-    return;
+    return { capturedManifest: true };
   }
   // Record the generation only when this exact manifest was actually pushed:
   // the adapter drops a stale manifest intent (settings changed after
@@ -325,6 +333,7 @@ async function runMaintenanceCycle(options?: {
       String(captured.manifest.generation),
     );
   }
+  return { capturedManifest: true };
 }
 
 export async function isBackupDirty(db?: SQLite.SQLiteDatabase): Promise<boolean> {

@@ -15,8 +15,8 @@ import { MomentumCard } from '@/features/momentum/MomentumCard';
 import type { MomentumGardenModel } from '@/features/momentum/momentum.types';
 import {
   getCalorieGoal,
+  hasCalorieEntriesInRange,
   listCalorieEntries,
-  listCalorieEntriesInRange,
 } from '@/features/calories/calories.data';
 import { getAllHabitCompletionsForRange, listHabits } from '@/features/habits/habits.data';
 import {
@@ -126,7 +126,7 @@ async function loadSummaries(): Promise<OverviewLoadResult> {
     routines,
     calorieEntries,
     calorieGoal,
-    weekCalorieEntries,
+    weekCalorieEntriesInUse,
     projects,
     goals,
     focusTimerIntent,
@@ -142,7 +142,9 @@ async function loadSummaries(): Promise<OverviewLoadResult> {
     listRoutines(),
     listCalorieEntries(today),
     getCalorieGoal(),
-    listCalorieEntriesInRange(weekStart, today),
+    // Only the boolean is consumed downstream — an existence probe avoids
+    // materializing a full week of entry rows on every dashboard refresh.
+    hasCalorieEntriesInRange(weekStart, today),
     listProjects(),
     listGoals(),
     getPomodoroActiveTimer(),
@@ -200,7 +202,7 @@ async function loadSummaries(): Promise<OverviewLoadResult> {
       workout: summaries.workout,
       workoutRoutineCount: routines.length,
       calories: summaries.calories,
-      caloriesInUse: weekCalorieEntries.length > 0,
+      caloriesInUse: weekCalorieEntriesInUse,
     }),
   };
 }

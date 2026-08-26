@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { createTestDatabase, type TestDatabase } from './helpers/db';
 import { timestampToLocalDateKey } from '@/lib/time';
@@ -104,6 +105,10 @@ const EXPECTED_NAMED_INDEXES = [
   'uq_workout_schedule_overrides_active_date',
   'idx_workout_schedule_overrides_date',
   'idx_body_weight_entries_measured_at',
+  'idx_pomodoro_sessions_started_at',
+  'idx_workout_logs_completed_at',
+  'idx_habit_completions_date_key',
+  'idx_todos_pending_sort',
 ];
 
 const EXPECTED_REFERENCE_NAMED_INDEXES = EXPECTED_NAMED_INDEXES.filter(
@@ -115,6 +120,11 @@ const EXPECTED_REFERENCE_NAMED_INDEXES = EXPECTED_NAMED_INDEXES.filter(
       'uq_workout_schedule_overrides_active_date',
       'idx_workout_schedule_overrides_date',
       'idx_body_weight_entries_measured_at',
+      // Migration 24 hot-path indexes are runtime-only (post-reference snapshot).
+      'idx_pomodoro_sessions_started_at',
+      'idx_workout_logs_completed_at',
+      'idx_habit_completions_date_key',
+      'idx_todos_pending_sort',
     ].includes(index),
 );
 
@@ -153,14 +163,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 23', async () => {
+  it('bootstraps from zero and reaches stored schema version 24', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('23');
+    expect(row?.value).toBe('24');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -356,7 +366,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('23');
+      expect(v1?.value).toBe('24');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -367,7 +377,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('23');
+      expect(v2?.value).toBe('24');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -427,48 +437,150 @@ describe('tests/integration/migrations', () => {
     }
   });
 
-  it('a failing migration step rolls back and does not advance the schema version', async () => {
+  it('repairs a skipped-block-6 todos shape during migration 24 and restores ordering intent', async () => {
+    // A database stamped at version 23 whose todos table predates migration
+    // 6's ordering columns (the historical swallowed-error cohort) must still
+    // upgrade cleanly: block 24's defensive repair adds the columns, reruns
+    // the block-6 sort_order backfill, and creates the partial pending index.
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-m24-repair-'));
+    const file = path.join(dir, 'superhabits.db');
+
+    try {
+      const { createTestDatabase } = await import('./helpers/db');
+      const legacy = createTestDatabase(file);
+      legacy.raw.exec(`
+        CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+        INSERT INTO app_meta (key, value) VALUES ('db_schema_version', '23');
+        CREATE TABLE todos (
+          id TEXT PRIMARY KEY NOT NULL,
+          title TEXT NOT NULL,
+          completed INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE TABLE pomodoro_sessions (
+          id TEXT PRIMARY KEY NOT NULL,
+          started_at TEXT
+        );
+        CREATE TABLE workout_logs (
+          id TEXT PRIMARY KEY NOT NULL,
+          completed_at TEXT
+        );
+        CREATE TABLE habit_completions (
+          id TEXT PRIMARY KEY NOT NULL,
+          date_key TEXT
+        );
+        -- Insert out of creation order on purpose: backfill must restore
+        -- created_at order, not rowid order.
+        INSERT INTO todos (id, title, completed, created_at, updated_at, deleted_at)
+          VALUES ('todo_b', 'B', 0, '2026-01-02T10:00:00.000Z', '2026-01-02T10:00:00.000Z', NULL);
+        INSERT INTO todos (id, title, completed, created_at, updated_at, deleted_at)
+          VALUES ('todo_a', 'A', 0, '2026-01-01T10:00:00.000Z', '2026-01-01T10:00:00.000Z', NULL);
+        INSERT INTO todos (id, title, completed, created_at, updated_at, deleted_at)
+          VALUES ('todo_dead', 'D', 0, '2026-01-03T10:00:00.000Z', '2026-01-03T10:00:00.000Z', '2026-01-04T00:00:00.000Z');
+      `);
+      await legacy.closeAsync();
+
+      const db = await openDb({ filename: file });
+
+      const version = await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_meta WHERE key = ?',
+        ['db_schema_version'],
+      );
+      expect(version?.value).toBe('24');
+
+      const index = await db.getFirstAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_todos_pending_sort'",
+      );
+      expect(index?.name).toBe('idx_todos_pending_sort');
+
+      // Block-6 backfill semantics: creation-order ranks among non-deleted
+      // rows; tombstones are excluded from ranking and stay unranked.
+      const orders = await db.getAllAsync<{ id: string; sort_order: number; priority: string }>(
+        'SELECT id, sort_order, priority FROM todos ORDER BY id',
+      );
+      expect(orders).toEqual([
+        { id: 'todo_a', sort_order: 1, priority: 'normal' },
+        { id: 'todo_b', sort_order: 2, priority: 'normal' },
+        { id: 'todo_dead', sort_order: 0, priority: 'normal' },
+      ]);
+
+      // The partial index serves the pending list; a pending read plans
+      // through it instead of a table scan.
+      const plan = await db.getAllAsync<{ detail: string }>(
+        'EXPLAIN QUERY PLAN SELECT id FROM todos WHERE deleted_at IS NULL AND completed = 0 ORDER BY sort_order ASC, created_at DESC',
+      );
+      expect(plan.some((p) => p.detail.includes('idx_todos_pending_sort'))).toBe(true);
+
+      await db.closeAsync();
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  });
+
+  it('a failing migration step rolls back, closes the handle, and does not advance the schema version', async () => {
     // `getDatabase()` rejects before returning the database, so capture the
-    // raw instance `openDatabaseAsync()` created and inspect it afterwards.
+    // raw instance `openDatabaseAsync()` created. Bootstrap now CLOSES that
+    // handle on failure (a retry must not stack connections), so the
+    // post-failure state is inspected through a fresh raw connection to a
+    // file-backed fixture.
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-rollback-'));
+    const file = path.join(dir, 'superhabits.db');
     let failedDb: TestDatabase | null = null;
     appMetaFailures.failVersionSevenBump = true;
-    vi.resetModules();
-    vi.doMock('expo-sqlite', async () => {
-      const { createTestDatabase } = await import('./helpers/db');
-      return {
-        openDatabaseAsync: vi.fn(() => {
-          const db = createTestDatabase();
-          failedDb = db;
-          return db;
-        }),
-      };
-    });
-    const { getDatabase } = await import('@/core/db/client');
-    await expect(getDatabase()).rejects.toThrow('simulated migration failure');
-    expect(failedDb).not.toBeNull();
+    try {
+      vi.resetModules();
+      vi.doMock('expo-sqlite', async () => {
+        const { createTestDatabase } = await import('./helpers/db');
+        return {
+          openDatabaseAsync: vi.fn(() => {
+            const db = createTestDatabase(file);
+            failedDb = db;
+            return db;
+          }),
+        };
+      });
+      const { getDatabase } = await import('@/core/db/client');
+      await expect(getDatabase()).rejects.toThrow('simulated migration failure');
+      expect(failedDb).not.toBeNull();
 
-    // Migrations 2–6 committed (their version bumps succeeded), so the schema
-    // version is 6 — migration 7's bump never landed.
-    const version = await failedDb!.getFirstAsync<{ value: string }>(
-      'SELECT value FROM app_meta WHERE key = ?',
-      ['db_schema_version'],
-    );
-    expect(version?.value).toBe('6');
+      // The failed bootstrap released its handle.
+      await expect(failedDb!.getFirstAsync('SELECT 1')).rejects.toThrow(
+        'database connection is not open',
+      );
 
-    // Migration 7's real work — the three CREATE TABLE statements — ran inside
-    // the same transaction as the failed version bump and must have been
-    // rolled back.
-    const tables = await failedDb!.getAllAsync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'table'",
-    );
-    const tableNames = tables.map((t) => t.name);
-    expect(tableNames).not.toContain('routine_exercises');
-    expect(tableNames).not.toContain('routine_exercise_sets');
-    expect(tableNames).not.toContain('workout_session_exercises');
+      // Inspect the persisted state through an independent connection:
+      // migrations 2–6 committed (their version bumps succeeded), so the
+      // schema version is 6 — migration 7's bump never landed.
+      const inspector = new Database(file);
+      try {
+        const version = inspector
+          .prepare("SELECT value FROM app_meta WHERE key = 'db_schema_version'")
+          .get() as { value: string };
+        expect(version.value).toBe('6');
 
-    // Sanity: the bootstrap tables survive the rollback.
-    expect(tableNames).toContain('todos');
-    expect(tableNames).toContain('habits');
-    await failedDb!.closeAsync();
+        // Migration 7's real work — the three CREATE TABLE statements — ran
+        // inside the same transaction as the failed version bump and must
+        // have been rolled back.
+        const tableNames = (
+          inspector.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+            name: string;
+          }[]
+        ).map((t) => t.name);
+        expect(tableNames).not.toContain('routine_exercises');
+        expect(tableNames).not.toContain('routine_exercise_sets');
+        expect(tableNames).not.toContain('workout_session_exercises');
+
+        // Sanity: the bootstrap tables survive the rollback.
+        expect(tableNames).toContain('todos');
+        expect(tableNames).toContain('habits');
+      } finally {
+        inspector.close();
+      }
+    } finally {
+      appMetaFailures.failVersionSevenBump = false;
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
   });
 });
