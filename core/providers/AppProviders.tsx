@@ -1,4 +1,4 @@
-import { type PropsWithChildren, useCallback, useEffect, useRef, useState } from 'react';
+import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppState, Modal, Platform, Text, View } from 'react-native';
@@ -16,6 +16,10 @@ import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
 import { applyPendingThemeApplication } from '@/core/backup/backupSettings';
 import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessage';
 import { withRemoteTimeout } from '@/core/providers/remotePhase';
+import {
+  createPreviewAdoptionGuard,
+  type PreviewAdoptionGuard,
+} from '@/core/providers/previewAdoption';
 import { resolveRestorePromptOutcome } from '@/core/providers/restorePromptFlow';
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { InAppNoticeProvider } from '@/core/providers/InAppNoticeProvider';
@@ -86,6 +90,16 @@ export function AppProviders({ children }: PropsWithChildren) {
     },
     [],
   );
+
+  /**
+   * Monotonic adoption authority for restore-preview state (F-03). A preview
+   * read may outlive its bounded await; backup maintenance and post-flush
+   * cycles may obtain a newer preview. Only the newest preview task may adopt,
+   * so a slow older preview can never overwrite newer restore-prompt state.
+   */
+  const previewGuard = useMemo<PreviewAdoptionGuard>(() => createPreviewAdoptionGuard(), []);
+  const beginPreviewTask = useCallback(() => previewGuard.begin(), [previewGuard]);
+  const isCurrentPreview = useCallback((id: number) => previewGuard.isCurrent(id), [previewGuard]);
 
   useEffect(() => {
     registerServiceWorker();
@@ -162,16 +176,17 @@ export function AppProviders({ children }: PropsWithChildren) {
       }
 
       try {
+        const previewTaskId = beginPreviewTask();
         const previewTask = getRestorePreview();
         void previewTask
           .then((preview) => {
-            if (cancelled) return;
+            if (cancelled || !isCurrentPreview(previewTaskId)) return;
             setRestorePreview(preview);
             setShowRestorePrompt(preview.startupPromptEligible);
           })
           .catch(() => undefined);
         const preview = await withRemoteTimeout(previewTask, 'restore preview');
-        if (cancelled) return;
+        if (cancelled || !isCurrentPreview(previewTaskId)) return;
         setRestorePreview(preview);
         setShowRestorePrompt(preview.startupPromptEligible);
       } catch (e) {
@@ -188,8 +203,11 @@ export function AppProviders({ children }: PropsWithChildren) {
       try {
         const maintenance = await runBackupMaintenance({ skipFlush: true });
         if (!cancelled && maintenance.capturedManifest) {
+          const refreshedPreviewId = beginPreviewTask();
           const refreshedPreview = await getRestorePreview();
-          if (!cancelled) setRestorePreview(refreshedPreview);
+          if (!cancelled && isCurrentPreview(refreshedPreviewId)) {
+            setRestorePreview(refreshedPreview);
+          }
         }
       } catch (e) {
         console.error('[backup] maintenance failed during bootstrap', e);
@@ -211,7 +229,14 @@ export function AppProviders({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [applyAccountStateIfCurrent, awaitAccountTask, beginAccountTask, bootstrapAttempt]);
+  }, [
+    applyAccountStateIfCurrent,
+    awaitAccountTask,
+    beginAccountTask,
+    beginPreviewTask,
+    isCurrentPreview,
+    bootstrapAttempt,
+  ]);
 
   const retryBootstrap = useCallback(() => {
     setDbError(null);
@@ -347,7 +372,11 @@ export function AppProviders({ children }: PropsWithChildren) {
         try {
           const maintenance = await runBackupMaintenance({ skipFlush: true });
           if (!maintenance.capturedManifest) return;
-          setRestorePreview(await getRestorePreview());
+          const postFlushPreviewId = beginPreviewTask();
+          const refreshedPreview = await getRestorePreview();
+          if (isCurrentPreview(postFlushPreviewId)) {
+            setRestorePreview(refreshedPreview);
+          }
         } catch (e) {
           console.error('[backup] post-flush maintenance failed', e);
         }
@@ -382,7 +411,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       unsubscribeNetInfo();
       flushTriggerRef.current = null;
     };
-  }, []);
+  }, [beginPreviewTask, isCurrentPreview]);
 
   const handleDismissRestorePrompt = async () => {
     try {

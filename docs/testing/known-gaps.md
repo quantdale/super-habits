@@ -150,7 +150,7 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Reason:** the `HEAVY` fixture is a realistic ceiling for one human over three months, not a load test. Sustained-load and memory-leak profiling need instrumentation this change does not add.
 
-**Closing path:** a separate change; profile a long session with the Chrome DevTools protocol.
+**Closing path:** partially closed by the deterministic long-session soak lane (`simulation/scenarios/soakSustainedUse.ts`), which provides bounded resource-soak coverage through repeated full section tours, periodic hard reloads, a local-midnight crossing, and acceptance that requires two clean fresh-state runs. Remaining: no Chrome DevTools heap/memory-leak profiling instrumentation, and no native-device load profiling.
 
 ### 5. Migration-from-old-database journeys — synthetic matrix covered; real corpus still open
 

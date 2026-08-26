@@ -7,7 +7,7 @@ import { Card } from '@/core/ui/Card';
 
 import type { NextBestAction } from './overview.domain';
 import { OVERVIEW_CARD_META } from './overviewCards';
-import { openCardTarget } from './cards/DashboardCard';
+import { openCardTarget } from './cards/DashboardCard.shared';
 
 /**
  * Next Best Action hero (docs/ui-ux/03-feature-blueprints.md §1B): one

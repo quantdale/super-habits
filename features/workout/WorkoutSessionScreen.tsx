@@ -304,7 +304,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     if (previousId) void cancelScheduledNotification(previousId);
     if (!isRunning || isComplete || currentPhase?.phase !== 'rest') return;
     void scheduleTimerEndNotification(
-      Math.max(1, Math.round(remaining)),
+      Math.max(1, Math.round(remainingRef.current)),
       'Rest complete',
       `Next: ${sequence[currentIndex + 1]?.exerciseName ?? routine.name}`,
     ).then((id) => {

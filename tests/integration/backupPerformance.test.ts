@@ -120,7 +120,7 @@ async function measure<T>(label: string, work: () => Promise<T>): Promise<T> {
   const started = Date.now();
   const result = await work();
   const elapsed = Date.now() - started;
-  console.log(`[perf] ${label}: ${elapsed}ms`);
+  console.warn(`[perf] ${label}: ${elapsed}ms`);
   return result;
 }
 

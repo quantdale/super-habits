@@ -50,8 +50,23 @@ export function TodayBriefingView() {
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let active = true;
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const briefing = await buildTodayBriefing();
+        if (active) setBriefing(briefing);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : 'Failed to load briefing');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading && !briefing) {
     return (

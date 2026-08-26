@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
@@ -56,25 +56,27 @@ export function GoalListView({ onOpenGoal }: GoalListViewProps) {
   const [horizonFilter, setHorizonFilter] = useState<GoalHorizonFilter>('all');
   const [sortKey, setSortKey] = useState<GoalSortKey>('created');
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [goals, projects] = await Promise.all([listGoals(), listProjects()]);
-      const projectNameById = new Map(projects.map((p) => [p.id, p.name]));
-      setRows(
-        goals.map((goal) => ({
-          goal,
-          projectName: goal.project_id ? (projectNameById.get(goal.project_id) ?? null) : null,
-        })),
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void (async () => {
+      try {
+        const [goals, projects] = await Promise.all([listGoals(), listProjects()]);
+        if (!active) return;
+        const projectNameById = new Map(projects.map((p) => [p.id, p.name]));
+        setRows(
+          goals.map((goal) => ({
+            goal,
+            projectName: goal.project_id ? (projectNameById.get(goal.project_id) ?? null) : null,
+          })),
+        );
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const visible = useMemo(
     () =>

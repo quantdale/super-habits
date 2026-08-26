@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
@@ -41,36 +41,38 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>('all');
   const [sortKey, setSortKey] = useState<ProjectSortKey>('manual');
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Bounded: one project list + three grouped aggregate queries (no N+1).
-      const [list, rollups] = await Promise.all([listProjects(), listProjectRollups()]);
-      setRows(
-        list.map((project) => {
-          const r = rollups[project.id];
-          const progress = r
-            ? computeProjectProgress({ todos: r.todos, goals: r.goals, habits: r.habits })
-            : null;
-          return {
-            project,
-            progressPercent: progress?.percent ?? 0,
-            linkedCounts: {
-              todos: r?.todos.total ?? 0,
-              goals: r?.goals.count ?? 0,
-              habits: r?.habits.habitCount ?? 0,
-            },
-          };
-        }),
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void (async () => {
+      try {
+        // Bounded: one project list + three grouped aggregate queries (no N+1).
+        const [list, rollups] = await Promise.all([listProjects(), listProjectRollups()]);
+        if (!active) return;
+        setRows(
+          list.map((project) => {
+            const r = rollups[project.id];
+            const progress = r
+              ? computeProjectProgress({ todos: r.todos, goals: r.goals, habits: r.habits })
+              : null;
+            return {
+              project,
+              progressPercent: progress?.percent ?? 0,
+              linkedCounts: {
+                todos: r?.todos.total ?? 0,
+                goals: r?.goals.count ?? 0,
+                habits: r?.habits.habitCount ?? 0,
+              },
+            };
+          }),
+        );
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const visible = useMemo(
     () => sortProjectRows(filterProjectRows(rows, statusFilter), sortKey),

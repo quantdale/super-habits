@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
@@ -23,11 +23,16 @@ import { listPendingTodos } from '@/features/todos/todos.data';
 import { listHabits } from '@/features/habits/habits.data';
 import { isHabitScheduledOn } from '@/features/habits/habits.domain';
 import { toDateKey } from '@/lib/time';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
+import { createEditableFieldOwner } from '@/lib/editableDraft';
 import type { DailyPlan } from '@/core/db/types';
 
 type DailyPlanViewProps = {
   dateKey?: string;
 };
+
+type EditableField =
+  'intention' | 'notes' | 'reflection' | 'energyScore' | 'focusTarget' | 'topTodoIds';
 
 type AdherenceSummary = {
   committedStreak: number;
@@ -37,6 +42,8 @@ type AdherenceSummary = {
 export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const { tokens } = useAppTheme();
   const today = dateKey ?? toDateKey();
+  const { begin } = useGuardedAsyncRefresh();
+  const draft = useMemo(() => createEditableFieldOwner<EditableField>(), []);
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [intention, setIntention] = useState('');
   const [notes, setNotes] = useState('');
@@ -52,53 +59,87 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const [carryingForward, setCarryingForward] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
+  const loadPlanData = useCallback(
+    () =>
+      Promise.all([
+        getDailyPlan(today),
+        listPendingTodos(),
+        listHabits(),
+        getDailyPlanAdherence().catch(() => null),
+      ]),
+    [today],
+  );
+
+  const applyLoadedPlan = useCallback(
+    (isCurrent: () => boolean, data: Awaited<ReturnType<typeof loadPlanData>>) => {
+      if (!isCurrent()) return;
+      const [existing, todos, habits, adherenceSummary] = data;
+      if (existing) {
+        setPlan(existing);
+        // Editable fields only adopt the persisted value when the user has not
+        // edited them since this load began (F-01 / D3): a slow refresh can
+        // never discard an in-progress user edit, while untouched fields still
+        // hydrate normally.
+        draft.applyIfPristine('intention', () => setIntention(existing.intention));
+        draft.applyIfPristine('notes', () => setNotes(existing.notes));
+        draft.applyIfPristine('reflection', () => setReflection(existing.reflection));
+        draft.applyIfPristine('energyScore', () => setEnergyScore(existing.energy_score));
+        draft.applyIfPristine('focusTarget', () => setFocusTarget(existing.focus_target_minutes));
+        draft.applyIfPristine('topTodoIds', () =>
+          setTopTodoIds(parseTopTodoIds(existing.top_todo_ids)),
+        );
+      } else {
+        // Read-only draft: do not persist until explicit Save/Commit/Complete.
+        // Keeps pristine provisional devices eligible for Recover Existing.
+        setPlan(null);
+        draft.applyIfPristine('intention', () => setIntention(''));
+        draft.applyIfPristine('notes', () => setNotes(''));
+        draft.applyIfPristine('reflection', () => setReflection(''));
+        draft.applyIfPristine('energyScore', () => setEnergyScore(null));
+        draft.applyIfPristine('focusTarget', () => setFocusTarget(0));
+        draft.applyIfPristine('topTodoIds', () => setTopTodoIds([]));
+      }
+      setPendingTodos(todos.map((t) => ({ id: t.id, title: t.title })));
+      setScheduledHabits(
+        habits
+          .filter((h) => isHabitScheduledOn(h.rule_history, today, h.target_per_day))
+          .map((h) => h.name),
+      );
+      if (adherenceSummary) {
+        setAdherence({
+          committedStreak: adherenceSummary.committedStreak,
+          completedStreak: adherenceSummary.completedStreak,
+        });
+      }
+    },
+    [draft, today],
+  );
+
   const refresh = useCallback(async () => {
-    const [existing, todos, habits, adherenceSummary] = await Promise.all([
-      getDailyPlan(today),
-      listPendingTodos(),
-      listHabits(),
-      getDailyPlanAdherence().catch(() => null),
-    ]);
-    if (existing) {
-      setPlan(existing);
-      setIntention(existing.intention);
-      setNotes(existing.notes);
-      setReflection(existing.reflection);
-      setEnergyScore(existing.energy_score);
-      setFocusTarget(existing.focus_target_minutes);
-      setTopTodoIds(parseTopTodoIds(existing.top_todo_ids));
-    } else {
-      // Read-only draft: do not persist until explicit Save/Commit/Complete.
-      // Keeps pristine provisional devices eligible for Recover Existing.
-      setPlan(null);
-      setIntention('');
-      setNotes('');
-      setReflection('');
-      setEnergyScore(null);
-      setFocusTarget(0);
-      setTopTodoIds([]);
-    }
-    setPendingTodos(todos.map((t) => ({ id: t.id, title: t.title })));
-    setScheduledHabits(
-      habits
-        .filter((h) => isHabitScheduledOn(h.rule_history, today, h.target_per_day))
-        .map((h) => h.name),
-    );
-    if (adherenceSummary) {
-      setAdherence({
-        committedStreak: adherenceSummary.committedStreak,
-        completedStreak: adherenceSummary.completedStreak,
-      });
-    }
-  }, [today]);
+    const isCurrent = begin();
+    const data = await loadPlanData();
+    applyLoadedPlan(isCurrent, data);
+  }, [begin, loadPlanData, applyLoadedPlan]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const isCurrent = begin();
+    let active = true;
+    void (async () => {
+      const data = await loadPlanData();
+      if (active) applyLoadedPlan(isCurrent, data);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [begin, loadPlanData, applyLoadedPlan]);
 
-  const toggleTodo = useCallback((todoId: string) => {
-    setTopTodoIds((current) => toggleTopTodoId(current, todoId));
-  }, []);
+  const toggleTodo = useCallback(
+    (todoId: string) => {
+      draft.markDirty('topTodoIds');
+      setTopTodoIds((current) => toggleTopTodoId(current, todoId));
+    },
+    [draft],
+  );
 
   const [carryForwardError, setCarryForwardError] = useState<string | null>(null);
 
@@ -137,11 +178,12 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           ...(extra.status ? { status: extra.status } : {}),
         });
         setPlan(updated);
+        draft.clear();
       } finally {
         setSaving(false);
       }
     },
-    [today, intention, notes, reflection, energyScore, focusTarget, topTodoIds],
+    [today, intention, notes, reflection, energyScore, focusTarget, topTodoIds, draft],
   );
 
   const isCompleted = plan?.status === 'completed';
@@ -194,7 +236,10 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       <TextField
         label="Intention"
         value={intention}
-        onChangeText={setIntention}
+        onChangeText={(value) => {
+          draft.markDirty('intention');
+          setIntention(value);
+        }}
         placeholder="What is the one thing that matters most today?"
       />
 
@@ -258,12 +303,23 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       <TextField
         label="Focus target (minutes)"
         value={String(focusTarget)}
-        onChangeText={(v) => setFocusTarget(Number(v.replace(/\D/g, '')) || 0)}
+        onChangeText={(value) => {
+          draft.markDirty('focusTarget');
+          setFocusTarget(Number(value.replace(/\D/g, '')) || 0);
+        }}
         keyboardType="number-pad"
         placeholder="0"
       />
 
-      <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional" />
+      <TextField
+        label="Notes"
+        value={notes}
+        onChangeText={(value) => {
+          draft.markDirty('notes');
+          setNotes(value);
+        }}
+        placeholder="Optional"
+      />
 
       <Button
         label="Save Plan"
@@ -286,7 +342,10 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         <TextField
           label="Reflection"
           value={reflection}
-          onChangeText={setReflection}
+          onChangeText={(value) => {
+            draft.markDirty('reflection');
+            setReflection(value);
+          }}
           placeholder="How did today go?"
         />
         <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
@@ -304,7 +363,10 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
                   ? { backgroundColor: SECTION_COLORS.focus, borderColor: SECTION_COLORS.focus }
                   : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
               }
-              onPress={() => setEnergyScore(normalizeEnergyScore(score))}
+              onPress={() => {
+                draft.markDirty('energyScore');
+                setEnergyScore(normalizeEnergyScore(score));
+              }}
             >
               <Text style={{ color: energyScore === score ? tokens.textOnAccent : tokens.text }}>
                 {score}

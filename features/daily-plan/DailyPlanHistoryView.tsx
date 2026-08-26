@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
@@ -21,32 +21,34 @@ export function DailyPlanHistoryView() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [plans, todos] = await Promise.all([listRecentDailyPlans(30), listPendingTodos()]);
-      const titleById = new Map(todos.map((t) => [t.id, t.title] as const));
-      setEntries(
-        plans.map((p) => {
-          // Save-time snapshot first (survives deletion), live lookup second;
-          // '(removed)' remains the last resort for snapshot-less rows.
-          const snapshotTitles = parseTopTodoTitles(p.top_todo_titles);
-          return {
-            ...p,
-            todoTitles: parseTopTodoIds(p.top_todo_ids).map(
-              (id, i) => snapshotTitles[i] || titleById.get(id) || '(removed)',
-            ),
-          };
-        }),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let active = true;
+    void (async () => {
+      try {
+        const [plans, todos] = await Promise.all([listRecentDailyPlans(30), listPendingTodos()]);
+        if (!active) return;
+        const titleById = new Map(todos.map((t) => [t.id, t.title] as const));
+        setEntries(
+          plans.map((p) => {
+            // Save-time snapshot first (survives deletion), live lookup second;
+            // '(removed)' remains the last resort for snapshot-less rows.
+            const snapshotTitles = parseTopTodoTitles(p.top_todo_titles);
+            return {
+              ...p,
+              todoTitles: parseTopTodoIds(p.top_todo_ids).map(
+                (id, i) => snapshotTitles[i] || titleById.get(id) || '(removed)',
+              ),
+            };
+          }),
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading) {
     return (

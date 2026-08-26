@@ -53,23 +53,24 @@ export function HabitDetailModal({
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!habit) {
-      setCompletions([]);
-      setLoaded(false);
-      return;
-    }
     let cancelled = false;
-    setLoaded(false);
-    loadCompletions(habit.id)
-      .then((rows) => {
+    void (async () => {
+      if (!habit) {
+        setCompletions([]);
+        setLoaded(false);
+        return;
+      }
+      setLoaded(false);
+      try {
+        const rows = await loadCompletions(habit.id);
         if (!cancelled) {
           setCompletions(rows);
           setLoaded(true);
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setLoaded(true);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };

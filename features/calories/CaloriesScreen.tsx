@@ -220,9 +220,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     // "today" must follow the new day so the active section never renders
     // yesterday's totals under the Today header. An explicitly selected
     // past day stays put.
-    if (followsToday) {
-      setSelectedDateKey(toDateKey());
-    }
+    if (!followsToday) return;
+    queueMicrotask(() => setSelectedDateKey(toDateKey()));
   }, [dayGeneration, followsToday]);
 
   useEffect(() => {

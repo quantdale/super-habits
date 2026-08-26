@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
@@ -18,18 +18,20 @@ export function ReviewHistoryView() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      setReviews(await listWeeklyReviews(26));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let active = true;
+    void (async () => {
+      try {
+        const reviews = await listWeeklyReviews(26);
+        if (active) setReviews(reviews);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading) {
     return (

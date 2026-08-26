@@ -14,7 +14,7 @@ import type {
   WorkoutSummary,
 } from './overview.domain';
 import { OVERVIEW_CARD_META } from './overviewCards';
-import { openCardTarget } from './cards/DashboardCard';
+import { openCardTarget } from './cards/DashboardCard.shared';
 
 type TodayProgressStripProps = {
   todayKey: string;

@@ -258,65 +258,63 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
    * to the durably-intended session, cancel the orphan OS notification, and
    * restore the cycle position. Never blocks the screen on failure.
    */
-  const reconcileActiveTimer = useCallback(async () => {
-    if (reconciledRef.current) return;
-    reconciledRef.current = true;
-    try {
-      const intent = await getPomodoroActiveTimer();
-      if (!intent) return;
-      const hasRow = await hasPomodoroSessionStartedAt(intent.startedAtIso);
-      const plan = planActiveTimerReconcile(intent, hasRow, Date.now());
-      // The OS notification survives JS death on native; cancel it in every
-      // outcome now that the session's fate is decided.
-      await cancelScheduledNotification(plan.notificationId);
-
-      if (plan.kind === 'already-logged') {
-        completedFocusRef.current = intent.completedFocus;
-        setCompletedFocus(intent.completedFocus);
-      } else if (plan.kind === 'complete-unlogged') {
-        // The countdown finished while the app was dead — honor the focus.
-        const endedAtIso = new Date(
-          new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000,
-        ).toISOString();
-        try {
-          const result = await recordCompletedPomodoroSession({
-            startedAtIso: intent.startedAtIso,
-            endedAtIso,
-            durationSeconds: intent.totalSeconds,
-            type: 'focus',
-          });
-          if (result.inserted) setNotePromptSessionId(result.id);
-          void loadHistory();
-        } catch {
-          await enqueuePendingPomodoroLog({
-            startedAtIso: intent.startedAtIso,
-            endedAtIso,
-            durationSeconds: intent.totalSeconds,
-            type: 'focus',
-          }).catch(() => undefined);
-          setLogSaveFailed(true);
-        }
-        const nextCompleted = intent.completedFocus + 1;
-        completedFocusRef.current = nextCompleted;
-        setCompletedFocus(nextCompleted);
-      } else {
-        const label = getModeLabel(intent.mode).toLowerCase();
-        setInterruptedNotice({
-          title: 'Previous session interrupted',
-          body: `Your ${label} didn't finish before the app closed. Interrupted sessions are never logged.`,
-        });
-        completedFocusRef.current = intent.completedFocus;
-        setCompletedFocus(intent.completedFocus);
-      }
-      await clearPomodoroActiveTimer().catch(() => undefined);
-    } catch {
-      // Best-effort reconciliation; the intent stays durable for next mount.
-    }
-  }, [loadHistory]);
-
   useEffect(() => {
-    void reconcileActiveTimer();
-  }, [reconcileActiveTimer]);
+    void (async () => {
+      if (reconciledRef.current) return;
+      reconciledRef.current = true;
+      try {
+        const intent = await getPomodoroActiveTimer();
+        if (!intent) return;
+        const hasRow = await hasPomodoroSessionStartedAt(intent.startedAtIso);
+        const plan = planActiveTimerReconcile(intent, hasRow, Date.now());
+        // The OS notification survives JS death on native; cancel it in every
+        // outcome now that the session's fate is decided.
+        await cancelScheduledNotification(plan.notificationId);
+
+        if (plan.kind === 'already-logged') {
+          completedFocusRef.current = intent.completedFocus;
+          setCompletedFocus(intent.completedFocus);
+        } else if (plan.kind === 'complete-unlogged') {
+          // The countdown finished while the app was dead — honor the focus.
+          const endedAtIso = new Date(
+            new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000,
+          ).toISOString();
+          try {
+            const result = await recordCompletedPomodoroSession({
+              startedAtIso: intent.startedAtIso,
+              endedAtIso,
+              durationSeconds: intent.totalSeconds,
+              type: 'focus',
+            });
+            if (result.inserted) setNotePromptSessionId(result.id);
+            void loadHistory();
+          } catch {
+            await enqueuePendingPomodoroLog({
+              startedAtIso: intent.startedAtIso,
+              endedAtIso,
+              durationSeconds: intent.totalSeconds,
+              type: 'focus',
+            }).catch(() => undefined);
+            setLogSaveFailed(true);
+          }
+          const nextCompleted = intent.completedFocus + 1;
+          completedFocusRef.current = nextCompleted;
+          setCompletedFocus(nextCompleted);
+        } else {
+          const label = getModeLabel(intent.mode).toLowerCase();
+          setInterruptedNotice({
+            title: 'Previous session interrupted',
+            body: `Your ${label} didn't finish before the app closed. Interrupted sessions are never logged.`,
+          });
+          completedFocusRef.current = intent.completedFocus;
+          setCompletedFocus(intent.completedFocus);
+        }
+        await clearPomodoroActiveTimer().catch(() => undefined);
+      } catch {
+        // Best-effort reconciliation; the intent stays durable for next mount.
+      }
+    })();
+  }, [loadHistory]);
 
   useEffect(() => {
     if (!isRunning) return;
