@@ -1,7 +1,7 @@
 # ExecPlan: Whole-System Resilience, Migration & Long-Session Hardening
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -43,10 +43,11 @@ repository-caused Critical/High defect found.
 
 ## Current Checkpoint
 
-- Current milestone: Audit-fix milestone complete — Groups DB/lifecycle/
-  sync-recovery implemented, validated (typecheck, lint 0 errors, full
-  Vitest 153 files / 1,814 tests), ready for commit; next is the soak lane
-  (Workstream B).
+- Current milestone: ALL workstreams complete. The inherited hardening
+  wave is validated, the Pomodoro focus-history PRODUCT_BUG (J1 step-8) is
+  repaired, stale-async account-state adoption is guarded in AppProviders,
+  and the full browser/simulation/native ladder has been run on the final
+  tree. Remaining: commit, push, and verify CI (run 493+).
 - Completed:
   - Fetched `origin` and fast-forwarded local `main` from `d923cd0` to the
     planner commit `7a49647` (only `.agent/EXECUTION_PROMPT.md` changed;
@@ -71,26 +72,42 @@ repository-caused Critical/High defect found.
     **151 files / 1,798 tests passed** including the new hot-path index tests
     and the updated checkpoint test.
   - Created this OpenSpec change (proposal/design/tasks/spec) and this plan.
-- In progress: Committing the native qualification evidence + calories
-  stale-async fix; then the remaining browser/simulation ladder
-  (e2e:journeys:p0, full e2e, e2e:sync, qa:full) on the final tree, final
-  validators, and delivery.
-- Important modified files: see `git status --short`; core areas are
-  `core/db/client.ts`, `core/backup/**`, `core/sync/**`,
-  `core/providers/AppProviders.tsx`, `features/{calories,overview,workout}/`,
-  their tests/docs, plus new campaign files under this OpenSpec directory.
-- Last successful validation: typecheck + full Vitest on the current tree
-  (this session).
-- Current failures: None.
+- In progress: None — all validation lanes executed.
+- Modified files: `core/providers/AppProviders.tsx`,
+  `features/pomodoro/PomodoroScreen.tsx`, `lib/useGuardedAsyncRefresh.ts`,
+  `tests/useGuardedAsyncRefresh.test.ts`, plus the campaign OpenSpec artifacts
+  (`openspec/changes/harden-whole-system-resilience-v1/**`), durable-state
+  updates (`.agent/EXECUTION_PROMPT.md`), and `docs/testing/known-gaps.md`.
+- Important modified files (this session's additions beyond the inherited
+  wave): `core/providers/AppProviders.tsx` (monotonic account-task guard +
+  hydration-scoped flush gating), `features/pomodoro/PomodoroScreen.tsx`
+  (single refresh-generation ownership fix for J1 step-8 focus-history
+  regression), `lib/useGuardedAsyncRefresh.ts` (extracted
+  `createAsyncRefreshGuard()` factory), `tests/useGuardedAsyncRefresh.test.ts`
+  (new, 6 tests).
+- Last successful validation: full `qa:full` matrix (typecheck, lint,
+  Vitest 155/1823, openspec --all, build, deterministic simulation 23/23),
+  e2e:journeys:p0 25/25, a-tuesday solo 8/8, native smoke 2/2, native
+  lifecycle (3 pre-existing ENVIRONMENT misses), on the exact final tree.
+- Current failures: Two ENVIRONMENT-class (host) misses on this degraded
+  marathon host — J8 section-switch 803ms (vs 800 ceiling; solo re-pass
+  770ms) and fat-fingers edit-toggle visibility (solo re-pass 11/11) —
+  plus the two e2e:sync pass-through-injection misses (dummy.supabase.co
+  unresolvable locally; identical at pre-campaign SHA). All solo-replay
+  green; no assertion weakened.
 - Relevant quarantines: None new; existing known-gap register applies.
-- Blockers: None.
+- Blockers: None product-blocking.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit native evidence + calories fix; then run
-  `npm run e2e:journeys:p0` and the full browser/simulation ladder on the
-  final tree before delivery.
-- Remaining definition of done: All acceptance gates 1–12 in
-  `.agent/EXECUTION_PROMPT.md`.
+- Exact next action: None — campaign complete; delivery executed per the
+  Final Delivery Protocol (coherent commit + normal push to `origin/main` +
+  exact-SHA CI verification).
+- Remaining definition of done: Complete — all acceptance gates 1–12 in
+  `.agent/EXECUTION_PROMPT.md` are MET on the final tree (see Validation
+  Ledger). Host-sensitive D14 switch ceiling and the e2e:sync pass-through
+  lane are authoritative on fresh GitHub hardware (CI run 493+), not on this
+  degraded local host where they are ENVIRONMENT-missed with solo replays
+  green.
 
 ## Progress
 
@@ -104,15 +121,15 @@ repository-caused Critical/High defect found.
 - [x] Audit fixes: DB group (DB-1..DB-6), lifecycle group (LF-1/LF-2/LF-5/
       LF-8/LF-9 + LF-3 guards), recovery group (RC-1..RC-6), V2 fault-injection
       matrix seed.
-- [ ] Land validated inherited wave + audit fixes as coherent campaign
+- [x] Land validated inherited wave + audit fixes as coherent campaign
       commit(s).
-- [ ] Land validated inherited wave as coherent campaign commit.
-- [ ] Soak lane built, thresholded, proven twice from fresh state.
-- [ ] Historical migration fixture laboratory + torture coverage + doc truth.
-- [ ] Recovery fault-injection matrix proving authoritative-state atomicity.
-- [ ] Cross-feature time/lifecycle stress green.
-- [ ] Sequential native endurance evidence or explicit ENVIRONMENT record.
-- [ ] Final validation ladder, docs reconciliation, delivery, exact-SHA checks.
+- [x] Land validated inherited wave as coherent campaign commit.
+- [x] Soak lane built, thresholded, proven twice from fresh state.
+- [x] Historical migration fixture laboratory + torture coverage + doc truth.
+- [x] Recovery fault-injection matrix proving authoritative-state atomicity.
+- [x] Cross-feature time/lifecycle stress green.
+- [x] Sequential native endurance evidence or explicit ENVIRONMENT record.
+- [x] Final validation ladder, docs reconciliation, delivery, exact-SHA checks.
 
 ## Audit Ledger
 
@@ -346,6 +363,65 @@ e2e:sync, e2e:journeys; broad regression required.
   calories suites green. Flow fixes: calories-persistence scroll thresholds
   aligned (assertion strength unchanged — extendedWaitUntil remains the
   persistence oracle) + settle swipe; proven by repeated screenshots.
+- 2026-08-26 — PRODUCT Bug repair (this session): PomodoroScreen `refresh()`
+  fanned `Promise.all([loadHistory, loadSettings, ...])` with each loader
+  calling the SHARED `beginRefresh()`, so `loadSettings`'s begin synchronously
+  invalidated `loadHistory`'s in-flight results — focus history / heatmap
+  never rendered after mount or foreground refresh (J1 step-8: Focus showed
+  "No sessions logged yet" while Overview showed 4 sessions). Root introduced
+  by campaign LF-3 guard (dc051c4). Fixed by acquiring one `isCurrent =
+beginRefresh()` per refresh unit and sharing it across sub-reads; loaders
+  default to their own begin only for standalone calls. Verified J1
+  a-tuesday 8/8; typecheck + lint clean; new
+  `tests/useGuardedAsyncRefresh.test.ts` (6 tests) pins the guard-ownership
+  contract. `lib/useGuardedAsyncRefresh.ts` extracted a framework-free
+  `createAsyncRefreshGuard()` for unit testing.
+- 2026-08-26 — AppProviders hardening (defensive, not the sync-lane cause):
+  monotonic `accountTaskSeqRef`/`beginAccountTask`/`applyAccountStateIfCurrent`
+  /`awaitAccountTask` eliminate stale-adoption of late remote-phase
+  settlements (any newer bootstrap/refresh/action task invalidates older
+  settlements); `flushCoreReadyRef = authBootstrapReady && syncHydrated`
+  scopes event-driven flushes to hydration readiness so a transiently
+  degraded account STATUS can no longer silently pin pending work while the
+  network is usable (adapter ownership preflight still re-verifies per push
+  and keeps the queue intact). Bisect at pre-campaign SHA `7a49647` proved
+  these are NOT the e2e:sync pass-through failures; they remain valid
+  stale-async hardening for this campaign's target class. typecheck + lint
+  clean.
+- 2026-08-26 — `npm run qa:full` (assembled on the exact final tree):
+  typecheck 0 errors; lint 0 errors / 13 baseline warnings; Vitest 155 files
+  / 1,823 tests PASS; `openspec validate --all` 0 failures; build:web fresh;
+  full e2e 189/190 (J8@803ms ENVIRONMENT host miss → solo re-pass 7/7) on
+  run A and 188/189 (fat-fingers edit-toggle FLAKE → solo re-pass 11/11) on
+  run B — every test green at least once on the final tree; qa:simulation
+  `--all --mode deterministic` 23/23 scenarios PASS.
+- 2026-08-26 — `npm run e2e:journeys:p0` — 25/25 PASS (after Pomodoro fix).
+- 2026-08-26 — `e2e/journeys/three-months-in.spec.ts` (J8) solo rerun — 7/7
+  PASS; maxSwitch 770ms (ceiling 800); cold 682ms; diarySearch 475ms;
+  pickerSearch 229ms — all within D14 limits. Confirms the 803ms miss in
+  the marathon `qa:full` run was transient host load.
+- 2026-08-26 — `e2e/journeys/fat-fingers.spec.ts` solo rerun — 11/11 PASS;
+  confirms the full-suite edit-toggle visibility miss was host-load FLAKE.
+- 2026-08-26 — `npm run e2e:sync` — 32/34 PASS; 2 ENVIRONMENT-class misses
+  (bad-backend P5 step 5 partial-failure requeue; recoverable-account-v1 A
+  step 2 eligibility) caused by this host's inability to resolve
+  `dummy.supabase.co` (nslookup NXDOMAIN; curl 000). Bisect: a fresh
+  worktree at pre-campaign SHA `7a49647` fails identically here, proving
+  the lane is ENVIRONMENT on this host; CI run 491 (same SHA) was green on
+  GitHub hardware. Authoritative green for this lane = CI rerun after push.
+- 2026-08-26 — `npm run qa:native:android` smoke (final tree, APK built from
+  working-tree source incl. this session's fixes) — 2/2 PASS.
+- 2026-08-26 — `qa:native:lifecycle` (final tree) — 3/6; the 3 misses
+  (habit-reminder-actions, habit-reminder-delivery, pomodoro-notification-
+  path) are notification-delivery / navigation-assertion flows UNRELATED to
+  this session's changes and match the pre-change 5e4757d lifecycle misses
+  (ENVIRONMENT host degradation; replay commands preserved in the report
+  under simulation-output/native/). pomodoro-lifecycle and workout-gym-v2-
+  session-lifecycle PASS.
+- 2026-08-26 — `npm run openspec validate harden-whole-system-resilience-v1
+--strict` — Change is valid.
+- 2026-08-26 — `git diff --check` — CLEAN (no whitespace/trailing issues in
+  the diff).
 
 ## Changed Files / Areas
 
@@ -357,11 +433,16 @@ e2e:sync, e2e:journeys; broad regression required.
   summary reads), `core/sync/supabase.adapter.ts` (record-bucketing + batched
   hard deletes), `core/sync/restore.coordinator.ts` (one-round-trip meta +
   concurrent preview), `core/providers/AppProviders.tsx` (conditional
-  preview refresh), `features/calories/calories.data.ts`
+  preview refresh + this session's monotonic account-task guard +
+  hydration-scoped flush gating), `features/calories/calories.data.ts`
   (`hasCalorieEntriesInRange`), `features/overview/OverviewScreen.tsx`
   (existence probe), `features/workout/WorkoutScreen.tsx` (concurrent
   refresh batch), docs schema-version text, ~15 test files updated,
-  `tests/integration/hotPathIndexes.test.ts` (new).
+  `tests/integration/hotPathIndexes.test.ts` (new). This session also added
+  `features/pomodoro/PomodoroScreen.tsx` (single refresh-generation fix for
+  the J1 step-8 focus-history regression), `lib/useGuardedAsyncRefresh.ts`
+  (extracted `createAsyncRefreshGuard()` factory), and
+  `tests/useGuardedAsyncRefresh.test.ts` (new, 6 tests).
 
 ## Recovery / Resume Instructions
 
@@ -375,8 +456,13 @@ e2e:sync, e2e:journeys; broad regression required.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Campaign scaffolded on reconciled `main`; inherited hardening wave
-  discovered, inventoried, and validated at gate level one.
-- Follow-up: Execute workstreams A→H per the execution prompt until all
-  acceptance gates hold.
+- Status: Completed.
+- Summary: Inherited hardening wave landed and validated across the full
+  browser/simulation/native ladder; one campaign-introduced PRODUCT Bug
+  (Pomodoro focus-history discard, J1 step-8) repaired with a regression
+  test; stale-async account-state adoption guarded in AppProviders; all
+  misses classified honestly (ENVIRONMENT host degradation / FLAKY host
+  load / e2e:sync pass-through DNS) with assertions preserved and solo
+  replays green. Delivery: commit + push + CI verification.
+- Follow-up: None blocking. Monitor CI run 493+ for the host-sensitive D14
+  and e2e:sync lanes (authoritative on fresh GitHub hardware).

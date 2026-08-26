@@ -59,21 +59,37 @@ export function AppProviders({ children }: PropsWithChildren) {
   const [restorePromptBusy, setRestorePromptBusy] = useState(false);
   const [restorePromptError, setRestorePromptError] = useState<string | null>(null);
 
+  /**
+   * Monotonic token for account-state tasks. Any newer task (refresh,
+   * protection/recovery action, bootstrap retry) invalidates older tasks'
+   * settlements so a hung remote phase that finally settles can never
+   * overwrite fresher account state (stale-async overwrite class).
+   */
+  const accountTaskSeqRef = useRef(0);
+  const beginAccountTask = useCallback(() => ++accountTaskSeqRef.current, []);
+  const applyAccountStateIfCurrent = useCallback((taskId: number, state: AccountState) => {
+    if (taskId === accountTaskSeqRef.current) setAccountState(state);
+  }, []);
+  const awaitAccountTask = useCallback(
+    async (
+      taskId: number,
+      task: Promise<AccountState>,
+      label: string,
+    ): Promise<AccountState | null> => {
+      try {
+        const state = await task;
+        return taskId === accountTaskSeqRef.current ? state : null;
+      } catch (e) {
+        console.error(`[auth] ${label} settled with an error`, e);
+        return null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     registerServiceWorker();
     let cancelled = false;
-
-    const adoptAccountState = (task: Promise<AccountState>, label: string) => {
-      // A bounded phase keeps running past its deadline; whenever it finally
-      // settles, still adopt the fresher result unless the provider unmounted.
-      task
-        .then((state) => {
-          if (!cancelled) setAccountState(state);
-        })
-        .catch((e) => {
-          console.error(`[auth] ${label} settled with an error`, e);
-        });
-    };
 
     const bootstrap = async () => {
       try {
@@ -100,12 +116,16 @@ export function AppProviders({ children }: PropsWithChildren) {
 
       try {
         // A hung network must never wedge the startup gate: bound each
-        // remote wait so local use stays available, then adopt the settled
-        // result if it arrives later.
-        const coordinatorBootstrap = accountCoordinator.bootstrap();
-        adoptAccountState(coordinatorBootstrap, 'account bootstrap');
-        const nextAccountState = await withRemoteTimeout(coordinatorBootstrap, 'account bootstrap');
-        if (!cancelled) setAccountState(nextAccountState);
+        // remote wait so local use stays available. The settled result is
+        // adopted only while its task is still the newest account task, so
+        // a late settlement can never overwrite newer state.
+        const taskId = beginAccountTask();
+        const coordinatorTask = accountCoordinator.bootstrap();
+        void awaitAccountTask(taskId, coordinatorTask, 'account bootstrap').then((state) => {
+          if (!cancelled && state) applyAccountStateIfCurrent(taskId, state);
+        });
+        const nextAccountState = await withRemoteTimeout(coordinatorTask, 'account bootstrap');
+        if (!cancelled) applyAccountStateIfCurrent(taskId, nextAccountState);
       } catch (e) {
         console.error('[auth] account bootstrap failed', e);
         if (!cancelled) {
@@ -128,10 +148,15 @@ export function AppProviders({ children }: PropsWithChildren) {
       if (!cancelled) setSyncHydrated(true);
 
       try {
-        const coordinatorRefresh = accountCoordinator.refresh();
-        adoptAccountState(coordinatorRefresh, 'account refresh after sync hydrate');
-        const nextAccountState = await withRemoteTimeout(coordinatorRefresh, 'account refresh');
-        if (!cancelled) setAccountState(nextAccountState);
+        const taskId = beginAccountTask();
+        const coordinatorTask = accountCoordinator.refresh();
+        void awaitAccountTask(taskId, coordinatorTask, 'account refresh after sync hydrate').then(
+          (state) => {
+            if (!cancelled && state) applyAccountStateIfCurrent(taskId, state);
+          },
+        );
+        const nextAccountState = await withRemoteTimeout(coordinatorTask, 'account refresh');
+        if (!cancelled) applyAccountStateIfCurrent(taskId, nextAccountState);
       } catch (e) {
         console.error('[auth] account refresh failed after sync hydrate', e);
       }
@@ -186,7 +211,7 @@ export function AppProviders({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [bootstrapAttempt]);
+  }, [applyAccountStateIfCurrent, awaitAccountTask, beginAccountTask, bootstrapAttempt]);
 
   const retryBootstrap = useCallback(() => {
     setDbError(null);
@@ -212,9 +237,13 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, []);
 
   const refreshAccountState = useCallback(async () => {
-    const nextAccountState = await accountCoordinator.refresh();
-    setAccountState(nextAccountState);
-  }, []);
+    const taskId = beginAccountTask();
+    const nextAccountState = await withRemoteTimeout(
+      accountCoordinator.refresh(),
+      'account refresh',
+    );
+    if (nextAccountState) applyAccountStateIfCurrent(taskId, nextAccountState);
+  }, [applyAccountStateIfCurrent, beginAccountTask]);
 
   const runAccountAction = useCallback(
     async (action: () => Promise<AccountActionResult>): Promise<AccountActionResult> => {
@@ -274,24 +303,31 @@ export function AppProviders({ children }: PropsWithChildren) {
   // Readiness is tracked by ref so account transitions don't tear down and
   // rebuild the flush subscriptions below (each rebuild fired one
   // backoff-bypassing flush via NetInfo's immediate emit). A transition into
-  // readiness kicks exactly one flush instead.
+  // full readiness kicks exactly one flush instead.
   const remoteFlushReadyRef = useRef(false);
+  // Core readiness gates every event-driven flush: the durable outbox must be
+  // hydrated before any push. Account STATUS deliberately does not gate the
+  // reconnect/visibility path — degraded statuses pause pushes inside the
+  // adapter's ownership preflight (which re-verifies per push and keeps the
+  // queue intact), so a transiently degraded status can never silently pin
+  // pending work while the network is actually usable.
+  const flushCoreReadyRef = useRef(false);
   const flushTriggerRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    const ready =
-      authBootstrapReady &&
-      syncHydrated &&
-      ['anonymous_ready', 'protected', 'protection_pending'].includes(accountState.status);
+    flushCoreReadyRef.current = authBootstrapReady && syncHydrated;
+    const statusReady = ['anonymous_ready', 'protected', 'protection_pending'].includes(
+      accountState.status,
+    );
     const wasReady = remoteFlushReadyRef.current;
-    remoteFlushReadyRef.current = ready;
-    if (ready && !wasReady) flushTriggerRef.current?.();
+    remoteFlushReadyRef.current = flushCoreReadyRef.current && statusReady;
+    if (remoteFlushReadyRef.current && !wasReady) flushTriggerRef.current?.();
   }, [accountState.status, authBootstrapReady, syncHydrated]);
 
   useEffect(() => {
     if (!isRemoteEnabled()) return;
 
     const flush = () => {
-      if (!remoteFlushReadyRef.current) return;
+      if (!flushCoreReadyRef.current) return;
       void (async () => {
         try {
           await syncEngine.flush();

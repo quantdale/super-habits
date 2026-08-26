@@ -1,4 +1,29 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+
+/**
+ * Framework-free core of the refresh guard, extracted so the ownership
+ * contract is unit-testable without a React render harness.
+ *
+ * One guard instance represents ONE refresh stream. `begin()` starts a new
+ * generation and returns an `isCurrent` predicate that stays true only while
+ * that generation is the newest one on this guard and the guard is mounted.
+ */
+export function createAsyncRefreshGuard() {
+  let mounted = true;
+  let latestRequestId = 0;
+
+  return {
+    setMounted(value: boolean): void {
+      mounted = value;
+    },
+    begin(): () => boolean {
+      const requestId = ++latestRequestId;
+      return () => mounted && latestRequestId === requestId;
+    },
+  };
+}
+
+export type AsyncRefreshGuard = ReturnType<typeof createAsyncRefreshGuard>;
 
 /**
  * Guards async refresh callbacks against two long-session hazards:
@@ -6,25 +31,23 @@ import { useCallback, useEffect, useRef } from 'react';
  * (around local-midnight rollover, rapid section switches, or repeated
  * foreground events) and overwriting fresher state with stale-day results.
  *
- * Call `begin()` at the top of each refresh run; the returned `isCurrent`
- * predicate is true only while that run is still the newest one and the
- * component remains mounted. Check it before applying any state.
+ * Ownership rule: acquire the predicate ONCE per refresh unit — the top of
+ * the screen's refresh function — and share it across every concurrent
+ * sub-read of that unit. Each `begin()` invalidates all earlier predicates
+ * from this guard, so per-loader `begin()` calls inside one fan-out would
+ * discard the unit's own in-flight results.
  */
 export function useGuardedAsyncRefresh() {
-  const mountedRef = useRef(true);
-  const requestRef = useRef(0);
+  const guard = useMemo(() => createAsyncRefreshGuard(), []);
 
   useEffect(() => {
-    mountedRef.current = true;
+    guard.setMounted(true);
     return () => {
-      mountedRef.current = false;
+      guard.setMounted(false);
     };
-  }, []);
+  }, [guard]);
 
-  const begin = useCallback(() => {
-    const requestId = ++requestRef.current;
-    return () => mountedRef.current && requestRef.current === requestId;
-  }, []);
+  const begin = useCallback(() => guard.begin(), [guard]);
 
   return { begin };
 }

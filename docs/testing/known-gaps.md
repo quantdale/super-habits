@@ -158,6 +158,8 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** capture and commit anonymised real-corpus fixtures as a follow-up; the synthetic matrix proves the migration code paths, not that it matches the shape of data written by historical production builds.
 
+**2026-08-26 re-verify:** this campaign re-ran the synthetic historical-fixture laboratory (3/3) and the migration-forward suites on the final tree; all pass. Real-corpus proof remains explicitly open as stated above — synthetic coverage is not a substitute for a captured real-world database file.
+
 ### 6. Pre-cutover UTC date keys
 
 **Reason:** migration 5 deliberately does not backfill, so real installs contain a mix of UTC-format and local date keys. Fixtures can simulate this, but no real corpus exists to validate against.
@@ -175,6 +177,8 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 **Reason:** the restore prompt needs a Supabase-backed remote to appear. The standard `dist/` web export bundles no `EXPO_PUBLIC_SUPABASE_*` env, so `supabase` is null and `getRestorePreview()` reports `remote_backup_unavailable` — the prompt can never appear and no import can run. In the standard lane, the journey branches that observe that boundary (J5: dismiss, no re-prompt after dismissal, accept-restore, what-does-not-come-back) stay gated with `test.fixme(!remoteBackupDetected, …)` and show as skipped — a lane attribute, not a coverage hole.
 
 **Resolution (closed 2026-08-04, task 6.1a/Q5; real-worker boundary verified 2026-08-09):** the dummy-Supabase `dist-sync/` build (non-routable `https://dummy.supabase.co` + placeholder anon key) is served on `localhost:8082` by the dedicated `journeys-sync` Playwright project (`npm run e2e:sync`, main/nightly only, never PRs). Against it, the J5 mock backup makes the prompt appear and all restore branches **run and pass** with the production service worker active (verified: 7/7 J5 steps green, including the CG-2 tombstone branch). The worker now bypasses cross-origin API/auth traffic while preserving same-origin shell caching; the gates remain in the code only so the standard `dist/` lane can keep the same files, releasing when a boundary is present rather than weakening an assertion. J5's CG-2 branch is now released separately under CG-2.
+
+**Host-unreachability caveat (2026-08-26):** the `journeys-sync` lane is ENVIRONMENT-sensitive on hosts that cannot resolve `dummy.supabase.co`. This campaign's local Windows host returned NXDOMAIN for `*.supabase.co` (nslookup against 8.8.8.8 and 1.1.1.1; `curl` exited `000` in ~0.12s), so the pass-through injection escapes to a dead host and the partial-failure (bad-backend P5 step 5) and recoverable-account-v1 (A step 2) journeys deterministically miss locally. A bisect at the pre-campaign SHA `7a49647` failed identically on this host, while CI run 491 (same SHA) was green on GitHub runners — proving the lane is valid on reachable DNS and the local misses are ENVIRONMENT, not product regressions. Authoritative green for this lane is the CI rerun after push, not a local run on an unreachable dummy host.
 
 ### 9. Reconnect-push boundary (standard `dist/` build) — CLOSED by the `journeys-sync` lane
 

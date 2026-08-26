@@ -4,7 +4,7 @@
 - [x] 1.2 Read AGENTS.md, `.agent/PLANS.md`, handoff/execution prompts, QA/native/simulation guidance, impact map, and predecessor artifacts.
 - [x] 1.3 Inventory the inherited uncommitted working-tree change set and validate typecheck plus the full Vitest suite before adopting it.
 - [x] 1.4 Create this OpenSpec change and the Version-2 ExecPlan (`Status: ACTIVE`) with one exact next action.
-- [ ] 1.5 Run `npm run qa:affected -- --base d923cd0` and record the resolved gate set in the ExecPlan.
+- [x] 1.5 Run `npm run qa:affected -- --base d923cd0` and record the resolved gate set in the ExecPlan.
 
 ## 2. Whole-codebase system audit (Workstream A)
 
@@ -15,9 +15,9 @@
 
 ## 3. Validate and land the inherited read-path hardening wave
 
-- [ ] 3.1 Complete the caller-level audit of migration 24 indexes, concurrent reads, existence probes, batched deletes, and the captured-manifest preview gate against governing invariants.
-- [ ] 3.2 Run lint, format checks, timezone/theme gates, and integration suites over the adopted tree; repair any introduced regression at the source.
-- [ ] 3.3 Land the validated wave as a coherent campaign commit with evidence in the body.
+- [x] 3.1 Complete the caller-level audit of migration 24 indexes, concurrent reads, existence probes, batched deletes, and the captured-manifest preview gate against governing invariants.
+- [x] 3.2 Run lint, format checks, timezone/theme gates, and integration suites over the adopted tree; repair any introduced regression at the source.
+- [x] 3.3 Land the validated wave as a coherent campaign commit with evidence in the body.
 
 ## 4. Long-session soak lane (Workstream B)
 
@@ -35,13 +35,13 @@
 ## 6. Recovery/backup/restore/portable fault injection (Workstream D)
 
 - [x] 6.1 Exercise the malformed/interrupted input matrix across Backup V2, Restore V2, portable import, owner binding, and outbox interaction.
-- [ ] 6.2 Prove final authoritative database state after each failure; add missing atomicity regressions.
-- [ ] 6.3 Prove broad seeded export→import round-trip determinism.
+- [x] 6.2 Prove final authoritative database state after each failure; add missing atomicity regressions.
+- [x] 6.3 Prove broad seeded export→import round-trip determinism.
 
 ## 7. Cross-feature time/lifecycle stress (Workstream E)
 
-- [ ] 7.1 Stress day rollover/foreground/timezone/DST boundaries across combined features using existing domain helpers.
-- [ ] 7.2 Prove stale-async guards and linked-action/reminders replay idempotency under reload/restart.
+- [x] 7.1 Stress day rollover/foreground/timezone/DST boundaries across combined features using existing domain helpers.
+- [x] 7.2 Prove stale-async guards and linked-action/reminders replay idempotency under reload/restart.
 
 ## 8. Native Android endurance (Workstream F)
 
@@ -50,6 +50,6 @@
 
 ## 9. Documentation, final validation, delivery (Workstreams G/H)
 
-- [ ] 9.1 Reconcile known gaps, QA impact map, docs, OpenSpec tasks/spec, and the ExecPlan with final evidence.
-- [ ] 9.2 Run the full applicable validation ladder including `qa:full`, strict OpenSpec validation, both plan validators, `qa:impact:validate`, format check, and `git diff --check`.
-- [ ] 9.3 Commit the detailed session-report body, push normally to `origin/main`, verify HEAD == fetched origin/main with a clean tree, and inspect exact-SHA CI where configured.
+- [x] 9.1 Reconcile known gaps, QA impact map, docs, OpenSpec tasks/spec, and the ExecPlan with final evidence.
+- [x] 9.2 Run the full applicable validation ladder including `qa:full`, strict OpenSpec validation, both plan validators, `qa:impact:validate`, format check, and `git diff --check`.
+- [x] 9.3 Commit the detailed session-report body, push normally to `origin/main`, verify HEAD == fetched origin/main with a clean tree, and inspect exact-SHA CI where configured.

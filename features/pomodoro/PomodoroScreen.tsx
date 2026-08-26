@@ -165,38 +165,44 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setRemaining(value);
   }, []);
 
-  const loadSettings = useCallback(async () => {
-    const isCurrent = beginRefresh();
-    const nextSettings = await getPomodoroSettings();
-    if (!isCurrent()) return;
-    const nextTimer = applySettingsToTimerState(nextSettings, {
-      currentMode,
-      isRunning,
-      isPaused,
-      totalSeconds,
-      remaining,
-    });
-    setSettings(nextTimer.settings);
-    if (!isRunning && !isPaused) {
-      setTotalSeconds(nextTimer.totalSeconds);
-      applyRemaining(nextTimer.remaining);
-      totalSecondsRef.current = nextTimer.totalSeconds;
-    }
-  }, [applyRemaining, beginRefresh, currentMode, isPaused, isRunning, remaining, totalSeconds]);
+  const loadSettings = useCallback(
+    async (isCurrent?: () => boolean) => {
+      const current = isCurrent ?? beginRefresh();
+      const nextSettings = await getPomodoroSettings();
+      if (!current()) return;
+      const nextTimer = applySettingsToTimerState(nextSettings, {
+        currentMode,
+        isRunning,
+        isPaused,
+        totalSeconds,
+        remaining,
+      });
+      setSettings(nextTimer.settings);
+      if (!isRunning && !isPaused) {
+        setTotalSeconds(nextTimer.totalSeconds);
+        applyRemaining(nextTimer.remaining);
+        totalSecondsRef.current = nextTimer.totalSeconds;
+      }
+    },
+    [applyRemaining, beginRefresh, currentMode, isPaused, isRunning, remaining, totalSeconds],
+  );
 
-  const loadHistory = useCallback(async () => {
-    const isCurrent = beginRefresh();
-    const start364 = new Date();
-    start364.setDate(start364.getDate() - 363);
-    const startKey = toDateKey(start364);
-    const endKey = toDateKey(new Date());
-    const rows = await listPomodoroSessionsForDateRange(startKey, endKey);
-    if (!isCurrent()) return;
-    // Break rows never reach the focus surfaces (count card, garden, heatmap).
-    const focusOnly = rows.filter((row) => row.session_type === 'focus');
-    setSessions(focusOnly);
-    setPomodoroHeatmapDays(buildPomodoroHeatmapDays(focusOnly, 364));
-  }, [beginRefresh]);
+  const loadHistory = useCallback(
+    async (isCurrent?: () => boolean) => {
+      const current = isCurrent ?? beginRefresh();
+      const start364 = new Date();
+      start364.setDate(start364.getDate() - 363);
+      const startKey = toDateKey(start364);
+      const endKey = toDateKey(new Date());
+      const rows = await listPomodoroSessionsForDateRange(startKey, endKey);
+      if (!current()) return;
+      // Break rows never reach the focus surfaces (count card, garden, heatmap).
+      const focusOnly = rows.filter((row) => row.session_type === 'focus');
+      setSessions(focusOnly);
+      setPomodoroHeatmapDays(buildPomodoroHeatmapDays(focusOnly, 364));
+    },
+    [beginRefresh],
+  );
 
   const loadPresets = useCallback(async () => {
     const state = await getPomodoroPresetsState();
@@ -215,23 +221,35 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     }
   }, []);
 
-  const retryPendingLogs = useCallback(async () => {
-    try {
-      const result = await retryPendingPomodoroLogs();
-      if (result.finalFailures.length > 0) {
-        setLogSaveFailed(true);
+  const retryPendingLogs = useCallback(
+    async (isCurrent?: () => boolean) => {
+      try {
+        const result = await retryPendingPomodoroLogs();
+        if (result.finalFailures.length > 0) {
+          setLogSaveFailed(true);
+        }
+        if (result.succeeded > 0) {
+          void loadHistory(isCurrent);
+        }
+      } catch {
+        // Recovery is best-effort; the queue stays durable for the next retry.
       }
-      if (result.succeeded > 0) {
-        void loadHistory();
-      }
-    } catch {
-      // Recovery is best-effort; the queue stays durable for the next retry.
-    }
-  }, [loadHistory]);
+    },
+    [loadHistory],
+  );
 
   const refresh = useCallback(async () => {
-    await Promise.all([loadHistory(), loadSettings(), loadPresets(), retryPendingLogs()]);
-  }, [loadHistory, loadSettings, loadPresets, retryPendingLogs]);
+    // One refresh generation owns every concurrent sub-read: per-loader
+    // begin() calls would invalidate each other and discard this unit's
+    // own in-flight results (the J1 step-8 focus-history regression).
+    const isCurrent = beginRefresh();
+    await Promise.all([
+      loadHistory(isCurrent),
+      loadSettings(isCurrent),
+      loadPresets(),
+      retryPendingLogs(isCurrent),
+    ]);
+  }, [beginRefresh, loadHistory, loadPresets, loadSettings, retryPendingLogs]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
