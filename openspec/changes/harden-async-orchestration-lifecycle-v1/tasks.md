@@ -91,3 +91,20 @@
 - [ ] 12.4 Validate the completed plan and strict OpenSpec again on the final tree.
 - [ ] 12.5 Commit with a detailed session-report body covering audit coverage, findings, fixes, tests, classifications, environment gaps, and follow-ups; push normally to `origin/main`.
 - [ ] 12.6 Fetch origin, verify clean tree and local HEAD == fetched `origin/main`, then inspect exact-SHA CI/status checks where configured and record the result.
+
+
+## 13. Planner re-audit: exact-HEAD CI closure (2026-08-27)
+
+- [ ] 13.1 Regenerate the final-tree `git ls-files` coverage ledger and reconcile the old 1,226-file count with the current tree; no unaccounted paths.
+- [ ] 13.2 Reconcile this task file against the ExecPlan evidence; check only tasks actually proven complete and retain evidence links/commands.
+- [ ] 13.3 Reproduce or deterministically lower-level reproduce GitHub Actions run #495's P5 partial-success outbox failure; bisect from green run #491 / `7a49647`; identify the first bad behavioral commit.
+- [ ] 13.4 Fix partial-success acknowledgement so successful remote rows are removed exactly once, failed rows remain exactly once, and concurrent lifecycle flush triggers cannot resurrect acknowledged work; add deterministic regression tests.
+- [ ] 13.5 Reproduce and bisect Recoverable Account V1's missing `Allowed` restore eligibility; fix the account/owner/preview state-adoption root cause with deterministic race tests.
+- [ ] 13.6 Finish F-05 per-surface AsyncStorage precedence classification and paired user-action-vs-hydration tests wherever streams genuinely compete.
+- [ ] 13.7 Finish M7 high-risk timer/listener/subscription mount-unmount-remount runtime proof and repair any duplicate/stale owner discovered.
+- [ ] 13.8 Finish M8 targeted cross-feature race/target-change coverage using state-based deterministic oracles; no sleeps/timeout inflation.
+- [ ] 13.9 Change the canonical lint gate to fail on any warning after verifying the zero-warning baseline; audit targeted suppressions without blanket disabling.
+- [ ] 13.10 Resolve the two previously UNKNOWN E2E skip classifications and ensure every remaining skip/fixme maps to a documented capability/environment reason.
+- [ ] 13.11 Run the full exact-tree validation ladder, including two fresh-state runs of formerly failing/race-sensitive suites and sequential native lanes when a verified target exists.
+- [ ] 13.12 Push normally, inspect GitHub Actions for the exact pushed SHA, and require quality + e2e + dist-sync/journeys-sync green before changing this OpenSpec to COMPLETED.
+- [ ] 13.13 Only after closure, re-audit residual risk and create a successor OpenSpec proposal if meaningful implementation work remains; otherwise stop.

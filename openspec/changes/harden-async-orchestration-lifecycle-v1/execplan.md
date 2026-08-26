@@ -3,6 +3,40 @@
 Plan-Version: 2
 Status: ACTIVE
 
+
+## Planner Re-Audit Addendum — 2026-08-27
+
+A new planner audit after the implementation commit changes the closure state:
+
+- Audited HEAD before this planner handoff: `79bf46821714094d8767a1fff5c7c43227da66f4`.
+- GitHub Actions push run #495 is **FAILED**. `quality`, ordinary full E2E,
+  full deterministic scenarios, and the dist-sync build passed; the
+  `journeys-sync` remote-boundary step failed.
+- Repeatable failure A: P5 partial-success outbox expected `['habits']` but
+  observed `['habits', 'todos']`.
+- Repeatable failure B: Recoverable Account V1 never surfaced restore
+  eligibility `Allowed` after owner recovery.
+- Push run #493 reproduces those same two failures.
+- Push run #491 on `7a496479fcf3831ba635c687c8b9247267900cfd` passed the same
+  remote-boundary lane and is the known-good bisect anchor.
+- The previous blanket statement that full `e2e:sync` belonged to a later CI
+  environment is now superseded: authoritative CI ran it and failed. These two
+  failures are open until fixed or independently proven external.
+- The remote GitHub tree now contains 1,233 blobs/files versus this plan's
+  1,226-file ledger. Regenerate from local `git ls-files` on the final tree.
+- `tasks.md` remains unchecked while this plan narrates completed milestones;
+  reconcile task state from evidence before closure.
+- F-05 still says per-surface AsyncStorage precedence adoption is a follow-up;
+  M7/M8/M10 remain partial; M11 remains incomplete.
+- `npm run lint` currently allows 25 warnings despite the claimed zero-warning
+  baseline. Make the warning budget zero after confirming the tree is clean.
+
+**Superseding exact next action:** read
+`planner-reaudit-2026-08-27.md` and `IMPLEMENTATION_PROMPT.md`; reproduce/bisect
+the two run-#495 remote-boundary failures from green `7a49647`, fix and
+regression-test their root causes, then complete the remaining F-05/M7/M8/M10/M11
+work and obtain green exact-SHA CI before marking this plan COMPLETED.
+
 ## Purpose / User Outcome
 
 Make SuperHabits resistant to stale asynchronous state adoption and duplicated
