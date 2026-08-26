@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-08-26
+goal: Systematize async-operation ownership, lifecycle cleanup, and user-intent
+  precedence across SuperHabits so slow or overlapping reads, hydration,
+  foreground/day-rollover events, timers, listeners, and late remote phases
+  can never overwrite newer authoritative UI state or duplicate side effects.
