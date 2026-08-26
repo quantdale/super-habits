@@ -152,11 +152,11 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** a separate change; profile a long session with the Chrome DevTools protocol.
 
-### 5. Migration-from-old-database journeys
+### 5. Migration-from-old-database journeys — synthetic matrix covered; real corpus still open
 
-**Reason:** testing a v6 database upgrading to v11 requires a captured legacy database file; none exists in the repo. The integration level covers migrations running forward from zero.
+**Reason:** testing an upgrade from a captured real-world database file still has no anonymized legacy corpus in the repo. The integration level now covers migrations forward from zero AND a synthetic historical-fixture laboratory (`tests/integration/migrationFixtures.test.ts` plus the legacy cases in `tests/integration/migrations.test.ts`) that hand-builds era-shaped databases at representative boundaries — v6 habit rule-history backfill, v13 legacy JSON outbox import, v17 daily_plans inline-UNIQUE rebuild, v19 durable-state promotion (NULL = unknown timing/link metadata), and the migration-24 skipped-block-6 defensive repair with sort_order backfill — and upgrades each through the real runtime chain with version/row/tombstone/default/idempotency oracles.
 
-**Closing path:** capture and commit anonymised legacy fixtures as a follow-up.
+**Closing path:** capture and commit anonymised real-corpus fixtures as a follow-up; the synthetic matrix proves the migration code paths, not that it matches the shape of data written by historical production builds.
 
 ### 6. Pre-cutover UTC date keys
 

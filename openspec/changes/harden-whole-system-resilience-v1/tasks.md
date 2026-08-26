@@ -8,10 +8,10 @@
 
 ## 2. Whole-codebase system audit (Workstream A)
 
-- [ ] 2.1 Audit `core/db/**` bootstrap/migrations/indexes/connection lifecycle/error paths; verify documented schema-version claims match runtime source.
-- [ ] 2.2 Audit backup/sync/portable/account inventories, transaction atomicity, outbox semantics, replay/idempotency, settings allowlist, and cross-version compatibility.
-- [ ] 2.3 Audit feature data writers/readers, cross-feature engines, providers/hooks/timers/listeners, service-worker registration, and harnesses for stale assumptions, unbounded reads, and missing cleanup.
-- [ ] 2.4 Record severity-classified findings in the ExecPlan audit ledger; fix Critical/High defects with regression proof.
+- [x] 2.1 Audit `core/db/**` bootstrap/migrations/indexes/connection lifecycle/error paths; verify documented schema-version claims match runtime source.
+- [x] 2.2 Audit backup/sync/portable/account inventories, transaction atomicity, outbox semantics, replay/idempotency, settings allowlist, and cross-version compatibility.
+- [x] 2.3 Audit feature data writers/readers, cross-feature engines, providers/hooks/timers/listeners, service-worker registration, and harnesses for stale assumptions, unbounded reads, and missing cleanup.
+- [x] 2.4 Record severity-classified findings in the ExecPlan audit ledger; fix Critical/High defects with regression proof.
 
 ## 3. Validate and land the inherited read-path hardening wave
 
@@ -27,14 +27,14 @@
 
 ## 5. Historical SQLite migration fixture laboratory (Workstream C)
 
-- [ ] 5.1 Select meaningful historical upgrade boundaries from the runtime migration chain.
-- [ ] 5.2 Build representative synthetic fixture generators/compact fixtures with row/default/idempotency oracles.
-- [ ] 5.3 Add failure-torture coverage where safely supported (interrupted step seam, malformed legacy metadata).
-- [ ] 5.4 Update documentation to distinguish synthetic matrix coverage from real-corpus proof.
+- [x] 5.1 Select meaningful historical upgrade boundaries from the runtime migration chain.
+- [x] 5.2 Build representative synthetic fixture generators/compact fixtures with row/default/idempotency oracles.
+- [x] 5.3 Add failure-torture coverage where safely supported (interrupted step seam, malformed legacy metadata).
+- [x] 5.4 Update documentation to distinguish synthetic matrix coverage from real-corpus proof.
 
 ## 6. Recovery/backup/restore/portable fault injection (Workstream D)
 
-- [ ] 6.1 Exercise the malformed/interrupted input matrix across Backup V2, Restore V2, portable import, owner binding, and outbox interaction.
+- [x] 6.1 Exercise the malformed/interrupted input matrix across Backup V2, Restore V2, portable import, owner binding, and outbox interaction.
 - [ ] 6.2 Prove final authoritative database state after each failure; add missing atomicity regressions.
 - [ ] 6.3 Prove broad seeded export→import round-trip determinism.
 

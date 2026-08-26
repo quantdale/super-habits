@@ -71,8 +71,8 @@ repository-caused Critical/High defect found.
     **151 files / 1,798 tests passed** including the new hot-path index tests
     and the updated checkpoint test.
   - Created this OpenSpec change (proposal/design/tasks/spec) and this plan.
-- In progress: Committing the audit-fix milestone; then Workstream B soak
-  lane.
+- In progress: Committing the migration fixture laboratory; then Workstream
+  B soak lane.
 - Important modified files: see `git status --short`; core areas are
   `core/db/client.ts`, `core/backup/**`, `core/sync/**`,
   `core/providers/AppProviders.tsx`, `features/{calories,overview,workout}/`,
@@ -84,8 +84,8 @@ repository-caused Critical/High defect found.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the audit-fix milestone with a detailed body;
-  then build the Workstream B long-session soak lane.
+- Exact next action: Commit the historical-fixture milestone; then build the
+  Workstream B long-session soak lane.
 - Remaining definition of done: All acceptance gates 1–12 in
   `.agent/EXECUTION_PROMPT.md`.
 
@@ -273,6 +273,15 @@ e2e:sync, e2e:journeys; broad regression required.
   intents loudly.
 - 2026-08-26 — full `npm run typecheck` + `npm test` on the combined tree —
   PASS; 153 files / 1,814 tests.
+- 2026-08-26 — historical fixture laboratory
+  (tests/integration/migrationFixtures.test.ts) — PASS; 3/3 synthetic
+  upgrades (v13 legacy JSON outbox epoch incl. malformed-entry tolerance and
+  latest-wins revisions; v17 daily_plans inline-UNIQUE rebuild with
+  tombstone preservation + active-only uniqueness; v19 durable-state
+  promotion asserting NULL = unknown for timing/link metadata), each through
+  the real chain to v24 with reopen-idempotency.
+- 2026-08-26 — docs/testing/known-gaps.md gap #5 updated: synthetic
+  migration matrix covered; real-corpus proof remains explicitly open.
 
 ## Changed Files / Areas
 
