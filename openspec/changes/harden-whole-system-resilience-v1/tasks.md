@@ -45,8 +45,8 @@
 
 ## 8. Native Android endurance (Workstream F)
 
-- [ ] 8.1 Preflight/provision sequentially when the environment provides the API-36 x86_64 target; otherwise record ENVIRONMENT.
-- [ ] 8.2 Run impact-selected smoke/persistence/lifecycle lanes plus repeated kill/relaunch endurance as far as reliably supported.
+- [x] 8.1 Preflight/provision sequentially when the environment provides the API-36 x86_64 target; otherwise record ENVIRONMENT.
+- [x] 8.2 Run impact-selected smoke/persistence/lifecycle lanes plus repeated kill/relaunch endurance as far as reliably supported.
 
 ## 9. Documentation, final validation, delivery (Workstreams G/H)
 

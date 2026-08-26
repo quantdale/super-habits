@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
@@ -156,6 +156,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<CaloriesViewMode>('form');
+  /** True once the user (or the persisted-value hydration) has chosen a view.
+   *  The AsyncStorage hydration resolves asynchronously; on a slow cold start
+   *  it can settle AFTER the user already tapped the view switch, and a plain
+   *  setViewMode(stored) would silently revert their choice. */
+  const viewChoiceMadeRef = useRef(false);
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
   const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [targetsSheetVisible, setTargetsSheetVisible] = useState(false);
@@ -225,8 +230,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
     AsyncStorage.getItem(CALORIES_VIEW_MODE_STORAGE_KEY)
       .then((storedValue) => {
-        if (!active) return;
+        if (!active || viewChoiceMadeRef.current) return;
         if (storedValue === 'form' || storedValue === 'diary') {
+          viewChoiceMadeRef.current = true;
           setViewMode(storedValue);
         }
       })
@@ -401,6 +407,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   };
 
   const setAndPersistViewMode = useCallback((nextMode: CaloriesViewMode) => {
+    // A manual choice always wins over the still-pending AsyncStorage
+    // hydration (see viewChoiceMadeRef).
+    viewChoiceMadeRef.current = true;
     setViewMode(nextMode);
     if (nextMode === 'form') {
       // The form always logs to today: drop any diary day selection so the

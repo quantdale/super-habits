@@ -71,9 +71,10 @@ repository-caused Critical/High defect found.
     **151 files / 1,798 tests passed** including the new hot-path index tests
     and the updated checkpoint test.
   - Created this OpenSpec change (proposal/design/tasks/spec) and this plan.
-- In progress: Committing the soak lane; then remaining gates (qa:timezones,
-  validate:themes, browser/simulation regression, native availability
-  check) and delivery.
+- In progress: Committing the native qualification evidence + calories
+  stale-async fix; then the remaining browser/simulation ladder
+  (e2e:journeys:p0, full e2e, e2e:sync, qa:full) on the final tree, final
+  validators, and delivery.
 - Important modified files: see `git status --short`; core areas are
   `core/db/client.ts`, `core/backup/**`, `core/sync/**`,
   `core/providers/AppProviders.tsx`, `features/{calories,overview,workout}/`,
@@ -85,9 +86,9 @@ repository-caused Critical/High defect found.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the soak lane; run qa:timezones +
-  validate:themes; then check Android emulator availability for sequential
-  native endurance (Workstream F) before the full ladder and delivery.
+- Exact next action: Commit native evidence + calories fix; then run
+  `npm run e2e:journeys:p0` and the full browser/simulation ladder on the
+  final tree before delivery.
 - Remaining definition of done: All acceptance gates 1–12 in
   `.agent/EXECUTION_PROMPT.md`.
 
@@ -213,6 +214,18 @@ repository-caused Critical/High defect found.
 - The full Vitest suite passes on that tree unchanged (1,798/1,798),
   including two new hot-path index integration tests — strong evidence the
   wave was finished but interrupted before commit/validation.
+- Native calories "data loss" was disproven by direct device SQLite
+  inspection and failure screenshots: the row persists with NULL deleted_at
+  and queued outbox intents, and renders post-relaunch (Recent/Frequent/
+  Today totals and the Daily log row). The flow failures were Maestro
+  matching/scroll geometry plus a REAL pre-existing product race found on
+  the way: the viewMode AsyncStorage hydration could revert a manual view
+  switch made before hydration settled (fixed with a user-choice guard).
+- The Android emulator host degraded progressively across the session
+  (wedged driver sessions, a concurrently running foreign emulator, two
+  reboots); flows tuned on a fresh host (yesterday's 11/11) became
+  timing/geometry sensitive. Fresh-host replay of the two remaining
+  lifecycle/persistence flows is the recorded resume action.
 
 ## Decision Log
 
@@ -297,6 +310,42 @@ e2e:sync, e2e:journeys; broad regression required.
   environment without a CDP harness; bounded-growth/stabilization is
   asserted via per-step durationMs distributions plus full-sequence oracle
   greenness — documented in simulation/scenarios/soakSustainedUse.ts.
+- 2026-08-26 — `npm run qa:timezones` — PASS; 43/43 in all five zones.
+- 2026-08-26 — `npm run validate:themes` — PASS; 140/140 contrast checks.
+- 2026-08-26 — web `e2e/calories.spec.ts` on current source — PASS; 8/8.
+- 2026-08-26 — Android preflight/provision (emulator-5556, Nitro_API_36,
+  API-36 x86_64) — PASS; provenance
+  simulation-output/native/native-android-build.json (sourceSha
+  80a7fad; rebuilt from the working tree with the calories fix before the
+  final replays).
+- 2026-08-26 — `qa:native:android` smoke — PASS; 2/2 at
+  simulation-output/native/native-android-smoke-2026-08-26T023003868Z.json.
+- 2026-08-26 — `qa:native:targeted` persistence lane — 9/11 PASS at
+  simulation-output/native/native-android-persistence-2026-08-26T064326647Z.json.
+  calories-persistence and workout-gym-v2-persistence fail in flow
+  robustness, NOT product: direct device DB inspection shows the calorie row
+  persisted (deleted_at NULL, outbox create intents queued) and failure
+  screenshots show the entry fully rendered post-relaunch (Recent foods,
+  Frequent foods, Today totals, Daily log row). Classification: TEST_BUG
+  (Maestro element matching/scroll geometry vs the FAB-overlapped diary row;
+  flow made strictly more robust in this campaign) and host-load scroll-band
+  sensitivity (gym-v2; all persistence assertions before the failing swipe
+  passed). Environment context: a second foreign emulator (emulator-5558,
+  brain-training) ran concurrently until removed; the target was rebooted
+  twice after wedged driver sessions.
+- 2026-08-26 — `qa:native:lifecycle` — habit-reminder-actions,
+  habit-reminder-actions-replay, pomodoro-lifecycle PASS in-lane;
+  habit-reminder-delivery PASS on post-reboot replay; pomodoro-notification-
+  path and workout-gym-v2-session-lifecycle fail on the degraded emulator
+  (launch-gate/element matching) — classified ENVIRONMENT (host), replay
+  command in each report under simulation-output/native/.
+- 2026-08-26 — PRODUCT fix from native evidence: CaloriesScreen viewMode
+  AsyncStorage hydration could resolve after a manual switch and revert the
+  user's choice (stale-async overwrite; widened by slow cold starts).
+  Fixed with a user-choice guard (viewChoiceMadeRef); typecheck + focused
+  calories suites green. Flow fixes: calories-persistence scroll thresholds
+  aligned (assertion strength unchanged — extendedWaitUntil remains the
+  persistence oracle) + settle swipe; proven by repeated screenshots.
 
 ## Changed Files / Areas
 
