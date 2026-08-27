@@ -404,10 +404,18 @@ export function AppProviders({ children }: PropsWithChildren) {
         document.removeEventListener('visibilitychange', onVisibilityChange);
     }
 
+    let prevConnected: boolean | null = null;
     const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
-      if (state.isConnected) flush();
+      const isConnected = state.isConnected ?? false;
+      const wasConnected = prevConnected;
+      prevConnected = isConnected;
+      // NetInfo on web immediately invokes the listener with the current
+      // isConnected (true). Flushing there would make every
+      // triggerReconnectFlush (which does ensureAppContext -> reload) count
+      // as two flushes (reload immediate + explicit reconnect). Only flush
+      // on a false->true transition.
+      if (wasConnected === false && isConnected) flush();
     });
-
     return () => {
       clearInterval(intervalId);
       removeVisibilityListener?.();
