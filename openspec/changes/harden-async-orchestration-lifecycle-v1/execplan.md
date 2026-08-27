@@ -3,6 +3,34 @@
 Plan-Version: 2
 Status: ACTIVE
 
+## Planner Re-Audit Addendum V2 — 2026-08-27 (supersedes the prior exact-next-action)
+
+The repository advanced beyond the failed-run state described in the earlier
+addendum. Exact planner baseline
+`93c651b5b8510243440823d8ea3456c0eae28454` has green GitHub Actions run
+`33048704704`, including quality, full E2E, deterministic scenarios and
+`dist-sync/journeys-sync`.
+
+**The change remains ACTIVE.** Green CI exposed a different problem: commit
+`2f81e1ce8a` repaired the remote-boundary harness but removed production
+protections introduced by this campaign from `AppProviders`. Current production
+no longer calls `withRemoteTimeout()` or `createPreviewAdoptionGuard()`, no
+longer sequences account-task adoption, can expose the app before durable
+`syncEngine.hydrate()` completes, rebinds flush subscriptions on account-state
+changes, and no longer offers bootstrap retry. The bad-backend journey also
+replaced a real stalled-request timeout with immediate 503, added a fixed 500 ms
+sleep, and widened failure-count expectations to tolerate one or two attempts.
+
+Read `planner-reaudit-2026-08-27-v2.md` for the full finding ledger.
+
+**Superseding exact next action:** execute `IMPLEMENTATION_PROMPT.md` V2,
+starting with the hydration/revision-floor race (SH-AUD-002), then bounded local
+bootstrap, monotonic account/preview adoption, stable flush ownership and
+deterministic remote-boundary harness repair. Do not mark this plan COMPLETED
+until the final pushed SHA is green and the new deterministic regressions prove
+those contracts.
+
+
 
 ## Planner Re-Audit Addendum — 2026-08-27
 

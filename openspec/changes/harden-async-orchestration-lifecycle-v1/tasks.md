@@ -108,3 +108,54 @@
 - [ ] 13.11 Run the full exact-tree validation ladder, including two fresh-state runs of formerly failing/race-sensitive suites and sequential native lanes when a verified target exists.
 - [ ] 13.12 Push normally, inspect GitHub Actions for the exact pushed SHA, and require quality + e2e + dist-sync/journeys-sync green before changing this OpenSpec to COMPLETED.
 - [ ] 13.13 Only after closure, re-audit residual risk and create a successor OpenSpec proposal if meaningful implementation work remains; otherwise stop.
+
+## 14. Planner re-audit V2: green-CI rollback closure (2026-08-27)
+
+The exact planner baseline `93c651b5b8510243440823d8ea3456c0eae28454` is green
+in GitHub Actions run `33048704704`, but planner re-audit found production
+lifecycle protections removed by the post-implementation repair wave. This
+section supersedes any assumption that green run #495-era remediation alone
+closes the change.
+
+- [ ] 14.1 Read `planner-reaudit-2026-08-27-v2.md` and regenerate the complete
+  `git ls-files` ledger on the implementation tree; account for every tracked
+  path and record the count in the ExecPlan.
+- [ ] 14.2 Reproduce/prove SH-AUD-002: persisted sync revision floor must be
+  hydrated before any durable revision allocation or flush; add a deterministic
+  real-SQLite cold-start write regression and fix the architecture.
+- [ ] 14.3 Restore bounded remote bootstrap so a configured-but-hung Supabase
+  phase cannot wedge local app use; prove late settlement and unmount behavior.
+- [ ] 14.4 Restore a recoverable bootstrap retry path and test failure → retry →
+  usable app without process restart.
+- [ ] 14.5 Restore monotonic account-state adoption across bootstrap, refresh,
+  auth callbacks, protect/recover/verify and retry; older tasks may not overwrite
+  newer state.
+- [ ] 14.6 Rewire one restore-preview adoption authority across bootstrap,
+  maintenance, post-flush, account transition and restore completion; older
+  previews may not regress newer prompt state.
+- [ ] 14.7 Stabilize sync interval/NetInfo/visibility ownership across account
+  transitions and prove one logical adapter attempt produces one failure-count
+  increment.
+- [ ] 14.8 Repair the remote-boundary harness: real stalled-request timeout,
+  deterministic injector teardown, no arbitrary 500 ms route sleep, no
+  tolerance for duplicate failure accounting, Worker/page traffic covered
+  without double logical ownership.
+- [ ] 14.9 Re-run and finish the original preference/editable-state, target
+  change, day-rollover, timer/listener, notification replay and skip/fixme
+  matrix with deterministic oracles.
+- [ ] 14.10 Reconcile stale runtime/docs including the obsolete local-only
+  contract in `core/db/localMutation.ts` and any dead protective helper left
+  unwired.
+- [ ] 14.11 Run the complete final-tree validation ladder in
+  `IMPLEMENTATION_PROMPT.md`, including two fresh-state runs of race-sensitive
+  suites and native lanes where a verified target exists.
+- [ ] 14.12 Push normally and require exact-SHA GitHub Actions quality + full
+  E2E + full deterministic simulation + dist-sync/journeys-sync green.
+- [ ] 14.13 Only after 14.1–14.12 and all earlier Critical/High tasks are
+  evidenced, reconcile all old checkboxes, set this ExecPlan to COMPLETED, and
+  validate strict OpenSpec/ExecPlan state.
+- [ ] 14.14 If meaningful repository-controlled release-boundary work remains
+  after completion, create (but only then activate)
+  `certify-production-backend-and-release-boundaries-v1` from the successor
+  scope in `IMPLEMENTATION_PROMPT.md`; otherwise stop.
+

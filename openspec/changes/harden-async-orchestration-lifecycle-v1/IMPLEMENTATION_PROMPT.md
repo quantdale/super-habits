@@ -1,286 +1,358 @@
-# Implementation Prompt — Async/Lifecycle Closure & Remote-Boundary Recovery
+# IMPLEMENTATION PROMPT V2 — Async/Lifecycle Closure After Green-CI Rollback Audit
 
-You are the autonomous executor for `quantdale/super-habits`.
+You are the implementation agent for `quantdale/super-habits`.
 
-Your mission is to **finish, repair, certify, and close**
-`openspec/changes/harden-async-orchestration-lifecycle-v1`.
-Do not start a parallel feature campaign while this change is ACTIVE.
+Work autonomously on the existing ACTIVE OpenSpec change:
 
-Target work budget: approximately one long autonomous session (about 12 hours
-when needed). Evidence, not elapsed time, controls completion. Do not create
-churn to fill the window, and do not stop at the first green local run.
+`openspec/changes/harden-async-orchestration-lifecycle-v1/`
 
-## First command-level objective
+Do **not** start an unrelated feature campaign. The planner baseline
+`93c651b5b8510243440823d8ea3456c0eae28454` has green CI, but the planner
+re-audit found that the fixes after the first async/lifecycle implementation
+rolled back several production invariants while repairing the E2E harness.
 
-Pull `main`, confirm the planner commit containing this prompt, read:
+Read first, in this order:
 
-1. `AGENTS.md`
-2. `.agent/PLANS.md`
-3. `.agent/EXECUTION_PROMPT.md`
-4. every file under
-   `openspec/changes/harden-async-orchestration-lifecycle-v1/`
-5. `docs/testing/known-gaps.md`
-6. `qa/impact-map.json`
-7. `.github/workflows/ci.yml`
+1. `AGENTS.md` and repository-local agent instructions.
+2. this file;
+3. `planner-reaudit-2026-08-27-v2.md`;
+4. `proposal.md`, `design.md`, `tasks.md` and `execplan.md` in this change;
+5. predecessor whole-system resilience evidence and `docs/testing/known-gaps.md`;
+6. `qa/impact-map.json` and native/simulation runbooks relevant to changed files.
 
-Then run the plan resume/validation commands and reconcile Git truth before
-editing product code.
+## Operating mode
 
-## Non-negotiable starting facts
+Target one long autonomous execution campaign, up to roughly **12 hours of work
+budget if useful**. The budget is not a reason to churn. Finish earlier when
+the evidence gates are satisfied. If external infrastructure blocks one lane,
+continue every non-blocked workstream and classify the blocked lane honestly.
 
-- Planner baseline before this handoff: `79bf46821714094d8767a1fff5c7c43227da66f4`.
-- CI run #495 on that SHA is red.
-- Quality, full ordinary browser E2E, and full deterministic scenario library
-  passed.
-- The failing lane is `journeys-sync` against `dist-sync/`.
-- P5 expected only `habits` in outbox after partial success; actual retained
-  `habits` + `todos`.
-- Recoverable Account V1 expected restore eligibility `Allowed`; it never
-  appeared on three attempts.
-- Push CI #491 on `7a496479fcf3831ba635c687c8b9247267900cfd`
-  passed the same remote-boundary lane.
-- Push runs #493 and #495 reproduce the same two dist-sync failures.
-- The current plan is ACTIVE and not eligible for archival.
+Use subagents/parallelism only for independent read-only audits or isolated test
+work. Serialize changes that touch bootstrap, sync, account, restore, migrations,
+shared test harnesses, or the same source files. One owner must integrate and
+validate the final tree.
 
-Treat these as evidence to reproduce, not as permission to assume a root cause.
+Do not weaken product invariants or tests to obtain green CI. Do not replace a
+real timeout with a generic HTTP error. Do not widen exact assertions merely to
+tolerate duplicate side effects. Do not add arbitrary sleeps when a state-based
+barrier or deterministic deferred promise can exist.
 
-## Phase 1 — Reconcile final-tree inventory and active plan
+## Primary mission
 
-- Run `git fetch origin`, fast-forward normally, record exact HEAD and status.
-- Run `git ls-files`; regenerate counts by top-level area.
-- Explain the planner's 1,233-blob remote tree versus the old 1,226-file
-  ExecPlan ledger using local Git as authority.
-- Reconcile `tasks.md` checkboxes against actual implemented evidence. Do not
-  mass-check tasks just because the ExecPlan prose says they happened.
+Restore and prove the lifecycle contracts that current `main` no longer wires
+into production, then close the existing OpenSpec honestly.
+
+The campaign is not complete until:
+
+- local-first startup cannot be wedged indefinitely by configured-but-hung
+  remote auth/backup;
+- durable sync hydration/revision ordering cannot lose or stale a write made
+  during startup;
+- older account/restore-preview work cannot overwrite newer state;
+- interval/NetInfo/visibility/auth lifecycle fan-in has explicit, stable
+  ownership and exact side-effect accounting;
+- a real stalled-request timeout is tested;
+- all current Critical/High findings have deterministic regressions;
+- the existing OpenSpec task/ExecPlan truth matches the final implementation;
+- exact pushed SHA CI is green.
+
+## Phase 0 — synchronize and preserve evidence
+
+- Fetch origin and fast-forward normally. Do not reset away other work.
+- Confirm the planner handoff commit is present.
+- Record exact starting HEAD and worktree.
+- Run `git ls-files` and regenerate the exhaustive path ledger. The planner
+  snapshot had 1,236 blobs; the executor count is authoritative for its tree.
 - Run baseline:
   - `npm ci`
   - `npm run typecheck`
   - `npm run lint`
-  - focused/current Vitest
   - `npm run openspec:validate`
   - `npm run agent:plan:validate:all`
-  - `npm run qa:impact:validate`
-- Record every command/result in the ExecPlan.
+  - `npm test`
+- Inspect current GitHub Actions state for the starting SHA when available.
+- Update the ExecPlan checkpoint before implementation.
 
-## Phase 2 — Reproduce and bisect the authoritative CI failures
+## Phase 1 — prove and fix hydration-before-revision/write readiness (SH-AUD-002)
 
-Reproduce the two failing `journeys-sync` scenarios locally when the host can
-run the dist-sync assumptions. If local DNS/network prevents the lane, use the
-GitHub Actions evidence and a deterministic lower-level harness; do not call the
-CI failure an environment problem.
+Treat this as the highest-risk item.
 
-Use the known-good `7a49647` and known-bad history to bisect the relevant
-changes. The commits between the green baseline and the planner stage include
-whole-system resilience, migration/soak work, Calories/native hardening,
-Pomodoro/account stale-async fixes, and the async-orchestration plan. Narrow
-the first bad behavioral commit for each failing invariant.
+Trace all paths to:
 
-Prefer a targeted command that runs only the two failing journeys during the
-bisect, after a fresh `dist-sync/` build. Once the first bad commit is known,
-inspect its exact diff and dependency effects.
+- `syncEngine.hydrate()`;
+- `syncEngine.prepare()`;
+- `runBackupMutation()` / `runSyncedMutation()`;
+- settings synthetic outbox enqueue;
+- first render and first user-mutating control;
+- interval/visibility/NetInfo flush registration.
 
-Do not:
-- increase Playwright timeouts;
-- add sleeps;
-- weaken expected outbox contents;
-- skip either failing test;
-- make the failure injector less strict;
-- serialize everything as a blanket race fix.
+Establish one explicit invariant:
 
-## Phase 3 — Fix P5 partial-success durable-outbox semantics
+> No durable sync revision may be allocated, and no remote flush may start,
+> before persisted sync state has been hydrated enough to establish the
+> monotonic revision floor.
 
-Trace the full write lifecycle:
+Implement the narrowest architecture that enforces it. A dedicated local
+bootstrap/readiness state is acceptable; silently relying on remote auth timing
+is not.
 
-`enqueue -> owner binding -> flush coalescing -> adapter preflight -> per-record
-remote result -> durable acknowledgement/delete -> retry/backoff -> post-flush
-maintenance`.
+Add a deterministic real-SQLite regression:
 
-Prove these invariants with narrow deterministic tests:
+1. preseed an outbox row with a high durable revision;
+2. hold hydration at a controlled barrier;
+3. exercise the earliest mutation boundary;
+4. release hydration;
+5. assert the newest mutation has a revision greater than the persisted floor;
+6. close/reopen/hydrate and assert the new intent survives;
+7. flush through a deterministic adapter and assert the new payload is the one
+   delivered.
 
-1. two entities queued, one remote success + one remote failure;
-2. successful row is removed exactly once;
-3. failed row remains exactly once;
-4. retry pushes only the failed row;
-5. concurrent flush callers coalesce and cannot resurrect acknowledged rows;
-6. reconnect/visibility/interval fan-in cannot create a second logical push;
-7. post-flush backup maintenance cannot alter outbox acknowledgement semantics;
-8. owner transition cannot acknowledge a row under the wrong owner.
+If product UI is intentionally gated until hydration, prove the mutating control
+cannot become available before hydration and that local startup still remains
+fast/offline-safe.
 
-Then keep the unchanged P5 E2E oracle green.
+## Phase 2 — restore bounded offline-first bootstrap (SH-AUD-001, SH-AUD-007)
 
-## Phase 4 — Fix Recoverable Account V1 convergence
+Current production no longer calls `withRemoteTimeout()`.
 
-Trace the exact state machine from a protected/recoverable owner through an
-empty-device recovery and restore eligibility.
+Design bootstrap as explicit phases with ownership:
 
-Add deterministic tests for:
+- local DB initialization/migrations;
+- durable sync hydration;
+- local ownership/account facts necessary for safe writes;
+- remote auth/account reconciliation;
+- restore preview/backup maintenance.
 
-- successful recovery followed by a late older account bootstrap/refresh;
-- auth-state callback racing the explicit recovery refresh;
-- restore preview started before recovery settling after recovery;
-- restore preview started after recovery winning over any older preview;
-- local owner binding and pending-outbox state after recovery;
-- empty-device eligibility becoming Allowed without reload;
-- no duplicate user creation (the existing `requestShouldCreateUser === false`
-  assertion stays unchanged);
-- retry/reconnect not regressing the recovered state.
+Remote calls must not hold the local application hostage forever. Preserve
+remote late-settlement adoption only when it is still current.
 
-Repair the narrowest ownership/ordering defect. Do not special-case the UI text
-or hard-code `Allowed` in the view.
+Deterministically cover:
 
-## Phase 5 — Finish the active async-precedence contract
+- permanently pending remote account bootstrap;
+- rejected remote account bootstrap;
+- late success after timeout;
+- retry after a local DB/bootstrap failure;
+- unmount during each pending phase;
+- bootstrap retry invalidating older tasks.
 
-Audit every current `AsyncStorage.getItem` caller. For each, record:
+Restore an in-app retry action for recoverable bootstrap failure, or document and
+test a stronger explicitly approved alternative.
 
-- persisted source;
-- state adopter;
-- whether an explicit user action can happen before hydration settles;
-- restore/remote authority if any;
-- precedence rule;
-- test evidence.
+## Phase 3 — reinstate monotonic account-state adoption (SH-AUD-003)
 
-Where a real competing source exists, use the existing
-`createPreferencePrecedenceGuard` or a justified narrower equivalent and add
-paired tests:
+Reintroduce one framework-free monotonic account task/adoption primitive or
+equivalent. Cover:
 
-- untouched state hydrates persisted value;
-- explicit user action after read start wins over late hydration.
+- old bootstrap settles after newer manual refresh;
+- old refresh settles after protect/recover verification;
+- auth callback refresh overlaps explicit account action;
+- bootstrap retry invalidates old task;
+- rejected/stale task cannot change visible state or owner-sensitive behavior.
 
-Do not wrap pure storage helpers or read-only caches without a race.
+Do not serialize all reads unnecessarily; sequence adoption, not harmless
+parallel I/O.
 
-## Phase 6 — Finish timer/listener/subscription runtime proof
+## Phase 4 — reinstate restore-preview adoption authority (SH-AUD-004)
 
-Build a finite ownership table for all intervals, timeouts, AppState/NetInfo/
-visibility listeners, service-worker hooks, notification responses, and
-theme/motion listeners.
+`createPreviewAdoptionGuard()` exists and is tested but is currently dead in
+production.
 
-For high-risk owners, add deterministic mount -> unmount -> remount/lifecycle
-tests proving:
+Route every competing preview producer through one authority:
 
-- exactly one active owner;
-- cleanup always removes old owner;
-- no stale closure updates a new target;
-- no duplicated Pomodoro/Workout completion;
-- no duplicate sync flush/domain write/navigation;
-- unmounted views reject late results.
+- initial bootstrap preview;
+- maintenance recalc;
+- post-flush recalc;
+- account recovery/protection transition when it changes eligibility;
+- restore completion;
+- dismissal/retry interactions where relevant.
 
-Finish M7 from the active ExecPlan rather than creating a new lifecycle system.
+Prove older preview settlement cannot re-open a dismissed prompt, hide a newer
+eligible prompt, or regress ownership/freshness state.
 
-## Phase 7 — Cross-feature race and target-change proof
+Delete the helper only if a better single authority replaces it and equivalent
+tests prove the contract.
 
-Close M8 with state-based tests/journeys for at least:
+## Phase 5 — make flush/listener lifecycle ownership stable (SH-AUD-005)
 
-- rapid section switching during in-flight reads;
-- day rollover + foreground + in-flight refresh;
-- Habit detail A -> B while A history is pending;
-- preference edit during hydration;
-- account recovery/restore-preview overlap;
-- reconnect/visibility/interval overlap.
+Audit `AppProviders` plus every timer/listener/subscription owner identified by
+the existing OpenSpec.
 
-Use deferred promises/fake clocks/injected adapters where possible. No timing
-lottery.
+For sync flush specifically:
 
-## Phase 8 — Make zero-warning enforcement durable
+- subscriptions should not churn merely because account status changes;
+- readiness may be read through stable state/refs or another explicit owner;
+- NetInfo immediate emission must be understood and tested;
+- visibility + online + NetInfo + fixed interval must coalesce correctly;
+- concurrent trigger calls must share the engine's in-flight flush;
+- failure accounting increments exactly once per actual adapter attempt;
+- mount → unmount → remount leaves one owner;
+- no post-unmount backup/preview adoption.
 
-The current project claims lint 0/0 but `package.json` allows 25 warnings.
+Restore exact E2E or lower-level failure-count oracles after the product/harness
+is deterministic.
 
-After confirming the final source really produces zero warnings, change the
-lint gate to fail on any warning (for example `--max-warnings 0`). Keep CI
-calling the same canonical script. Do not add blanket `eslint-disable`
-comments.
+## Phase 6 — repair the remote-boundary harness instead of weakening it (SH-AUD-006)
 
-Audit existing targeted suppressions. Remove only unjustified ones with proof;
-document legitimate framework/test harness exceptions.
+Keep the useful Worker-fetch lesson from the recent fix, but remove nondeterminism.
 
-## Phase 9 — Reconcile skips, known gaps, and plan truth
+Required work:
 
-- Inventory every active `test.fixme`, `test.skip`, `describe.skip`,
-  `it.skip`.
-- Resolve the two previously `UNKNOWN` E2E skip classifications.
-- Ensure every remaining skip maps to a named environment/capability gap.
-- Update known-gaps only when proof changes.
-- Update the tracked-file audit ledger to the final tree.
-- Reconcile `tasks.md`, Finding Ledger, Validation Ledger, Current Checkpoint,
-  Progress, and Outcomes.
-- Do not mark COMPLETED while any Critical/High finding or authoritative CI
-  failure remains open.
+- centralize Supabase request interception so page and Worker traffic are both
+  covered without double logical ownership;
+- add correct CORS preflight and Content-Range behavior;
+- replace `page.waitForTimeout(500)` route stabilization with an explicit
+  readiness/barrier;
+- implement a genuine stalled-request injector for the timeout scenario;
+- provide deterministic teardown/drain/cancellation of held requests before
+  switching injector modes;
+- change widened "one or two failures" assertions back to the exact intended
+  number after fixing duplicate trigger semantics;
+- remove temporary PA-02 debug logging once no longer needed;
+- keep partial success strict: succeeded rows disappear exactly once, failed
+  rows remain exactly once.
 
-## Phase 10 — Broad exact-tree qualification
+Do not make CI pass by converting timeout to 503.
 
-Run cheapest-to-broadest and record exact results:
+## Phase 7 — finish the original async/preference/lifecycle matrix
 
-- `npm run typecheck`
-- `npm run lint` — **0 errors / 0 warnings and warning budget = 0**
-- focused tests for every changed subsystem
-- `npm test`
-- `npm run test:integration`
-- `npm run validate:themes`
-- `npm run supabase:schema:validate`
-- strict validation of this OpenSpec change
-- `npm run openspec:validate`
-- `npm run qa:impact:validate`
-- plan validators
-- `npm run format:check`
-- `npm run build:web`
-- `npm run qa:affected`
-- `npm run e2e:journeys:p0`
-- focused changed journeys
-- `npm run e2e:full`
-- `npm run e2e:sync`
-- `npm run qa:simulation -- --all --mode deterministic`
-- `npm run qa:full`
-- `git diff --check`
+Re-run the original tasks, not just this addendum:
 
-For race-sensitive and formerly failing tests, require **two clean fresh-state
-runs** after the final fix.
+- AsyncStorage user-intent precedence for every actual competing hydration
+  surface;
+- Daily Plan editable field precedence;
+- Calories mode precedence;
+- target-change race (e.g. Habit A → B while A load is pending);
+- day rollover + foreground + pending read;
+- Pomodoro/Workout timer lifecycle;
+- notification response/action replay idempotency;
+- service worker/theme/motion/listener cleanup;
+- all current skip/fixme classifications;
+- targeted eslint suppressions: each must have a narrow reason; no blanket
+  suppression.
 
-Run Android native lanes sequentially when a verified device/emulator is
-available. iOS remains environment-classified unless actual macOS/EAS evidence
-exists. Never label unavailable native proof as PASS.
+Use deferred promises, controlled clocks, explicit latches, and state oracles.
 
-## Phase 11 — Push and exact-SHA CI closure
+## Phase 8 — repository truth and dead-code cleanup
 
-Commit coherent waves with useful messages. Final delivery commit must contain a
-detailed session report: audit coverage, root causes, fixes, tests, remaining
-capability gaps, and any justified deferrals.
+Reconcile:
 
-Push normally to `origin/main`, then:
+- `tasks.md` checkboxes from actual evidence;
+- `execplan.md` status/checkpoint/outcomes;
+- `docs/testing/known-gaps.md`;
+- structure/schema docs;
+- QA impact map;
+- comments that still describe superseded architecture.
 
-- fetch origin;
-- verify clean worktree;
-- verify local HEAD == fetched `origin/main`;
-- inspect the GitHub Actions run for the exact pushed SHA;
-- require `quality` and `e2e` green, including `journeys-sync`;
-- if CI is red, inspect artifacts/logs, fix, push, and repeat.
+Specifically inspect `core/db/localMutation.ts`. It currently describes
+projects/goals/daily plans as local-only even though current data layers use
+`runBackupMutation()` and remote migrations exist. If it is truly unused, delete
+it with search/test proof; otherwise correct its contract.
 
-Only after exact-SHA CI is green and all completion gates are met may you set:
+Do not mass-archive OpenSpec changes inside this campaign unless the archive
+operation is mechanically safe and validated. Record archive debt for the
+successor if broad cleanup would add risk.
 
-- `Status: COMPLETED`
-- every genuinely completed task checkbox to `[x]`
-- `Exact next action: None — task complete.`
+## Phase 9 — exact-tree validation ladder
 
-Then archive/sync OpenSpec only if repository conventions call for it.
+Run on the final implementation tree, not an earlier checkpoint:
 
-## Phase 12 — Decide whether a successor campaign exists
+1. `npm run typecheck`
+2. `npm run lint` — 0 errors, 0 warnings
+3. `npm test`
+4. focused new startup/hydration/account/preview/sync tests twice from fresh state
+5. `npm run validate:themes`
+6. `npm run supabase:schema:validate`
+7. `npm run openspec:validate`
+8. `npm run agent:plan:validate:all`
+9. `npm run qa:impact:validate`
+10. `npm run format:check`; if the repository-wide historical formatting gap
+    remains, distinguish pre-existing files from changed-file violations and do
+    not claim global cleanliness
+11. `npm run build:web`
+12. `npm run e2e:journeys:p0`
+13. `npm run e2e`
+14. `npm run e2e:sync`
+15. `npm run sim:validate`
+16. full deterministic simulation
+17. `npm run qa:full`
 
-After closure, re-run a whole-repo risk scan. If no Critical/High/meaningful
-Medium implementation work remains, stop and say no new implementation
-campaign is justified.
+For native-sensitive changed paths, also run the appropriate Maestro/EAS lanes
+sequentially when a verified target is available. If unavailable, record
+ENVIRONMENT with exact prerequisite; never call it PASS.
 
-If meaningful residual work remains, create a **new** OpenSpec proposal only
-then. Strong successor candidates, if still evidenced, are:
+Any race-sensitive suite fixed during this campaign must pass twice from fresh
+state after the final code change.
 
-- real historical SQLite corpus qualification;
-- guarded disposable real-Supabase/RLS round-trip certification;
-- heap/memory-leak and native sustained-load instrumentation;
-- remaining native/iOS platform proof.
+## Phase 10 — push and exact-SHA CI gate
 
-Do not invent a feature merely to keep the agent busy.
+- Run `git diff --check`.
+- Ensure no credentials, generated `dist*` output, disposable-backend state, or
+  unrelated formatting churn are staged.
+- Write a detailed commit message containing:
+  - starting and final SHA;
+  - path-ledger count;
+  - finding IDs closed;
+  - root causes;
+  - regression tests;
+  - local validation results;
+  - environment-classified gaps.
+- Push normally to `origin/main`.
+- Fetch origin and prove local HEAD == fetched origin/main.
+- Inspect GitHub Actions for that exact SHA.
+- Require quality + full E2E + deterministic scenarios + dist-sync/journeys-sync
+  green before completion.
 
-## Final instruction
+A green CI result is necessary, not sufficient: verify the new deterministic
+startup/hydration/account/preview tests were actually included in the quality
+test run.
 
-Work autonomously from evidence until the active change is genuinely terminal.
-Critical/High defects must be fixed and regression-tested. Never trade
-correctness for a green dashboard. Keep the ExecPlan resumable after every
-meaningful milestone so another agent can pull the repo and continue without
-chat history.
+## Phase 11 — close the OpenSpec honestly
+
+Only after all Critical/High in-scope findings are resolved:
+
+- check tasks that have actual evidence;
+- keep genuine unavailable external gaps open/classified;
+- set ExecPlan `Status: COMPLETED`;
+- fill outcomes/retrospective;
+- set exact next action to none;
+- validate OpenSpec + plans again;
+- commit/push any final documentation reconciliation and verify exact-SHA CI.
+
+## Phase 12 — conditional successor, only after this change is COMPLETED
+
+If meaningful repo-controlled production-certification work remains, create a
+new OpenSpec change named:
+
+`certify-production-backend-and-release-boundaries-v1`
+
+Its minimum scope should be:
+
+- make `simulation/backend/roundTripScenarios.ts` executable rather than
+  note-driven;
+- add first-class remote Supabase oracles;
+- provision disposable project → apply authoritative repository migrations →
+  configure required auth behavior → build `dist-live` → execute sync/restore/
+  partial failure/RLS/edge-function scenarios → teardown in `finally`;
+- add cross-user RLS negative tests and auth/quota edge-function tests;
+- prove disposable schema and production migrations cannot drift;
+- pin `tsx`/Supabase CLI or otherwise make the lane reproducible;
+- correct stale deploy-workflow linked-project instructions;
+- keep production-host/credential/disposable-marker guard fail-closed;
+- add a credentialed read-only live schema/RLS comparison only when explicitly
+  authorized;
+- evaluate native sustained-use and heap/memory profiling as separate
+  evidence-driven tasks;
+- preserve real historical DB corpus gaps as CREDENTIAL/ARTIFACT_REQUIRED until
+  an anonymized corpus actually exists;
+- reconcile/archive completed OpenSpec changes only after mechanical validation.
+
+Do not activate this successor before the current async/lifecycle change is
+COMPLETED.
+
+## Completion rule
+
+The user asked for a long autonomous campaign. Treat approximately 12 hours as
+a maximum useful work budget, **not** as an instruction to keep working after
+the repository is proven complete.
+
+Never fill time with speculative features. Stop when the evidence says stop.
