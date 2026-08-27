@@ -69,15 +69,6 @@ async function triggerReconnectFlush(page: Page, settleMs = 2500): Promise<void>
   await setOffline(page, true);
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
   await setOffline(page, false);
-  await page.evaluate(() => {
-    const nav = navigator as unknown as {
-      connection?: { dispatchEvent(ev: Event): boolean };
-      mozConnection?: { dispatchEvent(ev: Event): boolean };
-      webkitConnection?: { dispatchEvent(ev: Event): boolean };
-    };
-    const conn = nav.connection ?? nav.mozConnection ?? nav.webkitConnection;
-    if (conn) conn.dispatchEvent(new Event('change'));
-  });
   await page.waitForTimeout(settleMs);
 }
 
