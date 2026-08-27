@@ -69,6 +69,16 @@ async function triggerReconnectFlush(page: Page, settleMs = 2500): Promise<void>
   await setOffline(page, true);
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
   await setOffline(page, false);
+  await page.evaluate(() => {
+    const nav = navigator as unknown as {
+      connection?: { dispatchEvent(ev: Event): boolean };
+      mozConnection?: { dispatchEvent(ev: Event): boolean };
+      webkitConnection?: { dispatchEvent(ev: Event): boolean };
+    };
+    const conn = nav.connection ?? nav.mozConnection ?? nav.webkitConnection;
+    if (conn) conn.dispatchEvent(new Event('change'));
+    window.dispatchEvent(new Event('online'));
+  });
   await page.waitForTimeout(settleMs);
 }
 
@@ -286,16 +296,12 @@ defineJourney({
         await addHabitViaUi(page, 'J4 habit');
 
         // Both entities are in the outbox (created via the real write path).
-        // Synthetic backup entities (user_backup_settings, backup_manifest) are
-        // opportunistic and may appear due to maintenance; filter them for this
-        // data-entity oracle.
         await expectOutbox(page, (outbox) => {
-          const entities = outbox
-            .map((r) => r.entity)
-            .filter((e) => e !== 'user_backup_settings' && e !== 'backup_manifest')
-            .sort();
+          const entities = outbox.map((r) => r.entity).sort();
           expect(entities).toEqual(['habits', 'todos']);
         });
+
+        // The app has fully booted (UI writes succeeded). If it never issued a
         // supabase request, the served build is local-only → no boundary to
         // intercept; the failure scenarios below are gated on this.
         remoteBoundaryDetected = supabaseRequestsSeen > 0;
@@ -417,11 +423,7 @@ defineJourney({
           Date.now(),
         );
         await expectOutbox(page, (outbox) => {
-          const entities = outbox
-            .map((r) => r.entity)
-            .filter((e) => e !== 'user_backup_settings' && e !== 'backup_manifest')
-            .sort();
-          expect(entities).toEqual(['habits']);
+          expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
         });
         // A later success clears the failure state and the outbox (only the
         // Backup Completeness V2 manifest checkpoint record may remain,
