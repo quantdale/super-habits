@@ -152,6 +152,9 @@ These are starting evidence to reproduce/exonerate, not completed findings.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete.
 - Remaining definition of done: None — task complete. Every tracked path accounted (1237); all Critical/High findings resolved with proof; hydration revision test green; AppProviders local-first + bounded + monotonic + preview + stable flush + real timeout harness proven; lint 0/0; docs/known gaps accurate; strict OpenSpec/plan validation plus full applicable QA/native evidence on the exact final tree; exact-SHA CI green for 0d63f47.
+
+## Progress
+
 - [x] M1 — Executor reconciliation, baseline, complete tracked-file inventory (1237 files).
 - [x] M2 — Async/lifecycle ownership map and severity-classified audit ledger complete.
 - [x] M3 — Deterministic race harness + refresh guard contract hardened (editableDraft, previewAdoption, preferencePrecedence helpers + tests).
