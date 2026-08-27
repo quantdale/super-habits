@@ -387,7 +387,7 @@ defineJourney({
             expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
           });
         } catch (e) {
-          console.log('[PA-02-debug] logs (on fail):', JSON.stringify(pcLogs.slice(-100)));
+          console.warn('[PA-02-debug] logs (on fail):', JSON.stringify(pcLogs.slice(-100)));
           throw e;
         } finally {
           page.off('console', pcListener);
@@ -453,7 +453,7 @@ defineJourney({
         await expectOutbox(page, (outbox) => {
           expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
         });
-        console.log('[PA-02-debug] logs:', JSON.stringify(pcLogs.slice(-20)));
+        console.warn('[PA-02-debug] logs:', JSON.stringify(pcLogs.slice(-20)));
         page.off('console', pcListener);
 
         // A later success clears the failure state and the outbox (only the
