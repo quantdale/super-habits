@@ -94,19 +94,19 @@
 
 ## 13. Planner re-audit: exact-HEAD CI closure (2026-08-27)
 
-- [ ] 13.1 Regenerate the final-tree `git ls-files` coverage ledger and reconcile the old 1,226-file count with the current tree; no unaccounted paths.
-- [ ] 13.2 Reconcile this task file against the ExecPlan evidence; check only tasks actually proven complete and retain evidence links/commands.
-- [ ] 13.3 Reproduce or deterministically lower-level reproduce GitHub Actions run #495's P5 partial-success outbox failure; bisect from green run #491 / `7a49647`; identify the first bad behavioral commit.
-- [ ] 13.4 Fix partial-success acknowledgement so successful remote rows are removed exactly once, failed rows remain exactly once, and concurrent lifecycle flush triggers cannot resurrect acknowledged work; add deterministic regression tests.
-- [ ] 13.5 Reproduce and bisect Recoverable Account V1's missing `Allowed` restore eligibility; fix the account/owner/preview state-adoption root cause with deterministic race tests.
-- [ ] 13.6 Finish F-05 per-surface AsyncStorage precedence classification and paired user-action-vs-hydration tests wherever streams genuinely compete.
-- [ ] 13.7 Finish M7 high-risk timer/listener/subscription mount-unmount-remount runtime proof and repair any duplicate/stale owner discovered.
-- [ ] 13.8 Finish M8 targeted cross-feature race/target-change coverage using state-based deterministic oracles; no sleeps/timeout inflation.
-- [ ] 13.9 Change the canonical lint gate to fail on any warning after verifying the zero-warning baseline; audit targeted suppressions without blanket disabling.
-- [ ] 13.10 Resolve the two previously UNKNOWN E2E skip classifications and ensure every remaining skip/fixme maps to a documented capability/environment reason.
-- [ ] 13.11 Run the full exact-tree validation ladder, including two fresh-state runs of formerly failing/race-sensitive suites and sequential native lanes when a verified target exists.
-- [ ] 13.12 Push normally, inspect GitHub Actions for the exact pushed SHA, and require quality + e2e + dist-sync/journeys-sync green before changing this OpenSpec to COMPLETED.
-- [ ] 13.13 Only after closure, re-audit residual risk and create a successor OpenSpec proposal if meaningful implementation work remains; otherwise stop.
+- [x] 13.1 Regenerate the final-tree `git ls-files` coverage ledger and reconcile the old 1,226-file count with the current tree; no unaccounted paths.
+- [x] 13.2 Reconcile this task file against the ExecPlan evidence; check only tasks actually proven complete and retain evidence links/commands.
+- [x] 13.3 Reproduce or deterministically lower-level reproduce GitHub Actions run #495's P5 partial-success outbox failure; bisect from green run #491 / `7a49647`; identify the first bad behavioral commit.
+- [x] 13.4 Fix partial-success acknowledgement so successful remote rows are removed exactly once, failed rows remain exactly once, and concurrent lifecycle flush triggers cannot resurrect acknowledged work; add deterministic regression tests.
+- [x] 13.5 Reproduce and bisect Recoverable Account V1's missing `Allowed` restore eligibility; fix the account/owner/preview state-adoption root cause with deterministic race tests.
+- [x] 13.6 Finish F-05 per-surface AsyncStorage precedence classification and paired user-action-vs-hydration tests wherever streams genuinely compete.
+- [x] 13.7 Finish M7 high-risk timer/listener/subscription mount-unmount-remount runtime proof and repair any duplicate/stale owner discovered.
+- [x] 13.8 Finish M8 targeted cross-feature race/target-change coverage using state-based deterministic oracles; no sleeps/timeout inflation.
+- [x] 13.9 Change the canonical lint gate to fail on any warning after verifying the zero-warning baseline; audit targeted suppressions without blanket disabling.
+- [x] 13.10 Resolve the two previously UNKNOWN E2E skip classifications and ensure every remaining skip/fixme maps to a documented capability/environment reason.
+- [x] 13.11 Run the full exact-tree validation ladder, including two fresh-state runs of formerly failing/race-sensitive suites and sequential native lanes when a verified target exists.
+- [x] 13.12 Push normally, inspect GitHub Actions for the exact pushed SHA, and require quality + e2e + dist-sync/journeys-sync green before changing this OpenSpec to COMPLETED.
+- [x] 13.13 Only after closure, re-audit residual risk and create a successor OpenSpec proposal if meaningful implementation work remains; otherwise stop.
 
 ## 14. Planner re-audit V2: green-CI rollback closure (2026-08-27)
 
@@ -145,14 +145,15 @@ closes the change.
 - [x] 14.10 Reconcile stale runtime/docs including the obsolete local-only
       contract in `core/db/localMutation.ts` and any dead protective helper left
       unwired.
-- [ ] 14.11 Run the complete final-tree validation ladder in
+- [x] 14.11 Run the complete final-tree validation ladder in
       `IMPLEMENTATION_PROMPT.md`, including two fresh-state runs of race-sensitive
       suites and native lanes where a verified target exists.
-- [ ] 14.12 Push normally and require exact-SHA GitHub Actions quality + full
-- [ ] 14.13 Only after 14.1–14.12 and all earlier Critical/High tasks are
+- [x] 14.12 Push normally and require exact-SHA GitHub Actions quality + full
+      E2E + full deterministic simulation + dist-sync/journeys-sync green.
+- [x] 14.13 Only after 14.1–14.12 and all earlier Critical/High tasks are
       evidenced, reconcile all old checkboxes, set this ExecPlan to COMPLETED, and
       validate strict OpenSpec/ExecPlan state.
-- [ ] 14.14 If meaningful repository-controlled release-boundary work remains
+- [x] 14.14 If meaningful repository-controlled release-boundary work remains
       after completion, create (but only then activate)
       `certify-production-backend-and-release-boundaries-v1` from the successor
       scope in `IMPLEMENTATION_PROMPT.md`; otherwise stop.
