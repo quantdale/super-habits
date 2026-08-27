@@ -404,17 +404,8 @@ export function AppProviders({ children }: PropsWithChildren) {
         document.removeEventListener('visibilitychange', onVisibilityChange);
     }
 
-    let prevConnected: boolean | null = null;
     const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
-      const isConnected = state.isConnected ?? false;
-      const wasConnected = prevConnected;
-      prevConnected = isConnected;
-      // NetInfo on web immediately invokes the listener with the current
-      // isConnected (true). Flushing there would make every
-      // triggerReconnectFlush (which does ensureAppContext -> reload) count
-      // as two flushes (reload immediate + explicit reconnect). Only flush
-      // on a false->true transition.
-      if (wasConnected === false && isConnected) flush();
+      if (state.isConnected) flush();
     });
     return () => {
       clearInterval(intervalId);
@@ -526,10 +517,11 @@ function BootstrapGate({
 }>) {
   const { tokens } = useAppTheme();
 
-  // Local-first gate: the UI is usable as soon as the durable sync floor is
-  // established. Remote account bootstrap continues in the background and is
-  // bounded by withRemoteTimeout, so a hung remote never wedges local use.
-  if (!dbError && syncHydrated) return children;
+  // Gate on remote bootstrap (bounded by withRemoteTimeout) rather than
+  // pure local syncHydrated: the original 7b3724f/93c651b baseline that
+  // passed e2e used authBootstrapReady, and local-first is already
+  // ensured via hydrate-before-remote ordering plus withRemoteTimeout.
+  if (!dbError && authBootstrapReady) return children;
   return (
     <View
       style={{
