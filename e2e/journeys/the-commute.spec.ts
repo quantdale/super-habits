@@ -143,6 +143,18 @@ async function registerOfflineWasmRoute(page: Page): Promise<void> {
 async function installWithholdingSupabaseRoute(page: Page): Promise<void> {
   const handler = (route: import('@playwright/test').Route) => {
     supabaseRequestsSeen += 1;
+    const method = route.request().method();
+    if (method === 'OPTIONS') {
+      return route.fulfill({
+        status: 204,
+        headers: {
+          'access-control-allow-origin': '*',
+          'access-control-allow-headers': '*',
+          'access-control-allow-methods': 'GET, POST, PATCH, DELETE, PUT, OPTIONS',
+          'access-control-expose-headers': 'content-range',
+        },
+      });
+    }
     if (route.request().url().includes('/auth/v1/')) {
       return fulfillDummySupabaseAuth(route);
     }
@@ -153,7 +165,11 @@ async function installWithholdingSupabaseRoute(page: Page): Promise<void> {
       body: '{"error":"injected server error"}',
     });
   };
-  await page.route('**/*.supabase.co/**', handler);
+  await page.unroute('**/*.supabase.co/**').catch(() => {});
+  await page
+    .context()
+    .unroute('**/*.supabase.co/**')
+    .catch(() => {});
   await page.context().route('**/*.supabase.co/**', handler);
 }
 
@@ -355,6 +371,18 @@ defineJourney({
         const pushed: { entity: string; id: string; userId: unknown }[] = [];
         const handler2 = async (route: import('@playwright/test').Route) => {
           const req = route.request();
+          const method = req.method();
+          if (method === 'OPTIONS') {
+            return route.fulfill({
+              status: 204,
+              headers: {
+                'access-control-allow-origin': '*',
+                'access-control-allow-headers': '*',
+                'access-control-allow-methods': 'GET, POST, PATCH, DELETE, PUT, OPTIONS',
+                'access-control-expose-headers': 'content-range',
+              },
+            });
+          }
           if (req.url().includes('/auth/v1/')) {
             return fulfillDummySupabaseAuth(route);
           }
@@ -369,12 +397,20 @@ defineJourney({
           }
           await route.fulfill({
             status: 200,
-            headers: { 'access-control-allow-origin': '*' },
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-expose-headers': 'content-range',
+              'content-range': '0-0/*',
+            },
             contentType: 'application/json',
             body: '[]',
           });
         };
-        await page.route('**/*.supabase.co/**', handler2);
+        await page.unroute('**/*.supabase.co/**').catch(() => {});
+        await page
+          .context()
+          .unroute('**/*.supabase.co/**')
+          .catch(() => {});
         await page.context().route('**/*.supabase.co/**', handler2);
 
         // The page is on the app (calories) from step 5. Force one

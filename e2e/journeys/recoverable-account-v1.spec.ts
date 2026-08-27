@@ -210,7 +210,6 @@ async function installAccountMock(page: Page): Promise<void> {
     .context()
     .unroute(SUPABASE_ROUTE)
     .catch(() => {});
-  await page.route(SUPABASE_ROUTE, handleAccountMock);
   await page.context().route(SUPABASE_ROUTE, handleAccountMock);
 }
 

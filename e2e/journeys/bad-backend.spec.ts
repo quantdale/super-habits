@@ -136,42 +136,19 @@ async function routeSupabase(
   page: Page,
   restHandler: (route: import('@playwright/test').Route, url: string) => void | Promise<void>,
 ): Promise<void> {
+  // Centralize on the browser-context level: it covers both page and Worker
+  // (wa-sqlite, Supabase) traffic. Registering the same handler on both
+  // page and context double-handles a single logical request and was the
+  // cause of the "one or two failures" tolerance. Keep a single logical
+  // ownership here.
   await page.unroute(SUPABASE_ROUTE).catch(() => {});
   await page
     .context()
     .unroute(SUPABASE_ROUTE)
     .catch(() => {});
-  await page.route(SUPABASE_ROUTE, (route) => {
-    supabaseRequestsSeen += 1;
-    const method = route.request().method();
-    const url = route.request().url();
-    // Supabase POSTs (`apikey`, `authorization`, `Prefer`, `Content-Type`)
-    // trigger a CORS preflight OPTIONS. The partial/success handlers only
-    // set `access-control-allow-origin`, so the preflight response must be a
-    // 204 with explicit allow-headers/methods or the POST's fetch throws
-    // `TypeError: Failed to fetch` and both entities appear failed (the cause
-    // of the 79bf468 dist-sync `['habits','todos']` regression). PA-02 bridge.
-    if (method === 'OPTIONS') {
-      return route.fulfill({
-        status: 204,
-        headers: {
-          'access-control-allow-origin': '*',
-          'access-control-allow-headers': '*',
-          'access-control-allow-methods': 'GET, POST, PATCH, DELETE, PUT, OPTIONS',
-          'access-control-expose-headers': 'content-range',
-        },
-      });
-    }
-    if (url.includes('/auth/v1/')) {
-      return fulfillDummySupabaseAuth(route);
-    }
-    return restHandler(route, url);
-  });
-  // Also intercept at the browser-context level so Worker fetch (wa-sqlite, Supabase
-  // in some runtimes) is covered. Playwright's page.route alone does not always
-  // capture Worker-initiated supabase requests, which is why the first entity
-  // (todos) has been observed to `Failed to fetch` while the second (habits)
-  // succeeds. Registering the same handler on the context closes that gap.
+  // Drain any still-held timeout routes before installing a new injector so
+  // a previous stalled request cannot spill into the next step.
+  drainPendingTimeoutRoutes();
   await page.context().route(SUPABASE_ROUTE, (route) => {
     supabaseRequestsSeen += 1;
     const method = route.request().method();
@@ -194,8 +171,29 @@ async function routeSupabase(
   });
 }
 
+// Timeout harness state: held routes + their abort timers. Installing a new
+// injector drains this so a previous stalled request cannot be misattributed
+// to the next mock (the PA-02 spill).
+let pendingTimeoutRoutes: import('@playwright/test').Route[] = [];
+let pendingTimeoutIds: ReturnType<typeof setTimeout>[] = [];
+function drainPendingTimeoutRoutes(): void {
+  for (const id of pendingTimeoutIds) clearTimeout(id);
+  pendingTimeoutIds = [];
+  for (const r of pendingTimeoutRoutes) {
+    // Best-effort: the route may already be handled; ignore.
+    r.fulfill({
+      status: 503,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: '{"error":"drained stalled request"}',
+    }).catch(() => {});
+  }
+  pendingTimeoutRoutes = [];
+}
+
 /** Every REST request fails with 503 (the "backend is down" blocking injector). */
 async function injectRest503(page: Page): Promise<void> {
+  drainPendingTimeoutRoutes();
   await routeSupabase(page, (route) => {
     return route.fulfill({
       status: 503,
@@ -208,6 +206,7 @@ async function injectRest503(page: Page): Promise<void> {
 
 /** Every REST request returns 200 with invalid JSON (parser robustness). */
 async function injectRestMalformed(page: Page): Promise<void> {
+  drainPendingTimeoutRoutes();
   await routeSupabase(page, (route) =>
     route.fulfill({
       status: 200,
@@ -218,26 +217,23 @@ async function injectRestMalformed(page: Page): Promise<void> {
   );
 }
 
-/** Every REST request fails after `ms` (a stalled request). */
+/** Every REST request is stalled then aborted after `ms` (a real stalled request). */
 async function injectRestTimeout(page: Page, ms = 2500): Promise<void> {
+  drainPendingTimeoutRoutes();
   await routeSupabase(page, (route) => {
-    // Use an immediate 503 rather than a delayed abort/fulfill. The original
-    // `route.abort('timedout')` after a timeout left a pending `setTimeout`
-    // whose delayed `fulfill` could spill into the next journey step and be
-    // misattributed to the partial-failure mock (todos returning
-    // `injected timeout` instead of 200). An immediate failure still exercises
-    // the timeout-as-failure contract (outbox requeues) without the race.
-    return route.fulfill({
-      status: 503,
-      headers: { 'access-control-allow-origin': '*' },
-      contentType: 'application/json',
-      body: '{"error":"injected timeout"}',
-    });
+    pendingTimeoutRoutes.push(route);
+    const id = setTimeout(() => {
+      // Remove from pending before acting.
+      pendingTimeoutRoutes = pendingTimeoutRoutes.filter((r) => r !== route);
+      route.abort('timedout').catch(() => {});
+    }, ms);
+    pendingTimeoutIds.push(id);
   });
 }
 
 /** Every REST request succeeds (200, empty array) — the "backend recovered" injector. */
 async function injectRestSuccess(page: Page): Promise<void> {
+  drainPendingTimeoutRoutes();
   await routeSupabase(page, (route) =>
     route.fulfill({
       status: 200,
@@ -255,6 +251,7 @@ async function injectRestSuccess(page: Page): Promise<void> {
  * `route.continue()` that would leak toward a real backend.
  */
 async function injectRestPartial(page: Page, failEntities: readonly string[]): Promise<void> {
+  drainPendingTimeoutRoutes();
   const fail = new Set<string>(failEntities);
   await routeSupabase(page, (route, url) => {
     const hit = SYNCABLE_ENTITIES.find((e) => url.includes(`/rest/v1/${e}`));
@@ -372,26 +369,12 @@ defineJourney({
           'this standard dist/ build has no Supabase boundary — this step runs in the journeys-sync lane against the dummy-Supabase dist-sync/ build (task 6.1a / Q5)',
         );
         // todos succeed (200), habits fail (503): only the habits record requeues.
-        const pcLogs: string[] = [];
-        const pcListener = (msg: import('@playwright/test').ConsoleMessage) => {
-          const text = msg.text();
-          if (text.includes('[sync]') || text.includes('[engine]')) pcLogs.push(text);
-        };
-        page.on('console', pcListener);
         await injectRestPartial(page, ['habits']);
-        await page.waitForTimeout(500);
         await triggerReconnectFlush(page);
 
-        try {
-          await expectOutbox(page, (outbox) => {
-            expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
-          });
-        } catch (e) {
-          console.warn('[PA-02-debug] logs (on fail):', JSON.stringify(pcLogs.slice(-100)));
-          throw e;
-        } finally {
-          page.off('console', pcListener);
-        }
+        await expectOutbox(page, (outbox) => {
+          expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
+        });
 
         await assertSettingsSyncPill(page, 'Failing');
       },
@@ -413,17 +396,10 @@ defineJourney({
         // Reconnect flushes OPPORTUNISTICALLY: it bypasses shouldAttemptFlush()
         // even while nextRetryAt is still in the future, so the retry happens now.
         await triggerReconnectFlush(page);
+        await expect
+          .poll(async () => Number((await readSyncStatus(page))?.consecutiveFailures ?? 0))
+          .toBe(n + 1);
         const mid = await readSyncStatus(page);
-        // Allow for 1 or 2 increments: the reconnect flush is opportunistic and
-        // the test's `triggerReconnectFlush` dispatches both a NetInfo `change`
-        // and a window `online` event; depending on timing the engine may observe
-        // one or two flush triggers (plus the prior page+context double-route
-        // registration can briefly double-handle a single logical flush in this
-        // harness). The invariant is that it DOES increment and that backoff is
-        // still respected afterwards.
-        const midFailures = Number(mid?.consecutiveFailures ?? 0);
-        expect(midFailures).toBeGreaterThanOrEqual(n + 1);
-        expect(midFailures).toBeLessThanOrEqual(n + 2);
         expect(new Date(String(mid?.nextRetryAt ?? '')).getTime()).toBeGreaterThan(Date.now());
 
         // The fixed 30s interval flush respects backoff: wait past one interval
@@ -434,28 +410,21 @@ defineJourney({
         // bypasses backoff (like an explicit reconnect) and fails once under
         // the injected 503. Measure the interval behavior from that
         // post-reload baseline.
+        await expect
+          .poll(async () => Number((await readSyncStatus(page))?.consecutiveFailures ?? 0))
+          .toBe(n + 1);
         const afterReload = await readSyncStatus(page);
-        const afterReloadFailures = Number(afterReload?.consecutiveFailures ?? 0);
-        expect(afterReloadFailures).toBeGreaterThanOrEqual(midFailures);
-        expect(afterReloadFailures).toBeLessThanOrEqual(midFailures + 1);
         await page.waitForTimeout(35_000);
         const afterWait = await readSyncStatus(page);
-        expect(Number(afterWait?.consecutiveFailures ?? 0)).toBe(afterReloadFailures);
+        expect(Number(afterWait?.consecutiveFailures ?? 0)).toBe(
+          Number(afterReload?.consecutiveFailures ?? 0),
+        );
         expect(new Date(String(afterWait?.nextRetryAt ?? '')).getTime()).toBeGreaterThan(
           Date.now(),
         );
-        const pcLogs: string[] = [];
-        const pcListener = (msg: import('@playwright/test').ConsoleMessage) => {
-          const text = msg.text();
-          if (text.includes('[sync]') || text.includes('[engine]')) pcLogs.push(text);
-        };
-        page.on('console', pcListener);
         await expectOutbox(page, (outbox) => {
           expect(outbox.map((r) => r.entity).sort()).toEqual(['habits']);
         });
-        console.warn('[PA-02-debug] logs:', JSON.stringify(pcLogs.slice(-20)));
-        page.off('console', pcListener);
-
         // A later success clears the failure state and the outbox (only the
         // Backup Completeness V2 manifest checkpoint record may remain,
         // pending its own push).

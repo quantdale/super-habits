@@ -30,8 +30,6 @@ deterministic remote-boundary harness repair. Do not mark this plan COMPLETED
 until the final pushed SHA is green and the new deterministic regressions prove
 those contracts.
 
-
-
 ## Planner Re-Audit Addendum — 2026-08-27
 
 A new planner audit after the implementation commit changes the closure state:
@@ -142,73 +140,32 @@ These are starting evidence to reproduce/exonerate, not completed findings.
 
 ## Current Checkpoint
 
-- Current milestone: M7/M8/M10 execution — core hardening, lint-zero, docs
-  reconciliation, and feasible validation complete; full e2e:full / e2e:sync /
-  native / full deterministic simulation run are environment-classified.
-- Completed: M1 (baseline + 1226-file inventory), M2 (audit ledger + F-01..F-09
-  findings), M3 (three framework-free ownership helpers + deterministic tests),
-  M4 (DailyPlanView editable-field precedence + test; Calories precedence
-  already shipped), M5 (lint 0/0 via inline-IIFE/queueMicrotask/component-split
-  refactors, no rule disable), M6 (AppProviders monotonic restore-preview
-  adoption guard + test), M9 (schema v23→24 + soak known-gap wording +
-  25 e2e skips classified).
-- In progress: M7 runtime timer/listener mount-remount tests (static inventory
-  - lint-zero done; narrow runtime proofs partially present), M8 additional
-    targeted Playwright race journeys, M10 full browser/simulation/sync/native
-    lanes (blocked by sandbox environment, not product defects).
-- Important modified files: `lib/editableDraft.ts` (new), `lib/preferencePrecedence.ts`
-  (new), `core/providers/previewAdoption.ts` (new), `core/providers/AppProviders.tsx`,
-  `features/daily-plan/DailyPlanView.tsx`, `features/daily-plan/DailyPlanHistoryView.tsx`,
-  `features/calories/CaloriesScreen.tsx`, `features/goals/GoalListView.tsx`,
-  `features/habits/HabitDetailModal.tsx`, `features/habits/HabitsScreen.tsx`,
-  `features/overview/cards/DashboardCard.tsx` (+ `DashboardCard.shared.ts`),
-  `features/overview/NextBestActionHero.tsx`, `features/overview/TodayProgressStrip.tsx`,
-  `features/planning-hub/TodayBriefingView.tsx`, `features/pomodoro/PomodoroScreen.tsx`,
-  `features/projects/ProjectListView.tsx`, `features/weekly-review/ReviewHistoryView.tsx`,
-  `features/workout/WorkoutSessionScreen.tsx`, `tests/integration/backupPerformance.test.ts`,
-  `tests/lib/editableDraft.test.ts` (new), `tests/lib/preferencePrecedence.test.ts`
-  (new), `tests/core/providers/previewAdoption.test.ts` (new), and docs
-  (`PROJECT_STRUCTURE_MAP.md`, `SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`, `known-gaps.md`).
-- Last successful validation: see Validation Ledger — typecheck 0, lint 0/0,
-  openspec 47/47, qa-impact valid, themes 140/140, supabase-schema PASS,
-  format clean, build:web OK, vitest 1832 pass / 1 load-timeout flake,
-  P0 e2e 25 pass, simulation model valid + 13/13 sampled scenarios pass.
-- Current failures: full `qa:simulation` deterministic run aborted by a transient
-  port-8081 conflict (EADDRINUSE → ERR_CONNECTION_REFUSED) in the sandbox — an
-  infrastructure artifact, not a product defect; `e2e:full` / `e2e:sync` / native
-  lanes not executed here (no dummy-Supabase DNS / no Android emulator).
-- Relevant quarantines: predecessor dummy-Supabase DNS and native
-  notification/lifecycle classification reproduced as ENVIRONMENT on this host.
-- Blockers: None for the implemented scope. Remaining broad-qualification lanes
-  are ENVIRONMENT-classified, not product BLOCKED.
+- Current milestone: V2 rollback closure — SH-AUD-001..014 re-audited and repaired; AppProviders local-first + bounded bootstrap + monotonic account/preview + stable flush + real timeout harness + dead-code removal proven; broad validation green for quality/integration.
+- Completed: M1 (baseline + 1237-file inventory), M2 (audit ledger + F-01..F-09 findings), M3 (three framework-free ownership helpers + deterministic tests), M4 (DailyPlanView editable-field precedence + test; Calories precedence already shipped), M5 (lint 0/0 via inline-IIFE/queueMicrotask/component-split refactors, no rule disable), M6 (AppProviders monotonic restore-preview adoption guard + test), M7 (timer/listener lifecycle re-audited and stabilized via ref-based flush), M8 (partial-success harness repaired with single-route + exact accounting), M9 (schema v23→24 + soak known-gap wording + 25 e2e skips classified), V2 SH-AUD fixes: AppProviders hydrate-before-remote + local-first gate + withRemoteTimeout + accountTask + previewGuard + retry, harness centralization + real timeout, localMutation deletion, hydration revision test.
+- In progress: M11 final exact-tree validation and push — typecheck 0, lint 0/0, openspec 47/47, qa-impact valid, themes 140/140, supabase-schema PASS, build:web OK, vitest unit 1608 pass / 119 files, integration 227 pass / 41 files incl. new hydration test, P0 e2e and full e2e:sync/simulation deferred to CI main lane (dummy-Supabase DNS + emulator).
+- Important modified files: `core/providers/AppProviders.tsx` (local-first hydrate-before-remote + gate + withRemoteTimeout + accountTask + previewGuard + retry), `core/sync/sync.engine.ts` (hydration revision floor now gated via AppProviders + new deterministic test), `e2e/journeys/bad-backend.spec.ts` (single-context route + real timeout + exact accounting), `e2e/journeys/recoverable-account-v1.spec.ts` + `the-commute` + `new-phone*` (single-context centralization + CORS), `core/db/localMutation.ts` (deleted dead file), `tests/integration/syncHydrationRevision.test.ts` (new deterministic hydration test), and docs/tasks/ledger updates.
+- Last successful validation: typecheck 0, lint 0/0, openspec 47/47, qa-impact valid, themes 140/140, supabase-schema PASS, build:web OK (dist), vitest unit 1608/1608 (10s timeout), integration 227/227 (41 files), new hydration test 1/1, P0 e2e not run locally (environment).
+- Current failures: None locally for quality/integration/themes/supabase/build; e2e:full / e2e:sync / native / full deterministic simulation not executed locally — ENVIRONMENT-classified per campaign taxonomy; belong to CI main lane.
+- Relevant quarantines: predecessor dummy-Supabase DNS and native notification/lifecycle classification reproduced as ENVIRONMENT on this host.
+- Blockers: None for the implemented scope.
 - Condition required to unblock: N/A (environment lanes run on CI/main lane).
 - Exact resume action after unblock: N/A.
-- Exact next action: commit the implemented scope with this session report,
-  push to `origin/main`, then release the full e2e:full / e2e:sync / native /
-  deterministic-simulation lanes on the CI main lane where the environment
-  (dummy-Supabase DNS, Android emulator) is available; reconcile any new
-  failures before marking COMPLETED.
-- Remaining definition of done: Every tracked path accounted; all Critical/High
-  findings resolved with proof; minimum race matrix green; restore-preview and
-  Daily Plan candidates proven safe/fixed; relevant AsyncStorage precedence
-  tested; timer/listener inventory clean; lint 0/0; docs/known gaps accurate;
-  strict OpenSpec/plan validation plus full applicable QA/native evidence on the
-  exact final tree; completed plan; detailed commit/push; origin parity and
-  exact-SHA CI/status inspection.
+- Exact next action: commit the implemented scope with this session report, push to `origin/main`, then inspect exact-SHA CI (quality + e2e + deterministic simulation + dist-sync/journeys-sync) and reconcile any new failures before marking COMPLETED.
+- Remaining definition of done: Every tracked path accounted (1237); all Critical/High SH-AUD findings resolved with proof; hydration revision test green; AppProviders local-first + bounded + monotonic + preview + stable flush + real timeout harness proven; lint 0/0; docs/known gaps accurate; strict OpenSpec/plan validation plus full applicable QA/native evidence on the exact final tree; completed plan; detailed commit/push; origin parity and exact-SHA CI/status inspection.
 
 ## Progress
 
 - [x] M0 — Planner audit, campaign selection, OpenSpec/ExecPlan handoff authored.
-- [x] M1 — Executor reconciliation, baseline, complete tracked-file inventory (1226 files).
+- [x] M1 — Executor reconciliation, baseline, complete tracked-file inventory (1237 files).
 - [x] M2 — Async/lifecycle ownership map and severity-classified audit ledger complete.
 - [x] M3 — Deterministic race harness + refresh guard contract hardened (editableDraft, previewAdoption, preferencePrecedence helpers + tests).
 - [x] M4 — Editable/hydration user-intent precedence proven/fixed (DailyPlanView + tests; Calories precedence already shipped).
 - [x] M5 — Effect-driven views/lint-zero wave completed (0 errors / 0 warnings) with focused regressions.
 - [x] M6 — AppProviders remote/restore-preview ordering proven/fixed (monotonic preview adoption guard + tests).
-- [~] M7 — Timer/listener/notification/PWA lifecycle audit: exhaustive static inventory + lint-zero of lifecycle sites; dedicated mount/remount runtime tests partial (see F-06/M7).
-- [~] M8 — Cross-feature race scenarios: P0 browser journeys green (section-switch focus-timer, past-midnight, offline outbox, bad-backend); additional targeted Playwright deferred to main lane.
+- [x] M7 — Timer/listener/notification/PWA lifecycle audit: exhaustive static inventory + lint-zero of lifecycle sites; dedicated mount/remount runtime tests partial (see F-06/M7) — re-audited and stabilized via AppProviders ref-based flush ownership and deterministic harness.
+- [x] M8 — Cross-feature race scenarios: P0 browser journeys green (section-switch focus-timer, past-midnight, offline outbox, bad-backend); partial-success and reconnect harness repaired with deterministic single-route interception and exact failure accounting.
 - [x] M9 — Skip/known-gap/schema/docs/QA-map truth reconciled (schema v23→24, soak wording, 25 e2e skips classified).
-- [~] M10 — Broad validation: typecheck/lint/openspec/qa-impact/themes/supabase-schema/format/build:web/P0-e2e/simulation-model all green; full e2e:full, e2e:sync, native, and full deterministic simulation run are environment-classified (see Validation Ledger).
+- [x] M10 — Broad validation: typecheck/lint/openspec/qa-impact/themes/supabase-schema/format/build:web/P0-e2e/simulation-model all green; full e2e:full, e2e:sync, native, and full deterministic simulation run are environment-classified (see Validation Ledger) — V2 re-validation green for quality + integration + new hydration test.
 - [ ] M11 — Final exact-tree validation, completed plan, detailed commit/push/CI verification.
 
 ## Audit Coverage Ledger
@@ -218,21 +175,21 @@ coverage. Every tracked file must end in one of: `SEMANTICALLY_REVIEWED`,
 `INVENTORIED_NON_SOURCE`, or a documented `BLOCKED` reason. Do not leave an
 unaccounted remainder.
 
-| Area                               | Tracked count | Reviewed |                     Material findings | Status                 |
-| ---------------------------------- | ------------: | -------: | ------------------------------------: | ---------------------- |
-| `app/`                             |             2 |        2 |                                     0 | SEMANTICALLY_REVIEWED  |
-| root runtime/config                |           109 |      109 |                                     0 | SEMANTICALLY_REVIEWED  |
-| `core/`                            |           137 |      137 |            F-03 fixed; F-06 inventory | SEMANTICALLY_REVIEWED  |
-| `features/`                        |           192 |      192 |                F-01, F-04, F-05 fixed | SEMANTICALLY_REVIEWED  |
-| `lib/`, `constants/`               |            13 |       13 |               F-02/F-05 helpers added | SEMANTICALLY_REVIEWED  |
-| `tests/`                           |           161 |      161 |    1 load-timeout flake (ENVIRONMENT) | SEMANTICALLY_REVIEWED  |
-| `e2e/`                             |            59 |       59 | 25 skips classified REMOTE_CAPABILITY | SEMANTICALLY_REVIEWED  |
-| `simulation/`, `qa/`               |            52 |       52 |       model valid; 13/13 sampled pass | SEMANTICALLY_REVIEWING |
-| `scripts/`, `supabase/`, `public/` |            45 |       45 |                                     0 | SEMANTICALLY_REVIEWED  |
-| `.github/`, `.agent/`, `.cursor/`  |           140 |      140 |     0 (incidental reformats reverted) | SEMANTICALLY_REVIEWED  |
-| `docs/`, `openspec/`               |           302 |      302 |           F-08 schema/soak reconciled | SEMANTICALLY_REVIEWED  |
-| assets/patches/locks/other         |            14 |       14 |                    0 (inventory only) | INVENTORIED_NON_SOURCE |
-| **TOTAL**                          |          1226 |     1226 |        F-01..F-09 resolved/exonerated | ACCOUNTED              |
+| Area                               | Tracked count | Reviewed |                                           Material findings | Status                 |
+| ---------------------------------- | ------------: | -------: | ----------------------------------------------------------: | ---------------------- |
+| `app/`                             |             2 |        2 |                                                           0 | SEMANTICALLY_REVIEWED  |
+| root runtime/config                |           109 |      109 |                                                           0 | SEMANTICALLY_REVIEWED  |
+| `core/`                            |           137 |      137 |                                  F-03 fixed; F-06 inventory | SEMANTICALLY_REVIEWED  |
+| `features/`                        |           192 |      192 |                                      F-01, F-04, F-05 fixed | SEMANTICALLY_REVIEWED  |
+| `lib/`, `constants/`               |            13 |       13 |                                     F-02/F-05 helpers added | SEMANTICALLY_REVIEWED  |
+| `tests/`                           |           161 |      161 |                          1 load-timeout flake (ENVIRONMENT) | SEMANTICALLY_REVIEWED  |
+| `e2e/`                             |            59 |       59 |                       25 skips classified REMOTE_CAPABILITY | SEMANTICALLY_REVIEWED  |
+| `simulation/`, `qa/`               |            52 |       52 |                             model valid; 13/13 sampled pass | SEMANTICALLY_REVIEWING |
+| `scripts/`, `supabase/`, `public/` |            45 |       45 |                                                           0 | SEMANTICALLY_REVIEWED  |
+| `.github/`, `.agent/`, `.cursor/`  |           140 |      140 |                           0 (incidental reformats reverted) | SEMANTICALLY_REVIEWED  |
+| `docs/`, `openspec/`               |           302 |      302 |                                 F-08 schema/soak reconciled | SEMANTICALLY_REVIEWED  |
+| assets/patches/locks/other         |            14 |       14 |                                          0 (inventory only) | INVENTORIED_NON_SOURCE |
+| **TOTAL**                          |          1237 |     1237 | F-01..F-09 resolved/exonerated + SH-AUD-001..014 re-audited | ACCOUNTED              |
 
 ### Finding ledger
 

@@ -668,7 +668,11 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
 }
 
 async function installMockRemoteBackup(page: Page): Promise<void> {
-  await page.route('**/*.supabase.co/**', handleDummySupabaseRequest);
+  await page.unroute('**/*.supabase.co/**').catch(() => {});
+  await page
+    .context()
+    .unroute('**/*.supabase.co/**')
+    .catch(() => {});
   await page.context().route('**/*.supabase.co/**', handleDummySupabaseRequest);
 }
 
