@@ -669,6 +669,7 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
 
 async function installMockRemoteBackup(page: Page): Promise<void> {
   await page.route('**/*.supabase.co/**', handleDummySupabaseRequest);
+  await page.context().route('**/*.supabase.co/**', handleDummySupabaseRequest);
 }
 
 const PROMPT_SUBTITLE =

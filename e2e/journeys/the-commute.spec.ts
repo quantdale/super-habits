@@ -141,7 +141,7 @@ async function registerOfflineWasmRoute(page: Page): Promise<void> {
  * online flush cannot drain the outbox before the reconnect assertion.
  */
 async function installWithholdingSupabaseRoute(page: Page): Promise<void> {
-  await page.route('**/*.supabase.co/**', (route) => {
+  const handler = (route: import('@playwright/test').Route) => {
     supabaseRequestsSeen += 1;
     if (route.request().url().includes('/auth/v1/')) {
       return fulfillDummySupabaseAuth(route);
@@ -152,7 +152,9 @@ async function installWithholdingSupabaseRoute(page: Page): Promise<void> {
       contentType: 'application/json',
       body: '{"error":"injected server error"}',
     });
-  });
+  };
+  await page.route('**/*.supabase.co/**', handler);
+  await page.context().route('**/*.supabase.co/**', handler);
 }
 
 defineJourney({
@@ -351,7 +353,7 @@ defineJourney({
         // Auth stays 400 (supabase-js retries 5xx, not 4xx) so bootstrap and
         // any incidental load stay fast/deterministic.
         const pushed: { entity: string; id: string; userId: unknown }[] = [];
-        await page.route('**/*.supabase.co/**', async (route) => {
+        const handler2 = async (route: import('@playwright/test').Route) => {
           const req = route.request();
           if (req.url().includes('/auth/v1/')) {
             return fulfillDummySupabaseAuth(route);
@@ -371,7 +373,9 @@ defineJourney({
             contentType: 'application/json',
             body: '[]',
           });
-        });
+        };
+        await page.route('**/*.supabase.co/**', handler2);
+        await page.context().route('**/*.supabase.co/**', handler2);
 
         // The page is on the app (calories) from step 5. Force one
         // deterministic opportunistic flush: NetInfo's web module listens to
