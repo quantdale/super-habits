@@ -238,10 +238,12 @@ describe('mixed corpus containing pre-cutover UTC date keys', () => {
     });
 
     // Habit completion history spanning the cutover returns both flavours in
-    // string order — the app reads pre-cutover rows as-is.
-    const history = await habits.getCompletionHistory(habitId, 60);
+    // string order — the app reads pre-cutover rows as-is. Use 90 days to
+    // ensure the window includes 2026-06-29 even when today is 2026-08-28
+    // (60 days from Aug 28 is 2026-06-29 inclusive, but the implementation
+    // uses days-1, so 60 would start at 2026-06-30 and miss it by one).
+    const history = await habits.getCompletionHistory(habitId, 90);
     expect(history.map((h) => h.date_key)).toEqual(['2026-06-29', '2026-07-01']);
-
     // A summary spanning both eras shows both groups under their STORED keys;
     // a summary scoped to the local era sees only the local-era row. The app
     // treats date keys opaquely, so the mix never breaks a range query.
