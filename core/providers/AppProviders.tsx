@@ -1,4 +1,4 @@
-import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppState, Modal, Platform, Text, View } from 'react-native';
@@ -15,11 +15,6 @@ import {
 import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
 import { applyPendingThemeApplication } from '@/core/backup/backupSettings';
 import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessage';
-import { withRemoteTimeout } from '@/core/providers/remotePhase';
-import {
-  createPreviewAdoptionGuard,
-  type PreviewAdoptionGuard,
-} from '@/core/providers/previewAdoption';
 import { resolveRestorePromptOutcome } from '@/core/providers/restorePromptFlow';
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { InAppNoticeProvider } from '@/core/providers/InAppNoticeProvider';
@@ -41,9 +36,7 @@ import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroComma
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);
-  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [authBootstrapReady, setAuthBootstrapReady] = useState(false);
-  const [syncHydrated, setSyncHydrated] = useState(false);
   const [accountState, setAccountState] = useState<AccountState>({
     status: 'remote_unavailable',
     email: null,
@@ -62,44 +55,6 @@ export function AppProviders({ children }: PropsWithChildren) {
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [restorePromptBusy, setRestorePromptBusy] = useState(false);
   const [restorePromptError, setRestorePromptError] = useState<string | null>(null);
-
-  /**
-   * Monotonic token for account-state tasks. Any newer task (refresh,
-   * protection/recovery action, bootstrap retry) invalidates older tasks'
-   * settlements so a hung remote phase that finally settles can never
-   * overwrite fresher account state (stale-async overwrite class).
-   */
-  const accountTaskSeqRef = useRef(0);
-  const beginAccountTask = useCallback(() => ++accountTaskSeqRef.current, []);
-  const applyAccountStateIfCurrent = useCallback((taskId: number, state: AccountState) => {
-    if (taskId === accountTaskSeqRef.current) setAccountState(state);
-  }, []);
-  const awaitAccountTask = useCallback(
-    async (
-      taskId: number,
-      task: Promise<AccountState>,
-      label: string,
-    ): Promise<AccountState | null> => {
-      try {
-        const state = await task;
-        return taskId === accountTaskSeqRef.current ? state : null;
-      } catch (e) {
-        console.error(`[auth] ${label} settled with an error`, e);
-        return null;
-      }
-    },
-    [],
-  );
-
-  /**
-   * Monotonic adoption authority for restore-preview state (F-03). A preview
-   * read may outlive its bounded await; backup maintenance and post-flush
-   * cycles may obtain a newer preview. Only the newest preview task may adopt,
-   * so a slow older preview can never overwrite newer restore-prompt state.
-   */
-  const previewGuard = useMemo<PreviewAdoptionGuard>(() => createPreviewAdoptionGuard(), []);
-  const beginPreviewTask = useCallback(() => previewGuard.begin(), [previewGuard]);
-  const isCurrentPreview = useCallback((id: number) => previewGuard.isCurrent(id), [previewGuard]);
 
   useEffect(() => {
     registerServiceWorker();
@@ -129,17 +84,8 @@ export function AppProviders({ children }: PropsWithChildren) {
       }
 
       try {
-        // A hung network must never wedge the startup gate: bound each
-        // remote wait so local use stays available. The settled result is
-        // adopted only while its task is still the newest account task, so
-        // a late settlement can never overwrite newer state.
-        const taskId = beginAccountTask();
-        const coordinatorTask = accountCoordinator.bootstrap();
-        void awaitAccountTask(taskId, coordinatorTask, 'account bootstrap').then((state) => {
-          if (!cancelled && state) applyAccountStateIfCurrent(taskId, state);
-        });
-        const nextAccountState = await withRemoteTimeout(coordinatorTask, 'account bootstrap');
-        if (!cancelled) applyAccountStateIfCurrent(taskId, nextAccountState);
+        const nextAccountState = await accountCoordinator.bootstrap();
+        if (!cancelled) setAccountState(nextAccountState);
       } catch (e) {
         console.error('[auth] account bootstrap failed', e);
         if (!cancelled) {
@@ -159,34 +105,17 @@ export function AppProviders({ children }: PropsWithChildren) {
       await syncEngine.hydrate().catch((e) => {
         console.error('[sync] hydrate failed', e);
       });
-      if (!cancelled) setSyncHydrated(true);
 
       try {
-        const taskId = beginAccountTask();
-        const coordinatorTask = accountCoordinator.refresh();
-        void awaitAccountTask(taskId, coordinatorTask, 'account refresh after sync hydrate').then(
-          (state) => {
-            if (!cancelled && state) applyAccountStateIfCurrent(taskId, state);
-          },
-        );
-        const nextAccountState = await withRemoteTimeout(coordinatorTask, 'account refresh');
-        if (!cancelled) applyAccountStateIfCurrent(taskId, nextAccountState);
+        const nextAccountState = await accountCoordinator.refresh();
+        if (!cancelled) setAccountState(nextAccountState);
       } catch (e) {
         console.error('[auth] account refresh failed after sync hydrate', e);
       }
 
       try {
-        const previewTaskId = beginPreviewTask();
-        const previewTask = getRestorePreview();
-        void previewTask
-          .then((preview) => {
-            if (cancelled || !isCurrentPreview(previewTaskId)) return;
-            setRestorePreview(preview);
-            setShowRestorePrompt(preview.startupPromptEligible);
-          })
-          .catch(() => undefined);
-        const preview = await withRemoteTimeout(previewTask, 'restore preview');
-        if (cancelled || !isCurrentPreview(previewTaskId)) return;
+        const preview = await getRestorePreview();
+        if (cancelled) return;
         setRestorePreview(preview);
         setShowRestorePrompt(preview.startupPromptEligible);
       } catch (e) {
@@ -195,20 +124,12 @@ export function AppProviders({ children }: PropsWithChildren) {
 
       // Backup Completeness V2: backfill existing local state and publish a
       // completeness checkpoint once the owner is established and the queue
-      // drains. Best-effort; never blocks bootstrap. The restore preview is
-      // only re-read when this cycle actually captured a manifest (the common
-      // no-op cycle leaves remote state and pending counts untouched, so a
-      // second full preview would just repeat ~dozens of local scans and
-      // remote meta requests for identical data).
+      // drains. Best-effort; never blocks bootstrap.
       try {
-        const maintenance = await runBackupMaintenance({ skipFlush: true });
-        if (!cancelled && maintenance.capturedManifest) {
-          const refreshedPreviewId = beginPreviewTask();
-          const refreshedPreview = await getRestorePreview();
-          if (!cancelled && isCurrentPreview(refreshedPreviewId)) {
-            setRestorePreview(refreshedPreview);
-          }
-        }
+        await runBackupMaintenance({ skipFlush: true });
+        if (cancelled) return;
+        const refreshedPreview = await getRestorePreview();
+        if (!cancelled) setRestorePreview(refreshedPreview);
       } catch (e) {
         console.error('[backup] maintenance failed during bootstrap', e);
       }
@@ -229,20 +150,6 @@ export function AppProviders({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [
-    applyAccountStateIfCurrent,
-    awaitAccountTask,
-    beginAccountTask,
-    beginPreviewTask,
-    isCurrentPreview,
-    bootstrapAttempt,
-  ]);
-
-  const retryBootstrap = useCallback(() => {
-    setDbError(null);
-    setSyncHydrated(false);
-    setAuthBootstrapReady(false);
-    setBootstrapAttempt((attempt) => attempt + 1);
   }, []);
 
   useEffect(() => {
@@ -262,13 +169,9 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, []);
 
   const refreshAccountState = useCallback(async () => {
-    const taskId = beginAccountTask();
-    const nextAccountState = await withRemoteTimeout(
-      accountCoordinator.refresh(),
-      'account refresh',
-    );
-    if (nextAccountState) applyAccountStateIfCurrent(taskId, nextAccountState);
-  }, [applyAccountStateIfCurrent, beginAccountTask]);
+    const nextAccountState = await accountCoordinator.refresh();
+    setAccountState(nextAccountState);
+  }, []);
 
   const runAccountAction = useCallback(
     async (action: () => Promise<AccountActionResult>): Promise<AccountActionResult> => {
@@ -325,71 +228,36 @@ export function AppProviders({ children }: PropsWithChildren) {
     return () => data.subscription.unsubscribe();
   }, [authBootstrapReady, refreshAccountState]);
 
-  // Readiness is tracked by ref so account transitions don't tear down and
-  // rebuild the flush subscriptions below (each rebuild fired one
-  // backoff-bypassing flush via NetInfo's immediate emit). A transition into
-  // full readiness kicks exactly one flush instead.
-  const remoteFlushReadyRef = useRef(false);
-  // Core readiness gates every event-driven flush: the durable outbox must be
-  // hydrated before any push. Account STATUS deliberately does not gate the
-  // reconnect/visibility path — degraded statuses pause pushes inside the
-  // adapter's ownership preflight (which re-verifies per push and keeps the
-  // queue intact), so a transiently degraded status can never silently pin
-  // pending work while the network is actually usable.
-  const flushCoreReadyRef = useRef(false);
-  const flushTriggerRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    flushCoreReadyRef.current = authBootstrapReady && syncHydrated;
-    const statusReady = ['anonymous_ready', 'protected', 'protection_pending'].includes(
-      accountState.status,
-    );
-    const wasReady = remoteFlushReadyRef.current;
-    remoteFlushReadyRef.current = flushCoreReadyRef.current && statusReady;
-    if (remoteFlushReadyRef.current && !wasReady) flushTriggerRef.current?.();
-  }, [accountState.status, authBootstrapReady, syncHydrated]);
-
-  useEffect(() => {
-    if (!isRemoteEnabled()) return;
+    const remoteAccountReady =
+      authBootstrapReady &&
+      ['anonymous_ready', 'protected', 'protection_pending'].includes(accountState.status);
+    if (!isRemoteEnabled() || !remoteAccountReady) return;
 
     const flush = () => {
-      if (!flushCoreReadyRef.current) return;
-      void (async () => {
-        try {
-          await syncEngine.flush();
-        } catch (e) {
+      void syncEngine
+        .flush()
+        .then(() => {
+          // After a successful push, run the backup maintenance cycle: it
+          // checks whether a new completeness checkpoint is due and publishes
+          // it only after the queue fully drains. Best-effort. The flush just
+          // happened, so the cycle must not flush again (that would double
+          // the sync-failure accounting while the backend is down).
+          return runBackupMaintenance({ skipFlush: true });
+        })
+        .catch((e) => {
           console.error('[sync] flush failed', e);
-          return;
-        }
-        // After a successful push, run the backup maintenance cycle: it
-        // checks whether a new completeness checkpoint is due and publishes
-        // it only after the queue fully drains. Best-effort. The flush just
-        // happened, so the cycle must not flush again (that would double
-        // the sync-failure accounting while the backend is down). The
-        // restore preview is re-read only when that cycle captured a
-        // manifest — a no-op cycle leaves remote state and pending counts
-        // untouched, so a second full preview would just repeat local scans
-        // and remote meta requests for identical data.
-        try {
-          const maintenance = await runBackupMaintenance({ skipFlush: true });
-          if (!maintenance.capturedManifest) return;
-          const postFlushPreviewId = beginPreviewTask();
-          const refreshedPreview = await getRestorePreview();
-          if (isCurrentPreview(postFlushPreviewId)) {
-            setRestorePreview(refreshedPreview);
-          }
-        } catch (e) {
-          console.error('[backup] post-flush maintenance failed', e);
-        }
-      })();
+        });
     };
-    flushTriggerRef.current = flush;
 
     // The fixed interval respects backoff — no point hammering a backend
     // that just failed. Visibility/reconnect are rarer, event-driven signals
     // where an opportunistic retry (bypassing backoff) is worth it.
-    const intervalId = setInterval(() => {
+    const intervalFlush = () => {
       if (syncEngine.shouldAttemptFlush()) flush();
-    }, 30_000);
+    };
+
+    const intervalId = setInterval(intervalFlush, 30_000);
 
     let removeVisibilityListener: (() => void) | undefined;
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -409,9 +277,8 @@ export function AppProviders({ children }: PropsWithChildren) {
       clearInterval(intervalId);
       removeVisibilityListener?.();
       unsubscribeNetInfo();
-      flushTriggerRef.current = null;
     };
-  }, [beginPreviewTask, isCurrentPreview]);
+  }, [accountState.status, authBootstrapReady]);
 
   const handleDismissRestorePrompt = async () => {
     try {
@@ -474,11 +341,7 @@ export function AppProviders({ children }: PropsWithChildren) {
                   resendAccountRecovery,
                 }}
               >
-                <BootstrapGate
-                  dbError={dbError}
-                  authBootstrapReady={authBootstrapReady}
-                  onRetryDbBootstrap={retryBootstrap}
-                >
+                <BootstrapGate dbError={dbError} authBootstrapReady={authBootstrapReady}>
                   {children}
                   <HabitReminderHost />
                   <WorkoutReminderHost />
@@ -503,13 +366,8 @@ export function AppProviders({ children }: PropsWithChildren) {
 function BootstrapGate({
   dbError,
   authBootstrapReady,
-  onRetryDbBootstrap,
   children,
-}: PropsWithChildren<{
-  dbError: string | null;
-  authBootstrapReady: boolean;
-  onRetryDbBootstrap: () => void;
-}>) {
+}: PropsWithChildren<{ dbError: string | null; authBootstrapReady: boolean }>) {
   const { tokens } = useAppTheme();
 
   if (!dbError && authBootstrapReady) return children;
@@ -538,11 +396,6 @@ function BootstrapGate({
       <Text style={{ textAlign: 'center', fontSize: 14, color: tokens.textMuted }}>
         {dbError ?? 'Checking local backup ownership before remote backup is enabled.'}
       </Text>
-      {dbError ? (
-        <View style={{ marginTop: 16 }}>
-          <Button label="Try again" onPress={onRetryDbBootstrap} />
-        </View>
-      ) : null}
     </View>
   );
 }

@@ -127,7 +127,20 @@ export async function handleBackupRestRequest(
     return 'handled';
   }
 
-  // Other read shapes (e.g. select=updated_at) return the configured rows.
-  await route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify(rows) });
+  // Other read shapes (e.g. select=updated_at with count=exact, used by
+  // getRemoteEntityStatuses' single-request optimization introduced in the
+  // resilience campaign) return rows plus a content-range count. The Supabase
+  // client parses the count from the header; omitting it yields count 0 and
+  // the restore preview stays blocked (`remoteState: empty`).
+  const selectOtherCount = state.count !== undefined ? state.count : rows.length;
+  await route.fulfill({
+    status: 200,
+    headers: {
+      ...JSON_HEADERS,
+      'content-range':
+        selectOtherCount > 0 ? `0-${selectOtherCount - 1}/${selectOtherCount}` : '0--1/0',
+    },
+    body: JSON.stringify(rows),
+  });
   return 'handled';
 }

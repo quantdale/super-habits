@@ -205,7 +205,13 @@ async function installAccountMock(page: Page): Promise<void> {
   supabaseRequestsSeen = 0;
   verifyUserOverride = null;
   pushedTodoUserIds = [];
+  await page.unroute(SUPABASE_ROUTE).catch(() => {});
+  await page
+    .context()
+    .unroute(SUPABASE_ROUTE)
+    .catch(() => {});
   await page.route(SUPABASE_ROUTE, handleAccountMock);
+  await page.context().route(SUPABASE_ROUTE, handleAccountMock);
 }
 
 function requireAccountBoundary(): void {
