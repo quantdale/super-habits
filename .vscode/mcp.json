@@ -51,6 +51,18 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "lighthouse-mcp"]
+    },
+
+    // Mobile — Mobile Next MCP (exploratory/diagnostic only).
+    // Agent-driven Android emulator/device inspection (adb) and iOS (idb).
+    // MUST NOT replace qa:native or release evidence. Use a dedicated test
+    // emulator/device only. Pinned to a build patched for CVE-2026-33989
+    // (path traversal in screenshot/save tools; fixed in 0.0.49+).
+    // Docs: https://github.com/mobile-next/mobile-mcp
+    "mobile": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@mobilenext/mobile-mcp@1.0.2"]
     }
   }
 }
