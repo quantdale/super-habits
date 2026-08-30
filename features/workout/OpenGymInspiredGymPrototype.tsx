@@ -21,9 +21,17 @@ const WEEK = [
 ] as const;
 
 const ROUTINES = [
-  { name: 'Push', detail: '6 exercises · chest, shoulders, triceps', icon: 'fitness-center' as const },
+  {
+    name: 'Push',
+    detail: '6 exercises · chest, shoulders, triceps',
+    icon: 'fitness-center' as const,
+  },
   { name: 'Pull', detail: '6 exercises · back, rear delts, biceps', icon: 'rowing' as const },
-  { name: 'Legs', detail: '7 exercises · quads, hamstrings, calves', icon: 'directions-run' as const },
+  {
+    name: 'Legs',
+    detail: '7 exercises · quads, hamstrings, calves',
+    icon: 'directions-run' as const,
+  },
 ];
 
 const EXERCISES = [
@@ -46,7 +54,15 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) 
   );
 }
 
-function MiniMetric({ icon, value, label }: { icon: keyof typeof MaterialIcons.glyphMap; value: string; label: string }) {
+function MiniMetric({
+  icon,
+  value,
+  label,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  value: string;
+  label: string;
+}) {
   const { tokens, sectionAccents } = useAppTheme();
   return (
     <View
@@ -129,7 +145,10 @@ function RoutineRow({ name, detail, icon }: (typeof ROUTINES)[number]) {
           {detail}
         </Text>
       </View>
-      <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: tokens.surfaceElevated }}>
+      <View
+        className="rounded-full px-3 py-1.5"
+        style={{ backgroundColor: tokens.surfaceElevated }}
+      >
         <Text className="text-xs font-semibold" style={{ color: sectionAccents.workout.text }}>
           Start
         </Text>
@@ -138,7 +157,17 @@ function RoutineRow({ name, detail, icon }: (typeof ROUTINES)[number]) {
   );
 }
 
-function SetPreview({ set, weight, reps, done }: { set: number; weight: string; reps: string; done?: boolean }) {
+function SetPreview({
+  set,
+  weight,
+  reps,
+  done,
+}: {
+  set: number;
+  weight: string;
+  reps: string;
+  done?: boolean;
+}) {
   const { tokens, sectionAccents } = useAppTheme();
   return (
     <View className="mb-2 flex-row items-center gap-2">
@@ -189,7 +218,10 @@ export function OpenGymInspiredGymPrototype() {
         <Card accentColor={COLOR} className="mb-0">
           <View className="flex-row items-start justify-between gap-3">
             <View className="min-w-0 flex-1">
-              <Text className="text-xs font-semibold uppercase tracking-wide" style={{ color: accentText }}>
+              <Text
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: accentText }}
+              >
                 Today · Sunday
               </Text>
               <Text className="mt-1 text-2xl font-bold" style={{ color: tokens.text }}>
@@ -237,7 +269,9 @@ export function OpenGymInspiredGymPrototype() {
           accentColor={COLOR}
           headerTitle="Weekly plan"
           headerSubtitle="Assign a routine to each weekday; rescheduling becomes an override rather than destructive editing."
-          headerRight={<MaterialIcons name="calendar-month" size={22} color={tokens.textOnAccent} />}
+          headerRight={
+            <MaterialIcons name="calendar-month" size={22} color={tokens.textOnAccent} />
+          }
           className="mb-0"
         >
           {[
@@ -247,11 +281,18 @@ export function OpenGymInspiredGymPrototype() {
             ['Thursday', 'Rest'],
             ['Friday', 'Push'],
           ].map(([day, routine]) => (
-            <View key={day} className="flex-row items-center border-b py-3" style={{ borderBottomColor: tokens.border }}>
+            <View
+              key={day}
+              className="flex-row items-center border-b py-3"
+              style={{ borderBottomColor: tokens.border }}
+            >
               <Text className="flex-1 text-sm font-medium" style={{ color: tokens.text }}>
                 {day}
               </Text>
-              <Text className="text-sm font-semibold" style={{ color: routine === 'Rest' ? tokens.textMuted : accentText }}>
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: routine === 'Rest' ? tokens.textMuted : accentText }}
+              >
                 {routine}
               </Text>
               <MaterialIcons name="chevron-right" size={20} color={tokens.textMuted} />
@@ -291,15 +332,25 @@ export function OpenGymInspiredGymPrototype() {
                   backgroundColor: index === 1 ? tokens.surfaceElevated : tokens.surface,
                 }}
               >
-                <Text className="text-xs font-semibold" style={{ color: index === 1 ? accentText : tokens.textMuted }}>
+                <Text
+                  className="text-xs font-semibold"
+                  style={{ color: index === 1 ? accentText : tokens.textMuted }}
+                >
                   {chip}
                 </Text>
               </View>
             ))}
           </View>
           {EXERCISES.map((exercise) => (
-            <View key={exercise.name} className="mb-2 flex-row items-center rounded-2xl border p-3" style={{ borderColor: tokens.border }}>
-              <View className="h-11 w-11 items-center justify-center rounded-xl" style={{ backgroundColor: tokens.surfaceElevated }}>
+            <View
+              key={exercise.name}
+              className="mb-2 flex-row items-center rounded-2xl border p-3"
+              style={{ borderColor: tokens.border }}
+            >
+              <View
+                className="h-11 w-11 items-center justify-center rounded-xl"
+                style={{ backgroundColor: tokens.surfaceElevated }}
+              >
                 <MaterialIcons name="fitness-center" size={20} color={accentText} />
               </View>
               <View className="ml-3 min-w-0 flex-1">
@@ -339,22 +390,51 @@ export function OpenGymInspiredGymPrototype() {
                 Linear progression · +2.5 kg after completed target
               </Text>
             </View>
-            <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: tokens.surfaceElevated }}>
-              <Text className="text-xs font-semibold" style={{ color: accentText }}>Chest</Text>
+            <View
+              className="rounded-full px-3 py-1.5"
+              style={{ backgroundColor: tokens.surfaceElevated }}
+            >
+              <Text className="text-xs font-semibold" style={{ color: accentText }}>
+                Chest
+              </Text>
             </View>
           </View>
           <View className="mb-2 flex-row items-center gap-2">
-            <Text className="w-7 text-center text-[10px] font-semibold" style={{ color: tokens.textMuted }}>SET</Text>
-            <Text className="flex-1 text-center text-[10px] font-semibold" style={{ color: tokens.textMuted }}>WEIGHT</Text>
-            <Text className="flex-1 text-center text-[10px] font-semibold" style={{ color: tokens.textMuted }}>REPS</Text>
-            <Text className="w-9 text-center text-[10px] font-semibold" style={{ color: tokens.textMuted }}>DONE</Text>
+            <Text
+              className="w-7 text-center text-[10px] font-semibold"
+              style={{ color: tokens.textMuted }}
+            >
+              SET
+            </Text>
+            <Text
+              className="flex-1 text-center text-[10px] font-semibold"
+              style={{ color: tokens.textMuted }}
+            >
+              WEIGHT
+            </Text>
+            <Text
+              className="flex-1 text-center text-[10px] font-semibold"
+              style={{ color: tokens.textMuted }}
+            >
+              REPS
+            </Text>
+            <Text
+              className="w-9 text-center text-[10px] font-semibold"
+              style={{ color: tokens.textMuted }}
+            >
+              DONE
+            </Text>
           </View>
           <SetPreview set={1} weight="82.5" reps="8" done />
           <SetPreview set={2} weight="82.5" reps="8" />
           <SetPreview set={3} weight="82.5" reps="8" />
           <View className="mt-2 flex-row gap-2">
-            <View className="flex-1"><Button label="Add set" variant="ghost" onPress={() => {}} /></View>
-            <View className="flex-1"><Button label="Rest · 1:45" onPress={() => {}} color={COLOR} /></View>
+            <View className="flex-1">
+              <Button label="Add set" variant="ghost" onPress={() => {}} />
+            </View>
+            <View className="flex-1">
+              <Button label="Rest · 1:45" onPress={() => {}} color={COLOR} />
+            </View>
           </View>
         </Card>
       </ScreenSection>
@@ -372,17 +452,36 @@ export function OpenGymInspiredGymPrototype() {
         <Card accentColor={COLOR} className="mb-0 mt-3">
           <View className="flex-row items-center justify-between">
             <View>
-              <Text className="text-base font-semibold" style={{ color: tokens.text }}>Muscle balance</Text>
-              <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>Most trained this week</Text>
+              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                Muscle balance
+              </Text>
+              <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+                Most trained this week
+              </Text>
             </View>
             <MaterialIcons name="accessibility-new" size={25} color={accentText} />
           </View>
           <View className="mt-4 gap-3">
-            {[['Chest', 88], ['Back', 74], ['Quads', 62], ['Hamstrings', 45]].map(([name, width]) => (
+            {(
+              [
+                ['Chest', 88],
+                ['Back', 74],
+                ['Quads', 62],
+                ['Hamstrings', 45],
+              ] as [string, number][]
+            ).map(([name, width]) => (
               <View key={String(name)} className="flex-row items-center gap-3">
-                <Text className="w-20 text-xs" style={{ color: tokens.textMuted }}>{name}</Text>
-                <View className="h-2 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: tokens.surfaceElevated }}>
-                  <View className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: COLOR }} />
+                <Text className="w-20 text-xs" style={{ color: tokens.textMuted }}>
+                  {name}
+                </Text>
+                <View
+                  className="h-2 flex-1 overflow-hidden rounded-full"
+                  style={{ backgroundColor: tokens.surfaceElevated }}
+                >
+                  <View
+                    className="h-full rounded-full"
+                    style={{ width: `${width}%`, backgroundColor: COLOR }}
+                  />
                 </View>
               </View>
             ))}
@@ -395,9 +494,12 @@ export function OpenGymInspiredGymPrototype() {
           <View className="flex-row items-center gap-3">
             <MaterialIcons name="science" size={22} color={accentText} />
             <View className="min-w-0 flex-1">
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>Phase-0 design slice</Text>
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Phase-0 design slice
+              </Text>
               <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                This route intentionally uses representative data. Production phases will bind each surface to SuperHabits SQLite/domain APIs and preserve offline-first behavior.
+                This route intentionally uses representative data. Production phases will bind each
+                surface to SuperHabits SQLite/domain APIs and preserve offline-first behavior.
               </Text>
             </View>
           </View>
