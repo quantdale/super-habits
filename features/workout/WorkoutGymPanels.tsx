@@ -180,8 +180,13 @@ export function WorkoutWeekCard({
                     onPress={() => onSelect(weekday, candidate.id)}
                     accessibilityRole="button"
                     accessibilityLabel={`${weekdayLabel(weekday)} ${candidate.name}`}
-                    className="rounded-lg px-2 py-1"
+                    accessibilityState={{ selected: candidate.id === routine?.id }}
+                    className="min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 py-1"
                     style={{
+                      minHeight: 44,
+                      minWidth: 44,
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       backgroundColor:
                         candidate.id === routine?.id ? `${COLOR}22` : tokens.surfaceElevated,
                     }}
@@ -197,8 +202,13 @@ export function WorkoutWeekCard({
                   onPress={() => onSelect(weekday, null)}
                   accessibilityRole="button"
                   accessibilityLabel={`${weekdayLabel(weekday)} rest`}
-                  className="rounded-lg px-2 py-1"
+                  accessibilityState={{ selected: entry?.plan_kind === 'rest' }}
+                  className="min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 py-1"
                   style={{
+                    minHeight: 44,
+                    minWidth: 44,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     backgroundColor:
                       entry?.plan_kind === 'rest' ? `${COLOR}22` : tokens.surfaceElevated,
                   }}

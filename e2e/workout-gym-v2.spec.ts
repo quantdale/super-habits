@@ -37,6 +37,14 @@ test.describe('Workout Gym V2', () => {
     const picker = page.getByRole('dialog').last();
     await picker.getByRole('button', { name: 'Add Barbell Bench Press' }).click();
     await expect(builder.getByText('Barbell Bench Press', { exact: true })).toBeVisible();
+    const startButton = builder.getByRole('button', { name: 'Start workout', exact: true });
+    await expect(startButton).toBeVisible();
+    const startBox = await startButton.boundingBox();
+    const viewport = page.viewportSize();
+    expect(startBox).not.toBeNull();
+    expect((startBox?.y ?? Number.POSITIVE_INFINITY) + (startBox?.height ?? 0)).toBeLessThanOrEqual(
+      viewport?.height ?? 0,
+    );
 
     await builder.getByRole('textbox', { name: 'Active (seconds)' }).fill('5');
     await builder.getByRole('textbox', { name: 'Target reps min' }).fill('8');
@@ -68,12 +76,54 @@ test.describe('Workout Gym V2', () => {
     await plan
       .getByText(weekday, { exact: true })
       .locator('..')
-      .getByRole('button', { name: 'Gym V2 Upper', exact: true })
+      .getByRole('button', { name: `${weekday} Gym V2 Upper`, exact: true })
       .click();
     await plan.getByLabel('Close').click();
 
     await expect(page.getByText('Gym V2 Upper', { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Start today's workout", { exact: true })).toBeVisible();
+  });
+
+  test('explains empty exercise searches and keeps planning controls touchable', async ({
+    page,
+  }) => {
+    await fillRoutineName(page, 'Picker ergonomics');
+    await page.getByText('Add routine', { exact: true }).click();
+    await page.getByText('Picker ergonomics', { exact: true }).first().click();
+
+    const builder = page.getByRole('dialog').filter({ hasText: 'Routine builder' });
+    await builder.getByText('Choose from exercise library', { exact: true }).click();
+    const picker = page.getByRole('dialog').last();
+    const search = picker.getByRole('textbox', { name: 'Search exercises' });
+
+    await search.fill('row');
+    await expect(
+      picker.getByRole('button', { name: 'Add Barbell Row', exact: true }),
+    ).toBeVisible();
+    await expect(picker.getByRole('button', { name: 'treadmill', exact: true })).not.toBeVisible();
+
+    await search.fill('zzzzzz');
+    await expect(picker.getByText('No matching exercises', { exact: true })).toBeVisible();
+    await expect(
+      picker.getByRole('button', { name: 'Reset exercise filters', exact: true }),
+    ).toBeVisible();
+    await picker.getByRole('button', { name: 'Reset exercise filters', exact: true }).click();
+    await expect(
+      picker.getByRole('button', { name: 'Add Barbell Bench Press', exact: true }),
+    ).toBeVisible();
+
+    await picker.getByLabel('Close').click();
+    await builder.getByLabel('Close').click();
+    const weekRest = page.getByRole('button', { name: 'Monday rest', exact: true });
+    const weekBox = await weekRest.boundingBox();
+    expect(weekBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(weekBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await page.getByText('Plan week', { exact: true }).click();
+    const plan = page.getByRole('dialog');
+    const mondayRest = plan.getByRole('button', { name: 'Monday rest', exact: true });
+    const box = await mondayRest.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
   });
 
   test('reschedules today without changing the recurring week', async ({ page }) => {
@@ -97,9 +147,10 @@ test.describe('Workout Gym V2', () => {
     await expect(page.getByText('Rest day', { exact: true })).toBeVisible();
     await page.getByText('Plan week', { exact: true }).click();
     const plan = page.getByRole('dialog');
-    await expect(
-      plan.getByRole('button', { name: 'Reschedule Day', exact: true }).first(),
-    ).not.toHaveAttribute('aria-selected', 'true');
+    await expect(plan.getByRole('button', { name: /Reschedule Day$/ }).first()).not.toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await plan.getByLabel('Close').click();
   });
 

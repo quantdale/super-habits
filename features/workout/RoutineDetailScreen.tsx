@@ -6,6 +6,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import {
   listExercises,
   addExercise,
@@ -114,6 +115,7 @@ export function RoutineDetailModal({
   const [customInstructions, setCustomInstructions] = useState('');
   const [customUnilateral, setCustomUnilateral] = useState(false);
   const [customSupportsExternalLoad, setCustomSupportsExternalLoad] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
   const pendingBuilderMutationsRef = useRef<Promise<void>>(Promise.resolve());
 
   const refresh = useCallback(async () => {
@@ -140,10 +142,16 @@ export function RoutineDetailModal({
     return next;
   }, []);
 
-  const waitForBuilderMutations = useCallback(async () => {
-    await pendingBuilderMutationsRef.current;
-    await onStartWorkout();
-  }, [onStartWorkout]);
+  const handleStartWorkout = useCallback(async () => {
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      await pendingBuilderMutationsRef.current;
+      await onStartWorkout();
+    } finally {
+      setIsStarting(false);
+    }
+  }, [isStarting, onStartWorkout]);
 
   const queuedUpdateExercise = useCallback(
     (id: string, updates: Parameters<typeof updateExercise>[1]) =>
@@ -271,7 +279,7 @@ export function RoutineDetailModal({
     }
   };
 
-  const filteredCatalog = [
+  const catalogOptions = [
     ...BUILT_IN_EXERCISES,
     ...customExercises.map((exercise): ExerciseCatalogItem => ({
       id: exercise.id,
@@ -289,17 +297,33 @@ export function RoutineDetailModal({
           ? exercise.modality === 'weighted_strength'
           : exercise.supports_external_load === 1,
     })),
-  ].filter((exercise) => {
-    const query = pickerQuery.trim().toLowerCase();
+  ];
+  const pickerSearchQuery = pickerQuery.trim().toLowerCase();
+  const matchesQueryAndMetadata = catalogOptions.filter((exercise) => {
     return (
-      (!query ||
-        buildExerciseSearchText(exercise).includes(query) ||
-        getExerciseAliases(exercise).some((alias) => alias.includes(query))) &&
+      (!pickerSearchQuery ||
+        buildExerciseSearchText(exercise).includes(pickerSearchQuery) ||
+        getExerciseAliases(exercise).some((alias) => alias.includes(pickerSearchQuery))) &&
       (!pickerArea || exercise.primaryArea === pickerArea) &&
-      (!pickerEquipment || exercise.equipment === pickerEquipment) &&
       (!pickerModality || exercise.modality === pickerModality)
     );
   });
+  const availableEquipment = [
+    ...new Set([
+      ...matchesQueryAndMetadata.map((exercise) => exercise.equipment),
+      ...(pickerEquipment ? [pickerEquipment] : []),
+    ]),
+  ].sort();
+  const filteredCatalog = matchesQueryAndMetadata.filter(
+    (exercise) => !pickerEquipment || exercise.equipment === pickerEquipment,
+  );
+
+  const resetPickerFilters = () => {
+    setPickerQuery('');
+    setPickerArea(null);
+    setPickerEquipment(null);
+    setPickerModality(null);
+  };
 
   const moveExercise = async (id: string, direction: -1 | 1) => {
     const index = exercises.findIndex((exercise) => exercise.id === id);
@@ -341,7 +365,22 @@ export function RoutineDetailModal({
 
   return (
     <>
-      <Modal visible={visible} onClose={onClose} title={routineName} scroll>
+      <Modal
+        visible={visible}
+        onClose={onClose}
+        title={routineName}
+        scroll
+        footer={
+          exercises.length > 0 ? (
+            <Button
+              label={isStarting ? 'Starting…' : 'Start workout'}
+              loading={isStarting}
+              onPress={() => void handleStartWorkout()}
+              color={COLOR}
+            />
+          ) : null
+        }
+      >
         <View
           className="mb-4 rounded-2xl border px-4 py-3"
           style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
@@ -353,16 +392,6 @@ export function RoutineDetailModal({
             Add exercises, tune work and rest intervals, then start the routine when it is ready.
           </Text>
         </View>
-
-        {exercises.length > 0 ? (
-          <View className="mb-6">
-            <Button
-              label="Start workout"
-              onPress={() => void waitForBuilderMutations()}
-              color={COLOR}
-            />
-          </View>
-        ) : null}
 
         {Platform.OS === 'web' ? (
           <View className="gap-3">
@@ -1010,18 +1039,7 @@ export function RoutineDetailModal({
           Equipment
         </Text>
         <View className="mb-2 flex-row flex-wrap">
-          {[
-            'all',
-            'barbell',
-            'dumbbells',
-            'cable',
-            'machine',
-            'bodyweight',
-            'pull-up bar',
-            'treadmill',
-            'bike',
-            'other',
-          ].map((equipment) => (
+          {['all', ...availableEquipment].map((equipment) => (
             <PillChip
               key={equipment}
               label={equipment === 'all' ? 'All' : equipment}
@@ -1054,28 +1072,53 @@ export function RoutineDetailModal({
           )}
         </View>
         <View className="gap-2">
-          {filteredCatalog.map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => void handleAddCatalogExercise(item)}
-              accessibilityRole="button"
-              accessibilityLabel={`Add ${item.name}`}
-              className="rounded-2xl border px-4 py-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-            >
-              <View className="flex-row items-center justify-between gap-3">
-                <View className="min-w-0 flex-1">
-                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                    {item.name}
-                  </Text>
-                  <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                    {MODALITY_LABELS[item.modality]} · {item.primaryArea} · {item.equipment}
-                  </Text>
+          {filteredCatalog.length > 0 ? (
+            filteredCatalog.map((item) => (
+              <Pressable
+                key={item.id}
+                // The builder queue is read only when this user event fires,
+                // never while the component renders.
+                // eslint-disable-next-line react-hooks/refs -- event handler reads the queued mutation on press
+                onPress={() => void handleAddCatalogExercise(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${item.name}`}
+                className="rounded-2xl border px-4 py-3"
+                style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              >
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                      {item.name}
+                    </Text>
+                    <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+                      {MODALITY_LABELS[item.modality]} · {item.primaryArea} · {item.equipment}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="add-circle-outline" size={22} color={COLOR} />
                 </View>
-                <MaterialIcons name="add-circle-outline" size={22} color={COLOR} />
-              </View>
-            </Pressable>
-          ))}
+              </Pressable>
+            ))
+          ) : (
+            <>
+              <EmptyStateCard
+                accentColor={COLOR}
+                className="mb-0"
+                title="No matching exercises"
+                description={
+                  pickerQuery.trim()
+                    ? `Nothing matches “${pickerQuery.trim()}”. Try another search or reset the filters.`
+                    : 'These filters do not match any exercise. Reset them or create a custom exercise.'
+                }
+                icon={<MaterialIcons name="search-off" size={24} color={COLOR} />}
+              />
+              <Button
+                label="Reset filters"
+                accessibilityLabel="Reset exercise filters"
+                variant="ghost"
+                onPress={resetPickerFilters}
+              />
+            </>
+          )}
         </View>
         <View className="mt-5 border-t pt-4" style={{ borderColor: tokens.border }}>
           <Text className="mb-1 text-sm font-semibold" style={{ color: tokens.text }}>

@@ -4,19 +4,20 @@ import { useAppTheme } from '@/core/providers/themeContext';
 
 type Props = {
   label: string;
+  accessibilityLabel?: string;
   active: boolean;
   color: string; // section accent color
   onPress: () => void;
   icon?: string; // optional emoji or text prefix
 };
 
-export function PillChip({ label, active, color, onPress, icon }: Props) {
+export function PillChip({ label, accessibilityLabel, active, color, onPress, icon }: Props) {
   const { tokens } = useAppTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected: active }}
       className="mb-2 mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[8px]"
       style={
@@ -24,12 +25,12 @@ export function PillChip({ label, active, color, onPress, icon }: Props) {
           ? {
               backgroundColor: color,
               borderColor: color,
-              minHeight: 40,
+              minHeight: 44,
             }
           : {
               borderColor: tokens.border,
               backgroundColor: tokens.surfaceElevated,
-              minHeight: 40,
+              minHeight: 44,
             }
       }
     >

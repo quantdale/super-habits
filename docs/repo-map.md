@@ -91,7 +91,8 @@ Use with:
 - `features/workout/workout.domain.ts`
 - Workout V2 data also owns custom exercises, typed prescriptions, supersets,
   weekly plan/date overrides, body-weight history, performance reads, durable
-  drafts, and scope-6 backup enqueue behavior. The domain module owns schedule
+  drafts, and scope-7 backup enqueue behavior (with frozen scope-6 compatibility).
+  The domain module owns schedule
   resolution, modality-aware volume, progression, PR guards, trends, and
   training totals.
 

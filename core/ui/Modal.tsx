@@ -23,12 +23,15 @@ export type ModalProps = {
   children: ReactNode;
   scroll?: boolean;
   layout?: ModalLayout;
+  /** Optional action area that stays visible while a scrollable body moves. */
+  footer?: ReactNode;
 };
 
 // Android's native RNModal window does not always propagate the provider's
 // navigation-bar inset. Keep scrollable dialog actions above that bar when
 // the reported inset is zero.
 const ANDROID_MODAL_NAVIGATION_FALLBACK = 128;
+const MODAL_FOOTER_HEIGHT_RESERVE = 80;
 
 export function Modal({
   visible,
@@ -37,6 +40,7 @@ export function Modal({
   children,
   scroll = false,
   layout = 'dialog',
+  footer,
 }: ModalProps) {
   const { tokens } = useAppTheme();
   const closeFocusRing = useKeyboardFocusRing(tokens.accent);
@@ -48,7 +52,9 @@ export function Modal({
     Platform.OS === 'android'
       ? Math.max(safeAreaBottom, ANDROID_MODAL_NAVIGATION_FALLBACK) + 24
       : safeAreaBottom + (isBottomSheet ? 24 : 0);
-  const scrollMaxHeight = layout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92;
+  const scrollMaxHeight =
+    (layout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92) -
+    (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0);
 
   const overlayStyle = isDrawer
     ? {
@@ -87,7 +93,9 @@ export function Modal({
     maxHeight: isDrawer ? windowHeight - 32 : isBottomSheet ? windowHeight * 0.92 : undefined,
   };
 
-  const bodyContainerStyle = isBottomSheet ? { maxHeight: windowHeight * 0.82 } : undefined;
+  const bodyContainerStyle = isBottomSheet
+    ? { maxHeight: windowHeight * 0.82 - (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0) }
+    : undefined;
 
   return (
     <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -149,6 +157,18 @@ export function Modal({
                 {children}
               </View>
             )}
+            {footer ? (
+              <View
+                className="border-t px-5 pt-3"
+                style={{
+                  borderTopColor: tokens.border,
+                  borderTopWidth: 1,
+                  paddingBottom: Math.max(16, safeAreaBottom + 16),
+                }}
+              >
+                {footer}
+              </View>
+            ) : null}
           </View>
         </View>
       </View>

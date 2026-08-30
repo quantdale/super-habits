@@ -39,24 +39,24 @@ The recursive GitHub tree at the planner baseline returned `truncated: false`:
 
 Top-level tracked-file counts:
 
-| Area | Files |
-| --- | ---: |
-| openspec | 276 |
-| features | 193 |
-| tests | 165 |
-| core | 138 |
-| .agent | 94 |
-| e2e | 59 |
-| simulation | 51 |
-| .cursor | 30 |
-| docs | 28 |
-| .maestro | 27 |
-| root files | 25 |
-| supabase | 24 |
-| .github | 16 |
-| scripts | 16 |
-| lib | 14 |
-| remaining agent/editor/app/assets/public/patch areas | 80 |
+| Area                                                 | Files |
+| ---------------------------------------------------- | ----: |
+| openspec                                             |   276 |
+| features                                             |   193 |
+| tests                                                |   165 |
+| core                                                 |   138 |
+| .agent                                               |    94 |
+| e2e                                                  |    59 |
+| simulation                                           |    51 |
+| .cursor                                              |    30 |
+| docs                                                 |    28 |
+| .maestro                                             |    27 |
+| root files                                           |    25 |
+| supabase                                             |    24 |
+| .github                                              |    16 |
+| scripts                                              |    16 |
+| lib                                                  |    14 |
+| remaining agent/editor/app/assets/public/patch areas |    80 |
 
 Every tracked path is accounted for by the tree inventory. Semantic review was
 concentrated on executable/runtime/configuration/test contracts; lockfiles,

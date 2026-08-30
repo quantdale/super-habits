@@ -1514,45 +1514,72 @@ This project uses a delta-based foreground timer pattern inside `PomodoroScreen`
 
 #### Data layer — `features/workout/workout.data.ts`
 
-**`markWorkoutRoutineUpdated`:** Updates `workout_routines.updated_at` and enqueues `entity: "workout_routines"` — used when nested exercises/sets change.
+> The older API table below is retained as historical navigation context. The
+> current implementation also owns Gym V2 catalog/custom exercise identity,
+> typed prescriptions, weekly plans/date overrides, body weight, durable
+> drafts, modality-rich session sets, performance reads, and Backup/Portable
+> recovery. `core/db/client.ts` and the data module are authoritative.
 
-| Function                  | Signature                                            | `syncEngine`                              |
-| ------------------------- | ---------------------------------------------------- | ----------------------------------------- |
-| `listRoutines`            | `(): Promise<WorkoutRoutine[]>`                      | No                                        |
-| `addRoutine`              | `(name, description): Promise<void>`                 | Yes create                                |
-| `completeRoutine`         | `(routineId, notes?): Promise<void>`                 | No (`workout_logs` insert)                |
-| `listWorkoutLogs`         | `(limit?): Promise<WorkoutLog[]>`                    | No                                        |
-| `listWorkoutLogsForRange` | `(startDateKey, endDateKey): Promise<WorkoutLog[]>`  | No                                        |
-| `deleteRoutine`           | `(routineId): Promise<void>`                         | Yes delete                                |
-| `addExercise`             | `(input): Promise<string>`                           | Via `markWorkoutRoutineUpdated`           |
-| `listExercises`           | `(routineId): Promise<RoutineExercise[]>`            | No                                        |
-| `deleteExercise`          | `(id): Promise<void>`                                | Soft delete exercise + sets; bump routine |
-| `updateExerciseOrder`     | `(orderedIds): Promise<void>`                        | Bump routine                              |
-| `addSet`                  | `(input): Promise<string>`                           | Returns `""` if `validateSetTiming` fails |
-| `listSets`                | `(exerciseId): Promise<RoutineExerciseSet[]>`        | No                                        |
-| `updateSet`               | `(id, updates): Promise<void>`                       | No-op if timing invalid                   |
-| `deleteSet`               | `(id): Promise<void>`                                | Soft delete set                           |
-| `addDefaultSet`           | `(exerciseId): Promise<void>`                        | Default 40s active / 20s rest             |
-| `getRoutineWithExercises` | `(routineId): Promise<RoutineWithExercises \| null>` | Join tree                                 |
-| `logWorkoutSession`       | `(input): Promise<void>`                             | Inserts log + `workout_session_exercises` | No  |
+**Historical helper name:** nested changes are now handled by the internal
+`touchWorkoutRoutine` helper inside the shared mutation boundary; it updates
+the parent routine and enqueues the parent plus changed child rows.
+
+| Function                  | Signature                                             | `syncEngine`                                  |
+| ------------------------- | ----------------------------------------------------- | --------------------------------------------- |
+| `listRoutines`            | `(): Promise<WorkoutRoutine[]>`                       | No                                            |
+| `addRoutine`              | `(name, description): Promise<void>`                  | Yes create                                    |
+| `completeRoutine`         | `(routineId, notes?): Promise<CompleteRoutineResult>` | Backup mutation; creates `workout_logs`       |
+| `listWorkoutLogs`         | `(limit?): Promise<WorkoutLog[]>`                     | No                                            |
+| `listWorkoutLogsForRange` | `(startDateKey, endDateKey): Promise<WorkoutLog[]>`   | No                                            |
+| `deleteRoutine`           | `(routineId): Promise<void>`                          | Yes delete                                    |
+| `addExercise`             | `(input): Promise<string>`                            | Backup mutation + parent touch                |
+| `listExercises`           | `(routineId): Promise<RoutineExercise[]>`             | No                                            |
+| `deleteExercise`          | `(id): Promise<void>`                                 | Soft delete exercise + sets; bump routine     |
+| `updateExerciseOrder`     | `(orderedIds): Promise<void>`                         | Bump routine                                  |
+| `addSet`                  | `(input): Promise<string>`                            | Returns `""` if `validateSetTiming` fails     |
+| `listSets`                | `(exerciseId): Promise<RoutineExerciseSet[]>`         | No                                            |
+| `updateSet`               | `(id, updates): Promise<void>`                        | No-op if timing invalid                       |
+| `deleteSet`               | `(id): Promise<void>`                                 | Soft delete set                               |
+| `addDefaultSet`           | `(exerciseId): Promise<void>`                         | 40s active + persisted rest default           |
+| `getRoutineWithExercises` | `(routineId): Promise<RoutineWithExercises \| null>`  | Join tree                                     |
+| `logWorkoutSession`       | `(input): Promise<void>`                              | Backup mutation; inserts log + nested history |
+
+Current writes use the shared `runSyncedMutation`/`runBackupMutation` helpers;
+the internal routine-touch helper updates the parent routine after nested
+changes. The current default set uses 40 seconds active time and the persisted
+rest preference, not a hard-coded 20-second rest.
 
 #### Domain layer — `features/workout/workout.domain.ts`
 
 Exports: `buildWorkoutActivityDays`, `buildWorkoutHeatmapDays`, `computeWorkoutStreakFromHeatmapDays`, `buildWorkoutFrequency`, `formatWorkoutTime`, `parseWorkoutTime`, `calculateSessionDuration`, `buildTimerSequence`, `summarizeCompletedSets`, type `TimerPhase`
 
-**`buildTimerSequence`:** Omits rest phase after **last set of last exercise** only.
+**`buildTimerSequence`:** Omits rest after the final set and respects adjacent
+superset groups so the group boundary owns rest behavior.
 
 **`formatWorkoutTime(totalSeconds)`:** `M:SS` format (e.g. `1:30`, `0:45`).
 
-**Coverage gap:** `computeWorkoutStreakFromHeatmapDays` has no dedicated `it()` in tests.
+Workout domain, data, integrity, progression, PR, draft, and reminder behavior
+has focused Vitest/integration coverage; the current source is the authority
+for any signature details not represented by the historical table above.
 
 #### Screens
 
-**`WorkoutScreen.tsx` — view stack:** `ViewState`: `list` | `detail` | `session`. Inline list with create form, swipe rows, history + heatmap. `completeRoutine` quick action from list.
+**`WorkoutScreen.tsx`:** The canonical Gym shell is Today-first: Today and Week
+cards lead into real planning/override controls, followed by routine creation,
+routine cards, training totals, Progress, Body Weight, weekly volume, and
+history. Routine detail and history are full-screen modals; active sessions
+replace the list view.
 
-**`RoutineDetailScreen.tsx`:** Exercises + per-set timers; add exercise, `addDefaultSet`, adjust seconds ±5 with validation. **Start workout** button when at least one exercise present.
+**`RoutineDetailScreen.tsx`:** The real routine builder searches the bundled
+offline catalog and local custom exercises, supports type-aware prescriptions,
+ordering, superset/progression metadata, and uses a fixed guarded **Start
+workout** footer once an exercise exists.
 
-**`WorkoutSessionScreen.tsx`:** Steps through `buildTimerSequence`; auto-advances between active/rest phases; on complete, `logWorkoutSession` with `summarizeCompletedSets(sequence, currentIndex)`. Active phase = blue, rest phase = amber.
+**`WorkoutSessionScreen.tsx`:** Steps through `buildTimerSequence`, preserves
+typed measurements and phase dispositions in a local draft, supports strength,
+bodyweight, timed, cardio, effort, rest, skip, correction, and resume flows,
+then logs immutable per-set history. Web timer/notification behavior stays
+honest when native capabilities are unavailable.
 
 ---
 

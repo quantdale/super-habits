@@ -36,7 +36,7 @@ Current shell reality to preserve:
 
 - Expo `^55.0.8`
 - React `19.2.0`
-- React Native `0.83.4`
+- React Native `0.83.10`
 - Expo Router `^55.0.7`
 - TypeScript `~5.9.2`
 - NativeWind `^4.2.3` + Tailwind
@@ -196,7 +196,7 @@ Main tables include:
 - pomodoro settings
 - date-key cutover markers
 
-Current runtime schema version: `23`
+Current runtime schema version: `24`
 
 Next migration slot:
 

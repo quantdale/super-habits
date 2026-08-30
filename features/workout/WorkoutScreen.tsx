@@ -481,6 +481,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               <View className="flex-row flex-wrap">
                 <PillChip
                   label="Rest"
+                  accessibilityLabel={`${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][weekday - 1]} rest`}
                   active={
                     weeklyPlan.find((entry) => entry.weekday === weekday)?.plan_kind === 'rest'
                   }
@@ -495,6 +496,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                   <PillChip
                     key={routine.id}
                     label={routine.name}
+                    accessibilityLabel={`${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][weekday - 1]} ${routine.name}`}
                     active={
                       weeklyPlan.find((entry) => entry.weekday === weekday)?.routine_id ===
                       routine.id

@@ -1,10 +1,24 @@
 # SuperHabits Gym — OpenGym-Inspired Integration Master Plan
 
-**Branch:** `feat/opengym-inspired-gym`  
-**Target:** SuperHabits Gym / Workout domain  
-**Reference product:** `arvids-unavailable/openGym`  
-**Reference revision inspected:** OpenGym `main` around `c42ba6b98e3776af5981f20c05ba392238799670`  
-**Status:** Phase 0 design slice committed; production migration intentionally not merged into `main` yet.
+**Record type:** Historical clean-room design and reconciliation record
+**Target:** SuperHabits Gym / Workout domain
+**Reference product:** `arvids-unavailable/openGym`
+**Reference revision inspected:** OpenGym `main` around `c42ba6b98e3776af5981f20c05ba392238799670`
+**Status:** Completed design record. The production Gym V2 implementation and
+its post-release convergence are on `main`; the Phase-0 representative route
+was removed on 2026-08-30 after its useful concepts were reconciled into the
+real Workout feature.
+
+**Current production implementation:**
+[`features/workout/WorkoutScreen.tsx`](../features/workout/WorkoutScreen.tsx),
+[`RoutineDetailScreen.tsx`](../features/workout/RoutineDetailScreen.tsx),
+[`WorkoutSessionScreen.tsx`](../features/workout/WorkoutSessionScreen.tsx),
+[`workout.data.ts`](../features/workout/workout.data.ts), and
+[`workout.domain.ts`](../features/workout/workout.domain.ts). The authoritative
+implementation/recovery records are the completed
+`openspec/changes/archive/2026-08-30-add-gym-training-system-v2/`,
+`openspec/changes/archive/2026-08-30-add-gym-workout-v2/`, and
+`openspec/changes/archive/2026-08-30-harden-post-gym-release-convergence-v1/`.
 
 ---
 
@@ -114,7 +128,7 @@ Observed in `frontend/src/views/Plan.jsx` and `RoutineEdit.jsx`:
 - Starter Push/Pull/Legs plan reduces empty-state friction.
 - Plan sharing is treated as configuration-only data rather than history export.
 
-**Adoption principle:** Separate *routine definition*, *recurring weekly assignment*, and *date-specific override*. They are three different domain concepts.
+**Adoption principle:** Separate _routine definition_, _recurring weekly assignment_, and _date-specific override_. They are three different domain concepts.
 
 ### 3.5 Exercise library
 
@@ -170,7 +184,7 @@ OpenGym exposes multiple progression concepts in `frontend/src/lib/progression.j
 - Misses should not advance load.
 - Stalls can cause deload/reset behavior.
 - Bodyweight exercises may progress reps instead of weight.
-- The UI tells the user *why* the next target changed.
+- The UI tells the user _why_ the next target changed.
 
 **Adoption principle:** Progression should be pure-domain logic with deterministic tests. Never bury it in component event handlers.
 
@@ -272,27 +286,54 @@ This is valuable functionality and should be retained.
 
 This is stronger than OpenGym's JSON-file model for SuperHabits' requirements. The migration must extend it rather than bypass it.
 
-### 4.4 Key gaps against the target Gym product
+### 4.4 Phase-0 gaps and final disposition
 
-1. No dedicated Gym internal information architecture; most surfaces are stacked in one long `WorkoutScreen`.
-2. No weekly routine assignment model equivalent to OpenGym's weekday plan.
-3. No date-specific workout-plan override model.
-4. No large searchable exercise catalog surfaced as a dedicated Gym library.
-5. No explicit custom-exercise creation flow confirmed in the current Gym surface.
-6. No clear freestyle-workout entry surfaced on the landing page.
-7. Superset semantics need parity review against current session domain.
-8. Exercise modes need parity review: weighted reps, bodyweight, unilateral, timed, cardio.
-9. Progression policies and human-readable prescriptions are not yet at OpenGym depth.
-10. No body/muscle coverage preview on routine construction.
-11. No per-exercise strength curve / e1RM hub at OpenGym depth.
-12. Current workout charts are useful but do not yet form a focused analytics hierarchy.
-13. Gym onboarding/starter-plan flow is weak compared with OpenGym's immediate PPL path.
+The following list was the gap inventory when this record was written. It is
+kept as historical evidence rather than current product truth:
+
+1. The long mixed-purpose landing surface needed an action-first hierarchy.
+2. Weekly assignments and date-specific overrides were absent.
+3. Exercise identity, catalog search, custom exercises, and typed modes were
+   absent from the visible Workout flow.
+4. Freestyle training, starter-plan seeding, a standalone internal
+   Today/Plan/Exercises/Progress navigator, and richer media remained open
+   product ideas.
+5. Superset semantics, progression explanations, body-area feedback, and
+   per-exercise history needed implementation depth.
+
+Items 1–3 and the implementation portions of item 5 were delivered by the
+completed Gym V2 changes. The current Workout section is still one coherent,
+progressively disclosed shell: Today and Week are first, routine building owns
+catalog/custom exercise selection, guided sessions own set logging, and
+Progress/Body Weight/History follow the primary action. The 2026-08-30
+convergence pass added honest empty search feedback, adaptive equipment
+filters, contextual planning labels, 44 px planning targets, and a persistent
+builder Start action.
+
+Freestyle sessions, starter-plan seeding, a dedicated internal navigator, and
+licensed exercise media remain deferred rather than represented by fake UI.
 
 ---
 
-## 5. Target Gym information architecture
+## 5. Target Gym information architecture (historical design target)
 
-Do not force every item into the global SuperHabits navigation. Build an internal Gym navigator/segmented surface.
+The design target below deliberately avoided another global SuperHabits tab.
+The shipped implementation uses a single progressively disclosed Workout
+surface rather than a second routed navigator. This distinction is intentional
+and should not be read as an unmerged implementation claim.
+
+### 5.0 Current production mapping
+
+- **Today / Week:** `WorkoutTodayCard` and `WorkoutWeekCard` in
+  `features/workout/WorkoutGymPanels.tsx`.
+- **Plan / routines:** the recurring plan and override modals plus the real
+  routine builder in `RoutineDetailScreen.tsx`.
+- **Exercises:** the offline built-in/custom picker owned by the routine
+  builder; there is no fake standalone library route.
+- **Progress / history / body weight:** the real cards and history detail in
+  `WorkoutScreen.tsx` and `WorkoutHistoryDetail.tsx`.
+- **Active workout:** `WorkoutSessionScreen.tsx`, with durable local drafts and
+  the existing command-launcher suppression boundary.
 
 ### 5.1 Recommended primary Gym destinations
 
@@ -333,45 +374,45 @@ The active workout itself is a dedicated full-focus state and should suppress un
 
 ## 6. Feature parity matrix
 
-| OpenGym concept | SuperHabits decision | Phase | Notes |
-|---|---|---:|---|
-| Today-first home | **Adopt** | 1 | Replace analytics-first stacking with action-first hierarchy. |
-| Week strip | **Adopt** | 2 | Backed by recurring plan + date override. |
-| Weekly weekday plan | **Adopt** | 2 | New persistence entities required. |
-| One-day reschedule override | **Adopt** | 2 | Must not mutate recurring schedule. |
-| Routine entities | **Keep + extend** | 1–3 | Existing domain already sound. |
-| PPL starter plan | **Adapt** | 2 | Implement original seed content. Do not copy OpenGym routine definitions verbatim. |
-| Freestyle workout | **Adopt** | 3 | Session without saved routine; optionally save afterward. |
-| Exercise search | **Adopt** | 3 | Dedicated Gym library. |
-| Body-part filter | **Adopt** | 3 | Use normalized taxonomy. |
-| Dynamic equipment filter | **Adopt** | 3 | Only expose options that produce results. |
-| Custom exercise | **Adopt** | 3 | Local-first, syncable. |
-| Exercise animations | **Defer / license review** | 6 | Dataset/media licensing must be explicit. |
-| Previous set context | **Adopt** | 4 | Show prior comparable session inline. |
-| Best weight marker | **Adopt** | 4 | Extend toward PR/e1RM model. |
-| Add/remove set in session | **Keep/verify** | 4 | Existing session supports entered set values; parity test required. |
-| Rest timer | **Keep + extend** | 4 | Background notification behavior later. |
-| Work timer for timed sets | **Adopt** | 4 | Separate work vs rest semantics. |
-| Supersets | **Adopt** | 4 | Explicit group model preferred over UI-only adjacency. |
-| Cardio time + speed | **Adapt** | 4 | Model extensibly for future distance/pace. |
-| Bodyweight mode | **Adopt** | 4 | Avoid meaningless 0 kg field. |
-| Added load for bodyweight | **Adopt** | 4 | Positive external load separate from body mass. |
-| Per-side semantics | **Adopt** | 4 | Store canonical total or explicit per-side value consistently. |
-| RIR/RPE | **Adopt, opt-in** | 5 | Nullable; never conflate missing with zero. |
-| Linear progression | **Adopt** | 5 | Pure tested policy engine. |
-| Greyskull-like policy | **Adapt** | 5 | Implement from documented behavior, not copied code. |
-| Double progression | **Adopt** | 5 | Rep-range based. |
-| Time progression | **Adopt** | 5 | Timed mode. |
-| "Why this target" explanation | **Adopt** | 5 | Required acceptance criterion. |
-| Estimated 1RM | **Adopt** | 5 | Only eligible rep ranges; formula documented. |
-| Muscle map | **Adapt** | 6 | Original SVG/data implementation required. |
-| Muscle coverage preview | **Adopt** | 6 | Can launch as text/bars before body illustration. |
-| Bodyweight tracking | **Integrate, not duplicate** | 6 | Reuse whichever SuperHabits body/health domain owns weight. |
-| Plan share/import | **Defer** | 7 | Structured schema with versioning. |
-| Workout-history importers | **Defer** | 7 | FitNotes/Strong/Hevy later. |
-| JSON backup | **Use SuperHabits backup architecture** | 7 | No parallel backup system. |
-| Passkeys/admin/self-host backend | **Exclude** | — | Not relevant to Gym module. |
-| OpenGym theme/icon system | **Exclude as implementation** | — | Use SuperHabits tokens/components. |
+| OpenGym concept                  | SuperHabits decision                    | Phase | Notes                                                                              |
+| -------------------------------- | --------------------------------------- | ----: | ---------------------------------------------------------------------------------- |
+| Today-first home                 | **Adopt**                               |     1 | Replace analytics-first stacking with action-first hierarchy.                      |
+| Week strip                       | **Adopt**                               |     2 | Backed by recurring plan + date override.                                          |
+| Weekly weekday plan              | **Adopt**                               |     2 | New persistence entities required.                                                 |
+| One-day reschedule override      | **Adopt**                               |     2 | Must not mutate recurring schedule.                                                |
+| Routine entities                 | **Keep + extend**                       |   1–3 | Existing domain already sound.                                                     |
+| PPL starter plan                 | **Adapt**                               |     2 | Implement original seed content. Do not copy OpenGym routine definitions verbatim. |
+| Freestyle workout                | **Adopt**                               |     3 | Session without saved routine; optionally save afterward.                          |
+| Exercise search                  | **Adopt**                               |     3 | Dedicated Gym library.                                                             |
+| Body-part filter                 | **Adopt**                               |     3 | Use normalized taxonomy.                                                           |
+| Dynamic equipment filter         | **Adopt**                               |     3 | Only expose options that produce results.                                          |
+| Custom exercise                  | **Adopt**                               |     3 | Local-first, syncable.                                                             |
+| Exercise animations              | **Defer / license review**              |     6 | Dataset/media licensing must be explicit.                                          |
+| Previous set context             | **Adopt**                               |     4 | Show prior comparable session inline.                                              |
+| Best weight marker               | **Adopt**                               |     4 | Extend toward PR/e1RM model.                                                       |
+| Add/remove set in session        | **Keep/verify**                         |     4 | Existing session supports entered set values; parity test required.                |
+| Rest timer                       | **Keep + extend**                       |     4 | Background notification behavior later.                                            |
+| Work timer for timed sets        | **Adopt**                               |     4 | Separate work vs rest semantics.                                                   |
+| Supersets                        | **Adopt**                               |     4 | Explicit group model preferred over UI-only adjacency.                             |
+| Cardio time + speed              | **Adapt**                               |     4 | Model extensibly for future distance/pace.                                         |
+| Bodyweight mode                  | **Adopt**                               |     4 | Avoid meaningless 0 kg field.                                                      |
+| Added load for bodyweight        | **Adopt**                               |     4 | Positive external load separate from body mass.                                    |
+| Per-side semantics               | **Adopt**                               |     4 | Store canonical total or explicit per-side value consistently.                     |
+| RIR/RPE                          | **Adopt, opt-in**                       |     5 | Nullable; never conflate missing with zero.                                        |
+| Linear progression               | **Adopt**                               |     5 | Pure tested policy engine.                                                         |
+| Greyskull-like policy            | **Adapt**                               |     5 | Implement from documented behavior, not copied code.                               |
+| Double progression               | **Adopt**                               |     5 | Rep-range based.                                                                   |
+| Time progression                 | **Adopt**                               |     5 | Timed mode.                                                                        |
+| "Why this target" explanation    | **Adopt**                               |     5 | Required acceptance criterion.                                                     |
+| Estimated 1RM                    | **Adopt**                               |     5 | Only eligible rep ranges; formula documented.                                      |
+| Muscle map                       | **Adapt**                               |     6 | Original SVG/data implementation required.                                         |
+| Muscle coverage preview          | **Adopt**                               |     6 | Can launch as text/bars before body illustration.                                  |
+| Bodyweight tracking              | **Integrate, not duplicate**            |     6 | Reuse whichever SuperHabits body/health domain owns weight.                        |
+| Plan share/import                | **Defer**                               |     7 | Structured schema with versioning.                                                 |
+| Workout-history importers        | **Defer**                               |     7 | FitNotes/Strong/Hevy later.                                                        |
+| JSON backup                      | **Use SuperHabits backup architecture** |     7 | No parallel backup system.                                                         |
+| Passkeys/admin/self-host backend | **Exclude**                             |     — | Not relevant to Gym module.                                                        |
+| OpenGym theme/icon system        | **Exclude as implementation**           |     — | Use SuperHabits tokens/components.                                                 |
 
 ---
 
@@ -602,106 +643,60 @@ No chart should render a misleading zero for missing data.
 
 ---
 
-## 11. Phase plan
+## 11. Phase plan and final disposition
 
-### Phase 0 — research + isolated design slice **(this branch now)**
+This phase plan is historical. The production implementation was delivered by
+the completed `add-gym-training-system-v2`, `add-gym-workout-v2`, and
+`harden-post-gym-release-convergence-v1` changes (now archived under
+`openspec/changes/archive/`), then refined by the
+2026-08-30 convergence campaign.
 
-Deliverables:
+- **Phase 0 — research/design slice:** completed. The representative route and
+  component were removed after the audit; no fake data ships.
+- **Phases 1–2 — Today, weekly plan, and date overrides:** implemented in the
+  real Workout section with SQLite persistence, sync, and recovery coverage.
+- **Phases 3–5 — catalog, custom exercises, guided modalities, progression,
+  history, and body weight:** implemented in the real routine builder,
+  session, and progress surfaces.
+- **Phase 6 — body-area feedback/media:** body-area summaries are implemented;
+  media and a body illustration remain deferred pending provenance and
+  accessibility review.
+- **Phase 7 — portability/polish:** Portable Backup and reminders are real
+  SuperHabits features; external tracker importers, plan sharing, and richer
+  localization remain deferred.
 
-- this master plan;
-- `OpenGymInspiredGymPrototype.tsx`;
-- Expo Router prototype route `/gym-prototype`;
-- no changes to `main`;
-- representative mocked UI only, clearly labeled.
-
-Purpose: establish information architecture and visual density before altering production navigation/data.
-
-### Phase 1 — Gym shell and Today migration
-
-- Introduce Gym internal destination state (`today | plan | exercises | progress`).
-- Move current Start/Resume behavior to Today.
-- Reuse current real routine list, draft, logs, streak and volume data.
-- Remove duplicated sections from legacy landing only after parity tests exist.
-- Preserve `useCommandLauncherSuppressed` during active workout.
-
-### Phase 2 — weekly plan + day overrides
-
-- Add migrations.
-- Add typed data accessors.
-- Add pure `effectiveRoutineForDate()` resolver.
-- Add Plan UI.
-- Add current-week strip.
-- Add day-override sheet/modal.
-- Add starter-plan seed transaction.
-- Add sync records and conflict semantics.
-
-### Phase 3 — exercise catalog + freestyle
-
-- Select/license an exercise metadata source or author a smaller built-in catalog.
-- Add catalog search index strategy.
-- Add body-part/equipment filters.
-- Add custom exercises.
-- Connect routine editor to library.
-- Add freestyle session that can optionally be saved as a routine.
-
-### Phase 4 — session-mode hardening
-
-- Normalize reps/time/cardio/bodyweight/unilateral behaviors.
-- Add explicit work timer.
-- Harden rest timer across app lifecycle.
-- Add previous-session row context.
-- Add best/PR indications.
-- Add supersets with tested rest boundaries.
-- Add wake-lock behavior if Expo/platform support meets requirements.
-
-### Phase 5 — progression + strength analytics
-
-- Pure policy engine.
-- Policy configuration UI.
-- Explanation/reason strings.
-- e1RM calculation with conservative eligibility cutoff.
-- Exercise progress screen.
-- Optional RIR/RPE logging and analytics.
-
-### Phase 6 — muscle model + richer media
-
-- Independently define exercise-to-muscle contribution data.
-- Start with ranked bars/chips.
-- Add original body illustration only after accessibility and asset licensing review.
-- Add routine coverage preview.
-- Add exercise animation/media only after dataset/media license and app-size strategy are approved.
-
-### Phase 7 — portability and polish
-
-- plan import/export schema;
-- external tracker importers;
-- richer reminders;
-- localization extraction;
-- performance profiling on low/mid Android hardware;
-- final migration from prototype route into canonical Gym section.
+The remaining deferred ideas are intentionally recorded as roadmap items, not
+as claims that production Gym migration is pending.
 
 ---
 
-## 12. Exact proposed file plan
+## 12. Exact proposed file plan (historical sketch)
+
+The following decomposition was considered before the production Gym V2 work.
+It is retained for design provenance, not as a list of unmerged files. The
+shipped implementation intentionally keeps the feature in the existing
+`features/workout/` module and uses `WorkoutGymPanels.tsx` for shared landing
+surfaces.
 
 ### Existing files to evolve
 
 - `features/workout/WorkoutScreen.tsx`
-  - become Gym shell or delegate to one;
-  - stop owning every subsection directly.
+  - canonical Gym shell and orchestration;
+  - composes Today, Week, progress, body weight, volume, and history panels.
 
 - `features/workout/WorkoutSessionScreen.tsx`
-  - preserve working draft/session flow;
-  - add mode-specific set editors and superset execution semantics.
+  - canonical durable draft/session flow with mode-specific set editors and
+    superset execution semantics.
 
 - `features/workout/RoutineDetailScreen.tsx`
-  - evolve toward full routine editor or split editor from detail view.
+  - canonical routine builder, catalog/custom picker, and prescription editor.
 
 - `features/workout/WorkoutHistoryDetail.tsx`
   - extend per-set metadata carefully.
 
 - `features/workout/workout.data.ts`
-  - add week assignments, day overrides, exercise/custom exercise operations, session snapshots.
+  - owns week assignments, date overrides, exercise/custom-exercise operations,
+    and session snapshots.
 
 - `features/workout/workout.domain.ts`
   - keep pure date/activity/stat helpers;
@@ -916,14 +911,16 @@ Every destination needs explicit states.
 
 ---
 
-## 20. Phase-0 prototype on this branch
+## 20. Historical Phase-0 prototype (removed)
 
-Files:
+The Phase-0 design slice was removed on 2026-08-30 after its concepts were
+compared with the real product. Its historical files were:
 
-- `features/workout/OpenGymInspiredGymPrototype.tsx`
-- `app/gym-prototype.tsx`
+`features/workout/OpenGymInspiredGymPrototype.tsx` and
+`app/gym-prototype.tsx`. They are preserved only in Git history, not in the
+shipped route tree.
 
-The prototype deliberately demonstrates, in SuperHabits' component/theme language:
+It deliberately demonstrated, in SuperHabits' component/theme language:
 
 - today-first active workout card;
 - seven-day planning strip;
@@ -935,45 +932,41 @@ The prototype deliberately demonstrates, in SuperHabits' component/theme languag
 - rest timer placement;
 - progress and muscle-balance hierarchy.
 
-The prototype uses representative data and no copied OpenGym source. It exists to validate structure and visual direction before production persistence work.
-
-It should **not** be mistaken for a completed implementation. The production Gym tab remains the current `WorkoutScreen` until Phase 1 deliberately moves real behavior into the new information architecture.
-
----
-
-## 21. Recommended implementation sequence for the next coding agent
-
-1. Read this file fully.
-2. Read `features/workout/WorkoutScreen.tsx`, `WorkoutSessionScreen.tsx`, `RoutineDetailScreen.tsx`, `workout.data.ts`, `workout.domain.ts`, current DB types/migrations, sync mutation wrappers, and theme/UI primitives.
-3. Open `/gym-prototype` on web and Android and compare information density against the current Workout tab.
-4. Do not copy any OpenGym implementation code.
-5. Convert the prototype's **Today** section to real SuperHabits data first.
-6. Add internal Gym navigation while keeping the legacy sections reachable until parity is proven.
-7. Commit a working checkpoint.
-8. Implement week assignment + override domain/migrations with unit tests before building the Plan UI.
-9. Commit a working checkpoint.
-10. Build Plan UI and starter-plan transaction.
-11. Commit a working checkpoint.
-12. Implement Exercise Library only after catalog/license decision is documented.
-13. Continue phase-by-phase; never combine schema, progression engine, catalog, session rewrite and analytics rewrite into one unreviewable change.
+The prototype used representative data and no copied OpenGym source. The
+production implementation now uses real SQLite/domain APIs; no route or
+production control depends on the fixture.
 
 ---
 
-## 22. Definition of done for the full campaign
+## 21. Final reconciliation sequence
 
-The OpenGym-inspired Gym campaign is complete only when all of the following are true:
+1. Treat the production Workout feature and executable recovery contracts as
+   authoritative.
+2. Preserve the clean-room boundary: OpenGym remains a product/design
+   reference only.
+3. Add future training breadth only as a separate, evidence-backed change;
+   do not revive the removed representative route.
 
-- Gym has a dedicated, coherent Today/Plan/Exercises/Progress information architecture.
-- The default Gym landing view is useful in under two seconds: today's state and Start/Resume are obvious.
-- Weekly plans and date overrides are persisted, synced and tested.
-- Routine editing is faster and clearer than the current form/list combination.
-- Exercise library search/filter/custom-exercise flows are production-ready and legally sourced.
-- Active workout survives interruption and supports the required exercise modes.
-- Supersets and timers have deterministic tested semantics.
-- Progression engine is pure, versionable and explains its decisions.
-- History remains immutable and interpretable after configuration changes.
-- Progress surfaces distinguish consistency, volume, strength, balance and effort.
-- Android native, web export, typecheck, lint, unit/integration tests, relevant Playwright journeys and native smoke checks pass.
-- Accessibility regressions are addressed.
-- No OpenGym AGPL source has been copied into SuperHabits.
-- `main` remains untouched until this branch is deliberately reviewed and merged.
+---
+
+## 22. Final campaign status (2026-08-30)
+
+The original OpenGym-inspired campaign is complete for the implemented scope:
+
+- Real Gym V2 routines, planning/overrides, exercise identity/custom
+  definitions, typed guided sessions, recovery, progression, history, body
+  weight, reminders, backup, and portable/cloud contracts are on `main`.
+- The default landing view is Today-first with real Start/Resume state; Plan,
+  library selection, active session, and Progress/History remain progressively
+  disclosed within the existing Workout section.
+- Focused final browser evidence is 15/15, with typecheck and changed-file
+  lint green. The campaign report records the broader QA ladder and the native
+  target limitation separately.
+- The removed prototype contributes no runtime data, controls, route, or
+  duplicate product implementation.
+- No OpenGym AGPL source, assets, or dataset was copied.
+
+Deferred ideas are explicit: freestyle sessions, starter-plan seeding, a
+standalone internal Gym navigator, licensed exercise media/body illustration,
+and external tracker importers require separate product decisions and are not
+pretended to be implemented here.

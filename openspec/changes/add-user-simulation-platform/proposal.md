@@ -1,3 +1,8 @@
+**Lifecycle status:** BLOCKED for the two optional external lanes (AI
+exploration requires an LLM-capable agent runtime; backend round trips require
+a disposable authenticated Supabase project). The deterministic local runner,
+model, and validation remain implemented and usable.
+
 ## Why
 
 `add-real-world-user-simulation-testing` gives SuperHabits a deterministic, persona-driven journey suite — but every journey is a hand-written Playwright file with its persona, fixture, and steps frozen in code. That suite answers "does the app still work" but not the broader questions developers actually face day to day: _How would a specific kind of user exercise this new feature? Can I re-run the exact state and actions that produced this bug report? What does the app do under realistic, varied, imperfect use that nobody scripted? Does the sync/restore contract hold against a real backend?_ Today each of those requires repetitive manual work: hand-seeding data, clicking through flows, reconstructing bug state, and eyeballing screenshots.
