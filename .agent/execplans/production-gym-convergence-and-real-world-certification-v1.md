@@ -128,7 +128,7 @@ fixed with regression proof and the exact pushed `main` state is verified.
 - Exact resume action after unblock: None.
 - Exact next action: None — preserve the completed convergence commit and
   evidence; no further repository mutation is needed for this campaign.
-  `format:check` is a known baseline gap in 67 historical/agent files; changed
+  `format:check` is a known baseline gap in 61 historical/agent files; changed
   campaign files have targeted formatting checks and `git diff --check`.
 - Remaining definition of done: All repository-supported definition-of-done
   items are satisfied; native lanes are explicitly environment-blocked, and
@@ -326,9 +326,14 @@ fixed with regression proof and the exact pushed `main` state is verified.
 - 2026-08-30 — `git push origin main` — PASS; implementation milestone
   `efbc8ad9d3473f36766dd9983a4bff4276f4292a` advanced `origin/main` from the
   starting SHA, and local/remote refs matched immediately afterward.
-- 2026-08-30 — `npm run format:check` — FAIL/known baseline gap; 67 historical,
-  agent, and older docs/tooling files report style drift. Targeted formatting
-  checks for changed campaign files pass; no campaign diff whitespace error.
+- 2026-08-30 — initial `npm run format:check` — FAIL/known baseline gap; 67
+  historical, agent, and older docs/tooling files reported style drift. The
+  staged commit hook formatted the campaign's archived Markdown records; the
+  final post-commit run reports 61 remaining baseline files. Targeted checks
+  for changed campaign files pass; no campaign diff whitespace error.
+- 2026-08-30 — final post-commit `npm run format:check` — FAIL/known baseline
+  gap; 61 legacy/agent/docs/tooling files remain intentionally outside this
+  campaign's formatting scope. No changed campaign file is among the drift.
 - 2026-08-30 — `npm run agent:plan:validate:all` — PASS; all discovered
   versioned ExecPlans, including this ACTIVE plan, validate.
 - 2026-08-30 — `npm test` — FLAKY_TEST/host contention on the full parallel
