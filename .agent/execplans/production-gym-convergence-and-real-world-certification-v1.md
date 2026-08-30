@@ -1,7 +1,7 @@
 # ExecPlan: Production Gym Convergence and Real-World Certification
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -24,13 +24,14 @@ fixed with regression proof and the exact pushed `main` state is verified.
 - The historical Phase-0 design slice is `features/workout/OpenGymInspiredGymPrototype.tsx`
   exposed by `app/gym-prototype.tsx`; it uses hard-coded representative data
   and no-op handlers.
-- Completed Gym contracts are recorded in
-  `openspec/changes/add-gym-training-system-v2/` and
-  `openspec/changes/add-gym-workout-v2/`, with post-Gym release convergence in
-  `openspec/changes/harden-post-gym-release-convergence-v1/`.
-- `.agent/EXECUTION_PROMPT.md` still names the already-completed async/lifecycle
-  campaign as active; Git and the completed ExecPlan are authoritative. This
-  campaign will reconcile that handoff rather than reopen landed async work.
+- Completed Gym contracts are preserved in the archived records
+  `openspec/changes/archive/2026-08-30-add-gym-training-system-v2/`,
+  `openspec/changes/archive/2026-08-30-add-gym-workout-v2/`, and
+  `openspec/changes/archive/2026-08-30-harden-post-gym-release-convergence-v1/`.
+- At campaign start, `.agent/EXECUTION_PROMPT.md` still named the already-
+  completed async/lifecycle campaign as active. This campaign reconciled that
+  handoff without reopening landed async work; the handoff now records this
+  campaign as completed.
 - Relevant rules read before implementation: `AGENTS.md`, `.agent/PLANS.md`,
   project/rule docs, feature/RN/DB skills, and `docs/testing/autonomous-qa.md`.
 
@@ -67,14 +68,14 @@ fixed with regression proof and the exact pushed `main` state is verified.
 - Current milestone: Evidence-led Gym UX fixes, stale-prototype removal,
   OpenSpec/doc lifecycle reconciliation, route-free build verification, and
   focused/infrastructure/integration/timezone/static-contract/deterministic/P0
-  checks are green. Both the full local-only browser matrix and the dummy
-  remote-boundary sync lane are now green; broad-gate and delivery closure
-  remain.
+  checks are green. The full local-only browser matrix, dummy remote-boundary
+  sync lane, broad gates, and milestone push are complete; the final plan
+  closure and exact-head status record are captured here.
 - Completed: Read repository startup/control-plane docs, Gym/OpenGym master
   plan, Gym V2 proposals/design/spec/tasks/ExecPlans, post-Gym convergence
   artifacts, production Workout implementation, and relevant feature/domain/data
   code. Ran required Git, plan, and OpenSpec baseline commands.
-- In progress: The Exercise library now explains empty results, adapts
+- In progress: none. The Exercise library now explains empty results, adapts
   equipment choices to the active search/body-area/modality, and offers a
   reset. The builder Start action is a guarded fixed modal footer, and Week
   actions expose 44 px targets/selected semantics. A focused test initially
@@ -125,16 +126,13 @@ fixed with regression proof and the exact pushed `main` state is verified.
   GitHub status, and Vercel availability must be checked rather than assumed.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Stage the reviewed source, test, documentation, and
-  OpenSpec lifecycle changes; inspect the cached rename/move diff and checks;
-  then create the implementation milestone commit. After that, close the
-  plan with final-head validation, push, and CI verification.
+- Exact next action: None — preserve the completed convergence commit and
+  evidence; no further repository mutation is needed for this campaign.
   `format:check` is a known baseline gap in 67 historical/agent files; changed
   campaign files have targeted formatting checks and `git diff --check`.
-- Remaining definition of done: One canonical production Gym; prototype route
-  removed/quarantined; truthful docs/OpenSpec/ExecPlan lifecycle; no known
-  repository-owned Critical/High defect; affected and broad QA evidence;
-  available native evidence; clean exact pushed `main` with CI status recorded.
+- Remaining definition of done: All repository-supported definition-of-done
+  items are satisfied; native lanes are explicitly environment-blocked, and
+  the final report records the exact pushed `main` and CI availability.
 
 ## Progress
 
@@ -148,7 +146,7 @@ fixed with regression proof and the exact pushed `main` state is verified.
 - [x] Run affected QA, browser/P0/simulation/recovery lanes, and native lanes
       where the environment supports them.
 - [x] Fix, regression-test, and retest all repository-owned defects found.
-- [ ] Complete final validation, commit/push, exact-head verification, and
+- [x] Complete final validation, commit/push, exact-head verification, and
       close this ExecPlan.
 
 ## Surprises & Discoveries
@@ -325,6 +323,9 @@ fixed with regression proof and the exact pushed `main` state is verified.
 .agent/execplans/production-gym-convergence-and-real-world-certification-v1.md`
   and `npm run sim:validate` — PASS; the plan checkpoint reconciled against
   Git and the simulation model has 23 valid scenarios with clean API guards.
+- 2026-08-30 — `git push origin main` — PASS; implementation milestone
+  `efbc8ad9d3473f36766dd9983a4bff4276f4292a` advanced `origin/main` from the
+  starting SHA, and local/remote refs matched immediately afterward.
 - 2026-08-30 — `npm run format:check` — FAIL/known baseline gap; 67 historical,
   agent, and older docs/tooling files report style drift. Targeted formatting
   checks for changed campaign files pass; no campaign diff whitespace error.
@@ -341,9 +342,24 @@ fixed with regression proof and the exact pushed `main` state is verified.
 ## Changed Files / Areas
 
 - `.agent/execplans/production-gym-convergence-and-real-world-certification-v1.md`
-  — durable campaign state.
-- Future changes are intentionally not predeclared; reconcile the final Git
-  diff here after the audit.
+  and `.agent/EXECUTION_PROMPT.md` — durable campaign state and completed
+  handoff.
+- `features/workout/RoutineDetailScreen.tsx`,
+  `features/workout/WorkoutGymPanels.tsx`,
+  `features/workout/WorkoutScreen.tsx`, `core/ui/Modal.tsx`, and
+  `core/ui/PillChip.tsx` — production Workout UX/accessibility fixes.
+- `e2e/workout-gym-v2.spec.ts` — regression coverage for the exercised UX
+  contracts.
+- `app/gym-prototype.tsx` and
+  `features/workout/OpenGymInspiredGymPrototype.tsx` — removed fake route and
+  representative-data component.
+- `docs/OPEN_GYM_GYM_INTEGRATION_MASTER_PLAN.md`, current Gym maps/knowledge
+  docs, and current `openspec/specs/` — reconciled production truth.
+- `openspec/changes/archive/2026-08-30-*/` — 16 completed or superseded
+  historical changes moved through the archive workflow; the simulation
+  proposal records its two external blockers.
+- `simulation-output/` — ignored browser/native evidence only; no generated
+  output is tracked.
 
 ## Recovery / Resume Instructions
 
@@ -360,8 +376,22 @@ fixed with regression proof and the exact pushed `main` state is verified.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Campaign not yet complete.
-- Proof: Baseline Git/plan/OpenSpec evidence is recorded above; runtime and
-  final delivery evidence remain outstanding.
-- Follow-up: None yet.
+- Status: Completed.
+- Summary: The hard-coded OpenGym-inspired route was removed. Its useful
+  Today/Week, adaptive exercise discovery, previous-context, and action-first
+  interaction ideas are represented by the real SQLite-backed Workout V2
+  surface, with a guarded fixed Start footer, explicit empty search state,
+  contextual planning labels, and mobile-sized controls. Sixteen completed or
+  superseded OpenSpec records were archived and current-facing documentation
+  now points at production truth.
+- Proof: Focused Workout/Gym browser coverage is 15/15; the full local-only
+  browser matrix is 194 passed with 44 expected remote-capability skips; the
+  dummy sync lane is 40 passed with 6 capability-gated skips; unit,
+  integration, deterministic simulation, timezone, schema, impact, theme,
+  and web-export gates are green. Native smoke/persistence/lifecycle are
+  explicitly blocked by the machine's API-35-only AVDs, and iOS is blocked by
+  missing Xcode on Windows.
+- Follow-up: Run the documented native Android/iOS lanes when their required
+  environments are available. The only remaining unarchived OpenSpec change
+  is the simulation platform's externally blocked optional lanes; its local
+  deterministic runner remains valid and usable.
