@@ -44,11 +44,11 @@ export function Button({
       onFocus={focusRing.onFocus}
       onBlur={focusRing.onBlur}
       className={`min-h-[48px] rounded-2xl px-4 py-3 ${inactive ? 'opacity-40' : ''}`}
-      style={({ pressed }) => [
-        variant === 'ghost'
+      style={({ pressed }) => ({
+        ...(variant === 'ghost'
           ? { backgroundColor: tokens.surfaceElevated, borderColor: tokens.border, borderWidth: 1 }
-          : { backgroundColor: fillFor(pressed) },
-        variant === 'primary' || variant === 'danger'
+          : { backgroundColor: fillFor(pressed) }),
+        ...(variant === 'primary' || variant === 'danger'
           ? {
               shadowColor: tokens.shadowColor,
               shadowOffset: { width: 0, height: 6 },
@@ -56,10 +56,10 @@ export function Button({
               shadowRadius: 12,
               elevation: inactive ? 0 : 1,
             }
-          : undefined,
+          : {}),
         // Visible keyboard-focus indication on web (Design DNA §15).
-        focusRing.focusRingStyle,
-      ]}
+        ...(focusRing.focusRingStyle ?? {}),
+      })}
       onPress={onPress}
     >
       {loading ? (
