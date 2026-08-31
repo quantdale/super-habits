@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -220,7 +221,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
   const { width: viewportWidth } = useWindowDimensions();
-  const compactHeader = viewportWidth < 600;
+  const compactHeader = Platform.OS === 'web' && viewportWidth < 600;
 
   const [layout, setLayout] = useState<OverviewCardId[]>([]);
   const [isCustomizing, setIsCustomizing] = useState(false);
