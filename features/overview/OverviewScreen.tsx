@@ -222,6 +222,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { width: viewportWidth } = useWindowDimensions();
   const compactHeader = Platform.OS === 'web' && viewportWidth < 600;
+  const stackedHeader = compactHeader || (Platform.OS !== 'web' && viewportWidth < 1200);
 
   const [layout, setLayout] = useState<OverviewCardId[]>([]);
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -383,7 +384,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           <View className="flex-row flex-wrap items-start justify-between gap-4">
             <View
               className="min-w-0 flex-1"
-              style={compactHeader ? { flexBasis: '100%' } : undefined}
+              style={stackedHeader ? { flexBasis: '100%' } : undefined}
             >
               <Text className="text-2xl font-bold leading-tight" style={{ color: tokens.text }}>
                 Today
@@ -393,8 +394,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
               </Text>
             </View>
             <View
-              className={`flex-row flex-wrap items-center justify-end gap-2 pt-0.5 ${
-                compactHeader ? 'w-full' : 'shrink-0'
+              className={`flex-row flex-wrap items-center gap-2 pt-0.5 ${
+                stackedHeader ? 'w-full justify-start' : 'shrink-0'
               }`}
             >
               <Pressable
