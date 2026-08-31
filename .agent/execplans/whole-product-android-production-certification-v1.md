@@ -1,7 +1,7 @@
 # ExecPlan: Whole-Product Android Production Certification V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -39,34 +39,28 @@ Run a long-running (~12h) autonomous production hardening, real-device-simulatio
 
 ## Current Checkpoint
 
-- Current milestone: Provenance hardening and release verification are in progress; historical Android and broad-QA evidence is retained below.
+- Current milestone: Campaign implementation, clean-source Android qualification, broad QA, and release evidence are complete. Generated reports under `simulation-output/` are ignored by design and are not release inputs.
 - Completed:
-  - Git truth verified at repository revision `56dad404b2e85c19e8821ad032a374d5e76d20bf`; the working tree intentionally contains the campaign's uncommitted UI, flow, test, and plan changes.
-  - Read AGENTS.md, ONBOARDING.md, .agent/PLANS.md, docs/testing/native-e2e.md, autonomous-qa.md, known-gaps, previous execplan, validate plan, qa-native scripts, Maestro config, and flows.
-  - Android discovery: JDK 17 correct, SDK rooted, adb 37.0.0, emulator 37.1.11, platforms 35/36/37, build-tools 34/35/36, Maestro 2.9.0 present, licenses accepted, Node v24.3.0 (nvmrc wants 22.23.2).
-  - Phase 1: Installed `system-images;android-36;default;x86_64`; created and booted `Nitro_API_36` with `sys.boot_completed=1`, API 36, x86_64, Android 16, and WHPX acceleration.
-  - Phase 2: Provisioned the current working-tree source APK. The native provenance report identifies repository revision `56dad404`; campaign changes are included in the built artifact even though they are not committed.
-  - Shared `core/ui/Modal.tsx` reserves the effective Android navigation-bar inset in modal bounds and scroll viewport sizing. `core/ui/Screen.tsx` applies the same fallback inset to page scroll bounds and bottom content padding.
-  - Final current-source APK report: source revision `56dad404b2e85c19e8821ad032a374d5e76d20bf`, APK SHA-256 `527D3F8C9CAA566ABDEE8887040EC4E2E602788DEDEDD7344D363FDF5B8FA68C`, package `com.dale16.superhabits` 1.0.0, API 36/x86_64 `Nitro_API_36` on `emulator-5564`, report `simulation-output/native/native-android-build.json`.
-  - Final exact-APK native lanes: smoke 2/2, targeted persistence 11/11, and lifecycle 6/6 pass on `emulator-5564`; reports `simulation-output/native/native-android-smoke-2026-08-31T132408817Z.json`, `simulation-output/native/native-android-persistence-2026-08-31T133539933Z.json`, and `simulation-output/native/native-android-lifecycle-2026-08-31T134232000Z.json`. The lifecycle aggregate includes Gym V2 session lifecycle; the persistence aggregate includes Gym V2 persistence.
-  - Phase 4-15 Android exploration: Mobile Next inspected Overview, Todos, Habits, Focus, Workout, Calories, Command Center, and Settings; screenshots are retained under `simulation-output/native/mobile-next-*.png`. Native settings, backup, portable backup, auth/session, command-center, habit-insight, and notification-path flows pass.
-  - Phase 16-19 durability/performance/stress: two fresh deterministic `soak-sustained-use` runs pass all 132 steps and integrity oracles (`simulation-output/run_mth48p9y_yni5rjk7/run-report.json`, `simulation-output/run_mth4apkz_d3u9wlze/run-report.json`). Cycle averages remain bounded without late-sequence growth; `npm run qa:timezones` passes all five timezone environments (43 tests each).
-  - Phase 20 audit: all modified Maestro flows pass syntax validation; campaign source/flow files pass targeted Prettier; no additional product defect was established.
-  - Broad local-only QA: `qa:full` passes typecheck, lint, 1,835 Vitest tests, OpenSpec validation, full web E2E, simulation validation, and all 23 deterministic scenarios. `npm run build:sync` plus `npm run e2e:sync` passes 40/46 with six documented capability skips. Impact map, themes, and Supabase schema validation also pass.
-- In progress: fail-closed native provenance tooling, focused retesting of corrected Maestro flows, intentional-change commit, clean final APK rebuild, final broad gates, push, and exact-head CI verification.
-- Last successful validation: final exact-APK native smoke 2/2, persistence 11/11, lifecycle 6/6; `npm run qa:fast` PASS (typecheck, ESLint, 1,608 unit tests), `npm test` PASS 1,835/1,835, `npm run openspec:validate` PASS 45/45, `npm run sim:validate` PASS 23/23, themes 140/140, Supabase schema, impact map, five-zone timezone matrix, targeted Maestro syntax, and targeted Prettier all PASS.
-- Current failures: None in repository-owned gates. The earlier lifecycle aggregate failure was classified as environment interference after Maestro's device server died and the emulator package service became unavailable; the clean exact-APK rerun passed all 6/6.
-- Important modified files: `.agent/execplans/whole-product-android-production-certification-v1.md`, `core/ui/Modal.tsx`, `core/ui/Screen.tsx`, `e2e/pwa-update.spec.ts`, `.maestro/flows/workout-gym-v2-persistence.yaml`, `.maestro/flows/workout-gym-v2-session-lifecycle.yaml`, `.maestro/flows/backup-v2-settings.yaml`, `.maestro/flows/portable-backup.yaml`, `.maestro/flows/portable-backup-blocked.yaml`, `.maestro/flows/auth-session-protect.yaml`, `.maestro/flows/command-center-v2.yaml`, `.maestro/flows/habit-progress-insights.yaml`, `.maestro/flows/habit-reminder-actions.yaml`, `.maestro/flows/habit-reminder-actions-replay.yaml`, `.maestro/flows/habit-reminder-delivery.yaml`; provision/log files and native reports are ignored/generated.
-- Broad QA triage:
-  - The first `qa:full` attempt built with workstation Supabase variables and failed the local-only Settings assertion; screenshot showed the configured-build copy. A forced local-only rebuild (`EXPO_PUBLIC_SUPABASE_URL=` and `EXPO_PUBLIC_SUPABASE_ANON_KEY=`) reproduced no product failure; isolated Settings is 2/2 pass and the final local-only `qa:full` is green.
-  - The PWA apply-update test exposed a real test synchronization race: `expect.poll()` evaluated `sessionStorage` while the worker-driven reload destroyed the execution context. Arming a page load listener before the click preserves the exact once-only reload assertion; isolated PWA coverage is 4/4 pass and the final local-only `qa:full` is green.
-  - One configured-backend portable-owner journey step failed once then passed on retry; the local-only lane correctly skips that remote-capability path. Preserve the prior artifact as a flaky/remote-environment observation, not a product failure.
+  - Starting SHA: `56dad404b2e85c19e8821ad032a374d5e76d20bf`.
+  - All intentional campaign changes are committed together: shared Android inset handling, PWA reload synchronization, corrected Maestro flows, documentation, and fail-closed native provenance tooling/tests.
+  - `scripts/native-provenance.mjs` now verifies both `HEAD` and the complete non-ignored working-tree status; provisioning fails closed before build and after Gradle if source identity or cleanliness changes.
+  - Native metadata records `sourceSha`, `sourceTreeClean`, `sourceTreeStatus`, target serial/API/ABI/AVD, package/version, APK SHA-256, and build/capture timestamps. The authoritative latest metadata file is `simulation-output/native/native-android-build.json`.
+  - API-36 `Nitro_API_36` is installed and booted on `emulator-5564` with `sys.boot_completed=1`, API 36, x86_64, Android 16, and WHPX acceleration.
+  - A fresh clean-source release APK was provisioned and installed with `npm run qa:native:provision -- --serial emulator-5564 --force`; the metadata report proves the APK source SHA equals the certification commit and `sourceTreeClean` is true.
+  - Exact-APK native certification passes: smoke 2/2, targeted persistence 11/11, and lifecycle 6/6 on `emulator-5564`; each aggregate report records the same build metadata and target identity.
+  - Mobile Next inspected the six product sections, Command Center, and Settings on `Nitro_API_36`; the accessibility hierarchy exposed the expected navigation and Workout/Gym V2 controls. ADB error-log inspection found no app crash or fatal exception.
+  - Final repository gates pass: `qa:fast`, `npm test` (1,837/1,837), integration tests (227/227), OpenSpec (45/45), all-plan validation, impact map (13 rules), themes (140/140), Supabase schema, five-zone timezone matrix (43 tests per zone), and `git diff --check`.
+  - Final web gates pass from a local-only build: `npm run build:web`, P0 journeys 25/25, full E2E 195 passed with 43 capability skips, and deterministic simulation validation plus all 23 deterministic scenarios.
+  - Final dummy-backend sync gates pass: `npm run build:sync` and `npm run e2e:sync` with 40/46 passed; six restore-capability steps are explicitly skipped because the isolated dummy backend has no remote backup state.
+  - Native auth flows requiring a real/mock backend are not counted as release failures in the no-backend APK run; deterministic local-auth mock coverage is retained in the historical ledger. No assertion was weakened.
+- Current failures: None in repository-owned gates.
+- Capability skips: full local-only web E2E skips internal remote parser/observation, broken-backend, Ask V2 remote, restore, owner-recovery, and reconnect steps (43 total); the sync build skips six restore steps for absent remote backup state. These are environment capability outcomes, not product failures.
 - Relevant quarantines: None.
-- Blockers: The intentional campaign changes are not yet committed, so the final clean-commit APK and exact-head CI evidence do not exist.
+- Blockers: None for repository-owned implementation or local qualification. Push and exact-head CI remain delivery controls and must be recorded in the final certification report.
 - Condition required to unblock: N/A.
-- Exact resume action after unblock: N/A.
-- Exact next action: finish provenance validation, commit the intentional campaign changes, then rebuild and rerun final Android and broad gates from the clean candidate SHA.
-- Remaining definition of done: final intended source committed and pushed; working tree clean; APK built from that exact clean commit with `sourceTreeClean: true`; Android smoke/persistence/lifecycle pass; broad gates pass; `HEAD == origin/main`; exact-head GitHub CI passes.
+- Exact resume action after unblock: If exact-head CI reports a code or test failure, classify it, fix the repository, create a new commit, and rerun clean-source provisioning plus all affected certification gates.
+- Exact next action: push the final clean commit, verify `HEAD == origin/main`, and inspect the exact-head GitHub Actions result.
+- Remaining definition of done: delivery controls above recorded with a clean tree and no unverified claims.
 
 ## Progress
 
@@ -79,7 +73,7 @@ Run a long-running (~12h) autonomous production hardening, real-device-simulatio
 - [x] Phase 5-15: Whole-product journey matrix — native section coverage and cross-feature web journeys verified
 - [x] Phase 16-19: Durability/performance/stress — two clean 132-step deterministic soak runs plus timezone matrix PASS
 - [x] Phase 20: Engineering audit + fixes — shared Android inset fix, flow synchronization corrections, and PWA test synchronization fix verified
-- [x] Phase 22-26: Final QA + rebuild + hygiene — broad QA/sync pass, final APK `527D3F8C...` certified, targeted syntax/format checks pass, generated scratch files removed, and plan validation pass
+- [x] Phase 22-26: Final QA + rebuild + hygiene — broad QA, sync pass, final clean-source APK, targeted syntax/format checks, generated scratch cleanup, and plan closure
 
 ## Surprises & Discoveries
 
@@ -206,6 +200,7 @@ Run a long-running (~12h) autonomous production hardening, real-device-simulatio
 
 ## Outcomes & Retrospective
 
-- Status: Active; historical Android and repository evidence is preserved, but release certification remains open until clean-commit provenance, push, and exact-head CI are verified.
-- Summary: API-36 Android qualification and broad local QA were established on the prior current-tree artifact. This continuation adds fail-closed Git provenance and must replace the dirty-tree artifact with a clean-commit certification artifact.
-- Remaining: Commit all intentional source, Maestro, E2E, tooling, documentation, and test changes; rerun final certification; push `main`; verify exact-head CI.
+- Status: Complete for implementation and local certification; the final report must include the push and exact-head CI controls before claiming external release readiness.
+- Summary: The campaign installed the missing API-36 x86_64 target, corrected Android edge-to-edge and Maestro synchronization defects, hardened native build provenance against dirty or changing source trees, and certified the resulting clean-source APK across smoke, persistence, and lifecycle lanes. Whole-product web, sync-boundary, contract, timezone, and deterministic simulation gates are green.
+- Capability boundary: Local-only web E2E intentionally omits remote-capability paths, and the dummy-backend sync lane cannot manufacture remote restore state. Those skips are enumerated in the validation ledger and final report. No real cloud success is claimed.
+- Follow-up: push `main`, verify the remote tip exactly, inspect the exact-head CI result, and recertify any changed commit instead of carrying stale APK provenance forward.
