@@ -43,19 +43,6 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
-# Undo the form-entry depth, then re-reveal the fresh top row.
-- swipe:
-    start: '50%, 20%'
-    end: '50%, 92%'
-    duration: 400
-- swipe:
-    start: '50%, 20%'
-    end: '50%, 92%'
-    duration: 400
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
 - extendedWaitUntil:
     visible: 'Native Gym reminder'
     timeout: 15000
@@ -78,18 +65,6 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
-- swipe:
-    start: '50%, 20%'
-    end: '50%, 92%'
-    duration: 400
-- swipe:
-    start: '50%, 20%'
-    end: '50%, 92%'
-    duration: 400
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
 - extendedWaitUntil:
     visible: 'Native Read reminder'
     timeout: 15000
@@ -115,10 +90,6 @@ tags:
     visible: 'Native Read reminder'
     timeout: 5000
 - assertNotVisible: 'Native Gym reminder'
-- swipe:
-    start: '50%, 70%'
-    end: '50%, 30%'
-    duration: 350
 - assertNotVisible: 'Reminder 18:00'
 - tapOn:
     text: 'Focus'

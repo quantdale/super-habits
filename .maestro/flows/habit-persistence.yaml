@@ -40,10 +40,6 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
 # Cold relaunch loads habits asynchronously; give the query time.
 - extendedWaitUntil:
     visible: 'Native daily habit: 1 of 1 today.*'

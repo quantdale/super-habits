@@ -32,19 +32,6 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
-# Return toward the top so the fresh Anytime-group row enters the viewport.
-- swipe:
-    start: '50%, 20%'
-    end: '50%, 92%'
-    duration: 400
-- swipe:
-    start: '50%, 20%'
-    end: '50%, 92%'
-    duration: 400
-- swipe:
-    start: '50%, 66%'
-    end: '50%, 28%'
-    duration: 350
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
@@ -74,10 +61,6 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
-- swipe:
-    start: '50%, 70%'
-    end: '50%, 30%'
-    duration: 350
 - assertNotVisible: 'Reminder 18:00'
 - killApp
 - launchApp
@@ -95,8 +78,4 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 15000
-- swipe:
-    start: '50%, 70%'
-    end: '50%, 30%'
-    duration: 350
 - assertNotVisible: 'Reminder 18:00'
