@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
 import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
@@ -211,6 +219,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const { openPlanningHub, setActiveSection, openSettings } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
+  const { width: viewportWidth } = useWindowDimensions();
+  const compactHeader = viewportWidth < 600;
 
   const [layout, setLayout] = useState<OverviewCardId[]>([]);
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -370,15 +380,22 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       >
         <View className="mx-auto w-full max-w-[1180px]">
           <View className="flex-row flex-wrap items-start justify-between gap-4">
-            <View className="min-w-0 flex-1">
+            <View
+              className="min-w-0 flex-1"
+              style={compactHeader ? { flexBasis: '100%' } : undefined}
+            >
               <Text className="text-2xl font-bold leading-tight" style={{ color: tokens.text }}>
-                {greeting}
+                Today
               </Text>
               <Text className="mt-1.5 text-sm leading-6" style={{ color: tokens.textMuted }}>
-                {todayHeading}
+                {greeting} · {todayHeading}
               </Text>
             </View>
-            <View className="shrink-0 flex-row flex-wrap items-center justify-end gap-2 pt-0.5">
+            <View
+              className={`flex-row flex-wrap items-center justify-end gap-2 pt-0.5 ${
+                compactHeader ? 'w-full' : 'shrink-0'
+              }`}
+            >
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={isCustomizing ? 'Done customizing' : 'Customize dashboard'}
@@ -386,6 +403,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 onPress={() => setIsCustomizing((prev) => !prev)}
                 className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
                 style={{
+                  minHeight: 48,
                   backgroundColor: isCustomizing
                     ? `${sectionAccents[POMODORO_SECTION_KEY].text}1f`
                     : tokens.surfaceElevated,
@@ -396,38 +414,42 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                   size={18}
                   color={sectionAccents[POMODORO_SECTION_KEY].text}
                 />
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
-                >
-                  {isCustomizing ? 'Done' : 'Customize'}
-                </Text>
+                {!compactHeader ? (
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                  >
+                    {isCustomizing ? 'Done' : 'Customize'}
+                  </Text>
+                ) : null}
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Open settings"
                 onPress={openSettings}
                 className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
-                style={{ backgroundColor: tokens.surfaceElevated }}
+                style={{ minHeight: 48, backgroundColor: tokens.surfaceElevated }}
               >
                 <MaterialIcons
                   name="settings"
                   size={18}
                   color={sectionAccents[POMODORO_SECTION_KEY].text}
                 />
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
-                >
-                  Settings
-                </Text>
+                {!compactHeader ? (
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                  >
+                    Settings
+                  </Text>
+                ) : null}
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Plan today"
                 onPress={() => openPlanningHub('today')}
                 className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
-                style={{ backgroundColor: tokens.surfaceElevated }}
+                style={{ minHeight: 48, backgroundColor: tokens.surfaceElevated }}
               >
                 <MaterialIcons
                   name="event-note"

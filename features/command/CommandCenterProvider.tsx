@@ -83,9 +83,8 @@ function FloatingCommandLauncher({
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        right: 16,
+        right: 88,
         bottom: 24,
-        zIndex: 80,
       }}
     >
       <Pressable
@@ -108,7 +107,7 @@ function FloatingCommandLauncher({
         <MaterialIcons name="bolt" size={20} color={contextCopy.accentColor} />
         {showLabel ? (
           <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            Command
+            Describe
           </Text>
         ) : null}
       </Pressable>

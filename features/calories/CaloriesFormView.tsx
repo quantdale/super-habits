@@ -146,40 +146,9 @@ export function CaloriesFormView({
 
   return (
     <>
-      <ScreenSection>
-        <View className="flex-row flex-wrap gap-3">
-          <View className="min-w-[160px] flex-1">
-            <FeatureStatCard
-              accentColor={accentColor}
-              textColor={colorText}
-              icon="restaurant-menu"
-              title="Days logged"
-              value={calorieActivityDays.filter((day) => day.active).length}
-              subtitle="Rolling year"
-              note={
-                hasCalorieStripActivity ? 'Daily intake history is active' : 'No intake history yet'
-              }
-            />
-          </View>
-          <View className="min-w-[160px] flex-1">
-            <FeatureStatCard
-              accentColor={accentColor}
-              textColor={colorText}
-              icon="track-changes"
-              title="Goal progress"
-              value={`${goalProgress.percent}%`}
-              subtitle="Today"
-              note={
-                goalProgress.over ? 'You are over goal' : `${goalProgress.remaining} kcal remaining`
-              }
-            />
-          </View>
-        </View>
-      </ScreenSection>
-
-      {/* Blueprint ordering: today's summary anchors the screen above the
-          add-entry form (diary mode already renders the summary first). */}
-      <ScreenSection>{todayCard}</ScreenSection>
+      {/* Form mode is action-first: quick logging and the full entry fields
+          appear before rolling-year statistics; the diary keeps its own
+          date-oriented summary. */}
 
       <ScreenSection>
         <Card
@@ -225,6 +194,37 @@ export function CaloriesFormView({
             footer={addEntryFooter}
           />
         </Card>
+      </ScreenSection>
+      <ScreenSection>{todayCard}</ScreenSection>
+      <ScreenSection>
+        <View className="flex-row flex-wrap gap-3">
+          <View className="min-w-[160px] flex-1">
+            <FeatureStatCard
+              accentColor={accentColor}
+              textColor={colorText}
+              icon="restaurant-menu"
+              title="Days logged"
+              value={calorieActivityDays.filter((day) => day.active).length}
+              subtitle="Rolling year"
+              note={
+                hasCalorieStripActivity ? 'Daily intake history is active' : 'No intake history yet'
+              }
+            />
+          </View>
+          <View className="min-w-[160px] flex-1">
+            <FeatureStatCard
+              accentColor={accentColor}
+              textColor={colorText}
+              icon="track-changes"
+              title="Goal progress"
+              value={`${goalProgress.percent}%`}
+              subtitle="Today"
+              note={
+                goalProgress.over ? 'You are over goal' : `${goalProgress.remaining} kcal remaining`
+              }
+            />
+          </View>
+        </View>
       </ScreenSection>
 
       {entries.length > 0 ? (

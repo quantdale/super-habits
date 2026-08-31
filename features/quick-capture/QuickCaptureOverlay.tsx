@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import { useCommandCenter } from '@/features/command/commandCenterContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { addTodo, removeTodo } from '@/features/todos/todos.data';
 import { addHabit, deleteHabit } from '@/features/habits/habits.data';
@@ -97,7 +98,8 @@ function rebuildRecentCapture(record: PersistedRecentCapture): RecentCapture | n
 
 export function QuickCaptureOverlay() {
   const { tokens, sectionAccents } = useAppTheme();
-  const { closeQuickCapture, setActiveSection } = useAppNavigation();
+  const { closeQuickCapture, setActiveSection, activeSection } = useAppNavigation();
+  const { openCommandCenter } = useCommandCenter();
   const [mode, setMode] = useState<CaptureMode>('todo');
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [goals, setGoals] = useState<{ id: string; title: string }[]>([]);
@@ -183,6 +185,11 @@ export function QuickCaptureOverlay() {
     },
     [resetForm],
   );
+  const openAdvancedCapture = useCallback(() => {
+    const context = activeSection;
+    closeQuickCapture();
+    setTimeout(() => openCommandCenter(context), 0);
+  }, [activeSection, closeQuickCapture, openCommandCenter]);
 
   const pushRecent = useCallback((entry: RecentCapture) => {
     setRecent((prev) => pushRecentCapture(prev, entry));
@@ -325,7 +332,7 @@ export function QuickCaptureOverlay() {
   return (
     <View className="gap-3">
       <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-        Quick Capture
+        Add something
       </Text>
       <View className="flex-row flex-wrap">
         {MODES.map((m) => (
@@ -529,6 +536,7 @@ export function QuickCaptureOverlay() {
             </View>
           ) : null}
 
+          <Button label="Describe it" variant="ghost" onPress={openAdvancedCapture} />
           <Button label="Done" variant="ghost" onPress={closeQuickCapture} />
         </>
       )}

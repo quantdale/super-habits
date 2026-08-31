@@ -29,7 +29,14 @@ export const OVERVIEW_CARD_IDS = [
 
 export type OverviewCardId = (typeof OVERVIEW_CARD_IDS)[number];
 
-export const DEFAULT_CARD_LAYOUT: OverviewCardId[] = [...OVERVIEW_CARD_IDS];
+export const DEFAULT_CARD_LAYOUT: OverviewCardId[] = [
+  'plan',
+  'todos',
+  'habits',
+  'focus',
+  'workout',
+  'calories',
+];
 
 // ---------------------------------------------------------------------------
 // Card layout persistence helpers

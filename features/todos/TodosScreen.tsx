@@ -719,7 +719,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
           {totallyEmpty ? (
             <ScreenSection>
-              <TodoQuickCapture onSubmit={handleQuickAdd} />
+              <TodoQuickCapture onSubmit={handleQuickAdd} onOpenDetails={openNewTodoModal} />
               {noPendingTasksCard}
             </ScreenSection>
           ) : null}
@@ -837,7 +837,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 </View>
               ) : (
                 <>
-                  <TodoQuickCapture onSubmit={handleQuickAdd} />
+                  <TodoQuickCapture onSubmit={handleQuickAdd} onOpenDetails={openNewTodoModal} />
                   <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
                     <View>
                       <Text className="text-base font-semibold" style={{ color: tokens.text }}>
@@ -1161,16 +1161,6 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
         {confirmationDialog}
       </Screen>
-
-      <Pressable
-        onPress={openNewTodoModal}
-        accessibilityRole="button"
-        accessibilityLabel="Add task"
-        className="absolute bottom-24 right-4 z-10 h-14 w-14 items-center justify-center rounded-full shadow-lg"
-        style={{ backgroundColor: COLOR, elevation: 4, shadowColor: tokens.shadowColor }}
-      >
-        <MaterialIcons name="add" size={28} color={tokens.textOnAccent} />
-      </Pressable>
     </View>
   );
 }

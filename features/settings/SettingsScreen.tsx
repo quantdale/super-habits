@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.coordinator';
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { syncEngine } from '@/core/sync/sync.engine';
-import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
-import { ScreenSection } from '@/core/ui/ScreenSection';
 import { DEFAULT_GOAL, getCalorieGoal, setCalorieGoal } from '@/features/calories/calories.data';
 import type { CalorieGoal } from '@/features/calories/types';
 import {
@@ -326,26 +324,20 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
 
   return (
     <Screen scroll>
-      <ScreenSection>
-        <PageHeader
-          title="Settings"
-          subtitle="Everyday settings come first. Internal tools stay separate at the bottom."
-          actions={
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close settings"
-              className="ml-4 flex-row items-center gap-1.5 rounded-2xl border px-3.5 py-2.5"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-              onPress={onRequestClose}
-            >
-              <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                Back
-              </Text>
-            </Pressable>
-          }
-        />
-      </ScreenSection>
+      <View className="mb-4 items-end">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close settings"
+          className="flex-row items-center gap-1.5 rounded-2xl border px-3.5 py-2.5"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          onPress={onRequestClose}
+        >
+          <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            Back
+          </Text>
+        </Pressable>
+      </View>
 
       <SettingsAppearanceSection
         mode={mode}

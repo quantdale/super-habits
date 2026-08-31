@@ -773,78 +773,6 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         </ScreenSection>
       ) : null}
 
-      {!activeSession ? (
-        <ScreenSection>
-          <View className="flex-row flex-wrap gap-3">
-            <View className="min-w-[160px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="timer"
-                title="Focus sessions"
-                value={sessions.length}
-                subtitle="Last 52 weeks"
-                note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
-              />
-            </View>
-            <View className="min-w-[160px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="local-fire-department"
-                title="Current streak"
-                value={pomodoroStreak}
-                subtitle="Consecutive focus days"
-                note={
-                  pomodoroStreak > 0
-                    ? 'Keep the streak alive'
-                    : 'Your next session starts the streak'
-                }
-              />
-            </View>
-          </View>
-          <View className="mt-3 flex-row flex-wrap gap-3">
-            <View className="min-w-[110px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="today"
-                title="Today"
-                value={`${focusStats.todayMinutes}m`}
-                subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
-                note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
-              />
-            </View>
-            <View className="min-w-[110px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="date-range"
-                title="This week"
-                value={`${focusStats.weekMinutes}m`}
-                subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
-                note="Last 7 days"
-              />
-            </View>
-            <View className="min-w-[110px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="insights"
-                title="30 days"
-                value={`${focusStats.thirtyDayMinutes}m`}
-                subtitle={
-                  focusStats.bestDay
-                    ? `Best day ${focusStats.bestDay.minutes}m`
-                    : `${focusStats.thirtyDaySessions} sessions`
-                }
-                note={focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'}
-              />
-            </View>
-          </View>
-        </ScreenSection>
-      ) : null}
-
       <ScreenSection>
         <Card
           variant="header"
@@ -1044,6 +972,77 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           ) : null}
         </Card>
       </ScreenSection>
+      {!activeSession ? (
+        <ScreenSection>
+          <View className="flex-row flex-wrap gap-3">
+            <View className="min-w-[160px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="timer"
+                title="Focus sessions"
+                value={sessions.length}
+                subtitle="Last 52 weeks"
+                note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
+              />
+            </View>
+            <View className="min-w-[160px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="local-fire-department"
+                title="Current streak"
+                value={pomodoroStreak}
+                subtitle="Consecutive focus days"
+                note={
+                  pomodoroStreak > 0
+                    ? 'Keep the streak alive'
+                    : 'Your next session starts the streak'
+                }
+              />
+            </View>
+          </View>
+          <View className="mt-3 flex-row flex-wrap gap-3">
+            <View className="min-w-[110px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="today"
+                title="Today"
+                value={`${focusStats.todayMinutes}m`}
+                subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
+                note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
+              />
+            </View>
+            <View className="min-w-[110px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="date-range"
+                title="This week"
+                value={`${focusStats.weekMinutes}m`}
+                subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
+                note="Last 7 days"
+              />
+            </View>
+            <View className="min-w-[110px] flex-1">
+              <FeatureStatCard
+                accentColor={COLOR}
+                textColor={textColor}
+                icon="insights"
+                title="30 days"
+                value={`${focusStats.thirtyDayMinutes}m`}
+                subtitle={
+                  focusStats.bestDay
+                    ? `Best day ${focusStats.bestDay.minutes}m`
+                    : `${focusStats.thirtyDaySessions} sessions`
+                }
+                note={focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'}
+              />
+            </View>
+          </View>
+        </ScreenSection>
+      ) : null}
 
       {notePromptSessionId && !activeSession && !summaryVisible ? (
         <ScreenSection>

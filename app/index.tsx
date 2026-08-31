@@ -53,6 +53,7 @@ const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolea
 
 type TopTabItemProps = {
   isFocused?: boolean;
+  compact?: boolean;
   label: string;
   icon: string;
   color: string;
@@ -66,6 +67,7 @@ type TopTabItemProps = {
 
 function TopTabItem({
   isFocused,
+  compact,
   label,
   icon,
   color,
@@ -90,12 +92,14 @@ function TopTabItem({
       onBlur={() => setKeyboardFocused(false)}
       style={[
         {
-          flex: 1,
+          flex: compact ? undefined : 1,
+          width: compact ? '32.8%' : undefined,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 5,
           minWidth: 0,
+          flexShrink: compact ? 0 : 1,
           backgroundColor: isFocused ? surfaceColor : tabRailColor,
           borderBottomWidth: isFocused ? 0 : 1,
           borderBottomColor: tabRailBorderColor,
@@ -104,8 +108,8 @@ function TopTabItem({
           marginTop: isFocused ? 0 : 3,
           marginBottom: isFocused ? -1 : 0,
           zIndex: isFocused ? 2 : 0,
-          paddingVertical: 10,
-          paddingHorizontal: 4,
+          paddingVertical: compact ? 8 : 10,
+          paddingHorizontal: compact ? 6 : 4,
           minHeight: 48,
         },
         // Visible keyboard-focus indication on web so the tab rail stays
@@ -125,7 +129,7 @@ function TopTabItem({
           fontSize: 12,
           color: isFocused ? color : inactiveColor,
           fontWeight: isFocused ? '600' : '400',
-          flexShrink: 1,
+          flexShrink: compact ? 0 : 1,
         }}
         numberOfLines={1}
       >
@@ -184,6 +188,8 @@ export default function Index() {
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop, bottom: safeAreaBottom } = useSafeAreaInsets();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
+  const compactNavigation = screenWidth < 600;
+  const showQuickCaptureLabel = Platform.OS === 'web' && screenWidth >= 960;
 
   const currentIndex = useMemo(
     () => NAV_ITEMS.findIndex((item) => item.name === activeSection),
@@ -251,6 +257,7 @@ export default function Index() {
         accessibilityRole="tablist"
         style={{
           flexDirection: 'row',
+          flexWrap: compactNavigation ? 'wrap' : 'nowrap',
           width: '100%',
           alignItems: 'stretch',
           backgroundColor: tokens.tabRail,
@@ -273,6 +280,7 @@ export default function Index() {
             <TopTabItem
               key={item.name}
               isFocused={activeSection === item.name}
+              compact={compactNavigation}
               label={item.label}
               icon={item.icon}
               color={color}
@@ -325,7 +333,7 @@ export default function Index() {
       <Modal
         visible={isPlanningHubOpen}
         onClose={closePlanningHub}
-        title="Planning Hub"
+        title="Plan"
         scroll
         layout="drawer"
       >
@@ -335,7 +343,7 @@ export default function Index() {
       <Modal
         visible={isQuickCaptureOpen}
         onClose={closeQuickCapture}
-        title="Quick Capture"
+        title="Add"
         scroll
         layout="bottom-sheet"
       >
@@ -346,7 +354,9 @@ export default function Index() {
         accessibilityRole="button"
         accessibilityLabel="Quick capture"
         onPress={openQuickCapture}
-        className="absolute right-4 h-14 w-14 items-center justify-center rounded-full shadow-lg"
+        className={`absolute right-4 items-center justify-center shadow-lg ${
+          showQuickCaptureLabel ? 'flex-row gap-2 rounded-2xl px-4 py-3' : 'h-14 w-14 rounded-full'
+        }`}
         style={{
           bottom: safeAreaBottom + 16,
           backgroundColor: SECTION_COLORS.focus,
@@ -358,6 +368,11 @@ export default function Index() {
         }}
       >
         <MaterialIcons name="add" size={26} color={tokens.textOnAccent} />
+        {showQuickCaptureLabel ? (
+          <Text className="text-sm font-semibold" style={{ color: tokens.textOnAccent }}>
+            Add
+          </Text>
+        ) : null}
       </Pressable>
     </View>
   );

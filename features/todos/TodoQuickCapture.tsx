@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { opacity } from '@/core/theme';
 import { useAppTheme } from '@/core/providers/themeContext';
@@ -8,14 +8,16 @@ import { useAppTheme } from '@/core/providers/themeContext';
 type Props = {
   /** Creates the task; resolves after persistence so the input only clears on success. */
   onSubmit: (title: string) => Promise<void>;
+  /** Opens the full task editor for dates, links, recurrence, and rules. */
+  onOpenDetails?: () => void;
 };
 
 /**
  * Persistent single-line quick capture pinned above the pending list. Enter or
- * the add button creates a task with just a title; the FAB stays available for
- * detailed capture (due date, priority, project, linked actions).
+ * the add button creates a task with just a title; the optional details action
+ * keeps advanced task editing reachable without another floating action.
  */
-export function TodoQuickCapture({ onSubmit }: Props) {
+export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
   const { tokens } = useAppTheme();
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,6 +67,19 @@ export function TodoQuickCapture({ onSubmit }: Props) {
       >
         <MaterialIcons name="add" size={24} color={tokens.textOnAccent} />
       </Pressable>
+      {onOpenDetails ? (
+        <Pressable
+          onPress={onOpenDetails}
+          accessibilityRole="button"
+          accessibilityLabel="Add task"
+          accessibilityHint="Open task details"
+          className="min-h-[48px] justify-center rounded-xl px-2"
+        >
+          <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
+            Details
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

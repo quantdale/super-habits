@@ -711,205 +711,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         />
       </ScreenSection>
 
-      <ScreenSection>
-        <Card accentColor={SECTION_COLORS.habits} className="mb-0" innerClassName="p-0">
-          <View className="p-4">
-            <View className="flex-row items-start gap-3">
-              <View
-                className="h-11 w-11 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
-              >
-                <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                  Today&apos;s rhythm
-                </Text>
-                <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
-                  {habits.length} habits across your daily routine
-                </Text>
-              </View>
-            </View>
-
-            {/* Blueprint §3B: one calm completion summary — ring + caption.
-                Rest day renders a neutral empty ring with no fake percentage. */}
-            <View
-              className="mt-4 flex-row items-center gap-4"
-              accessible
-              accessibilityLabel={
-                todayProgress === null
-                  ? 'No habits scheduled today.'
-                  : `Today: ${completedTodayCount} of ${scheduledTodayCount} scheduled habits complete.`
-              }
-            >
-              <View
-                style={{
-                  width: 76,
-                  height: 76,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <ProgressRing
-                  size={76}
-                  strokeWidth={8}
-                  progress={todayProgress === null ? 0 : completedTodayCount / scheduledTodayCount}
-                  backgroundColor={tokens.border}
-                  progressColor={SECTION_COLORS.habits}
-                />
-                <View
-                  style={{
-                    position: 'absolute',
-                    left: 8,
-                    top: 8,
-                    width: 60,
-                    height: 60,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    className="text-sm font-bold tabular-nums"
-                    style={{ color: tokens.text }}
-                    importantForAccessibility="no"
-                  >
-                    {todayProgress === null ? '—' : `${todayProgress}%`}
-                  </Text>
-                </View>
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                  {todayProgress === null
-                    ? 'Rest day'
-                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`}
-                </Text>
-                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
-                  {todayProgress === null
-                    ? 'No habits due today.'
-                    : todayProgress >= 100
-                      ? 'All done for today.'
-                      : `${scheduledTodayCount - completedTodayCount} habit${
-                          scheduledTodayCount - completedTodayCount === 1 ? '' : 's'
-                        } left to check in.`}
-                </Text>
-              </View>
-            </View>
-
-            <View className="mt-4 flex-row flex-wrap gap-3">
-              <StatBlock
-                accentColor={SECTION_COLORS.habits}
-                className="min-w-[148px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>⚡</Text>}
-                value={overallStreak}
-                label="Best streak"
-                detail="days in a row"
-              />
-              <StatBlock
-                accentColor={SECTION_COLORS.habits}
-                className="min-w-[148px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>📊</Text>}
-                value={`${consistencyPct}%`}
-                label="Consistency"
-                detail="over the last year"
-              />
-              <StatBlock
-                accentColor={SECTION_COLORS.habits}
-                className="min-w-[148px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>🗓️</Text>}
-                value={todayProgress === null ? 'Rest' : `${todayProgress}%`}
-                label="Today"
-                detail={
-                  todayProgress === null
-                    ? 'no habits scheduled'
-                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`
-                }
-              />
-            </View>
-          </View>
-        </Card>
-      </ScreenSection>
-
-      <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
-        <View className="flex-row flex-wrap gap-2">
-          {(
-            [
-              { key: 'active', label: 'Active' },
-              { key: 'paused', label: 'Paused' },
-              { key: 'archived', label: 'Archived' },
-              { key: 'all', label: 'All' },
-            ] as { key: HabitStatusFilter; label: string }[]
-          ).map((option) => {
-            const active = statusFilter === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter habits: ${option.label}`}
-                accessibilityState={{ selected: active }}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  active
-                    ? { backgroundColor: COLOR, borderColor: COLOR }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setStatusFilter(option.key)}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: active ? tokens.textOnAccent : tokens.textMuted }}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View className="flex-row flex-wrap gap-2">
-          {(
-            [
-              { key: 'default', label: 'Default order' },
-              { key: 'name', label: 'Name' },
-              { key: 'streak', label: 'Streak' },
-            ] as { key: HabitSortMode; label: string }[]
-          ).map((option) => {
-            const active = sortMode === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Sort habits by ${option.label}`}
-                accessibilityState={{ selected: active }}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  active
-                    ? { backgroundColor: tokens.textMuted, borderColor: tokens.textMuted }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setSortMode(option.key)}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: active ? (tokens.surface ?? '#fff') : tokens.textMuted }}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScreenSection>
-
-      {habitsLoaded ? (
-        <ScreenSection className="pb-0" accessibilityLabel="Check-in day">
-          <HabitDayStrip
-            days={stripDays}
-            selectedDateKey={selectedDateKey}
-            todayKey={todayKey}
-            onSelect={setSelectedDateKey}
-          />
-        </ScreenSection>
-      ) : null}
-
       <ScreenSection className="gap-4 pb-2" accessibilityLabel="Habit groups">
         {!habitsLoaded ? (
           // First-load placeholders in place of the grid (no premature
@@ -1229,6 +1030,205 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             })
           : null}
       </ScreenSection>
+
+      <ScreenSection>
+        <Card accentColor={SECTION_COLORS.habits} className="mb-0" innerClassName="p-0">
+          <View className="p-4">
+            <View className="flex-row items-start gap-3">
+              <View
+                className="h-11 w-11 items-center justify-center rounded-xl"
+                style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
+              >
+                <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                  Today&apos;s rhythm
+                </Text>
+                <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
+                  {habits.length} habits across your daily routine
+                </Text>
+              </View>
+            </View>
+
+            {/* Blueprint §3B: one calm completion summary — ring + caption.
+                Rest day renders a neutral empty ring with no fake percentage. */}
+            <View
+              className="mt-4 flex-row items-center gap-4"
+              accessible
+              accessibilityLabel={
+                todayProgress === null
+                  ? 'No habits scheduled today.'
+                  : `Today: ${completedTodayCount} of ${scheduledTodayCount} scheduled habits complete.`
+              }
+            >
+              <View
+                style={{
+                  width: 76,
+                  height: 76,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ProgressRing
+                  size={76}
+                  strokeWidth={8}
+                  progress={todayProgress === null ? 0 : completedTodayCount / scheduledTodayCount}
+                  backgroundColor={tokens.border}
+                  progressColor={SECTION_COLORS.habits}
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: 8,
+                    top: 8,
+                    width: 60,
+                    height: 60,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    className="text-sm font-bold tabular-nums"
+                    style={{ color: tokens.text }}
+                    importantForAccessibility="no"
+                  >
+                    {todayProgress === null ? '—' : `${todayProgress}%`}
+                  </Text>
+                </View>
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                  {todayProgress === null
+                    ? 'Rest day'
+                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`}
+                </Text>
+                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                  {todayProgress === null
+                    ? 'No habits due today.'
+                    : todayProgress >= 100
+                      ? 'All done for today.'
+                      : `${scheduledTodayCount - completedTodayCount} habit${
+                          scheduledTodayCount - completedTodayCount === 1 ? '' : 's'
+                        } left to check in.`}
+                </Text>
+              </View>
+            </View>
+
+            <View className="mt-4 flex-row flex-wrap gap-3">
+              <StatBlock
+                accentColor={SECTION_COLORS.habits}
+                className="min-w-[148px] flex-1"
+                icon={<Text style={{ fontSize: 20 }}>⚡</Text>}
+                value={overallStreak}
+                label="Best streak"
+                detail="days in a row"
+              />
+              <StatBlock
+                accentColor={SECTION_COLORS.habits}
+                className="min-w-[148px] flex-1"
+                icon={<Text style={{ fontSize: 20 }}>📊</Text>}
+                value={`${consistencyPct}%`}
+                label="Consistency"
+                detail="over the last year"
+              />
+              <StatBlock
+                accentColor={SECTION_COLORS.habits}
+                className="min-w-[148px] flex-1"
+                icon={<Text style={{ fontSize: 20 }}>🗓️</Text>}
+                value={todayProgress === null ? 'Rest' : `${todayProgress}%`}
+                label="Today"
+                detail={
+                  todayProgress === null
+                    ? 'no habits scheduled'
+                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`
+                }
+              />
+            </View>
+          </View>
+        </Card>
+      </ScreenSection>
+
+      <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
+        <View className="flex-row flex-wrap gap-2">
+          {(
+            [
+              { key: 'active', label: 'Active' },
+              { key: 'paused', label: 'Paused' },
+              { key: 'archived', label: 'Archived' },
+              { key: 'all', label: 'All' },
+            ] as { key: HabitStatusFilter; label: string }[]
+          ).map((option) => {
+            const active = statusFilter === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter habits: ${option.label}`}
+                accessibilityState={{ selected: active }}
+                className="rounded-full border px-3 py-1.5"
+                style={
+                  active
+                    ? { backgroundColor: COLOR, borderColor: COLOR }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setStatusFilter(option.key)}
+              >
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: active ? tokens.textOnAccent : tokens.textMuted }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View className="flex-row flex-wrap gap-2">
+          {(
+            [
+              { key: 'default', label: 'Default order' },
+              { key: 'name', label: 'Name' },
+              { key: 'streak', label: 'Streak' },
+            ] as { key: HabitSortMode; label: string }[]
+          ).map((option) => {
+            const active = sortMode === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort habits by ${option.label}`}
+                accessibilityState={{ selected: active }}
+                className="rounded-full border px-3 py-1.5"
+                style={
+                  active
+                    ? { backgroundColor: tokens.textMuted, borderColor: tokens.textMuted }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setSortMode(option.key)}
+              >
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: active ? (tokens.surface ?? '#fff') : tokens.textMuted }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScreenSection>
+
+      {habitsLoaded ? (
+        <ScreenSection className="pb-0" accessibilityLabel="Check-in day">
+          <HabitDayStrip
+            days={stripDays}
+            selectedDateKey={selectedDateKey}
+            todayKey={todayKey}
+            onSelect={setSelectedDateKey}
+          />
+        </ScreenSection>
+      ) : null}
 
       <ScreenSection className="mb-0 pt-1">
         <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
