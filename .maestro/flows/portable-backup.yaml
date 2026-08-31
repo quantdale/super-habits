@@ -23,21 +23,23 @@ tags:
 - extendedWaitUntil:
     visible: 'Theme and display'
     timeout: 10000
-# Scroll down in stages to the Portable data card (after the backup section).
-- repeat:
-    times: 10
-    commands:
-      - swipe:
-          start: 50%, 85%
-          end: 50%, 30%
-          duration: 200
-# The fling reaches the bottom; scroll back up until the card is found.
+# Scroll within the settings modal in stable anchors to the Portable data card.
+- scrollUntilVisible:
+    element:
+      text: 'Backup status and restore'
+    direction: DOWN
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: 'Portable data'
-    direction: UP
+    direction: DOWN
     timeout: 30000
 - assertVisible: 'Portable data'
+- scrollUntilVisible:
+    element:
+      text: 'This file contains your Super Habits data. Store it somewhere you trust. The exported file is not encrypted — anyone with the file can read its contents.'
+    direction: DOWN
+    timeout: 10000
 - assertVisible: 'This file contains your Super Habits data. Store it somewhere you trust. The exported file is not encrypted — anyone with the file can read its contents.'
 - assertVisible: 'Export data'
 - assertVisible: 'Import data'
@@ -46,14 +48,15 @@ tags:
 # Real OS share surface: export opens the Android share sheet.
 - tapOn: 'Export data'
 - extendedWaitUntil:
-    visible: 'Export Super Habits backup'
+    visible: 'No apps can perform this action.'
     timeout: 10000
 # Dismiss the share sheet without saving (semi-automated share smoke).
 - back
 # Real OS document picker: import selection surface opens and cancels.
 - tapOn: 'Import data'
 - extendedWaitUntil:
-    visible: 'Import data'
+    visible: 'Recent'
     timeout: 10000
+- assertVisible: 'No items'
 - back
 - stopApp

@@ -14,23 +14,36 @@ tags:
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000
-- tapOn: 'Add task'
-- extendedWaitUntil:
-    visible: 'Add a task'
-    timeout: 10000
-- tapOn: 'Add a task'
+- tapOn:
+    text: 'To Do'
+    index: 0
+- assertVisible: 'Quick add'
+- tapOn: 'Quick add task title'
 - inputText: 'Native local todo'
-- tapOn: 'Add task'
+- pressKey: enter
 - extendedWaitUntil:
     visible: 'Native local todo'
     timeout: 10000
+- tapOn:
+    text: 'Overview'
+    index: 0
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Theme and display'
     timeout: 10000
 - scrollUntilVisible:
     element:
+      text: 'Backup status and restore'
+    direction: DOWN
+    timeout: 20000
+- scrollUntilVisible:
+    element:
       text: 'Portable data'
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'Import is available only on an empty device. This device contains local data, so portable import is paused here.'
     direction: DOWN
     timeout: 20000
 - assertVisible: 'Import is available only on an empty device. This device contains local data, so portable import is paused here.'

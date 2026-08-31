@@ -1,5 +1,13 @@
 import { PropsWithChildren } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { layout } from '@/core/theme/designTokens';
 
@@ -16,10 +24,18 @@ type ScreenProps = PropsWithChildren<{
   contentMaxWidth?: number;
 }>;
 
+// Android 15+ edge-to-edge can leave RN's SafeAreaView inset at zero. Reserve
+// the standard 48dp three-button navigation bar when no inset is reported.
+const ANDROID_NAVIGATION_FALLBACK = 48;
 export function Screen({ children, scroll = false, padded = true, contentMaxWidth }: ScreenProps) {
   const { tokens } = useAppTheme();
   const { width } = useWindowDimensions();
-
+  const { bottom: safeAreaBottom } = useSafeAreaInsets();
+  const effectiveBottomInset =
+    Platform.OS === 'android'
+      ? Math.max(safeAreaBottom, ANDROID_NAVIGATION_FALLBACK)
+      : safeAreaBottom;
+  const bottomPadding = padded ? 36 + effectiveBottomInset : effectiveBottomInset;
   // Phones/narrow viewports keep the legacy shell styles untouched; only wide
   // viewports tighten the existing 1180 cap down to the content column width.
   const wideShellStyle: { maxWidth: number } | null =
@@ -31,9 +47,14 @@ export function Screen({ children, scroll = false, padded = true, contentMaxWidt
     <SafeAreaView style={[styles.root, { backgroundColor: tokens.background }]}>
       {scroll ? (
         <ScrollView
-          style={[styles.scroll, { backgroundColor: tokens.background }]}
+          style={[
+            styles.scroll,
+            effectiveBottomInset > 0 ? { marginBottom: effectiveBottomInset } : null,
+            { backgroundColor: tokens.background },
+          ]}
           contentContainerStyle={[
             padded ? styles.scrollContentPadded : styles.scrollContent,
+            bottomPadding > 0 ? { paddingBottom: bottomPadding } : null,
             { backgroundColor: tokens.background },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -51,6 +72,7 @@ export function Screen({ children, scroll = false, padded = true, contentMaxWidt
         <View
           style={[
             padded ? [styles.fill, styles.padded] : styles.fill,
+            bottomPadding > 0 ? { paddingBottom: bottomPadding } : null,
             { backgroundColor: tokens.background },
           ]}
         >

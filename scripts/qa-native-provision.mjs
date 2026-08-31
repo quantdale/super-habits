@@ -6,7 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -14,6 +14,7 @@ import {
   parsePackageIdentity,
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
+import { readGitProvenance, requireCleanGitTree } from './native-provenance.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
@@ -112,19 +113,12 @@ function run(command, args, options = {}) {
   };
 }
 
-function gitSha() {
-  try {
-    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-}
-
 function apkSha256(apkPath) {
   return createHash('sha256').update(readFileSync(apkPath)).digest('hex').toUpperCase();
 }
 
 function writeFailure(args, reason, details = {}) {
+  const provenance = readGitProvenance(ROOT);
   mkdirSync(REPORT_DIR, { recursive: true });
   const stamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
   const path = resolve(REPORT_DIR, `native-android-provision-${stamp}.json`);
@@ -137,7 +131,12 @@ function writeFailure(args, reason, details = {}) {
         classification: 'ENVIRONMENT',
         platform: 'android',
         appId: APP_ID,
-        gitSha: gitSha(),
+        gitSha: provenance.sourceSha,
+        sourceSha: provenance.sourceSha,
+        sourceTreeClean: provenance.sourceTreeClean,
+        sourceTreeStatus: provenance.sourceTreeStatus,
+        sourceShaError: provenance.sourceShaError,
+        sourceTreeStatusError: provenance.sourceTreeStatusError,
         requestedSerial: args.serial,
         reason,
         details,
@@ -191,18 +190,25 @@ function main(args) {
       `The local provisioning path targets Android API 36 x86_64; observed API ${target.api ?? 'unknown'} / ABI ${target.abi ?? 'unknown'} on '${serial}'.`,
     );
   }
+  const sourceProvenance = requireCleanGitTree(ROOT);
+  console.log(`Preparing clean source ${sourceProvenance.sourceSha} for ${serial}...`);
 
   const prebuildCommand = 'npx expo prebuild --platform android --clean';
   const buildEnv = { ...process.env, [E2E_ENV_NAME]: 'true' };
   const npx = findCommand('npx');
   if (!npx) throw new Error('npx is not installed or not discoverable on PATH.');
   if (args.force) console.log('Forcing a fresh current-source Android E2E build.');
-  console.log(`Preparing current source ${gitSha() ?? '<unknown SHA>'} for ${serial}...`);
   const prebuild = run(npx, ['expo', 'prebuild', '--platform', 'android', '--clean'], {
     env: buildEnv,
     stdio: 'inherit',
   });
   requireSuccess(prebuild, 'Expo Android prebuild', prebuildCommand);
+  const postPrebuildProvenance = requireCleanGitTree(ROOT);
+  if (postPrebuildProvenance.sourceSha !== sourceProvenance.sourceSha) {
+    throw new Error(
+      `Git HEAD changed during Expo prebuild (${sourceProvenance.sourceSha} -> ${postPrebuildProvenance.sourceSha}); refusing to certify the resulting APK.`,
+    );
+  }
 
   const gradleWrapper = resolve(
     ROOT,
@@ -223,6 +229,12 @@ function main(args) {
     stdio: 'inherit',
   });
   requireSuccess(gradle, 'Gradle Android release build', gradleCommand);
+  const builtSourceProvenance = requireCleanGitTree(ROOT);
+  if (builtSourceProvenance.sourceSha !== sourceProvenance.sourceSha) {
+    throw new Error(
+      `Git HEAD or working-tree provenance changed during the Android build (${sourceProvenance.sourceSha} -> ${builtSourceProvenance.sourceSha}); refusing to certify the resulting APK.`,
+    );
+  }
 
   const apkPath = resolve(
     ROOT,
@@ -253,13 +265,16 @@ function main(args) {
     );
   }
 
+  const builtAt = new Date().toISOString();
   const metadata = {
     schemaVersion: 1,
     status: 'PASS',
     classification: null,
     platform: 'android',
     appId: APP_ID,
-    sourceSha: gitSha(),
+    sourceSha: builtSourceProvenance.sourceSha,
+    sourceTreeClean: builtSourceProvenance.sourceTreeClean,
+    sourceTreeStatus: builtSourceProvenance.sourceTreeStatus,
     apkSha256: apkHash,
     apkPath: relative(ROOT, apkPath),
     versionName: packageIdentity.versionName,
@@ -269,7 +284,8 @@ function main(args) {
     prebuildCommand,
     buildCommand: gradleCommand,
     installCommand: `${adb} -s ${serial} install -r -d -g <apk>`,
-    capturedAt: new Date().toISOString(),
+    builtAt,
+    capturedAt: builtAt,
   };
   mkdirSync(dirname(METADATA_PATH), { recursive: true });
   writeFileSync(METADATA_PATH, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');

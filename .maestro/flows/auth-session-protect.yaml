@@ -18,19 +18,32 @@ tags:
 - scrollUntilVisible:
     element: 'Email for backup recovery'
     direction: DOWN
+- swipe:
+    start: 50%, 70%
+    end: 50%, 40%
+    duration: 300
 - tapOn: 'Email for backup recovery'
 - inputText: 'canary@example.test'
 - hideKeyboard
 - tapOn: 'Protect backup with email'
 - extendedWaitUntil:
-    visible: 'VERIFICATION PENDING'
+    visible: 'Six-digit verification code'
+    timeout: 20000
+- scrollUntilVisible:
+    element: 'VERIFICATION PENDING'
+    direction: UP
+    timeout: 20000
+- scrollUntilVisible:
+    element: 'Backup protection verification code'
+    direction: DOWN
     timeout: 20000
 - tapOn: 'Backup protection verification code'
 - inputText: '123456'
 - hideKeyboard
 - tapOn: 'Verify email'
-- extendedWaitUntil:
-    visible: 'PROTECTED'
+- scrollUntilVisible:
+    element: 'PROTECTED'
+    direction: UP
     timeout: 20000
 - assertNotVisible: 'ACCOUNT MISMATCH'
 - killApp

@@ -138,7 +138,12 @@ test.describe('PWA update lifecycle', () => {
     await bystander.waitForTimeout(1_000);
     const bystanderLoadsBefore = await getLoadCount(bystander);
 
+    // Arm the load listener before the worker-driven reload. Polling
+    // sessionStorage while the old execution context is being torn down can
+    // otherwise fail with "Execution context was destroyed".
+    const reloadPromise = page.waitForEvent('load', { timeout: 20_000 });
     await page.getByRole('button', { name: 'Apply app update' }).click();
+    await reloadPromise;
 
     // Loads: initial (1) + apply reload (2).
     await expect.poll(() => getLoadCount(page), { timeout: 20_000 }).toBe(2);

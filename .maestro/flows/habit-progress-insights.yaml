@@ -13,6 +13,9 @@ tags:
     direction: LEFT
 - swipe:
     direction: LEFT
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
 - tapOn: 'Add anytime habit'
 - tapOn: 'Habit name'
 - inputText: 'Native insights habit'

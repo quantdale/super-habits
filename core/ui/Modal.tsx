@@ -30,7 +30,7 @@ export type ModalProps = {
 // Android's native RNModal window does not always propagate the provider's
 // navigation-bar inset. Keep scrollable dialog actions above that bar when
 // the reported inset is zero.
-const ANDROID_MODAL_NAVIGATION_FALLBACK = 128;
+const ANDROID_MODAL_NAVIGATION_FALLBACK = 64;
 const MODAL_FOOTER_HEIGHT_RESERVE = 80;
 
 export function Modal({
@@ -48,13 +48,23 @@ export function Modal({
   const { bottom: safeAreaBottom } = useSafeAreaInsets();
   const isDrawer = layout === 'drawer';
   const isBottomSheet = layout === 'bottom-sheet';
-  const scrollBottomPadding =
+  const modalBottomInset =
     Platform.OS === 'android'
-      ? Math.max(safeAreaBottom, ANDROID_MODAL_NAVIGATION_FALLBACK) + 24
-      : safeAreaBottom + (isBottomSheet ? 24 : 0);
-  const scrollMaxHeight =
-    (layout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92) -
-    (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0);
+      ? Math.max(safeAreaBottom, ANDROID_MODAL_NAVIGATION_FALLBACK)
+      : safeAreaBottom;
+  const modalMaxHeight = isBottomSheet
+    ? Math.max(0, windowHeight * 0.92 - modalBottomInset)
+    : Math.max(0, windowHeight - 32 - modalBottomInset);
+  const scrollBottomPadding =
+    Platform.OS === 'android' ? modalBottomInset + 24 : safeAreaBottom + (isBottomSheet ? 24 : 0);
+  const scrollMaxHeight = Math.max(
+    0,
+    Math.min(
+      (layout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92) -
+        (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0),
+      modalMaxHeight - 88,
+    ),
+  );
 
   const overlayStyle = isDrawer
     ? {
@@ -62,12 +72,26 @@ export function Modal({
         justifyContent: 'flex-start' as const,
         paddingTop: 16,
         paddingRight: 16,
-        paddingBottom: 16,
+        paddingBottom: 16 + modalBottomInset,
         paddingLeft: 16,
       }
     : isBottomSheet
-      ? { alignItems: 'stretch' as const, justifyContent: 'flex-end' as const, padding: 0 }
-      : { alignItems: 'center' as const, justifyContent: 'center' as const, padding: 16 };
+      ? {
+          alignItems: 'stretch' as const,
+          justifyContent: 'flex-end' as const,
+          paddingTop: 0,
+          paddingRight: 0,
+          paddingBottom: modalBottomInset,
+          paddingLeft: 0,
+        }
+      : {
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
+          paddingTop: 16,
+          paddingRight: 16,
+          paddingBottom: 16 + modalBottomInset,
+          paddingLeft: 16,
+        };
 
   const shellStyle = isDrawer
     ? { width: Math.min(windowWidth - 32, 520) }
@@ -90,13 +114,17 @@ export function Modal({
     borderTopRightRadius: isBottomSheet ? 28 : 24,
     borderBottomLeftRadius: isBottomSheet ? 0 : 24,
     borderBottomRightRadius: isBottomSheet ? 0 : 24,
-    maxHeight: isDrawer ? windowHeight - 32 : isBottomSheet ? windowHeight * 0.92 : undefined,
+    maxHeight: modalMaxHeight,
   };
 
   const bodyContainerStyle = isBottomSheet
-    ? { maxHeight: windowHeight * 0.82 - (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0) }
+    ? {
+        maxHeight: Math.max(
+          0,
+          windowHeight * 0.82 - (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0) - modalBottomInset,
+        ),
+      }
     : undefined;
-
   return (
     <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View

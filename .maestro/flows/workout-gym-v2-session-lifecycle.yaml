@@ -17,10 +17,6 @@ tags:
 - tapOn:
     text: 'Workout'
     index: 0
-- swipe:
-    start: '5%, 85%'
-    end: '5%, 50%'
-    duration: 500
 - scrollUntilVisible:
     element: 'Routine name'
     direction: DOWN
@@ -28,10 +24,6 @@ tags:
 - tapOn: 'Routine name'
 - inputText: 'Native Gym V2 resume routine'
 - hideKeyboard
-- swipe:
-    start: '5%, 85%'
-    end: '5%, 50%'
-    duration: 500
 - scrollUntilVisible:
     element: 'Add routine'
     direction: DOWN
@@ -49,14 +41,25 @@ tags:
 - inputText: 'zzzz-native-resume'
 - hideKeyboard
 - scrollUntilVisible:
-    element: 'Create custom exercise'
+    element: 'Name'
     direction: DOWN
+    visibilityPercentage: 100
 - tapOn: 'Name'
 - inputText: 'Native resume press'
 - hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 2000
+- swipe:
+    start: '50%, 80%'
+    end: '50%, 40%'
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 2000
 - scrollUntilVisible:
     element: 'Primary body area'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
 - tapOn: 'Primary body area'
 - inputText: 'chest'
 - hideKeyboard
@@ -80,10 +83,6 @@ tags:
 - tapOn: 'Instructions (optional)'
 - inputText: 'Brace and press with a controlled descent'
 - hideKeyboard
-- swipe:
-    start: '5%, 85%'
-    end: '5%, 50%'
-    duration: 500
 - scrollUntilVisible:
     element: 'Create and add'
     direction: DOWN
@@ -137,17 +136,10 @@ tags:
     visible: 'Workout saved'
     timeout: 15000
 - tapOn: 'Done'
-- swipe:
-    direction: UP
-- swipe:
-    direction: UP
-- swipe:
-    direction: UP
-- swipe:
-    direction: UP
-- extendedWaitUntil:
-    visible: 'Recent sessions'
-    timeout: 15000
+- scrollUntilVisible:
+    element: 'Recent sessions'
+    direction: DOWN
+    visibilityPercentage: 50
 - killApp
 - launchApp
 - extendedWaitUntil:

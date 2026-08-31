@@ -43,14 +43,25 @@ tags:
 - inputText: 'zzzz-native-custom'
 - hideKeyboard
 - scrollUntilVisible:
-    element: 'Create custom exercise'
+    element: 'Name'
     direction: DOWN
+    visibilityPercentage: 100
 - tapOn: 'Name'
 - inputText: 'Native custom press'
 - hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 2000
+- swipe:
+    start: '50%, 80%'
+    end: '50%, 40%'
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 2000
 - scrollUntilVisible:
     element: 'Primary body area'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
 - tapOn: 'Primary body area'
 - inputText: 'chest'
 - hideKeyboard
@@ -71,10 +82,6 @@ tags:
 - tapOn: 'Instructions (optional)'
 - inputText: 'Brace and press with a controlled descent'
 - hideKeyboard
-- swipe:
-    start: '5%, 85%'
-    end: '5%, 50%'
-    duration: 500
 - scrollUntilVisible:
     element: 'Create and add'
     direction: DOWN
@@ -87,6 +94,9 @@ tags:
     timeout: 10000
 - assertVisible: 'Strength'
 - tapOn: 'Linear'
+- scrollUntilVisible:
+    element: 'Native custom press progression increment'
+    direction: DOWN
 - tapOn: 'Native custom press progression increment'
 - inputText: '2.5'
 - hideKeyboard
@@ -114,22 +124,20 @@ tags:
 - tapOn: 'Target reps max'
 - inputText: '8'
 - hideKeyboard
-- swipe:
-    start: '5%, 85%'
-    end: '5%, 50%'
-    duration: 500
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
 - tapOn: 'Target load'
 - inputText: '40'
 - hideKeyboard
 - assertVisible: 'Target load'
 - pressKey: BACK
-- swipe:
-    direction: DOWN
-- swipe:
-    direction: DOWN
+- scrollUntilVisible:
+    element: 'Week'
+    direction: UP
+    visibilityPercentage: 50
 - assertVisible: 'Week'
 - tapOn: 'Monday Native Gym V2 typed routine'
 - killApp
@@ -143,13 +151,15 @@ tags:
     text: 'Workout'
     index: 0
 - assertVisible: 'Monday Native Gym V2 typed routine'
-- swipe:
-    direction: UP
-- swipe:
-    direction: UP
-- swipe:
-    direction: UP
+- scrollUntilVisible:
+    element: 'Your routines'
+    direction: DOWN
+    visibilityPercentage: 50
 - assertVisible: 'Your routines'
+- scrollUntilVisible:
+    element: 'Open Native Gym V2 typed routine routine'
+    direction: DOWN
+    visibilityPercentage: 50
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'
 - scrollUntilVisible:

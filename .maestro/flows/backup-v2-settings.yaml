@@ -23,11 +23,21 @@ tags:
     timeout: 10000
 - scrollUntilVisible:
     element:
-      text: 'Backup coverage'
+      text: 'Backup status and restore'
     direction: DOWN
     timeout: 20000
 - assertVisible: 'Backup status and restore'
+- scrollUntilVisible:
+    element:
+      text: 'Recoverable areas'
+    direction: DOWN
+    timeout: 20000
 - assertVisible: 'Recoverable areas'
+- scrollUntilVisible:
+    element:
+      text: 'V2 scope'
+    direction: DOWN
+    timeout: 10000
 - assertVisible: 'V2 scope'
 - scrollUntilVisible:
     element:

@@ -28,10 +28,6 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
-- swipe:
-    start: '5%, 85%'
-    end: '5%, 50%'
-    duration: 500
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN

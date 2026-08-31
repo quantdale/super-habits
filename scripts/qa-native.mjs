@@ -20,6 +20,7 @@ import {
   parsePackageIdentity,
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
+import { readGitProvenance } from './native-provenance.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
@@ -180,6 +181,7 @@ function readBuildMetadata() {
 }
 
 function blocked(platform, tag, replayCommand, reason, details) {
+  const provenance = readGitProvenance(ROOT);
   const report = {
     schemaVersion: 1,
     status: 'BLOCKED',
@@ -189,7 +191,12 @@ function blocked(platform, tag, replayCommand, reason, details) {
     appId: APP_ID,
     tag,
     flow: details.flow,
-    gitSha: gitSha(),
+    gitSha: provenance.sourceSha,
+    sourceSha: provenance.sourceSha,
+    sourceTreeClean: provenance.sourceTreeClean,
+    sourceTreeStatus: provenance.sourceTreeStatus,
+    sourceShaError: provenance.sourceShaError,
+    sourceTreeStatusError: provenance.sourceTreeStatusError,
     reason,
     details,
     replayCommand,
@@ -269,17 +276,39 @@ function checkTarget(platform, options) {
           'Boot the documented Nitro_API_36 x86_64 emulator or use the EAS native-e2e workflow.',
       };
     }
-    const currentSha = gitSha();
+    const currentProvenance = readGitProvenance(ROOT);
+    if (currentProvenance.sourceShaError || currentProvenance.sourceSha === null) {
+      return {
+        blocked: `Android certification requires a verifiable Git HEAD; ${currentProvenance.sourceShaError ?? 'the current SHA is unavailable'}.`,
+        remediation: 'Run from a valid Git checkout and retry the native certification lane.',
+      };
+    }
+    if (currentProvenance.sourceTreeStatusError) {
+      return {
+        blocked: `Android certification requires a verifiable Git working-tree status; ${currentProvenance.sourceTreeStatusError}.`,
+        remediation: 'Repair Git status access, then retry the native certification lane.',
+      };
+    }
+    if (!currentProvenance.sourceTreeClean) {
+      return {
+        blocked: `Android certification requires a clean Git working tree; changed entries: ${currentProvenance.sourceTreeStatus.join(', ')}.`,
+        remediation:
+          'Commit, stash, or reconcile tracked and relevant untracked source changes before running native certification.',
+      };
+    }
+    const currentSha = currentProvenance.sourceSha;
     let metadata = readBuildMetadata();
     let installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
     let packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
     const metadataMatches = () =>
       metadata?.status === 'PASS' &&
+      metadata.sourceTreeClean === true &&
       metadata.appId === APP_ID &&
       metadata.sourceSha === currentSha &&
       metadata.target?.serial === serial &&
       metadata.target?.api === targetIdentity.api &&
       metadata.target?.abi === targetIdentity.abi &&
+      metadata.target?.avd === targetIdentity.avd &&
       metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true';
     if ((!packageInstalled || !metadataMatches()) && options.provision) {
       const provisioningBlock = provisionAndroid(serial);

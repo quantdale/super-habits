@@ -69,7 +69,8 @@ node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke
 On the documented Windows Android lane, the runner selects the single booted
 API-36 x86_64 target, checks its package/provenance identity, and automatically
 builds and installs the current credential-free `e2e-test` equivalent when the
-APK is missing or stale:
+APK is missing or stale. Native certification is fail-closed when Git cannot
+prove a clean checkout of the source SHA.
 
 ```bash
 npm run qa:native:provision -- --serial <serial>
@@ -85,10 +86,15 @@ node scripts/qa-native-delivery.mjs
 The local Android provisioner runs Expo prebuild with
 `EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST=true`, assembles the x86_64 release APK
 without production credentials, installs it on the verified serial, and writes
-ignored provenance metadata under `simulation-output/native/`. Missing Maestro,
-`adb`, Xcode/simctl, a booted target, or a supported API-36 x86_64 target
-returns `ENVIRONMENT` with a replay command and focused JSON report; it is not
-reported as a pass. EAS remains the cloud build/install path for iOS.
+ignored provenance metadata under `simulation-output/native/`. The metadata
+records the source SHA, `sourceTreeClean`, target serial/API/ABI/AVD, package
+identity, build timestamp, and APK SHA-256; the provisioner rechecks cleanliness
+after prebuild and Gradle. `git status --porcelain` omits intentionally ignored
+generated output, but tracked or relevant untracked source changes block the
+build with a remediation message. Missing Maestro, `adb`, Xcode/simctl, a
+booted target, or a supported API-36 x86_64 target returns `ENVIRONMENT` with a
+replay command and focused JSON report; it is not reported as a pass. EAS
+remains the cloud build/install path for iOS.
 
 ## Nitro validation evidence (2026-08-10)
 
