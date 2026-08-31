@@ -25,9 +25,10 @@ tags:
     timeout: 10000
 - tapOn:
     text: 'Habits'
-    index: 0
 - extendedWaitUntil:
-    visible: "Today's rhythm"
+    # The simplified Habits surface leads with time-of-day groups; the
+    # Today's rhythm summary remains below the check-in controls.
+    visible: 'Anytime'
     timeout: 10000
 - tapOn:
     text: 'Focus'
