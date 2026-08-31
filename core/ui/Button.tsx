@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
@@ -25,6 +26,7 @@ export function Button({
 }: ButtonProps) {
   const { tokens } = useAppTheme();
   const focusRing = useKeyboardFocusRing(tokens.accent);
+  const [pressed, setPressed] = useState(false);
   const useCustomPrimary = Boolean(color) && variant === 'primary';
   const inactive = disabled || loading;
 
@@ -44,22 +46,25 @@ export function Button({
       onFocus={focusRing.onFocus}
       onBlur={focusRing.onBlur}
       className={`min-h-[48px] rounded-2xl px-4 py-3 ${inactive ? 'opacity-40' : ''}`}
-      style={({ pressed }) => ({
-        ...(variant === 'ghost'
+      style={[
+        variant === 'ghost'
           ? { backgroundColor: tokens.surfaceElevated, borderColor: tokens.border, borderWidth: 1 }
-          : { backgroundColor: fillFor(pressed) }),
+          : { backgroundColor: fillFor(pressed) },
         ...(variant === 'primary' || variant === 'danger'
-          ? {
-              shadowColor: tokens.shadowColor,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: inactive ? 0 : 0.08,
-              shadowRadius: 12,
-              elevation: inactive ? 0 : 1,
-            }
-          : {}),
-        // Visible keyboard-focus indication on web (Design DNA §15).
-        ...(focusRing.focusRingStyle ?? {}),
-      })}
+          ? [
+              {
+                shadowColor: tokens.shadowColor,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: inactive ? 0 : 0.08,
+                shadowRadius: 12,
+                elevation: inactive ? 0 : 1,
+              },
+            ]
+          : []),
+        focusRing.focusRingStyle,
+      ]}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       onPress={onPress}
     >
       {loading ? (
