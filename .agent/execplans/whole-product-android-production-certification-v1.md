@@ -53,14 +53,17 @@ Run a long-running (~12h) autonomous production hardening, real-device-simulatio
   - Final web gates pass from a local-only build: `npm run build:web`, P0 journeys 25/25, full E2E 195 passed with 43 capability skips, and deterministic simulation validation plus all 23 deterministic scenarios.
   - Final dummy-backend sync gates pass: `npm run build:sync` and `npm run e2e:sync` with 40/46 passed; six restore-capability steps are explicitly skipped because the isolated dummy backend has no remote backup state.
   - Native auth flows requiring a real/mock backend are not counted as release failures in the no-backend APK run; deterministic local-auth mock coverage is retained in the historical ledger. No assertion was weakened.
+- In progress: none.
+- Important modified files: `scripts/native-provenance.mjs`, `scripts/qa-native-provision.mjs`, `scripts/qa-native.mjs`, `tests/qaNativeProvision.test.ts`, `core/ui/Modal.tsx`, `core/ui/Screen.tsx`, `e2e/pwa-update.spec.ts`, the 11 corrected `.maestro/flows/*.yaml` files listed in Changed Files / Areas, this ExecPlan, and `docs/testing/native-e2e.md`; generated Android, web, sync, and simulation outputs remain ignored.
+- Last successful validation: clean-source APK provisioning and exact native smoke 2/2, persistence 11/11, lifecycle 6/6; `qa:fast`, full unit/integration, OpenSpec, all-plan, impact, themes, schema, timezone, web/P0/full E2E, sync, and deterministic simulation gates all pass on the closure candidate.
 - Current failures: None in repository-owned gates.
 - Capability skips: full local-only web E2E skips internal remote parser/observation, broken-backend, Ask V2 remote, restore, owner-recovery, and reconnect steps (43 total); the sync build skips six restore steps for absent remote backup state. These are environment capability outcomes, not product failures.
 - Relevant quarantines: None.
 - Blockers: None for repository-owned implementation or local qualification. Push and exact-head CI remain delivery controls and must be recorded in the final certification report.
 - Condition required to unblock: N/A.
 - Exact resume action after unblock: If exact-head CI reports a code or test failure, classify it, fix the repository, create a new commit, and rerun clean-source provisioning plus all affected certification gates.
-- Exact next action: push the final clean commit, verify `HEAD == origin/main`, and inspect the exact-head GitHub Actions result.
-- Remaining definition of done: delivery controls above recorded with a clean tree and no unverified claims.
+- Exact next action: None.
+- Remaining definition of done: Complete — implementation, local qualification, provenance, evidence capture, hygiene, and ExecPlan closure are recorded.
 
 ## Progress
 
