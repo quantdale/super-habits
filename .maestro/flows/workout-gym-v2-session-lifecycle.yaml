@@ -157,4 +157,5 @@ tags:
 - scrollUntilVisible:
     element: 'Progress'
     direction: DOWN
+    visibilityPercentage: 50
 - assertVisible: 'Progress'
