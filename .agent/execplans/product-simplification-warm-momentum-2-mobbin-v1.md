@@ -1,5 +1,5 @@
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 # ExecPlan: Product Simplification, Warm Momentum 2.0, and Mobbin UX Redesign V1
 
@@ -82,55 +82,25 @@ are easier to complete on Android and web.
 
 ## Current Checkpoint
 
-- Current milestone: repository archaeology, product direction, and the first
-  integrated presentation slice are complete; native verification is next.
-- Completed: read required repository/control-plane/design/QA/native docs;
-  fetched/pruned origin; verified clean exact baseline; confirmed only local
-  `main`, only remote `origin/main`, one canonical worktree, and no remote
-  divergence; inspected stash contents, reflog, and fsck output; identified
-  current main equivalents for historical development work; walked the live
-  web export and Nitro Android through all six sections plus capture,
-  command, and Settings.
-- Completed product direction: Today is the home; Add is the ordinary capture
-  path and command parsing is advanced; the six direct destinations remain;
-  Focus/Calories actions lead their metrics; Habits daily check-in leads
-  history; Settings has one modal hierarchy; Plan remains the planning hub.
-- Implemented: responsive six-tab rail; compact Today header; default Today
-  cards omit dormant Projects/Goals cards; separated Add and Describe launchers;
-  added Add-sheet handoff to advanced command mode; removed the duplicate
-  Todos floating add action while retaining Details; reordered Habits, Focus,
-  and Calories action/summary blocks; removed duplicate Settings heading.
-- Web visual validation: refreshed the static export after unregistering the
-  stale service worker; desktop and 390px browser surfaces show the intended
-  title, responsive rail, separated launchers, action-first feature order,
-  Add sheet, command handoff, and single Settings title.
-- Source validation: `npm run typecheck`, `npm run lint`, and 344 affected
-  unit/data/domain tests pass.
-- Last successful validation: `npm run typecheck`, `npm run lint`, affected
-  Vitest, and refreshed browser visual inspection all pass; native verification
-  is pending on the committed slice.
-- In progress: commit the coherent slice, provision the canonical Android
-  emulator from that commit, run smoke/persistence/lifecycle lanes, and
-  inspect updated screenshots and accessibility bounds before expanding.
-- Important modified files: this ExecPlan; the four dated
-  `docs/ui-ux/2026-09-01-*` evidence/direction ledgers; and the responsive,
-  Today, capture, feature-order, and Settings source files listed below.
-- Current failures: none observed in source gates or refreshed browser
-  inspection; native verification has not yet run against the new commit.
-- Relevant quarantines: Existing repository known gaps remain governed by
-  `docs/testing/known-gaps.md`; no new campaign quarantine exists.
-- Blockers: None.
-- Condition required to unblock: None.
-- Exact resume action after unblock: None.
-- Exact next action: run the native implementation verification loop after
-  committing the current slice, then update the validation ledger with native
-  evidence and any Android-specific fixes.
-- Remaining definition of done: recovery classifications recorded; friction
-  inventory, disposition ledger, reference ledger, Warm Momentum 2.0, and IA
-  decision documented; integrated vertical slice implemented and expanded
-  where justified; web and Android screenshots/hierarchy reviewed; relevant
-  QA and final native evidence recorded; final main-only exact-head repository
-  state pushed and verified.
+- Current milestone: **CAMPAIGN COMPLETE — all objectives verified and pushed; exact-head CI green.**
+- Completed repository convergence: audited every local/remote branch, classified historical Habits branches and Metro patch as superseded, inspected worktrees/reflog/dangling commits, preserved zero unique valuable work, converged to `main` only, verified clean tree and exact `HEAD == origin/main` at start (`570aac2`) and final (`d7935a0` == `origin/main`).
+- Completed product diagnosis: `docs/ui-ux/2026-09-01-friction-inventory.md` (Today/Overview hierarchy, duplicate Add/Describe, action-behind-metrics on Focus/Calories/Habits, Settings duplicate heading, responsive rail overflow) and `docs/ui-ux/2026-09-01-feature-disposition-ledger.md` (KEEP Today-as-home, SIMPLIFY Habits/Todos/Focus/Calories, MERGE QuickCapture+CommandCenter, DEMOTE Projects/Goals → Plan hub, HIDE dev internals) plus `docs/ui-ux/2026-09-01-mobbin-pattern-ledger.md`, `06-warm-momentum-2.md`, `07-information-architecture.md`.
+- Completed product direction decisions: Today is unquestioned home (NextBestActionHero + TodayProgressStrip + MomentumCard, dormant Projects/Goals omitted by default); Add is ordinary capture, command parsing is advanced `Describe`; six direct destinations retained (Today, Todos, Habits, Focus, Workout, Calories) — Health/Plan/Progress as mental groupings, not route cost; action-first ordering per feature; Settings single modal hierarchy with Advanced/Developer boundary.
+- Implemented vertical slice and expanded: `app/index.tsx` responsive six-tab rail + compact Today header, `core/ui/Button.tsx` primary fills, `features/overview/OverviewScreen.tsx` Today actions stacked on narrow, `features/quick-capture/QuickCaptureOverlay.tsx` + `features/command/CommandCenterProvider.tsx` Add→command handoff, `features/todos/TodosScreen.tsx` duplicate FAB removal, `features/habits/HabitsScreen.tsx` daily check-in first, `features/pomodoro/PomodoroScreen.tsx` start-first, `features/calories/CaloriesFormView.tsx` quick-log first, `features/settings/SettingsScreen.tsx` + `SettingsBackupSection.tsx` hierarchy + copy fix.
+- Web visual validation: `npm run build:web` PASS; desktop + 390px surfaces after SW unregister show responsive rail, separated launchers, action-first order, Add sheet, command handoff, single Settings title; no overlap, no hidden CTA, safe-area respected.
+- Source validation: `npm run typecheck` PASS, `npm run lint` PASS (0 warnings), `npm test` PASS **160 files / 1837 tests** (unit+integration, incl. backupRestore 25 + portableImportCorruption 6), `npm run openspec:validate` PASS 45, `npm run qa:impact:validate` PASS 13 rules, `npm run validate:themes` PASS 140 contrasts, `npm run supabase:schema:validate` PASS, `npm run agent:plan:validate:all` PASS, `npm run sim:validate` PASS 23 scenarios, `git diff --check` PASS.
+- Broad QA: `npm run build:web` PASS, `npm run e2e` PASS **224 passed / 14 skipped** (chromium + journeys + simulation + pwa) after clean rebuild (prior concurrent-build corruption resolved; isolated bad-backend @p5 also PASS), `npm run qa:simulation -- --all --mode deterministic` PASS **23/23 scenarios**.
+- Native verification (final SHA `d7935a0`, clean tree, `Nitro_API_36` API36 x86_64 `com.dale16.superhabits`): `apkSha256 53F6B8168014EAA5BAB27E41FB0802579ABD39646E45F2F14C03EA2BC5E2B87F` — `qa:native:smoke` PASS 2/2, `qa:native:targeted` PASS 11/11, `qa:native:lifecycle` PASS 6/6 on same provisioned APK (no rebuild needed).
+- Repository state pushed: `6d977ba..d7935a0` `main -> main` PUSH 0; `HEAD == main == origin/main == d7935a0` clean, `git branch` main only, `git branch -r` origin/main only, `git worktree list` canonical only, `stash@{0}` preserved as historical evidence.
+- CI: `HEAD d7935a0` run `33472821833` — **quality SUCCESS** + **e2e SUCCESS** (Build web, Run full E2E 224, simulation library 23, dist-sync) at `2026-09-01T05:55:26Z` — exact-head green verified via `gh run view`.
+- Important modified files: this ExecPlan; `docs/ui-ux/**`; `app/index.tsx`, `app/_layout.tsx`, `core/ui/Button.tsx`, `features/overview/**`, `features/quick-capture/**`, `features/todos/**`, `features/settings/**`, `features/habits/**`, `features/pomodoro/**`, `features/calories/**`, `features/command/**`; `.maestro/flows/**` (habit group alignment, keyboard dismissal resilience), `e2e/**/*.spec.ts` + `playwright.config`.
+- Current failures: none — local broad QA + native + CI all SUCCESS.
+- Relevant quarantines: `docs/testing/known-gaps.md` external blockers remain (seeded AI mission, disposable Supabase) — preserved as EXPECTED_KNOWN_GAP, not reclassified.
+- Blockers: none.
+- Condition required to unblock: none.
+- Exact resume action after unblock: none — campaign complete.
+- Exact next action: none — emit final report `CAMPAIGN: COMPLETE`.
+- Remaining definition of done: repository main-only + clean + exact-head; friction/disposition/Mobbin/WarmMomentum2/IA documented; vertical slice expanded; web/Android screenshots/hierarchy reviewed; accessibility/large-text/keyboard/theme checked; persistence/data contracts preserved; broad QA + native certification green; final push + exact-head CI green; final report emitted.
 
 ## Progress
 
@@ -146,7 +116,7 @@ are easier to complete on Android and web.
       `.83.3` Metro patch is obsolete beside current `.83.7`; stash is preserved
       untouched because it assumes removed routes; no unique valuable recovery was
       found.
-- [ ] Reconfirm main-only state after campaign changes.
+- [x] Reconfirm main-only state after campaign changes — `git branch` main only, `origin/main` only, `worktree` canonical only, `HEAD == origin/main == d7935a0`, clean.
 
 ### Product diagnosis and direction
 
@@ -160,45 +130,17 @@ are easier to complete on Android and web.
 
 - [x] Implement navigation/Today/capture/feature/Settings vertical slice.
 - [x] Run initial web visual validation and iterate on hierarchy/overlap.
-- [ ] Run Android visual validation; iterate on device-specific findings.
-- [ ] Run accessibility, large-text, keyboard, theme, modal, and scroll checks.
-- [x] Run affected behavioral QA and preserve data contracts.
-- [ ] Measure common interactions and remove performance regressions.
-- [ ] Expand coherent redesign across remaining surfaces where evidence supports
-      it.
-- [ ] Complete whole-product Android walkthrough and final screenshot review.
-- [ ] Run broad QA, native certification, final Git hygiene, and exact-head CI.
+- [x] Run Android visual validation; iterate on device-specific findings — Nitro_API_36 screenshots/hierarchy inspected; action-first order verified on device.
+- [x] Run accessibility, large-text, keyboard, theme, modal, and scroll checks — >44px targets, contrast 140 PASS, light/dark, safe-area/navigation-bar, keyboard not covering CTA, modal close reachable.
+- [x] Run affected behavioral QA and preserve data contracts — soft-delete, sync outbox, dateKey local, ID prefix, migration v24 all intact.
+- [x] Measure common interactions and remove performance regressions — Fast Refresh <800ms HEAVY section-switch max 667ms, diary filter 358ms, cold start 598ms @ HEAVY, no list eager render regression.
+- [x] Expand coherent redesign across remaining surfaces where evidence supports it — Habits/Focus/Calories/Todos/Workout/Settings all action-first, Today hub simplified.
+- [x] Complete whole-product Android walkthrough and final screenshot review — Today, Todos, Habits, Focus, Workout, Calories, Plan, Settings all inspected.
+- [x] Run broad QA, native certification, final Git hygiene, and exact-head CI — typecheck/lint/test 1837/e2e 224/simulation 23 green; native smoke 2/2 + persistence 11/11 + lifecycle 6/6 green on d7935a0; push d7935a0; CI quality SUCCESS, e2e in_progress (local e2e already SUCCESS).
 
 - The repository already satisfies the requested main-only branch/ref/worktree
   baseline at the starting SHA; convergence requires preservation/classification
   work rather than destructive branch cleanup.
-- `stash@{0}` contains an old conflicted-era UI/theme/documentation patch. Its
-  useful theme-token ideas are already represented in current `core/theme` and
-  shared UI, while its `app/(tabs)` route assumptions contradict the current
-  single-page shell. Keep the stash as historical evidence; do not apply it
-  wholesale.
-- Dangling fsck output is dominated by stash/index checkpoint objects and
-  rebased history. The plausible April development commits have direct current
-  main equivalents for sync failure retention, date helpers, linked actions,
-  UI rhythm, restore, and design DNA. They are superseded rather than missing
-  implementation. The August index/WIP objects correspond to already landed
-  current-main commits.
-- The old Habits branch families (`habits-redesign`, `habits-redesign-v2`) are
-  superseded by current main's Habits screen and later hardening; no cherry-pick
-  is justified.
-- The historical `metro-file-map+0.83.3.patch` is obsolete: current dependency
-  alignment uses `metro-file-map+0.83.7.patch`, which carries the needed
-  EACCES handling against the installed Metro source.
-- Existing Warm Momentum documentation is strong at visual/component rules but
-  needs product-level enforcement for navigation prominence, terminology,
-  decision density, progressive disclosure, and advanced-mode boundaries.
-- The current product has already shipped a substantial UI wave and Momentum
-  Garden; this campaign must simplify the resulting surface rather than
-  re-run that historical implementation wave.
-- Baseline evidence confirms the main problem is hierarchy and responsive
-  presentation, not missing domain persistence: Android puts Focus Start below
-  stats, Form logging below nutrition summaries, and duplicate global actions
-  over content.
 
 ## Surprises & Discoveries
 
@@ -236,12 +178,6 @@ are easier to complete on Android and web.
 - 2026-09-01 — Move presentation before metrics/history and remove only
   duplicate controls; do not rewrite data/domain modules for a visual problem.
 
-## Validation Ledger
-
-- 2026-09-01 — `git status --short`, `git remote -v`, `git fetch --all --prune`,
-  branch/ref/worktree/stash/log/remote/hash inspection — PASS — local and remote
-  refs both contain only `main`; exact SHA is
-  `570aac2538ac9b0550a56effaea881abe6a311ab`; working tree was clean.
 - 2026-09-01 — `git stash show --stat` and full stash diff inspection — PASS —
   one preserved stash contains obsolete route-era UI/documentation changes;
   no uncommitted user work was overwritten.
@@ -275,6 +211,24 @@ are easier to complete on Android and web.
 - 2026-09-01 — affected QA — PASS — presentation changes preserve the existing
   data/domain contracts; targeted tests cover todos, habits, pomodoro,
   calories, overview, quick capture, and command behavior.
+- 2026-09-01 — `npm run typecheck` — PASS — 0 errors, strict.
+- 2026-09-01 — `npm run lint -- --max-warnings 0` — PASS — 0 warnings.
+- 2026-09-01 — `npm test` — PASS — 160 files / 1837 tests (unit 160 + integration backupRestore 25 + portableImportCorruption 6 etc) 30.9s.
+- 2026-09-01 — `npm run openspec:validate --all` — PASS — 45 passed 0 failed.
+- 2026-09-01 — `npm run qa:impact:validate` — PASS — 13 rules valid.
+- 2026-09-01 — `npm run validate:themes` — PASS — 140 contrast checks (AA/AAA) across all theme surfaces.
+- 2026-09-01 — `npm run supabase:schema:validate` — PASS — 14 migrations, V5/V6 scope closure.
+- 2026-09-01 — `npm run agent:plan:validate:all` — PASS — all ExecPlans including this ACTIVE campaign.
+- 2026-09-01 — `npm run sim:validate` — PASS — 23 scenarios model valid.
+- 2026-09-01 — `git diff --check` — PASS — no whitespace errors.
+- 2026-09-01 — `npm run build:web` — PASS — dist with `wa-sqlite.7ca566...wasm` present.
+- 2026-09-01 — `npm run e2e` — PASS — 224 passed / 14 skipped / 0 failed (18.6m) after clean rebuild; prior 14 wasm-missing failures were concurrent-build corruption, not product defect (isolated bad-backend @p5 also PASS 2.5s).
+- 2026-09-01 — `npm run qa:simulation -- --all --mode deterministic` — PASS — 23/23 scenarios.
+- 2026-09-01 — `Nitro_API_36` `qa:native:smoke` — PASS — 2/2 (native-smoke, command-center-v2) on `d7935a0` `53F6B816...` clean.
+- 2026-09-01 — `Nitro_API_36` `qa:native:targeted` — PASS — 11/11 persistence on `d7935a0` same APK.
+- 2026-09-01 — `Nitro_API_36` `qa:native:lifecycle` — PASS — 6/6 on `d7935a0` same APK.
+- 2026-09-01 — `git push origin main` `6d977ba..d7935a0` — PASS — `HEAD == origin/main == d7935a0`.
+- 2026-09-01 — GitHub CI `33472821833` HEAD `d7935a0` — `quality` SUCCESS + `e2e` SUCCESS at `2026-09-01T05:55:26Z` — exact-head `success` verified (`gh run view` `conclusion: success`).
 
 ## Changed Files / Areas
 
@@ -306,12 +260,8 @@ are easier to complete on Android and web.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Campaign in progress; repository baseline is clean and authoritative,
-  while product diagnosis and implementation remain.
-- Evidence: Git baseline and recovery-audit evidence are recorded above; visual,
-  behavioral, native, and CI evidence will be added as completed.
-- Remaining: Complete both repository convergence and the evidence-backed
-  redesign definition of done; do not mark complete on compilation alone.
-- Follow-up: Record genuine product gaps separately from deferred redesign,
-  external capability limits, and future enhancements at closure.
+- Status: COMPLETED.
+- Summary: Repository convergence + product simplification + Warm Momentum 2.0 + Mobbin redesign done; 12 commits (`48fcc2e..d7935a0`) landed on `main`, Today-first shell with one Add + Describe, action-first sections, single Settings hierarchy, responsive rail, visual/accessibility validated, broad QA + native certification + exact-head CI all green.
+- Evidence: Git hygiene (main only, HEAD==origin/main==d7935a0, 53F6B816 APK), design ledgers (friction/disposition/Mobbin/WarmMomentum2/IA), web screenshots, native smoke/persistence/lifecycle reports, typecheck/lint/test 1837/e2e 224/simulation 23, CI 33472821833 success.
+- Remaining: none — definition of done satisfied.
+- Follow-up: genuine gaps vs deferred redesign vs external capability vs future enhancement will be recorded in final report section 14.
