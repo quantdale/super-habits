@@ -367,12 +367,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
 
       <SettingsPortableSection />
 
-      <SettingsCommandSection
-        commandInternalRolloutAvailable={commandInternalRolloutAvailable}
-        commandRolloutEnabledOnDevice={commandRolloutEnabledOnDevice}
-        commandRolloutLoading={commandRolloutLoading}
-        onOpenCommandCenter={() => openCommandCenter('overview')}
-      />
+      <SettingsCommandSection onOpenCommandCenter={() => openCommandCenter('overview')} />
 
       <SettingsNotificationsSection />
 

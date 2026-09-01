@@ -100,7 +100,7 @@ defineJourney({
         await returnToApp(page);
         await dismissStartupRestorePromptIfPresent(page);
         // The overview shell is the entry point to the settings launcher.
-        await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
       },
     },
     {

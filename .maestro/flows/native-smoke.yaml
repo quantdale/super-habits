@@ -6,7 +6,7 @@ tags:
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: 'Overview'
+    visible: 'Today'
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -51,7 +51,7 @@ tags:
     visible: 'Switch between manual entry and a diary grouped by meal.'
     timeout: 10000
 - tapOn:
-    text: 'Overview'
+    text: 'Today'
     index: 0
 - extendedWaitUntil:
     visible: 'Customize'

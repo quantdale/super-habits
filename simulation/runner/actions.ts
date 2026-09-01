@@ -123,30 +123,7 @@ export async function actionSetCalorieGoal(
 
 export async function actionOpenCommand(page: Page): Promise<string> {
   await ensureApp(page);
-  // Tolerate 0..N launcher instances (COMMAND_EXPERIMENT_ENABLED gates it).
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const launcher = page.getByRole('button', { name: 'Open command center', exact: true });
-    const count = await launcher.count();
-    if (count > 0) {
-      await launcher.first().click({ force: true });
-      try {
-        // The command center remembers the last-used mode and defaults to
-        // Auto on a fresh origin (AI_ASK_EXPERIMENT_ENABLED). The runner's
-        // openCommand contract is the Create parser input, so pin the Create
-        // mode before waiting on #command-input.
-        const createMode = page.getByRole('button', { name: 'Create', exact: true });
-        await createMode.waitFor({ state: 'visible', timeout: 8_000 });
-        await createMode.click({ force: true });
-        await page.locator('#command-input').waitFor({ state: 'visible', timeout: 8_000 });
-        break;
-      } catch {
-        // launcher may not have been visible yet; retry
-      }
-    } else {
-      await page.waitForTimeout(300);
-    }
-  }
-  await expect(page.locator('#command-input')).toBeVisible({ timeout: 15_000 });
+  await openCommandScreen(page);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('#command-input')).toHaveCount(0);
   return 'openCommand';

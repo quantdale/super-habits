@@ -65,7 +65,7 @@ defineJourney({
         await expect(second.getByText(/close other SuperHabits tabs/i)).toBeVisible();
         await expect(second.getByText(/Your data is still safe on this device/i)).toBeVisible();
         // The app shell is gated away — nothing silently half-renders.
-        await expect(second.getByRole('button', { name: 'Overview', exact: true })).toHaveCount(0);
+        await expect(second.getByRole('button', { name: 'Today', exact: true })).toHaveCount(0);
         await expect(second.getByRole('button', { name: 'To Do', exact: true })).toHaveCount(0);
       },
     },
@@ -79,7 +79,7 @@ defineJourney({
           const fresh = await freshContext.newPage();
           await fresh.goto(`${APP_BASE_URL}/`, { waitUntil: 'domcontentloaded' });
           // Separate partition -> no lock contention: the app boots normally.
-          await expect(fresh.getByRole('button', { name: 'Overview', exact: true })).toBeVisible({
+          await expect(fresh.getByRole('button', { name: 'Today', exact: true })).toBeVisible({
             timeout: 60_000,
           });
           await expect(fresh.getByText('Unable to start', { exact: true })).toHaveCount(0);

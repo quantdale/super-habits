@@ -27,7 +27,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { name: 'overview', label: 'Overview', icon: 'dashboard' },
+  { name: 'overview', label: 'Today', icon: 'dashboard' },
   { name: 'todos', label: 'To Do', icon: 'check-circle-outline', sectionKey: 'todos' },
   { name: 'habits', label: 'Habits', icon: 'loop', sectionKey: 'habits' },
   { name: 'pomodoro', label: 'Focus', icon: 'timer', sectionKey: POMODORO_SECTION_KEY },

@@ -1,7 +1,7 @@
 import { Page } from '@playwright/test';
 
 export const TAB_LABELS = {
-  overview: 'Overview',
+  overview: 'Today',
   todos: 'To Do',
   habits: 'Habits',
   pomodoro: 'Focus',

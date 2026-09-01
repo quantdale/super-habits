@@ -6,68 +6,41 @@ import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
 import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 type SettingsCommandSectionProps = {
-  commandInternalRolloutAvailable: boolean;
-  commandRolloutEnabledOnDevice: boolean;
-  commandRolloutLoading: boolean;
   onOpenCommandCenter: () => void;
 };
 
-export function SettingsCommandSection({
-  commandInternalRolloutAvailable,
-  commandRolloutEnabledOnDevice,
-  commandRolloutLoading,
-  onOpenCommandCenter,
-}: SettingsCommandSectionProps) {
+export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandSectionProps) {
   const { tokens } = useAppTheme();
-
-  const effectiveParserLabel = commandRolloutLoading
-    ? 'Loading'
-    : commandInternalRolloutAvailable && commandRolloutEnabledOnDevice
-      ? 'Model'
-      : 'Mock';
-
-  const effectiveParserDescription = commandInternalRolloutAvailable
-    ? commandRolloutEnabledOnDevice
-      ? 'Model-backed parsing is enabled on this device. You can turn it off in Developer / Internal to fall back to the mock parser immediately.'
-      : 'The command shell still defaults to the local mock parser. Internal testers can opt in from Developer / Internal.'
-    : 'This build keeps the command shell on the local mock parser only.';
 
   return (
     <ScreenSection>
       <SettingsSectionHeading
-        eyebrow="AI / Command"
-        title="Command center"
-        subtitle="Status and entry point for the experimental command shell."
-        icon="terminal"
+        eyebrow="Capture"
+        title="Advanced capture"
+        subtitle="Describe what you want to add in plain language, then review the draft before saving."
+        icon="edit-note"
         accentColor={tokens.textMuted}
       />
       <Card accentColor={tokens.textMuted} className="mb-0">
         <SettingsRow
           first
-          label="Current scope"
-          description="Command center drafts one todo or one habit from plain language, then waits for your review and confirmation before anything is saved."
-          statusLabel="Experimental"
+          label="Describe it"
+          description="Write a task, habit, meal, workout, or focus action naturally. SuperHabits prepares a draft and waits for your review before anything is saved."
+          statusLabel="Optional"
           statusTone="accent"
           accentColor={tokens.textMuted}
         />
         <SettingsRow
-          label="Effective parser"
-          description={effectiveParserDescription}
-          statusLabel={effectiveParserLabel}
-          statusTone={effectiveParserLabel === 'Model' ? 'accent' : 'neutral'}
-          accentColor={tokens.textMuted}
-        />
-        <SettingsRow
-          label="What it is not"
-          description="This route is a command-focused shell for structured drafts. It is not a general-purpose assistant chat."
-          statusLabel="Current"
+          label="Default path"
+          description="Use the global Add button for ordinary capture. Choose Describe it inside Add when you want the advanced capture flow."
+          statusLabel="Add"
           last
         />
 
         {COMMAND_EXPERIMENT_ENABLED ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open command center from settings"
+            accessibilityLabel="Open advanced capture from settings"
             className="mt-4 rounded-2xl px-4 py-3"
             style={{
               backgroundColor: tokens.textMuted,
@@ -83,7 +56,7 @@ export function SettingsCommandSection({
               className="text-center text-sm font-semibold"
               style={{ color: tokens.textOnAccent }}
             >
-              Open command center
+              Open advanced capture
             </Text>
           </Pressable>
         ) : null}

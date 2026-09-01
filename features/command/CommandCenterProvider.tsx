@@ -1,14 +1,9 @@
-import { MaterialIcons } from '@expo/vector-icons';
 import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
-import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { useAppTheme } from '@/core/providers/themeContext';
+import { Platform, useWindowDimensions } from 'react-native';
 import { Modal } from '@/core/ui/Modal';
 import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
-import {
-  type CommandCenterLaunchContext,
-  getCommandCenterContextCopy,
-} from './commandCenterConfig';
+import { type CommandCenterLaunchContext } from './commandCenterConfig';
 import { CommandScreen } from './CommandScreen';
 import { CommandCenterContext, useCommandCenter } from './commandCenterContext';
 import { usePomodoroCommandBridge } from '@/features/pomodoro/pomodoroCommandBridgeContext';
@@ -64,67 +59,11 @@ export function CommandCenterProvider({ children }: PropsWithChildren) {
   return <CommandCenterContext.Provider value={value}>{children}</CommandCenterContext.Provider>;
 }
 
-function FloatingCommandLauncher({
-  launchContext,
-  onPress,
-}: {
-  launchContext: CommandCenterLaunchContext;
-  onPress: () => void;
-}) {
-  const { tokens } = useAppTheme();
-  const { width } = useWindowDimensions();
-  const contextCopy = getCommandCenterContextCopy(launchContext);
-  const showLabel = Platform.OS === 'web' && width >= 960;
-
-  if (!contextCopy) return null;
-
-  return (
-    <View
-      pointerEvents="box-none"
-      style={{
-        position: 'absolute',
-        right: 88,
-        bottom: 24,
-      }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open command center"
-        onPress={onPress}
-        className={`items-center justify-center rounded-2xl border ${
-          showLabel ? 'flex-row gap-2 px-4 py-3' : 'h-14 w-14'
-        }`}
-        style={{
-          borderColor: tokens.border,
-          backgroundColor: tokens.surface,
-          shadowColor: tokens.shadowColor,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-          elevation: 3,
-        }}
-      >
-        <MaterialIcons name="bolt" size={20} color={contextCopy.accentColor} />
-        {showLabel ? (
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            Describe
-          </Text>
-        ) : null}
-      </Pressable>
-    </View>
-  );
-}
-
 export function GlobalCommandCenterHost() {
   const { width } = useWindowDimensions();
-  const { activeSection, setActiveSection, isSettingsOpen } = useAppNavigation();
+  const { setActiveSection } = useAppNavigation();
   const { requestFocusSession } = usePomodoroCommandBridge();
-  const { isOpen, launchContext, launcherSuppressed, openCommandCenter, closeCommandCenter } =
-    useCommandCenter();
-
-  const currentContext = activeSection;
-  const launcherVisible =
-    COMMAND_EXPERIMENT_ENABLED && !isOpen && !launcherSuppressed && !isSettingsOpen;
+  const { isOpen, launchContext, closeCommandCenter } = useCommandCenter();
 
   const handleNavigateToDestination = useCallback(
     (section: AppSection) => {
@@ -147,30 +86,21 @@ export function GlobalCommandCenterHost() {
   }
 
   return (
-    <>
-      {launcherVisible ? (
-        <FloatingCommandLauncher
-          launchContext={currentContext}
-          onPress={() => openCommandCenter(currentContext)}
+    <Modal
+      visible={isOpen}
+      onClose={closeCommandCenter}
+      title="Command center"
+      scroll
+      layout={Platform.OS === 'web' && width >= 960 ? 'drawer' : 'bottom-sheet'}
+    >
+      {launchContext ? (
+        <CommandScreen
+          launchContext={launchContext}
+          onRequestClose={closeCommandCenter}
+          onNavigateToDestination={handleNavigateToDestination}
+          onStartFocusSession={handleStartFocusSession}
         />
       ) : null}
-
-      <Modal
-        visible={isOpen}
-        onClose={closeCommandCenter}
-        title="Command center"
-        scroll
-        layout={Platform.OS === 'web' && width >= 960 ? 'drawer' : 'bottom-sheet'}
-      >
-        {launchContext ? (
-          <CommandScreen
-            launchContext={launchContext}
-            onRequestClose={closeCommandCenter}
-            onNavigateToDestination={handleNavigateToDestination}
-            onStartFocusSession={handleStartFocusSession}
-          />
-        ) : null}
-      </Modal>
-    </>
+    </Modal>
   );
 }

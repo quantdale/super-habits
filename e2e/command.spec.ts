@@ -1,7 +1,7 @@
 import { expect, test, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
 import { goToTab } from './helpers/navigation';
-import { openSettingsScreen } from './helpers/commandObservation';
+import { openCommandScreen, openSettingsScreen } from './helpers/commandObservation';
 
 const INTERNAL_ROLLOUT_BUILD_ENABLED =
   process.env.EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT === 'true' &&
@@ -10,41 +10,6 @@ const INTERNAL_REMOTE_BACKEND_CONFIGURED =
   process.env.EXPO_PUBLIC_AI_COMMAND_BACKEND_HOST === 'custom_url'
     ? Boolean(process.env.EXPO_PUBLIC_AI_COMMAND_PROXY_URL)
     : Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
-
-async function openCommandScreen(page: Page) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  const launcher = page.getByRole('button', { name: 'Open command center' });
-  await expect(launcher).toBeVisible({
-    timeout: 15_000,
-  });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const launcherCount = await launcher.count();
-    for (let index = 0; index < launcherCount; index += 1) {
-      const candidate = launcher.nth(index);
-      if (await candidate.isVisible().catch(() => false)) {
-        try {
-          await candidate.click({ force: true });
-          break;
-        } catch {
-          continue;
-        }
-      }
-    }
-    try {
-      // The command center remembers the last-used mode and defaults to Auto
-      // on a fresh origin (AI_ASK_EXPERIMENT_ENABLED). These specs exercise
-      // the Create/parser flow, so pin the Create mode before interacting
-      // with #command-input.
-      const createMode = page.getByRole('button', { name: 'Create', exact: true });
-      await expect(createMode).toBeVisible({ timeout: 5_000 });
-      await createMode.click({ force: true });
-      await expect(page.locator('#command-input')).toBeVisible({ timeout: 5_000 });
-      return;
-    } catch {}
-  }
-
-  await expect(page.locator('#command-input')).toBeVisible({ timeout: 15_000 });
-}
 
 async function parseCommand(page: Page, rawText: string) {
   await page.locator('#command-input').fill(rawText);
@@ -61,36 +26,38 @@ test.describe('Command shell', () => {
     await clearDatabase(page);
   });
 
-  test('shows the global launcher on main tabs, hides it on settings, and closes the overlay cleanly', async ({
+  test('uses Add as the only global launcher and reaches Command Center through Describe it', async ({
     page,
   }) => {
-    const launcher = page.getByRole('button', { name: 'Open command center', exact: true });
+    const commandLauncher = page.getByRole('button', { name: 'Open command center', exact: true });
+    const addLauncher = page.getByRole('button', { name: 'Quick capture', exact: true });
     const visibleTabs = ['overview', 'todos', 'habits', 'pomodoro', 'workout', 'calories'] as const;
 
     for (const tab of visibleTabs) {
       await goToTab(page, tab);
-      await expect(launcher).toBeVisible();
+      await expect(addLauncher).toBeVisible();
+      await expect(commandLauncher).toHaveCount(0);
     }
-
-    await openSettingsScreen(page);
-    await expect(launcher).toHaveCount(0);
 
     await openCommandScreen(page);
     await expect(page.getByText('Command center', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click({ force: true });
     await expect(page.locator('#command-input')).toBeHidden();
-    await expect(launcher).toBeVisible();
+    await expect(addLauncher).toBeVisible();
+    await expect(commandLauncher).toHaveCount(0);
   });
 
-  test('hides the launcher during an active pomodoro session and restores it after reset', async ({
+  test('keeps the single Add launcher available through an active pomodoro session', async ({
     page,
   }) => {
-    const launcher = page.getByRole('button', { name: 'Open command center' });
+    const addLauncher = page.getByRole('button', { name: 'Quick capture', exact: true });
+    const commandLauncher = page.getByRole('button', { name: 'Open command center', exact: true });
     const startButton = page.getByText('Start focus', { exact: true });
     const pauseButton = page.getByText('Pause', { exact: true });
 
     await goToTab(page, 'pomodoro');
-    await expect(launcher).toBeVisible();
+    await expect(addLauncher).toBeVisible();
+    await expect(commandLauncher).toHaveCount(0);
 
     await startButton.click({ force: true });
     try {
@@ -99,13 +66,12 @@ test.describe('Command shell', () => {
       await startButton.click({ force: true });
       await expect(pauseButton).toBeEnabled({ timeout: 3_000 });
     }
-    await expect(launcher).toHaveCount(0);
+    await expect(addLauncher).toBeVisible();
+    await expect(commandLauncher).toHaveCount(0);
 
-    // The reset control's label is 'Reset (not logged)' while the focus
-    // session is under a minute (wave-v2 abandon/rename semantics).
     await page.getByRole('button', { name: /^Reset \(not logged\)$/ }).click({ force: true });
     await expect(page.getByText('Start focus', { exact: true })).toBeVisible();
-    await expect(launcher).toBeVisible();
+    await expect(addLauncher).toBeVisible();
   });
 
   test('parses todo, allows inline edits, and saves edited values on confirm', async ({ page }) => {

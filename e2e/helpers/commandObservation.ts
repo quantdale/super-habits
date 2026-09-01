@@ -13,39 +13,18 @@ export async function clickLabeledAction(page: Page, label: string) {
 
 export async function openCommandScreen(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  const launcher = page.getByRole('button', { name: 'Open command center' });
-  await expect(launcher).toBeVisible({
+
+  await page.getByRole('button', { name: 'Quick capture', exact: true }).click();
+  await expect(page.getByText('Add something', { exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const launcherCount = await launcher.count();
-    for (let index = 0; index < launcherCount; index += 1) {
-      const candidate = launcher.nth(index);
-      if (await candidate.isVisible().catch(() => false)) {
-        try {
-          await candidate.click({ force: true });
-          break;
-        } catch {
-          continue;
-        }
-      }
-    }
-    try {
-      // The command center remembers the last-used mode and defaults to Auto
-      // on a fresh origin (AI_ASK_EXPERIMENT_ENABLED). These specs exercise
-      // the Create/parser flow, so pin the Create mode before interacting
-      // with #command-input.
-      const createMode = page.getByRole('button', { name: 'Create', exact: true });
-      await expect(createMode).toBeVisible({ timeout: 5_000 });
-      await createMode.click({ force: true });
-      await expect(page.locator('#command-input')).toBeVisible({ timeout: 5_000 });
-      return;
-    } catch {
-      // The next attempt reuses Playwright's locator auto-waiting; no fixed
-      // delay is needed between two observable overlay attempts.
-    }
-  }
+  await page.getByText('Describe it', { exact: true }).locator('..').click({ force: true });
 
+  // The command center remembers the last-used mode and defaults to Auto on a
+  // fresh origin. Parser-oriented tests pin Create before using #command-input.
+  const createMode = page.getByRole('button', { name: 'Create', exact: true });
+  await expect(createMode).toBeVisible({ timeout: 15_000 });
+  await createMode.click({ force: true });
   await expect(page.locator('#command-input')).toBeVisible({ timeout: 15_000 });
 }
 

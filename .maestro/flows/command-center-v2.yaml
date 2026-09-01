@@ -7,11 +7,15 @@ tags:
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: 'Overview'
+    visible: 'Today'
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000
-- tapOn: 'Open command center'
+- tapOn: 'Quick capture'
+- extendedWaitUntil:
+    visible: 'Add something'
+    timeout: 10000
+- tapOn: 'Describe it'
 - extendedWaitUntil:
     visible: 'Command center'
     timeout: 10000

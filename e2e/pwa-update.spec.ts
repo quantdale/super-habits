@@ -53,7 +53,7 @@ async function waitForDbReady(page: Page, timeout = 30_000): Promise<void> {
 }
 
 async function waitForShell(page: Page, timeout = 30_000): Promise<void> {
-  await page.getByRole('button', { name: 'Overview', exact: true }).first().waitFor({ timeout });
+  await page.getByRole('button', { name: 'Today', exact: true }).first().waitFor({ timeout });
 }
 
 /** Change the served /sw.js bytes via the E2E server's variant endpoint. */
