@@ -172,7 +172,7 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 ### Routing
 
 - Single-page model: `app/` contains only `_layout.tsx` and `index.tsx`. There are no `app/(tabs)/`, `app/settings.tsx`, or `app/command.tsx` routes.
-- `app/_layout.tsx` mounts `GlobalCommandCenterHost` (shows the floating launcher when `COMMAND_EXPERIMENT_ENABLED` is true) and `NavigationProvider`.
+- `app/_layout.tsx` mounts `GlobalCommandCenterHost` (overlay host only; no standalone floating launcher) and `NavigationProvider`. Ordinary entry is Add → Describe it; Settings may open the advanced capture overlay explicitly.
 - `app/index.tsx` renders the six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind `NavigationContext.activeSection`, with a top tab rail of plain `Pressable` items.
 - Settings is a full-screen **modal** opened via `openSettings`; the Command Center is a **global overlay** opened via `openCommand`. Old URLs `/settings`, `/command`, and `/(tabs)/*` no longer exist.
 

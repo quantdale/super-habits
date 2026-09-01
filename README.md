@@ -1,6 +1,6 @@
 # SuperHabits
 
-SuperHabits is an offline-first productivity app for web and mobile with an overview dashboard, six tab surfaces, a six-bucket settings IA, and an experimental command center that now launches as a global overlay. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
+SuperHabits is an offline-first productivity app for web and mobile with a Today-first dashboard, six direct section surfaces, progressive settings, and an advanced command/capture overlay reached from the global Add flow. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
 Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes the complete recoverable scope to Supabase, and Restore V2 can import that full scope back onto an empty device. This is not full two-way sync. When remote backup is configured, the local SQLite dataset also keeps a durable owner binding so auth loss cannot silently attach existing data to a new anonymous user.
 
@@ -14,9 +14,9 @@ Beyond cloud backup, users also get **Portable Backup V1**: a user-controlled fi
 - Feature modules with strict data/domain/UI layering
 - Optional anonymous Supabase backup/restore integration with Recoverable Account V1 email protection and empty-device recovery
 - Portable file export/import (Backup V1) that works without Supabase
-- Global command-center overlay across the six sections (no `/command` route)
+- One global Add action; advanced natural-language capture opens the command overlay from Add → Describe it (no `/command` route)
 - Calories `Form` / `Diary` modes with remembered last-view preference
-- Settings grouped into Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal
+- Settings keep everyday capture language separate from parser/model diagnostics, which live under Developer / Internal
 
 ## Tech Stack
 
@@ -113,18 +113,18 @@ Optional platform commands:
 
 ## Routes and Surfaces
 
-The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Overview, Todos, Habits, Pomodoro, Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a top tab rail of plain `Pressable` items:
+The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Today (`overview` internally), Todos, Habits, Pomodoro, Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a top tab rail of plain `Pressable` items:
 
-- Overview
+- Today
 - Todos
 - Habits
-- Pomodoro
+- Focus
 - Workout
 - Calories
 
 Settings is a full-screen modal (not a route). The Command Center is a global overlay only — there is no `/command` route. Old URLs `/settings`, `/command`, and `/(tabs)/*` no longer exist.
 
-The root layout mounts `GlobalCommandCenterHost`, so when `COMMAND_EXPERIMENT_ENABLED` is true the eligible sections show a floating launcher that opens a drawer on wide web and a bottom sheet elsewhere. The launcher is hidden while Settings is open and suppressed during active pomodoro/workout sessions.
+The root layout mounts `GlobalCommandCenterHost`, which owns the command overlay but no longer renders a competing floating launcher. The single global Add action opens Quick Capture; choosing `Describe it` hands off to Command Center using the current section context. Settings also exposes an explicit advanced-capture entry. The overlay is a drawer on wide web and a bottom sheet elsewhere.
 
 Workout is the Gym V2 training workspace inside that tab: users can choose
 built-in or custom exercises, build typed strength/bodyweight/timed/cardio
@@ -137,8 +137,8 @@ lightweight path for linked actions and fast entries.
 
 The Command Center is an experimental overlay-first quick-command shell, not a general assistant surface.
 
-- The primary user-facing entry is the global overlay launcher across all six sections.
-- The Command Center is a global overlay only (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`); there is no `/command` route.
+- The primary user-facing entry is the global Add action; `Describe it` inside Add opens the advanced command flow.
+- The Command Center remains a global overlay (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`), but it has no standalone floating launcher and no `/command` route.
 - Supported draft kinds are limited to `create_todo` and `create_habit`.
 - The flow is parse -> review -> confirm before write.
 - Default parser mode is `mock`.

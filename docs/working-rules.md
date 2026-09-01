@@ -49,8 +49,8 @@ If this file conflicts with current code, trust the code and document the confli
 ### Confirmed from code
 
 - The app is single-page: `app/index.tsx` renders all six sections behind `NavigationContext.activeSection`; there is no `/` redirect or `/(tabs)/` routes.
-- The command center is overlay-first: `app/_layout.tsx` mounts a global launcher/host, and there is no retained `/command` page route.
-- The command launcher is hidden on the settings modal and is suppressed during active pomodoro/workout sessions.
+- The command center is overlay-first: `app/_layout.tsx` mounts the global overlay host, but the only global floating action is Add. Advanced capture is reached through Add → Describe it; there is no retained `/command` page route.
+- Do not add a second global command launcher. Command Center can still open from Add → Describe it and explicit advanced/developer entry points.
 - Calories supports `Form` and `Diary` modes and remembers the last selected mode.
 - Settings keeps six buckets in this order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
 - Backup wording must stay conservative: push backup + Restore V2 (legacy V1 labeled) + Portable file export/import, not full two-way sync.

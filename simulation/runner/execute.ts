@@ -958,8 +958,8 @@ export async function replaySteps(
  * | step kind            | resolution                                                       |
  * |----------------------|------------------------------------------------------------------|
  * | switchSection        | `oracles.switchSection`                                          |
- * | openSettings         | runner-owned (Overview header "Open settings" → Modal "Close")   |
- * | openCommand          | runner-owned (launcher "Open command center" → `#command-input`) |
+ * | openSettings         | runner-owned (Today header "Open settings" → Modal "Close")   |
+ * | openCommand          | runner-owned (Quick capture → "Describe it" → `#command-input`) |
  * | commandPreview       | `commandObservation.openCommandScreen` + parse + preview       |
  * | commandConfirm       | `commandObservation.openCommandScreen` + parse + confirm       |
  * | askQuestion          | `commandObservation.openCommandScreen` + AskConversationView  |

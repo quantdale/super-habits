@@ -32,7 +32,7 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 - Six sections (`overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories`) render inside `app/index.tsx`, switched by `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`) with a top tab rail of plain `Pressable` items
 - Settings is a full-screen modal (`isSettingsOpen` / `openSettings` / `closeSettings`), not a route
 - Global command-center host: `app/_layout.tsx` mounts `GlobalCommandCenterHost`; the Command Center is a global overlay only (`features/command/CommandCenterProvider.tsx`) — no `/command` route
-- Command launcher shows across the six sections, opens as a drawer on wide web and a bottom sheet elsewhere, and stays hidden while Settings is open
+- Command Center has no standalone launcher; the single global Add action opens Quick Capture, and Add → Describe it opens Command Center as a drawer on wide web or a bottom sheet elsewhere
 
 ## Current product-shell facts
 

@@ -4,7 +4,7 @@ Human-run, time-boxed exploratory missions for the areas automation cannot reach
 
 Each mission states the objective, starting state, area, realistic behaviours to try, risks, and what to observe — **without prescribing every interaction**. The point is to explore like a user, not to follow a script. Recommended time-boxes are included; a mission that runs out of time should be stopped, not rushed. If the mission finds nothing, that is a valid result — record it as such.
 
-Sections and screens are named as they appear in the app: **Overview, Todos, Habits, Focus (Pomodoro), Workout, Calories**, plus the **Settings** drawer and the experimental **Command Center** overlay.
+Sections and screens are named as they appear in the app: **Today, Todos, Habits, Focus (Pomodoro), Workout, Calories**, plus the **Settings** drawer and the experimental **Command Center** overlay.
 
 - **Quoted drop-downs and labels** are the app's own text; where a label is not yet known, the mission says "the label/control for X" rather than guessing.
 - These missions are **manual**. They run on a real device (iOS/Android) or a real browser tab, not Playwright. The same mission may uncover a reproducible defect — that is the desired outcome, and it is recorded per the convention in [Recording findings](#recording-findings).
@@ -82,16 +82,16 @@ Sections and screens are named as they appear in the app: **Overview, Todos, Hab
 ## M5 — Command Center with the flag enabled
 
 - **Objective:** Exercise the Command Center overlay with the experiment flag enabled (`COMMAND_EXPERIMENT_ENABLED === true`), including its interaction with a running Focus timer.
-- **Area:** Command Center overlay (`GlobalCommandCenterHost`), its floating launcher, parse/edit/confirm flow; suppression during an active Pomodoro session.
+- **Area:** Command Center overlay (`GlobalCommandCenterHost`), the Add → Describe it handoff, and the parse/edit/confirm flow.
 - **Persona:** P3 — Priya, the Power User.
-- **Starting state:** Clean install with the flag enabled (current default). Open the Command Center from the floating launcher.
+- **Starting state:** Clean install with the flag enabled (current default). Open Add, then choose Describe it.
 - **Realistic behaviours to try:**
   - Create a todo and a habit via natural language; edit the draft before confirming; confirm.
-  - Open the Command Center while a Focus timer is running and verify the launcher is suppressed (per `useCommandLauncherSuppressed('pomodoro-active-session', …)`).
-  - Open it while Settings is open and verify the launcher is hidden.
+  - Open Add while a Focus timer is running and verify there is still only one global floating action.
+  - Choose Describe it and verify the command overlay opens without adding another persistent launcher.
   - Enter garbage input and observe the `unsupported` / `unavailable` outcomes.
-- **Risks to investigate:** The launcher appearing during an active session; the overlay covering the section it is meant to complement; a confirmed command that does not land in the right section; the overlay not closing cleanly.
-- **What to observe:** Whether the overlay is usable, whether the launcher suppression behaves as documented, and whether a confirmed command is reflected in the owning section and the Overview aggregate.
+- **Risks to investigate:** A second global launcher reappearing; Add → Describe it losing the active-section context; the overlay covering the section it is meant to complement; a confirmed command that does not land in the right section; the overlay not closing cleanly.
+- **What to observe:** Whether the overlay is usable through Add → Describe it, whether Add remains the only global floating action, and whether a confirmed command is reflected in the owning section and the Today aggregate.
 - **Time-box:** 30 minutes.
 
 ## M6 — PWA install and offline shell
