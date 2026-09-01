@@ -23,7 +23,6 @@ tags:
     visibilityPercentage: 50
 - tapOn: 'Routine name'
 - inputText: 'Native Gym V2 resume routine'
-- hideKeyboard
 - scrollUntilVisible:
     element: 'Add routine'
     direction: DOWN
