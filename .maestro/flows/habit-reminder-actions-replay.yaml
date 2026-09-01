@@ -71,9 +71,13 @@ tags:
 - tapOn:
     text: 'Habits'
     index: 0
+- extendedWaitUntil:
+    visible: 'Native replay action: 1 of 1 today.*'
+    timeout: 15000
 - scrollUntilVisible:
     element: 'Native replay action: 1 of 1 today.*'
     direction: DOWN
+    visibilityPercentage: 50
 - assertVisible: 'Native replay action: 1 of 1 today.*'
 - scrollUntilVisible:
     element: 'Enter habit edit mode'
