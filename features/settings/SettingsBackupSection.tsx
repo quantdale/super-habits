@@ -102,7 +102,7 @@ function describeBackupEntity(status: RemoteBackupEntityStatus) {
   }
 
   if (status.remoteState === 'unavailable') {
-    return 'Remote backup is not configured in this build.';
+    return 'Remote backup is not configured.';
   }
 
   return status.errorMessage

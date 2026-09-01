@@ -36,7 +36,7 @@ test.describe('Settings backup restore', () => {
     await expect(page.getByText('Backup identity', { exact: true })).toBeVisible();
     await expect(page.getByText('Unavailable', { exact: true }).last()).toBeVisible();
     await expect(
-      page.getByText('Remote backup is not configured.', { exact: false }),
+      page.getByText('Remote backup is not configured.', { exact: false }).first(),
     ).toBeVisible();
   });
 
