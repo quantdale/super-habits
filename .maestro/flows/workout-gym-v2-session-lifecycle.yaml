@@ -28,6 +28,7 @@ tags:
     element: 'Add routine'
     direction: DOWN
     visibilityPercentage: 50
+- tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native Gym V2 resume routine routine'
     direction: DOWN
