@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import { spacing, radius, size } from '@/core/theme/designTokens';
 import type { PlanningHubView } from '@/core/providers/navigationContext';
 import { ProjectListView } from '@/features/projects/ProjectListView';
 import { ProjectDetailView } from '@/features/projects/ProjectDetailView';
@@ -46,8 +47,8 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
   }, []);
 
   return (
-    <View className="flex-1 gap-3">
-      <View className="flex-row flex-wrap gap-2">
+    <View className="flex-1" style={{ gap: spacing.md }}>
+      <View className="flex-row flex-wrap" style={{ gap: spacing.sm }}>
         {TABS.map((tab) => {
           const active = view === tab.key && detail === null;
           return (
@@ -56,12 +57,16 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
               accessibilityRole="button"
               accessibilityLabel={tab.label}
               accessibilityState={{ selected: active }}
-              className="rounded-full border px-4 py-2"
-              style={
-                active
+              style={{
+                borderRadius: radius.full,
+                borderWidth: 1,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.sm,
+                minHeight: size.touchTargetMin - 4,
+                ...(active
                   ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                  : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-              }
+                  : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }),
+              }}
               onPress={() => selectTab(tab.key)}
             >
               <Text style={{ color: active ? tokens.textOnAccent : tokens.textMuted }}>

@@ -7,6 +7,7 @@ import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { syncEngine } from '@/core/sync/sync.engine';
 import { Screen } from '@/core/ui/Screen';
+import { spacing, radius, size } from '@/core/theme/designTokens';
 import { DEFAULT_GOAL, getCalorieGoal, setCalorieGoal } from '@/features/calories/calories.data';
 import type { CalorieGoal } from '@/features/calories/types';
 import {
@@ -328,8 +329,17 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close settings"
-          className="flex-row items-center gap-1.5 rounded-2xl border px-3.5 py-2.5"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          className="flex-row items-center"
+          style={{
+            borderRadius: radius.lg,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            backgroundColor: tokens.surface,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            minHeight: size.touchTargetMin - 4,
+            gap: spacing.xs,
+          }}
           onPress={onRequestClose}
         >
           <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
