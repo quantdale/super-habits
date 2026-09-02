@@ -53,7 +53,7 @@ Transform Super Habits from a feature-dense app into a visually coherent, produc
 - [x] Wave 5: Focus + Workout + Calories (PomodoroScreen.tsx, WorkoutScreen.tsx, CaloriesScreen.tsx).
 - [x] Wave 6: Plan/Settings/Command (PlanningHubScreen.tsx, SettingsScreen.tsx, Command overlay).
 - [x] Wave 8: State Quality Pass (QA gates PASS).
-- [ ] Wave 9: Accessibility + Responsive.
+- [x] Wave 9: Accessibility + Responsive (Design tokens normalization).
 - [ ] Wave 12: Final QA + Documentation.
 
 ## Surprises & Discoveries
