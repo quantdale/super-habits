@@ -30,9 +30,32 @@
 
 ## 3. Migration hardening
 
-- [ ] 3.1 Audit migration blocks 1–24 for append-only/transaction/idempotency policy (read-only audit, findings recorded).
-- [ ] 3.2 Failed-migration regression: injected failure leaves version unchanged, error surfaced, restart recovers.
-- [ ] 3.3 Historical upgrade fixtures: pre-planning, pre-Gym (21), v23 → 24; assert data preservation, defaults, indexes, final version.
+- [x] 3.1 Audit migration blocks 1–24 (read-only). Findings: every block
+      2–24 runs through `applyMigration` (step + version bump in ONE
+      `withTransactionAsync`); all DDL uses `IF NOT EXISTS` and all ALTERs go
+      through PRAGMA-gated `addColumnIfMissing` (idempotent restart); garbage
+      stored version safely restarts from 0; `openAndBootstrap` closes the handle
+      on failure and `getDatabase` clears the cached promise (retryable init);
+      no destructive statements (only m18 table rebuild, with row-count +
+      active-uniqueness fail-closed checks inside the tx); m6/m24 backfills are
+      bounded UPDATEs. No append-only violation found — no new migration needed.
+      Existing cover: `tests/db.client.test.ts` (per-block mock proofs) +
+      `tests/integration/migrations.test.ts` (real-SQLite bootstrap, indexes,
+      idempotent rerun, REAL rollback proof at m7, m24 repair) +
+      `tests/integration/migrationFixtures.test.ts` (v13, v17, v19 synthetic
+      upgrades). Genuine gaps: no fail→fix→retry→24 test (§3.2); no TRUE
+      pre-Gym v21 or v23→24 upgrade fixture (§3.3).
+- [x] 3.2 Retry-after-failure regression (`migrations.test.ts`, real
+      SQLite): m7 bump fails on a file DB → version stays 6 → row inserted
+      post-failure → fault cleared → SAME file reopens at 24 with the row and
+      m7 tables present. Full integration 230/230 green.
+- [x] 3.3 Trigger-frozen TRUE-shape fixtures (`migrationFixtures.test.ts`,
+      no hand-copied DDL, no product seam): v21 (12-row era corpus incl.
+      tombstone) → 24 with all rows/ids preserved, Gym tables empty, legacy
+      exercise defaults (`timed`/0/1), v24 + Gym indexes present; v23 (Gym
+      corpus) → 24 with rows preserved, snapshot defaults (`[]`/0), hot-path
+      indexes landed. Also fixed stale schema-version line in the
+      db-and-sync-invariants skill (23 → 24).
 
 ## 4. Persistence/mutation invariants + duplicate-write audit
 

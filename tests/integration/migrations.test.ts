@@ -583,4 +583,63 @@ describe('tests/integration/migrations', () => {
       rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
+
+  it('recovers after a failed migration: clearing the fault and reopening the same file completes the chain with prior rows preserved', async () => {
+    // Spec scenario: initialization rejects, the stored version is unchanged,
+    // and retrying with the failure removed completes the chain to the
+    // current version with prior rows preserved.
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-retry-'));
+    const file = path.join(dir, 'superhabits.db');
+    appMetaFailures.failVersionSevenBump = true;
+    try {
+      // Session 1 fails at the migration-7 version bump (version stays 6).
+      vi.resetModules();
+      vi.doMock('expo-sqlite', async () => {
+        const { createTestDatabase } = await import('./helpers/db');
+        return {
+          openDatabaseAsync: vi.fn(() => createTestDatabase(file)),
+        };
+      });
+      const { getDatabase } = await import('@/core/db/client');
+      await expect(getDatabase()).rejects.toThrow('simulated migration failure');
+
+      // A row written after the failure: blocks 2-6 committed, so the live
+      // schema already serves user writes before the retry.
+      const interim = new Database(file);
+      try {
+        interim
+          .prepare(
+            `INSERT INTO todos (id, title, completed, created_at, updated_at)
+             VALUES ('todo_retry', 'Survives retry', 0, '2026-04-01T10:00:00.000Z', '2026-04-01T10:00:00.000Z')`,
+          )
+          .run();
+      } finally {
+        interim.close();
+      }
+
+      // Session 2: fault cleared, SAME file. The chain resumes at block 7.
+      appMetaFailures.failVersionSevenBump = false;
+      const db = await openDb({ filename: file });
+      const version = await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_meta WHERE key = ?',
+        ['db_schema_version'],
+      );
+      expect(version?.value).toBe('24');
+
+      const todo = await db.getFirstAsync<{ title: string }>(
+        'SELECT title FROM todos WHERE id = ?',
+        ['todo_retry'],
+      );
+      expect(todo?.title).toBe('Survives retry');
+
+      const tables = await db.getAllAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table'",
+      );
+      expect(tables.map((t) => t.name)).toContain('routine_exercises');
+      await db.closeAsync();
+    } finally {
+      appMetaFailures.failVersionSevenBump = false;
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  });
 });

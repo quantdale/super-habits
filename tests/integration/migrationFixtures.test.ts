@@ -394,4 +394,274 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   }, 30_000);
+
+  it('upgrades a TRUE v21 database (frozen at the v22 bump): pre-Gym rows survive, Gym tables arrive empty with defaults, v24 indexes exist', async () => {
+    // No hand-copied DDL and no product seam: a trigger aborts the version
+    // bump to 22, so the frozen file holds EXACTLY blocks ≤ 21 as the runtime
+    // built them (block 22's DDL rolls back with its bump). Rows are then
+    // inserted into that true shape before the real upgrade runs.
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-fixture-'));
+    const file = path.join(dir, 'superhabits.db');
+    const seed = createTestDatabase(file);
+    seed.raw.exec(`
+      CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      CREATE TRIGGER freeze_v21 BEFORE INSERT ON app_meta
+      WHEN NEW.key = 'db_schema_version' AND NEW.value = '22'
+      BEGIN SELECT RAISE(ABORT, 'injected migration freeze at v21'); END;
+    `);
+    await seed.closeAsync();
+
+    await expect(upgradeFixture(file)).rejects.toThrow('injected migration freeze at v21');
+
+    const staging = createTestDatabase(file);
+    const frozen = staging.raw
+      .prepare("SELECT value FROM app_meta WHERE key = 'db_schema_version'")
+      .get() as { value: string };
+    expect(frozen.value).toBe('21');
+    const frozenTables = (
+      staging.raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+        name: string;
+      }[]
+    ).map((t) => t.name);
+    expect(frozenTables).not.toContain('custom_exercises');
+    expect(frozenTables).toContain('daily_plans');
+
+    staging.raw.exec(`
+      DROP TRIGGER freeze_v21;
+      INSERT INTO todos (id, title, completed, created_at, updated_at)
+        VALUES ('todo_v21', 'Pre-Gym todo', 0, '2026-02-01T09:00:00.000Z', '2026-02-01T09:00:00.000Z');
+      INSERT INTO habits (id, name, target_per_day, created_at, updated_at)
+        VALUES ('habit_v21', 'Pre-Gym habit', 2, '2026-02-01T09:00:00.000Z', '2026-02-01T09:00:00.000Z');
+      INSERT INTO habits (id, name, target_per_day, created_at, updated_at, deleted_at)
+        VALUES ('habit_tomb', 'Deleted habit', 1, '2026-02-01T09:00:00.000Z', '2026-02-02T09:00:00.000Z', '2026-02-03T09:00:00.000Z');
+      INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+        VALUES ('hcmp_v21', 'habit_v21', '2026-02-10', 2, '2026-02-10T09:00:00.000Z', '2026-02-10T09:00:00.000Z');
+      INSERT INTO pomodoro_sessions (id, started_at, ended_at, duration_seconds, session_type, created_at)
+        VALUES ('pom_v21', '2026-02-11T10:00:00.000Z', '2026-02-11T10:25:00.000Z', 1500, 'focus', '2026-02-11T10:25:00.000Z');
+      INSERT INTO calorie_entries (id, food_name, calories, meal_type, consumed_on, created_at, updated_at)
+        VALUES ('cal_v21', 'Oats', 300, 'breakfast', '2026-02-11', '2026-02-11T08:00:00.000Z', '2026-02-11T08:00:00.000Z');
+      INSERT INTO daily_plans (id, date_key, intention, created_at, updated_at)
+        VALUES ('plan_v21', '2026-02-11', 'Ship it', '2026-02-11T08:00:00.000Z', '2026-02-11T08:00:00.000Z');
+      INSERT INTO projects (id, name, color, status, created_at, updated_at)
+        VALUES ('proj_v21', 'Pre-Gym project', '#0ea5e9', 'active', '2026-02-01T09:00:00.000Z', '2026-02-01T09:00:00.000Z');
+      INSERT INTO goals (id, project_id, title, horizon, status, created_at, updated_at)
+        VALUES ('goal_v21', 'proj_v21', 'Pre-Gym goal', 'quarter', 'active', '2026-02-01T09:00:00.000Z', '2026-02-01T09:00:00.000Z');
+      INSERT INTO workout_routines (id, name, created_at, updated_at)
+        VALUES ('wrk_v21', 'Legacy Push Day', '2026-02-01T09:00:00.000Z', '2026-02-01T09:00:00.000Z');
+      INSERT INTO routine_exercises (id, routine_id, name, sort_order, created_at, updated_at)
+        VALUES ('ex_v21', 'wrk_v21', 'Old bench', 0, '2026-02-01T09:00:00.000Z', '2026-02-01T09:00:00.000Z');
+      INSERT INTO workout_logs (id, routine_id, completed_at, created_at)
+        VALUES ('log_v21', 'wrk_v21', '2026-02-12T18:00:00.000Z', '2026-02-12T18:00:00.000Z');
+    `);
+    await staging.closeAsync();
+
+    try {
+      const db = await upgradeFixture(file);
+
+      const version = await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
+      );
+      expect(version?.value).toBe('24');
+
+      // Every pre-Gym row kept its id and user data, including the tombstone.
+      const todo = await db.getFirstAsync<{ title: string; completed: number }>(
+        'SELECT title, completed FROM todos WHERE id = ?',
+        ['todo_v21'],
+      );
+      expect(todo).toMatchObject({ title: 'Pre-Gym todo', completed: 0 });
+      const habit = await db.getFirstAsync<{ name: string; target_per_day: number }>(
+        'SELECT name, target_per_day FROM habits WHERE id = ?',
+        ['habit_v21'],
+      );
+      expect(habit).toMatchObject({ name: 'Pre-Gym habit', target_per_day: 2 });
+      const tomb = await db.getFirstAsync<{ deleted_at: string | null }>(
+        'SELECT deleted_at FROM habits WHERE id = ?',
+        ['habit_tomb'],
+      );
+      expect(tomb?.deleted_at).toBe('2026-02-03T09:00:00.000Z');
+      const completion = await db.getFirstAsync<{ count: number }>(
+        'SELECT count FROM habit_completions WHERE id = ?',
+        ['hcmp_v21'],
+      );
+      expect(completion?.count).toBe(2);
+      const session = await db.getFirstAsync<{ duration_seconds: number }>(
+        'SELECT duration_seconds FROM pomodoro_sessions WHERE id = ?',
+        ['pom_v21'],
+      );
+      expect(session?.duration_seconds).toBe(1500);
+      const entry = await db.getFirstAsync<{ calories: number }>(
+        'SELECT calories FROM calorie_entries WHERE id = ?',
+        ['cal_v21'],
+      );
+      expect(entry?.calories).toBe(300);
+      const plan = await db.getFirstAsync<{ intention: string }>(
+        'SELECT intention FROM daily_plans WHERE id = ?',
+        ['plan_v21'],
+      );
+      expect(plan?.intention).toBe('Ship it');
+      const goal = await db.getFirstAsync<{ title: string }>(
+        'SELECT title FROM goals WHERE id = ?',
+        ['goal_v21'],
+      );
+      expect(goal?.title).toBe('Pre-Gym goal');
+      const log = await db.getFirstAsync<{ completed_at: string }>(
+        'SELECT completed_at FROM workout_logs WHERE id = ?',
+        ['log_v21'],
+      );
+      expect(log?.completed_at).toBe('2026-02-12T18:00:00.000Z');
+
+      // Gym V2 tables arrived empty with correct defaults on legacy rows.
+      for (const table of [
+        'custom_exercises',
+        'workout_weekly_plan',
+        'workout_schedule_overrides',
+        'body_weight_entries',
+      ]) {
+        const count = await db.getFirstAsync<{ count: number }>(
+          `SELECT COUNT(*) AS count FROM ${table}`,
+        );
+        expect(Number(count?.count)).toBe(0);
+      }
+      const legacyExercise = await db.getFirstAsync<{
+        modality: string;
+        unilateral: number;
+        supports_external_load: number;
+      }>(
+        'SELECT modality, unilateral, supports_external_load FROM routine_exercises WHERE id = ?',
+        ['ex_v21'],
+      );
+      expect(legacyExercise).toMatchObject({
+        modality: 'timed',
+        unilateral: 0,
+        supports_external_load: 1,
+      });
+
+      // Hot-path range indexes from migration 24 exist.
+      const indexes = (
+        await db.getAllAsync<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'index'",
+        )
+      ).map((i) => i.name);
+      for (const index of [
+        'idx_pomodoro_sessions_started_at',
+        'idx_workout_logs_completed_at',
+        'idx_habit_completions_date_key',
+        'idx_todos_pending_sort',
+        'uq_workout_weekly_plan_active_weekday',
+        'idx_custom_exercises_active_search',
+      ]) {
+        expect(indexes).toContain(index);
+      }
+
+      await db.closeAsync();
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  }, 30_000);
+
+  it('upgrades a TRUE v23 database (frozen at the v24 bump): Gym rows survive with semantic snapshots defaulted, hot-path indexes land', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-fixture-'));
+    const file = path.join(dir, 'superhabits.db');
+    const seed = createTestDatabase(file);
+    seed.raw.exec(`
+      CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      CREATE TRIGGER freeze_v23 BEFORE INSERT ON app_meta
+      WHEN NEW.key = 'db_schema_version' AND NEW.value = '24'
+      BEGIN SELECT RAISE(ABORT, 'injected migration freeze at v23'); END;
+    `);
+    await seed.closeAsync();
+
+    await expect(upgradeFixture(file)).rejects.toThrow('injected migration freeze at v23');
+
+    const staging = createTestDatabase(file);
+    const frozen = staging.raw
+      .prepare("SELECT value FROM app_meta WHERE key = 'db_schema_version'")
+      .get() as { value: string };
+    expect(frozen.value).toBe('23');
+
+    staging.raw.exec(`
+      DROP TRIGGER freeze_v23;
+      INSERT INTO custom_exercises (id, name, primary_area, modality, created_at, updated_at)
+        VALUES ('cex_v23', 'Zercher Squat', 'legs', 'strength', '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+      INSERT INTO workout_weekly_plan (id, weekday, routine_id, plan_kind, created_at, updated_at)
+        VALUES ('wplan_v23', 1, NULL, 'rest', '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+      INSERT INTO workout_schedule_overrides (id, date_key, override_kind, created_at, updated_at)
+        VALUES ('ovr_v23', '2026-03-02', 'rest', '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+      INSERT INTO body_weight_entries (id, measured_on, measured_at, weight, unit, created_at, updated_at)
+        VALUES ('bw_v23', '2026-03-01', '2026-03-01T07:00:00.000Z', 82.5, 'kg', '2026-03-01T07:00:00.000Z', '2026-03-01T07:00:00.000Z');
+      INSERT INTO workout_routines (id, name, goal_tag, created_at, updated_at)
+        VALUES ('wrk_v23', 'Pull Day', 'strength', '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+      INSERT INTO routine_exercises (id, routine_id, name, sort_order, modality, created_at, updated_at)
+        VALUES ('ex_v23', 'wrk_v23', 'Pull-up', 0, 'strength', '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+      INSERT INTO workout_logs (id, routine_id, routine_name, completed_at, created_at)
+        VALUES ('log_v23', 'wrk_v23', 'Pull Day', '2026-03-03T18:00:00.000Z', '2026-03-03T18:00:00.000Z');
+      INSERT INTO todos (id, title, completed, created_at, updated_at)
+        VALUES ('todo_v23', 'V23 todo', 0, '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+      INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+        VALUES ('hcmp_v23', 'habit_missing', '2026-03-01', 1, '2026-03-01T09:00:00.000Z', '2026-03-01T09:00:00.000Z');
+    `);
+    await staging.closeAsync();
+
+    try {
+      const db = await upgradeFixture(file);
+
+      const version = await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
+      );
+      expect(version?.value).toBe('24');
+
+      // Gym rows kept ids, timestamps, and user data across the upgrade.
+      const custom = await db.getFirstAsync<{
+        name: string;
+        aliases: string;
+        supports_external_load: number;
+      }>('SELECT name, aliases, supports_external_load FROM custom_exercises WHERE id = ?', [
+        'cex_v23',
+      ]);
+      expect(custom).toMatchObject({
+        name: 'Zercher Squat',
+        aliases: '[]',
+        supports_external_load: 0,
+      });
+      const weekly = await db.getFirstAsync<{ plan_kind: string }>(
+        'SELECT plan_kind FROM workout_weekly_plan WHERE id = ?',
+        ['wplan_v23'],
+      );
+      expect(weekly?.plan_kind).toBe('rest');
+      const bodyWeight = await db.getFirstAsync<{ weight: number; unit: string }>(
+        'SELECT weight, unit FROM body_weight_entries WHERE id = ?',
+        ['bw_v23'],
+      );
+      expect(bodyWeight).toMatchObject({ weight: 82.5, unit: 'kg' });
+      const exercise = await db.getFirstAsync<{ modality: string; unilateral: number }>(
+        'SELECT modality, unilateral FROM routine_exercises WHERE id = ?',
+        ['ex_v23'],
+      );
+      expect(exercise).toMatchObject({ modality: 'strength', unilateral: 0 });
+      const completion = await db.getFirstAsync<{ count: number }>(
+        'SELECT count FROM habit_completions WHERE id = ?',
+        ['hcmp_v23'],
+      );
+      expect(completion?.count).toBe(1);
+
+      // Migration-24 hot-path indexes serve the unbounded history tables.
+      const indexes = (
+        await db.getAllAsync<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'index'",
+        )
+      ).map((i) => i.name);
+      for (const index of [
+        'idx_pomodoro_sessions_started_at',
+        'idx_workout_logs_completed_at',
+        'idx_habit_completions_date_key',
+        'idx_todos_pending_sort',
+      ]) {
+        expect(indexes).toContain(index);
+      }
+
+      await db.closeAsync();
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  }, 30_000);
 });
