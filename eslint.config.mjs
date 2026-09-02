@@ -62,6 +62,7 @@ export default [
       '*.config.js',
       '*.config.mjs',
       'scripts/**/*.mjs',
+      'scripts/**/*.d.mts',
       'supabase/functions/**',
       '.vercel/**',
       '.cursor/**',

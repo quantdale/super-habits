@@ -151,6 +151,7 @@ If this file conflicts with current code, trust the code and document the confli
   - `Cross-Origin-Opener-Policy: same-origin`
 - Those headers are enforced in development and in `vercel.json` for deployment.
 - E2E and production-like web testing should use the static export flow, not `npm run web`.
+- `npm run web` / `npm run web:dev` is a **persistent Metro server** — agents must never await it as a validation gate. Automated web verification uses only finite commands: `npm run build:web`, Playwright (which owns its server via `scripts/serve-e2e.js`), or `npm run web:verify`. At campaign end, `npm run web:hygiene` must report 8081/8082 free or owned by unrelated processes.
 
 ## Documentation Hygiene
 

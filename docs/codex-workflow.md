@@ -29,6 +29,12 @@ Cursor rule files (for example `.cursorrules` and `.cursor/rules/superhabits-rul
 - Keep each worktree scoped to its assigned task so diffs stay reviewable and merge conflicts stay local.
 - If a task needs changes already in progress elsewhere, finish or merge that earlier task before starting the dependent task's wave.
 
+## Server Lifecycle Rule
+
+- `npm run web` / `npm run web:dev` is a **persistent Metro server**. Never await it as a validation gate; it does not exit on its own.
+- Finite web validation only: `npm run build:web`, Playwright (server owned by `scripts/serve-e2e.js`), or `npm run web:verify` (build → owned server → bounded probe → guaranteed cleanup → port release).
+- Before finishing a task/campaign, run `npm run web:hygiene`; free only exact campaign-owned PIDs, and never use `taskkill /IM node.exe` / `killall node`.
+
 ## Wave-Based Execution
 
 - Organize concurrent work into waves.

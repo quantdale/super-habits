@@ -44,7 +44,11 @@ An untriaged failure stays untriaged. A passing retry is evidence to investigate
 
 For local E2E, build the static export first. The standard Playwright projects
 serve it on `http://localhost:8081` by default. If another development server
-already owns that port, use an isolated port; reuse is opt-in:
+already owns that port, use an isolated port; reuse is opt-in. Never await the
+persistent `npm run web` (Metro) as a validation gate — it does not exit; use
+`npm run build:web`, Playwright, or the finite `npm run web:verify` (which
+builds, serves, probes, and terminates its own server), and run
+`npm run web:hygiene` before finishing a campaign:
 
 ```bash
 E2E_PORT=8091 npm run e2e:journeys:p0

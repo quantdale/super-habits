@@ -1,7 +1,7 @@
 # audit-performance
 
 Run a full performance and PWA audit of the SuperHabits web app
-using Lighthouse and Fetch MCPs. Requires the app on `http://localhost:8081` — e.g. `npm run web` (Metro) or `npm run build:web` then `node scripts/serve-e2e.js` (static; matches E2E).
+using Lighthouse and Fetch MCPs. Requires the app on `http://localhost:8081`. Use a finite flow: `npm run web:verify` (builds, serves `dist/` with `require-corp` COEP, probes, and terminates its own server) — or manually `npm run build:web` then `node scripts/serve-e2e.js` (static; matches E2E). Do NOT leave a persistent `npm run web` (Metro) running for this audit; if Metro is used interactively, kill the exact owned process tree when done (see AGENTS.md → Server Lifecycle Rule).
 
 ---
 

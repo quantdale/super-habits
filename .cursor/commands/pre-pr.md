@@ -9,7 +9,7 @@ check Actions CI on the open PR for the current branch, fix failures if
 needed, and confirm a green run before merge.
 
 Requires:
-- App reachable at `http://localhost:8081` — for parity with CI/E2E, run `npm run build:web` then `node scripts/serve-e2e.js` (static `dist/`, `require-corp` COEP). For quick UI iteration, `npm run web` (Metro) on 8081 is fine for manual inspection but does not match the static E2E bundle.
+- App reachable at `http://localhost:8081` — for parity with CI/E2E and for automated agents, use the finite path: `npm run web:verify` (builds `dist/`, serves it with `require-corp` COEP, probes, and self-terminates). Manual fallback: `npm run build:web` then `node scripts/serve-e2e.js` (static `dist/`). `npm run web` (Metro) is for human HMR iteration only — it is a **persistent server**; never await it as a gate (see AGENTS.md → Server Lifecycle Rule).
 - One tab / one origin for DB-heavy flows (OPFS lock)
 - Playwright MCP must be connected in Cursor Settings → MCP
 - **GitHub MCP** — for Phases 4–6 (CI status, logs, PR review comments in deep mode)

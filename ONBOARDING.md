@@ -20,6 +20,7 @@ Credentials, API keys, signing material, account logins, licensed assets, and ot
 **Primary host:** Windows/Linux/macOS authoring; Android is a primary native test target and iOS requires macOS/Xcode.
 
 **Required machine tools**
+
 - Git
 - Node.js >=22.22.1 <23
 - npm >=10.9 <11
@@ -28,11 +29,11 @@ Credentials, API keys, signing material, account logins, licensed assets, and ot
 - Playwright Chromium for web/E2E
 
 **Task-dependent / optional tools**
+
 - Maestro for native journeys (`.maestro/`)
 - Supabase CLI for schema/backend tasks
 - macOS/Xcode for iOS
 - Lighthouse for PWA/performance checks
-
 
 ## 3. Agent setup
 
@@ -55,7 +56,6 @@ npm run doctor
 
 The repo contains `.nvmrc`; honor it. Supabase is optional for local-first app work but required for tasks that explicitly touch backup/schema integration.
 
-
 ## 5. Editor/LSP baseline
 
 Use the local TypeScript 5.9 service, ESLint, Expo/React Native types, and NativeWind awareness. Do not let a global TypeScript version override the repo pin.
@@ -70,6 +70,7 @@ npm run qa:integration
 npm run openspec:validate
 npm run qa:impact:validate
 npm run build:web
+npm run web:verify    # finite live-web verification; must exit by itself and free its port
 npm run e2e:journeys:p0
 ```
 

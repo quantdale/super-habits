@@ -269,7 +269,10 @@ npm install
 npx expo start
 npm run android
 npm run ios
-npm run web          # headless web dev server
+npm run web          # headless web dev server (PERSISTENT — never await as a validation gate)
+npm run web:dev      # explicit alias for the persistent dev server (same as `web`)
+npm run web:verify   # FINITE automated live-web verification (build + owned server + bounded probe + guaranteed cleanup)
+npm run web:hygiene  # report web test ports / free an exact owned PID (read-only by default)
 
 # Quality gates
 npm run typecheck    # tsc --noEmit
@@ -280,7 +283,7 @@ npm run format:check # prettier --check .
 npm test             # vitest run
 
 # Web build / deploy
-npm run build:web    # npx expo export -p web → dist/
+npm run build:web    # npx expo export -p web → dist/ (one-shot, finite)
 
 # E2E (requires dist/ to be up to date)
 npm run e2e          # playwright test (chromium + journeys + simulation projects)
@@ -377,6 +380,29 @@ decision rule.
 - `/pre-pr` — full code-quality + live web inspection + optional CI check
 - `/e2e-fix` — run E2E and auto-detect selector mismatches
 - `.cursor/commands/test.md`, `.cursor/commands/fix.md`, `.cursor/commands/pre-pr.md`
+
+## Server Lifecycle Rule (autonomous agents)
+
+`npm run web` / `npm run web:dev` starts a **persistent Metro development
+server**. Autonomous agents MUST NOT await it as a validation gate — it
+intentionally never exits, so a shell that waits on it stays alive
+indefinitely (this caused a 3.5h "session" whose actual bundles finished in
+tens of seconds).
+
+- **Finite paths only for automated work:** `npm run build:web` (one-shot
+  static export) and `npm run web:verify` (build → owned static server →
+  bounded HTTP/browser probe → guaranteed tree cleanup → port-release check).
+  Playwright E2E owns its own server via `scripts/serve-e2e.js`; Metro must
+  never replace that.
+- **If Metro is genuinely required** for interactive HMR inspection, start it
+  as a managed background process, wait for readiness, perform the
+  inspection, then terminate the **exact owned process tree** immediately
+  (Windows: `taskkill /PID <ownedPid> /T /F`). Never run `taskkill /IM
+node.exe` or `killall node` — those kill unrelated user processes.
+- **Final hygiene gate:** before finishing a campaign, run
+  `npm run web:hygiene` and confirm 8081/8082 are free (or that remaining
+  owners are unrelated). Never finish a campaign with campaign-owned servers
+  listening on development/test ports.
 
 ## Deployment
 
