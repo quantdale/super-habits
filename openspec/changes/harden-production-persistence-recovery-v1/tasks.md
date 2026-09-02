@@ -87,9 +87,23 @@
 
 ## 5. Restore disaster-recovery matrix
 
-- [ ] 5.1 Malformed/adversarial payload matrix (checksum, owner, scope, truncation, duplicate ids) → pre-import rejection, classified errors.
-- [ ] 5.2 Atomicity: injected mid-import failure → DB byte-identical, no outbox rows, version untouched.
-- [ ] 5.3 Wrong-owner refusal + legacy V1 honesty re-verified (extend existing tests only where a gap is found).
+- [x] 5.1 Matrix audited against `backupRestore.test.ts` (25 tests) +
+      `portableImportCorruption.test.ts` + unit coordinator: checksum, malformed
+      rows, broken dependencies, corrupt/future/unknown-scope manifests,
+      duplicate ids, mid-fetch failure, owner mismatch, remote-disabled, and all
+      settings-integrity variants are covered with pre-import rejection. One gap
+      added: missing manifest → `legacy` fallthrough with device untouched.
+- [x] 5.2 Mid-import atomicity (`backupRestore.test.ts`): row-level tripwire
+      fails the habit_completions applier after 5 entities applied → rejects;
+      zero user rows, zero outbox rows, version 24, app_meta identical,
+      no linked-action side effects; dropping the tripwire restores cleanly on
+      the same handle. Lesson: file-level vi.mock of a getDatabase()-dependent
+      data layer freezes the first registry generation and breaks later
+      freshDatabase() generations — DB tripwires instead (see execplan).
+- [x] 5.3 Wrong-owner refusal proven (unit owner variants + integration
+      owner_mismatch matrix); legacy V1 import scope proven (unit V1 import +
+      integration `restore.test.ts`); `Legacy (V1)` label + honest disclosure
+      copy verified in `SettingsBackupSection.tsx` (static, no logic to test).
 
 ## 6. Offline/reconnect outbox torture
 

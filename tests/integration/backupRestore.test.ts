@@ -1126,6 +1126,81 @@ describe('backup completeness v2 restore', () => {
     await expectZeroImportedRows(targetDb);
     await targetDb.closeAsync();
   });
+
+  it('rolls back already-applied entities when a mid-import applier fails, then restores cleanly on retry', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    const metaBefore = await targetDb.getAllAsync<{ key: string; value: string }>(
+      'SELECT key, value FROM app_meta ORDER BY key ASC',
+    );
+
+    // Fail the habit_completions importer with a row-level tripwire: the
+    // projects, goals, todos, habits, and daily_plans importers have already
+    // run inside the same transaction when the first completions INSERT
+    // aborts. A DB trigger is used instead of a module mock on purpose — a
+    // file-level vi.mock of a getDatabase()-dependent data layer freezes the
+    // first registry generation and breaks later freshDatabase() generations.
+    // The trigger is created (and later dropped) outside the import
+    // transaction, so it survives the rollback deterministically.
+    await targetDb.execAsync(`
+      CREATE TRIGGER fail_completions_import BEFORE INSERT ON habit_completions
+      BEGIN SELECT RAISE(ABORT, 'simulated mid-import applier failure'); END;
+    `);
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    await expect(restoreFromRemoteBackupV2()).rejects.toThrow(
+      'simulated mid-import applier failure',
+    );
+
+    // Strict atomicity: no user rows, no outbox rows, version untouched,
+    // app_meta identical, no linked-action side effects.
+    await expectZeroImportedRows(targetDb);
+    const outbox = await targetDb.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM sync_outbox',
+    );
+    expect(Number(outbox?.count)).toBe(0);
+    const version = await targetDb.getFirstAsync<{ value: string }>(
+      "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
+    );
+    expect(version?.value).toBe('24');
+    const metaAfter = await targetDb.getAllAsync<{ key: string; value: string }>(
+      'SELECT key, value FROM app_meta ORDER BY key ASC',
+    );
+    expect(metaAfter).toEqual(metaBefore);
+    for (const table of ['linked_action_events', 'linked_action_executions']) {
+      const count = await targetDb.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM ${table}`,
+      );
+      expect(Number(count?.count), table).toBe(0);
+    }
+
+    // The failed import left a retryable pristine device: drop the tripwire
+    // and the same handle restores cleanly.
+    await targetDb.execAsync('DROP TRIGGER fail_completions_import;');
+    const retry = await restoreFromRemoteBackupV2();
+    expect(retry.status).toBe('restored');
+    const restoredTodos = await targetDb.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM todos',
+    );
+    expect(Number(restoredTodos?.count)).toBeGreaterThan(0);
+    await targetDb.closeAsync();
+  });
+
+  it('treats a missing manifest as a legacy backup without touching the device', async () => {
+    const remote = await publishSourceBackup();
+    remote.delete('backup_manifest');
+    const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result).toMatchObject({ status: 'legacy' });
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
 });
 
 describe('backup completeness v2 restore — fault-injection matrix', () => {

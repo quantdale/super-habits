@@ -38,17 +38,17 @@ campaign proves (and where needed fixes) those properties with evidence.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 2 — §4 COMPLETE (inventory clean; 7/7 probes
-  green; pomodoro-backfill outbox defect fixed at root with unit +
-  integration regression); starting §5 (restore DR matrix).
+- Current milestone: Phase 2 — §5 COMPLETE (mid-import tripwire rollback +
+  retry green; missing-manifest legacy green; file 27/27); starting §6
+  (offline/reconnect outbox torture).
 - Completed: Phase 0 (git truth, hygiene, control plane read), Phase 1
   (baseline gates recorded in tasks.md §1), OpenSpec change created
   (proposal/design/tasks/spec/execplan), §2.1–§2.3 (mechanism proven as
   wall-clock timeout from per-test full-graph re-import; test-only root fix
   in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green), §3
   (retry test + v21/v23 TRUE-shape fixtures; integration 230/230).
-- In progress: none (§3 done) — next is the §3 commit, then §4.1
-  write-family inventory across the 10 data layers.
+- In progress: none (§5 done) — next is the §5 commit, then §6.1/§6.2
+  (outbox restart survival + flapping torture).
 - Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).
 - Decisions: D1–D7 in design.md (CG-9 battery protocol; injected-failure
   migration test; runtime-derived historical fixtures; data-layer duplicate
@@ -67,8 +67,8 @@ campaign proves (and where needed fixes) those properties with evidence.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: n/a.
-- Exact next action: commit the §3 migration-hardening tests, then start
-  §4.1 (inventory write families + sync-enqueue coverage).
+- Exact next action: commit the §5 restore-DR tests, then start §6
+  (read sync.engine + syncOutbox tests to find the real gaps).
 - Remaining definition of done: tasks §2–§8 complete; full validation
   matrix green on the final tree; independent verification PASS; coherent
   commits pushed per policy; web:hygiene PASS with no campaign-owned
@@ -112,6 +112,14 @@ campaign proves (and where needed fixes) those properties with evidence.
   1663 passed under full parallel load; isolated run 18/18; full re-run
   1665/1665. Same CG-9 class WM2.4 closed elsewhere — mechanism not yet
   identified.
+- §5: file-level `vi.mock` of a getDatabase()-dependent data layer is
+  UNSAFE with this repo's reset-per-test integration pattern — the mock
+  namespace freezes the first registry generation, so later
+  `freshDatabase()` generations hit a stale closed handle (broke the
+  success-path restore test deterministically). Safe file-level mocks are
+  db-explicit (appMeta, transactions) or external (AsyncStorage). For
+  row-level fault injection prefer DB tripwires (triggers) over module
+  mocks — same technique as the §3.3 version-freeze.
 
 ## Decision Log
 
