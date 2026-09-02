@@ -177,4 +177,31 @@ test.describe('PWA update lifecycle', () => {
     await page.reload();
     await page.getByText('Update available', { exact: true }).waitFor({ timeout: 20_000 });
   });
+
+  test('reload during registration never surfaces an unhandled rejection (WM2.4)', async ({
+    page,
+  }) => {
+    // WM2.4 regression gate: when a reload lands while register() is in
+    // flight, navigator.serviceWorker.register() can resolve undefined and
+    // workbox's internal registration.waiting access rejects. The app's
+    // registration boundary must swallow it (log + retry next load), never
+    // surface it as an unhandled page error.
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error?.message ?? error)));
+
+    // Reload as early as possible, twice, to maximize the chance of landing
+    // inside the register() window on both cold and controlled loads.
+    await page.goto('/');
+    await page.reload({ waitUntil: 'commit' });
+    await page.reload({ waitUntil: 'commit' });
+    await waitForShell(page);
+    await waitForControlled(page);
+    await waitForDbReady(page);
+
+    const waitingCrash = pageErrors.find((message) => message.includes("reading 'waiting'"));
+    expect(
+      waitingCrash,
+      `unhandled SW registration crash: ${pageErrors.join(' | ')}`,
+    ).toBeUndefined();
+  });
 });

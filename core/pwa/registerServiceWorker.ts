@@ -93,7 +93,24 @@ export function registerServiceWorker() {
     notifyApplied({ isUpdate: true, isExternal: event.isExternal === true });
   });
 
-  void wb.register();
+  void wb
+    .register()
+    .then((registration) => {
+      // Reload-during-registration race (WM2.4): register() can resolve
+      // undefined; workbox's internal `this._registration.waiting` access
+      // then rejects inside this chain. Treated as a retryable noop — the
+      // next page load re-attempts registration. No unhandled rejection.
+      if (!registration) {
+        console.warn(
+          '[pwa] service-worker registration resolved undefined (reload race); will retry on next load',
+        );
+      }
+    })
+    .catch((error) => {
+      // Registration failures (offline, quota, races) must never escape as
+      // an unhandled rejection; the next load retries.
+      console.error('[pwa] service-worker registration failed', error);
+    });
   workboxInstance = wb;
   registered = true;
   // register() already performed an update check; start the throttle window.
