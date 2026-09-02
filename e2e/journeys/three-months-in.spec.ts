@@ -512,7 +512,8 @@ defineJourney({
 type SectionName = 'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories';
 
 const TAB_LABELS_NAMES: Record<SectionName, string> = {
-  overview: 'Overview',
+  // WM2.0 renamed the Overview tab to "Today" (app/index.tsx section rail).
+  overview: 'Today',
   todos: 'To Do',
   habits: 'Habits',
   pomodoro: 'Focus',

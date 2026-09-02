@@ -116,14 +116,16 @@ test.describe('Workout Gym V2', () => {
     await builder.getByLabel('Close').click();
     const weekRest = page.getByRole('button', { name: 'Monday rest', exact: true });
     const weekBox = await weekRest.boundingBox();
-    expect(weekBox?.width ?? 0).toBeGreaterThanOrEqual(44);
-    expect(weekBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    // Chips follow the documented compact chip rule (WM2.2):
+    // minHeight = size.touchTargetMin - 4 = 40.
+    expect(weekBox?.width ?? 0).toBeGreaterThanOrEqual(40);
+    expect(weekBox?.height ?? 0).toBeGreaterThanOrEqual(40);
     await page.getByText('Plan week', { exact: true }).click();
     const plan = page.getByRole('dialog');
     const mondayRest = plan.getByRole('button', { name: 'Monday rest', exact: true });
     const box = await mondayRest.boundingBox();
-    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(40);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(40);
   });
 
   test('reschedules today without changing the recurring week', async ({ page }) => {

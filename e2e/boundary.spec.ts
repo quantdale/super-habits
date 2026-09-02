@@ -93,8 +93,9 @@ test.describe('Todos — boundary inputs', () => {
     // The pending list is virtualized (DraggableFlatList mounts a window):
     // hover a mounted row so wheel events target the list scroller, then
     // scroll to the tail so the last-created task mounts before asserting.
-    const anchorRow = page.getByText('Task 11', { exact: true }).last();
-    await anchorRow.waitFor({ state: 'visible', timeout: 20_000 });
+    // Anchor on the first row — the initial mount window does not
+    // necessarily reach Task 11 (rows got taller with WM2.2 density).
+    const anchorRow = page.getByText('Task 1', { exact: true }).last();
     await anchorRow.hover();
     for (let i = 0; i < 12; i += 1) {
       await page.mouse.wheel(0, 900);
