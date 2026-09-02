@@ -43,7 +43,7 @@
     "sim:validate": "tsc -p simulation/tsconfig.json && node simulation/.build/simulation/runner/cli.js validate",
     "sim:repro:capture": "tsc -p simulation/tsconfig.json && node simulation/.build/simulation/repro/cli.js capture",
     "sim:repro:replay": "tsc -p simulation/tsconfig.json && node simulation/.build/simulation/repro/cli.js replay",
-    "qa:fast": "npm run typecheck && npm run lint && npm run test:unit",
+    "qa:fast": "npm run typecheck && npm run lint && npm run test:unit && node scripts/journey-label-parity.mjs",
     "qa:integration": "npm run test:integration",
     "qa:journeys": "npm run build:web && npm run e2e:journeys:p0",
     "qa:simulation": "node scripts/qa-simulation.mjs",
