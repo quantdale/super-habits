@@ -68,6 +68,27 @@ Every entry below is either a contract gap or a capability gap. If a new uncover
 - **Reason:** a 364-day window beginning on a Sunday was padded to 365 cells and rendered as 53 columns even though the Habits surface passed `weeks={52}`. J8's unchanged boundary assertion caught the mismatch.
 - **Resolution (closed 2026-08-10):** `buildHeatmapWeekColumns` now trims calendar padding to the explicit width while retaining the most recent columns. Unit coverage and the unchanged HEAVY J8 52-column assertion pass.
 
+### CG-7 — Service-worker registration reload race — CLOSED
+
+**Decided contract (WM2.4):** a reload landing while `register()` is in flight must never surface an unhandled rejection; the registration is retried on the next page load and the update flow is unchanged.
+
+- **Reason (reproduced 2026-09-03, WM2.3 diagnostic trace):** workbox-window 7.3.0's `register()` reads `this._registration.waiting` immediately after `navigator.serviceWorker.register()` resolves; during a reload race that promise can resolve `undefined`, throwing `TypeError: Cannot read properties of undefined (reading 'waiting')` as an unhandled rejection (app survives; console shows a crash-grade pageerror).
+- **Resolution (closed 2026-09-03, `harden-warm-momentum-2-4-*`):** the registration boundary in `core/pwa/registerServiceWorker.ts` now handles the promise chain — a falsy registration logs a retryable-noop warning and any rejection is logged, never unhandled. `applyServiceWorkerUpdate` semantics are unchanged; the full pwa-update suite (5/5, three consecutive runs) and the new reload-race regression test stay green.
+
+### CG-8 — Journey tab-label parity — CLOSED (guard added)
+
+**Decided contract (WM2.4):** every tab label used by e2e helpers/journeys must match the app's section-rail labels, enforced in the PR quality lane so main/nightly-only lanes cannot rot silently.
+
+- **Reason:** the P2 heavy journey clicked tab 'Overview' for ~30 days after the WM2.0 rename to 'Today' (0ef426c) because the journeys project skips PR lanes and nothing compared labels. Discovered and fixed 2026-09-03 (WM2.3); the _class_ remained unguarded.
+- **Resolution (closed 2026-09-03):** `scripts/journey-label-parity.mjs` parses `NAV_ITEMS` in `app/index.tsx` as the single source of truth and checks every e2e label map plus inline tab clicks; wired into `qa:fast`. Negative check verified: renaming a rail label produces 8 named failures. Parser unit-tested in `tests/journeyLabelParity.test.ts`.
+
+### CG-9 — Full-parallel Vitest load sensitivity (timeout + bind-race class) — CLOSED
+
+**Decided contract (WM2.4):** load-sensitive real-I/O tests carry explicit bounds sized to their meaning, not the 5s default; spawned servers fail fast on bind death via child-watching probes with bounded bind-race retries; a genuine hang still fails fast.
+
+- **Reason (reproduced 2026-09-03):** across seven full `npm test` runs, four different files failed sporadically — `caloriesIntegrity`, `portableOwnerRecovery`, `fixtures`, `portableLargeDataset` (integration: real SQLite bootstrap per test, file-backed imports, tens-of-thousands-row export/import), and `web-lifecycle` (spawns two real node HTTP servers). Two distinct mechanisms were proven with captured stack traces: (a) the 5s/30s bounds being tighter than the operation's meaning under parallel worker load (no assertion ever failed — pure timeouts); (b) a `pickPort()` TOCTOU bind race — the port scanner sees a port free while a previous test's server is still mid-shutdown, the spawned server dies instantly on `EADDRINUSE`, and a probe _not watching the child_ then burns its full 10s. Classification: `TEST_BUG` for both; no product, no flake of any assertion.
+- **Resolution (closed 2026-09-03):** integration project sets `testTimeout: 15_000` with rationale in `vitest.config.ts`; `portableLargeDataset` describe gets a proportional 120s ceiling (its own timing assertions at 30–60s remain the real contract); `fixtures` gets 30s; `web-lifecycle`'s tree-isolation spec gets 10s child-watching readiness probes, a bounded 3-attempt spawn retry on a fresh port for both owned and victim servers, a 60s describe ceiling exceeding the worst path, and a bounded cleanup wait (the only previously unbounded await). No assertion semantics changed; no blind retries — the retry is specifically the proven bind race, with the child watcher making genuine server failures fail fast. Verified by eight consecutive full parallel runs (see ExecPlan ledger).
+
 ---
 
 ## Capability gaps

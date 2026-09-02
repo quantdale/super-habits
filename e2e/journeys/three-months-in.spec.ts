@@ -160,6 +160,7 @@ defineJourney({
           coldStartMs,
           `cold Overview at HEAVY ${coldStartMs}ms > D14 ceiling 5000ms`,
         ).toBeLessThanOrEqual(5000);
+        assertHeadroom('cold Overview', coldStartMs, 5000);
 
         // The rest of the Overview aggregates, each checked against the same
         // SQL the row oracle computed (week-scoped cards → week-scoped oracle).
@@ -226,6 +227,9 @@ defineJourney({
           );
         }
         sectionSwitchObserved = measured;
+        // WM2.4: sustained headroom gate on the worst switch (ceiling 800ms).
+        const worst = measured.reduce((m, s) => Math.max(m, s.ms), 0);
+        assertHeadroom('section switch (max of 6)', worst, 800);
 
         // Capture the post-activation rows (the first Todos visit expanded the
         // daily-recurring todos — the fixture's own realism), then return to app.
@@ -404,6 +408,7 @@ defineJourney({
           diarySearchMs,
           `diary search response ${diarySearchMs}ms > D14 ceiling 500ms`,
         ).toBeLessThanOrEqual(500);
+        assertHeadroom('diary search', diarySearchMs, 500);
         await searchInput.fill('');
 
         // Saved-meal picker: 'Browse saved meals (15)' → modal search.
@@ -427,6 +432,7 @@ defineJourney({
           pickerSearchMs,
           `saved-meal picker search response ${pickerSearchMs}ms > D14 ceiling 500ms`,
         ).toBeLessThanOrEqual(500);
+        assertHeadroom('saved-meal picker search', pickerSearchMs, 500);
         // Close the modal so later steps are not blocked by the overlay.
         await page.getByLabel('Close').first().click();
         await expect(page.getByText('Saved meals', { exact: true })).toBeHidden();
@@ -550,14 +556,31 @@ function storeOf<T>(key: string): T {
   return storeMap.get(key) as T;
 }
 
+/**
+ * WM2.4 headroom floor: a budgeted step fails when its sustained headroom
+ * falls below 15% of its ceiling, so drift toward the ceiling is visible
+ * (and gated) before it becomes an outright ceiling breach.
+ */
+const HEADROOM_FLOOR_PCT = 15;
+
+function assertHeadroom(label: string, measuredMs: number, ceilingMs: number): void {
+  const headroomPct = ((ceilingMs - measuredMs) / ceilingMs) * 100;
+  expect(
+    headroomPct,
+    `${label}: ${measuredMs}ms of ${ceilingMs}ms ceiling = ${headroomPct.toFixed(1)}% headroom (< ${HEADROOM_FLOOR_PCT}% floor)`,
+  ).toBeGreaterThanOrEqual(HEADROOM_FLOOR_PCT);
+}
+
 /** Print the measured numbers once (they also appear in the report). */
 function commitObservedBaselines(): void {
   const max = sectionSwitchObserved.reduce((m, s) => Math.max(m, s.ms), 0);
+  const headroom = (measured: number, ceiling: number) =>
+    `${measured}/${ceiling}ms (${(((ceiling - measured) / ceiling) * 100).toFixed(1)}% headroom)`;
   // eslint-disable-next-line no-console
   console.log(
-    `[J8 baseline] coldOverview=${coldStartObservedMs}ms (limit 5000) | ` +
-      `maxSwitch=${max}ms (limit 800): ${sectionSwitchObserved.map((s) => `${s.label}=${s.ms}`).join(', ')} | ` +
-      `diarySearch=${diaryInputObservedMs}ms (limit 500) | pickerSearch=${pickerInputObservedMs}ms (limit 500)`,
+    `[J8 baseline] coldOverview=${headroom(coldStartObservedMs, 5000)} | ` +
+      `maxSwitch=${headroom(max, 800)}: ${sectionSwitchObserved.map((s) => `${s.label}=${s.ms}`).join(', ')} | ` +
+      `diarySearch=${headroom(diaryInputObservedMs, 500)} | pickerSearch=${headroom(pickerInputObservedMs, 500)}`,
   );
 }
 
