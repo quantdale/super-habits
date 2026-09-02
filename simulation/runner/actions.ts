@@ -124,6 +124,11 @@ export async function actionSetCalorieGoal(
 export async function actionOpenCommand(page: Page): Promise<string> {
   await ensureApp(page);
   await openCommandScreen(page);
+  // "Describe it" closes the quick-capture sheet and opens the command modal
+  // in the same tick; the sheet's fade-out keeps both modals mounted for a
+  // few hundred ms, so wait for the sheet to unmount before clicking the
+  // (now unambiguous) Close control.
+  await expect(page.getByText('Add something', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('#command-input')).toHaveCount(0);
   return 'openCommand';
