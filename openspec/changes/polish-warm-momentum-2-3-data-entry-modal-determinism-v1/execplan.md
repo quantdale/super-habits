@@ -97,6 +97,12 @@ origin/main`; ports clean; ExecPlan COMPLETED.
 
 ## Progress
 
+- [x] Shared numeric-input model (`lib/numericInput.ts` + 17 unit tests) adopted across workout/calories/quick-capture.
+- [x] Shared submit guard (`lib/submitGuard.ts`) adopted by Calories (closed the double-submit gap), Quick Capture, Habits, Todos.
+- [x] TextField contract completion (error/helperText/multiline/keyboard/disabled) + pure a11y model + tests.
+- [x] Modal closing-phase determinism contract (one interactive layer) + determinism E2E (double-submit + modal swap), 3× green.
+- [x] Three pre-existing E2E rots repaired (virtualization anchor, compact-chip contract, Today-tab label).
+- [x] Full gates green (see Validation Ledger); docs written; commits pushed.
 - 2026-09-02: Phase A diagnosed (probe evidence), fixed, 3×P0 green,
   committed 9719587. WM2.3 OpenSpec change created and validated.
 - 2026-09-03: WM2.3 implemented end-to-end (numeric model, submit guard,
