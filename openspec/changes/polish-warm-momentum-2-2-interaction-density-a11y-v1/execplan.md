@@ -1,7 +1,7 @@
 # ExecPlan: Warm Momentum 2.2 — Interaction Primitives, Tablet Density, Accessibility Order
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -62,8 +62,9 @@ resilience are re-audited on touched surfaces. Presentation-layer only.
 
 ## Current Checkpoint
 
-- Current milestone: Wave B10 — final evidence re-capture + docs, then
-  Wave B11 full validation/closure.
+- Current milestone: Campaign closed — independent verification agent
+  returned PASS on all 12 checks (git/typecheck/lint/tests/openspec/plans/
+  themes/impact-map/web:verify-finiteness/code-audit/evidence/hygiene).
 - Completed: Phase A pushed (dc3be75); WM2.2 OpenSpec artifacts validated;
   B1 control audit (SegmentedControl primitive existed but had ~37px touch
   target, no disabled/keyboard; zero adopters); B2 primitive upgraded
@@ -94,19 +95,9 @@ resilience are re-audited on touched surfaces. Presentation-layer only.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: none.
-- Exact next action: after `npm run build:web` completes, re-run
-  `node scripts/capture-wm22-evidence.js` (Planning Hub/Habits/Calories/Workout
-  × phone/tablet/desktop) to refresh the "after" evidence, then write
-  docs/ui-ux/09-warm-momentum-2-2.md, update the UI/UX README map, then run
-  the full final gate set (git diff --check, typecheck, lint, vitest,
-  openspec:validate, qa:impact:validate, validate:themes,
-  supabase:schema:validate, agent:plan:validate:all, sim:validate,
-  build:web, web:verify, Playwright applicable suite, web:hygiene),
-  spin an independent verification agent, then commit + push.
-- Remaining definition of done: shared SegmentedControl + Planning Hub +
-  Habits + Calories tablet + Workout tablet all certified; a11y evidence
-  persisted; final gates green; ExecPlan COMPLETED; pushed clean with
-  hygiene PASS.
+- Exact next action: none.
+- Remaining definition of done: complete — all gates green, verification
+  agent PASS, ExecPlan COMPLETED, commits pushed to origin/main.
 
 ## Progress
 
@@ -123,7 +114,7 @@ resilience are re-audited on touched surfaces. Presentation-layer only.
 - [x] Wave B8 — responsive/large-text refinement (segmented flex-wrap; tablet collapse behavior).
 - [x] Wave B9 — performance check (single responsive tree; no duplicated reads confirmed structurally).
 - [x] Wave B10 — full visual walkthrough + 18-file evidence matrix + manifest.json.
-- [ ] Wave B11 — full validation, documentation, Git closure (in progress).
+- [x] Wave B11 — full validation, documentation, Git closure (independent verification agent: PASS on all 12 checks incl. adversarial probes; ExecPlan COMPLETED; pushed).
 
 ## Surprises & Discoveries
 
@@ -162,12 +153,27 @@ resilience are re-audited on touched surfaces. Presentation-layer only.
 
 ## Validation Ledger
 
-- Phase A: typecheck PASS, lint PASS, vitest 1856/1856 PASS, build:web
-  PASS, web:verify PASS ×2 (58.7s / 1.9s, port released), qa:impact:validate
-  PASS (13 rules), hygiene PASS.
-- Pending: openspec validate (change), agent:plan:validate (this plan),
-  HEAD re-qualification (typecheck/lint/vitest/impact/themes), per-wave
-  `npm run qa:affected`, final gate set per tasks.md 10.2.
+- Phase A (dc3be75): `npm run typecheck` PASS, `npm run lint` PASS,
+  vitest 1856/1856 PASS, `npm run build:web` PASS, `npm run web:verify`
+  PASS ×2 (58.7s / 1.9s, port released), `npm run qa:impact:validate`
+  PASS (13 rules), `npm run web:hygiene` PASS.
+- Phase B (80cf09f / 94ffb9a): typecheck PASS, lint PASS (0 warnings),
+  vitest 1864/1864 PASS (162 files, incl. 8 new segmented-model tests +
+  19 web-lifecycle tests), validate:themes PASS (140 checks),
+  supabase:schema:validate PASS, openspec:validate PASS (47 checks),
+  qa:impact:validate PASS, sim:validate PASS, agent:plan:validate:all PASS
+  (after closing WM2.1 markers), build:web PASS, web:verify PASS (56.6s,
+  shell + crossOriginIsolated + Add, port released).
+- Playwright: chromium feature suite 111 passed / 7 skipped (10.3m);
+  journeys P0 24/25 passed (1 flake passes in isolation, 5.6s — artifact
+  preserved, classified FLAKY_TEST); full journeys lane deferred to CI
+  main gate after push.
+- Simulation: deterministic smoke @p0 PASS ×2 after the runner race fix
+  (c66ba18); sim definitions 23 PASS.
+- A11y: focus probe HIDDEN_FOCUS_COUNT=0; tab order matches product
+  hierarchy; segmented groups announce group/option/selected.
+- Native: NOT RUN / ENVIRONMENT — no Android/macOS infrastructure in this
+  session (truthful classification, not a pass).
 
 ## Changed Files / Areas
 

@@ -1,7 +1,7 @@
 # ExecPlan: Agent-Safe Web Server Lifecycle (Phase A)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -62,12 +62,10 @@ system-v1`) completed at 9727abe.
 
 ## Current Checkpoint
 
-- Current milestone: Wave A5 — commit + push Phase A.
+- Current milestone: Campaign closed — Phase A committed (dc3be75), pushed,
+  and independently verified PASS (part of the joint WM2.2 verification).
 - Completed: A0 baseline + leftover server cleanup; A1/A2 implementation +
-  tests; A3 docs updated; A4 certification (web:verify browser probe 58.7s
-  exit 0 + repeat 1.9s exit 0; occupied/invalid port → exit 2; hygiene
-  report/kill PASS; port release verified after every run).
-- In progress: commit + push Phase A (Wave A5).
+  tests; A3 docs updated; A4 certification; A5 commit + push.
 - Important modified files: scripts/web-lifecycle.mjs, scripts/web-verify.mjs,
   scripts/web-hygiene.mjs, scripts/web-lifecycle.d.mts,
   tests/web-lifecycle.test.ts, package.json, eslint.config.mjs, AGENTS.md,
@@ -96,7 +94,7 @@ system-v1`) completed at 9727abe.
 - [x] Wave A2 — implementation + 19 unit/integration tests; typecheck/lint green.
 - [x] Wave A3 — agent docs and command references updated.
 - [x] Wave A4 — failure-path/cleanup certification (verify ×2, failure injection, hygiene, impact map, full suite).
-- [ ] Wave A5 — commit + push Phase A (in progress).
+- [x] Wave A5 — commit + push Phase A (dc3be75 on origin/main, verified PASS).
 
 ## Surprises & Discoveries
 
@@ -163,6 +161,19 @@ system-v1`) completed at 9727abe.
 
 ## Outcomes & Retrospective
 
-- (Pending completion — filled at campaign close with measured verifier
-  runtime, repeat-run results, failure-cleanup proof, and port-release
-  evidence.)
+- Measured: full `web:verify` (build + browser probe) 56.6–58.7s; repeat
+  with `--skip-build` 1.9s; both exit by themselves with exit 0 and release
+  their port. Failure injections: invalid `--port abc` → exit 2; occupied
+  explicit port → exit 2 with "refusing to attach"; missing dist with
+  `--skip-build` → exit 1 (unit-tested). `web:hygiene` correctly reported
+  an occupied 8091 with owner PID + command line and freed it via exact
+  `--kill <pid>`.
+- The leftover Metro tree from the predecessor session (PIDs
+  22220/5724/7016, 1.6GB RSS on :8081) was terminated at campaign start —
+  live proof of the hygiene problem this plan fixes.
+- Follow-up recorded: predecessor Metro warnings (linked-actions/habits
+  require cycles; expo-notifications web capability warning) are
+  architectural/platform notes, not lifecycle causes — not addressed here.
+- This plan's rules were exercised throughout the WM2.2 campaign (build +
+  web:verify + Playwright-owned servers; zero campaign-owned servers left
+  running at any checkpoint).
