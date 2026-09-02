@@ -38,17 +38,17 @@ campaign proves (and where needed fixes) those properties with evidence.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 2 — §5 COMPLETE (mid-import tripwire rollback +
-  retry green; missing-manifest legacy green; file 27/27); starting §6
-  (offline/reconnect outbox torture).
+- Current milestone: Phase 2 — §6 COMPLETE (restart + flapping torture
+  2/2 green, no product defect — engine machinery holds); starting §7
+  (native readiness: doctor → provision → smoke with provenance).
 - Completed: Phase 0 (git truth, hygiene, control plane read), Phase 1
   (baseline gates recorded in tasks.md §1), OpenSpec change created
   (proposal/design/tasks/spec/execplan), §2.1–§2.3 (mechanism proven as
   wall-clock timeout from per-test full-graph re-import; test-only root fix
   in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green), §3
   (retry test + v21/v23 TRUE-shape fixtures; integration 230/230).
-- In progress: none (§5 done) — next is the §5 commit, then §6.1/§6.2
-  (outbox restart survival + flapping torture).
+- In progress: none (§6 done) — next is the §6 commit, then §7.1
+  (`dev:doctor` + boot API-36 AVD).
 - Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).
 - Decisions: D1–D7 in design.md (CG-9 battery protocol; injected-failure
   migration test; runtime-derived historical fixtures; data-layer duplicate
@@ -67,8 +67,8 @@ campaign proves (and where needed fixes) those properties with evidence.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: n/a.
-- Exact next action: commit the §5 restore-DR tests, then start §6
-  (read sync.engine + syncOutbox tests to find the real gaps).
+- Exact next action: commit the §6 torture tests, then run
+  `npm run dev:doctor` and inspect the native lane state.
 - Remaining definition of done: tasks §2–§8 complete; full validation
   matrix green on the final tree; independent verification PASS; coherent
   commits pushed per policy; web:hygiene PASS with no campaign-owned

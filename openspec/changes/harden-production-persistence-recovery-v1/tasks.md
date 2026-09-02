@@ -107,8 +107,17 @@
 
 ## 6. Offline/reconnect outbox torture
 
-- [ ] 6.1 Offline restart survival: failing adapter → close/reopen DB → outbox rows survive → hydrate → flush.
-- [ ] 6.2 Flapping: alternating success/failure cycles with concurrent flush triggers; no duplicate pushes, no lost records, sane backoff.
+- [x] 6.1 `syncOutboxTorture.test.ts`: real `addTodo` writes offline →
+      file DB closed/reopened (fresh modules) → new engine hydrates 2 pending
+      → recovering adapter flushes both exactly once; second flush is silent;
+      outbox drained; local rows intact.
+- [x] 6.2 Flapping in the same file: 3 concurrent flushes offline share ONE
+      push (single-flight), records retained, failures=1, `shouldAttemptFlush`
+      false; 4th record + 2 concurrent flushes → still one push, failures=2
+      with strictly growing `nextRetryAt`; reconnect flushes all 4 exactly once
+      each and resets metadata; empty-queue flush issues no push. No product
+      defect found — the engine's snapshot/revision/single-flight machinery
+      holds; the tests lock it in.
 
 ## 7. Native readiness
 
