@@ -31,16 +31,16 @@ Transform Super Habits from a feature-dense app into a visually coherent, produc
 
 ## Current Checkpoint
 
-- Current milestone: Wave 12 — Final QA + Documentation.
-- Completed: Waves 0–9 — design system normalization, shell/tab/card/chip/modal updates, screen-level token migration across all six surfaces plus Plan/Settings/Command.
-- In progress: Final documentation update and ExecPlan closure.
+- Current milestone: Wave 12 complete — campaign closed at 9727abe.
+- Completed: Waves 0–12 — design system normalization, shell/tab/card/chip/modal updates, screen-level token migration across all six surfaces plus Plan/Settings/Command, Final QA + documentation.
+- In progress: none.
 - Important modified files: `core/ui/Screen.tsx`, `core/ui/Card.tsx`, `core/ui/Modal.tsx`, `core/ui/PillChip.tsx`, `app/index.tsx`, `features/overview/OverviewScreen.tsx`, `features/overview/cards/DashboardCard.tsx`, `features/todos/TodoQuickCapture.tsx`, `features/todos/TodoItem.tsx`, `features/pomodoro/PomodoroScreen.tsx`, `features/workout/WorkoutScreen.tsx`, `features/calories/CaloriesScreen.tsx`, `features/planning-hub/PlanningHubScreen.tsx`, `features/settings/SettingsScreen.tsx`, `features/command/CommandCenterProvider.tsx`.
 - Last successful validation: `npm run typecheck` PASS, `npm run lint` PASS, `npm test` PASS (1837 tests / 160 files), `npm run validate:themes` PASS (140 checks).
-- Current failures: None.
-- Relevant quarantines: None.
-- Blockers: None.
-- Exact next action: Final documentation commit, then ExecPlan COMPLETED.
-- Remaining definition of done: Documentation updated, QA green, ExecPlan COMPLETED.
+- Current failures: none.
+- Relevant quarantines: none.
+- Blockers: none.
+- Exact next action: none.
+- Remaining definition of done: complete — documentation updated, QA green, ExecPlan closed.
 
 ## Progress
 
@@ -54,7 +54,7 @@ Transform Super Habits from a feature-dense app into a visually coherent, produc
 - [x] Wave 6: Plan/Settings/Command (PlanningHubScreen.tsx, SettingsScreen.tsx, Command overlay).
 - [x] Wave 8: State Quality Pass (QA gates PASS).
 - [x] Wave 9: Accessibility + Responsive (Design tokens normalization).
-- [ ] Wave 12: Final QA + Documentation.
+- [x] Wave 12: Final QA + Documentation.
 
 ## Surprises & Discoveries
 

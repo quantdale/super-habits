@@ -272,7 +272,8 @@ export async function unregisterServiceWorker(page: Page): Promise<void> {
  * partial version, so this wait is load-bearing for every DB-context handoff.
  */
 export async function waitForAppReady(page: Page, timeout = 30_000): Promise<void> {
-  await page.getByRole('button', { name: 'Overview', exact: true }).first().waitFor({ timeout });
+  // Primary nav label is "Today" (internal section key stays `overview`).
+  await page.getByRole('button', { name: 'Today', exact: true }).first().waitFor({ timeout });
   await page.waitForFunction(() => document.documentElement.dataset.dbReady === 'true', null, {
     timeout,
   });

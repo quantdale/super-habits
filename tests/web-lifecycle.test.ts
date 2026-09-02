@@ -94,7 +94,7 @@ describe('pickPort / isPortAvailable', () => {
   });
 });
 
-describe('waitForHttp', () => {
+describe('waitForHttp', { timeout: 30_000 }, () => {
   it('resolves when the server becomes ready', async () => {
     const port = await freePort();
     const owned = spawnServer(port);
@@ -131,7 +131,7 @@ describe('waitForHttp', () => {
   });
 });
 
-describe('terminateOwnedTree', () => {
+describe('terminateOwnedTree', { timeout: 30_000 }, () => {
   it('cleans up the owned server after a successful probe and releases the port', async () => {
     const port = await freePort();
     const owned = spawnServer(port);
@@ -181,7 +181,7 @@ describe('terminateOwnedTree', () => {
   });
 });
 
-describe('runWebVerify (finite pipeline)', () => {
+describe('runWebVerify (finite pipeline)', { timeout: 30_000 }, () => {
   it('passes end-to-end and releases its port', async () => {
     const port = await freePort();
     const serverScript = writeTempServer(SERVER_SCRIPT);

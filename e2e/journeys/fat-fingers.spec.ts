@@ -423,7 +423,7 @@ defineJourney({
         await page.reload({ waitUntil: 'domcontentloaded' });
         await returnToApp(page);
         // App still usable after the mid-save reload.
-        await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
         // One-or-zero, never two.
         await expectRows(
           page,
