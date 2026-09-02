@@ -38,12 +38,15 @@ campaign proves (and where needed fixes) those properties with evidence.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 2 — campaign created; starting Workstream A/B
-  (flake + migration hardening).
+- Current milestone: Phase 2 — §2 COMPLETE (8/8 battery green); starting
+  §3 (migration hardening audit).
 - Completed: Phase 0 (git truth, hygiene, control plane read), Phase 1
   (baseline gates recorded in tasks.md §1), OpenSpec change created
-  (proposal/design/tasks/spec/execplan).
-- In progress: restore-tombstone flake mechanism identification.
+  (proposal/design/tasks/spec/execplan), §2.1–§2.3 (mechanism proven as
+  wall-clock timeout from per-test full-graph re-import; test-only root fix
+  in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green).
+- In progress: none (§2 done) — next is the §2 commit, then §3.1 migration
+  block audit (read-only) in `core/db/client.ts`.
 - Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).
 - Decisions: D1–D7 in design.md (CG-9 battery protocol; injected-failure
   migration test; runtime-derived historical fixtures; data-layer duplicate
@@ -62,10 +65,8 @@ campaign proves (and where needed fixes) those properties with evidence.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: n/a.
-- Exact next action: investigate the restore-tombstone flake mechanism —
-  read `tests/restore.coordinator.test.ts` and
-  `core/sync/restore.coordinator.ts`, then run a full-parallel reproduction
-  battery capturing complete logs (tasks §2.1–§2.2).
+- Exact next action: commit the §2 fix (test-only) with an evidence-rich
+  message, then start §3.1 (read-only migration audit).
 - Remaining definition of done: tasks §2–§8 complete; full validation
   matrix green on the final tree; independent verification PASS; coherent
   commits pushed per policy; web:hygiene PASS with no campaign-owned

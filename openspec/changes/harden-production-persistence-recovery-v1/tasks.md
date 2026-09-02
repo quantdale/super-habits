@@ -9,10 +9,24 @@
 
 ## 2. Restore-tombstone parallel-load flake (CG-9 class)
 
-- [ ] 2.1 Reproduce under load; capture full failure log with stack.
-- [ ] 2.2 Identify mechanism (shared state / unawaited chain / worker contention) from evidence.
-- [ ] 2.3 Root fix + regression protection; no retries, no weakened assertion.
-- [ ] 2.4 Battery: 8 consecutive clean full-parallel `qa:fast` runs.
+- [x] 2.1 Reproduced load sensitivity (not the exact failure): solo file 2.37s /
+      first-test 713ms → full parallel 6.17s / 1875ms; 4 concurrent solo runs
+      4.2s each / ~1.2s first-test. Per-test wall clock scales with contention.
+- [x] 2.2 Mechanism: wall-clock timeout, not logic. The test graph is fully
+      deterministic under hermetic mocks (no timers/randomness/shared mutable
+      state across tests — audited `restore.coordinator.ts`, `account.data.ts`,
+      `backupRestore.ts`, `appMeta.ts`); the only load-sensitive dimension is
+      time: 18 × full-graph re-import (`vi.resetModules()` + dynamic import per
+      test, ~0.6s solo / ~1.9s loaded each) inside timed test bodies against the
+      5s default unit `testTimeout`. Any scheduling spike drops one random test.
+- [x] 2.3 Root fix in `tests/restore.coordinator.test.ts` (test-only, no product
+      change): coordinator graph imported ONCE in `beforeAll` (untimed hook);
+      per-test fixtures swap via a shared holder with delegating mocks; owner
+      cache re-primed per fixture; freshness test serialized (same fixtures and
+      assertion, preview read before next fixture install). No retries, no
+      timeout change, no weakened assertion. Per-test cost 300–1900ms → 1–9ms.
+- [x] 2.4 Battery: 8 consecutive clean full-parallel `qa:fast` runs — all exit 0
+      (typecheck 0, lint 0, unit 1665/1665, journey-label parity OK each run).
 
 ## 3. Migration hardening
 

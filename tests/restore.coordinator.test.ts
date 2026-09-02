@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type RemoteRowsByEntity = Partial<Record<string, Record<string, unknown>[]>>;
 type RemoteErrorByEntity = Partial<
@@ -161,6 +161,99 @@ function buildDb(localCounts: Record<string, number>, initialMeta: Record<string
   };
 }
 
+type FixtureDb = ReturnType<typeof buildDb>;
+type FixtureSupabase = ReturnType<typeof buildSupabaseMock>;
+type ApplyRemoteFn = (database: unknown, rows: unknown) => Promise<unknown>;
+type CoordinatorApi = Pick<
+  typeof import('@/core/sync/restore.coordinator'),
+  'getRestorePreview' | 'restoreFromRemoteBackup' | 'dismissCurrentRestorePrompt'
+> & {
+  primeDatasetOwner: (owner: string | null) => void;
+  getAuthUserId: () => Promise<string | null>;
+};
+
+// Load-sensitivity root fix (Production Hardening V1 §2): the coordinator
+// graph (restore → backup/account/feature-data modules) costs ~0.6s to
+// re-evaluate per import in isolation and ~1.9s under full parallel load, so
+// re-importing it inside every timed test body pushed individual tests toward
+// the 5s default timeout — the observed single-test parallel-load flake. The
+// graph is imported ONCE in beforeAll (untimed hook); each test only swaps
+// the hermetic fixture below. No assertion, timeout, or retry changed.
+const shared: {
+  db: FixtureDb | null;
+  supabase: FixtureSupabase | null;
+  remoteEnabled: boolean;
+  authUserIds: (string | null)[];
+  apply: { todos: ApplyRemoteFn; habits: ApplyRemoteFn; calories: ApplyRemoteFn } | null;
+  api: CoordinatorApi | null;
+} = {
+  db: null,
+  supabase: null,
+  remoteEnabled: true,
+  authUserIds: ['user_a'],
+  apply: null,
+  api: null,
+};
+
+function requireApply() {
+  const apply = shared.apply;
+  if (!apply) throw new Error('[test] restore fixture apply functions are not set');
+  return apply;
+}
+
+function requireApi() {
+  const api = shared.api;
+  if (!api) throw new Error('[test] restore coordinator was not loaded in beforeAll');
+  return api;
+}
+
+async function getFixtureAuthUserId(): Promise<string | null> {
+  const ids = shared.authUserIds;
+  if (ids.length > 1) return ids.shift() ?? null;
+  return ids[0] ?? null;
+}
+
+beforeAll(async () => {
+  vi.resetModules();
+  vi.doMock('@/core/db/client', () => ({
+    getDatabase: () => Promise.resolve(shared.db),
+  }));
+  vi.doMock('@/lib/time', () => ({
+    nowIso: () => '2026-04-21T12:00:00.000Z',
+  }));
+  vi.doMock('@/lib/supabase', () => ({
+    supabase: {
+      from: (entity: string) => {
+        const current = shared.supabase;
+        if (!current) throw new Error('[test] restore fixture supabase mock is not set');
+        return current.from(entity);
+      },
+    },
+    isRemoteEnabled: () => shared.remoteEnabled,
+    getSupabaseAuthUserId: getFixtureAuthUserId,
+  }));
+  vi.doMock('@/features/todos/todos.data', () => ({
+    applyRemoteTodos: (database: unknown, rows: unknown) => requireApply().todos(database, rows),
+  }));
+  vi.doMock('@/features/habits/habits.data', () => ({
+    applyRemoteHabits: (database: unknown, rows: unknown) => requireApply().habits(database, rows),
+  }));
+  vi.doMock('@/features/calories/calories.data', () => ({
+    applyRemoteCalorieEntries: (database: unknown, rows: unknown) =>
+      requireApply().calories(database, rows),
+  }));
+
+  const coordinator = await import('@/core/sync/restore.coordinator');
+  const accountData = await import('@/core/auth/account.data');
+  shared.api = {
+    getRestorePreview: coordinator.getRestorePreview,
+    restoreFromRemoteBackup: coordinator.restoreFromRemoteBackup,
+    dismissCurrentRestorePrompt: coordinator.dismissCurrentRestorePrompt,
+    primeDatasetOwner: accountData.primeLocalDatasetOwner,
+    getAuthUserId: getFixtureAuthUserId,
+  };
+});
+
 async function loadCoordinator(options: {
   localCounts: Record<string, number>;
   remoteRowsByEntity: RemoteRowsByEntity;
@@ -170,73 +263,61 @@ async function loadCoordinator(options: {
   remoteEnabled?: boolean;
   authUserIds?: (string | null)[];
 }) {
-  vi.resetModules();
-
   const db = buildDb(options.localCounts, options.initialMeta);
   const supabaseMock = buildSupabaseMock(options.remoteRowsByEntity, options.remoteErrorsByEntity);
-  const authUserIds = options.authUserIds ?? ['user_a'];
-  const getSupabaseAuthUserId = vi.fn(async () => {
-    if (authUserIds.length > 1) return authUserIds.shift() ?? null;
-    return authUserIds[0] ?? null;
-  });
-  const applyRemoteTodos = vi.fn(async (database, rows) => {
+  shared.authUserIds = options.authUserIds ?? ['user_a'];
+  const applyRemoteTodos: ApplyRemoteFn = vi.fn(async (database, rows) => {
     if (options.applyFailure?.entity === 'todos') {
       if (options.applyFailure.sql) {
-        await database.runAsync(options.applyFailure.sql, ['todo_failure']);
+        await (database as FixtureDb).runAsync(options.applyFailure.sql, ['todo_failure']);
       }
       throw new Error('todo restore failed');
     }
     return rows;
   });
-  const applyRemoteHabits = vi.fn(async (database, rows) => {
+  const applyRemoteHabits: ApplyRemoteFn = vi.fn(async (database, rows) => {
     if (options.applyFailure?.entity === 'habits') {
       if (options.applyFailure.sql) {
-        await database.runAsync(options.applyFailure.sql, ['habit_failure']);
+        await (database as FixtureDb).runAsync(options.applyFailure.sql, ['habit_failure']);
       }
       throw new Error('habit restore failed');
     }
     return rows;
   });
-  const applyRemoteCalorieEntries = vi.fn(async (database, rows) => {
+  const applyRemoteCalorieEntries: ApplyRemoteFn = vi.fn(async (database, rows) => {
     if (options.applyFailure?.entity === 'calorie_entries') {
       if (options.applyFailure.sql) {
-        await database.runAsync(options.applyFailure.sql, ['cal_failure']);
+        await (database as FixtureDb).runAsync(options.applyFailure.sql, ['cal_failure']);
       }
       throw new Error('calorie restore failed');
     }
     return rows;
   });
 
-  vi.doMock('@/core/db/client', () => ({
-    getDatabase: vi.fn().mockResolvedValue(db),
-  }));
-  vi.doMock('@/lib/time', () => ({
-    nowIso: vi.fn(() => '2026-04-21T12:00:00.000Z'),
-  }));
-  vi.doMock('@/lib/supabase', () => ({
-    supabase: supabaseMock,
-    isRemoteEnabled: vi.fn(() => options.remoteEnabled ?? true),
-    getSupabaseAuthUserId,
-  }));
-  vi.doMock('@/features/todos/todos.data', () => ({
-    applyRemoteTodos,
-  }));
-  vi.doMock('@/features/habits/habits.data', () => ({
-    applyRemoteHabits,
-  }));
-  vi.doMock('@/features/calories/calories.data', () => ({
-    applyRemoteCalorieEntries,
-  }));
+  shared.db = db;
+  shared.supabase = supabaseMock;
+  shared.remoteEnabled = options.remoteEnabled ?? true;
+  shared.apply = {
+    todos: applyRemoteTodos,
+    habits: applyRemoteHabits,
+    calories: applyRemoteCalorieEntries,
+  };
+  const api = requireApi();
+  // Re-prime the shared module's dataset-owner cache so the previous test's
+  // binding can never leak into this fixture (every preview re-reads it from
+  // the fixture db, but hermeticity must not depend on that ordering).
+  api.primeDatasetOwner(null);
 
-  const coordinator = await import('@/core/sync/restore.coordinator');
   return {
     db,
     supabaseMock,
-    getSupabaseAuthUserId,
+    getSupabaseAuthUserId: api.getAuthUserId,
     applyRemoteTodos,
     applyRemoteHabits,
     applyRemoteCalorieEntries,
-    ...coordinator,
+    getRestorePreview: api.getRestorePreview,
+    restoreFromRemoteBackup: api.restoreFromRemoteBackup,
+    dismissCurrentRestorePrompt: api.dismissCurrentRestorePrompt,
   };
 }
 
@@ -528,6 +609,10 @@ describe('core/sync/restore.coordinator', () => {
   });
 
   it('changes the freshness signature when remote backup metadata changes', async () => {
+    // Fixtures are consumed serially: the coordinator graph is loaded once
+    // per file (see above), so each preview must be read before the next
+    // fixture is installed. Fixtures, order of observation, and assertion
+    // are unchanged.
     const first = await loadCoordinator({
       localCounts: {
         todos: 0,
@@ -545,6 +630,7 @@ describe('core/sync/restore.coordinator', () => {
         ],
       },
     });
+    const firstPreview = await first.getRestorePreview();
     const second = await loadCoordinator({
       localCounts: {
         todos: 0,
@@ -568,7 +654,6 @@ describe('core/sync/restore.coordinator', () => {
       },
     });
 
-    const firstPreview = await first.getRestorePreview();
     const secondPreview = await second.getRestorePreview();
 
     expect(firstPreview.freshnessSignature).not.toBe(secondPreview.freshnessSignature);
