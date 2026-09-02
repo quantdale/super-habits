@@ -1,0 +1,31 @@
+{
+  "campaign": "warm-momentum-2-2",
+  "sourceSha": "dc3be75a5fc79ee9f27d8d1af78220d447ce7a18",
+  "capturedAt": "2026-09-02T05:25:56.303Z",
+  "viewports": ["phone-390", "tablet-768", "desktop-1280"],
+  "files": [
+    "phone-390-today.png",
+    "phone-390-habits.png",
+    "phone-390-workout.png",
+    "phone-390-calories.png",
+    "phone-390-calories-diary.png",
+    "phone-390-planning-hub.png",
+    "tablet-768-today.png",
+    "tablet-768-habits.png",
+    "tablet-768-workout.png",
+    "tablet-768-calories.png",
+    "tablet-768-calories-diary.png",
+    "tablet-768-planning-hub.png",
+    "desktop-1280-today.png",
+    "desktop-1280-habits.png",
+    "desktop-1280-workout.png",
+    "desktop-1280-calories.png",
+    "desktop-1280-calories-diary.png",
+    "desktop-1280-planning-hub.png"
+  ],
+  "notes": [
+    "Empty/fresh app state except a lightly-seeded Calories diary (3 quick-add entries).",
+    "Large-text resilience verified structurally: SegmentedControl wraps (flex-wrap) and never shrinks fonts.",
+    "Keyboard focus order evidence: see scripts/a11y-focus-probe.mjs output (HIDDEN_FOCUS_COUNT=0)."
+  ]
+}
