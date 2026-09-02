@@ -41,14 +41,14 @@ The UI should reduce the feeling that Super Habits is a collection of six or mor
 
 ### Primary experience goals
 
-| Goal | Desired user perception | Design response |
-|---|---|---|
-| Clarity | “I immediately know what to do.” | One dominant action per state; strong hierarchy; progressive disclosure. |
-| Warmth | “This feels encouraging, not clinical.” | Soft surfaces, restrained illustration, human copy, gentle motion. |
-| Momentum | “My effort is visibly accumulating.” | Living progress artifacts, streak context, weekly trends, completion feedback. |
-| Speed | “Logging takes almost no effort.” | Quick capture, defaults, recent items, inline completion, minimal modal depth. |
-| Cohesion | “Every screen belongs to the same app.” | Shared tokens, shapes, components, motion grammar, state patterns. |
-| Trust | “The app does not manipulate or shame me.” | Transparent metrics, recoverable states, no false urgency, no punitive dark patterns. |
+| Goal     | Desired user perception                    | Design response                                                                       |
+| -------- | ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Clarity  | “I immediately know what to do.”           | One dominant action per state; strong hierarchy; progressive disclosure.              |
+| Warmth   | “This feels encouraging, not clinical.”    | Soft surfaces, restrained illustration, human copy, gentle motion.                    |
+| Momentum | “My effort is visibly accumulating.”       | Living progress artifacts, streak context, weekly trends, completion feedback.        |
+| Speed    | “Logging takes almost no effort.”          | Quick capture, defaults, recent items, inline completion, minimal modal depth.        |
+| Cohesion | “Every screen belongs to the same app.”    | Shared tokens, shapes, components, motion grammar, state patterns.                    |
+| Trust    | “The app does not manipulate or shame me.” | Transparent metrics, recoverable states, no false urgency, no punitive dark patterns. |
 
 ---
 
@@ -294,6 +294,13 @@ This directory is the implementation source of truth for the UI overhaul:
 - [`03-feature-blueprints.md`](./03-feature-blueprints.md) — screen-by-screen and feature-by-feature UX proposals.
 - [`04-roadmap-and-acceptance.md`](./04-roadmap-and-acceptance.md) — phased migration, work packages, acceptance criteria, and implementation guardrails.
 - [`05-inspiration-research.md`](./05-inspiration-research.md) — source research and what should/should not be transferred from Avocation, Forest, Macro Sync, Todoist, TickTick, Hevy, and platform guidance.
+- [`06-warm-momentum-2.md`](./06-warm-momentum-2.md) — Warm Momentum 2.0 behavioral interaction contract.
+- [`07-information-architecture.md`](./07-information-architecture.md) — Today-first IA and navigation model.
+- [`08-warm-momentum-2-1.md`](./08-warm-momentum-2-1.md) — Warm Momentum 2.1 visual-system contract (tokens, primitives, states, one global Add).
+- [`2026-09-01-friction-inventory.md`](./2026-09-01-friction-inventory.md) — baseline per-surface friction inventory for the 2.0 campaign.
+- [`2026-09-01-feature-disposition-ledger.md`](./2026-09-01-feature-disposition-ledger.md) — disposition of each feature surface across campaigns.
+- [`2026-09-01-mobbin-pattern-ledger.md`](./2026-09-01-mobbin-pattern-ledger.md) — transferable reference UI patterns (principles, not trade dress).
+- [`2026-09-02-warm-momentum-2-1-visual-friction-matrix.md`](./2026-09-02-warm-momentum-2-1-visual-friction-matrix.md) — 2.1 friction matrix, screenshot manifest, and verification evidence.
 
 ---
 
