@@ -25,6 +25,7 @@ import { Button } from '@/core/ui/Button';
 import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
+import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
@@ -711,6 +712,60 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         />
       </ScreenSection>
 
+      <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
+        <SegmentedControl
+          options={(
+            [
+              { key: 'active', label: 'Active' },
+              { key: 'paused', label: 'Paused' },
+              { key: 'archived', label: 'Archived' },
+              { key: 'all', label: 'All' },
+            ] as { key: HabitStatusFilter; label: string }[]
+          ).map((option) => ({
+            value: option.key,
+            label: option.label,
+            accessibilityLabel: `Filter habits: ${option.label}`,
+          }))}
+          value={statusFilter}
+          onChange={setStatusFilter}
+          accentColor={COLOR}
+          accessibilityLabel="Habit status filter"
+        />
+        <View className="flex-row flex-wrap gap-2">
+          {(
+            [
+              { key: 'default', label: 'Default order' },
+              { key: 'name', label: 'Name' },
+              { key: 'streak', label: 'Streak' },
+            ] as { key: HabitSortMode; label: string }[]
+          ).map((option) => {
+            const active = sortMode === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort habits by ${option.label}`}
+                accessibilityState={{ selected: active }}
+                className="rounded-full border px-3 py-1.5"
+                style={
+                  active
+                    ? { backgroundColor: tokens.textMuted, borderColor: tokens.textMuted }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setSortMode(option.key)}
+              >
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: active ? (tokens.surface ?? '#fff') : tokens.textMuted }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScreenSection>
+
       <ScreenSection className="gap-4 pb-2" accessibilityLabel="Habit groups">
         {!habitsLoaded ? (
           // First-load placeholders in place of the grid (no premature
@@ -1147,76 +1202,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             </View>
           </View>
         </Card>
-      </ScreenSection>
-
-      <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
-        <View className="flex-row flex-wrap gap-2">
-          {(
-            [
-              { key: 'active', label: 'Active' },
-              { key: 'paused', label: 'Paused' },
-              { key: 'archived', label: 'Archived' },
-              { key: 'all', label: 'All' },
-            ] as { key: HabitStatusFilter; label: string }[]
-          ).map((option) => {
-            const active = statusFilter === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter habits: ${option.label}`}
-                accessibilityState={{ selected: active }}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  active
-                    ? { backgroundColor: COLOR, borderColor: COLOR }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setStatusFilter(option.key)}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: active ? tokens.textOnAccent : tokens.textMuted }}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View className="flex-row flex-wrap gap-2">
-          {(
-            [
-              { key: 'default', label: 'Default order' },
-              { key: 'name', label: 'Name' },
-              { key: 'streak', label: 'Streak' },
-            ] as { key: HabitSortMode; label: string }[]
-          ).map((option) => {
-            const active = sortMode === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Sort habits by ${option.label}`}
-                accessibilityState={{ selected: active }}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  active
-                    ? { backgroundColor: tokens.textMuted, borderColor: tokens.textMuted }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setSortMode(option.key)}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: active ? (tokens.surface ?? '#fff') : tokens.textMuted }}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
       </ScreenSection>
 
       {habitsLoaded ? (

@@ -5,7 +5,7 @@ import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { PageHeader } from '@/core/ui/PageHeader';
-import { PillChip } from '@/core/ui/PillChip';
+import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
@@ -781,35 +781,36 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           headerSubtitle="Classic focus and break sequence with live progress."
           className="mb-0"
         >
-          <View className="mb-4 flex-row flex-wrap justify-center">
-            {(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => (
-              <PillChip
-                key={mode}
-                label={getModeLabel(mode)}
-                active={currentMode === mode}
-                color={COLOR}
-                onPress={() => {
-                  if (isRunning) return;
-                  clearAutoStartTimer();
-                  // Switching modes abandons any paused session: per contract
-                  // it is never logged, so drop its durable intent and cancel
-                  // any surviving OS notification with it.
-                  void cancelScheduledNotification(notificationIdRef.current);
-                  notificationIdRef.current = null;
-                  void clearPomodoroActiveTimer().catch(() => undefined);
-                  setCompletionSummary(null);
-                  setIsPaused(false);
-                  setCurrentMode(mode);
-                  currentModeRef.current = mode;
-                  const d = getModeDuration(mode, settings);
-                  setTotalSeconds(d);
-                  totalSecondsRef.current = d;
-                  applyRemaining(d);
-                  setStartedAt(null);
-                  startedAtRef.current = null;
-                }}
-              />
-            ))}
+          <View className="mb-4">
+            <SegmentedControl
+              options={(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => ({
+                value: mode,
+                label: getModeLabel(mode),
+              }))}
+              value={currentMode}
+              onChange={(mode) => {
+                if (isRunning) return;
+                clearAutoStartTimer();
+                // Switching modes abandons any paused session: per contract
+                // it is never logged, so drop its durable intent and cancel
+                // any surviving OS notification with it.
+                void cancelScheduledNotification(notificationIdRef.current);
+                notificationIdRef.current = null;
+                void clearPomodoroActiveTimer().catch(() => undefined);
+                setCompletionSummary(null);
+                setIsPaused(false);
+                setCurrentMode(mode);
+                currentModeRef.current = mode;
+                const d = getModeDuration(mode, settings);
+                setTotalSeconds(d);
+                totalSecondsRef.current = d;
+                applyRemaining(d);
+                setStartedAt(null);
+                startedAtRef.current = null;
+              }}
+              accentColor={COLOR}
+              accessibilityLabel="Focus timer mode"
+            />
           </View>
 
           <View className="w-full items-center justify-center py-2">

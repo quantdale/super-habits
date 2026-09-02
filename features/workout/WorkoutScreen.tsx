@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Text, View, useWindowDimensions } from 'react-native';
+import { layout, spacing } from '@/core/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
 import { Screen } from '@/core/ui/Screen';
@@ -10,7 +11,6 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { ScreenSection } from '@/core/ui/ScreenSection';
-// import { spacing } from '@/core/theme/designTokens';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
@@ -189,6 +189,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [bodyWeightGoalValue, setBodyWeightGoalValue] = useState('');
   const [workoutPreferences, setWorkoutPreferences] = useState<WorkoutPreferences | null>(null);
   useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
+  // At content-max widths the history/analytics stack composes into a
+  // two-column grid; below it the single-column flow stays (one responsive
+  // tree — only one branch renders, no duplicated reads).
+  const isWide = useWindowDimensions().width >= layout.contentMaxWidth;
 
   const refresh = useCallback(async () => {
     const isCurrent = beginRefresh();
@@ -456,6 +460,132 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       />
     );
   }
+
+  // History/analytics sections, composed into a two-column grid at content-max
+  // widths (isWide) and stacked on phones. One responsive tree — only one
+  // branch renders, so there are no duplicated SQLite reads or chart mounts.
+  const recentSessionsSection =
+    recentLogs.length > 0 ? (
+      <ScreenSection>
+        <View className="mb-4 mt-1">
+          <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+            Recent sessions
+          </Text>
+          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            Tap a session to see every exercise and set you completed.
+          </Text>
+        </View>
+        {recentLogs.map((log) => {
+          const routine = routines.find((r) => r.id === log.routine_id);
+          return (
+            <Card key={log.id} accentColor={COLOR} style={{ marginBottom: 12 }}>
+              <RectButton
+                onPress={() => setDetailLogId(log.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open session from ${log.completed_at}`}
+                style={{ backgroundColor: 'transparent' }}
+              >
+                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                  {routine?.name ?? 'Workout'}
+                </Text>
+                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  {new Date(log.completed_at).toLocaleString('en', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </RectButton>
+            </Card>
+          );
+        })}
+      </ScreenSection>
+    ) : null;
+
+  const analyticsCardSection = (
+    <ScreenSection>
+      <WorkoutTotalsCard
+        sessions={trainingTotals.sessions}
+        sets={trainingTotals.completedSets}
+        durationSeconds={trainingTotals.durationSeconds}
+        volume={trainingTotals.measurableVolume}
+        trainingDays={trainingTotals.trainingDays}
+      />
+      <WorkoutProgressCard
+        rows={performanceRows}
+        records={personalRecords}
+        bodyAreas={bodyAreaDistribution}
+        selectedExercise={selectedProgressExercise}
+        onSelectExercise={setSelectedProgressExercise}
+      />
+      <BodyWeightCard
+        entries={bodyWeightEntries}
+        goalWeight={workoutPreferences?.goalWeight ?? null}
+        onAdd={() => openBodyWeightModal()}
+        onEdit={openBodyWeightModal}
+        onDelete={(entry) => void handleDeleteBodyWeight(entry)}
+      />
+    </ScreenSection>
+  );
+
+  const volumeSection = (
+    <ScreenSection className="mb-0">
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Weekly volume"
+        headerSubtitle="Completed sets per week over the last 8 weeks."
+        headerRight={<MaterialIcons name="bar-chart" size={22} color={tokens.textOnAccent} />}
+        className="mb-0"
+      >
+        {weeklyVolume.some((w) => w.totalSets > 0) ? (
+          <WeeklyVolumeChart data={weeklyVolume} />
+        ) : (
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+            Complete a session to start filling your weekly volume chart.
+          </Text>
+        )}
+      </Card>
+    </ScreenSection>
+  );
+
+  const historySection = (
+    <ScreenSection className="mb-0">
+      <Card
+        variant="header"
+        accentColor={COLOR}
+        headerTitle="Workout history"
+        headerSubtitle="Session intensity over the last 52 weeks."
+        headerRight={<MaterialIcons name="insights" size={22} color={tokens.textOnAccent} />}
+        className="mb-0"
+      >
+        <View className="w-full min-w-0 items-center justify-center">
+          <GitHubHeatmap days={workoutHeatmapDays} color={COLOR} weeks={52} />
+        </View>
+      </Card>
+    </ScreenSection>
+  );
+
+  const historyAnalyticsComposition = isWide ? (
+    <View className="flex-row flex-wrap" style={{ gap: spacing.lg, alignItems: 'flex-start' }}>
+      <View className="flex-1" style={{ minWidth: 300, gap: spacing.lg }}>
+        {recentSessionsSection}
+        {volumeSection}
+      </View>
+      <View className="flex-1" style={{ minWidth: 300, gap: spacing.lg }}>
+        {analyticsCardSection}
+        {historySection}
+      </View>
+    </View>
+  ) : (
+    <>
+      {recentSessionsSection}
+      {analyticsCardSection}
+      {volumeSection}
+      {historySection}
+    </>
+  );
 
   return (
     <>
@@ -947,101 +1077,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           </ScreenSection>
         ) : null}
 
-        {recentLogs.length > 0 ? (
-          <ScreenSection>
-            <View className="mb-4 mt-1">
-              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                Recent sessions
-              </Text>
-              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                Tap a session to see every exercise and set you completed.
-              </Text>
-            </View>
-            {recentLogs.map((log) => {
-              const routine = routines.find((r) => r.id === log.routine_id);
-              return (
-                <Card key={log.id} accentColor={COLOR} style={{ marginBottom: 12 }}>
-                  <RectButton
-                    onPress={() => setDetailLogId(log.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open session from ${log.completed_at}`}
-                    style={{ backgroundColor: 'transparent' }}
-                  >
-                    <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                      {routine?.name ?? 'Workout'}
-                    </Text>
-                    <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                      {new Date(log.completed_at).toLocaleString('en', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                  </RectButton>
-                </Card>
-              );
-            })}
-          </ScreenSection>
-        ) : null}
-
-        <ScreenSection>
-          <WorkoutTotalsCard
-            sessions={trainingTotals.sessions}
-            sets={trainingTotals.completedSets}
-            durationSeconds={trainingTotals.durationSeconds}
-            volume={trainingTotals.measurableVolume}
-            trainingDays={trainingTotals.trainingDays}
-          />
-          <WorkoutProgressCard
-            rows={performanceRows}
-            records={personalRecords}
-            bodyAreas={bodyAreaDistribution}
-            selectedExercise={selectedProgressExercise}
-            onSelectExercise={setSelectedProgressExercise}
-          />
-          <BodyWeightCard
-            entries={bodyWeightEntries}
-            goalWeight={workoutPreferences?.goalWeight ?? null}
-            onAdd={() => openBodyWeightModal()}
-            onEdit={openBodyWeightModal}
-            onDelete={(entry) => void handleDeleteBodyWeight(entry)}
-          />
-        </ScreenSection>
-
-        <ScreenSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Weekly volume"
-            headerSubtitle="Completed sets per week over the last 8 weeks."
-            headerRight={<MaterialIcons name="bar-chart" size={22} color={tokens.textOnAccent} />}
-            className="mb-0"
-          >
-            {weeklyVolume.some((w) => w.totalSets > 0) ? (
-              <WeeklyVolumeChart data={weeklyVolume} />
-            ) : (
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                Complete a session to start filling your weekly volume chart.
-              </Text>
-            )}
-          </Card>
-        </ScreenSection>
-
-        <ScreenSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Workout history"
-            headerSubtitle="Session intensity over the last 52 weeks."
-            headerRight={<MaterialIcons name="insights" size={22} color={tokens.textOnAccent} />}
-            className="mb-0"
-          >
-            <View className="w-full min-w-0 items-center justify-center">
-              <GitHubHeatmap days={workoutHeatmapDays} color={COLOR} weeks={52} />
-            </View>
-          </Card>
-        </ScreenSection>
+        {historyAnalyticsComposition}
       </Screen>
     </>
   );

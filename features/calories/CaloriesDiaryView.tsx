@@ -1,8 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { memo, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { layout, spacing } from '@/core/theme/designTokens';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
@@ -392,72 +393,95 @@ export function CaloriesDiaryView({
 }: CaloriesDiaryViewProps) {
   const { tokens } = useAppTheme();
   const [copyModalVisible, setCopyModalVisible] = useState(false);
+  const { width: windowWidth } = useWindowDimensions();
+  // At content-max widths the summary card becomes a context pane beside the
+  // diary content; below it the classic stacked layout stays (single tree, no
+  // duplicated reads — only one branch renders.
+  const isWide = windowWidth >= layout.contentMaxWidth;
+
+  const quickAdd = (
+    <DiaryQuickAdd
+      accentColor={accentColor}
+      allSavedMeals={allSavedMeals}
+      recentMeals={recentMeals}
+      frequentFoods={frequentFoods}
+      onSelectSavedMeal={onSelectSavedMeal}
+      onSelectFrequentFood={onSelectFrequentFood}
+      onQuickAddKcal={onQuickAddKcal}
+      onBrowseSavedMeals={onBrowseSavedMeals}
+      onManualAdd={onManualAdd}
+    />
+  );
+
+  const dailyLogSection = (
+    <ScreenSection accessibilityLabel="Daily log">
+      <View className="mb-3">
+        <DiaryDayNavigator
+          selectedDateKey={selectedDateKey}
+          summaries={summaries}
+          onSelectDate={onSelectDate}
+          onCopyDay={() => setCopyModalVisible(true)}
+        />
+        {copyStatus ? (
+          <Text
+            className="mt-2 px-1 text-xs"
+            style={{ color: tokens.textMuted }}
+            accessibilityLabel="Copy day status"
+          >
+            {copyStatus}
+          </Text>
+        ) : null}
+      </View>
+      {groupedEntries.length === 0 ? (
+        <EmptyStateCard
+          accentColor={accentColor}
+          className="mb-0"
+          icon={<MaterialIcons name="menu-book" size={22} color={colorText} />}
+          title="No meals logged on this day"
+          description="Use quick add, manual add, or copy a previous day to start it."
+        />
+      ) : (
+        <>
+          <View className="mb-4 px-1">
+            <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+              Daily log
+            </Text>
+            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              Entries are grouped by stored meal type and default to expanded.
+            </Text>
+          </View>
+          {groupedEntries.map((section) => (
+            <DiaryMealGroupCard
+              key={section.mealType}
+              section={section}
+              collapsed={collapsedMeals[section.mealType] ?? false}
+              onToggle={() => onToggleMealGroup(section.mealType)}
+              onEdit={onEditEntry}
+              onDelete={onDeleteEntry}
+            />
+          ))}
+        </>
+      )}
+    </ScreenSection>
+  );
 
   return (
     <>
-      <ScreenSection>{todayCard}</ScreenSection>
-
-      <DiaryQuickAdd
-        accentColor={accentColor}
-        allSavedMeals={allSavedMeals}
-        recentMeals={recentMeals}
-        frequentFoods={frequentFoods}
-        onSelectSavedMeal={onSelectSavedMeal}
-        onSelectFrequentFood={onSelectFrequentFood}
-        onQuickAddKcal={onQuickAddKcal}
-        onBrowseSavedMeals={onBrowseSavedMeals}
-        onManualAdd={onManualAdd}
-      />
-
-      <ScreenSection accessibilityLabel="Daily log">
-        <View className="mb-3">
-          <DiaryDayNavigator
-            selectedDateKey={selectedDateKey}
-            summaries={summaries}
-            onSelectDate={onSelectDate}
-            onCopyDay={() => setCopyModalVisible(true)}
-          />
-          {copyStatus ? (
-            <Text
-              className="mt-2 px-1 text-xs"
-              style={{ color: tokens.textMuted }}
-              accessibilityLabel="Copy day status"
-            >
-              {copyStatus}
-            </Text>
-          ) : null}
+      {isWide ? (
+        <View className="flex-row" style={{ gap: spacing.lg, alignItems: 'flex-start' }}>
+          <View className="flex-1" style={{ gap: spacing.lg }}>
+            {quickAdd}
+            {dailyLogSection}
+          </View>
+          <View style={{ width: 264 }}>{todayCard}</View>
         </View>
-        {groupedEntries.length === 0 ? (
-          <EmptyStateCard
-            accentColor={accentColor}
-            className="mb-0"
-            icon={<MaterialIcons name="menu-book" size={22} color={colorText} />}
-            title="No meals logged on this day"
-            description="Use quick add, manual add, or copy a previous day to start it."
-          />
-        ) : (
-          <>
-            <View className="mb-4 px-1">
-              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                Daily log
-              </Text>
-              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                Entries are grouped by stored meal type and default to expanded.
-              </Text>
-            </View>
-            {groupedEntries.map((section) => (
-              <DiaryMealGroupCard
-                key={section.mealType}
-                section={section}
-                collapsed={collapsedMeals[section.mealType] ?? false}
-                onToggle={() => onToggleMealGroup(section.mealType)}
-                onEdit={onEditEntry}
-                onDelete={onDeleteEntry}
-              />
-            ))}
-          </>
-        )}
-      </ScreenSection>
+      ) : (
+        <>
+          <ScreenSection>{todayCard}</ScreenSection>
+          {quickAdd}
+          {dailyLogSection}
+        </>
+      )}
 
       <CopyDayModal
         visible={copyModalVisible}

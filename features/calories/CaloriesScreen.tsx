@@ -11,6 +11,7 @@ import { Modal } from '@/core/ui/Modal';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { SegmentedControl } from '@/core/ui/SegmentedControl';
 // import { spacing, radius } from '@/core/theme/designTokens';
 import {
   DEFAULT_GOAL,
@@ -102,34 +103,19 @@ function ViewModeSwitch({
   value: CaloriesViewMode;
   onChange: (nextValue: CaloriesViewMode) => void;
 }) {
-  const { tokens } = useAppTheme();
-
   return (
-    <View
-      className="mt-4 self-start flex-row rounded-2xl border p-1"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-    >
-      {VIEW_MODE_OPTIONS.map((option) => {
-        const active = value === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            onPress={() => onChange(option.value)}
-            accessibilityRole="button"
-            accessibilityLabel={`${option.label} view`}
-            accessibilityState={{ selected: active }}
-            className="rounded-2xl px-4 py-2.5"
-            style={active ? { backgroundColor: COLOR } : undefined}
-          >
-            <Text
-              className={active ? 'text-sm font-semibold' : 'text-sm font-medium'}
-              style={active ? { color: tokens.textOnAccent } : { color: tokens.textMuted }}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+    <View className="mt-4 self-start">
+      <SegmentedControl
+        options={VIEW_MODE_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          accessibilityLabel: `${option.label} view`,
+        }))}
+        value={value}
+        onChange={onChange}
+        accentColor={COLOR}
+        accessibilityLabel="Calories view"
+      />
     </View>
   );
 }
