@@ -20,6 +20,13 @@ export async function openCommandScreen(page: Page) {
   });
   await page.getByText('Describe it', { exact: true }).locator('..').click({ force: true });
 
+  // "Describe it" closes the quick-capture sheet and opens the command modal
+  // in the same tick; the sheet's fade-out keeps both modals mounted for a few
+  // hundred ms, so wait for the sheet to unmount before pinning the mode. The
+  // same wait is applied in simulation/runner/actions.ts (c66ba18) and closing
+  // this window prevents the command modal from re-rendering mid-interaction.
+  await expect(page.getByText('Add something', { exact: true })).toHaveCount(0);
+
   // The command center remembers the last-used mode and defaults to Auto on a
   // fresh origin. Parser-oriented tests pin Create before using #command-input.
   const createMode = page.getByRole('button', { name: 'Create', exact: true });
@@ -36,6 +43,11 @@ export async function openSettingsScreen(page: Page) {
 
 export async function parseCommand(page: Page, rawText: string) {
   await page.locator('#command-input').fill(rawText);
+  // Wait for the parse button to become enabled. The button is disabled until
+  // the controlled input's text commits to React state (hasCommandText); a
+  // force:true click on the still-disabled button silently no-ops and leaves
+  // the command unparsed, so synchronize on the semantic enabled state.
+  await expect(page.getByText('Parse command', { exact: true }).locator('..')).toBeEnabled();
   await clickLabeledAction(page, 'Parse command');
   await page.waitForFunction(
     () => {
