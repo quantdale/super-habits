@@ -38,14 +38,15 @@ campaign proves (and where needed fixes) those properties with evidence.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 2 — §3 COMPLETE (§3.2 retry test +
-  §3.3 v21/v23 TRUE-shape fixtures green; full integration 230/230);
-  starting §4 (write-family inventory + duplicate probes).
+- Current milestone: Phase 2 — §4 COMPLETE (inventory clean; 7/7 probes
+  green; pomodoro-backfill outbox defect fixed at root with unit +
+  integration regression); starting §5 (restore DR matrix).
 - Completed: Phase 0 (git truth, hygiene, control plane read), Phase 1
   (baseline gates recorded in tasks.md §1), OpenSpec change created
   (proposal/design/tasks/spec/execplan), §2.1–§2.3 (mechanism proven as
   wall-clock timeout from per-test full-graph re-import; test-only root fix
-  in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green).
+  in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green), §3
+  (retry test + v21/v23 TRUE-shape fixtures; integration 230/230).
 - In progress: none (§3 done) — next is the §3 commit, then §4.1
   write-family inventory across the 10 data layers.
 - Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).

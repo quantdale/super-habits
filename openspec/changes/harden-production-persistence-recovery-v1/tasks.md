@@ -59,9 +59,31 @@
 
 ## 4. Persistence/mutation invariants + duplicate-write audit
 
-- [ ] 4.1 Write-family inventory across 10 data layers; confirm tx + enqueue coverage; record findings.
-- [ ] 4.2 Rapid double-invocation probes for todo add/complete, habit increment, calorie entry, saved meal, pomodoro completion, workout set logging, project/goal creation.
-- [ ] 4.3 Fix any vulnerable path at root + regression tests.
+- [x] 4.1 Inventory complete (14 data files + linked-actions + syncedMutation
+      core). All user-table writes ride `runSyncedMutation`/`runBackupMutation`
+      or a contract-equivalent bespoke tx (durable outbox upsert in-tx +
+      post-commit `enqueuePrepared`): habit/todo notification completions
+      (module promise-queue serialized + claim-deduped), linked-action habit
+      effects, linked-action rules. Restore apply paths run inside the
+      coordinator/import tx with no enqueue by design. Momentum/progress/
+      activity-timeline are read-only. Raw `withTransactionAsync` appears only
+      at the 3 queued notification-claim sites. No bypassing write found except
+      §4.3.
+- [x] 4.2 Probes (`tests/integration/duplicateWriteProbes.test.ts`, 7/7
+      green on real SQLite): toggle round-trip + complete-wins-noop (CAS +
+      serialization deterministic), adds repeatable with distinct slots, pomodoro
+      same-id idempotent incl. true overlap, concurrent set logs land cleanly,
+      saved-meal upsert keeps one row (use_count 2), backfill mints intent +
+      retry no-op. Habit increment race already covered by
+      `constraints.test.ts`; submit-guard covers UI double-tap (WM2.3).
+- [x] 4.3 One real defect fixed at root: `backfillLegacyPomodoroSessionMeta`
+      used plain UPDATEs with no outbox intent, so pre-v20 legacy session meta
+      (linked todo + note, canonical backup columns) stayed NULL remotely
+      forever — now `runBackupMutation` with one `update` intent per
+      actually-touched row (NULL predicates keep crash-retry exact), matching
+      `setPomodoroSessionMeta`'s contract. Unit + integration regression added.
+      Also corrected the stale skill line claiming `habit_completions` needs no
+      enqueue.
 
 ## 5. Restore disaster-recovery matrix
 

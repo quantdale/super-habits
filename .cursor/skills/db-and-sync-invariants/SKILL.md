@@ -87,7 +87,7 @@ UNIQUE(habit_id, date_key) — enforced at DB level
 Data layer (`features/habits/habits.data.ts`):
 - **Increment:** SELECT → if no row: INSERT (new row, count=1); if row exists: UPDATE (count+1).
 - **Decrement:** SELECT → if count === 1: DELETE (hard delete — allowed exception); else UPDATE (count−1).
-- Hard delete is the allowed exception for this table — it is not a synced entity; **no** `syncEngine.enqueue()` needed.
+- `habit_completions` IS a synced entity: increment/decrement ride `runBackupMutation` (or the equivalent bespoke tx + durable outbox + post-commit `enqueuePrepared` on notification/linked-action paths) with `create`/`update` intents; the count-1→0 hard delete enqueues a `delete` intent. Only `linked_action_events`, `linked_action_executions`, and `processed_notification_actions` stay unsynced.
 
 Do not use INSERT OR REPLACE for this flow. Do not introduce duplicate INSERTs for the same (habit_id, date_key).
 

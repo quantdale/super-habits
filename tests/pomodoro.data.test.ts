@@ -437,6 +437,16 @@ describe('migrateLegacySessionMeta', () => {
     expect(updates[0].params).toEqual(['todo_1', 'Ship the release', 'pom_ok']);
     expect(updates[1].params).toEqual(['deep work on the parser', 'pom_ok']);
 
+    // Touched rows ride the backup outbox (sessions are immutable history, so
+    // no later update would carry the enriched cells remotely otherwise).
+    const outbox = db.calls.find(
+      (c) =>
+        c.sql.includes('sync_outbox') &&
+        c.params[0] === 'pomodoro_sessions' &&
+        c.params[1] === 'pom_ok',
+    );
+    expect(outbox?.params[3]).toBe('update');
+
     // Legacy keys retired only after all backfills succeeded.
     expect(asyncStorage.store.has('superhabits.pomodoro.sessionAssociations')).toBe(false);
     expect(asyncStorage.store.has('superhabits.pomodoro.sessionNotes')).toBe(false);

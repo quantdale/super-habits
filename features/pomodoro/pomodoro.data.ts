@@ -713,26 +713,60 @@ export type LegacySessionMetaBackfill = {
 /**
  * Guarded COALESCE backfill of legacy AsyncStorage metadata onto existing
  * rows — only currently-NULL cells are filled so newer row data never gets
- * clobbered. Plain statements (not runBackupMutation): this repairs local
- * history in place and must not mint outbox records for pre-column rows.
+ * clobbered. Routed through runBackupMutation with one `update` outbox
+ * record per actually-touched row (same contract as setPomodoroSessionMeta):
+ * the canonical backup columns include linked_todo_id/title/note, and
+ * sessions are immutable history, so without the intent the enriched cells
+ * would stay NULL remotely forever. Bounded and one-time: the legacy keys
+ * are retired after a successful pass (see pomodoro.sessionMeta.ts), and a
+ * crash-retry re-run touches nothing (NULL predicates) so it stays a no-op.
  */
 export async function backfillLegacyPomodoroSessionMeta(
   updates: LegacySessionMetaBackfill,
 ): Promise<void> {
   const db = await getDatabase();
-  for (const association of updates.associations) {
-    await db.runAsync(
-      `UPDATE pomodoro_sessions
-       SET linked_todo_id = COALESCE(linked_todo_id, ?),
-           linked_todo_title = COALESCE(linked_todo_title, ?)
-       WHERE id = ?`,
-      [association.todoId, association.todoTitle, association.sessionId],
-    );
-  }
-  for (const note of updates.notes) {
-    await db.runAsync(`UPDATE pomodoro_sessions SET note = COALESCE(note, ?) WHERE id = ?`, [
-      note.note,
-      note.sessionId,
-    ]);
-  }
+  const now = nowIso();
+  await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      let touched = 0;
+      for (const association of updates.associations) {
+        const result = await transactionDb.runAsync(
+          `UPDATE pomodoro_sessions
+           SET linked_todo_id = COALESCE(linked_todo_id, ?),
+               linked_todo_title = COALESCE(linked_todo_title, ?)
+           WHERE id = ?
+             AND (linked_todo_id IS NULL OR linked_todo_title IS NULL)`,
+          [association.todoId, association.todoTitle, association.sessionId],
+        );
+        if (result.changes === 1) {
+          touched += 1;
+          enqueue({
+            entity: 'pomodoro_sessions',
+            id: association.sessionId,
+            updatedAt: now,
+            operation: 'update',
+          });
+        }
+      }
+      for (const note of updates.notes) {
+        const result = await transactionDb.runAsync(
+          `UPDATE pomodoro_sessions
+           SET note = COALESCE(note, ?)
+           WHERE id = ? AND note IS NULL`,
+          [note.note, note.sessionId],
+        );
+        if (result.changes === 1) {
+          touched += 1;
+          enqueue({
+            entity: 'pomodoro_sessions',
+            id: note.sessionId,
+            updatedAt: now,
+            operation: 'update',
+          });
+        }
+      }
+      return { changed: touched > 0, value: undefined };
+    },
+  });
 }
