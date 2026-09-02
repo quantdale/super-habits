@@ -14,7 +14,11 @@ async function count(db: Awaited<ReturnType<typeof seedSmall>>, sql: string): Pr
   return row?.n ?? 0;
 }
 
-describe('tests/integration/fixtures', () => {
+// CG-9: fixture seeding walks the real data layers (many sequential async
+// writes through SQLite); under full parallel load it can cross the 15s
+// project bound. Fixture correctness is not a timing contract — 30s keeps
+// the load sensitivity out without weakening any assertion.
+describe('tests/integration/fixtures', { timeout: 30_000 }, () => {
   it('SMALL seeds a realistic single day through the real data layers', async () => {
     const db = await seedSmall();
     // Re-import the clock AFTER seeding: the seeder runs its own module reset,

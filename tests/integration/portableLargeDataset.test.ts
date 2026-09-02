@@ -224,7 +224,7 @@ function seedLongTermDataset(db: TestDatabase): Promise<void> {
   });
 }
 
-describe('portable large long-term dataset', () => {
+describe('portable large long-term dataset', { timeout: 120_000 }, () => {
   it('exports and imports tens of thousands of rows with measured, bounded timings', async () => {
     asyncStorageMock.state.set('superhabits.theme.mode', 'system');
     const sourceDb = await freshDatabase();

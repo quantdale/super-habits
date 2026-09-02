@@ -6,7 +6,7 @@
  * tiny inline Node servers and (in one integration smoke) the real
  * `web:verify` CLI against the real static export when `dist/` exists.
  */
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -25,6 +25,8 @@ import {
 } from '../scripts/web-lifecycle.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+type OwnedServer = ReturnType<typeof spawnOwnedServer>;
 
 const SERVER_SCRIPT = `
 const http = require('http');
@@ -131,7 +133,11 @@ describe('waitForHttp', { timeout: 30_000 }, () => {
   });
 });
 
-describe('terminateOwnedTree', { timeout: 30_000 }, () => {
+// CG-9: the isolation spec's worst path is 4 × 10s readiness probes +
+// terminate + port release; the describe ceiling must exceed that sum, or
+// the *outer* bound becomes the load-sensitive failure (observed: 30s
+// describe timeout firing while every inner bound still had headroom).
+describe('terminateOwnedTree', { timeout: 60_000 }, () => {
   it('cleans up the owned server after a successful probe and releases the port', async () => {
     const port = await freePort();
     const owned = spawnServer(port);
@@ -156,27 +162,73 @@ describe('terminateOwnedTree', { timeout: 30_000 }, () => {
   });
 
   it('terminates only the owned tree, never an unrelated process', async () => {
-    const ownedPort = await freePort();
-    const victimPort = await freePort();
-    const owned = spawnServer(ownedPort);
-    const victim = spawn(process.execPath, ['-e', SERVER_SCRIPT], {
-      env: { ...process.env, WV_PORT: String(victimPort) },
-      stdio: 'ignore',
-    });
+    // CG-9 bind-race guard: pickPort() sees a port as free while a previous
+    // test's server is still mid-shutdown; the spawned server then fails to
+    // bind and dies instantly (observed: "did not become ready within
+    // 10000ms at :18081"). Spawn + probe with a child watcher so a bind
+    // death fails fast, and retry on a fresh port (bounded, 3 attempts).
+    // The isolation assertions themselves are unchanged.
+    let owned: OwnedServer | null = null;
+    let ownedPort = 0;
+    let victimPort = 0;
+    let victim: ChildProcess | null = null;
     try {
-      await waitForHttp({ url: `http://localhost:${ownedPort}/`, timeoutMs: 5000 });
-      await waitForHttp({ url: `http://localhost:${victimPort}/`, timeoutMs: 5000 });
-      await terminateOwnedTree(owned, { graceMs: 500 });
-      expect(owned.child.exitCode !== null).toBe(true);
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        ownedPort = await freePort();
+        owned = spawnServer(ownedPort);
+        try {
+          await waitForHttp({
+            url: `http://localhost:${ownedPort}/`,
+            timeoutMs: 10_000,
+            child: owned.child,
+          });
+          break;
+        } catch (error) {
+          await terminateOwnedTree(owned, { graceMs: 250 });
+          owned = null;
+          if (attempt === 2) throw error;
+        }
+      }
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        victimPort = await freePort();
+        victim = spawn(process.execPath, ['-e', SERVER_SCRIPT], {
+          env: { ...process.env, WV_PORT: String(victimPort) },
+          stdio: 'ignore',
+        });
+        try {
+          await waitForHttp({
+            url: `http://localhost:${victimPort}/`,
+            timeoutMs: 10_000,
+          });
+          break;
+        } catch (error) {
+          victim.kill('SIGKILL');
+          victim = null;
+          if (attempt === 2) throw error;
+        }
+      }
+
+      await terminateOwnedTree(owned!, { graceMs: 500 });
+      expect(owned!.child.exitCode !== null).toBe(true);
       // The unrelated victim must still be serving.
       const victimProbe = await waitForHttp({
         url: `http://localhost:${victimPort}/`,
-        timeoutMs: 3000,
+        timeoutMs: 10_000,
       });
       expect(victimProbe.status).toBe(200);
     } finally {
-      victim.kill('SIGKILL');
-      await new Promise((resolve) => victim.once('exit', resolve));
+      victim?.kill('SIGKILL');
+      // CG-9: bound the cleanup wait — an unbounded exit wait hangs the
+      // whole describe budget if SIGKILL delivery stalls under
+      // process-table pressure. The assertion under test (isolation) has
+      // already completed by then.
+      if (victim) {
+        await Promise.race([
+          new Promise((resolve) => victim!.once('exit', resolve)),
+          new Promise((resolve) => setTimeout(resolve, 5_000)),
+        ]);
+      }
     }
   });
 });
