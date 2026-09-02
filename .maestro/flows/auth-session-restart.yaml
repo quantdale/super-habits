@@ -11,7 +11,7 @@ tags:
 # may be created for the bound dataset).
 - launchApp
 - extendedWaitUntil:
-    visible: 'Overview'
+    visible: 'Today'
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000

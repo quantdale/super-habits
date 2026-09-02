@@ -10,7 +10,7 @@ tags:
     permissions:
       notifications: deny
 - extendedWaitUntil:
-    visible: 'Overview'
+    visible: 'Today'
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000

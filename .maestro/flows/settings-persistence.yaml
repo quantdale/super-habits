@@ -7,7 +7,7 @@ tags:
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: 'Overview'
+    visible: 'Today'
     timeout: 10000
 - tapOn: 'Open settings'
 - extendedWaitUntil:
@@ -18,7 +18,7 @@ tags:
 - killApp
 - launchApp
 - extendedWaitUntil:
-    visible: 'Overview'
+    visible: 'Today'
     timeout: 10000
 - tapOn: 'Open settings'
 - assertVisible: 'Dark'
