@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { spacing, radius, layout } from '@/core/theme/designTokens';
 
 export type ModalLayout = 'dialog' | 'drawer' | 'bottom-sheet';
 
@@ -22,7 +23,7 @@ export type ModalProps = {
   title?: string;
   children: ReactNode;
   scroll?: boolean;
-  layout?: ModalLayout;
+  modalLayout?: ModalLayout;
   /** Optional action area that stays visible while a scrollable body moves. */
   footer?: ReactNode;
 };
@@ -39,15 +40,15 @@ export function Modal({
   title,
   children,
   scroll = false,
-  layout = 'dialog',
+  modalLayout = 'dialog',
   footer,
 }: ModalProps) {
   const { tokens } = useAppTheme();
   const closeFocusRing = useKeyboardFocusRing(tokens.accent);
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const { bottom: safeAreaBottom } = useSafeAreaInsets();
-  const isDrawer = layout === 'drawer';
-  const isBottomSheet = layout === 'bottom-sheet';
+  const isDrawer = modalLayout === 'drawer';
+  const isBottomSheet = modalLayout === 'bottom-sheet';
   const modalBottomInset =
     Platform.OS === 'android'
       ? Math.max(safeAreaBottom, ANDROID_MODAL_NAVIGATION_FALLBACK)
@@ -60,7 +61,7 @@ export function Modal({
   const scrollMaxHeight = Math.max(
     0,
     Math.min(
-      (layout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92) -
+      (modalLayout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92) -
         (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0),
       modalMaxHeight - 88,
     ),
@@ -70,10 +71,10 @@ export function Modal({
     ? {
         alignItems: 'flex-end' as const,
         justifyContent: 'flex-start' as const,
-        paddingTop: 16,
-        paddingRight: 16,
-        paddingBottom: 16 + modalBottomInset,
-        paddingLeft: 16,
+        paddingTop: spacing.lg,
+        paddingRight: spacing.lg,
+        paddingBottom: spacing.lg + modalBottomInset,
+        paddingLeft: spacing.lg,
       }
     : isBottomSheet
       ? {
@@ -87,16 +88,16 @@ export function Modal({
       : {
           alignItems: 'center' as const,
           justifyContent: 'center' as const,
-          paddingTop: 16,
-          paddingRight: 16,
-          paddingBottom: 16 + modalBottomInset,
-          paddingLeft: 16,
+          paddingTop: spacing.lg,
+          paddingRight: spacing.lg,
+          paddingBottom: spacing.lg + modalBottomInset,
+          paddingLeft: spacing.lg,
         };
 
   const shellStyle = isDrawer
-    ? { width: Math.min(windowWidth - 32, 520) }
+    ? { width: Math.min(windowWidth - spacing.xxl * 2, 520) }
     : isBottomSheet
-      ? { width: '100%' as const, maxWidth: 720, alignSelf: 'center' as const }
+      ? { width: '100%' as const, maxWidth: layout.contentMaxWidth, alignSelf: 'center' as const }
       : { width: '100%' as const, maxWidth: 448 };
 
   const surfaceStyle = {
@@ -110,10 +111,10 @@ export function Modal({
     shadowOpacity: 0.1,
     shadowRadius: 24,
     elevation: 4,
-    borderTopLeftRadius: isBottomSheet ? 28 : 24,
-    borderTopRightRadius: isBottomSheet ? 28 : 24,
-    borderBottomLeftRadius: isBottomSheet ? 0 : 24,
-    borderBottomRightRadius: isBottomSheet ? 0 : 24,
+    borderTopLeftRadius: isBottomSheet ? radius.xl : radius.lg,
+    borderTopRightRadius: isBottomSheet ? radius.xl : radius.lg,
+    borderBottomLeftRadius: isBottomSheet ? 0 : radius.lg,
+    borderBottomRightRadius: isBottomSheet ? 0 : radius.lg,
     maxHeight: modalMaxHeight,
   };
 

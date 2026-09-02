@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing, radius, size } from '@/core/theme/designTokens';
 
 type Props = {
   label: string;
@@ -19,20 +20,23 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected: active }}
-      className="mb-2 mr-2 flex-row items-center gap-1 rounded-full border px-[14px] py-[8px]"
-      style={
-        active
+      className="mb-2 mr-2 flex-row items-center gap-1"
+      style={{
+        borderRadius: radius.full,
+        borderWidth: 1,
+        paddingHorizontal: spacing.lg - 2,
+        paddingVertical: spacing.sm,
+        minHeight: size.touchTargetMin - 4,
+        ...(active
           ? {
               backgroundColor: color,
               borderColor: color,
-              minHeight: 44,
             }
           : {
               borderColor: tokens.border,
               backgroundColor: tokens.surfaceElevated,
-              minHeight: 44,
-            }
-      }
+            }),
+      }}
     >
       {icon ? <Text className="text-[13px]">{icon}</Text> : null}
       <Text

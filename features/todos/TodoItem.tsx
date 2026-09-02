@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from '
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
+import { spacing } from '@/core/theme/designTokens';
 import { MenuSheet } from '@/core/ui/MenuSheet';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import { DueDateBadge } from './DueDateBadge';
@@ -139,11 +140,11 @@ export const TodoItem = memo(function TodoItem({
     row = (
       <SwipeableCard
         accentColor={SECTION_COLORS.todos}
-        style={{ marginBottom: 8, opacity: isActive ? 0.85 : 1 }}
+        style={{ marginBottom: spacing.sm, opacity: isActive ? 0.85 : 1 }}
         onEdit={onEdit}
         onDelete={onDelete}
       >
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center" style={{ gap: spacing.sm }}>
           <Pressable
             onLongPress={onLongPress}
             delayLongPress={180}

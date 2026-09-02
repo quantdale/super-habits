@@ -91,7 +91,7 @@ export function GlobalCommandCenterHost() {
       onClose={closeCommandCenter}
       title="Command center"
       scroll
-      layout={Platform.OS === 'web' && width >= 960 ? 'drawer' : 'bottom-sheet'}
+      modalLayout={Platform.OS === 'web' && width >= 960 ? 'drawer' : 'bottom-sheet'}
     >
       {launchContext ? (
         <CommandScreen

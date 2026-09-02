@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
+import { spacing, radius } from '@/core/theme/designTokens';
 
 import { openCardTarget } from './DashboardCard.shared';
 import type { OverviewCardMeta } from '../overviewCards';
@@ -59,11 +60,16 @@ export function DashboardCard({ meta, loading = false, empty, children }: Dashbo
       className="active:opacity-90"
     >
       <Card accentColor={meta.accentColor} className="mb-0" innerClassName="p-0">
-        <View className="flex-1 p-4">
-          <View className="flex-row items-center gap-3">
+        <View className="flex-1" style={{ padding: spacing.lg }}>
+          <View className="flex-row items-center" style={{ gap: spacing.md }}>
             <View
-              className="h-10 w-10 items-center justify-center rounded-xl"
-              style={{ backgroundColor: `${meta.accentColor}18` }}
+              className="items-center justify-center"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: radius.md,
+                backgroundColor: `${meta.accentColor}18`,
+              }}
             >
               <MaterialIcons name={meta.icon} size={20} color={textColor} />
             </View>

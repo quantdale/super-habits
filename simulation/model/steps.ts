@@ -117,7 +117,8 @@ export const SEMANTIC_STEP_CATALOG: Record<SemanticStepName, StepDefinition> = {
   openCommand: {
     kind: 'openCommand',
     category: 'navigation',
-    description: 'Open the Command Center overlay through the Add → Describe it advanced-capture path.',
+    description:
+      'Open the Command Center overlay through the Add → Describe it advanced-capture path.',
     mutating: false,
     parentHelper: null,
     note: 'Runner-owned: parent harness has no openCommand helper; overlay interaction belongs to the runner.',

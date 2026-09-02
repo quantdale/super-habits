@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { layout } from '@/core/theme/designTokens';
+import { spacing, layout } from '@/core/theme/designTokens';
 
 /** Viewport widths above this get a centered, width-capped content column. */
 const WIDE_VIEWPORT_MIN_WIDTH = 768;
@@ -101,27 +101,27 @@ const styles = StyleSheet.create({
   },
   scrollContentPadded: {
     flexGrow: 1,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 36,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   fill: {
     flex: 1,
   },
   padded: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 36,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   contentShell: {
     width: '100%',
-    maxWidth: 1180,
+    maxWidth: layout.contentMaxWidth,
     alignSelf: 'center',
   },
   contentShellFill: {
     flex: 1,
     width: '100%',
-    maxWidth: 1180,
+    maxWidth: layout.contentMaxWidth,
     alignSelf: 'center',
   },
 });

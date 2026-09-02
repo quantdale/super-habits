@@ -4,6 +4,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { opacity } from '@/core/theme';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing, radius, size } from '@/core/theme/designTokens';
 
 type Props = {
   /** Creates the task; resolves after persistence so the input only clears on success. */
@@ -36,15 +37,19 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
   };
 
   return (
-    <View className="mb-4 flex-row items-center gap-2">
+    <View className="mb-4 flex-row items-center" style={{ gap: spacing.sm }}>
       <TextInput
         accessibilityLabel="Quick add task title"
-        className="flex-1 rounded-2xl border px-4 py-3 text-base"
+        className="flex-1 text-base"
         style={{
-          minHeight: 48,
+          minHeight: size.touchTargetMin,
+          borderRadius: radius.lg,
+          borderWidth: 1,
           borderColor: tokens.border,
           backgroundColor: tokens.surfaceElevated,
           color: tokens.text,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
         }}
         value={title}
         onChangeText={setTitle}
@@ -59,11 +64,14 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Add task"
         accessibilityState={{ disabled: !canSubmit }}
-        className="h-12 w-12 items-center justify-center rounded-2xl"
-        style={({ pressed }) => ({
+        className="items-center justify-center"
+        style={{
+          width: size.touchTargetMin,
+          height: size.touchTargetMin,
+          borderRadius: radius.lg,
           backgroundColor: SECTION_COLORS.todos,
-          opacity: canSubmit ? (pressed ? opacity.pressed : 1) : opacity.disabled,
-        })}
+          opacity: canSubmit ? 1 : opacity.disabled,
+        }}
       >
         <MaterialIcons name="add" size={24} color={tokens.textOnAccent} />
       </Pressable>
@@ -73,7 +81,12 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Add task"
           accessibilityHint="Open task details"
-          className="min-h-[48px] justify-center rounded-xl px-2"
+          className="justify-center"
+          style={{
+            minHeight: size.touchTargetMin,
+            borderRadius: radius.md,
+            paddingHorizontal: spacing.sm,
+          }}
         >
           <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
             Details

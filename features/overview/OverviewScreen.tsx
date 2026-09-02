@@ -17,6 +17,7 @@ import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildDateRangeOldestFirst, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import { spacing, layout } from '@/core/theme/designTokens';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
 import { getMomentumGarden } from '@/features/momentum/momentum.data';
@@ -224,7 +225,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const compactHeader = Platform.OS === 'web' && viewportWidth < 600;
   const stackedHeader = compactHeader || (Platform.OS !== 'web' && viewportWidth < 1200);
 
-  const [layout, setLayout] = useState<OverviewCardId[]>([]);
+  const [cardLayout, setCardLayout] = useState<OverviewCardId[]>([]);
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -249,7 +250,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     try {
       const [nextLayout, nextLoad] = await Promise.all([loadCardLayout(), loadSummaries()]);
       if (!isCurrent()) return;
-      setLayout(nextLayout);
+      setCardLayout(nextLayout);
       setSummaries(nextLoad.summaries);
       setNextBestAction(nextLoad.nextBestAction);
       setLoadError(null);
@@ -287,7 +288,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   );
 
   const handleLayoutChange = useCallback((next: OverviewCardId[]) => {
-    setLayout(next);
+    setCardLayout(next);
     saveCardLayout(next).catch((err) =>
       console.error('[OverviewScreen] saveCardLayout failed', err),
     );
@@ -366,7 +367,11 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 36 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          paddingBottom: spacing.xxl,
+        }}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -380,7 +385,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           />
         }
       >
-        <View className="mx-auto w-full max-w-[1180px]">
+        <View className="mx-auto w-full" style={{ maxWidth: layout.contentMaxWidth }}>
           <View className="flex-row flex-wrap items-start justify-between gap-4">
             <View
               className="min-w-0 flex-1"
@@ -470,7 +475,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
 
           {isCustomizing ? (
             <View className="mt-5">
-              <CustomizeCardsPanel layout={layout} onChange={handleLayoutChange} />
+              <CustomizeCardsPanel layout={cardLayout} onChange={handleLayoutChange} />
             </View>
           ) : null}
 
@@ -531,7 +536,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
             </View>
           ) : (
             <View className="mt-5 gap-4">
-              {layout.map((id) => (
+              {cardLayout.map((id) => (
                 <View key={id}>{renderCard(id)}</View>
               ))}
               {!isCustomizing && !hasAnyData ? (

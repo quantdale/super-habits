@@ -18,6 +18,7 @@ import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { WeeklyReviewScreen } from '@/features/weekly-review/WeeklyReviewScreen';
 import { PlanningHubScreen } from '@/features/planning-hub/PlanningHubScreen';
 import { QuickCaptureOverlay } from '@/features/quick-capture/QuickCaptureOverlay';
+import { spacing, radius, size } from '@/core/theme/designTokens';
 
 type NavItem = {
   name: AppSection;
@@ -97,20 +98,20 @@ function TopTabItem({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 5,
+          gap: spacing.xs,
           minWidth: 0,
           flexShrink: compact ? 0 : 1,
           backgroundColor: isFocused ? surfaceColor : tabRailColor,
           borderBottomWidth: isFocused ? 0 : 1,
           borderBottomColor: tabRailBorderColor,
-          borderTopLeftRadius: isFocused ? 16 : 8,
-          borderTopRightRadius: isFocused ? 16 : 8,
+          borderTopLeftRadius: isFocused ? radius.lg : radius.sm,
+          borderTopRightRadius: isFocused ? radius.lg : radius.sm,
           marginTop: isFocused ? 0 : 3,
           marginBottom: isFocused ? -1 : 0,
           zIndex: isFocused ? 2 : 0,
-          paddingVertical: compact ? 8 : 10,
-          paddingHorizontal: compact ? 6 : 4,
-          minHeight: 48,
+          paddingVertical: compact ? spacing.sm : spacing.md,
+          paddingHorizontal: compact ? spacing.xs : spacing.sm,
+          minHeight: size.touchTargetMin,
         },
         // Visible keyboard-focus indication on web so the tab rail stays
         // fully keyboard-operable.
@@ -315,7 +316,7 @@ export default function Index() {
         onClose={closeSettings}
         title="Settings"
         scroll
-        layout="drawer"
+        modalLayout="drawer"
       >
         <SettingsScreen visible={isSettingsOpen} onRequestClose={closeSettings} />
       </Modal>
@@ -325,7 +326,7 @@ export default function Index() {
         onClose={closeWeeklyReview}
         title="Weekly Review"
         scroll
-        layout="drawer"
+        modalLayout="drawer"
       >
         <WeeklyReviewScreen onClose={closeWeeklyReview} />
       </Modal>
@@ -335,7 +336,7 @@ export default function Index() {
         onClose={closePlanningHub}
         title="Plan"
         scroll
-        layout="drawer"
+        modalLayout="drawer"
       >
         <PlanningHubScreen initialView={planningHubInitialView} />
       </Modal>
@@ -345,7 +346,7 @@ export default function Index() {
         onClose={closeQuickCapture}
         title="Add"
         scroll
-        layout="bottom-sheet"
+        modalLayout="bottom-sheet"
       >
         <QuickCaptureOverlay />
       </Modal>

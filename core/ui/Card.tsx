@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing } from '@/core/theme/designTokens';
 
 export type CardVariant = 'standard' | 'header' | 'stat';
 
@@ -219,7 +220,9 @@ export function Card({
           />
         </>
       ) : null}
-      <View className={bodyClass}>{children}</View>
+      <View className={bodyClass} style={{ padding: spacing.lg }}>
+        {children}
+      </View>
     </View>
   );
 }
