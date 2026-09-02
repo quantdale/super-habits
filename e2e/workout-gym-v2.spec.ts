@@ -59,8 +59,10 @@ test.describe('Workout Gym V2', () => {
     await builder.getByText('Choose from exercise library', { exact: true }).click();
     const customPicker = page.getByRole('dialog').last();
     await customPicker.getByPlaceholder('Cable press variation').fill('Cable Y Raise');
-    await customPicker.getByRole('textbox', { name: 'Primary body area' }).fill('shoulders');
-    await customPicker.getByRole('textbox', { name: 'Equipment' }).fill('cable');
+    await customPicker
+      .getByRole('textbox', { name: 'Custom exercise primary area' })
+      .fill('shoulders');
+    await customPicker.getByRole('textbox', { name: 'Custom exercise equipment' }).fill('cable');
     await customPicker.getByText('Create and add', { exact: true }).click();
 
     await expect(builder.getByText('Cable Y Raise', { exact: true })).toBeVisible();
@@ -94,7 +96,7 @@ test.describe('Workout Gym V2', () => {
     const builder = page.getByRole('dialog').filter({ hasText: 'Routine builder' });
     await builder.getByText('Choose from exercise library', { exact: true }).click();
     const picker = page.getByRole('dialog').last();
-    const search = picker.getByRole('textbox', { name: 'Search exercises' });
+    const search = picker.getByRole('textbox', { name: 'Exercise library search' });
 
     await search.fill('row');
     await expect(

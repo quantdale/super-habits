@@ -47,8 +47,9 @@ campaign proves (and where needed fixes) those properties with evidence.
   wall-clock timeout from per-test full-graph re-import; test-only root fix
   in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green), §3
   (retry test + v21/v23 TRUE-shape fixtures; integration 230/230).
-- In progress: none (§6 done) — next is the §6 commit, then §7.1
-  (`dev:doctor` + boot API-36 AVD).
+- In progress: §7.2 — gym-v2 picker a11y-label fix written; needs
+  targeted-lane replay (auto-rebuilds APK) + web workout spec, then the §7
+  commit.
 - Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).
 - Decisions: D1–D7 in design.md (CG-9 battery protocol; injected-failure
   migration test; runtime-derived historical fixtures; data-layer duplicate
@@ -67,8 +68,9 @@ campaign proves (and where needed fixes) those properties with evidence.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: n/a.
-- Exact next action: commit the §6 torture tests, then run
-  `npm run dev:doctor` and inspect the native lane state.
+- Exact next action: commit the §7 native work, re-run
+  `npm run qa:native:targeted` (auto-provisions the new HEAD), then run
+  the web `workout-gym-v2` Chromium spec against a fresh `dist/`.
 - Remaining definition of done: tasks §2–§8 complete; full validation
   matrix green on the final tree; independent verification PASS; coherent
   commits pushed per policy; web:hygiene PASS with no campaign-owned

@@ -121,8 +121,20 @@
 
 ## 7. Native readiness
 
-- [ ] 7.1 Boot API-36 AVD; `qa:native:provision`; verify APK provenance == current HEAD.
-- [ ] 7.2 `qa:native:smoke` (+ targeted persistence if green); classify any blocker exactly.
+- [x] 7.1 Booted Nitro_API_36 (emulator-5554, API 36 x86_64); `qa:native:provision`
+      PASS with provenance (sourceSha == HEAD, clean tree, apkSha256 recorded,
+      installed). Smoke 2/2 PASS on the current-source APK.
+- [ ] 7.2 Targeted persistence: 10/11 green after fixing the stale `Overview`
+      rail marker (→ `Today`, 24 flow files). One failure left:
+      `workout-gym-v2-persistence` cannot reach the custom-exercise area field.
+      Root-caused with screenshots/logcat/hierarchy (see execplan): the picker
+      custom-form inputs share their accessible name with their visible labels,
+      so taps land on the non-focusable label and typed text is dropped (plus
+      BACK-via-hideKeyboard modal hazard). Fix: distinct `accessibilityLabel`s
+      on the 6 picker inputs (CaloriesEntryFields convention) + flow taps on
+      the explicit names + `pressKey enter` instead of `hideKeyboard` in the
+      picker + settle/filter-proof waits. Web E2E `workout-gym-v2` selectors
+      updated to the new names (visible text unchanged).
 
 ## 8. Validation and closure
 

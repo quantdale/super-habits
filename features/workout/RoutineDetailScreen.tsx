@@ -1005,6 +1005,7 @@ export function RoutineDetailModal({
       >
         <TextField
           label="Search exercises"
+          accessibilityLabel="Exercise library search"
           value={pickerQuery}
           onChangeText={setPickerQuery}
           placeholder="Bench, squat, cardio…"
@@ -1130,30 +1131,35 @@ export function RoutineDetailModal({
           </Text>
           <TextField
             label="Name"
+            accessibilityLabel="Custom exercise name"
             value={customName}
             onChangeText={setCustomName}
             placeholder="Cable press variation"
           />
           <TextField
             label="Primary body area"
+            accessibilityLabel="Custom exercise primary area"
             value={customArea}
             onChangeText={setCustomArea}
             placeholder="chest"
           />
           <TextField
             label="Equipment"
+            accessibilityLabel="Custom exercise equipment"
             value={customEquipment}
             onChangeText={setCustomEquipment}
             placeholder="cable, barbell, none"
           />
           <TextField
             label="Search aliases (comma separated)"
+            accessibilityLabel="Custom exercise aliases"
             value={customAliases}
             onChangeText={setCustomAliases}
             placeholder="close grip, narrow press"
           />
           <TextField
             label="Instructions (optional)"
+            accessibilityLabel="Custom exercise instructions"
             value={customInstructions}
             onChangeText={setCustomInstructions}
             placeholder="Short user-authored setup cue"

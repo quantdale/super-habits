@@ -37,52 +37,53 @@ tags:
 - extendedWaitUntil:
     visible: 'Exercise library'
     timeout: 5000
-- tapOn: 'Search exercises'
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: 'Exercise library search'
 - inputText: 'zzzz-native-resume'
-- hideKeyboard
+- pressKey: enter
+# Explicit proof the filter applied: with zero matches the list collapses
+# to the empty state and the create form sits near the top.
+- extendedWaitUntil:
+    visible: 'No matching exercises'
+    timeout: 10000
 - scrollUntilVisible:
     element: 'Name'
     direction: DOWN
     visibilityPercentage: 100
-- tapOn: 'Name'
+- tapOn: 'Custom exercise name'
 - inputText: 'Native resume press'
-- hideKeyboard
+- pressKey: enter
 - waitForAnimationToEnd:
     timeout: 2000
 - swipe:
-    start: '50%, 80%'
-    end: '50%, 40%'
-    duration: 600
-- waitForAnimationToEnd:
-    timeout: 2000
-- scrollUntilVisible:
-    element: 'Primary body area'
-    direction: DOWN
-    visibilityPercentage: 50
-    centerElement: true
-- tapOn: 'Primary body area'
+    start: '50%, 70%'
+    end: '50%, 55%'
+    duration: 400
+- extendedWaitUntil:
+    visible: 'Primary body area'
+    timeout: 10000
+- tapOn: 'Custom exercise primary area'
 - inputText: 'chest'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Search aliases (comma separated)'
     direction: DOWN
-- tapOn:
-    text: 'Equipment'
-    index: 1
+- tapOn: 'Custom exercise equipment'
 - inputText: 'barbell'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Search aliases (comma separated)'
     direction: DOWN
-- tapOn: 'Search aliases (comma separated)'
+- tapOn: 'Custom exercise aliases'
 - inputText: 'incline press'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Instructions (optional)'
     direction: DOWN
-- tapOn: 'Instructions (optional)'
+- tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Create and add'
     direction: DOWN
