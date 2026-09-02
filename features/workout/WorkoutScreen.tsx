@@ -69,6 +69,7 @@ import type {
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { isValidDateKey, toDateKey } from '@/lib/time';
+import { sanitizeNumericInput } from '@/lib/numericInput';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
@@ -736,7 +737,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         <TextField
           label="Weight"
           value={bodyWeightValue}
-          onChangeText={(value) => setBodyWeightValue(value.replace(/[^0-9.]/g, ''))}
+          onChangeText={(value) =>
+            setBodyWeightValue(sanitizeNumericInput(value, { allowDecimal: true }))
+          }
           placeholder="80.0"
           keyboardType="numeric"
         />
@@ -766,7 +769,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         <TextField
           label="Goal weight (optional)"
           value={bodyWeightGoalValue}
-          onChangeText={(value) => setBodyWeightGoalValue(value.replace(/[^0-9.]/g, ''))}
+          onChangeText={(value) =>
+            setBodyWeightGoalValue(sanitizeNumericInput(value, { allowDecimal: true }))
+          }
           placeholder="75.0"
           keyboardType="numeric"
         />

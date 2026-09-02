@@ -43,6 +43,7 @@ import {
   saveWorkoutSessionDraft,
 } from './workout.data';
 import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
+import { sanitizeNumericInput } from '@/lib/numericInput';
 import {
   DEFAULT_REST_SECONDS,
   REST_SECONDS_MAX,
@@ -1126,7 +1127,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                         }}
                         value={enteredSets[currentIndex]?.weight ?? ''}
                         onChangeText={(t) =>
-                          updateEnteredValues(currentIndex, { weight: t.replace(/[^0-9.]/g, '') })
+                          updateEnteredValues(currentIndex, {
+                            weight: sanitizeNumericInput(t, { allowDecimal: true }),
+                          })
                         }
                         placeholder={isBodyweight ? 'optional' : 'e.g. 60'}
                         placeholderTextColor={tokens.textMuted}
@@ -1173,7 +1176,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   }}
                   value={enteredSets[currentIndex]?.distance ?? ''}
                   onChangeText={(value) =>
-                    updateEnteredValues(currentIndex, { distance: value.replace(/[^0-9.]/g, '') })
+                    updateEnteredValues(currentIndex, {
+                      distance: sanitizeNumericInput(value, { allowDecimal: true }),
+                    })
                   }
                   placeholder="Distance"
                   placeholderTextColor={tokens.textMuted}
@@ -1190,7 +1195,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   }}
                   value={enteredSets[currentIndex]?.pace ?? ''}
                   onChangeText={(value) =>
-                    updateEnteredValues(currentIndex, { pace: value.replace(/[^0-9.]/g, '') })
+                    updateEnteredValues(currentIndex, {
+                      pace: sanitizeNumericInput(value, { allowDecimal: true }),
+                    })
                   }
                   placeholder="Pace / speed"
                   placeholderTextColor={tokens.textMuted}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -86,6 +86,8 @@ import {
 } from '@/features/habits/habitPresets';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { parseNumericInput } from '@/lib/numericInput';
+import { createSubmitGuard } from '@/lib/submitGuard';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { validateHabit } from '@/lib/validation';
@@ -197,6 +199,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [consistencyPct, setConsistencyPct] = useState(0);
   const [overallStreak, setOverallStreak] = useState(0);
   const [habitError, setHabitError] = useState<string | null>(null);
+  const [isSavingHabit, setIsSavingHabit] = useState(false);
+  const habitSubmitGuard = useRef(createSubmitGuard());
   const [linkedActionRows, setLinkedActionRows] = useState<LinkedActionEditorRowDraft[]>([]);
   const [linkedActionsError, setLinkedActionsError] = useState<string | null>(null);
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
@@ -509,7 +513,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   };
 
   const onSubmit = async () => {
-    const targetNum = Number(target);
+    if (!habitSubmitGuard.current.tryStart()) return;
+    setIsSavingHabit(true);
+    try {
+      await runHabitSubmit();
+    } finally {
+      habitSubmitGuard.current.finish();
+      setIsSavingHabit(false);
+    }
+  };
+
+  const runHabitSubmit = async () => {
+    const targetNum = parseNumericInput(target) ?? 0;
     const err = validateHabit(name, targetNum);
     if (err) {
       setHabitError(err);
@@ -1567,6 +1582,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 label={editingHabit ? 'Save changes' : 'Create habit'}
                 onPress={onSubmit}
                 color={COLOR}
+                loading={isSavingHabit}
               />
             </View>
           </View>

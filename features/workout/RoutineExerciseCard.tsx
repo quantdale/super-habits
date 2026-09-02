@@ -6,6 +6,7 @@ import { Card } from '@/core/ui/Card';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { PillChip } from '@/core/ui/PillChip';
 import { validateSetTiming } from '@/lib/validation';
+import { parseNumericInput } from '@/lib/numericInput';
 import { formatWorkoutTime } from './workout.domain';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type {
@@ -286,9 +287,9 @@ export function RoutineExerciseCard({
                     accessibilityLabel={`${ex.name} progression increment`}
                     value={ex.progression_increment == null ? '' : String(ex.progression_increment)}
                     onChangeText={(value) => {
-                      const parsed = Number(value.replace(/[^0-9.]/g, ''));
+                      const parsed = parseNumericInput(value, { allowDecimal: true });
                       void onUpdateExercise(ex.id, {
-                        progressionIncrement: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+                        progressionIncrement: parsed !== null && parsed > 0 ? parsed : null,
                       }).then(onRefresh);
                     }}
                     placeholder="Load + (kg)"
@@ -307,9 +308,9 @@ export function RoutineExerciseCard({
                     accessibilityLabel={`${ex.name} minimum reps`}
                     value={ex.progression_min_reps == null ? '' : String(ex.progression_min_reps)}
                     onChangeText={(value) => {
-                      const parsed = Number(value.replace(/\D/g, ''));
+                      const parsed = parseNumericInput(value);
                       void onUpdateExercise(ex.id, {
-                        progressionMinReps: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+                        progressionMinReps: parsed !== null && parsed > 0 ? parsed : null,
                       }).then(onRefresh);
                     }}
                     placeholder="Min reps"
@@ -328,9 +329,9 @@ export function RoutineExerciseCard({
                     accessibilityLabel={`${ex.name} maximum reps`}
                     value={ex.progression_max_reps == null ? '' : String(ex.progression_max_reps)}
                     onChangeText={(value) => {
-                      const parsed = Number(value.replace(/\D/g, ''));
+                      const parsed = parseNumericInput(value);
                       void onUpdateExercise(ex.id, {
-                        progressionMaxReps: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+                        progressionMaxReps: parsed !== null && parsed > 0 ? parsed : null,
                       }).then(onRefresh);
                     }}
                     placeholder="Max reps"

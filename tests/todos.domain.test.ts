@@ -3,13 +3,13 @@ import {
   getTodayDateKey,
   getTomorrowDateKey,
   findMissingRecurrenceIds,
-  createSubmitGuard,
   applyTodoListQuery,
   filterTodos,
   groupTodosByDueWindow,
   searchTodos,
   sortTodos,
 } from '@/features/todos/todos.domain';
+import { createSubmitGuard } from '@/lib/submitGuard';
 
 describe('getTodayDateKey', () => {
   it('returns YYYY-MM-DD format', () => {

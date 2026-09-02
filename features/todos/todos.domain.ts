@@ -222,23 +222,3 @@ export function groupTodosByDueWindow<T extends { due_date: string | null }>(
   }
   return groups;
 }
-
-/**
- * Synchronous guard for async modal submissions. The closure flips before the
- * save. Call finish() from the caller's finally block so validation/errors do
- * not permanently lock the form.
- */
-export function createSubmitGuard(): { tryStart: () => boolean; finish: () => void } {
-  let inFlight = false;
-
-  return {
-    tryStart: () => {
-      if (inFlight) return false;
-      inFlight = true;
-      return true;
-    },
-    finish: () => {
-      inFlight = false;
-    },
-  };
-}

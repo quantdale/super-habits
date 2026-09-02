@@ -44,13 +44,13 @@ import { TodoListToolbar } from './TodoListToolbar';
 import { TodoBulkBar } from './TodoBulkBar';
 import {
   applyTodoListQuery,
-  createSubmitGuard,
   findMissingRecurrenceIds,
   getTodayDateKey,
   groupTodosByDueWindow,
   type TodoListFilters,
   type TodoSortMode,
 } from './todos.domain';
+import { createSubmitGuard } from '@/lib/submitGuard';
 import {
   addTodo,
   bulkAssignTodosProject,

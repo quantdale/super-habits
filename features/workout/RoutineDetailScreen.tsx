@@ -33,6 +33,7 @@ import {
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { validateExerciseName, validateSetTiming } from '@/lib/validation';
+import { parseNumericInput } from '@/lib/numericInput';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
@@ -617,10 +618,10 @@ export function RoutineDetailModal({
                                     : String(ex.progression_increment)
                                 }
                                 onChangeText={(value) => {
-                                  const parsed = Number(value.replace(/[^0-9.]/g, ''));
+                                  const parsed = parseNumericInput(value, { allowDecimal: true });
                                   void queuedUpdateExercise(ex.id, {
                                     progressionIncrement:
-                                      Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+                                      parsed !== null && parsed > 0 ? parsed : null,
                                   }).then(refresh);
                                 }}
                                 placeholder="Load + (kg)"
@@ -643,10 +644,10 @@ export function RoutineDetailModal({
                                     : String(ex.progression_min_reps)
                                 }
                                 onChangeText={(value) => {
-                                  const parsed = Number(value.replace(/\D/g, ''));
+                                  const parsed = parseNumericInput(value);
                                   void queuedUpdateExercise(ex.id, {
                                     progressionMinReps:
-                                      Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+                                      parsed !== null && parsed > 0 ? parsed : null,
                                   }).then(refresh);
                                 }}
                                 placeholder="Min reps"
@@ -669,10 +670,10 @@ export function RoutineDetailModal({
                                     : String(ex.progression_max_reps)
                                 }
                                 onChangeText={(value) => {
-                                  const parsed = Number(value.replace(/\D/g, ''));
+                                  const parsed = parseNumericInput(value);
                                   void queuedUpdateExercise(ex.id, {
                                     progressionMaxReps:
-                                      Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+                                      parsed !== null && parsed > 0 ? parsed : null,
                                   }).then(refresh);
                                 }}
                                 placeholder="Max reps"

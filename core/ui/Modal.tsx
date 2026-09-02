@@ -130,7 +130,10 @@ export function Modal({
     <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View
         className="flex-1"
-        accessibilityViewIsModal
+        accessibilityViewIsModal={visible}
+        accessibilityElementsHidden={!visible}
+        importantForAccessibility={visible ? 'yes' : 'no-hide-descendants'}
+        pointerEvents={visible ? 'auto' : 'none'}
         style={{ backgroundColor: tokens.overlayScrim, ...overlayStyle }}
       >
         <Pressable

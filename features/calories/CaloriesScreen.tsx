@@ -12,6 +12,8 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
+import { createSubmitGuard } from '@/lib/submitGuard';
+import { parseNumericInput } from '@/lib/numericInput';
 // import { spacing, radius } from '@/core/theme/designTokens';
 import {
   DEFAULT_GOAL,
@@ -142,6 +144,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
+  const [isSavingEntry, setIsSavingEntry] = useState(false);
+  const entrySubmitGuard = useRef(createSubmitGuard());
   const [viewMode, setViewMode] = useState<CaloriesViewMode>('form');
   /** True once the user (or the persisted-value hydration) has chosen a view.
    *  The AsyncStorage hydration resolves asynchronously; on a slow cold start
@@ -310,10 +314,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const computedKcal = useMemo(
     () =>
       kcalFromMacros(
-        Number(protein) || 0,
-        Number(carbs) || 0,
-        Number(fats) || 0,
-        Number(fiber) || 0,
+        parseNumericInput(protein) ?? 0,
+        parseNumericInput(carbs) ?? 0,
+        parseNumericInput(fats) ?? 0,
+        parseNumericInput(fiber) ?? 0,
       ),
     [protein, carbs, fats, fiber],
   );
@@ -561,12 +565,15 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     }
 
     setCalorieError(null);
+    // Double-submit guard: rapid re-taps must not create duplicate entries.
+    if (!entrySubmitGuard.current.tryStart()) return;
+    setIsSavingEntry(true);
     void (async () => {
       try {
-        const proteinN = Number(protein) || 0;
-        const carbsN = Number(carbs) || 0;
-        const fatsN = Number(fats) || 0;
-        const fiberN = Number(fiber) || 0;
+        const proteinN = parseNumericInput(protein) ?? 0;
+        const carbsN = parseNumericInput(carbs) ?? 0;
+        const fatsN = parseNumericInput(fats) ?? 0;
+        const fiberN = parseNumericInput(fiber) ?? 0;
 
         if (editingEntryId) {
           await updateCalorieEntry(editingEntryId, {
@@ -600,6 +607,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
               ? error
               : 'Could not save entry.';
         setCalorieError(message);
+      } finally {
+        entrySubmitGuard.current.finish();
+        setIsSavingEntry(false);
       }
     })();
   };
@@ -621,6 +631,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           label={editingEntryId ? 'Save changes' : 'Add entry'}
           onPress={handleSubmit}
           color={COLOR}
+          loading={isSavingEntry}
         />
       </View>
     </View>

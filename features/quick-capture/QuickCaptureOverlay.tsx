@@ -18,6 +18,8 @@ import { addProject, listProjects, softDeleteProject } from '@/features/projects
 import { addGoal, listGoals, softDeleteGoal } from '@/features/goals/goals.data';
 import { PROJECT_COLORS } from '@/features/projects/projects.types';
 import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain';
+import { sanitizeNumericInput, parseNumericInput } from '@/lib/numericInput';
+import { createSubmitGuard } from '@/lib/submitGuard';
 import {
   loadLastCaptureMode,
   loadPersistedRecentCaptures,
@@ -115,6 +117,7 @@ export function QuickCaptureOverlay() {
   const [saved, setSaved] = useState(false);
   const [recent, setRecent] = useState<RecentCapture[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const submitGuard = useRef(createSubmitGuard());
 
   const refreshOptions = useCallback(async () => {
     const [ps, gs] = await Promise.all([listProjects(), listGoals()]);
@@ -210,7 +213,9 @@ export function QuickCaptureOverlay() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) return;
+    // Shared double-submit guard (WM2.3): the state flag renders feedback;
+    // the ref guard serializes concurrent activations.
+    if (!submitGuard.current.tryStart()) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -252,8 +257,8 @@ export function QuickCaptureOverlay() {
           undo: () => deleteHabit(id),
         });
       } else if (mode === 'calorie') {
-        const cal = Number(calories);
-        if (!title.trim() || !Number.isFinite(cal) || cal <= 0) {
+        const cal = parseNumericInput(calories);
+        if (!title.trim() || cal === null || cal <= 0) {
           setError('Food name and a positive calorie amount are required.');
           return;
         }
@@ -310,10 +315,10 @@ export function QuickCaptureOverlay() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not capture.');
     } finally {
+      submitGuard.current.finish();
       setSubmitting(false);
     }
   }, [
-    submitting,
     mode,
     parsed,
     priorityTouched,
@@ -436,7 +441,7 @@ export function QuickCaptureOverlay() {
               <CaptureInput
                 label="Calories"
                 value={calories}
-                onChangeText={setCalories}
+                onChangeText={(text) => setCalories(sanitizeNumericInput(text))}
                 keyboardType="numeric"
                 placeholder="0"
                 onSubmitEditing={handleSubmit}
