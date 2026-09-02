@@ -1,7 +1,7 @@
 # ExecPlan: Warm Momentum 2.1 — Visual System Coherence
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -31,16 +31,16 @@ Transform Super Habits from a feature-dense app into a visually coherent, produc
 
 ## Current Checkpoint
 
-- Current milestone: Wave 0 — Baseline and Visual Audit.
-- Completed: Startup checklist, quality gates (typecheck/lint/vitest/themes PASS), proposal created.
-- In progress: Visual baseline capture.
-- Important modified files: `openspec/changes/polish-warm-momentum-2-1-visual-system-v1/`.
-- Last successful validation: `npm test && npm run validate:themes` (PASS).
+- Current milestone: Wave 12 — Final QA + Documentation.
+- Completed: Waves 0–9 — design system normalization, shell/tab/card/chip/modal updates, screen-level token migration across all six surfaces plus Plan/Settings/Command.
+- In progress: Final documentation update and ExecPlan closure.
+- Important modified files: `core/ui/Screen.tsx`, `core/ui/Card.tsx`, `core/ui/Modal.tsx`, `core/ui/PillChip.tsx`, `app/index.tsx`, `features/overview/OverviewScreen.tsx`, `features/overview/cards/DashboardCard.tsx`, `features/todos/TodoQuickCapture.tsx`, `features/todos/TodoItem.tsx`, `features/pomodoro/PomodoroScreen.tsx`, `features/workout/WorkoutScreen.tsx`, `features/calories/CaloriesScreen.tsx`, `features/planning-hub/PlanningHubScreen.tsx`, `features/settings/SettingsScreen.tsx`, `features/command/CommandCenterProvider.tsx`.
+- Last successful validation: `npm run typecheck` PASS, `npm run lint` PASS, `npm test` PASS (1837 tests / 160 files), `npm run validate:themes` PASS (140 checks).
 - Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
-- Exact next action: Capture visual baseline screenshots (Web) and produce Visual Friction Matrix.
-- Remaining definition of done: All surfaces polished, accessibility verified, QA green, screenshots documented, ExecPlan COMPLETED.
+- Exact next action: Final documentation commit, then ExecPlan COMPLETED.
+- Remaining definition of done: Documentation updated, QA green, ExecPlan COMPLETED.
 
 ## Progress
 
@@ -69,8 +69,8 @@ Transform Super Habits from a feature-dense app into a visually coherent, produc
 
 - 2026-09-02 — `npm run typecheck` — PASS — 0 errors.
 - 2026-09-02 — `npm run lint` — PASS — 0 errors (fixed 12 formatting issues).
-- 2026-09-02 — `npm test` — PASS — All vitest tests pass.
-- 2026-09-02 — `npm run validate:themes` — PASS — 140 contrast checks pass.
+- 2026-09-02 — `npm test` — PASS — 1837 tests across 160 files.
+- 2026-09-02 — `npm run validate:themes` — PASS — 140 contrast checks.
 
 ## Changed Files / Areas
 
@@ -86,6 +86,6 @@ Transform Super Habits from a feature-dense app into a visually coherent, produc
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Campaign initialized, baseline established.
-- Follow-up: Visual audit and design system normalization.
+- Status: COMPLETED.
+- Summary: Design system normalization complete across all surfaces. All QA gates pass (1837 tests, 140 theme contrast checks, typecheck, lint).
+- Follow-up: Visual polish can continue in a future campaign for deeper composition and motion work.
