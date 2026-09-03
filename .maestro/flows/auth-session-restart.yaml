@@ -20,15 +20,16 @@ tags:
     visible: 'Close settings'
     timeout: 5000
 # The SAME anonymous session must be restored: the account card stays
-# 'ANONYMOUS / UNPROTECTED' (pill renders uppercase) and must NOT enter
-# 'RECOVERY REQUIRED' (which would mean the persisted session was lost and no
-# new anonymous user may be created for the bound dataset).
+# 'Anonymous / unprotected' (pill is styled uppercase; hierarchy text is
+# mixed-case) and must NOT enter 'Recovery required' (which would mean the
+# persisted session was lost and no new anonymous user may be created for
+# the bound dataset).
 - scrollUntilVisible:
-    element: 'ANONYMOUS / UNPROTECTED'
+    element: 'Anonymous / unprotected'
     direction: DOWN
     timeout: 30000
-- assertNotVisible: 'RECOVERY REQUIRED'
-- assertNotVisible: 'ACCOUNT MISMATCH'
+- assertNotVisible: 'Recovery required'
+- assertNotVisible: 'Account mismatch'
 # Close settings is scrolled off-screen at this point; the kill is the
 # state boundary that matters for the restart proof.
 - killApp

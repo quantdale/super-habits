@@ -30,7 +30,7 @@ tags:
     visible: 'Six-digit verification code'
     timeout: 20000
 - scrollUntilVisible:
-    element: 'VERIFICATION PENDING'
+    element: 'Verification pending'
     direction: UP
     timeout: 20000
 - scrollUntilVisible:
@@ -42,8 +42,8 @@ tags:
 - hideKeyboard
 - tapOn: 'Verify email'
 - scrollUntilVisible:
-    element: 'PROTECTED'
+    element: 'Protected'
     direction: UP
     timeout: 20000
-- assertNotVisible: 'ACCOUNT MISMATCH'
+- assertNotVisible: 'Account mismatch'
 - killApp

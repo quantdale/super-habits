@@ -22,9 +22,10 @@ tags:
     visible: 'Close settings'
     timeout: 5000
 # Anonymous bootstrap + provisional owner binding complete asynchronously.
-# The status pill renders uppercase on native.
+# The pill is styled uppercase but its text is 'Anonymous / unprotected';
+# Maestro matches hierarchy text, so assert the raw string.
 - scrollUntilVisible:
-    element: 'ANONYMOUS / UNPROTECTED'
+    element: 'Anonymous / unprotected'
     direction: DOWN
     timeout: 30000
 # Close settings is scrolled off-screen at this point; the kill is the
