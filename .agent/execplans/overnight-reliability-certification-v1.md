@@ -50,14 +50,15 @@ certification; no historical-log rewrites.
 
 ## Current Checkpoint
 
-- Current milestone: Wave 0 COMPLETE — baseline recertified; Wave 1 native audit next.
+- Current milestone: Wave 1 COMPLETE — native baseline green incl. auth 3/3 x3; Wave 2 soak next.
 - Completed: planner prompt authored/validated/pushed (2347b4a); executor
   startup reads (AGENTS.md via env, PLANS.md, EXECUTION_PROMPT ACTIVE,
   PLANNER_HANDOFF routing-only); Git reconciliation (HEAD == origin/main ==
   2347b4a, clean, descendant of Planned-From); campaign tracking list created.
-- In progress: none (Wave 0 done); Wave 1 native audit queued.
+- In progress: none (Wave 1 done); Wave 2 native soak queued.
 - Important modified files: `.agent/execplans/overnight-reliability-certification-v1.md`
-  (new, this plan).
+  (this plan); `.maestro/flows/auth-session-*.yaml` (TEST_BUG fixes +
+  01/02/03 ordering). No product source changes.
 - Last successful validation: Wave 0 executor baseline (2026-09-04) — hygiene PASS; diff-check clean; typecheck 0; lint 0 warnings; unit 1665/1665 (125 files); impact 13 rules; themes 140/140; supabase schema PASS; openspec 50/50; plan:validate:all PASS (incl. this ACTIVE plan after placeholder-word repair); sim:validate 23/23; dev:doctor PASS (Maestro 2.8.0, emulator present, EAS CLI absent/optional); 4 API-36 AVDs present, none booted.
 - Current failures: None.
 - Relevant quarantines: None (inherited residuals are follow-ups, not
@@ -65,7 +66,9 @@ certification; no historical-log rewrites.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Wave 1 — audit scripts/qa-native*.mjs + .maestro flows/config, then provision Nitro_API_36 and run smoke/persistence/lifecycle lanes.
+- Exact next action: Wave 2 — soak repetition (persistence full rerun +
+  smoke rerun) on emulator-5554, watching for leaks/stale-state/runtime
+  growth; then Waves 5–7 web lanes.
 - Remaining definition of done: Waves 0–15 with evidence ledgers; all
   P0/P1 fixed/verified or deferred with evidence; final battery green;
   adversarial verification PASS; docs/gaps reconciled; clean pushed main;
@@ -75,7 +78,9 @@ certification; no historical-log rewrites.
 
 - [x] Planner prompt ACTIVE at 2347b4a (validated, pushed).
 - [x] Wave 0 recertification (git/hygiene/baseline/native-presence) — all green 2026-09-04.
-- [ ] Wave 1 native lane stability V1.
+- [x] Wave 1 native lane stability V1 — provision/smoke/persistence/
+      lifecycle green; auth 3/3 x3 with exactly-1-signup proof; 2 TEST_BUG
+      flow fixes committed (1c725d7 pill text, de89f5b ordering).
 - [ ] Waves 2–4 native soak / heavy-state / long-horizon.
 - [ ] Waves 5–6 soak-chaos / heavy-state performance.
 - [ ] Wave 7 determinism + long-suite batteries.
@@ -85,7 +90,20 @@ certification; no historical-log rewrites.
 
 ## Surprises & Discoveries
 
-- None yet.
+- Auth lane 0/3 root causes (all setup/test, no product defect): (1) flows
+  asserted styled-uppercase pill text, Maestro matches raw hierarchy text;
+  (2) lane was run against local-only APK with no Supabase URL, so the
+  account card never entered anonymous state; (3) mock server died with its
+  parent shell (`start /B` does not survive) and `adb root` wiped the
+  reverse forward; (4) Android blocks cleartext HTTP — mock-backed APK
+  needs a test-only manifest cleartext patch in gitignored `android/`
+  (repo precedent agrees; release config untouched); (5) restart flow ran
+  after protect alphabetically and inherited permanent state — fixed by
+  01/02/03 filename ordering. Mock proof per green run: exactly 1 signup,
+  same UID, verify email_change preserves UID, 0 unauthenticated checks.
+- Native runner has no first-class auth-mock support (server start, reverse,
+  mock-URL build, cleartext patch all manual). Candidate Wave 1E tooling:
+  `--auth-mock` option for provision/runner. Deferred until post-soak.
 
 ## Decision Log
 
@@ -97,6 +115,11 @@ certification; no historical-log rewrites.
 
 - 2026-09-04 — planner `agent:plan:validate:all` — PASS (all versioned plans).
 - 2026-09-04 — planner `openspec:validate` — PASS 50/50.
+- 2026-09-04 — executor Wave 1 native (Nitro_API_36, emulator-5554):
+  canonical provision PASS at de89f5b; smoke 2/2; persistence 11/11;
+  lifecycle 6/6; auth-persistence 3/3 x3 on functionally-exact cleartext
+  mock build (APK DBD2B3D9, 1 signup/same-UID/verify-preserves-UID proof).
+  Commits 1c725d7 + de89f5b pushed.
 - 2026-09-04 — executor Wave 0: hygiene PASS; `git diff --check` clean;
   typecheck 0; lint 0; unit 1665/1665; impact 13; themes 140/140; supabase
   schema PASS; openspec 50/50; plan:validate:all PASS; sim:validate 23/23;
