@@ -23,7 +23,10 @@ tags:
     element: 'Add anytime habit'
     direction: DOWN
 - tapOn: 'Add anytime habit'
-- tapOn: 'Habit name'
+# Index 1 targets the input: index 0 is the visible label (tapping it focuses nothing and drops typed text).
+- tapOn:
+    text: 'Habit name'
+    index: 1
 - inputText: 'Native Gym reminder'
 - hideKeyboard
 - tapOn: 'Custom'
@@ -54,7 +57,10 @@ tags:
 - scrollUntilVisible:
     element: 'Habit name'
     direction: UP
-- tapOn: 'Habit name'
+# Index 1 targets the input: index 0 is the visible label (tapping it focuses nothing and drops typed text).
+- tapOn:
+    text: 'Habit name'
+    index: 1
 - inputText: 'Native Read reminder'
 - hideKeyboard
 - swipe:

@@ -1029,6 +1029,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           >
             <TextField
               label="Routine name"
+              accessibilityLabel="New routine name"
               value={name}
               onChangeText={(t) => {
                 setWorkoutError(null);
@@ -1038,6 +1039,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             />
             <TextField
               label="Description"
+              accessibilityLabel="New routine description"
               value={description}
               onChangeText={(t) => {
                 setWorkoutError(null);

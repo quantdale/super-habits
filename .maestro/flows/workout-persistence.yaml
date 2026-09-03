@@ -17,12 +17,12 @@ tags:
 - scrollUntilVisible:
     element: 'Routine name'
     direction: DOWN
-- tapOn: 'Routine name'
+- tapOn: 'New routine name'
 - inputText: 'Native strength routine'
 - scrollUntilVisible:
     element: 'Description'
     direction: DOWN
-- tapOn: 'Description'
+- tapOn: 'New routine description'
 - inputText: 'Native routine'
 - scrollUntilVisible:
     element: 'Add routine'
