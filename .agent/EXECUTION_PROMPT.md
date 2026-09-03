@@ -1,6 +1,6 @@
 # Super Habits Overnight Reliability & Real-World Certification Program V1
 
-**Status:** ACTIVE
+**Status:** COMPLETED
 **Planned-From:** `5ee35318dd3a932c6aa6cdaf2553080cd19fa3c2`
 **Target branch:** `main`
 **Campaign:** Super Habits Overnight Reliability & Real-World Certification Program V1
@@ -231,6 +231,33 @@ Use a separate verifier (subagent where supported). Instruction: assume the comp
 
 Invalid stops: native stability alone, one green suite, five green P0s, one closed OpenSpec, elapsed hours, or end of an initial checklist. Reassess and continue while valuable work remains.
 
-## Final report structure
+## Final report (campaign COMPLETED 2026-09-04)
+
+- Baseline `5ee3531` → closure HEAD (this commit): 8 commits, all
+  `docs(agent)` / `fix(test)`; zero product-source changes
+  (`app core features lib scripts supabase` untouched).
+- Waves: Wave 0 recert green; Wave 1 native stability (provision/smoke
+  2/2/persistence 11/11/lifecycle 6/6 canonical + auth 3/3 x3 mock with
+  1-signup/same-UID proof; 2 TEST_BUG flow fixes); Wave 2 soak (no
+  growth); Waves 5–6 soak scenario + J8 ceilings with margin;
+  Wave 7 full batteries (Vitest 1906/1906, P0 25/25 x5, E2E 198/43/0,
+  sim 23/23, seeded sample, sync 40/46); Waves 8–9 fresh builds +
+  CI parity incl. deno; Wave 10 no-cycle proof, no change;
+  Waves 11–15 personas/a11y/security/docs/sweep clean.
+- Failures: 1 ENVIRONMENT (emulator contention vs J8 15% headroom
+  floor; 701/691ms vs 642ms clean; 800ms ceiling always held) +
+  auth-lane setup/test issues (fixed at test layer). No PRODUCT_BUG.
+- Native cert: Nitro_API_36/API36/x86_64/emulator-5554; canonical APK
+  0E20EB1F @c00d6eb; mock APK 44B632BE (TEST-ONLY, release config
+  verified clean after); reports under `simulation-output/native/`.
+- Perf: J8 cold 544/5000, maxSwitch 642/800, diary 318/500, picker
+  108/500 (emulator off); portable-large 18k rows export 742ms.
+- Residual/external: iOS (no Xcode), disposable-backend (no token),
+  internal-parser lanes (opt-in), real-corpus DB fixtures (open),
+  multi-AVD + `--auth-mock` automation (deferred follow-ups).
+- Exact next action: None — campaign complete. Next executor: normal
+  goal workflow or a newly planned prompt; do not resume this one.
+
+## Final report structure (template, retained)
 
 Baseline SHA → new commits/SHAs → waves completed with evidence → validation battery table (command/outcome/date) → native certification table (device/APK/tag/count/artifacts) → performance table (scenario/dataset/env/baseline/result) → failure classifications (`PRODUCT_BUG`/`TEST_BUG`/`FLAKY_TEST`/`ENVIRONMENT`/`EXPECTED_KNOWN_GAP`/`SPEC_AMBIGUITY`) with artifacts → OpenSpec/ExecPlan lifecycle states → docs/gaps updated → residual blockers/gaps → exact next action (normally: none — campaign complete; or named follow-up with plan path).
