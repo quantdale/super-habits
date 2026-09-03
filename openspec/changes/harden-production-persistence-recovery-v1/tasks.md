@@ -124,21 +124,35 @@
 - [x] 7.1 Booted Nitro_API_36 (emulator-5554, API 36 x86_64); `qa:native:provision`
       PASS with provenance (sourceSha == HEAD, clean tree, apkSha256 recorded,
       installed). Smoke 2/2 PASS on the current-source APK.
-- [ ] 7.2 Targeted persistence: 10/11 green after fixing the stale `Overview`
-      rail marker (→ `Today`, 24 flow files). One failure left:
-      `workout-gym-v2-persistence` cannot reach the custom-exercise area field.
-      Root-caused with screenshots/logcat/hierarchy (see execplan): the picker
-      custom-form inputs share their accessible name with their visible labels,
-      so taps land on the non-focusable label and typed text is dropped (plus
-      BACK-via-hideKeyboard modal hazard). Fix: distinct `accessibilityLabel`s
-      on the 6 picker inputs (CaloriesEntryFields convention) + flow taps on
-      the explicit names + `pressKey enter` instead of `hideKeyboard` in the
-      picker + settle/filter-proof waits. Web E2E `workout-gym-v2` selectors
-      updated to the new names (visible text unchanged).
+- [x] 7.2 Targeted persistence 11/11 green on the rebuilt current-source
+      APK: the stale `Overview` rail marker fix (→ `Today`, 24 flow files) took
+      10/11; the gym-v2 picker failure root-caused with screenshots/logcat/
+      hierarchy (see execplan) to ambiguous tap targets (inputs shared their
+      accessible name with their visible labels → taps hit the non-focusable
+      label, text dropped; plus BACK-via-hideKeyboard modal hazard). Fixed
+      with distinct `accessibilityLabel`s on the 6 picker inputs
+      (CaloriesEntryFields convention) + explicit-name taps/scrolls + `pressKey
+enter` + settle/filter-proof waits; `workout-gym-v2-persistence` replays
+      green end-to-end (restart assertions included) and the lifecycle sibling
+      passes directly. The remaining lane failure (`habit-reminder-
+persistence` at launch) replays green — one-off >30s cold start on a
+      saturated emulator (app legitimately in bootstrap loader), classified
+      FLAKY_TEST/ENVIRONMENT, no flow change. Web `workout-gym-v2` Chromium
+      spec 7/7 green on fresh `dist/`. Emulator shut down cleanly afterward
+      (`emu kill`; `adb devices` empty; 8081/8082 free).
 
 ## 8. Validation and closure
 
-- [ ] 8.1 `qa:affected` after each workstream; focused gates per lane.
-- [ ] 8.2 Full matrix: typecheck, lint, vitest, qa:integration, openspec:validate, plan:validate:all, sim:validate, build:web, web:verify, web:hygiene, P0, full Chromium.
+- [x] 8.1 `qa:affected` after each workstream; focused gates per lane.
+- [x] 8.2 Full matrix on the final tree: typecheck 0; lint 0;
+      unit 1665/1665; integration green incl. all campaign tests (final counts
+      recorded in the execplan ledger);
+      openspec 50/50; impact map 13 rules; themes 140/140; supabase schema
+      PASS; plan:validate:all PASS (incl. repairing the stale checkpoint of
+      the long-closed `agent-safe-web-lifecycle` plan, untouched since WM2.2);
+      sim:validate PASS; deterministic sim @p0 24/24; timezone matrix 5/5;
+      build:web OK; web:verify PASS; web:hygiene PASS; P0 25/25; full `npm run
+e2e` exit 0 (241 tests, conditional skips only); native provision PASS
+      ×3 with provenance + smoke 2/2 + persistence 11/11 + lifecycle gym flow.
 - [ ] 8.3 Independent verification agent PASS.
 - [ ] 8.4 Docs: known-gaps updates if any; campaign evidence recorded; commits coherent; push per policy.

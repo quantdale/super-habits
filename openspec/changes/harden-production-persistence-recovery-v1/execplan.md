@@ -47,9 +47,10 @@ campaign proves (and where needed fixes) those properties with evidence.
   wall-clock timeout from per-test full-graph re-import; test-only root fix
   in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green), §3
   (retry test + v21/v23 TRUE-shape fixtures; integration 230/230).
-- In progress: §7.2 — gym-v2 picker a11y-label fix written; needs
-  targeted-lane replay (auto-rebuilds APK) + web workout spec, then the §7
-  commit.
+- In progress: none (§7 done — emulator shut down; native commits
+  a47d1b6/1f20d8b/423d2fe pushed) — next is §8: the full validation
+  matrix, then independent verification, then the plan-doc closure commit
+  and push.
 - Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).
 - Decisions: D1–D7 in design.md (CG-9 battery protocol; injected-failure
   migration test; runtime-derived historical fixtures; data-layer duplicate
@@ -68,9 +69,10 @@ campaign proves (and where needed fixes) those properties with evidence.
 - Blockers: none.
 - Condition required to unblock: none.
 - Exact resume action after unblock: n/a.
-- Exact next action: commit the §7 native work, re-run
-  `npm run qa:native:targeted` (auto-provisions the new HEAD), then run
-  the web `workout-gym-v2` Chromium spec against a fresh `dist/`.
+- Exact next action: run the §8 full validation matrix
+  (typecheck/lint/vitest/integration/openspec/impact/themes/supabase/
+  plans/sim/ build:web/web:verify/hygiene/P0/Chromium/journeys/determinism)
+  on the final tree.
 - Remaining definition of done: tasks §2–§8 complete; full validation
   matrix green on the final tree; independent verification PASS; coherent
   commits pushed per policy; web:hygiene PASS with no campaign-owned

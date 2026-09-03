@@ -80,12 +80,11 @@ system-v1`) completed at 9727abe.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: none.
-- Exact next action: `git add` Phase A files, commit
-  (`fix(dev): make automated web verification finite and self-cleaning`),
-  push to origin/main, confirm HEAD == main == origin/main, then begin
-  Phase B Wave B0 (Warm Momentum 2.2 OpenSpec + ExecPlan).
-- Remaining definition of done: Phase A pushed and green; Phase B campaign
-  created with complete OpenSpec artifacts and validated ExecPlan.
+- In progress: none — campaign closed; this checkpoint is historical record only.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete — Phase A committed (dc3be75),
+  pushed, and independently verified PASS; Phase B proceeded as the separate
+  Warm Momentum 2.2 campaign (see its COMPLETED ExecPlan).
 
 ## Progress
 
