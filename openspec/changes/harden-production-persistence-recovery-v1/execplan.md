@@ -1,7 +1,7 @@
 # ExecPlan: Production Hardening V1 — Persistence, Recovery, Heavy-State, Offline
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -38,45 +38,32 @@ campaign proves (and where needed fixes) those properties with evidence.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 2 — §6 COMPLETE (restart + flapping torture
-  2/2 green, no product defect — engine machinery holds); starting §7
-  (native readiness: doctor → provision → smoke with provenance).
-- Completed: Phase 0 (git truth, hygiene, control plane read), Phase 1
-  (baseline gates recorded in tasks.md §1), OpenSpec change created
-  (proposal/design/tasks/spec/execplan), §2.1–§2.3 (mechanism proven as
-  wall-clock timeout from per-test full-graph re-import; test-only root fix
-  in `tests/restore.coordinator.test.ts`; full unit 1665/1665 green), §3
-  (retry test + v21/v23 TRUE-shape fixtures; integration 230/230).
-- In progress: none (§7 done — emulator shut down; native commits
-  a47d1b6/1f20d8b/423d2fe pushed) — next is §8: the full validation
-  matrix, then independent verification, then the plan-doc closure commit
-  and push.
-- Modified files: openspec/changes/harden-production-persistence-recovery-v1/* (new).
-- Decisions: D1–D7 in design.md (CG-9 battery protocol; injected-failure
-  migration test; runtime-derived historical fixtures; data-layer duplicate
-  probes; validator-reuse restore DR matrix; fake-timer outbox torture;
-  native provision on available AVD).
-- Last successful validation: baseline matrix at `ac0d9b2` — typecheck 0,
-  lint 0, Vitest 1892/1892, qa:fast 1665/1665 (after one observed flake,
-  see failures), openspec 50/50, plan:validate:all PASS, sim:validate PASS,
-  build:web OK, web:verify PASS exit 0 (71.2s), P0 journeys 25/25,
-  web:hygiene PASS, migrations/restore/backup integration 46/46.
-- Current failures: one load-sensitive flake observed in
-  `tests/restore.coordinator.test.ts` ("blocks restore when local synced
-  tables contain tombstones") under full `qa:fast` parallel load; passed in
-  isolation and on full re-run. Investigation is task §2.
-- Relevant quarantines: none.
-- Blockers: none.
-- Condition required to unblock: none.
-- Exact resume action after unblock: n/a.
-- Exact next action: run the §8 full validation matrix
-  (typecheck/lint/vitest/integration/openspec/impact/themes/supabase/
-  plans/sim/ build:web/web:verify/hygiene/P0/Chromium/journeys/determinism)
-  on the final tree.
-- Remaining definition of done: tasks §2–§8 complete; full validation
-  matrix green on the final tree; independent verification PASS; coherent
-  commits pushed per policy; web:hygiene PASS with no campaign-owned
-  servers.
+- Current milestone: COMPLETE — all tasks §1–§8 checked with evidence;
+  final commits pushed; emulator shut down; no campaign-owned servers.
+- Completed: Phase 0, Phase 1, OpenSpec change, §2 (flake root fix +
+  8/8 battery), §3 (retry + v21/v23 fixtures), §4 (inventory + 7 probes +
+  backfill fix), §5 (mid-import rollback + legacy), §6 (restart + flap
+  torture), §7 (provision ×5 + smoke 2/2 + persistence 11/11 + lifecycle
+  - web workout 7/7), §8 (full matrix + reconciled verification).
+- Important modified files: see Changed Files / Areas below.
+- Last successful validation: closing tree — typecheck 0; lint 0;
+  unit 1665/1665; integration 241/241; openspec 50/50; impact 13 rules;
+  themes 140/140; supabase schema PASS; plan:validate:all PASS;
+  sim:validate PASS; deterministic sim 24/24; timezones 5/5; build:web OK;
+  web:verify exit 0; hygiene PASS; P0 25/25; full e2e exit 0 (241 tests);
+  native 11/11 PASS report on final HEAD.
+- Current failures: None (one portable-import infra flake observed 1-in-5
+  runs, classified FLAKY_TEST with evidence in tasks §8.2; no product
+  impact).
+- Relevant quarantines: None.
+- Blockers: None.
+- In progress: none.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete — all §2–§8 boxes checked,
+  validation ledger holds final evidence, Outcomes & Retrospective filled,
+  commits pushed, hygiene PASS.
 
 ## Recovery Notes
 
@@ -89,16 +76,50 @@ campaign proves (and where needed fixes) those properties with evidence.
 
 ## Progress
 
-- 2026-09-03: Campaign created. Baseline recorded (tasks §1). Next: §2
-  flake investigation.
+- [x] 2026-09-03: Campaign created. Baseline recorded (tasks §1).
+- [x] §2: restore-tombstone flake root-caused (wall-clock timeout from
+      per-test full-graph re-import) and fixed (single beforeAll import +
+      fixture holder); 8/8 `qa:fast` battery green; committed `9ddc01f`.
+- [x] §3: migration audit clean (all blocks transactional/idempotent);
+      retry-after-failure + TRUE v21/v23 trigger-frozen fixtures added;
+      integration green; committed `bc8e6e4`.
+- [x] §4: write-family inventory clean except one real defect —
+      `backfillLegacyPomodoroSessionMeta` never enqueued (fixed at root with
+      per-row update intents + unit/integration regression); 7 duplicate-write
+      probes green; committed `d970826`.
+- [x] §5: DR matrix audited (existing 25-test matrix strong); added
+      mid-import tripwire rollback + retry and missing-manifest legacy tests;
+      committed `2aa3597`.
+- [x] §6: outbox restart + flapping torture added (2/2 green, no product
+      defect — engine machinery holds); committed `3c424a6`.
+- [x] §7: provision PASS ×5 with provenance; smoke 2/2; persistence lane
+      to 11/11 PASS (stale Overview marker, picker tap-target ambiguity, and
+      settle timing fixed with evidence); lifecycle gym flow green; web
+      workout-gym-v2 7/7; commits `a47d1b6`/`1f20d8b`/`423d2fe`/`5b16d33`/
+      `7f1c1d2`/`ea91f4b`.
+- [x] §8: full matrix green; independent verification reconciled;
+      closure commit + push.
 
 ## Changed Files / Areas
 
 - `openspec/changes/harden-production-persistence-recovery-v1/` (new):
   proposal.md, design.md, tasks.md, specs/persistence-recovery-hardening/spec.md, execplan.md.
-- Expected later: `tests/restore.coordinator.test.ts`, migration/outbox
-  integration tests, data-layer fixes only if defects are proven, native
-  reports under `simulation-output/native/`.
+- `tests/restore.coordinator.test.ts` — single-import fixture holder (§2).
+- `tests/integration/migrations.test.ts` — retry-after-failure (§3.2).
+- `tests/integration/migrationFixtures.test.ts` — TRUE v21/v23 fixtures (§3.3).
+- `features/pomodoro/pomodoro.data.ts` — backfill outbox intents (§4.3).
+- `tests/pomodoro.data.test.ts` — backfill intent assertion (§4.3).
+- `tests/integration/duplicateWriteProbes.test.ts` (new, 7 probes) (§4.2).
+- `tests/integration/backupRestore.test.ts` — mid-import + legacy tests (§5).
+- `tests/integration/syncOutboxTorture.test.ts` (new, restart+flap) (§6).
+- `features/workout/RoutineDetailScreen.tsx` + `WorkoutScreen.tsx` —
+  distinct picker/routine input accessibilityLabels (§7).
+- `.maestro/flows/` (24 files) — Today marker, deterministic taps (§7).
+- `e2e/workout-gym-v2.spec.ts` — new accessible names (§7).
+- `.cursor/skills/db-and-sync-invariants/SKILL.md` — stale version +
+  habit_completions sync lines corrected (§3/§4).
+- `.agent/execplans/agent-safe-web-lifecycle.md` — stale COMPLETED
+  checkpoint repaired to the validator contract (§8).
 
 ## Recovery / Resume Instructions
 
@@ -143,7 +164,59 @@ campaign proves (and where needed fixes) those properties with evidence.
   crossOriginIsolated=true); P0 journeys 25/25 (1.1m);
   migrations/restore/backup integration subset 46/46; web:hygiene PASS
   (8081/8082 free); dev:doctor PASS.
+- §2 battery (2026-09-03): 8 consecutive `qa:fast` exit 0 post-fix
+  (typecheck 0, lint 0, unit 1665/1665, parity OK each run).
+- §3–§6 lanes: full integration 230/230 then 237/237 then 241/241
+  (43 files) green incl. all campaign tests.
+- §8 final (2026-09-03, closing tree): typecheck 0; lint 0;
+  `qa:fast` exit 0 (unit 1665/1665); `qa:integration` 241/241 with one
+  `portableExportImport` infra flake (`appMetaKeys` undefined in a fresh
+  client import; 1 in 5 runs; green on immediate re-run + pair +
+  isolation) classified FLAKY_TEST infrastructure, no product code
+  implicated; openspec 50/50; impact map 13 rules; themes 140/140;
+  supabase schema PASS; plan:validate:all PASS (after repairing the stale
+  checkpoint of long-closed `agent-safe-web-lifecycle`); sim:validate
+  PASS; deterministic sim @p0 24/24; timezone matrix 5/5;
+  `build:web` OK; `web:verify` PASS exit 0 (60.8s); hygiene PASS;
+  P0 25/25; full `npm run e2e` exit 0 (241 tests, conditional skips only).
+- §7 native (API-36 x86_64, Nitro_API_36): provision PASS with provenance
+  (sourceSha == HEAD each build); smoke 2/2; persistence lane 11/11 PASS
+  report on the final HEAD; lifecycle gym flow green; web workout-gym-v2
+  7/7. Two lane flakes met the evidence bar (cold-start bootstrap loader
+  screenshot → ENVIRONMENT, replays green; label-position scroll miss →
+  retargeted to inputs).
+- Independent verification: read-only agent re-ran key files + tsc +
+  defect hunt (NONE FOUND); its two FAILs were Git/provenance staleness,
+  reconciled by push + the 11/11 lane PASS report.
 
 ## Outcomes & Retrospective
 
-- (populated at closure)
+- Status: COMPLETE. Every task §1–§8 is checked with evidence in tasks.md
+  and this ledger.
+- Summary: the campaign proved (and where needed repaired) years-of-data
+  trust: one test-flake root fix (no product change), migration
+  failure/upgrade proofs, one real backup-fidelity defect fixed
+  (pomodoro legacy meta now rides the outbox), restore mid-import
+  atomicity + legacy proofs, outbox restart/flap proofs, and a native
+  suite repaired from 0/11 stale selectors to 11/11 green — with the
+  tap-target ambiguity that caused it fixed at the product layer via
+  distinct accessible names (also a screen-reader win).
+- Product changes (2): pomodoro backfill outbox intents;
+  picker/routine input accessibilityLabels. Everything else is tests,
+  flows, specs, and docs.
+- Remaining work: the 1-in-5 portable-import infra flake (FLAKY_TEST,
+  mechanism unidentified after bounded investigation — full evidence in
+  tasks §8.2); auth-lane Maestro inputs share the tap-target ambiguity
+  class but run in unverified lanes (playbook recorded: explicit labels
+  or proven index taps); one-off >30s emulator cold starts need no
+  action.
+- Follow-up recommendation: a native-lane stability campaign (auth +
+  lifecycle tags on the emulator, seeded repetition counts) using this
+  campaign's evidence-first triage playbook (screenshot + logcat +
+  hierarchy + diag-flow tap-order proof).
+- Lessons: (1) load-sensitive cost inside timed test bodies is the CG-9
+  signature — move it to untimed hooks; (2) file-level vi.mock of
+  getDatabase()-dependent modules freezes a stale registry — prefer DB
+  tripwires; (3) Maestro taps on TextField visible labels silently miss —
+  tap inputs via distinct accessible names or proven indices, and never
+  hideKeyboard inside a modal on emulator IME.

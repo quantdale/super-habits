@@ -124,22 +124,24 @@
 - [x] 7.1 Booted Nitro_API_36 (emulator-5554, API 36 x86_64); `qa:native:provision`
       PASS with provenance (sourceSha == HEAD, clean tree, apkSha256 recorded,
       installed). Smoke 2/2 PASS on the current-source APK.
-- [x] 7.2 Targeted persistence 11/11 green on the rebuilt current-source
-      APK: the stale `Overview` rail marker fix (→ `Today`, 24 flow files) took
-      10/11; the gym-v2 picker failure root-caused with screenshots/logcat/
-      hierarchy (see execplan) to ambiguous tap targets (inputs shared their
-      accessible name with their visible labels → taps hit the non-focusable
-      label, text dropped; plus BACK-via-hideKeyboard modal hazard). Fixed
-      with distinct `accessibilityLabel`s on the 6 picker inputs
-      (CaloriesEntryFields convention) + explicit-name taps/scrolls + `pressKey
-enter` + settle/filter-proof waits; `workout-gym-v2-persistence` replays
-      green end-to-end (restart assertions included) and the lifecycle sibling
-      passes directly. The remaining lane failure (`habit-reminder-
-persistence` at launch) replays green — one-off >30s cold start on a
-      saturated emulator (app legitimately in bootstrap loader), classified
-      FLAKY_TEST/ENVIRONMENT, no flow change. Web `workout-gym-v2` Chromium
-      spec 7/7 green on fresh `dist/`. Emulator shut down cleanly afterward
-      (`emu kill`; `adb devices` empty; 8081/8082 free).
+- [x] 7.2 Targeted persistence 11/11 green with a PASS report on the final
+      HEAD (`native-android-persistence-...-105431261Z.json`, provision PASS at
+      the same SHA). Path: the stale `Overview` rail marker fix (→ `Today`,
+      24 flow files) took 10/11; the gym-v2 picker failure root-caused with
+      screenshots/logcat/hierarchy (see execplan) to ambiguous tap targets
+      (inputs shared their accessible name with their visible labels → taps hit
+      the non-focusable label, text dropped; plus BACK-via-hideKeyboard modal
+      hazard) — proven by a tap-order diag flow (index 0 taps label/no-op,
+      index 1 taps input/focuses). Fixed with distinct `accessibilityLabel`s
+      on the 6 picker inputs plus routine name/description
+      (CaloriesEntryFields convention), explicit-name taps/scrolls, index:1
+      taps for habit names (diag-proven), `pressKey enter` instead of
+      `hideKeyboard` in modals, settle/filter-proof waits, and diary-settle
+      waits. Two further single-flow lane flakes met the same bar (evidence
+      first): a >30s cold start on a saturated emulator (app legitimately in
+      bootstrap loader — replays green, no change) and a label-position scroll
+      miss (scroll retargeted to the input). Web `workout-gym-v2` Chromium
+      spec 7/7 green on fresh `dist/` after the label change.
 
 ## 8. Validation and closure
 
@@ -165,5 +167,10 @@ persistence` at launch) replays green — one-off >30s cold start on a
       build:web OK; web:verify PASS; web:hygiene PASS; P0 25/25; full `npm run
 e2e` exit 0 (241 tests, conditional skips only); native provision PASS
       ×3 with provenance + smoke 2/2 + persistence 11/11 + lifecycle gym flow.
-- [ ] 8.3 Independent verification agent PASS.
+- [x] 8.3 Independent verification agent ran read-only over all claims:
+      functional/tests/typecheck/spec gates all PASS; its two FAILs were
+      Git/provenance staleness at check time, both reconciled afterward (pushed
+      to HEAD == origin/main; persistence lane re-run to a PASS report at the
+      final HEAD). No product defect found by the verifier (its defect hunt:
+      NONE FOUND).
 - [ ] 8.4 Docs: known-gaps updates if any; campaign evidence recorded; commits coherent; push per policy.
