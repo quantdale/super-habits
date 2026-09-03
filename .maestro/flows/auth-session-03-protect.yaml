@@ -4,7 +4,8 @@ tags:
   - account-v1
   - auth-persistence
 ---
-# On-device protection OTP flow against the hermetic local Auth mock: the
+# On-device protection OTP flow against the hermetic local Auth mock —
+# launch 3 of 3 (runs last, on 02-restart's anonymous state; no clearing): the
 # anonymous session converts to a permanent account with the SAME user id
 # (the mock server logs the id for the harness assertion). The mock OTP is
 # always 123456.

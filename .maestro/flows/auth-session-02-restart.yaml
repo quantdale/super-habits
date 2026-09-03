@@ -4,8 +4,9 @@ tags:
   - account-v1
   - auth-persistence
 ---
-# Auth persistence across process restart — SECOND launch after killApp (no
-# state clearing). The SAME anonymous session must be restored: the account
+# Auth persistence across process restart — launch 2 of 3 (runs second,
+# right after 01-first's killApp, before 03-protect; no state clearing).
+# The SAME anonymous session must be restored: the account
 # card stays 'Anonymous / unprotected' and must NOT enter 'Recovery required'
 # (which would mean the persisted session was lost and no new anonymous user
 # may be created for the bound dataset).

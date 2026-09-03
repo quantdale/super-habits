@@ -4,11 +4,12 @@ tags:
   - account-v1
   - auth-persistence
 ---
-# Auth persistence across process restart — FIRST launch on a fresh install.
+# Auth persistence across process restart — launch 1 of 3 (runs first:
+# filename order 01 → 02 → 03 is the execution contract). Fresh install.
 # The app bootstraps an anonymous Supabase session and provisionally binds the
 # empty dataset. The test harness extracts the durable owner UID from the app's
 # SQLite (app_meta.account.owner_user_id) and the Auth session id from
-# AsyncStorage between this flow and auth-session-restart.yaml, then asserts
+# AsyncStorage between this flow and auth-session-02-restart.yaml, then asserts
 # both are unchanged after the force-stop/relaunch.
 - launchApp:
     clearState: true
