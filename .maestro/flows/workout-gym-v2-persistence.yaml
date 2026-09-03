@@ -20,7 +20,7 @@ tags:
 - swipe:
     direction: UP
 - scrollUntilVisible:
-    element: 'Routine name'
+    element: 'New routine name'
     direction: DOWN
     visibilityPercentage: 50
 - tapOn: 'New routine name'

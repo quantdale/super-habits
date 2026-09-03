@@ -15,12 +15,12 @@ tags:
     text: 'Workout'
     index: 0
 - scrollUntilVisible:
-    element: 'Routine name'
+    element: 'New routine name'
     direction: DOWN
 - tapOn: 'New routine name'
 - inputText: 'Native strength routine'
 - scrollUntilVisible:
-    element: 'Description'
+    element: 'New routine description'
     direction: DOWN
 - tapOn: 'New routine description'
 - inputText: 'Native routine'

@@ -18,7 +18,7 @@ tags:
     text: 'Workout'
     index: 0
 - scrollUntilVisible:
-    element: 'Routine name'
+    element: 'New routine name'
     direction: DOWN
     visibilityPercentage: 50
 - tapOn: 'New routine name'
