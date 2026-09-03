@@ -51,6 +51,10 @@ tags:
     element: 'Diary view'
     direction: UP
 - tapOn: 'Diary view'
+# Let the diary transition + chart settle: scrolling while the list is still
+# mounting starves the matcher and times out even though the entry renders.
+- waitForAnimationToEnd:
+    timeout: 8000
 - scrollUntilVisible:
     element: 'Native breakfast'
     direction: DOWN
@@ -68,6 +72,8 @@ tags:
     text: 'Calories'
     index: 0
 - tapOn: 'Diary view'
+- waitForAnimationToEnd:
+    timeout: 8000
 - swipe:
     direction: UP
 - scrollUntilVisible:
