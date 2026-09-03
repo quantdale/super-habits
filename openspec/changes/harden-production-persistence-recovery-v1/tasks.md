@@ -145,8 +145,19 @@ persistence` at launch) replays green — one-off >30s cold start on a
 
 - [x] 8.1 `qa:affected` after each workstream; focused gates per lane.
 - [x] 8.2 Full matrix on the final tree: typecheck 0; lint 0;
-      unit 1665/1665; integration green incl. all campaign tests (final counts
-      recorded in the execplan ledger);
+      unit 1665/1665 (×10 consecutive `qa:fast` all green); integration 241/241
+      (43 files) on re-run — one `portableExportImport` infra flake observed
+      (`appMetaKeys` undefined inside a fresh `client` import; 1 in 5 full
+      runs; green in isolation, in pair runs, and on immediate re-run).
+      Investigated (all mock sites audited; no partial appMeta mock exists;
+      no product code implicated): classified FLAKY_TEST infrastructure
+      (module-registry/transform scheduling), recorded for the successor — no
+      blind retry added. Independent verification re-ran the key files
+      (restore.coordinator 18/18, migrations+fixtures 15/15, probes 7/7,
+      backupRestore 27/27, torture 2/2, tsc 0) all PASS; its two FAILs were
+      Git/provenance staleness at check time (unpushed docs commit; native
+      provision predating it) — reconciling now: push, then re-run the
+      persistence lane for a PASS report on the final HEAD.
       openspec 50/50; impact map 13 rules; themes 140/140; supabase schema
       PASS; plan:validate:all PASS (incl. repairing the stale checkpoint of
       the long-closed `agent-safe-web-lifecycle` plan, untouched since WM2.2);
