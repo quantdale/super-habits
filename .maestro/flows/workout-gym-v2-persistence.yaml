@@ -55,7 +55,7 @@ tags:
     visible: 'No matching exercises'
     timeout: 10000
 - scrollUntilVisible:
-    element: 'Name'
+    element: 'Custom exercise name'
     direction: DOWN
     visibilityPercentage: 100
 - tapOn: 'Custom exercise name'
@@ -63,18 +63,15 @@ tags:
 - pressKey: enter
 - waitForAnimationToEnd:
     timeout: 2000
-- swipe:
-    start: '50%, 70%'
-    end: '50%, 55%'
-    duration: 400
-- extendedWaitUntil:
-    visible: 'Primary body area'
-    timeout: 10000
+- scrollUntilVisible:
+    element: 'Custom exercise primary area'
+    direction: DOWN
+    visibilityPercentage: 50
 - tapOn: 'Custom exercise primary area'
 - inputText: 'chest'
 - pressKey: enter
 - scrollUntilVisible:
-    element: 'Search aliases (comma separated)'
+    element: 'Custom exercise equipment'
     direction: DOWN
 - tapOn: 'Custom exercise equipment'
 - inputText: 'barbell'
@@ -83,7 +80,7 @@ tags:
 - inputText: 'incline press'
 - pressKey: enter
 - scrollUntilVisible:
-    element: 'Instructions (optional)'
+    element: 'Custom exercise instructions'
     direction: DOWN
 - tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
