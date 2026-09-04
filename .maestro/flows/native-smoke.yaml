@@ -25,6 +25,10 @@ tags:
     timeout: 10000
 - tapOn:
     text: 'Habits'
+# Small screens fit only down to the day strip; the groups render below it.
+- scrollUntilVisible:
+    element: 'Anytime'
+    direction: DOWN
 - extendedWaitUntil:
     # The simplified Habits surface leads with time-of-day groups; the
     # Today's rhythm summary remains below the check-in controls.
