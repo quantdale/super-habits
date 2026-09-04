@@ -169,9 +169,16 @@
     },
     {
       "id": "native-e2e-infrastructure",
-      "patterns": [".maestro/**", ".eas/workflows/**", "scripts/qa-native.mjs"],
+      "patterns": [
+        ".maestro/**",
+        ".eas/workflows/**",
+        "scripts/qa-native.mjs",
+        "scripts/native-*.mjs",
+        "tests/native*.test.ts",
+        "tests/qaNative*.test.ts"
+      ],
       "gates": ["qa:fast", "qa:native:smoke", "qa:native:lifecycle", "qa:full"],
-      "tests": [],
+      "tests": ["tests/nativeAvd.test.ts", "tests/qaNativeProvision.test.ts"],
       "journeys": ["native smoke and targeted flows"],
       "broadRegression": true
     },

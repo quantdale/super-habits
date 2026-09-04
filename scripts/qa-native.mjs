@@ -10,17 +10,30 @@
  *   npm run qa:native:ios
  *   node scripts/qa-native.mjs --platform android --tag lifecycle
  *   node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml
+ *   node scripts/qa-native.mjs --platform android --tag smoke --avd Nitro_API_36 --avd CRBABot_API_36
+ *   node scripts/qa-native.mjs --list-avds
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
+  parseAdbDevices,
   parseAndroidProperties,
   parsePackageIdentity,
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
 import { readGitProvenance } from './native-provenance.mjs';
+import {
+  buildTargetRunRecord,
+  findNewEmulatorSerial,
+  isBootReady,
+  matchConnectedAvd,
+  parseAvdListOutput,
+  planAvdSequence,
+  summarizeTargetRuns,
+  targetLabel,
+} from './native-avd.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
@@ -43,6 +56,11 @@ function parseArgs(argv) {
     flow: null,
     serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
     provision: process.env.NATIVE_AUTO_PROVISION !== '0',
+    avds: [],
+    listAvds: false,
+    bootTimeoutMs: 300000,
+    noStop: false,
+    reset: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -52,9 +70,25 @@ function parseArgs(argv) {
     else if (arg === '--serial') args.serial = argv[++i];
     else if (arg === '--provision') args.provision = true;
     else if (arg === '--no-provision') args.provision = false;
+    else if (arg === '--avd') {
+      const value = argv[++i] ?? '';
+      for (const name of String(value).split(',')) {
+        const trimmed = name.trim();
+        if (trimmed) args.avds.push(trimmed);
+      }
+    } else if (arg === '--list-avds') args.listAvds = true;
+    else if (arg === '--boot-timeout') {
+      const seconds = Number(argv[++i]);
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        throw new Error(`Invalid --boot-timeout '${argv[i]}'. Pass a positive number of seconds.`);
+      }
+      args.bootTimeoutMs = Math.round(seconds * 1000);
+    } else if (arg === '--no-stop') args.noStop = true;
+    else if (arg === '--reset') args.reset = true;
+    else if (arg === '--no-reset') args.reset = false;
     else if (arg === '--help' || arg === '-h') {
       console.log(
-        'Usage: node scripts/qa-native.mjs [--platform android|ios|all] [--tag TAG] [--flow PATH] [--serial SERIAL] [--no-provision]',
+        'Usage: node scripts/qa-native.mjs [--platform android|ios|all] [--tag TAG] [--flow PATH] [--serial SERIAL] [--no-provision] [--avd NAME ...] [--list-avds] [--boot-timeout SECONDS] [--no-stop] [--reset]',
       );
       process.exit(0);
     } else {
@@ -159,16 +193,18 @@ function gitSha() {
   }
 }
 
-function reportPath(platform, tag) {
+function reportPath(platform, tag, label = null) {
   const stamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
-  return resolve(REPORT_DIR, `native-${platform}-${tag ?? 'all'}-${stamp}.json`);
+  const infix = label ? `-${label}` : '';
+  return resolve(REPORT_DIR, `native-${platform}-${tag ?? 'all'}${infix}-${stamp}.json`);
 }
 
 function writeReport(report) {
   mkdirSync(REPORT_DIR, { recursive: true });
-  const path = reportPath(report.platform, report.tag);
+  const path = reportPath(report.platform, report.tag, report.targetLabel ?? null);
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(`Native QA report: ${path}`);
+  return path;
 }
 
 function readBuildMetadata() {
@@ -182,6 +218,11 @@ function readBuildMetadata() {
 
 function blocked(platform, tag, replayCommand, reason, details) {
   const provenance = readGitProvenance(ROOT);
+  const hasTargetIdentity = Boolean(details.targetLabel ?? details.avd ?? details.serial);
+  const label = hasTargetIdentity
+    ? (details.targetLabel ??
+      targetLabel({ avd: details.avd ?? null, serial: details.serial ?? null }))
+    : null;
   const report = {
     schemaVersion: 1,
     status: 'BLOCKED',
@@ -198,14 +239,17 @@ function blocked(platform, tag, replayCommand, reason, details) {
     sourceShaError: provenance.sourceShaError,
     sourceTreeStatusError: provenance.sourceTreeStatusError,
     reason,
+    targetLabel: details.targetLabel ?? label,
+    avd: details.avd ?? null,
+    ownedEmulator: details.ownedEmulator ?? false,
     details,
     replayCommand,
     capturedAt: new Date().toISOString(),
   };
   console.error(`Native QA blocked [ENVIRONMENT]: ${reason}`);
   if (details.remediation) console.error(`Remediation: ${details.remediation}`);
-  writeReport(report);
-  return 2;
+  const reportPath = writeReport(report);
+  return { exitCode: 2, report, reportPath };
 }
 
 function provisionAndroid(serial) {
@@ -409,11 +453,37 @@ function runPlatform(platform, options) {
   }
 
   const target = checkTarget(platform, options);
+  const avdContext = options.avdContext ?? null;
   if (target.blocked) {
     return blocked(platform, options.tag, options.replayCommand, target.blocked, {
       flow: options.flow ?? '.maestro',
+      avd: avdContext?.avd ?? null,
+      serial: options.serial ?? null,
+      ownedEmulator: avdContext?.owned ?? false,
       remediation: target.remediation,
     });
+  }
+
+  let stateReset = false;
+  if (options.reset) {
+    const adb = findCommand('adb');
+    const clear = run(adb, ['-s', target.serial, 'shell', 'pm', 'clear', APP_ID]);
+    if (clear.status !== 0) {
+      return blocked(
+        platform,
+        options.tag,
+        options.replayCommand,
+        `State reset (pm clear ${APP_ID}) failed on '${target.serial}' with exit code ${clear.status}.`,
+        {
+          flow: options.flow ?? '.maestro',
+          avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
+          serial: target.serial,
+          ownedEmulator: avdContext?.owned ?? false,
+          remediation: `Replay adb -s ${target.serial} shell pm clear ${APP_ID} and inspect the target.`,
+        },
+      );
+    }
+    stateReset = true;
   }
 
   const args = ['test', '--no-ansi', '--reinstall-driver'];
@@ -431,6 +501,10 @@ function runPlatform(platform, options) {
         }
       : undefined,
   });
+  const label = targetLabel({
+    avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
+    serial: target.serial ?? null,
+  });
   const report = {
     schemaVersion: 1,
     status: result.status === 0 ? 'PASS' : 'FAILED_NEEDS_TRIAGE',
@@ -439,6 +513,10 @@ function runPlatform(platform, options) {
     platform,
     appId: APP_ID,
     target: target.target,
+    targetLabel: label,
+    avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
+    ownedEmulator: avdContext?.owned ?? false,
+    stateReset,
     targetIdentity: target.targetIdentity ?? null,
     packageIdentity: target.packageIdentity ?? null,
     buildMetadata: target.buildMetadata ?? null,
@@ -451,26 +529,338 @@ function runPlatform(platform, options) {
     stderr: result.stderr,
     capturedAt: new Date().toISOString(),
   };
-  writeReport(report);
+  const reportPath = writeReport(report);
   if (result.status !== 0) {
     console.error(
       'Native QA failed without an automatic classification. Preserve artifacts, replay, and classify with evidence.',
     );
   }
-  return result.status === 0 ? 0 : 1;
+  return { exitCode: result.status === 0 ? 0 : 1, report, reportPath };
+}
+
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(0, ms));
+}
+
+function findEmulator() {
+  // `emulator --version` exits nonzero when no AVD is specified, so the
+  // generic version-probe cannot discover it. `-list-avds` is read-only,
+  // fast, and exits 0 exactly when the CLI is usable.
+  for (const candidate of commandCandidates('emulator')) {
+    const useWindowsBatchShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(candidate);
+    const spawnCommand = useWindowsBatchShell ? quoteWindowsShellArg(candidate) : candidate;
+    const result = spawnSync(
+      useWindowsBatchShell ? `${spawnCommand} -list-avds` : spawnCommand,
+      useWindowsBatchShell ? [] : ['-list-avds'],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        shell: useWindowsBatchShell,
+      },
+    );
+    if (!result.error && result.status === 0) return candidate;
+  }
+  return null;
+}
+
+function listAvdTargets() {
+  const emulator = findEmulator();
+  if (!emulator) {
+    console.error('Android emulator CLI is not installed or not on PATH.');
+    return 1;
+  }
+  const avds = run(emulator, ['-list-avds']);
+  if (avds.status !== 0) {
+    console.error(`emulator -list-avds failed (exit ${avds.status}).`);
+    return 1;
+  }
+  const names = parseAvdListOutput(avds.stdout);
+  console.log(`Configured AVDs (${names.length}):`);
+  for (const name of names) console.log(`  ${name}`);
+  const adb = findCommand('adb');
+  if (!adb) {
+    console.log('adb is not installed or not on PATH; connected targets unknown.');
+    return 0;
+  }
+  const devices = run(adb, ['devices']);
+  if (devices.status !== 0) {
+    console.error(`adb devices failed (exit ${devices.status}).`);
+    return 1;
+  }
+  console.log('Connected targets:');
+  const connected = parseAdbDevices(devices.stdout);
+  if (connected.length === 0) console.log('  (none)');
+  for (const device of connected) {
+    let avd = null;
+    if (device.state === 'device') {
+      const props = run(adb, ['-s', device.serial, 'shell', 'getprop']);
+      if (props.status === 0) {
+        avd = parseAndroidProperties(props.stdout)['ro.boot.qemu.avd_name'] ?? null;
+      }
+    }
+    console.log(`  ${device.serial} ${device.state}${avd ? ` avd=${avd}` : ''}`);
+  }
+  return 0;
+}
+
+function bootOwnedEmulator(emulator, avdName) {
+  const child = spawn(emulator, ['-avd', avdName, '-no-boot-anim', '-no-snapshot-save'], {
+    cwd: ROOT,
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+  if (child.pid == null) {
+    throw new Error(`Could not start an owned emulator for AVD '${avdName}' (no process id).`);
+  }
+  console.log(`Booted owned emulator for AVD '${avdName}' (pid ${child.pid}).`);
+  return child.pid;
+}
+
+function waitForNewSerial(adb, beforeOutput, deadlineMs) {
+  for (;;) {
+    const current = run(adb, ['devices']);
+    if (current.status === 0) {
+      const found = findNewEmulatorSerial(beforeOutput, current.stdout);
+      if (found.serial) return found.serial;
+      if (found.reason && !/No new connected device/.test(found.reason))
+        throw new Error(found.reason);
+    }
+    if (Date.now() >= deadlineMs) {
+      throw new Error('Timed out waiting for the booted emulator to appear in adb devices.');
+    }
+    sleepMs(5000);
+  }
+}
+
+function waitForTargetReady(adb, serial, deadlineMs) {
+  let lastReason = 'no getprop response yet';
+  for (;;) {
+    const props = run(adb, ['-s', serial, 'shell', 'getprop']);
+    if (props.status === 0) {
+      const readiness = isBootReady(parseAndroidProperties(props.stdout));
+      if (readiness.ready) return;
+      lastReason = readiness.reason;
+    } else {
+      lastReason = `getprop exited ${props.status}`;
+    }
+    if (Date.now() >= deadlineMs) {
+      throw new Error(
+        `Timed out waiting for '${serial}' to finish booting. Last state: ${lastReason}`,
+      );
+    }
+    sleepMs(5000);
+  }
+}
+
+function stopOwnedEmulator(adb, serial) {
+  const kill = run(adb, ['-s', serial, 'emu', 'kill']);
+  if (kill.status !== 0) {
+    throw new Error(`adb emu kill failed on owned emulator '${serial}' (exit ${kill.status}).`);
+  }
+  const deadline = Date.now() + 60000;
+  for (;;) {
+    const devices = run(adb, ['devices']);
+    if (devices.status === 0) {
+      const stillThere = parseAdbDevices(devices.stdout).some((device) => device.serial === serial);
+      if (!stillThere) return;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`Owned emulator '${serial}' did not disappear within 60s of emu kill.`);
+    }
+    sleepMs(5000);
+  }
+}
+
+function resolveAvdTarget(adb, emulator, avdName, bootTimeoutMs) {
+  const devices = run(adb, ['devices']);
+  if (devices.status !== 0) {
+    throw new Error(
+      `adb devices failed (exit ${devices.status}) while resolving AVD '${avdName}'.`,
+    );
+  }
+  const known = [];
+  for (const device of parseAdbDevices(devices.stdout).filter(
+    (entry) => entry.state === 'device',
+  )) {
+    const props = run(adb, ['-s', device.serial, 'shell', 'getprop']);
+    known.push({
+      ...device,
+      avd:
+        props.status === 0
+          ? (parseAndroidProperties(props.stdout)['ro.boot.qemu.avd_name'] ?? null)
+          : null,
+    });
+  }
+  const reuse = matchConnectedAvd(known, avdName);
+  if (reuse) {
+    console.log(`Reusing connected '${avdName}' on ${reuse} (not owned; it will not be stopped).`);
+    return { serial: reuse, owned: false, pid: null };
+  }
+  bootOwnedEmulator(emulator, avdName);
+  const deadline = Date.now() + bootTimeoutMs;
+  const serial = waitForNewSerial(adb, devices.stdout, deadline);
+  waitForTargetReady(adb, serial, deadline);
+  return { serial, owned: true, pid: null };
+}
+
+function runMultiAvd(options) {
+  const emulator = findEmulator();
+  if (!emulator) {
+    console.error('Android emulator CLI is not installed or not on PATH.');
+    return 1;
+  }
+  const adb = findCommand('adb');
+  if (!adb) {
+    console.error('Android adb is not installed or not on PATH.');
+    return 1;
+  }
+  const available = run(emulator, ['-list-avds']);
+  if (available.status !== 0) {
+    console.error(`emulator -list-avds failed (exit ${available.status}).`);
+    return 1;
+  }
+  let sequence;
+  try {
+    sequence = planAvdSequence(options.avds, parseAvdListOutput(available.stdout)).sequence;
+  } catch (error) {
+    console.error(
+      `Native QA configuration error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return 1;
+  }
+  console.log(`Multi-AVD certification (sequential): ${sequence.join(' -> ')}`);
+  const records = [];
+  const cleanupErrors = [];
+  let exitCode = 0;
+  for (const avdName of sequence) {
+    const startedAt = new Date().toISOString();
+    let resolution = null;
+    let outcome = null;
+    try {
+      resolution = resolveAvdTarget(adb, emulator, avdName, options.bootTimeoutMs);
+      const targetOptions = {
+        ...options,
+        serial: resolution.serial,
+        avdContext: { avd: avdName, owned: resolution.owned },
+        replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      };
+      outcome = runPlatform('android', targetOptions);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      outcome = blocked(
+        'android',
+        options.tag,
+        `${options.replayCommand} --avd ${avdName}`,
+        message,
+        {
+          flow: options.flow ?? '.maestro',
+          avd: avdName,
+          serial: resolution?.serial ?? null,
+          ownedEmulator: resolution?.owned ?? false,
+          remediation:
+            'Inspect the message above; no emulator was left in an unknown state by this step.',
+        },
+      );
+    } finally {
+      if (resolution?.owned && !options.noStop) {
+        try {
+          stopOwnedEmulator(adb, resolution.serial);
+          console.log(`Stopped owned emulator ${resolution.serial} (AVD '${avdName}').`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
+          console.error(`Emulator cleanup failed [ENVIRONMENT]: ${message}`);
+        }
+      } else if (resolution?.owned && options.noStop) {
+        console.log(
+          `Leaving owned emulator ${resolution.serial} (AVD '${avdName}') running (--no-stop).`,
+        );
+      }
+    }
+    const endedAt = new Date().toISOString();
+    const report = outcome.report;
+    records.push(
+      buildTargetRunRecord({
+        repoSha: report.gitSha ?? report.sourceSha ?? null,
+        sourceSha: report.sourceSha ?? report.gitSha ?? null,
+        apkSha256: report.buildMetadata?.apkSha256 ?? null,
+        buildKind: 'canonical',
+        platform: 'android',
+        avd: report.avd ?? avdName,
+        api: report.targetIdentity?.api ?? null,
+        abi: report.targetIdentity?.abi ?? null,
+        serial:
+          report.targetIdentity?.serial ?? report.details?.serial ?? resolution?.serial ?? null,
+        ownedEmulator: report.ownedEmulator ?? resolution?.owned ?? false,
+        stateReset: report.stateReset ?? false,
+        tag: options.tag,
+        flow: options.flow ?? '.maestro',
+        startedAt,
+        endedAt,
+        status: report.status,
+        classification:
+          report.classification ?? (report.status === 'BLOCKED' ? 'ENVIRONMENT' : null),
+        artifactPath: outcome.reportPath,
+        replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      }),
+    );
+    exitCode = Math.max(exitCode, outcome.exitCode);
+    console.log(`Target '${avdName}': ${report.status} (artifact: ${outcome.reportPath})`);
+  }
+  const summary = summarizeTargetRuns(records);
+  if (cleanupErrors.length > 0) exitCode = Math.max(exitCode, 1);
+  const stamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
+  const collatedPath = resolve(REPORT_DIR, `native-android-multiavd-${stamp}.json`);
+  mkdirSync(REPORT_DIR, { recursive: true });
+  writeFileSync(
+    collatedPath,
+    `${JSON.stringify({ schemaVersion: 1, summary, records, cleanupErrors, replayCommand: options.replayCommand, capturedAt: new Date().toISOString() }, null, 2)}\n`,
+    'utf8',
+  );
+  console.log(
+    `Multi-AVD summary: ${summary.pass}/${summary.total} PASS, ${summary.failed} failed, ${summary.blocked} blocked.`,
+  );
+  console.log(`Multi-AVD collated record: ${collatedPath}`);
+  return summary.status === 'PASS' && cleanupErrors.length === 0
+    ? 0
+    : exitCode === 0
+      ? 1
+      : exitCode;
 }
 
 try {
   const options = parseArgs(process.argv.slice(2));
+  if (options.listAvds) process.exit(listAvdTargets());
+  if (options.avds.length > 0 && options.platform !== 'android') {
+    console.error(
+      'Native QA configuration error: --avd multi-target orchestration supports android only.',
+    );
+    process.exit(1);
+  }
+  if (options.avds.length > 0 && options.serial) {
+    console.error(
+      'Native QA configuration error: --serial cannot be combined with --avd; the orchestrator pins one serial per target.',
+    );
+    process.exit(1);
+  }
   const platforms = options.platform === 'all' ? ['android', 'ios'] : [options.platform];
   const command = ['npm run qa:native', `-- --platform ${options.platform}`];
   if (options.tag) command.push(`--tag ${options.tag}`);
   if (options.flow) command.push(`--flow ${options.flow}`);
   if (options.serial) command.push(`--serial ${options.serial}`);
   if (!options.provision) command.push('--no-provision');
+  for (const avd of options.avds) command.push(`--avd ${avd}`);
+  if (options.reset) command.push('--reset');
+  if (options.noStop) command.push('--no-stop');
   options.replayCommand = command.join(' ');
+  if (options.avds.length > 0) process.exit(runMultiAvd(options));
   let exitCode = 0;
-  for (const platform of platforms) exitCode = Math.max(exitCode, runPlatform(platform, options));
+  for (const platform of platforms) {
+    const outcome = runPlatform(platform, options);
+    exitCode = Math.max(exitCode, outcome.exitCode);
+  }
   process.exit(exitCode);
 } catch (error) {
   console.error(
