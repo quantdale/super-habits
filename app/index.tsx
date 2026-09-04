@@ -354,7 +354,14 @@ export default function Index() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Quick capture"
-        onPress={openQuickCapture}
+        onPress={() => {
+          // Open the sheet after the opening gesture completes. Creating
+          // the modal window synchronously inside the press lets the
+          // gesture's release re-target to freshly laid-out sheet content
+          // under the finger, skipping the sheet straight into advanced
+          // capture on small screens.
+          setTimeout(() => openQuickCapture(), 0);
+        }}
         className={`absolute right-4 items-center justify-center shadow-lg ${
           showQuickCaptureLabel ? 'flex-row gap-2 rounded-2xl px-4 py-3' : 'h-14 w-14 rounded-full'
         }`}
