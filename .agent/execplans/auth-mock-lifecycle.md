@@ -71,10 +71,9 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `node scripts/qa-native.mjs --platform
-android --tag auth-persistence --avd Nitro_API_36 --auth-mock`
-  (owned boot + mock build + lane + proof + teardown), then repeat
-  for the ×2 proof.
+- Exact next action: Commit the two fixes, push, rerun the auth
+  lane via `--auth-mock` on Nitro (rebuild expected), then repeat
+  for the ×2 proof with per-run 1-signup/same-UID evidence.
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
   reverse/emulator left; ledger + commit/push; plan COMPLETED.
@@ -90,7 +89,18 @@ android --tag auth-persistence --avd Nitro_API_36 --auth-mock`
 
 ## Surprises & Discoveries
 
-- None yet.
+- 2026-09-04 — First live `--auth-mock` run (Nitro) built the
+  TEST-ONLY APK correctly (BUILD SUCCESSFUL, cleartext patch,
+  separate mock metadata) but exposed two runner bugs before any
+  lane ran: (1) `buildKindOk` was a stale pre-provision const, so
+  the fresh test-only build was rejected as identity-mismatched —
+  moved inside `metadataMatches()`; (2) `ChildProcess.exitCode`
+  polling under event-loop-blocking sleeps never observes exits,
+  so mock teardown always reported failure (the kill itself
+  worked; port closed, pid gone) — replaced with synchronous
+  OS-level `isPidAlive` probes (tasklist / kill -0) + unit tests.
+  Reverse establish/remove, owned emulator stop, and the empty
+  mock-proof honesty path all behaved correctly in the same run.
 
 ## Decision Log
 
@@ -103,6 +113,10 @@ android --tag auth-persistence --avd Nitro_API_36 --auth-mock`
 - 2026-09-04 — `vitest run --project unit
 tests/nativeAuthMock.test.ts tests/nativeAvd.test.ts` — 14/14
   PASS; `typecheck` 0; `--help` probes for both scripts PASS.
+- 2026-09-04 — first live `--auth-mock` (Nitro): TEST-ONLY build
+  PASS (APK D86B7B97 @9bbd48c, mock metadata file), reverse +
+  emulator cleanup correct, proof honestly empty (no lane ran);
+  BLOCKED by the two runner bugs above (both fixed, 15/15 tests).
 
 ## Changed Files / Areas
 

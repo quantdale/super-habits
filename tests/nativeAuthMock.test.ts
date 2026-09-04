@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCleartextAttr,
   assertMockProof,
+  isPidAlive,
   parseMockLog,
   reverseSpecPresent,
 } from '../scripts/native-avd.mjs';
@@ -68,6 +69,13 @@ describe('native auth-mock proof helpers', () => {
     expect(reverseSpecPresent(listing, 4546)).toBe(false);
     expect(reverseSpecPresent('emulator-5554 tcp:4545 tcp:9999\n', 4545)).toBe(false);
     expect(reverseSpecPresent('', 4545)).toBe(false);
+  });
+
+  it('probes process liveness without signaling anyone', () => {
+    expect(isPidAlive(process.pid)).toBe(true);
+    expect(isPidAlive(2147483647)).toBe(false);
+    expect(isPidAlive(0)).toBe(false);
+    expect(isPidAlive('not-a-pid')).toBe(false);
   });
 
   it('patches the application tag for test-only cleartext exactly once', () => {

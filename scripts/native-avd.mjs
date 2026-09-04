@@ -13,6 +13,7 @@
  * the requested order, one at a time.
  */
 
+import { spawnSync } from 'node:child_process';
 import { parseAdbDevices } from './native-qa-utils.mjs';
 
 /**
@@ -151,6 +152,37 @@ export function reverseSpecPresent(listOutput, port) {
   return String(listOutput ?? '')
     .split(/\r?\n/)
     .some((line) => line.includes(spec));
+}
+
+/**
+ * Process-liveness probe used ONLY to observe helper processes the native
+ * runner itself started and owns (the auth-mock server). Implemented with
+ * synchronous OS queries that never signal anyone: `tasklist` on win32,
+ * `kill -0` elsewhere. It must never be used to discover, adopt, or manage
+ * foreign processes. (Async `ChildProcess.exitCode` polling cannot work
+ * here: the runner blocks the event loop with bounded sleeps, so exit
+ * events would never be delivered while waiting.)
+ *
+ * @param {unknown} pid process id.
+ * @returns {boolean} true when a process with that id exists right now.
+ */
+export function isPidAlive(pid) {
+  const id = Number(pid);
+  if (!Number.isInteger(id) || id <= 0) return false;
+  try {
+    if (process.platform === 'win32') {
+      const result = spawnSync('tasklist', ['/FI', `PID eq ${id}`, '/FO', 'CSV', '/NH'], {
+        encoding: 'utf8',
+      });
+      if (result.status !== 0) return false;
+      return String(result.stdout ?? '')
+        .split(/\r?\n/)
+        .some((line) => line.split(',').some((field) => field === `"${id}"`));
+    }
+    return spawnSync('kill', ['-0', String(id)], { stdio: 'ignore' }).status === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**

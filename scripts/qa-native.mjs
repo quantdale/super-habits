@@ -34,6 +34,7 @@ import {
 import { readGitProvenance } from './native-provenance.mjs';
 import {
   assertMockProof,
+  isPidAlive,
   parseMockLog,
   reverseSpecPresent,
   buildTargetRunRecord,
@@ -382,23 +383,28 @@ function checkTarget(platform, options) {
     let metadata = readBuildMetadata(metadataPath);
     let installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
     let packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
-    // Provenance separation is enforced here, not just by filename: mock
-    // mode requires an explicit test-only build for this mock URL, and
-    // canonical mode never accepts a test-only build.
-    const buildKindOk = options.authMock
-      ? metadata?.buildKind === 'test-only' && metadata?.mockAuthUrl === deviceAuthMockUrl(options)
-      : metadata?.buildKind !== 'test-only';
-    const metadataMatches = () =>
-      metadata?.status === 'PASS' &&
-      metadata.sourceTreeClean === true &&
-      metadata.appId === APP_ID &&
-      metadata.sourceSha === currentSha &&
-      metadata.target?.serial === serial &&
-      metadata.target?.api === targetIdentity.api &&
-      metadata.target?.abi === targetIdentity.abi &&
-      metadata.target?.avd === targetIdentity.avd &&
-      metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true' &&
-      buildKindOk;
+    const metadataMatches = () => {
+      // Provenance separation is enforced here, not just by filename:
+      // mock mode requires an explicit test-only build for this mock
+      // URL, and canonical mode never accepts a test-only build.
+      // Recomputed per call: provisioning refreshes `metadata` above.
+      const buildKindOk = options.authMock
+        ? metadata?.buildKind === 'test-only' &&
+          metadata?.mockAuthUrl === deviceAuthMockUrl(options)
+        : metadata?.buildKind !== 'test-only';
+      return (
+        metadata?.status === 'PASS' &&
+        metadata.sourceTreeClean === true &&
+        metadata.appId === APP_ID &&
+        metadata.sourceSha === currentSha &&
+        metadata.target?.serial === serial &&
+        metadata.target?.api === targetIdentity.api &&
+        metadata.target?.abi === targetIdentity.abi &&
+        metadata.target?.avd === targetIdentity.avd &&
+        metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true' &&
+        buildKindOk
+      );
+    };
     if ((!packageInstalled || !metadataMatches()) && options.provision) {
       const provisioningBlock = provisionAndroid(serial, options);
       if (provisioningBlock) return provisioningBlock;
@@ -765,10 +771,8 @@ function startAuthMockSession(options) {
   }
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
-      throw new Error(
-        `Owned auth-mock (pid ${child.pid}) exited during startup (code ${child.exitCode}); see ${logPath}.`,
-      );
+    if (!isPidAlive(child.pid)) {
+      throw new Error(`Owned auth-mock (pid ${child.pid}) exited during startup; see ${logPath}.`);
     }
     if (isMockServing(port)) {
       console.log(`Owned auth-mock ready on :${port} (pid ${child.pid}); log ${logPath}.`);
@@ -786,17 +790,24 @@ function startAuthMockSession(options) {
 
 function stopAuthMockSession(session) {
   const { child, pid, port, logPath } = session;
-  if (child.exitCode === null) {
-    child.kill('SIGTERM');
+  const tryKill = (signal) => {
+    try {
+      if (isPidAlive(pid)) child.kill(signal);
+    } catch {
+      // Rechecked below; a TOCTOU exit between probe and kill is success.
+    }
+  };
+  if (isPidAlive(pid)) {
+    tryKill('SIGTERM');
     const deadline = Date.now() + 10000;
-    while (child.exitCode === null && Date.now() < deadline) sleepMs(250);
+    while (isPidAlive(pid) && Date.now() < deadline) sleepMs(250);
   }
-  if (child.exitCode === null) {
-    child.kill('SIGKILL');
+  if (isPidAlive(pid)) {
+    tryKill('SIGKILL');
     const deadline = Date.now() + 5000;
-    while (child.exitCode === null && Date.now() < deadline) sleepMs(250);
+    while (isPidAlive(pid) && Date.now() < deadline) sleepMs(250);
   }
-  if (child.exitCode === null) {
+  if (isPidAlive(pid)) {
     throw new Error(`Owned auth-mock pid ${pid} did not exit; refusing to leave it running.`);
   }
   if (isMockServing(port)) {
