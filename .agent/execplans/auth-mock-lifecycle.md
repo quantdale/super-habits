@@ -71,9 +71,9 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit /dev/tcp probe + 03 scroll-up fix,
-  push, rerun auth lane via `--auth-mock` on Nitro ×2 with full
-  proof (signup/PUT/UID/verify).
+- Exact next action: Commit dead-forward retry, push, rerun auth
+  lane via `--auth-mock` on Nitro ×2 with full proof
+  (signup/PUT/UID/verify).
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
   reverse/emulator left; ledger + commit/push; plan COMPLETED.
@@ -135,6 +135,16 @@ tests/nativeAuthMock.test.ts tests/nativeAvd.test.ts` — 14/14
   next lane still fails at 03 with PUT logged, the remaining
   suspect is app-side state derivation, with full request logs
   now available.
+- 2026-09-04 — dead-forward boots (~3 occurrences: 2 diag + 1
+  lane): reverse listed but zero bytes flow; app silently stays
+  local-only. Device has neither curl nor /dev/tcp, so no
+  device-side probe is possible; instead the orchestrator now
+  retries a zero-traffic non-pass ONCE on the same target with a
+  fresh mock session (bounded, logged, both attempts recorded,
+  superseded excluded from summary). Prophylactic `reverse
+--remove-all` on owned targets. `mockSliceTouched` +
+  signup-line counting + record attempt/superseded fields +
+  summary filtering (20/20 tests).
 - 2026-09-04 — correction: the PUT + healthy-session evidence
   plus the Resend-peeking-at-top screenshots point at the SAME
   below/above-fold assertion class as Wave 1 (the verify form

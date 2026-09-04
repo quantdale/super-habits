@@ -96,6 +96,14 @@ describe('native multi-AVD orchestration helpers', () => {
     });
   });
 
+  it('excludes superseded attempts from the campaign summary', () => {
+    const summary = summarizeTargetRuns([
+      buildTargetRunRecord({ status: 'BLOCKED', attempt: 1, supersededByRetry: true }),
+      buildTargetRunRecord({ status: 'PASS', attempt: 2 }),
+    ]);
+    expect(summary).toEqual({ total: 1, pass: 1, failed: 0, blocked: 0, status: 'PASS' });
+  });
+
   it('collates per-target runs into a campaign summary', () => {
     expect(summarizeTargetRuns([])).toEqual({
       total: 0,

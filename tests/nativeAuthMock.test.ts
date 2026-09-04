@@ -4,6 +4,7 @@ import {
   assertMockProof,
   interpretDeviceProbe,
   isPidAlive,
+  mockSliceTouched,
   parseMockLog,
   reverseSpecPresent,
 } from '../scripts/native-avd.mjs';
@@ -30,6 +31,7 @@ describe('native auth-mock proof helpers', () => {
       refreshes: 1,
       logouts: 0,
       putUserRequests: 1,
+      restProbes: 0,
     });
   });
 
@@ -64,6 +66,14 @@ describe('native auth-mock proof helpers', () => {
     );
     expect(proof.ok).toBe(false);
     expect(proof.reasons.join(';')).toMatch(/PUT \/auth\/v1\/user/);
+  });
+
+  it('counts signup events per slice, not the cumulative counter', () => {
+    const parsed = parseMockLog('[mock] signup count=2 user=aaa\n[mock] signup count=3 user=aaa\n');
+    expect(parsed.signupCount).toBe(2);
+    expect(parsed.restProbes).toBe(0);
+    const withProbes = parseMockLog('[mock] rest probe GET /rest/v1/todos -> empty\n');
+    expect(withProbes.restProbes).toBe(1);
   });
 
   it('rejects a lane slice with no protection verify', () => {
@@ -110,6 +120,15 @@ describe('native auth-mock proof helpers', () => {
     const odd = interpretDeviceProbe({ status: 1, stdout: '', stderr: 'boom' });
     expect(odd.ok).toBe(false);
     expect(odd.skipped).toBe(false);
+  });
+
+  it('detects whether a mock-log slice saw any traffic', () => {
+    expect(mockSliceTouched(null)).toBe(false);
+    expect(mockSliceTouched(parseMockLog(''))).toBe(false);
+    expect(mockSliceTouched(parseMockLog(GREEN_LOG))).toBe(true);
+    expect(mockSliceTouched(parseMockLog('[mock] rest probe GET /rest/v1/todos -> empty\n'))).toBe(
+      true,
+    );
   });
 
   it('patches the application tag for test-only cleartext exactly once', () => {

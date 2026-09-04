@@ -36,6 +36,7 @@ import {
   assertMockProof,
   interpretDeviceProbe,
   isPidAlive,
+  mockSliceTouched,
   parseMockLog,
   reverseSpecPresent,
   buildTargetRunRecord,
@@ -822,7 +823,17 @@ function stopAuthMockSession(session) {
   console.log(`Stopped owned auth-mock (pid ${pid}); port ${port} closed; log ${logPath}.`);
 }
 
-function ensureAuthReverse(adb, serial, port) {
+function ensureAuthReverse(adb, serial, port, owned = false) {
+  if (owned) {
+    // Owned targets boot fresh, so no legitimate forward can exist here;
+    // clearing ADBD ghost state before establishing our own forward.
+    const clear = run(adb, ['-s', serial, 'reverse', '--remove-all']);
+    console.log(
+      clear.status === 0
+        ? `Cleared reverse forwards on owned '${serial}'.`
+        : `Note: reverse --remove-all on '${serial}' exited ${clear.status}; continuing.`,
+    );
+  }
   const list = run(adb, ['-s', serial, 'reverse', '--list']);
   if (list.status === 0 && reverseSpecPresent(list.stdout, port)) {
     const stale = run(adb, ['-s', serial, 'reverse', '--remove', `tcp:${port}`]);
@@ -946,70 +957,16 @@ function resolveAvdTarget(adb, emulator, avdName, bootTimeoutMs) {
   return { serial, owned: true, pid: null };
 }
 
-function runMultiAvdTarget(adb, emulator, avdName, options, authSession, records, cleanupErrors) {
-  const startedAt = new Date().toISOString();
-  let resolution = null;
-  let outcome = null;
-  let reverseEstablished = false;
-  try {
-    resolution = resolveAvdTarget(adb, emulator, avdName, options.bootTimeoutMs);
-    if (authSession) {
-      ensureAuthReverse(adb, resolution.serial, authSession.port);
-      reverseEstablished = true;
-    }
-    const targetOptions = {
-      ...options,
-      serial: resolution.serial,
-      avdContext: { avd: avdName, owned: resolution.owned },
-      replayCommand: `${options.replayCommand} --avd ${avdName}`,
-      authSlice: authSession
-        ? { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) }
-        : null,
-    };
-    outcome = runPlatform('android', targetOptions);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    outcome = blocked(
-      'android',
-      options.tag,
-      `${options.replayCommand} --avd ${avdName}`,
-      message,
-      {
-        flow: options.flow ?? '.maestro',
-        avd: avdName,
-        serial: resolution?.serial ?? null,
-        ownedEmulator: resolution?.owned ?? false,
-        mockState: null,
-        remediation:
-          'Inspect the message above; no emulator was left in an unknown state by this step.',
-      },
-    );
-  } finally {
-    if (authSession && reverseEstablished && resolution) {
-      try {
-        removeAuthReverse(adb, resolution.serial, authSession.port);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
-        console.error(`Auth reverse cleanup failed [ENVIRONMENT]: ${message}`);
-      }
-    }
-    if (resolution?.owned && !options.noStop) {
-      try {
-        stopOwnedEmulator(adb, resolution.serial);
-        console.log(`Stopped owned emulator ${resolution.serial} (AVD '${avdName}').`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
-        console.error(`Emulator cleanup failed [ENVIRONMENT]: ${message}`);
-      }
-    } else if (resolution?.owned && options.noStop) {
-      console.log(
-        `Leaving owned emulator ${resolution.serial} (AVD '${avdName}') running (--no-stop).`,
-      );
-    }
-  }
-  const endedAt = new Date().toISOString();
+function pushTargetRecord(
+  records,
+  outcome,
+  avdName,
+  options,
+  resolution,
+  startedAt,
+  endedAt,
+  attempt,
+) {
   const report = outcome.report;
   records.push(
     buildTargetRunRecord({
@@ -1033,10 +990,173 @@ function runMultiAvdTarget(adb, emulator, avdName, options, authSession, records
       classification: report.classification ?? (report.status === 'BLOCKED' ? 'ENVIRONMENT' : null),
       artifactPath: outcome.reportPath,
       replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      attempt,
     }),
   );
-  console.log(`Target '${avdName}': ${report.status} (artifact: ${outcome.reportPath})`);
+  console.log(
+    `Target '${avdName}' attempt ${attempt}: ${report.status} (artifact: ${outcome.reportPath})`,
+  );
   return outcome.exitCode;
+}
+
+function blockedTargetOutcome(avdName, options, resolution, message, remediation) {
+  return blocked('android', options.tag, `${options.replayCommand} --avd ${avdName}`, message, {
+    flow: options.flow ?? '.maestro',
+    avd: avdName,
+    serial: resolution?.serial ?? null,
+    ownedEmulator: resolution?.owned ?? false,
+    mockState: null,
+    remediation,
+  });
+}
+
+function runLaneAttempt(
+  adb,
+  avdName,
+  options,
+  authSession,
+  resolution,
+  records,
+  cleanupErrors,
+  attempt,
+) {
+  const startedAt = new Date().toISOString();
+  let outcome = null;
+  let reverseEstablished = false;
+  try {
+    if (authSession) {
+      ensureAuthReverse(adb, resolution.serial, authSession.port, resolution.owned);
+      reverseEstablished = true;
+    }
+    outcome = runPlatform('android', {
+      ...options,
+      serial: resolution.serial,
+      avdContext: { avd: avdName, owned: resolution.owned },
+      replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      authSlice: authSession
+        ? { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) }
+        : null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    outcome = blockedTargetOutcome(
+      avdName,
+      options,
+      resolution,
+      message,
+      'Inspect the message above; no emulator was left in an unknown state by this step.',
+    );
+  } finally {
+    if (authSession && reverseEstablished && resolution) {
+      try {
+        removeAuthReverse(adb, resolution.serial, authSession.port);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
+        console.error(`Auth reverse cleanup failed [ENVIRONMENT]: ${message}`);
+      }
+    }
+  }
+  const endedAt = new Date().toISOString();
+  return pushTargetRecord(
+    records,
+    outcome,
+    avdName,
+    options,
+    resolution,
+    startedAt,
+    endedAt,
+    attempt,
+  );
+}
+
+function runMultiAvdTarget(adb, emulator, avdName, options, sessionCtl, records, cleanupErrors) {
+  let resolution = null;
+  try {
+    resolution = resolveAvdTarget(adb, emulator, avdName, options.bootTimeoutMs);
+  } catch (error) {
+    // Boot/resolution failure: BLOCKED with no retry (nothing ran to retry).
+    const message = error instanceof Error ? error.message : String(error);
+    const outcome = blockedTargetOutcome(
+      avdName,
+      options,
+      resolution,
+      message,
+      'Inspect the message above; no emulator was left in an unknown state by this step.',
+    );
+    const endedAt = new Date().toISOString();
+    pushTargetRecord(records, outcome, avdName, options, resolution, endedAt, endedAt, 1);
+    return outcome.exitCode;
+  }
+  let exitCode = 0;
+  try {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      exitCode = Math.max(
+        exitCode,
+        runLaneAttempt(
+          adb,
+          avdName,
+          options,
+          sessionCtl.get(),
+          resolution,
+          records,
+          cleanupErrors,
+          attempt,
+        ),
+      );
+      const last = records[records.length - 1];
+      const retryable =
+        sessionCtl.get() !== null &&
+        last.status !== 'PASS' &&
+        last.mockState &&
+        !mockSliceTouched(last.mockState);
+      if (!retryable || attempt === 2) break;
+      last.supersededByRetry = true;
+      console.log(
+        `Attempt ${attempt} on '${avdName}' reached the lane with zero mock traffic (dead-forward boot?); restarting the mock session and retrying once on the same target.`,
+      );
+      try {
+        sessionCtl.restart();
+      } catch (error) {
+        const outcome = blockedTargetOutcome(
+          avdName,
+          options,
+          resolution,
+          `Auth-mock restart failed: ${error instanceof Error ? error.message : String(error)}`,
+          'Inspect the mock log and retry the lane.',
+        );
+        const endedAt = new Date().toISOString();
+        pushTargetRecord(
+          records,
+          outcome,
+          avdName,
+          options,
+          resolution,
+          endedAt,
+          endedAt,
+          attempt + 1,
+        );
+        exitCode = Math.max(exitCode, outcome.exitCode);
+        break;
+      }
+    }
+  } finally {
+    if (resolution?.owned && !options.noStop) {
+      try {
+        stopOwnedEmulator(adb, resolution.serial);
+        console.log(`Stopped owned emulator ${resolution.serial} (AVD '${avdName}').`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
+        console.error(`Emulator cleanup failed [ENVIRONMENT]: ${message}`);
+      }
+    } else if (resolution?.owned && options.noStop) {
+      console.log(
+        `Leaving owned emulator ${resolution.serial} (AVD '${avdName}') running (--no-stop).`,
+      );
+    }
+  }
+  return exitCode;
 }
 
 function runMultiAvd(options) {
@@ -1078,12 +1198,32 @@ function runMultiAvd(options) {
   }
   const records = [];
   const cleanupErrors = [];
+  const authSessions = [];
+  const sessionCtl = {
+    get: () => authSession,
+    restart: () => {
+      if (authSession) {
+        try {
+          stopAuthMockSession(authSession);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          cleanupErrors.push({ avd: null, serial: null, message });
+          console.error(`Auth-mock teardown failed [ENVIRONMENT]: ${message}`);
+        } finally {
+          authSession = null;
+        }
+      }
+      authSession = startAuthMockSession(options);
+      authSessions.push(authSession);
+    },
+  };
+  if (options.authMock) authSessions.push(authSession);
   let exitCode = 0;
   try {
     for (const avdName of sequence) {
       exitCode = Math.max(
         exitCode,
-        runMultiAvdTarget(adb, emulator, avdName, options, authSession, records, cleanupErrors),
+        runMultiAvdTarget(adb, emulator, avdName, options, sessionCtl, records, cleanupErrors),
       );
     }
   } finally {
@@ -1099,18 +1239,22 @@ function runMultiAvd(options) {
   }
   const summary = summarizeTargetRuns(records);
   let authProof = null;
-  if (authSession) {
+  if (options.authMock) {
     authProof = {
-      port: authSession.port,
-      deviceUrl: authSession.deviceUrl,
-      logPath: authSession.logPath,
-      ...mockProofSlice(authSession.logPath, 0),
+      sessions: authSessions.map((session) => ({
+        port: session.port,
+        deviceUrl: session.deviceUrl,
+        logPath: session.logPath,
+        ...mockProofSlice(session.logPath, 0),
+      })),
     };
-    console.log(
-      `Auth-mock invocation proof: signup=${authProof.signupCount} unauth=${authProof.unauthenticatedChecks} users=[${authProof.userIds.join(', ')}] ok=${authProof.ok}`,
-    );
-    if (!authProof.ok) {
-      console.error(`Auth-mock proof reasons: ${authProof.reasons.join('; ')}`);
+    for (const sessionProof of authProof.sessions) {
+      console.log(
+        `Auth-mock session proof (${sessionProof.logPath}): signup=${sessionProof.signupCount} put=${sessionProof.putUserRequests} unauth=${sessionProof.unauthenticatedChecks} users=[${sessionProof.userIds.join(', ')}] ok=${sessionProof.ok}`,
+      );
+      if (!sessionProof.ok) {
+        console.error(`Auth-mock proof reasons: ${sessionProof.reasons.join('; ')}`);
+      }
     }
   }
   if (cleanupErrors.length > 0) exitCode = Math.max(exitCode, 1);
@@ -1199,19 +1343,57 @@ function runSingleWithAuthMock(options, platforms) {
     );
     return Math.max(outcome.exitCode, stopSession());
   }
-  const outcome = runPlatform('android', {
-    ...options,
-    serial,
-    authSlice: { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) },
-  });
-  let exitCode = outcome.exitCode;
-  try {
-    removeAuthReverse(adb, serial, authSession.port);
-  } catch (error) {
-    console.error(
-      `Auth reverse cleanup failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+  let exitCode = 0;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const outcome = runPlatform('android', {
+      ...options,
+      serial,
+      authSlice: { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) },
+    });
+    exitCode = Math.max(exitCode, outcome.exitCode);
+    try {
+      removeAuthReverse(adb, serial, authSession.port);
+    } catch (error) {
+      console.error(
+        `Auth reverse cleanup failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      exitCode = Math.max(exitCode, 1);
+    }
+    const retryable =
+      outcome.report.status !== 'PASS' &&
+      outcome.report.mockState &&
+      !mockSliceTouched(outcome.report.mockState);
+    if (!retryable || attempt === 2) {
+      return Math.max(exitCode, stopSession());
+    }
+    console.log(
+      `Attempt ${attempt} reached the lane with zero mock traffic (dead-forward boot?); restarting the mock session and retrying once on the same target.`,
     );
-    exitCode = Math.max(exitCode, 1);
+    exitCode = Math.max(exitCode, stopSession());
+    try {
+      authSession = startAuthMockSession(options);
+    } catch (error) {
+      console.error(
+        `Auth-mock restart failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 2;
+    }
+    try {
+      ensureAuthReverse(adb, serial, authSession.port, false);
+    } catch (error) {
+      const blockedOutcome = blocked(
+        'android',
+        options.tag,
+        options.replayCommand,
+        error instanceof Error ? error.message : String(error),
+        {
+          flow: options.flow ?? '.maestro',
+          serial,
+          remediation: 'Inspect adb reverse state on the target and retry.',
+        },
+      );
+      return Math.max(blockedOutcome.exitCode, stopSession());
+    }
   }
   return Math.max(exitCode, stopSession());
 }

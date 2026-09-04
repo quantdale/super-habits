@@ -213,6 +213,29 @@ export function interpretDeviceProbe(result) {
 }
 
 /**
+ * Whether a per-target mock-log slice shows ANY traffic. A lane that ran
+ * but left zero bytes is a dead-forward boot, not a lane result: the
+ * orchestrator retries those once on a fresh session instead of
+ * triaging them as product failures.
+ *
+ * @param {{ signupCount?: number, unauthenticatedChecks?: number, putUserRequests?: number, otpRequests?: number, refreshes?: number, logouts?: number, restProbes?: number, userIds?: string[] } | null} mockState
+ * @returns {boolean}
+ */
+export function mockSliceTouched(mockState) {
+  if (!mockState) return false;
+  return (
+    (mockState.signupCount ?? 0) > 0 ||
+    (mockState.unauthenticatedChecks ?? 0) > 0 ||
+    (mockState.putUserRequests ?? 0) > 0 ||
+    (mockState.otpRequests ?? 0) > 0 ||
+    (mockState.refreshes ?? 0) > 0 ||
+    (mockState.logouts ?? 0) > 0 ||
+    (mockState.restProbes ?? 0) > 0 ||
+    (mockState.userIds ?? []).length > 0
+  );
+}
+
+/**
  * Filename-safe label identifying one certification target.
  *
  * @param {{ avd: string | null, serial: string | null }} target
@@ -254,6 +277,8 @@ export function buildTargetRunRecord(fields = {}) {
     artifactPath = null,
     mockState = null,
     replayCommand = null,
+    attempt = 1,
+    supersededByRetry = false,
   } = fields;
   let durationMs = null;
   if (startedAt && endedAt) {
@@ -283,6 +308,8 @@ export function buildTargetRunRecord(fields = {}) {
     artifactPath,
     mockState,
     replayCommand,
+    attempt,
+    supersededByRetry,
   };
 }
 
@@ -306,16 +333,19 @@ export function parseMockLog(logText) {
   let refreshes = 0;
   let logouts = 0;
   let putUserRequests = 0;
+  let restProbes = 0;
   const userIds = [];
   const verifyPermanentIds = [];
   const noteUser = (id) => {
     if (id && !userIds.includes(id)) userIds.push(id);
   };
   for (const line of text.split(/\r?\n/)) {
-    let match = line.match(/\[mock\] signup count=(\d+) user=(\S+)/);
+    // Count signup EVENTS (lines), not the mock's cumulative counter: a
+    // lane slice may start mid-counter when targets share one mock.
+    let match = line.match(/\[mock\] signup count=\d+ user=(\S+)/);
     if (match) {
-      signupCount = Math.max(signupCount, Number(match[1]));
-      noteUser(match[2]);
+      signupCount += 1;
+      noteUser(match[1]);
       continue;
     }
     if (/\[mock\] user-check UNAUTHENTICATED/.test(line)) {
@@ -334,6 +364,7 @@ export function parseMockLog(logText) {
       continue;
     }
     if (/\[mock\] put user/.test(line)) putUserRequests += 1;
+    else if (/\[mock\] rest probe/.test(line)) restProbes += 1;
     else if (/\[mock\] otp requested/.test(line)) otpRequests += 1;
     else if (/\[mock\] token refresh ok/.test(line)) refreshes += 1;
     else if (/\[mock\] logout count=/.test(line)) logouts += 1;
@@ -347,6 +378,7 @@ export function parseMockLog(logText) {
     refreshes,
     logouts,
     putUserRequests,
+    restProbes,
   };
 }
 
@@ -414,7 +446,9 @@ export function addCleartextAttr(manifestXml) {
  * @returns {{ total: number, pass: number, failed: number, blocked: number, status: string }}
  */
 export function summarizeTargetRuns(records) {
-  const list = records ?? [];
+  // Superseded attempts stay in the file as evidence but never decide the
+  // campaign: only the decisive attempt per target counts.
+  const list = (records ?? []).filter((record) => !record.supersededByRetry);
   const pass = list.filter((record) => record.status === 'PASS').length;
   const failed = list.filter((record) => record.status === 'FAILED_NEEDS_TRIAGE').length;
   const blocked = list.filter((record) => record.status === 'BLOCKED').length;
