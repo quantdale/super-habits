@@ -82,16 +82,22 @@ tags:
     index: 0
 # W8-4 probe (permanent): viewMode persisted as diary, so Calories opens in
 # diary; switch explicitly to Form first and prove the row survived restart
-# through the FORM read path before exercising the diary layer. Form-shows
-# + diary-empty localizes a diary-layer defect; both-empty implicates the
-# read path (a root-pulled DB dump already rules out data loss).
+# through the FORM read path before exercising the diary layer. The
+# 'Logged today' header renders ONLY when entries.length > 0
+# (CaloriesFormView, code-guaranteed), so it is the sound signal — plain
+# entry text would also match the recent/frequent chips. Header-shows +
+# diary-empty localizes a diary-layer defect; both-empty implicates the
+# shared entries state (a root-pulled DB dump already rules out data
+# loss). Scroll first: the section sits below the fold.
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn: 'Form view'
+- scrollUntilVisible:
+    element: 'Logged today'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Logged today'
     timeout: 15000
-- assertVisible: 'Native breakfast'
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 8000
