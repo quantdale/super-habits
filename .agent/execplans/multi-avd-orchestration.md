@@ -1,7 +1,7 @@
 # ExecPlan: Wave 1 — Multi-AVD Native Orchestration
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -58,9 +58,12 @@ rewriting provisioner provenance logic that already works.
   impact map `native-e2e-infrastructure` rule covers `scripts/native-*.mjs`
   - native tests; `--list-avds` verified (4 AVDs, none connected);
     unknown-AVD fail-fast verified with zero emulators started.
-- In progress: triaging a CRBABot-only smoke failure the orchestrator
-  surfaced (Nitro green 3×; CRBABot red 2× with varying steps).
-  Runner now captures Maestro `--debug-output` per lane for evidence.
+- Current milestone: COMPLETE — tooling landed + tested, ≥2-AVD
+  proof green, PRODUCT_BUG + TEST_BUGs fixed and verified.
+- Completed: all Wave 1 implementation + verification (see Progress
+  and Validation Ledger). No product-tree drift beyond the one
+  justified FAB-gesture product fix.
+- In progress: none.
 - Important modified files: `scripts/native-avd.mjs` (new),
   `scripts/qa-native.mjs`, `tests/nativeAvd.test.ts` (new),
   `qa/impact-map.json`.
@@ -70,11 +73,10 @@ rewriting provisioner provenance logic that already works.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit hideKeyboard flow fix, push, rerun
-  full smoke on CRBABot (no rebuild needed — test-only change),
-  then Nitro regression + full smoke on both AVDs.
-- Remaining definition of done: orchestration landed + tested; ≥2-AVD
-  lane proof (or ENVIRONMENT record); docs updated; ledger + commit/push.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete — orchestration landed +
+  tested; Nitro + CRBABot smoke green @45dc256; fixes verified;
+  ledger + commits pushed; plan validated.
 
 ## Progress
 
@@ -94,10 +96,11 @@ rewriting provisioner provenance logic that already works.
 - [x] Second CRBABot finding (screenshot-proven): sheet autofocus
       pops the keyboard over `Describe it`; scroll cannot reveal
       it. Test-layer fix: `hideKeyboard` before scroll+tap.
-- [ ] Re-verify full smoke on CRBABot, then Nitro regression;
-      plan COMPLETED.
-- [ ] ≥2-AVD lane certification (or ENVIRONMENT record).
-- [ ] Docs/provenance updated; plan validated; committed/pushed.
+- [x] Re-verified full smoke on CRBABot (2/2 @45dc256: ccv2 33s,
+      native-smoke 36s) then Nitro regression (2/2 @45dc256, no
+      regressions); plan COMPLETED.
+- [x] ≥2-AVD lane certification (Nitro + CRBABot green).
+- [x] Docs/provenance updated; plan validated; committed/pushed.
 
 ## Surprises & Discoveries
 
@@ -147,6 +150,12 @@ it` under the finger — a real small-screen tap race (fast human
   with exact reason; `adb devices` still empty (nothing booted).
 - 2026-09-04 — `qa:impact:validate` — 13 rules valid after
   `native-e2e-infrastructure` extension.
+- 2026-09-04 — CRBABot smoke @45dc256 — 2/2 PASS (ccv2 33s,
+  native-smoke 36s); owned stop + collated record verified;
+  `adb devices` empty after.
+- 2026-09-04 — Nitro smoke @45dc256 — 2/2 PASS (ccv2 33s,
+  native-smoke 43s); no regressions from FAB deferral or flow
+  changes; `adb devices` empty after.
 - 2026-09-04 — Live Wave 1 proof: owned boot + provision (BUILD
   SUCCESSFUL) + smoke + owned stop + labeled reports + collated
   record on Nitro PASS 2/2 (APK DE46ADA6 @3c1ddfe); sequential
@@ -187,6 +196,19 @@ it` under the finger — a real small-screen tap race (fast human
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: audit starting.
-- Follow-up: none yet.
+- Status: Completed.
+- Summary: sequential multi-AVD orchestration landed in
+  `scripts/qa-native.mjs` on pure helpers in `scripts/native-avd.mjs`
+  (8 unit tests), with labeled per-target reports, owned-emulator
+  lifecycle, fail-fast planning, and collated Wave 6 records. Live
+  proof on Nitro_API_36 + CRBABot_API_36 (API 36 x86_64) green 2/2
+  each at `45dc256`. The second AVD found one PRODUCT_BUG (FAB tap
+  race skipping the sheet on small screens; fixed by deferring the
+  sheet window past the opening gesture) and two TEST_BUG flow gaps
+  (below-fold `Anytime`/`Describe it`; fixed with scroll) plus one
+  keyboard-coverage gap (fixed with `hideKeyboard`) — all verified
+  on both AVDs with no regressions. Maestro `--debug-output` per
+  lane is now standard (screenshots/hierarchies/logcat per failure).
+- Follow-up: install-reuse across serials (avoid identical rebuilds
+  per AVD switch; deferred to Wave 5); `--auth-mock` lane (Wave 2)
+  reuses the per-target record shape and owned-lifecycle patterns.

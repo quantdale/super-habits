@@ -56,9 +56,8 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   observed); Maestro 2.8.0. No tree drift: `app core features lib
 scripts supabase` identical to `1e1f4d0` (only tracked diff since
   Planned-From is the ACTIVE prompt itself).
-- In progress: Wave 1 multi-AVD orchestration — tooling implemented +
-  unit-tested (`scripts/native-avd.mjs`, `--avd/--list-avds` in runner,
-  8/8 new tests, impact map extended); live boot+lane proof next.
+- In progress: Wave 2 auth-mock lifecycle automation (workstream
+  plan next).
 - Important modified files: `.agent/execplans/certification-infrastructure-v2.md`
   (this plan).
 - Last successful validation: planner-era `agent:plan:validate:all` PASS +
@@ -79,7 +78,12 @@ scripts supabase` identical to `1e1f4d0` (only tracked diff since
 
 - [x] Git truth reconciled; master orchestration plan opened.
 - [x] Wave 0 recertification (hygiene, baseline, native presence, drift check).
-- [ ] Wave 1 multi-AVD orchestration tooling + tests + ≥2-AVD proof (tooling done; live proof pending).
+- [x] Wave 0 recertification (done). Wave 1 COMPLETED 2026-09-04:
+      orchestration landed + 8/8 tests; Nitro + CRBABot smoke 2/2 each
+      @45dc256; PRODUCT_BUG (FAB tap race, fixed in app/index.tsx) +
+      TEST_BUGs (below-fold scrolls, keyboard hide, fixed in flows)
+      verified both AVDs; commits 3c1ddfe/ab3588c/9be8bcd/94d2c80/
+      65063a5/45dc256 pushed.
 - [ ] Wave 2 auth-mock lifecycle automation + tests + auth 3/3 ×N.
 - [ ] Wave 3 historical DB corpus (seeded synthetic; regeneration proof).
 - [ ] Wave 4 corpus-backed migration/restart/performance certification.
