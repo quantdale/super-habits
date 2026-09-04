@@ -44,50 +44,52 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 
 ## Current Checkpoint
 
-- Current milestone: Wave 0 COMPLETE at `2502a75`; Wave 1 opening.
-- Completed: Wave 0 recertification — hygiene PASS (8081/8082 free);
-  `git diff --check` clean; typecheck 0; lint 0 (max-warnings 0);
-  unit 1665/1665; journey-label parity OK; impact map 13 rules valid;
-  themes 140/140; Supabase schema PASS; OpenSpec 50/50;
-  `agent:plan:validate:all` PASS (incl. this ACTIVE plan); sim:validate
-  23/23. Native presence: adb OK with 0 devices attached (nothing
-  booted); AVDs present: CRBABot_API_36, Nitro_API_36,
-  braintraining-qa36, braintraining36 (same set as predecessor
-  observed); Maestro 2.8.0. No tree drift: `app core features lib
-scripts supabase` identical to `1e1f4d0` (only tracked diff since
-  Planned-From is the ACTIVE prompt itself).
-- In progress: Waves 5/6 repetition framework + provenance
-  standardization.
+- Current milestone: Waves 0–6 COMPLETE at `0b0b3c0`; Wave 7 opening.
+- Completed: Wave 0 recert at `2502a75` (hygiene, typecheck 0, lint 0,
+  unit 1665/1665, impact 13, themes 140/140, supabase PASS, OpenSpec
+  50/50, sim:validate 23/23; 4 AVDs present; Maestro 2.8.0); Wave 1
+  multi-AVD orchestration COMPLETED (8/8 tests; Nitro + CRBABot smoke
+  2/2 each @45dc256; FAB PRODUCT_BUG + flow TEST_BUGs fixed);
+  Wave 2 auth-mock lifecycle COMPLETED (auth 3/3 ×2 @b32bc7c, APK
+  5642673B, exactly-1-signup/same-UID proof); Wave 3 mature corpus
+  COMPLETED (seedMature ~9k rows, byte-reproducible @c2f7561, full
+  171/1929 green); Wave 4 corpus-backed certification COMPLETED
+  (backfill/restart/perf + 15/15 migrations @3f9046a); Waves 5/6
+  repetition + provenance COMPLETED (repeat 5/5; unit×2 + p0×2
+  25/25 collated PASS @3f9046a tree; native 21-field + repeat
+  14-field contracts verified; `qa:repeat` landed @4049450).
+- In progress: Wave 7 CI/nightly placement evaluation.
 - Important modified files: `.agent/execplans/certification-infrastructure-v2.md`
-  (this plan).
-- Last successful validation: planner-era `agent:plan:validate:all` PASS +
-  `openspec:validate` 50/50 PASS (pre-executor, at planning commit).
+  (this plan); per-workstream COMPLETED plans for Waves 1–6.
+- Last successful validation: 2026-09-04 Waves 5/6 closure — repeat
+  5/5 + typecheck 0 + lint 0 + impact 13 valid + p0×2 collated PASS
+  - provenance-contract PASS + hygiene PASS + plan:validate PASS.
 - Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Open Wave 1 workstream ExecPlan, audit
-  `scripts/qa-native*.mjs` + `native-qa-utils.mjs` + provisioner, then
-  implement sequential multi-AVD orchestration with unit tests.
-- Remaining definition of done: Waves 0–10 evidenced per prompt; tooling
-  landed with tests; corpus reproducible; battery green; verifier PASS;
-  clean pushed main; prompt marked COMPLETED.
+- Exact next action: Open Wave 7 evaluation (audit matrix.ts +
+  CI workflows vs Wave 1–6 evidence; placement decision only).
+- Remaining definition of done: Wave 7 decision; Wave 8 battery;
+  Wave 9 adversarial verification; Wave 10 sweep; prompt COMPLETED;
+  clean pushed main.
 
 ## Progress
 
 - [x] Git truth reconciled; master orchestration plan opened.
 - [x] Wave 0 recertification (hygiene, baseline, native presence, drift check).
-- [x] Wave 0 recertification (done). Wave 1 COMPLETED 2026-09-04:
-      orchestration landed + 8/8 tests; Nitro + CRBABot smoke 2/2 each
-      @45dc256; PRODUCT_BUG (FAB tap race, fixed in app/index.tsx) +
-      TEST_BUGs (below-fold scrolls, keyboard hide, fixed in flows)
-      verified both AVDs; commits 3c1ddfe/ab3588c/9be8bcd/94d2c80/
-      65063a5/45dc256 pushed.
-- [ ] Wave 2 auth-mock lifecycle automation + tests + auth 3/3 ×N.
-- [ ] Wave 3 historical DB corpus (seeded synthetic; regeneration proof).
-- [ ] Wave 4 corpus-backed migration/restart/performance certification.
-- [ ] Wave 5/6 repetition framework + provenance standardization.
+- [x] Wave 1 COMPLETED 2026-09-04: orchestration + 8/8 tests; Nitro +
+      CRBABot smoke 2/2 each @45dc256; FAB PRODUCT_BUG + flow TEST_BUGs fixed.
+- [x] Wave 2 COMPLETED 2026-09-04: owned auth-mock lifecycle + auth 3/3 ×2
+      with mock proof @b32bc7c (APK 5642673B); plan COMPLETED @b9e2697.
+- [x] Wave 3 COMPLETED 2026-09-04: deterministic mature corpus + edge
+      states, byte-reproducible @c2f7561; full 171/1929 green.
+- [x] Wave 4 COMPLETED 2026-09-04: corpus backfill/restart/perf +
+      15/15 migrations @3f9046a.
+- [x] Waves 5/6 COMPLETED 2026-09-04: `qa:repeat` runner + 5/5 tests +
+      unit×2 + p0×2 (25/25) collated PASS + provenance contracts verified
+      (@4049450 + plan @0b0b3c0).
 - [ ] Wave 7 CI/nightly evaluation with placement decision.
 - [ ] Wave 8 expensive stability battery (quiet window).
 - [ ] Wave 9 adversarial verification PASS; Wave 10 P0/P1 sweep.
@@ -112,6 +114,10 @@ scripts supabase` identical to `1e1f4d0` (only tracked diff since
   impact 13; themes 140/140; supabase schema PASS; openspec 50/50;
   plan:validate:all PASS; sim:validate 23/23; adb 0 devices; 4 AVDs
   present; Maestro 2.8.0; no product-tree drift vs `1e1f4d0`.
+- 2026-09-04 — Waves 5/6 closure: repeat 5/5; typecheck 0; lint 0;
+  impact 13 valid; unit×2 collated PASS; p0×2 collated PASS (25/25
+  each, fresh dist/ once); provenance-contract PASS; hygiene PASS +
+  adb empty; plans validated; feat(qa) @4049450 + docs(agent) @0b0b3c0.
 
 ## Changed Files / Areas
 
