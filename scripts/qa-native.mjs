@@ -842,21 +842,14 @@ function ensureAuthReverse(adb, serial, port) {
     throw new Error(`adb reverse tcp:${port} on '${serial}' did not appear in reverse --list.`);
   }
   // The --list entry proves the forward exists, not that bytes flow
-  // (a fresh boot can list a dead forward). Probe end-to-end from the
-  // device; one re-establishment is allowed, then fail with the reason.
+  // (stale ADBD state can list a dead forward). Probe end-to-end from
+  // the device via shell /dev/tcp (no curl needed); one
+  // re-establishment is allowed, then fail with the reason.
   const probeArgs = [
     '-s',
     serial,
     'shell',
-    'curl',
-    '--max-time',
-    '5',
-    '-s',
-    '-o',
-    '/dev/null',
-    '-w',
-    '%{http_code}',
-    `http://127.0.0.1:${port}/rest/v1/auth-mock-probe`,
+    `cat < /dev/null > /dev/tcp/127.0.0.1/${port} && echo PROBE_OPEN || echo PROBE_CLOSED`,
   ];
   let probe = interpretDeviceProbe(run(adb, probeArgs));
   if (!probe.ok && !probe.skipped) {
@@ -870,7 +863,7 @@ function ensureAuthReverse(adb, serial, port) {
     probe = interpretDeviceProbe(run(adb, probeArgs));
   }
   if (probe.skipped) {
-    console.log(`Device has no curl; connectivity probe skipped (${probe.reason}).`);
+    console.log(`Device connectivity probe skipped (${probe.reason}).`);
   } else if (!probe.ok) {
     throw new Error(
       `Device-side mock connectivity probe failed on '${serial}' (${probe.reason}); the lane would run offline.`,

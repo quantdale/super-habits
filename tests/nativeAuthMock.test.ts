@@ -90,21 +90,26 @@ describe('native auth-mock proof helpers', () => {
   });
 
   it('interprets the device-side connectivity probe', () => {
-    expect(interpretDeviceProbe({ status: 0, stdout: '200', stderr: '' })).toEqual({
+    expect(interpretDeviceProbe({ status: 0, stdout: 'PROBE_OPEN\n', stderr: '' })).toEqual({
       ok: true,
       skipped: false,
       reason: null,
     });
-    expect(interpretDeviceProbe({ status: 0, stdout: '  200\n', stderr: '' }).ok).toBe(true);
-    const refused = interpretDeviceProbe({ status: 0, stdout: '000', stderr: '' });
-    expect(refused.ok).toBe(false);
-    expect(refused.skipped).toBe(false);
+    const refused = interpretDeviceProbe({ status: 0, stdout: 'PROBE_CLOSED\n', stderr: '' });
+    expect(refused).toEqual({
+      ok: false,
+      skipped: false,
+      reason: 'device TCP connection to the mock was refused',
+    });
     const missing = interpretDeviceProbe({
-      status: 127,
+      status: 1,
       stdout: '',
-      stderr: '/system/bin/sh: curl: not found',
+      stderr: "/system/bin/sh: can't create /dev/tcp/127.0.0.1/4545: No such file or directory",
     });
     expect(missing.skipped).toBe(true);
+    const odd = interpretDeviceProbe({ status: 1, stdout: '', stderr: 'boom' });
+    expect(odd.ok).toBe(false);
+    expect(odd.skipped).toBe(false);
   });
 
   it('patches the application tag for test-only cleartext exactly once', () => {

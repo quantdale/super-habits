@@ -71,9 +71,9 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit connectivity-probe fix, push, rerun
-  auth lane via `--auth-mock` on Nitro ×2 with full proof
-  (signup/PUT/UID/verify).
+- Exact next action: Commit /dev/tcp probe + 03 scroll-up fix,
+  push, rerun auth lane via `--auth-mock` on Nitro ×2 with full
+  proof (signup/PUT/UID/verify).
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
   reverse/emulator left; ledger + commit/push; plan COMPLETED.
@@ -135,6 +135,17 @@ tests/nativeAuthMock.test.ts tests/nativeAvd.test.ts` — 14/14
   next lane still fails at 03 with PUT logged, the remaining
   suspect is app-side state derivation, with full request logs
   now available.
+- 2026-09-04 — correction: the PUT + healthy-session evidence
+  plus the Resend-peeking-at-top screenshots point at the SAME
+  below/above-fold assertion class as Wave 1 (the verify form
+  renders above the viewport after the form swap + keyboard
+  dismissal; hierarchy dumps prune above-viewport nodes). The
+  `localhost` and PUT-fidelity fixes stand on their own evidence
+  (predecessor URL precedent; silent-{} session corruption in
+  supabase-js `_updateUser`); the diag-run zero-traffic mystery
+  is attributed to dead-forward boots (`--list` without bytes),
+  now gated by a curl-free /dev/tcp device probe (with one honest
+  retry). 03 flow gains scroll-UP-to-code before waiting.
 
 ## Changed Files / Areas
 

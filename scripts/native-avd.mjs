@@ -186,24 +186,27 @@ export function isPidAlive(pid) {
 }
 
 /**
- * Interpret a device-side mock-connectivity probe (`adb shell curl
- * --max-time 5 -s -o /dev/null -w %{http_code} <device-url>/probe`).
- * The `adb reverse --list` entry proves the forward exists, not that
- * bytes flow; this probe proves the app will actually reach the mock.
+ * Interpret a device-side mock-connectivity probe. The probe opens a TCP
+ * connection from the device to the reversed mock port using the shell's
+ * `/dev/tcp` redirection (no curl needed):
+ * `cat < /dev/null > /dev/tcp/127.0.0.1/<port> && echo PROBE_OPEN ||
+ * echo PROBE_CLOSED`. The `adb reverse --list` entry proves the forward
+ * exists, not that bytes flow (stale ADBD state can list a dead
+ * forward); this probe proves the app will actually reach the mock.
  *
  * @param {{ status: number, stdout: string, stderr: string }} result
  * @returns {{ ok: boolean, skipped: boolean, reason: string | null }}
  */
 export function interpretDeviceProbe(result) {
   const combined = `${result?.stdout ?? ''}\n${result?.stderr ?? ''}`;
-  if (
-    /curl\s*:\s*not found|unknown command|not recognized/i.test(combined) ||
-    result?.status === 127
-  ) {
-    return { ok: false, skipped: true, reason: 'device has no curl; probe skipped' };
+  if (/no such file|not found|unknown command|not recognized|bad/i.test(combined)) {
+    return { ok: false, skipped: true, reason: 'device shell has no /dev/tcp; probe skipped' };
   }
-  if (result?.status === 0 && String(result?.stdout ?? '').trim() === '200') {
+  if (/PROBE_OPEN/.test(combined)) {
     return { ok: true, skipped: false, reason: null };
+  }
+  if (/PROBE_CLOSED/.test(combined)) {
+    return { ok: false, skipped: false, reason: 'device TCP connection to the mock was refused' };
   }
   const detail = combined.trim().slice(-300) || `exit ${result?.status ?? '?'}`;
   return { ok: false, skipped: false, reason: `device probe failed: ${detail}` };

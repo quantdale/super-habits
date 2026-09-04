@@ -27,6 +27,12 @@ tags:
 - inputText: 'canary@example.test'
 - hideKeyboard
 - tapOn: 'Protect backup with email'
+# The form swap + keyboard dismissal can leave the new code field above the
+# viewport (only its Resend button peeks in). Scroll up to it first.
+- scrollUntilVisible:
+    element: 'Six-digit verification code'
+    direction: UP
+    timeout: 20000
 - extendedWaitUntil:
     visible: 'Six-digit verification code'
     timeout: 20000
