@@ -88,10 +88,12 @@ describe('native multi-AVD orchestration helpers', () => {
       status: 'PASS',
       replayCommand: 'npm run qa:native -- --platform android --tag smoke',
     });
-    expect(record.schemaVersion).toBe(1);
-    expect(record.buildKind).toBe('canonical');
-    expect(record.durationMs).toBe(300000);
-    expect(record.lane).toEqual({ tag: 'smoke', flow: null });
+    expect(record).toMatchObject({
+      schemaVersion: 1,
+      buildKind: 'canonical',
+      durationMs: 300000,
+      lane: { tag: 'smoke', flow: null },
+    });
   });
 
   it('collates per-target runs into a campaign summary', () => {

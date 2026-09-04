@@ -20,7 +20,7 @@ import { parseAdbDevices } from './native-qa-utils.mjs';
  * Blank lines are ignored; names are returned verbatim (never trimmed
  * internally beyond surrounding whitespace).
  *
- * @param {string} output
+ * @param {unknown} output
  * @returns {string[]}
  */
 export function parseAvdListOutput(output) {
