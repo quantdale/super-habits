@@ -74,11 +74,15 @@ tags:
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 8000
+# The saved entry chip pins to the TOP of the diary, partially under the
+# tab rail (Wave 8 screenshot proof). Scrolling DOWN pushes it further
+# off-screen so the matcher never reaches 60% visibility — scroll UP to
+# pull it fully into view.
 - swipe:
     direction: UP
 - scrollUntilVisible:
     element: 'Native breakfast'
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 60
 - extendedWaitUntil:
     visible: 'Native breakfast'

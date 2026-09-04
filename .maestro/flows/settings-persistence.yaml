@@ -6,9 +6,12 @@ tags:
 ---
 - launchApp:
     clearState: true
+# Cold-emulator bootstrap (account-ownership gate) can still be showing its
+# 'Preparing local workspace' loader at 10s (Wave 8 screenshot proof).
+# 30s matches the launch budgets in calories-persistence/native-smoke.
 - extendedWaitUntil:
     visible: 'Today'
-    timeout: 10000
+    timeout: 30000
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Close settings'
@@ -19,7 +22,7 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible: 'Today'
-    timeout: 10000
+    timeout: 30000
 - tapOn: 'Open settings'
 - assertVisible: 'Dark'
 - tapOn: 'Close settings'
