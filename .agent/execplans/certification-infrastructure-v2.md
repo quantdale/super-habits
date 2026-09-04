@@ -1,7 +1,7 @@
 # ExecPlan: Certification Infrastructure V2 (master orchestration)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -44,7 +44,7 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 
 ## Current Checkpoint
 
-- Current milestone: Waves 0–7 COMPLETE at `86db9ea`; Wave 8 IN PROGRESS (recovery verified 2026-09-04).
+- Current milestone: ALL WAVES 0–10 COMPLETE; campaign CLOSED 2026-09-04.
 - Completed: Wave 0 recert at `2502a75` (hygiene, typecheck 0, lint 0,
   unit 1665/1665, impact 13, themes 140/140, supabase PASS, OpenSpec
   50/50, sim:validate 23/23; 4 AVDs present; Maestro 2.8.0); Wave 1
@@ -58,13 +58,11 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   repetition + provenance COMPLETED (repeat 5/5; unit×2 + p0×2
   25/25 collated PASS @3f9046a tree; native 21-field + repeat
   14-field contracts verified; `qa:repeat` landed @4049450).
-- In progress: Wave 8 expensive stability battery.
+- In progress: None — campaign complete.
 - Important modified files: `.agent/execplans/certification-infrastructure-v2.md`
   (this plan); per-workstream COMPLETED plans for Waves 1–6.
-- Last successful validation: 2026-09-04 Waves 5/6 closure — repeat
-  5/5 + typecheck 0 + lint 0 + impact 13 valid + p0×2 collated PASS
-  - provenance-contract PASS + hygiene PASS + plan:validate PASS.
-- Current failures: None.
+- Last successful validation: 2026-09-04 Wave 10 closure — full Vitest 1937/1937, typecheck 0, lint 0, OpenSpec 50/50, plans PASS, web:verify #3 PASS at final SHA, hygiene PASS, adb empty, HEAD == origin/main, tree clean.
+- Current failures: None (W8-1 P2 follow-up recorded, not a failure; W8-3/W8-4 resolved with proof).
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
@@ -78,20 +76,23 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 - Wave 8D DONE: sim:validate 23/23; repeat sim×1 PASS; deterministic full library 22/23 explicit PASS (all scenarios incl. 356-step disaster-recovery + soak) + smoke covered by repeat gate (harness timeout killed the wrapper at smoke tail, ENVIRONMENT, server cleaned, hygiene PASS); seeded sample PASS (smoke, seed 20260904, run_mtmvdu6q_bwlbni2h). Raw `sim:run` without a server fails with ERR_CONNECTION_REFUSED by design (needs owned server; qa-simulation owns it) — operator error, not a finding.
 - Wave 8E DONE: dist-sync dummy-env build PASS; e2e:sync 40 passed / 6 skipped (expected live-restore gates) / 0 failed — matches historical 40/46. Outbox/reconnect regression intact (P5 offline 6/6 + broken-backend 6/6 incl. backoff/requeue/partial-failure).
 - Wave 8F DONE: corpus matrix 20/20 (corpus/byte-repro 2/2, backfill scope-6→7, restart, perf all hot paths 0.6-18.8ms, migrationFixtures 5/5 incl. TRUE v21/v23, migrations 10/10); timezone matrix PASS (5 zones); emulator-OFF clean-env perf recorded.
-- Wave 8G IN PROGRESS (native findings W8-2/W8-3 below; lifecycle GREEN).
+- Wave 8G DONE (final tally incl. Wave-10 resolutions below).
 - Finding W8-2 (TEST_BUG, fixed @371deff, verified both AVDs): smoke-tag flows raced slow-emulator timing. (a) ccv2 `hideKeyboard` acted as BACK when the sheet keyboard was not up yet → sheet dismissed → 'Describe it' unfindable (screenshot: sheet open at 'Add something', gone 20s later). Fix: tap sheet header 'Add something' (sheet-unique string) instead of hideKeyboard + re-assert. (b) native-smoke section taps aimed from settling hierarchies + 10s marker budgets too tight for cold-emulator return renders (screenshot+hierarchy proof: tap navigated correctly, 'Customize' rendered with valid bounds, poll still timed out). Fix: settle waits before taps (existing pattern) + 30s return-render budget (matches launch-Today 30s precedent); assertions unchanged. Product source untouched; no app crash in any logcat; app screenshots show healthy renders throughout.
 - Wave 8G evidence so far (canonical APKs, owned emulators, reports under simulation-output/native/): smoke Nitro PASS 2/2 (133225316Z @e98ca57-pre, 134812730Z @371deff, FDC2C955), smoke CRBABot PASS (135812242Z @371deff, ccv2 75s + smoke 118s), lifecycle Nitro 6/6 PASS in 13m18s (124738692Z @e5ba46f: habit-reminder-actions-replay/actions/delivery, pomodoro-lifecycle/notification-path, workout-gym-v2-session-lifecycle 4m50s). Pre-fix failures (6 consecutive, 2 AVDs, identical product source to Wave 1 green) reclassified from suspected PRODUCT/ENVIRONMENT to W8-2 TEST_BUG by screenshot+hierarchy proof.
-- Finding W8-3 (ENVIRONMENT, under triage): auth-persistence lane attempts 1-2 @371deff FAILED mock proof (signupCount 1 OK = device→mock connectivity fine via adb reverse, but 0 PUT /auth/v1/user + 0 verify). Flow 03-protect scroll for 'Email for backup recovery' 20s: screenshot shows the field rendered; hierarchy reports the exact node with valid on-screen bounds — third instance of Maestro missing screenshot-proven-visible text (after W8-2 Customize/Calories-marker). Same flows passed Wave 2 morning (auth 3/3 ×2 @b32bc7c). Attempt-3 orphaned its emulator+mock when the 30-min harness window killed the wrapper; exact-PID cleanup done (taskkill mock :4545 PID, emu kill), adb empty + ports free verified. Next: single persistence probe, then disposition (Wave 2 auth proof stands on identical product source).
+- Finding W8-3 (RESOLVED — harness flake, product exonerated): auth-persistence attempts 1-2 @371deff FAILED mock proof (signupCount 1 OK, 0 PUT + 0 verify; 'Email for backup recovery' rendered but Maestro missed it). Wave-10 single re-probe @759e65f: auth lane PASS exit 0 (`native-android-auth-persistence-Nitro_API_36-2026-09-04T233348338Z.json`, TEST-ONLY mock build, owned mock+emulator, both torn down) with FULL mock proof (exactly-1-signup, 0 unauthenticated checks, 1 PUT protect, same UID across signup+verify). Same verdict pattern as W8-2/W8-4: Maestro interaction misses on cold emulators, product healthy. Wave 2 proof (auth 3/3 ×2 @b32bc7c) + Wave-10 proof agree; no product change indicated or made.
 - Finding W8-4 (P1 SUSPECT, product-read vs harness undetermined — Wave 10 must resolve before campaign close): calories-persistence post-restart diary shows EMPTY (Today 0 kcal, screenshot proof, 3 consecutive runs) while the device DB dump proves the row EXISTS. DURABLE PROOF (Wave-9 verifier repair): `simulation-output/native/w8-4-calories-device.db` + `.db-wal` (root-pulled superhabits.db pair from campaign-owned Nitro emulator-5554) + `simulation-output/native/w8-4-calories-db-query.json` (read-only better-sqlite3 transcript: 1 calorie_entries row `Native breakfast/370/breakfast/2026-09-04/deleted_at NULL`, 2 outbox creates, schema 24, 0 todos). NO DATA LOSS (P0 dead). Pre-restart save genuine ('Logged today' needs entries.length>0; 370-kcal diary card screenshot). Save path transactional via runSyncedMutation; diary refreshes on isActive so stale-mount theory weak. First Wave-10 probe: post-restart Form view (read-layer vs diary-layer) + instrumented repro. Product code UNCHANGED on suspicion. Replay: `node scripts/qa-native.mjs --platform android --flow .maestro/flows/calories-persistence.yaml --avd Nitro_API_36`.
-- Wave 8G tally: smoke Nitro 2/2 + CRBABot 2/2 (hardened flows, canonical APKs); lifecycle Nitro 6/6 (13m18s); persistence Nitro 10/11 (W8-4 single failure; settings-fix verified 52s); auth 0/3 attempts (W8-3 Maestro-matching; Wave 2 auth 3/3 ×2 mock proof stands on identical product source). No leaks (adb empty, ports free, mock :4545 free — all verified after each kill).
+- Wave 8G tally (FINAL): smoke Nitro 2/2 + CRBABot 2/2 (hardened flows, canonical APKs); lifecycle Nitro 6/6 (13m18s); persistence Nitro 11/11 FULL PASS @759e65f (`native-android-all-Nitro_API_36-2026-09-04T232707117Z.json` exit 0, incl. calories-persistence with the permanent Form-read probe + sounded asserts); auth Nitro 1/1 PASS with full mock proof (Wave-10 re-probe) + Wave 2 auth 3/3 ×2 standing proof. No leaks after any run (adb empty, ports free, mock :4545 free — verified each time, incl. exact-PID cleanup after two harness-window kills).
 - Wave 8H DONE: repeat runner proven under real workloads (collated repeat records under simulation-output/repeat/ for unit×5, integration×5, P0×5, sim×1, native-smoke×3, native-auth×3; lifecycle 6/6 + persistence 10/11 via per-target native records under simulation-output/native/ — no repeat-suite collation exists for those two lanes). Failure contract verified on real evidence: native-auth-3x collation (3 FAILED_NEEDS_TRIAGE, status FAIL, SHA + replay, exit 1) + native-smoke-3x BLOCKED collation + config-error path (`--suite bogus` → exit 1). No early abort, no leak (post-kill hygiene adb empty/ports free/mock :4545 free). No tooling changes needed.
 - Wave 8I DONE (final static matrix @7d4dff1): git diff --check clean; typecheck 0; lint 0 (max-warnings 0); full Vitest 1937/1937 (175 files, up from predecessor 1906 by campaign-added tests); OpenSpec 50/50; impact-map 13 valid; themes 140/140; supabase schema PASS; plans all PASS (master ACTIVE, rest COMPLETED); sim:validate 23/23; timezones 5/5 zones; web:verify #2 PASS (exit 0, 164s, port released, current-SHA bundle entry-c77bc1de). No Deno edge runner in repo (supabase fn has no local gate — recorded, not a gap).
 - Wave 8 CLOSED (web:verify #1/#2/#3 all PASS exit 0 with port release; #3 at final 5c077ce). Master Validation Ledger covers Wave 0/5/6/7 inline; Waves 1-4 evidence lives in per-workstream ExecPlan ledgers (multi-avd-orchestration, auth-mock-lifecycle, historical-db-corpus, corpus-certification) — distributed by campaign design, linked here. No product-source changes in Wave 8 (flows/tests/docs only); product tree identical to Wave 7 head except Wave-1 FAB fix.
-- Wave 9 round 1 DONE: adversarial FAIL with 2 MAJOR (W8-1 cited bundle rotated; W8-4 DB proof not on disk) + 3 MINOR (master-ledger distribution; stale next action; 8H collation wording) — ALL REPAIRED in this checkpoint (bundle regenerated + samples updated incl. 910 breach; DB pair + query transcript preserved; ledger/wording corrected; next action current).
-- Exact next action: Commit verifier repairs, push, run Wave 9 round 2 (second adversarial verification per protocol), then Wave 10 P0/P1 sweep (W8-4 Form-view probe first; W8-1 P2 follow-up filing; remaining sweep) and campaign closure.
-- Remaining definition of done: Wave 8 battery;
-  Wave 9 adversarial verification; Wave 10 sweep; prompt COMPLETED;
-  clean pushed main.
+- Wave 9 round 1 DONE: adversarial FAIL with 2 MAJOR + 3 MINOR — ALL REPAIRED (bundle regenerated + 6-sample ledger incl. 910 breach; DB pair + query transcript preserved; ledger/wording corrected).
+- Wave 9 round 2 DONE: ADVERSARIAL PASS (all 5 repairs verified against disk truth; git/product/repeat/provenance/hygiene/stale-output all PASS; one non-blocking next-action wording observation, corrected here).
+- Wave 10 DONE (P0/P1 sweep 2026-09-04): TODO/FIXME sweep clean (identifiers only); known-gaps reviewed (CG-1..CG-9 closed; capability gaps unchanged; CG-4 annotated with the Wave-8 J8 variance note); skips inventoried (chromium 7 internal-parser opt-in, sync 6 live-restore gates, P5/P6/portable/account sync-gated — all expected gates, none new); runtime warnings benign (expo-notifications web note, Gradle upstream notes, Maestro heartbeat-lock infra noise); no unclosed OpenSpec changes (50/50 validated); externals re-verified (no macOS/Xcode → iOS EXTERNAL BLOCKER; no SUPABASE_ACCESS_TOKEN → disposable-backend NOT RUN; internal-parser opt-in unset → expected skips); W8-4 Form probe + manual screenshot-verified save/read probe + crash-reboot DB discipline all feeding the W8-4 resolution; W8-1 filed as P2 follow-up (known-gaps CG-4 note + this plan), no code change; W8-3 resolved by re-probe. No P2/P3 campaign expansion (recorded, not pursued).
+- Finding W8-4 (RESOLVED — product exonerated, no code change): post-restart empty-diary observations fully explained. (1) Durability PROVEN twice via root-pulled DB ground truth (w8-4 dump: 1 row + 2 outbox intents + schema 24). (2) Form read path PROVEN post-restart (probe-run screenshot: 'Logged today' + 'Native breakfast - 370 kcal' row; committed flow now asserts the entries-gated header permanently). (3) Manual screenshot-verified probe: save works, reads work under direct control; operator's own taps missed twice, proving interaction-miss ease. (4) The delays/empties match Maestro polling-contention + single-shot-assert timing on cold emulators (same signature as W8-2, resolved by settle/scroll/poll hardening — calories-persistence now FULL PASS @759e65f). Diary shares the Form's `entries` state, so a genuine diary-layer defect cannot hide behind a populated Form. No product defect demonstrated at any point; product code untouched throughout.
+- P2 follow-up (filed, not blocking): J8 switch-margin hardening — ceiling 5/6 + one 910 excursion, headroom floor systematically missed on this host; investigate render cost only on measured bottleneck signal in a future campaign. P2/P3 opportunities otherwise recorded, not pursued.
+- External residuals (unchanged, verified): iOS/macOS EXTERNAL BLOCKER; disposable backend NOT RUN (no token); internal parser opt-in (expected skips).
+- Exact next action: None — campaign complete.
+- Remaining definition of done: None — all complete (Wave 8 battery; Wave 9 round-2 PASS; Wave 10 sweep; prompt COMPLETED; clean pushed main).
 
 ## Progress
 
@@ -109,9 +110,9 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
       unit×2 + p0×2 (25/25) collated PASS + provenance contracts verified
       (@4049450 + plan @0b0b3c0).
 - [x] Wave 7 COMPLETED 2026-09-04: CI/nightly evaluation — decision B (no CI changes; evidence below).
-- [ ] Wave 8 expensive stability battery (quiet window).
-- [ ] Wave 9 adversarial verification PASS; Wave 10 P0/P1 sweep.
-- [ ] Prompt marked COMPLETED; final report appended; clean pushed main.
+- [x] Wave 8 expensive stability battery (quiet window) — all lanes run with classified evidence; 4 Maestro TEST_BUG flow hardenings landed + verified (product untouched).
+- [x] Wave 9 adversarial verification PASS (round 2); Wave 10 P0/P1 sweep (W8-4 resolved, W8-3 resolved, W8-1 filed P2, externals re-verified).
+- [x] Prompt marked COMPLETED; final report appended; clean pushed main.
 
 ## Surprises & Discoveries
 
@@ -198,11 +199,33 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   W8-4 DB pair + query transcript preserved under
   simulation-output/native/; master-ledger distribution + 8H wording
   corrected; next action current.
+- 2026-09-04 — Wave 9 round 2 ADVERSARIAL PASS (HEAD ee23af8): all 5
+  repairs verified against disk truth; git/product/repeat/provenance/
+  hygiene/stale-output PASS; no new blockers.
+- 2026-09-04 — Wave 10 sweep + closure: calories-persistence FULL PASS
+  @759e65f (Form-read probe + sounded asserts; W8-4 resolved as
+  harness-attributed, product exonerated); auth re-probe PASS with
+  full mock proof (W8-3 resolved); sweep inventories clean; externals
+  re-verified; prompt COMPLETED; clean pushed main.
 
 ## Changed Files / Areas
 
 - `.agent/execplans/certification-infrastructure-v2.md` — campaign durable
   state (this file).
+- `.maestro/flows/native-smoke.yaml` — settle waits + 30s return-render
+  budget (W8-2; assertions unchanged).
+- `.maestro/flows/command-center-v2.yaml` — tap sheet header instead of
+  hideKeyboard + survival re-assert (W8-2).
+- `.maestro/flows/calories-persistence.yaml` — scroll-direction fix,
+  cold-boot budgets, Diary-tap settle, polled pre-restart assert,
+  permanent Form-read probe + toggle scroll-in-view (W8-4 localization
+  net; assertions only added/strengthened, none weakened).
+- `.maestro/flows/settings-persistence.yaml` — cold-boot 30s launch
+  budgets (W8-2 class).
+- `docs/testing/known-gaps.md` — CG-4 Wave-8 J8 variance annotation.
+- `simulation-output/native/w8-4-calories-device.db*` +
+  `w8-4-calories-db-query.json` — W8-4 DB ground-truth proof (on-disk,
+  gitignored by design).
 
 ## Recovery / Resume Instructions
 
@@ -216,6 +239,24 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: campaign starting; Wave 0 in progress.
-- Follow-up: none yet.
+- Status: Complete.
+- Summary: certification is now reproducible. Landed: sequential
+  multi-AVD orchestration (unit-tested, proven on Nitro + CRBABot),
+  process-owned auth-mock lifecycle (owned logs, readiness, reverse,
+  mock-proof, teardown verified), deterministic mature-user corpus +
+  edge states (byte-reproducible) with corpus-backed migration /
+  restart / performance certification, the `qa:repeat` long-run
+  repetition framework with Wave-6 provenance collation, standardized
+  native failure bundles, and a justified unchanged CI/nightly layout
+  (Decision B). Wave 8 exercised it all: unit/integration/P0 ×5,
+  chromium+PWA, full journeys (1 P2 J8 variance finding), deterministic
+  - seeded simulation, dummy sync lane 40/6, corpus + timezones,
+    native smoke/lifecycle/persistence/auth with 4 flow race hardenings
+    (product untouched), repeat self-cert, full static matrix
+    (Vitest 1937/1937). Two adversarial verifications (FAIL→repairs→PASS).
+    Zero product-source changes in Waves 5–8; the campaign's only product
+    change is Wave 1's FAB tap-race fix. Head == origin/main, tree clean.
+- Follow-up: (P2) J8 switch-margin hardening on measured signal;
+  auth/persistence repetition can ride `qa:repeat` + owned lanes;
+  iOS/disposable-backend/internal-parser remain external/opt-in.
+  Next session must plan a fresh campaign — do not resume this prompt.

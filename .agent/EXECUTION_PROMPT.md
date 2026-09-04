@@ -1,6 +1,7 @@
 # Super Habits Certification Infrastructure V2
 
-**Status:** ACTIVE
+**Status:** COMPLETED
+**Exact next action:** None — campaign complete.
 **Planned-From:** `1e1f4d04aa30980667d27ecc1caa38734060e9ff`
 **Target branch:** `main`
 **Campaign:** Super Habits Certification Infrastructure V2
