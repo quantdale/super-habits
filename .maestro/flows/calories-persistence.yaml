@@ -50,6 +50,12 @@ tags:
 - scrollUntilVisible:
     element: 'Diary view'
     direction: UP
+# Settle before tapping: a stale-coordinate tap misses the Diary switch,
+# leaving the Form visible whose food input still reads 'Native breakfast'
+# — the later text assert then false-passes on the input and the relaunch
+# finds a genuinely empty diary (Wave 8 trace proof).
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn: 'Diary view'
 # Let the diary transition + chart settle: scrolling while the list is still
 # mounting starves the matcher and times out even though the entry renders.
