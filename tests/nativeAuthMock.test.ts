@@ -7,6 +7,7 @@ import {
   mockSliceTouched,
   parseMockLog,
   reverseSpecPresent,
+  validateInstallOnlyMetadata,
 } from '../scripts/native-avd.mjs';
 
 const GREEN_LOG = `[mock] native auth mock listening on :4545 (user 00000000-0000-0000-0000-00000000ca1a)
@@ -128,6 +129,49 @@ describe('native auth-mock proof helpers', () => {
     expect(mockSliceTouched(parseMockLog(GREEN_LOG))).toBe(true);
     expect(mockSliceTouched(parseMockLog('[mock] rest probe GET /rest/v1/todos -> empty\n'))).toBe(
       true,
+    );
+  });
+
+  it('validates install-only metadata before any reinstall', () => {
+    const canonical = {
+      status: 'PASS',
+      sourceTreeClean: true,
+      sourceSha: 'abc123',
+      appId: 'com.dale16.superhabits',
+      buildKind: 'canonical',
+      mockAuthUrl: null,
+      e2eEnvironment: { EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST: 'true' },
+    };
+    const expected = {
+      sourceSha: 'abc123',
+      appId: 'com.dale16.superhabits',
+      e2eEnvName: 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST',
+    };
+    expect(validateInstallOnlyMetadata(canonical, expected)).toEqual({ ok: true, reason: null });
+    expect(
+      validateInstallOnlyMetadata(
+        { ...canonical, buildKind: 'test-only', mockAuthUrl: 'http://127.0.0.1:4545' },
+        expected,
+      ).ok,
+    ).toBe(true);
+    expect(validateInstallOnlyMetadata(null, expected).ok).toBe(false);
+    expect(validateInstallOnlyMetadata({ ...canonical, sourceSha: 'other' }, expected).ok).toBe(
+      false,
+    );
+    expect(validateInstallOnlyMetadata({ ...canonical, sourceTreeClean: false }, expected).ok).toBe(
+      false,
+    );
+    expect(validateInstallOnlyMetadata({ ...canonical, buildKind: 'mystery' }, expected).ok).toBe(
+      false,
+    );
+    expect(
+      validateInstallOnlyMetadata(
+        { ...canonical, buildKind: 'test-only', mockAuthUrl: 'https://evil.example/x' },
+        expected,
+      ).ok,
+    ).toBe(false);
+    expect(validateInstallOnlyMetadata({ ...canonical, e2eEnvironment: {} }, expected).ok).toBe(
+      false,
     );
   });
 

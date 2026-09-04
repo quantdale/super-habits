@@ -71,9 +71,9 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit dead-forward retry, push, rerun auth
-  lane via `--auth-mock` on Nitro ×2 with full proof
-  (signup/PUT/UID/verify).
+- Exact next action: Commit install-only fix, push, verify auth
+  lane on Nitro (expect install-only, no rebuild, 3/3 green),
+  then repeat for the ×2 proof.
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
   reverse/emulator left; ledger + commit/push; plan COMPLETED.
@@ -145,6 +145,20 @@ tests/nativeAuthMock.test.ts tests/nativeAvd.test.ts` — 14/14
 --remove-all` on owned targets. `mockSliceTouched` +
   signup-line counting + record attempt/superseded fields +
   summary filtering (20/20 tests).
+- 2026-09-04 — FORENSIC ROOT CAUSE for the dead boots (live
+  `dumpsys package` on a dead-state emulator): the booted device
+  holds an APK with lastUpdateTime 2026-09-03 10:42 +
+  firstInstallTime 2026-08-10 — a snapshot-reverted stale binary
+  — while host metadata claims the current mock build. `pm
+path` + equal versionName/Code cannot distinguish canonical
+  vs mock builds, so provision-skip trusted it (every skip-run
+  dead, every rebuild-run green, 7/7). The dead-forward/retry
+  machinery stays as honest defense-in-depth; the fix is
+  `--install-only`: reinstall the hash-verified host APK
+  whenever the host build matches (validateInstallOnlyMetadata
+  - tests), full rebuild only when the host build is stale.
+    Serial/AVD pinning removed from the match (one APK installs
+    anywhere; install target recorded per verified install).
 - 2026-09-04 — correction: the PUT + healthy-session evidence
   plus the Resend-peeking-at-top screenshots point at the SAME
   below/above-fold assertion class as Wave 1 (the verify form

@@ -386,13 +386,14 @@ function checkTarget(platform, options) {
     const currentSha = currentProvenance.sourceSha;
     const metadataPath = metadataPathFor(options);
     let metadata = readBuildMetadata(metadataPath);
-    let installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
-    let packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
-    const metadataMatches = () => {
-      // Provenance separation is enforced here, not just by filename:
-      // mock mode requires an explicit test-only build for this mock
-      // URL, and canonical mode never accepts a test-only build.
-      // Recomputed per call: provisioning refreshes `metadata` above.
+    let packageInstalled = false;
+    let packageIdentity = { appId: APP_ID, present: false, versionName: null, versionCode: null };
+    const buildMatches = () => {
+      // Host-side build identity, deliberately target-independent (one APK
+      // installs on any serial/AVD; the per-target install is recorded on
+      // every verified install). Provenance separation is enforced here,
+      // not just by filename: mock mode requires an explicit test-only
+      // build for this mock URL, canonical mode never accepts test-only.
       const buildKindOk = options.authMock
         ? metadata?.buildKind === 'test-only' &&
           metadata?.mockAuthUrl === deviceAuthMockUrl(options)
@@ -402,57 +403,71 @@ function checkTarget(platform, options) {
         metadata.sourceTreeClean === true &&
         metadata.appId === APP_ID &&
         metadata.sourceSha === currentSha &&
-        metadata.target?.serial === serial &&
-        metadata.target?.api === targetIdentity.api &&
-        metadata.target?.abi === targetIdentity.abi &&
-        metadata.target?.avd === targetIdentity.avd &&
         metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true' &&
         buildKindOk
       );
     };
-    if ((!packageInstalled || !metadataMatches()) && options.provision) {
+    const refreshPackageState = () => {
+      const installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
+      packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
+      const packageDetails = run(adb, ['-s', serial, 'shell', 'dumpsys', 'package', APP_ID]);
+      packageIdentity = parsePackageIdentity(packageDetails.stdout, APP_ID);
+    };
+    const installedMatches = () =>
+      packageInstalled &&
+      packageIdentity.present &&
+      (!metadata.versionName || metadata.versionName === packageIdentity.versionName) &&
+      (metadata.versionCode === null ||
+        metadata.versionCode === undefined ||
+        metadata.versionCode === packageIdentity.versionCode);
+    const ensureInstalled = () => {
+      refreshPackageState();
+      if (buildMatches() && installedMatches()) return { ok: true };
+      if (!options.provision) return { ok: false };
+      if (buildMatches() && metadata) {
+        // The host build is current: (re)install the hash-verified APK
+        // instead of rebuilding. Snapshot-reverted boots can otherwise
+        // present a stale binary that version checks cannot distinguish
+        // (canonical and mock builds share versionName/versionCode).
+        const installOnly = run(
+          process.execPath,
+          [
+            resolve(ROOT, 'scripts/qa-native-provision.mjs'),
+            '--install-only',
+            '--metadata-path',
+            metadataPath,
+            '--serial',
+            serial,
+          ],
+          { stdio: 'inherit' },
+        );
+        if (installOnly.status === 0) {
+          metadata = readBuildMetadata(metadataPath);
+          refreshPackageState();
+          if (buildMatches() && installedMatches()) return { ok: true };
+        }
+      }
       const provisioningBlock = provisionAndroid(serial, options);
       if (provisioningBlock) return provisioningBlock;
       metadata = readBuildMetadata(metadataPath);
-      installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
-      packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
-    }
-    if (!packageInstalled) {
-      return {
-        blocked: `${APP_ID} is not installed on Android target '${serial}'.`,
-        remediation:
-          'Run npm run qa:native:provision -- --serial <serial>, or allow automatic provisioning by omitting --no-provision.',
-      };
-    }
-    const packageDetails = run(adb, ['-s', serial, 'shell', 'dumpsys', 'package', APP_ID]);
-    const packageIdentity = parsePackageIdentity(packageDetails.stdout, APP_ID);
-    if (!packageIdentity.present) {
-      return {
-        blocked: `ADB could not verify the installed package identity for ${APP_ID} on '${serial}'.`,
-        remediation: 'Rebuild/install the current e2e-test equivalent and rerun the same command.',
-      };
-    }
-    if (!metadataMatches()) {
+      refreshPackageState();
+      if (buildMatches() && installedMatches()) return { ok: true };
+      return { ok: false };
+    };
+    const ensured = ensureInstalled();
+    if (ensured.ok !== true) {
+      if (ensured.blocked) return ensured;
+      if (!packageInstalled || !packageIdentity.present) {
+        return {
+          blocked: `${APP_ID} is not installed on Android target '${serial}'.`,
+          remediation:
+            'Run npm run qa:native:provision -- --serial <serial>, or allow automatic provisioning by omitting --no-provision.',
+        };
+      }
       return {
         blocked: `Installed Android build identity does not match current source ${currentSha ?? '<unknown SHA>'}.`,
         remediation:
           'Allow automatic provisioning or run npm run qa:native:provision -- --force --serial <serial>.',
-      };
-    }
-    if (metadata.versionName && metadata.versionName !== packageIdentity.versionName) {
-      return {
-        blocked: `Installed ${APP_ID} version ${packageIdentity.versionName ?? '<unknown>'} does not match provisioned version ${metadata.versionName}.`,
-        remediation: 'Rebuild/install the current e2e-test equivalent and rerun the same command.',
-      };
-    }
-    if (
-      metadata.versionCode !== null &&
-      metadata.versionCode !== undefined &&
-      metadata.versionCode !== packageIdentity.versionCode
-    ) {
-      return {
-        blocked: `Installed ${APP_ID} version code ${packageIdentity.versionCode ?? '<unknown>'} does not match provisioned version code ${metadata.versionCode}.`,
-        remediation: 'Rebuild/install the current e2e-test equivalent and rerun the same command.',
       };
     }
     return {

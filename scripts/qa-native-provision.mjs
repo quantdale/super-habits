@@ -5,7 +5,7 @@
  * builds are not the supported Windows workflow.
  */
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ import {
   parsePackageIdentity,
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
-import { addCleartextAttr } from './native-avd.mjs';
+import { addCleartextAttr, validateInstallOnlyMetadata } from './native-avd.mjs';
 import { readGitProvenance, requireCleanGitTree } from './native-provenance.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -30,20 +30,32 @@ function parseArgs(argv) {
     serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
     force: false,
     mockAuthUrl: null,
+    installOnly: false,
+    metadataPath: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--serial') args.serial = argv[++i];
     else if (arg === '--force') args.force = true;
     else if (arg === '--mock-auth-url') args.mockAuthUrl = argv[++i];
+    else if (arg === '--install-only') args.installOnly = true;
+    else if (arg === '--metadata-path') args.metadataPath = argv[++i];
     else if (arg === '--help' || arg === '-h') {
       console.log(
-        'Usage: node scripts/qa-native-provision.mjs [--serial SERIAL] [--force] [--mock-auth-url URL]',
+        'Usage: node scripts/qa-native-provision.mjs [--serial SERIAL] [--force] [--mock-auth-url URL] [--install-only --metadata-path PATH]',
       );
       process.exit(0);
     } else {
       throw new Error(`Unknown argument '${arg}'. Use --help for usage.`);
     }
+  }
+  if (args.installOnly && !args.metadataPath) {
+    throw new Error('--install-only requires --metadata-path.');
+  }
+  if (args.installOnly && (args.mockAuthUrl !== null || args.force)) {
+    throw new Error(
+      '--install-only cannot be combined with --mock-auth-url or --force; build kind is read from the metadata file.',
+    );
   }
   if (
     args.mockAuthUrl !== null &&
@@ -175,10 +187,7 @@ function requireSuccess(result, label, command) {
   );
 }
 
-function main(args) {
-  const adb = findCommand('adb');
-  if (!adb) throw new Error('Android adb is not installed or not discoverable on PATH.');
-
+function resolveTargetDevice(adb, args) {
   const devicesResult = run(adb, ['devices']);
   requireSuccess(devicesResult, 'adb devices', `${adb} devices`);
   const selected = selectAndroidDevice(devicesResult.stdout, args.serial);
@@ -205,6 +214,85 @@ function main(args) {
       `The local provisioning path targets Android API 36 x86_64; observed API ${target.api ?? 'unknown'} / ABI ${target.abi ?? 'unknown'} on '${serial}'.`,
     );
   }
+  return { adb, serial, target };
+}
+
+function installOnlyMain(args) {
+  // Reinstall the hash-verified APK recorded in a provenance metadata file
+  // without rebuilding: snapshot-reverted emulator boots can otherwise
+  // present a stale binary that version checks cannot distinguish
+  // (canonical and mock builds share versionName/versionCode).
+  // Returns { fallback: reason } when a full provision is needed instead.
+  const adb = findCommand('adb');
+  if (!adb) throw new Error('Android adb is not installed or not discoverable on PATH.');
+  const metadataPath = resolve(ROOT, args.metadataPath);
+  let metadata = null;
+  try {
+    metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+  } catch {
+    return {
+      fallback: `no readable build metadata at ${args.metadataPath}; full provision required`,
+    };
+  }
+  const sourceProvenance = requireCleanGitTree(ROOT);
+  const check = validateInstallOnlyMetadata(metadata, {
+    sourceSha: sourceProvenance.sourceSha,
+    appId: APP_ID,
+    e2eEnvName: E2E_ENV_NAME,
+  });
+  if (!check.ok) return { fallback: `${check.reason}; full provision required` };
+  const apkPath = resolve(ROOT, metadata.apkPath ?? '');
+  if (!metadata.apkPath || !existsSync(apkPath)) {
+    return {
+      fallback: `recorded APK missing at ${metadata.apkPath ?? '<none>'}; full provision required`,
+    };
+  }
+  if (apkSha256(apkPath) !== metadata.apkSha256) {
+    return { fallback: 'recorded APK hash mismatch; full provision required' };
+  }
+  const { serial, target } = resolveTargetDevice(adb, args);
+  const install = run(adb, ['-s', serial, 'install', '-r', '-d', '-g', apkPath], {
+    stdio: 'inherit',
+  });
+  requireSuccess(install, 'ADB APK install', `${adb} -s ${serial} install -r -d -g <apk>`);
+  const packageResult = run(adb, ['-s', serial, 'shell', 'dumpsys', 'package', APP_ID]);
+  requireSuccess(
+    packageResult,
+    'Installed package inspection',
+    `${adb} -s ${serial} shell dumpsys package ${APP_ID}`,
+  );
+  const packageIdentity = parsePackageIdentity(packageResult.stdout, APP_ID);
+  if (
+    !packageIdentity.present ||
+    (metadata.versionName && metadata.versionName !== packageIdentity.versionName) ||
+    (metadata.versionCode !== null &&
+      metadata.versionCode !== undefined &&
+      metadata.versionCode !== packageIdentity.versionCode)
+  ) {
+    throw new Error(
+      `ADB install completed but ${APP_ID} identity does not match the recorded build on '${serial}'.`,
+    );
+  }
+  metadata.target = {
+    serial: target.serial,
+    api: target.api,
+    abi: target.abi,
+    avd: target.avd,
+  };
+  metadata.installedAt = new Date().toISOString();
+  mkdirSync(dirname(metadataPath), { recursive: true });
+  writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+  console.log(
+    `Reinstalled verified ${metadata.buildKind} APK on ${serial} (source ${metadata.sourceSha}, APK SHA-256 ${metadata.apkSha256}).`,
+  );
+  return { fallback: null };
+}
+
+function main(args) {
+  const adb = findCommand('adb');
+  if (!adb) throw new Error('Android adb is not installed or not discoverable on PATH.');
+
+  const { serial, target } = resolveTargetDevice(adb, args);
   const sourceProvenance = requireCleanGitTree(ROOT);
   console.log(`Preparing clean source ${sourceProvenance.sourceSha} for ${serial}...`);
 
@@ -322,6 +410,7 @@ function main(args) {
     buildCommand: gradleCommand,
     installCommand: `${adb} -s ${serial} install -r -d -g <apk>`,
     builtAt,
+    installedAt: builtAt,
     capturedAt: builtAt,
   };
   mkdirSync(dirname(metadataPath), { recursive: true });
@@ -335,9 +424,20 @@ function main(args) {
 let args = {
   serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
   force: false,
+  mockAuthUrl: null,
+  installOnly: false,
+  metadataPath: null,
 };
 try {
   args = parseArgs(process.argv.slice(2));
+  if (args.installOnly) {
+    const outcome = installOnlyMain(args);
+    if (outcome.fallback) {
+      console.error(`Install-only unavailable: ${outcome.fallback}`);
+      process.exit(3);
+    }
+    process.exit(0);
+  }
   main(args);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);

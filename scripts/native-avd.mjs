@@ -236,6 +236,59 @@ export function mockSliceTouched(mockState) {
 }
 
 /**
+ * Validate a provenance metadata file for `--install-only` reinstalls:
+ * the recorded build must be a PASS on a clean tree at the current HEAD
+ * with the expected app id, an explicit build kind, a loopback mock URL
+ * when test-only, and the required E2E environment marker. Anything else
+ * means a full provision is required, never a blind reinstall.
+ *
+ * @param {unknown} metadata parsed metadata JSON.
+ * @param {{ sourceSha: string, appId: string, e2eEnvName: string }} expected
+ * @returns {{ ok: boolean, reason: string | null }}
+ */
+export function validateInstallOnlyMetadata(metadata, expected) {
+  const fail = (reason) => ({ ok: false, reason });
+  if (!metadata || typeof metadata !== 'object') {
+    return fail('no build metadata recorded; full provision required');
+  }
+  const record = /** @type {Record<string, unknown>} */ (metadata);
+  if (record.status !== 'PASS') {
+    return fail(
+      `metadata status is '${String(record.status ?? 'missing')}'; full provision required`,
+    );
+  }
+  if (record.sourceTreeClean !== true) {
+    return fail('metadata records a dirty tree; full provision required');
+  }
+  if (record.sourceSha !== expected.sourceSha) {
+    return fail(
+      `metadata source ${String(record.sourceSha ?? 'missing')} !== current HEAD ${expected.sourceSha}; full provision required`,
+    );
+  }
+  if (record.appId !== expected.appId) {
+    return fail(`metadata app id mismatch; full provision required`);
+  }
+  if (record.buildKind !== 'canonical' && record.buildKind !== 'test-only') {
+    return fail(
+      `metadata build kind '${String(record.buildKind ?? 'missing')}' is not reinstallable`,
+    );
+  }
+  if (record.buildKind === 'test-only') {
+    if (
+      typeof record.mockAuthUrl !== 'string' ||
+      !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(record.mockAuthUrl)
+    ) {
+      return fail('test-only metadata lacks a loopback mock URL; full provision required');
+    }
+  }
+  const env = /** @type {Record<string, unknown> | null} */ (record.e2eEnvironment ?? null);
+  if (!env || env[expected.e2eEnvName] !== 'true') {
+    return fail('metadata lacks the required E2E environment marker; full provision required');
+  }
+  return { ok: true, reason: null };
+}
+
+/**
  * Filename-safe label identifying one certification target.
  *
  * @param {{ avd: string | null, serial: string | null }} target
