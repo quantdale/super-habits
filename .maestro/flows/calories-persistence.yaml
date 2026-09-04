@@ -77,6 +77,18 @@ tags:
 - tapOn:
     text: 'Calories'
     index: 0
+# W8-4 probe (permanent): viewMode persisted as diary, so Calories opens in
+# diary; switch explicitly to Form first and prove the row survived restart
+# through the FORM read path before exercising the diary layer. Form-shows
+# + diary-empty localizes a diary-layer defect; both-empty implicates the
+# read path (a root-pulled DB dump already rules out data loss).
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn: 'Form view'
+- extendedWaitUntil:
+    visible: 'Logged today'
+    timeout: 15000
+- assertVisible: 'Native breakfast'
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 8000
