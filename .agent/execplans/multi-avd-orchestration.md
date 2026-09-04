@@ -70,10 +70,9 @@ rewriting provisioner provenance logic that already works.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Implement the FAB-deferral product fix +
-  scroll-robustness flow fixes, rebuild, verify sheet-opens on
-  CRBABot (adb tap + ccv2) with no Nitro regression, then full
-  smoke on both AVDs.
+- Exact next action: Commit hideKeyboard flow fix, push, rerun
+  full smoke on CRBABot (no rebuild needed — test-only change),
+  then Nitro regression + full smoke on both AVDs.
 - Remaining definition of done: orchestration landed + tested; ≥2-AVD
   lane proof (or ENVIRONMENT record); docs updated; ledger + commit/push.
 
@@ -90,8 +89,13 @@ rewriting provisioner provenance logic that already works.
 - [x] CRBABot-only failure triaged (PRODUCT_BUG tap race +
       TEST_BUG below-fold assertions; see Surprises).
 - [x] Product fix + flow fixes implemented (typecheck 0, lint 0,
-      unit 8/8); rebuild + re-verification next.
-- [ ] Rebuilt + re-verified on both AVDs; plan COMPLETED.
+      unit 8/8); rebuilt @65063a5; CRBABot smoke: FAB race FIXED
+      (sheet opens), native-smoke PASSED (Anytime scroll works).
+- [x] Second CRBABot finding (screenshot-proven): sheet autofocus
+      pops the keyboard over `Describe it`; scroll cannot reveal
+      it. Test-layer fix: `hideKeyboard` before scroll+tap.
+- [ ] Re-verify full smoke on CRBABot, then Nitro regression;
+      plan COMPLETED.
 - [ ] ≥2-AVD lane certification (or ENVIRONMENT record).
 - [ ] Docs/provenance updated; plan validated; committed/pushed.
 

@@ -15,6 +15,9 @@ tags:
 - extendedWaitUntil:
     visible: 'Add something'
     timeout: 10000
+# The sheet autofocuses its input, so the soft keyboard covers the bottom
+# actions on short screens. Dismiss it before reaching Describe it.
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Describe it'
     direction: DOWN
