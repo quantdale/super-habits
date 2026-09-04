@@ -486,7 +486,16 @@ function runPlatform(platform, options) {
     stateReset = true;
   }
 
-  const args = ['test', '--no-ansi', '--reinstall-driver'];
+  const label = targetLabel({
+    avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
+    serial: target.serial ?? null,
+  });
+  const debugStamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
+  const debugOutputDir = resolve(
+    REPORT_DIR,
+    `debug-${platform}-${options.tag ?? 'all'}-${label}-${debugStamp}`,
+  );
+  const args = ['test', '--no-ansi', '--reinstall-driver', '--debug-output', debugOutputDir];
   if (target.serial) args.push('--device', target.serial);
   args.push(flow);
   if (options.tag) args.push(`--include-tags=${options.tag}`);
@@ -500,10 +509,6 @@ function runPlatform(platform, options) {
           NATIVE_ANDROID_SERIAL: target.serial,
         }
       : undefined,
-  });
-  const label = targetLabel({
-    avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
-    serial: target.serial ?? null,
   });
   const report = {
     schemaVersion: 1,
@@ -522,6 +527,7 @@ function runPlatform(platform, options) {
     buildMetadata: target.buildMetadata ?? null,
     tag: options.tag,
     flow: options.flow ?? '.maestro',
+    debugOutputDir: debugOutputDir,
     gitSha: gitSha(),
     replayCommand: options.replayCommand,
     exitCode: result.status,

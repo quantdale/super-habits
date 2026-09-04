@@ -58,7 +58,9 @@ rewriting provisioner provenance logic that already works.
   impact map `native-e2e-infrastructure` rule covers `scripts/native-*.mjs`
   - native tests; `--list-avds` verified (4 AVDs, none connected);
     unknown-AVD fail-fast verified with zero emulators started.
-- In progress: live proof — boot + lane via the orchestrator.
+- In progress: triaging a CRBABot-only smoke failure the orchestrator
+  surfaced (Nitro green 3×; CRBABot red 2× with varying steps).
+  Runner now captures Maestro `--debug-output` per lane for evidence.
 - Important modified files: `scripts/native-avd.mjs` (new),
   `scripts/qa-native.mjs`, `tests/nativeAvd.test.ts` (new),
   `qa/impact-map.json`.
@@ -68,9 +70,10 @@ rewriting provisioner provenance logic that already works.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit tooling milestone, then run live proof:
-  `node scripts/qa-native.mjs --platform android --tag smoke --avd
-Nitro_API_36` (boot owned, provision, lane, stop, labeled artifacts).
+- Exact next action: Rerun the single command-center flow on CRBABot
+  with debug artifacts, inspect screenshot/hierarchy, classify the
+  failure (TEST_BUG vs ENVIRONMENT vs PRODUCT_BUG), fix at the root
+  with regression coverage, and re-verify on both AVDs.
 - Remaining definition of done: orchestration landed + tested; ≥2-AVD
   lane proof (or ENVIRONMENT record); docs updated; ledger + commit/push.
 
@@ -79,12 +82,26 @@ Nitro_API_36` (boot owned, provision, lane, stop, labeled artifacts).
 - [x] Workstream plan opened.
 - [x] Script audit complete.
 - [x] Multi-AVD orchestration implemented + unit-tested.
+- [x] Live proof: owned boot + provision (BUILD SUCCESSFUL) + smoke +
+      owned stop + labeled reports + collated record on Nitro (PASS 2/2).
+- [x] Sequential two-target run Nitro→CRBABot: Nitro PASS, CRBABot
+      FAILED (command-center-v2 element-not-found), orchestration
+      continued, stopped, collated 1/2 correctly.
+- [ ] CRBABot-only failure triaged, fixed, re-verified on both AVDs.
 - [ ] ≥2-AVD lane certification (or ENVIRONMENT record).
 - [ ] Docs/provenance updated; plan validated; committed/pushed.
 
 ## Surprises & Discoveries
 
-- None yet.
+- 2026-09-04 — Second AVD pays off immediately: CRBABot_API_36
+  (720×1280 @240dpi, GPU on) fails smoke while Nitro_API_36
+  (1080×2400 @420dpi) passes the identical APK/source 3×. Failure
+  step varies between runs ('Describe it' tap once; first-visible
+  waits next) — points at timing/form-factor, not a deterministic
+  product defect. Reproducing with debug artifacts before classifying.
+- 2026-09-04 — Clean-tree gate verified live: uncommitted runner
+  change produced a BLOCKED record (not a lane run), the owned
+  emulator was still stopped, and the collated summary counted it.
 
 ## Decision Log
 
