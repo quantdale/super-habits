@@ -57,6 +57,7 @@
     "qa:impact": "node scripts/qa-impact.mjs",
     "qa:affected": "node scripts/qa-impact.mjs",
     "qa:impact:validate": "node scripts/qa-impact.mjs --validate",
+    "qa:repeat": "node scripts/qa-repeat.mjs",
     "agent:plan:validate": "node scripts/agent-execplan.mjs validate",
     "agent:plan:validate:all": "node scripts/agent-execplan.mjs validate --all",
     "agent:plans": "node scripts/agent-execplan.mjs list",

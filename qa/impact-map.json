@@ -114,10 +114,13 @@
         "simulation/**",
         "playwright.config.ts",
         "vitest.config.ts",
-        "scripts/serve-e2e.js"
+        "scripts/serve-e2e.js",
+        "scripts/qa-repeat.mjs",
+        "scripts/repeat.mjs",
+        "tests/repeat.test.ts"
       ],
       "gates": ["qa:fast", "qa:integration", "qa:journeys", "qa:simulation", "qa:full"],
-      "tests": ["tests/simulation.*.test.ts"],
+      "tests": ["tests/simulation.*.test.ts", "tests/repeat.test.ts"],
       "journeys": ["@p0", "full deterministic library"],
       "broadRegression": true
     },
