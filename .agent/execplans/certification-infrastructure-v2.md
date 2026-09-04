@@ -44,7 +44,7 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 
 ## Current Checkpoint
 
-- Current milestone: Waves 0–6 COMPLETE at `0b0b3c0`; Wave 7 opening.
+- Current milestone: Waves 0–7 COMPLETE at `454d9bd`; Wave 8 opening.
 - Completed: Wave 0 recert at `2502a75` (hygiene, typecheck 0, lint 0,
   unit 1665/1665, impact 13, themes 140/140, supabase PASS, OpenSpec
   50/50, sim:validate 23/23; 4 AVDs present; Maestro 2.8.0); Wave 1
@@ -58,7 +58,7 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   repetition + provenance COMPLETED (repeat 5/5; unit×2 + p0×2
   25/25 collated PASS @3f9046a tree; native 21-field + repeat
   14-field contracts verified; `qa:repeat` landed @4049450).
-- In progress: Wave 7 CI/nightly placement evaluation.
+- In progress: Wave 8 expensive stability battery.
 - Important modified files: `.agent/execplans/certification-infrastructure-v2.md`
   (this plan); per-workstream COMPLETED plans for Waves 1–6.
 - Last successful validation: 2026-09-04 Waves 5/6 closure — repeat
@@ -69,9 +69,8 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Open Wave 7 evaluation (audit matrix.ts +
-  CI workflows vs Wave 1–6 evidence; placement decision only).
-- Remaining definition of done: Wave 7 decision; Wave 8 battery;
+- Exact next action: Open Wave 8 battery via `qa:repeat` (unit×5 / P0×5 where runtime permits; native repeats only with owned AVD + provenance; corpus + web lanes per prompt §Wave 8).
+- Remaining definition of done: Wave 8 battery;
   Wave 9 adversarial verification; Wave 10 sweep; prompt COMPLETED;
   clean pushed main.
 
@@ -90,20 +89,41 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 - [x] Waves 5/6 COMPLETED 2026-09-04: `qa:repeat` runner + 5/5 tests +
       unit×2 + p0×2 (25/25) collated PASS + provenance contracts verified
       (@4049450 + plan @0b0b3c0).
-- [ ] Wave 7 CI/nightly evaluation with placement decision.
+- [x] Wave 7 COMPLETED 2026-09-04: CI/nightly evaluation — decision B (no CI changes; evidence below).
 - [ ] Wave 8 expensive stability battery (quiet window).
 - [ ] Wave 9 adversarial verification PASS; Wave 10 P0/P1 sweep.
 - [ ] Prompt marked COMPLETED; final report appended; clean pushed main.
 
 ## Surprises & Discoveries
 
-- None yet.
+- 2026-09-04 (Wave 7) — Corpus certification is already PR-gated: `corpus.test` / `corpusBackfill` / `corpusRestart` / `corpusPerformance` / `migrationFixtures` / `migrations` all ride the `integration` Vitest project inside the `quality` job (`npm test`), so the Wave 3/4 corpus matrix needs no new CI lane. Verified by inspection (tests under `tests/integration/`, `vitest.config.ts` projects, `ci.yml` quality runs `npm test`), not by re-running the full suite in this wave.
 
 ## Decision Log
 
 - 2026-09-04 — One master orchestration plan + per-workstream plans opened
   lazily as implementation work opens (predecessor precedent). No OpenSpec
   change until a workstream justifies one.
+- 2026-09-04 (Wave 7) — Decision B: keep current CI unchanged.
+  Placement: PR keeps quality + chromium + P0 + sim:validate +
+  deterministic @p0 (fast, fake-backed, deterministic per matrix);
+  main keeps full e2e + full deterministic library + dist-sync +
+  e2e:sync; nightly keeps full e2e + seeded + dist-sync + e2e:sync +
+  guarded disposable-backend (report-only); native stays manual/on-demand
+  - `.eas/workflows/native-e2e.yml` label/dispatch (no GitHub-runner
+    emulator infra — adding emulator work to `ci.yml` would fake
+    certification). `qa:repeat` (unit/integration/p0/sim/native suites,
+    10–30min backstops) stays manual/on-demand for Wave 8 + future
+    stability work: PR already gates single unit+integration + P0, and
+    Waves 5/6 + predecessor show zero recurring flake (unit×2, P0 25/25
+    ×2 here; P0 ×5 + 30+ native runs zero flakes before) to justify 2–5×
+    PR latency. Corpus migration/restart/perf already ride `npm test`
+    integration in quality (Backfill 10.9s, Restart 4.3s, perf ≤4.3ms vs
+    5000ms tripwires, migrations 15/15); web J8 ceilings already ride
+    main/nightly full e2e by design. Matrix unchanged (`sim:validate`
+    23/23 incl. `validateMatrix`); no new lanes, no promotion criteria
+    met, no overturning defect class (Wave 1 FAB race is
+    hardware-geometry-specific, only catchable on a second physical AVD,
+    not on ubuntu runners).
 
 ## Validation Ledger
 
@@ -118,6 +138,13 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   impact 13 valid; unit×2 collated PASS; p0×2 collated PASS (25/25
   each, fresh dist/ once); provenance-contract PASS; hygiene PASS +
   adb empty; plans validated; feat(qa) @4049450 + docs(agent) @0b0b3c0.
+- 2026-09-04 — Wave 7 decision (no code change): hygiene PASS
+  (8081/8082 free); `adb devices` empty; `git diff --check` clean;
+  impact-map 13 valid; `sim:validate` 23/23 (includes
+  `validateMatrix`); `openspec:validate` 50/50;
+  `agent:plan:validate:all` PASS; tree clean at `454d9bd` ==
+  `origin/main`; Waves 0–6 remain COMPLETED with zero
+  product-source drift from the repetition/provenance waves.
 
 ## Changed Files / Areas
 
