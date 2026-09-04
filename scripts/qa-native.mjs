@@ -34,6 +34,7 @@ import {
 import { readGitProvenance } from './native-provenance.mjs';
 import {
   assertMockProof,
+  interpretDeviceProbe,
   isPidAlive,
   parseMockLog,
   reverseSpecPresent,
@@ -840,7 +841,43 @@ function ensureAuthReverse(adb, serial, port) {
   if (verify.status !== 0 || !reverseSpecPresent(verify.stdout, port)) {
     throw new Error(`adb reverse tcp:${port} on '${serial}' did not appear in reverse --list.`);
   }
-  console.log(`Reverse tcp:${port} established on '${serial}' (device localhost:${port}).`);
+  // The --list entry proves the forward exists, not that bytes flow
+  // (a fresh boot can list a dead forward). Probe end-to-end from the
+  // device; one re-establishment is allowed, then fail with the reason.
+  const probeArgs = [
+    '-s',
+    serial,
+    'shell',
+    'curl',
+    '--max-time',
+    '5',
+    '-s',
+    '-o',
+    '/dev/null',
+    '-w',
+    '%{http_code}',
+    `http://127.0.0.1:${port}/rest/v1/auth-mock-probe`,
+  ];
+  let probe = interpretDeviceProbe(run(adb, probeArgs));
+  if (!probe.ok && !probe.skipped) {
+    console.log(
+      `Device connectivity probe failed (${probe.reason}); re-establishing reverse tcp:${port} once.`,
+    );
+    const redo = run(adb, ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`]);
+    if (redo.status !== 0) {
+      throw new Error(`adb reverse tcp:${port} retry failed on '${serial}' (exit ${redo.status}).`);
+    }
+    probe = interpretDeviceProbe(run(adb, probeArgs));
+  }
+  if (probe.skipped) {
+    console.log(`Device has no curl; connectivity probe skipped (${probe.reason}).`);
+  } else if (!probe.ok) {
+    throw new Error(
+      `Device-side mock connectivity probe failed on '${serial}' (${probe.reason}); the lane would run offline.`,
+    );
+  } else {
+    console.log(`Reverse tcp:${port} verified end-to-end on '${serial}' (device HTTP 200).`);
+  }
 }
 
 function removeAuthReverse(adb, serial, port) {

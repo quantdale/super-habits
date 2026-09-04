@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCleartextAttr,
   assertMockProof,
+  interpretDeviceProbe,
   isPidAlive,
   parseMockLog,
   reverseSpecPresent,
@@ -86,6 +87,24 @@ describe('native auth-mock proof helpers', () => {
     expect(isPidAlive(2147483647)).toBe(false);
     expect(isPidAlive(0)).toBe(false);
     expect(isPidAlive('not-a-pid')).toBe(false);
+  });
+
+  it('interprets the device-side connectivity probe', () => {
+    expect(interpretDeviceProbe({ status: 0, stdout: '200', stderr: '' })).toEqual({
+      ok: true,
+      skipped: false,
+      reason: null,
+    });
+    expect(interpretDeviceProbe({ status: 0, stdout: '  200\n', stderr: '' }).ok).toBe(true);
+    const refused = interpretDeviceProbe({ status: 0, stdout: '000', stderr: '' });
+    expect(refused.ok).toBe(false);
+    expect(refused.skipped).toBe(false);
+    const missing = interpretDeviceProbe({
+      status: 127,
+      stdout: '',
+      stderr: '/system/bin/sh: curl: not found',
+    });
+    expect(missing.skipped).toBe(true);
   });
 
   it('patches the application tag for test-only cleartext exactly once', () => {

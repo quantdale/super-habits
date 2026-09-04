@@ -186,6 +186,30 @@ export function isPidAlive(pid) {
 }
 
 /**
+ * Interpret a device-side mock-connectivity probe (`adb shell curl
+ * --max-time 5 -s -o /dev/null -w %{http_code} <device-url>/probe`).
+ * The `adb reverse --list` entry proves the forward exists, not that
+ * bytes flow; this probe proves the app will actually reach the mock.
+ *
+ * @param {{ status: number, stdout: string, stderr: string }} result
+ * @returns {{ ok: boolean, skipped: boolean, reason: string | null }}
+ */
+export function interpretDeviceProbe(result) {
+  const combined = `${result?.stdout ?? ''}\n${result?.stderr ?? ''}`;
+  if (
+    /curl\s*:\s*not found|unknown command|not recognized/i.test(combined) ||
+    result?.status === 127
+  ) {
+    return { ok: false, skipped: true, reason: 'device has no curl; probe skipped' };
+  }
+  if (result?.status === 0 && String(result?.stdout ?? '').trim() === '200') {
+    return { ok: true, skipped: false, reason: null };
+  }
+  const detail = combined.trim().slice(-300) || `exit ${result?.status ?? '?'}`;
+  return { ok: false, skipped: false, reason: `device probe failed: ${detail}` };
+}
+
+/**
  * Filename-safe label identifying one certification target.
  *
  * @param {{ avd: string | null, serial: string | null }} target

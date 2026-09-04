@@ -71,8 +71,8 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit mock-fidelity + URL fixes, push,
-  rerun auth lane via `--auth-mock` on Nitro ×2 with full proof
+- Exact next action: Commit connectivity-probe fix, push, rerun
+  auth lane via `--auth-mock` on Nitro ×2 with full proof
   (signup/PUT/UID/verify).
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
@@ -127,6 +127,14 @@ tests/nativeAuthMock.test.ts tests/nativeAvd.test.ts` — 14/14
   device URL → 127.0.0.1; explicit PUT handler returning the
   user; universal request logging; PUT gate in the proof
   (16/16 tests).
+- 2026-09-04 — diag run with zero mock traffic (not even bootstrap
+  getUser): `reverse --list` proves the forward EXISTS, not that
+  bytes flow. Added device-side curl connectivity probe to
+  `ensureAuthReverse` (one re-establishment, then fail with
+  reason) + `interpretDeviceProbe` unit tests (17/17). If the
+  next lane still fails at 03 with PUT logged, the remaining
+  suspect is app-side state derivation, with full request logs
+  now available.
 
 ## Changed Files / Areas
 
