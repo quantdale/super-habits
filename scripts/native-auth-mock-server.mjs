@@ -4,9 +4,11 @@
  * lane (no real Supabase credentials are available in this environment).
  *
  * Serves exactly the Auth REST surface supabase-js uses on Android/iOS:
- * anonymous signup, user fetch, token refresh, logout, email-change (PATCH),
- * OTP request, OTP verify, plus empty owner-scoped REST probes for restore
- * previews. It never emails anyone: the OTP is always `123456`.
+ * anonymous signup, user fetch, token refresh, logout, email-change
+ * (PUT as sent by updateUser, plus PATCH), OTP request, OTP verify,
+ * plus empty owner-scoped REST probes for restore previews. Every
+ * request is logged (method + path + outcome) so lane proof can see
+ * all traffic. It never emails anyone: the OTP is always `123456`.
  *
  * Diagnostics are printed as `[mock]` lines WITHOUT tokens — only event types,
  * user ids, and counts. The journey asserts:
@@ -39,6 +41,7 @@ const CORS = {
 
 let user = { ...ANON_USER };
 const issuedTokens = new Map(); // token -> userId
+let putUserCount = 0;
 let signupCount = 0;
 let userCheckCount = 0;
 let userCheckAuthedCount = 0;
@@ -128,6 +131,25 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (path === '/auth/v1/user' && method === 'PUT') {
+    // supabase-js updateUser sends PUT (not PATCH). Faithful emulation:
+    // record the pending email and answer with the current user, exactly
+    // like the PATCH path, so client sessions are never corrupted by an
+    // empty response body.
+    const body = await readBody(req);
+    putUserCount += 1;
+    if (typeof body.email === 'string' && body.email.length > 0) {
+      user.pending_email = body.email;
+      console.log(
+        `[mock] put user email-change requested for ${body.email} user=${user.id} count=${putUserCount}`,
+      );
+    } else {
+      console.log(`[mock] put user (no email change) user=${user.id} count=${putUserCount}`);
+    }
+    json(200, user);
+    return;
+  }
+
   if (path === '/auth/v1/verify' && method === 'POST') {
     const body = await readBody(req);
     verifyCount += 1;
@@ -183,16 +205,19 @@ const server = createServer(async (req, res) => {
   }
 
   if (path.startsWith('/auth/v1/')) {
+    console.log(`[mock] unhandled ${method} ${path}`);
     json(200, {});
     return;
   }
 
   if (path.startsWith('/rest/v1/')) {
     // Owner-scoped restore/backup probes: empty dataset.
+    console.log(`[mock] rest probe ${method} ${path} -> empty`);
     json(200, []);
     return;
   }
 
+  console.log(`[mock] 404 ${method} ${path}`);
   json(404, { message: 'not found' });
 });
 

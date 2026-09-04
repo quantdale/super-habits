@@ -11,6 +11,7 @@ const GREEN_LOG = `[mock] native auth mock listening on :4545 (user 00000000-000
 [mock] signup count=1 user=00000000-0000-0000-0000-00000000ca1a
 [mock] user-check authed=1 user=00000000-0000-0000-0000-00000000ca1a
 [mock] user-check authed=2 user=00000000-0000-0000-0000-00000000ca1a
+[mock] put user email-change requested for canary@example.test user=00000000-0000-0000-0000-00000000ca1a count=1
 [mock] otp requested email=canary@example.test shouldCreateUser=false count=1
 [mock] email-change requested for canary@example.test user=00000000-0000-0000-0000-00000000ca1a
 [mock] verify email_change -> permanent user=00000000-0000-0000-0000-00000000ca1a
@@ -27,6 +28,7 @@ describe('native auth-mock proof helpers', () => {
       otpRequests: 1,
       refreshes: 1,
       logouts: 0,
+      putUserRequests: 1,
     });
   });
 
@@ -53,6 +55,14 @@ describe('native auth-mock proof helpers', () => {
     );
     expect(drifted.ok).toBe(false);
     expect(drifted.reasons.join(';')).toMatch(/single user id|changed the user id/);
+  });
+
+  it('rejects a lane slice with no protect request', () => {
+    const proof = assertMockProof(
+      parseMockLog('[mock] signup count=1 user=aaa\n[mock] user-check authed=1 user=aaa\n'),
+    );
+    expect(proof.ok).toBe(false);
+    expect(proof.reasons.join(';')).toMatch(/PUT \/auth\/v1\/user/);
   });
 
   it('rejects a lane slice with no protection verify', () => {

@@ -45,9 +45,12 @@ function parseArgs(argv) {
       throw new Error(`Unknown argument '${arg}'. Use --help for usage.`);
     }
   }
-  if (args.mockAuthUrl !== null && !/^http:\/\/localhost:\d+$/.test(args.mockAuthUrl)) {
+  if (
+    args.mockAuthUrl !== null &&
+    !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(args.mockAuthUrl)
+  ) {
     throw new Error(
-      `Refusing TEST-ONLY mock build for non-loopback URL '${args.mockAuthUrl}'. Use http://localhost:<port>.`,
+      `Refusing TEST-ONLY mock build for non-loopback URL '${args.mockAuthUrl}'. Use http://localhost:<port> or http://127.0.0.1:<port>.`,
     );
   }
   return args;

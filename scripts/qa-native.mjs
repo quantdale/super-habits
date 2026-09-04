@@ -53,7 +53,10 @@ const REPORT_DIR = resolve(ROOT, 'simulation-output', 'native');
 const BUILD_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build.json');
 const MOCK_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build-mock.json');
 const MOCK_SERVER_SCRIPT = resolve(ROOT, 'scripts', 'native-auth-mock-server.mjs');
-const MOCK_DEVICE_HOST = 'localhost';
+// Device-loopback literal (not `localhost`): Android may resolve `localhost`
+// to ::1 first and only fall back to 127.0.0.1, adding nondeterministic
+// per-request failure modes under `adb reverse`. The literal is proven.
+const MOCK_DEVICE_HOST = '127.0.0.1';
 const E2E_ENV_NAME = 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST';
 const FAILURE_CLASSES = [
   'PRODUCT_BUG',
@@ -875,6 +878,7 @@ function mockProofSlice(logPath, startOffset) {
     reasons: verdict.reasons,
     signupCount: parsed.signupCount,
     unauthenticatedChecks: parsed.unauthenticatedChecks,
+    putUserRequests: parsed.putUserRequests,
     userIds: parsed.userIds,
     verifyPermanentIds: parsed.verifyPermanentIds,
   };

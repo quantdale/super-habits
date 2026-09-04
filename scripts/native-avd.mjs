@@ -265,9 +265,9 @@ export function buildTargetRunRecord(fields = {}) {
  *
  * Recognized lines: `signup count=N user=<id>`,
  * `user-check UNAUTHENTICATED (N)`, `user-check authed=N user=<id>`,
- * `verify email_change -> permanent user=<id>`, plus otp/refresh/logout
- * counters. Anything else is ignored so future log lines cannot break
- * proof parsing.
+ * `put user ...` (protect request), `verify email_change -> permanent
+ * user=<id>`, plus otp/refresh/logout counters. Anything else is
+ * ignored so future log lines cannot break proof parsing.
  *
  * @param {unknown} logText full or sliced mock stdout.
  */
@@ -278,6 +278,7 @@ export function parseMockLog(logText) {
   let otpRequests = 0;
   let refreshes = 0;
   let logouts = 0;
+  let putUserRequests = 0;
   const userIds = [];
   const verifyPermanentIds = [];
   const noteUser = (id) => {
@@ -305,7 +306,8 @@ export function parseMockLog(logText) {
       noteUser(match[1]);
       continue;
     }
-    if (/\[mock\] otp requested/.test(line)) otpRequests += 1;
+    if (/\[mock\] put user/.test(line)) putUserRequests += 1;
+    else if (/\[mock\] otp requested/.test(line)) otpRequests += 1;
     else if (/\[mock\] token refresh ok/.test(line)) refreshes += 1;
     else if (/\[mock\] logout count=/.test(line)) logouts += 1;
   }
@@ -317,14 +319,15 @@ export function parseMockLog(logText) {
     otpRequests,
     refreshes,
     logouts,
+    putUserRequests,
   };
 }
 
 /**
  * Assert the per-run auth proof for one lane slice: exactly one anonymous
- * signup, zero unauthenticated session checks, a single user id across
- * every observed request, and at least one email_change verify preserving
- * that id.
+ * signup, zero unauthenticated session checks, at least one PUT
+ * /auth/v1/user protect request, a single user id across every observed
+ * request, and at least one email_change verify preserving that id.
  *
  * @param {ReturnType<typeof parseMockLog>} parsed
  * @returns {{ ok: boolean, reasons: string[] }}
@@ -339,6 +342,9 @@ export function assertMockProof(parsed) {
     reasons.push(
       `expected 0 unauthenticated session checks, observed ${proof.unauthenticatedChecks}`,
     );
+  }
+  if ((proof.putUserRequests ?? 0) < 1) {
+    reasons.push('expected at least one PUT /auth/v1/user protect request, observed none');
   }
   const ids = proof.userIds ?? [];
   if (ids.length !== 1) {

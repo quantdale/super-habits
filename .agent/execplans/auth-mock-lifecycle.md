@@ -71,9 +71,9 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the two fixes, push, rerun the auth
-  lane via `--auth-mock` on Nitro (rebuild expected), then repeat
-  for the ×2 proof with per-run 1-signup/same-UID evidence.
+- Exact next action: Commit mock-fidelity + URL fixes, push,
+  rerun auth lane via `--auth-mock` on Nitro ×2 with full proof
+  (signup/PUT/UID/verify).
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
   reverse/emulator left; ledger + commit/push; plan COMPLETED.
@@ -117,6 +117,16 @@ tests/nativeAuthMock.test.ts tests/nativeAvd.test.ts` — 14/14
   PASS (APK D86B7B97 @9bbd48c, mock metadata file), reverse +
   emulator cleanup correct, proof honestly empty (no lane ran);
   BLOCKED by the two runner bugs above (both fixed, 15/15 tests).
+- 2026-09-04 — second live run: lifecycle fully owned (mock +
+  reverse + TEST-ONLY build DE74F582 + lane + teardown with port
+  closed); 01/02 PASS, 03 FAILED at the OTP sheet with
+  signup=1/unauth=0/same-UID but no verify and no PUT/OTP in the
+  mock log. Root-caused to mock infidelity (PUT /user silently
+  swallowed as `{}`) compounded by `localhost`-vs-`127.0.0.1`
+  nondeterminism vs predecessor's proven literal URL. Fixes:
+  device URL → 127.0.0.1; explicit PUT handler returning the
+  user; universal request logging; PUT gate in the proof
+  (16/16 tests).
 
 ## Changed Files / Areas
 
