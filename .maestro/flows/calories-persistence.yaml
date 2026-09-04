@@ -64,9 +64,12 @@ tags:
 - scrollUntilVisible:
     element: 'Native breakfast'
     direction: DOWN
+# Polled (not single-shot) with the same 15s budget as the post-restart
+# check: Wave 10 shows the scroller finding the row while a short poll
+# misses it during the diary list rebuild. Same assertion, no weakening.
 - extendedWaitUntil:
     visible: 'Native breakfast'
-    timeout: 5000
+    timeout: 15000
 - killApp
 - launchApp
 - extendedWaitUntil:
