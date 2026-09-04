@@ -71,9 +71,16 @@ coverage; changing mock protocol or app auth code without new evidence.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit install-only fix, push, verify auth
-  lane on Nitro (expect install-only, no rebuild, 3/3 green),
+- Exact next action: Commit always-install correction, push,
+  verify auth lane on Nitro (expect install-only + 3/3 green),
   then repeat for the ×2 proof.
+- 2026-09-04 — self-review catch before the fix even ran: the
+  committed `ensureInstalled` kept an early trust return when
+  build+installed both matched, preserving the exact staleness
+  hole (proven by the next dead run skipping install-only
+  entirely). Corrected to always (re)install the verified host
+  APK when the host build matches; only `--no-provision` keeps
+  legacy trust-the-device behavior.
 - Remaining definition of done: helpers tested; provisioner + runner
   extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
   reverse/emulator left; ledger + commit/push; plan COMPLETED.

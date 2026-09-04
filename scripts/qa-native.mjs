@@ -422,8 +422,13 @@ function checkTarget(platform, options) {
         metadata.versionCode === packageIdentity.versionCode);
     const ensureInstalled = () => {
       refreshPackageState();
-      if (buildMatches() && installedMatches()) return { ok: true };
-      if (!options.provision) return { ok: false };
+      // Never trust installed state outright: snapshot-reverted boots can
+      // present a stale binary that version checks cannot distinguish, so
+      // a matching host build is always (re)installed and re-verified.
+      // Only --no-provision keeps the legacy trust-the-device behavior.
+      if (!options.provision) {
+        return buildMatches() && installedMatches() ? { ok: true } : { ok: false };
+      }
       if (buildMatches() && metadata) {
         // The host build is current: (re)install the hash-verified APK
         // instead of rebuilding. Snapshot-reverted boots can otherwise
