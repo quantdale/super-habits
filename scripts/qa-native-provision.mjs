@@ -14,29 +14,41 @@ import {
   parsePackageIdentity,
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
+import { addCleartextAttr } from './native-avd.mjs';
 import { readGitProvenance, requireCleanGitTree } from './native-provenance.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
 const REPORT_DIR = resolve(ROOT, 'simulation-output', 'native');
 const METADATA_PATH = resolve(REPORT_DIR, 'native-android-build.json');
+const MOCK_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build-mock.json');
 const E2E_ENV_NAME = 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST';
+const MOCK_SUPABASE_ANON_KEY = 'mock-anon-key-for-tests-only';
 
 function parseArgs(argv) {
   const args = {
     serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
     force: false,
+    mockAuthUrl: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--serial') args.serial = argv[++i];
     else if (arg === '--force') args.force = true;
+    else if (arg === '--mock-auth-url') args.mockAuthUrl = argv[++i];
     else if (arg === '--help' || arg === '-h') {
-      console.log('Usage: node scripts/qa-native-provision.mjs [--serial SERIAL] [--force]');
+      console.log(
+        'Usage: node scripts/qa-native-provision.mjs [--serial SERIAL] [--force] [--mock-auth-url URL]',
+      );
       process.exit(0);
     } else {
       throw new Error(`Unknown argument '${arg}'. Use --help for usage.`);
     }
+  }
+  if (args.mockAuthUrl !== null && !/^http:\/\/localhost:\d+$/.test(args.mockAuthUrl)) {
+    throw new Error(
+      `Refusing TEST-ONLY mock build for non-loopback URL '${args.mockAuthUrl}'. Use http://localhost:<port>.`,
+    );
   }
   return args;
 }
@@ -140,7 +152,7 @@ function writeFailure(args, reason, details = {}) {
         requestedSerial: args.serial,
         reason,
         details,
-        replayCommand: `npm run qa:native:provision -- --serial ${args.serial ?? '<serial>'}`,
+        replayCommand: `npm run qa:native:provision -- --serial ${args.serial ?? '<serial>'}${args.mockAuthUrl ? ` --mock-auth-url ${args.mockAuthUrl}` : ''}`,
         capturedAt: new Date().toISOString(),
       },
       null,
@@ -195,6 +207,14 @@ function main(args) {
 
   const prebuildCommand = 'npx expo prebuild --platform android --clean';
   const buildEnv = { ...process.env, [E2E_ENV_NAME]: 'true' };
+  const mockMode = args.mockAuthUrl !== null;
+  if (mockMode) {
+    buildEnv.EXPO_PUBLIC_SUPABASE_URL = args.mockAuthUrl;
+    buildEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY = MOCK_SUPABASE_ANON_KEY;
+    console.log(
+      `TEST-ONLY mock-auth build: Supabase endpoint is ${args.mockAuthUrl} (device loopback) with a non-secret placeholder key.`,
+    );
+  }
   const npx = findCommand('npx');
   if (!npx) throw new Error('npx is not installed or not discoverable on PATH.');
   if (args.force) console.log('Forcing a fresh current-source Android E2E build.');
@@ -203,6 +223,17 @@ function main(args) {
     stdio: 'inherit',
   });
   requireSuccess(prebuild, 'Expo Android prebuild', prebuildCommand);
+  if (mockMode) {
+    // TEST-ONLY: allow cleartext HTTP to the device-loopback mock in the
+    // generated, gitignored android/ tree. Tracked config is untouched;
+    // release builds never pass through here.
+    const manifestPath = resolve(ROOT, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
+    const manifest = readFileSync(manifestPath, 'utf8');
+    writeFileSync(manifestPath, addCleartextAttr(manifest), 'utf8');
+    console.log(
+      'TEST-ONLY cleartext patch applied to the generated manifest (gitignored android/ only).',
+    );
+  }
   const postPrebuildProvenance = requireCleanGitTree(ROOT);
   if (postPrebuildProvenance.sourceSha !== sourceProvenance.sourceSha) {
     throw new Error(
@@ -266,12 +297,15 @@ function main(args) {
   }
 
   const builtAt = new Date().toISOString();
+  const metadataPath = mockMode ? MOCK_METADATA_PATH : METADATA_PATH;
   const metadata = {
     schemaVersion: 1,
     status: 'PASS',
     classification: null,
     platform: 'android',
     appId: APP_ID,
+    buildKind: mockMode ? 'test-only' : 'canonical',
+    mockAuthUrl: mockMode ? args.mockAuthUrl : null,
     sourceSha: builtSourceProvenance.sourceSha,
     sourceTreeClean: builtSourceProvenance.sourceTreeClean,
     sourceTreeStatus: builtSourceProvenance.sourceTreeStatus,
@@ -287,11 +321,12 @@ function main(args) {
     builtAt,
     capturedAt: builtAt,
   };
-  mkdirSync(dirname(METADATA_PATH), { recursive: true });
-  writeFileSync(METADATA_PATH, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+  mkdirSync(dirname(metadataPath), { recursive: true });
+  writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
   console.log(
-    `Android E2E APK installed: ${APP_ID} ${packageIdentity.versionName ?? '<unknown>'} on ${serial} (source ${metadata.sourceSha}, APK SHA-256 ${apkHash}).`,
+    `${mockMode ? 'TEST-ONLY mock-auth' : 'Android E2E'} APK installed: ${APP_ID} ${packageIdentity.versionName ?? '<unknown>'} on ${serial} (source ${metadata.sourceSha}, APK SHA-256 ${apkHash}).`,
   );
+  console.log(`Build provenance: ${relative(ROOT, metadataPath)}`);
 }
 
 let args = {

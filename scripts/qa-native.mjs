@@ -13,7 +13,15 @@
  *   node scripts/qa-native.mjs --platform android --tag smoke --avd Nitro_API_36 --avd CRBABot_API_36
  *   node scripts/qa-native.mjs --list-avds
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +33,9 @@ import {
 } from './native-qa-utils.mjs';
 import { readGitProvenance } from './native-provenance.mjs';
 import {
+  assertMockProof,
+  parseMockLog,
+  reverseSpecPresent,
   buildTargetRunRecord,
   findNewEmulatorSerial,
   isBootReady,
@@ -39,6 +50,9 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
 const REPORT_DIR = resolve(ROOT, 'simulation-output', 'native');
 const BUILD_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build.json');
+const MOCK_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build-mock.json');
+const MOCK_SERVER_SCRIPT = resolve(ROOT, 'scripts', 'native-auth-mock-server.mjs');
+const MOCK_DEVICE_HOST = 'localhost';
 const E2E_ENV_NAME = 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST';
 const FAILURE_CLASSES = [
   'PRODUCT_BUG',
@@ -61,6 +75,9 @@ function parseArgs(argv) {
     bootTimeoutMs: 300000,
     noStop: false,
     reset: false,
+    authMock: false,
+    authMockPort: 4545,
+    buildMetadata: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -86,9 +103,18 @@ function parseArgs(argv) {
     } else if (arg === '--no-stop') args.noStop = true;
     else if (arg === '--reset') args.reset = true;
     else if (arg === '--no-reset') args.reset = false;
+    else if (arg === '--auth-mock') args.authMock = true;
+    else if (arg === '--auth-mock-port') {
+      const port = Number(argv[++i]);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`Invalid --auth-mock-port '${argv[i]}'. Pass an integer 1..65535.`);
+      }
+      args.authMockPort = port;
+      args.authMock = true;
+    } else if (arg === '--build-metadata') args.buildMetadata = argv[++i];
     else if (arg === '--help' || arg === '-h') {
       console.log(
-        'Usage: node scripts/qa-native.mjs [--platform android|ios|all] [--tag TAG] [--flow PATH] [--serial SERIAL] [--no-provision] [--avd NAME ...] [--list-avds] [--boot-timeout SECONDS] [--no-stop] [--reset]',
+        'Usage: node scripts/qa-native.mjs [--platform android|ios|all] [--tag TAG] [--flow PATH] [--serial SERIAL] [--no-provision] [--avd NAME ...] [--list-avds] [--boot-timeout SECONDS] [--no-stop] [--reset] [--auth-mock] [--auth-mock-port PORT] [--build-metadata PATH]',
       );
       process.exit(0);
     } else {
@@ -207,10 +233,19 @@ function writeReport(report) {
   return path;
 }
 
-function readBuildMetadata() {
-  if (!existsSync(BUILD_METADATA_PATH)) return null;
+function deviceAuthMockUrl(options) {
+  return `http://${MOCK_DEVICE_HOST}:${options.authMockPort}`;
+}
+
+function metadataPathFor(options) {
+  if (options.buildMetadata) return resolve(ROOT, options.buildMetadata);
+  return options.authMock ? MOCK_METADATA_PATH : BUILD_METADATA_PATH;
+}
+
+function readBuildMetadata(metadataPath = BUILD_METADATA_PATH) {
+  if (!existsSync(metadataPath)) return null;
   try {
-    return JSON.parse(readFileSync(BUILD_METADATA_PATH, 'utf8'));
+    return JSON.parse(readFileSync(metadataPath, 'utf8'));
   } catch {
     return null;
   }
@@ -242,6 +277,7 @@ function blocked(platform, tag, replayCommand, reason, details) {
     targetLabel: details.targetLabel ?? label,
     avd: details.avd ?? null,
     ownedEmulator: details.ownedEmulator ?? false,
+    mockState: details.mockState ?? null,
     details,
     replayCommand,
     capturedAt: new Date().toISOString(),
@@ -252,9 +288,10 @@ function blocked(platform, tag, replayCommand, reason, details) {
   return { exitCode: 2, report, reportPath };
 }
 
-function provisionAndroid(serial) {
+function provisionAndroid(serial, options) {
   const command = process.execPath;
   const args = [resolve(ROOT, 'scripts/qa-native-provision.mjs'), '--serial', serial];
+  if (options.authMock) args.push('--mock-auth-url', deviceAuthMockUrl(options));
   console.log(
     `Android E2E package is absent or stale; provisioning current source with ${command} ${args.slice(1).join(' ')}`,
   );
@@ -341,9 +378,16 @@ function checkTarget(platform, options) {
       };
     }
     const currentSha = currentProvenance.sourceSha;
-    let metadata = readBuildMetadata();
+    const metadataPath = metadataPathFor(options);
+    let metadata = readBuildMetadata(metadataPath);
     let installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
     let packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
+    // Provenance separation is enforced here, not just by filename: mock
+    // mode requires an explicit test-only build for this mock URL, and
+    // canonical mode never accepts a test-only build.
+    const buildKindOk = options.authMock
+      ? metadata?.buildKind === 'test-only' && metadata?.mockAuthUrl === deviceAuthMockUrl(options)
+      : metadata?.buildKind !== 'test-only';
     const metadataMatches = () =>
       metadata?.status === 'PASS' &&
       metadata.sourceTreeClean === true &&
@@ -353,11 +397,12 @@ function checkTarget(platform, options) {
       metadata.target?.api === targetIdentity.api &&
       metadata.target?.abi === targetIdentity.abi &&
       metadata.target?.avd === targetIdentity.avd &&
-      metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true';
+      metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true' &&
+      buildKindOk;
     if ((!packageInstalled || !metadataMatches()) && options.provision) {
-      const provisioningBlock = provisionAndroid(serial);
+      const provisioningBlock = provisionAndroid(serial, options);
       if (provisioningBlock) return provisioningBlock;
-      metadata = readBuildMetadata();
+      metadata = readBuildMetadata(metadataPath);
       installed = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
       packageInstalled = installed.status === 0 && installed.stdout.includes('package:');
     }
@@ -522,6 +567,10 @@ function runPlatform(platform, options) {
     avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
     ownedEmulator: avdContext?.owned ?? false,
     stateReset,
+    mockState:
+      options.authMock && options.authSlice
+        ? mockProofSlice(options.authSlice.logPath, options.authSlice.startOffset)
+        : null,
     targetIdentity: target.targetIdentity ?? null,
     packageIdentity: target.packageIdentity ?? null,
     buildMetadata: target.buildMetadata ?? null,
@@ -679,6 +728,147 @@ function stopOwnedEmulator(adb, serial) {
   }
 }
 
+function isMockServing(port) {
+  const probe = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      `fetch('http://127.0.0.1:${port}/rest/v1/auth-mock-probe',{signal:AbortSignal.timeout(2000)}).then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))`,
+    ],
+    { cwd: ROOT, stdio: 'ignore' },
+  );
+  return probe.status === 0;
+}
+
+function startAuthMockSession(options) {
+  const port = options.authMockPort;
+  if (isMockServing(port)) {
+    throw new Error(
+      `Auth-mock port ${port} is already serving; refusing to adopt a possibly stale mock. Free the port and retry.`,
+    );
+  }
+  mkdirSync(REPORT_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
+  const logPath = resolve(REPORT_DIR, `mock-auth-${port}-${stamp}.log`);
+  const fd = openSync(logPath, 'a');
+  let child;
+  try {
+    child = spawn(process.execPath, [MOCK_SERVER_SCRIPT, String(port)], {
+      cwd: ROOT,
+      stdio: ['ignore', fd, fd],
+    });
+  } finally {
+    closeSync(fd);
+  }
+  if (child.pid == null) {
+    throw new Error(`Could not start the owned auth-mock server (no process id); see ${logPath}.`);
+  }
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(
+        `Owned auth-mock (pid ${child.pid}) exited during startup (code ${child.exitCode}); see ${logPath}.`,
+      );
+    }
+    if (isMockServing(port)) {
+      console.log(`Owned auth-mock ready on :${port} (pid ${child.pid}); log ${logPath}.`);
+      return { port, deviceUrl: deviceAuthMockUrl(options), logPath, child, pid: child.pid };
+    }
+    sleepMs(250);
+  }
+  try {
+    child.kill('SIGTERM');
+  } catch {
+    // Fall through to the timeout error below.
+  }
+  throw new Error(`Owned auth-mock did not become ready on :${port} within 15s; see ${logPath}.`);
+}
+
+function stopAuthMockSession(session) {
+  const { child, pid, port, logPath } = session;
+  if (child.exitCode === null) {
+    child.kill('SIGTERM');
+    const deadline = Date.now() + 10000;
+    while (child.exitCode === null && Date.now() < deadline) sleepMs(250);
+  }
+  if (child.exitCode === null) {
+    child.kill('SIGKILL');
+    const deadline = Date.now() + 5000;
+    while (child.exitCode === null && Date.now() < deadline) sleepMs(250);
+  }
+  if (child.exitCode === null) {
+    throw new Error(`Owned auth-mock pid ${pid} did not exit; refusing to leave it running.`);
+  }
+  if (isMockServing(port)) {
+    throw new Error(
+      `Port ${port} still serves after the owned mock (pid ${pid}) exited; see ${logPath}.`,
+    );
+  }
+  console.log(`Stopped owned auth-mock (pid ${pid}); port ${port} closed; log ${logPath}.`);
+}
+
+function ensureAuthReverse(adb, serial, port) {
+  const list = run(adb, ['-s', serial, 'reverse', '--list']);
+  if (list.status === 0 && reverseSpecPresent(list.stdout, port)) {
+    const stale = run(adb, ['-s', serial, 'reverse', '--remove', `tcp:${port}`]);
+    if (stale.status !== 0) {
+      throw new Error(
+        `Could not remove stale reverse tcp:${port} on '${serial}' (exit ${stale.status}).`,
+      );
+    }
+    console.log(`Removed stale reverse tcp:${port} on '${serial}'.`);
+  }
+  const forward = run(adb, ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`]);
+  if (forward.status !== 0) {
+    throw new Error(`adb reverse tcp:${port} failed on '${serial}' (exit ${forward.status}).`);
+  }
+  const verify = run(adb, ['-s', serial, 'reverse', '--list']);
+  if (verify.status !== 0 || !reverseSpecPresent(verify.stdout, port)) {
+    throw new Error(`adb reverse tcp:${port} on '${serial}' did not appear in reverse --list.`);
+  }
+  console.log(`Reverse tcp:${port} established on '${serial}' (device localhost:${port}).`);
+}
+
+function removeAuthReverse(adb, serial, port) {
+  const remove = run(adb, ['-s', serial, 'reverse', '--remove', `tcp:${port}`]);
+  if (remove.status !== 0) {
+    throw new Error(`Could not remove reverse tcp:${port} on '${serial}' (exit ${remove.status}).`);
+  }
+  const verify = run(adb, ['-s', serial, 'reverse', '--list']);
+  if (verify.status === 0 && reverseSpecPresent(verify.stdout, port)) {
+    throw new Error(`Reverse tcp:${port} on '${serial}' persisted after removal.`);
+  }
+  console.log(`Reverse tcp:${port} removed on '${serial}'.`);
+}
+
+function mockLogOffset(logPath) {
+  try {
+    return statSync(logPath).size;
+  } catch {
+    return 0;
+  }
+}
+
+function mockProofSlice(logPath, startOffset) {
+  // The mock log is ASCII-only `[mock]` lines, so a byte offset is a safe slice point.
+  let text = '';
+  try {
+    text = readFileSync(logPath, 'utf8').slice(startOffset);
+  } catch {
+    text = '';
+  }
+  const parsed = parseMockLog(text);
+  const verdict = assertMockProof(parsed);
+  return {
+    ok: verdict.ok,
+    reasons: verdict.reasons,
+    signupCount: parsed.signupCount,
+    unauthenticatedChecks: parsed.unauthenticatedChecks,
+    userIds: parsed.userIds,
+    verifyPermanentIds: parsed.verifyPermanentIds,
+  };
+}
+
 function resolveAvdTarget(adb, emulator, avdName, bootTimeoutMs) {
   const devices = run(adb, ['devices']);
   if (devices.status !== 0) {
@@ -711,6 +901,99 @@ function resolveAvdTarget(adb, emulator, avdName, bootTimeoutMs) {
   return { serial, owned: true, pid: null };
 }
 
+function runMultiAvdTarget(adb, emulator, avdName, options, authSession, records, cleanupErrors) {
+  const startedAt = new Date().toISOString();
+  let resolution = null;
+  let outcome = null;
+  let reverseEstablished = false;
+  try {
+    resolution = resolveAvdTarget(adb, emulator, avdName, options.bootTimeoutMs);
+    if (authSession) {
+      ensureAuthReverse(adb, resolution.serial, authSession.port);
+      reverseEstablished = true;
+    }
+    const targetOptions = {
+      ...options,
+      serial: resolution.serial,
+      avdContext: { avd: avdName, owned: resolution.owned },
+      replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      authSlice: authSession
+        ? { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) }
+        : null,
+    };
+    outcome = runPlatform('android', targetOptions);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    outcome = blocked(
+      'android',
+      options.tag,
+      `${options.replayCommand} --avd ${avdName}`,
+      message,
+      {
+        flow: options.flow ?? '.maestro',
+        avd: avdName,
+        serial: resolution?.serial ?? null,
+        ownedEmulator: resolution?.owned ?? false,
+        mockState: null,
+        remediation:
+          'Inspect the message above; no emulator was left in an unknown state by this step.',
+      },
+    );
+  } finally {
+    if (authSession && reverseEstablished && resolution) {
+      try {
+        removeAuthReverse(adb, resolution.serial, authSession.port);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
+        console.error(`Auth reverse cleanup failed [ENVIRONMENT]: ${message}`);
+      }
+    }
+    if (resolution?.owned && !options.noStop) {
+      try {
+        stopOwnedEmulator(adb, resolution.serial);
+        console.log(`Stopped owned emulator ${resolution.serial} (AVD '${avdName}').`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
+        console.error(`Emulator cleanup failed [ENVIRONMENT]: ${message}`);
+      }
+    } else if (resolution?.owned && options.noStop) {
+      console.log(
+        `Leaving owned emulator ${resolution.serial} (AVD '${avdName}') running (--no-stop).`,
+      );
+    }
+  }
+  const endedAt = new Date().toISOString();
+  const report = outcome.report;
+  records.push(
+    buildTargetRunRecord({
+      repoSha: report.gitSha ?? report.sourceSha ?? null,
+      sourceSha: report.sourceSha ?? report.gitSha ?? null,
+      apkSha256: report.buildMetadata?.apkSha256 ?? null,
+      buildKind: report.buildMetadata?.buildKind ?? 'canonical',
+      platform: 'android',
+      avd: report.avd ?? avdName,
+      api: report.targetIdentity?.api ?? null,
+      abi: report.targetIdentity?.abi ?? null,
+      serial: report.targetIdentity?.serial ?? report.details?.serial ?? resolution?.serial ?? null,
+      ownedEmulator: report.ownedEmulator ?? resolution?.owned ?? false,
+      stateReset: report.stateReset ?? false,
+      mockState: report.mockState ?? null,
+      tag: options.tag,
+      flow: options.flow ?? '.maestro',
+      startedAt,
+      endedAt,
+      status: report.status,
+      classification: report.classification ?? (report.status === 'BLOCKED' ? 'ENVIRONMENT' : null),
+      artifactPath: outcome.reportPath,
+      replayCommand: `${options.replayCommand} --avd ${avdName}`,
+    }),
+  );
+  console.log(`Target '${avdName}': ${report.status} (artifact: ${outcome.reportPath})`);
+  return outcome.exitCode;
+}
+
 function runMultiAvd(options) {
   const emulator = findEmulator();
   if (!emulator) {
@@ -737,92 +1020,61 @@ function runMultiAvd(options) {
     return 1;
   }
   console.log(`Multi-AVD certification (sequential): ${sequence.join(' -> ')}`);
+  let authSession = null;
+  if (options.authMock) {
+    try {
+      authSession = startAuthMockSession(options);
+    } catch (error) {
+      console.error(
+        `Auth-mock startup failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 2;
+    }
+  }
   const records = [];
   const cleanupErrors = [];
   let exitCode = 0;
-  for (const avdName of sequence) {
-    const startedAt = new Date().toISOString();
-    let resolution = null;
-    let outcome = null;
-    try {
-      resolution = resolveAvdTarget(adb, emulator, avdName, options.bootTimeoutMs);
-      const targetOptions = {
-        ...options,
-        serial: resolution.serial,
-        avdContext: { avd: avdName, owned: resolution.owned },
-        replayCommand: `${options.replayCommand} --avd ${avdName}`,
-      };
-      outcome = runPlatform('android', targetOptions);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      outcome = blocked(
-        'android',
-        options.tag,
-        `${options.replayCommand} --avd ${avdName}`,
-        message,
-        {
-          flow: options.flow ?? '.maestro',
-          avd: avdName,
-          serial: resolution?.serial ?? null,
-          ownedEmulator: resolution?.owned ?? false,
-          remediation:
-            'Inspect the message above; no emulator was left in an unknown state by this step.',
-        },
+  try {
+    for (const avdName of sequence) {
+      exitCode = Math.max(
+        exitCode,
+        runMultiAvdTarget(adb, emulator, avdName, options, authSession, records, cleanupErrors),
       );
-    } finally {
-      if (resolution?.owned && !options.noStop) {
-        try {
-          stopOwnedEmulator(adb, resolution.serial);
-          console.log(`Stopped owned emulator ${resolution.serial} (AVD '${avdName}').`);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          cleanupErrors.push({ avd: avdName, serial: resolution.serial, message });
-          console.error(`Emulator cleanup failed [ENVIRONMENT]: ${message}`);
-        }
-      } else if (resolution?.owned && options.noStop) {
-        console.log(
-          `Leaving owned emulator ${resolution.serial} (AVD '${avdName}') running (--no-stop).`,
-        );
+    }
+  } finally {
+    if (authSession) {
+      try {
+        stopAuthMockSession(authSession);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        cleanupErrors.push({ avd: null, serial: null, message });
+        console.error(`Auth-mock teardown failed [ENVIRONMENT]: ${message}`);
       }
     }
-    const endedAt = new Date().toISOString();
-    const report = outcome.report;
-    records.push(
-      buildTargetRunRecord({
-        repoSha: report.gitSha ?? report.sourceSha ?? null,
-        sourceSha: report.sourceSha ?? report.gitSha ?? null,
-        apkSha256: report.buildMetadata?.apkSha256 ?? null,
-        buildKind: 'canonical',
-        platform: 'android',
-        avd: report.avd ?? avdName,
-        api: report.targetIdentity?.api ?? null,
-        abi: report.targetIdentity?.abi ?? null,
-        serial:
-          report.targetIdentity?.serial ?? report.details?.serial ?? resolution?.serial ?? null,
-        ownedEmulator: report.ownedEmulator ?? resolution?.owned ?? false,
-        stateReset: report.stateReset ?? false,
-        tag: options.tag,
-        flow: options.flow ?? '.maestro',
-        startedAt,
-        endedAt,
-        status: report.status,
-        classification:
-          report.classification ?? (report.status === 'BLOCKED' ? 'ENVIRONMENT' : null),
-        artifactPath: outcome.reportPath,
-        replayCommand: `${options.replayCommand} --avd ${avdName}`,
-      }),
-    );
-    exitCode = Math.max(exitCode, outcome.exitCode);
-    console.log(`Target '${avdName}': ${report.status} (artifact: ${outcome.reportPath})`);
   }
   const summary = summarizeTargetRuns(records);
+  let authProof = null;
+  if (authSession) {
+    authProof = {
+      port: authSession.port,
+      deviceUrl: authSession.deviceUrl,
+      logPath: authSession.logPath,
+      ...mockProofSlice(authSession.logPath, 0),
+    };
+    console.log(
+      `Auth-mock invocation proof: signup=${authProof.signupCount} unauth=${authProof.unauthenticatedChecks} users=[${authProof.userIds.join(', ')}] ok=${authProof.ok}`,
+    );
+    if (!authProof.ok) {
+      console.error(`Auth-mock proof reasons: ${authProof.reasons.join('; ')}`);
+    }
+  }
   if (cleanupErrors.length > 0) exitCode = Math.max(exitCode, 1);
   const stamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
   const collatedPath = resolve(REPORT_DIR, `native-android-multiavd-${stamp}.json`);
   mkdirSync(REPORT_DIR, { recursive: true });
   writeFileSync(
     collatedPath,
-    `${JSON.stringify({ schemaVersion: 1, summary, records, cleanupErrors, replayCommand: options.replayCommand, capturedAt: new Date().toISOString() }, null, 2)}\n`,
+    `${JSON.stringify({ schemaVersion: 1, summary, records, cleanupErrors, authProof, replayCommand: options.replayCommand, capturedAt: new Date().toISOString() }, null, 2)}\n`,
     'utf8',
   );
   console.log(
@@ -834,6 +1086,89 @@ function runMultiAvd(options) {
     : exitCode === 0
       ? 1
       : exitCode;
+}
+
+function runSingleWithAuthMock(options, platforms) {
+  if (platforms.length !== 1 || platforms[0] !== 'android') {
+    console.error('Native QA configuration error: --auth-mock supports android only.');
+    return 1;
+  }
+  let authSession = null;
+  try {
+    authSession = startAuthMockSession(options);
+  } catch (error) {
+    console.error(
+      `Auth-mock startup failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return 2;
+  }
+  const stopSession = () => {
+    try {
+      stopAuthMockSession(authSession);
+    } catch (error) {
+      console.error(
+        `Auth-mock teardown failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 1;
+    }
+    return 0;
+  };
+  const adb = findCommand('adb');
+  if (!adb) {
+    console.error('Android adb is not installed or not on PATH.');
+    return Math.max(1, stopSession());
+  }
+  let serial;
+  try {
+    const devices = run(adb, ['devices']);
+    if (devices.status !== 0) throw new Error(`adb devices failed (exit ${devices.status}).`);
+    serial = selectAndroidDevice(devices.stdout, options.serial).serial;
+  } catch (error) {
+    const outcome = blocked(
+      'android',
+      options.tag,
+      options.replayCommand,
+      error instanceof Error ? error.message : String(error),
+      {
+        flow: options.flow ?? '.maestro',
+        serial: options.serial ?? null,
+        remediation:
+          'Boot one Android E2E emulator, set ANDROID_SERIAL, or pass --avd for owned lifecycle.',
+      },
+    );
+    return Math.max(outcome.exitCode, stopSession());
+  }
+  try {
+    ensureAuthReverse(adb, serial, authSession.port);
+  } catch (error) {
+    const outcome = blocked(
+      'android',
+      options.tag,
+      options.replayCommand,
+      error instanceof Error ? error.message : String(error),
+      {
+        flow: options.flow ?? '.maestro',
+        serial,
+        remediation: 'Inspect adb reverse state on the target and retry.',
+      },
+    );
+    return Math.max(outcome.exitCode, stopSession());
+  }
+  const outcome = runPlatform('android', {
+    ...options,
+    serial,
+    authSlice: { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) },
+  });
+  let exitCode = outcome.exitCode;
+  try {
+    removeAuthReverse(adb, serial, authSession.port);
+  } catch (error) {
+    console.error(
+      `Auth reverse cleanup failed [ENVIRONMENT]: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    exitCode = Math.max(exitCode, 1);
+  }
+  return Math.max(exitCode, stopSession());
 }
 
 try {
@@ -860,8 +1195,14 @@ try {
   for (const avd of options.avds) command.push(`--avd ${avd}`);
   if (options.reset) command.push('--reset');
   if (options.noStop) command.push('--no-stop');
+  if (options.authMock) {
+    command.push('--auth-mock');
+    if (options.authMockPort !== 4545) command.push(`--auth-mock-port ${options.authMockPort}`);
+  }
+  if (options.buildMetadata) command.push(`--build-metadata ${options.buildMetadata}`);
   options.replayCommand = command.join(' ');
   if (options.avds.length > 0) process.exit(runMultiAvd(options));
+  if (options.authMock) process.exit(runSingleWithAuthMock(options, platforms));
   let exitCode = 0;
   for (const platform of platforms) {
     const outcome = runPlatform(platform, options);

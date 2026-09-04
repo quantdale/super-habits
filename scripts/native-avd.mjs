@@ -138,6 +138,22 @@ export function findNewEmulatorSerial(beforeOutput, afterOutput) {
 }
 
 /**
+ * Check `adb reverse --list` output for our exact forward spec.
+ * Lines look like `<serial> tcp:<port> tcp:<port>`; matching requires
+ * both ends so a same-port-different-target line can never qualify.
+ *
+ * @param {unknown} listOutput stdout of `adb reverse --list`.
+ * @param {number} port the device/host port.
+ * @returns {boolean}
+ */
+export function reverseSpecPresent(listOutput, port) {
+  const spec = `tcp:${port} tcp:${port}`;
+  return String(listOutput ?? '')
+    .split(/\r?\n/)
+    .some((line) => line.includes(spec));
+}
+
+/**
  * Filename-safe label identifying one certification target.
  *
  * @param {{ avd: string | null, serial: string | null }} target
@@ -209,6 +225,121 @@ export function buildTargetRunRecord(fields = {}) {
     mockState,
     replayCommand,
   };
+}
+
+/**
+ * Parse the deterministic `[mock]` log lines of
+ * `scripts/native-auth-mock-server.mjs` into request-proof counters.
+ *
+ * Recognized lines: `signup count=N user=<id>`,
+ * `user-check UNAUTHENTICATED (N)`, `user-check authed=N user=<id>`,
+ * `verify email_change -> permanent user=<id>`, plus otp/refresh/logout
+ * counters. Anything else is ignored so future log lines cannot break
+ * proof parsing.
+ *
+ * @param {unknown} logText full or sliced mock stdout.
+ */
+export function parseMockLog(logText) {
+  const text = String(logText ?? '');
+  let signupCount = 0;
+  let unauthenticatedChecks = 0;
+  let otpRequests = 0;
+  let refreshes = 0;
+  let logouts = 0;
+  const userIds = [];
+  const verifyPermanentIds = [];
+  const noteUser = (id) => {
+    if (id && !userIds.includes(id)) userIds.push(id);
+  };
+  for (const line of text.split(/\r?\n/)) {
+    let match = line.match(/\[mock\] signup count=(\d+) user=(\S+)/);
+    if (match) {
+      signupCount = Math.max(signupCount, Number(match[1]));
+      noteUser(match[2]);
+      continue;
+    }
+    if (/\[mock\] user-check UNAUTHENTICATED/.test(line)) {
+      unauthenticatedChecks += 1;
+      continue;
+    }
+    match = line.match(/\[mock\] user-check authed=\d+ user=(\S+)/);
+    if (match) {
+      noteUser(match[1]);
+      continue;
+    }
+    match = line.match(/\[mock\] verify email_change -> permanent user=(\S+)/);
+    if (match) {
+      verifyPermanentIds.push(match[1]);
+      noteUser(match[1]);
+      continue;
+    }
+    if (/\[mock\] otp requested/.test(line)) otpRequests += 1;
+    else if (/\[mock\] token refresh ok/.test(line)) refreshes += 1;
+    else if (/\[mock\] logout count=/.test(line)) logouts += 1;
+  }
+  return {
+    signupCount,
+    unauthenticatedChecks,
+    userIds,
+    verifyPermanentIds,
+    otpRequests,
+    refreshes,
+    logouts,
+  };
+}
+
+/**
+ * Assert the per-run auth proof for one lane slice: exactly one anonymous
+ * signup, zero unauthenticated session checks, a single user id across
+ * every observed request, and at least one email_change verify preserving
+ * that id.
+ *
+ * @param {ReturnType<typeof parseMockLog>} parsed
+ * @returns {{ ok: boolean, reasons: string[] }}
+ */
+export function assertMockProof(parsed) {
+  const reasons = [];
+  const proof = parsed ?? {};
+  if (proof.signupCount !== 1) {
+    reasons.push(`expected exactly 1 anonymous signup, observed ${proof.signupCount ?? 0}`);
+  }
+  if ((proof.unauthenticatedChecks ?? 0) !== 0) {
+    reasons.push(
+      `expected 0 unauthenticated session checks, observed ${proof.unauthenticatedChecks}`,
+    );
+  }
+  const ids = proof.userIds ?? [];
+  if (ids.length !== 1) {
+    reasons.push(`expected a single user id across requests, observed [${ids.join(', ')}]`);
+  }
+  const verified = proof.verifyPermanentIds ?? [];
+  if (verified.length === 0) {
+    reasons.push('expected at least one email_change verify preserving the user id');
+  } else if (ids.length === 1 && verified.some((id) => id !== ids[0])) {
+    reasons.push(
+      `verify changed the user id (expected ${ids[0]}, observed [${verified.join(', ')}])`,
+    );
+  }
+  return { ok: reasons.length === 0, reasons };
+}
+
+/**
+ * TEST-ONLY manifest transform for mock-URL builds: allow cleartext HTTP
+ * (the device-loopback mock) in the generated, gitignored
+ * `android/app/src/main/AndroidManifest.xml`. Never applied to tracked
+ * config; release builds never pass through here.
+ *
+ * @param {unknown} manifestXml manifest source text.
+ * @returns {string} patched text (unchanged when already patched).
+ * @throws {Error} when no `<application` tag is present.
+ */
+export function addCleartextAttr(manifestXml) {
+  const text = String(manifestXml ?? '');
+  if (!/<application[\s>]/.test(text)) {
+    throw new Error('Android manifest has no <application> tag to patch.');
+  }
+  if (/usesCleartextTraffic\s*=/.test(text)) return text;
+  return text.replace('<application', '<application android:usesCleartextTraffic="true"');
 }
 
 /**
