@@ -98,6 +98,11 @@ tags:
 - extendedWaitUntil:
     visible: 'Logged today'
     timeout: 15000
+# Back to the top: the Form/Diary toggle scrolled off-screen with the
+# probe scroll, and a blind tap misses it.
+- scrollUntilVisible:
+    element: 'Diary view'
+    direction: UP
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 8000
