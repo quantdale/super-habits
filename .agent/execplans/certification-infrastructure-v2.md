@@ -44,7 +44,7 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 
 ## Current Checkpoint
 
-- Current milestone: Waves 0–7 COMPLETE at `454d9bd`; Wave 8 opening.
+- Current milestone: Waves 0–7 COMPLETE at `86db9ea`; Wave 8 IN PROGRESS (recovery verified 2026-09-04).
 - Completed: Wave 0 recert at `2502a75` (hygiene, typecheck 0, lint 0,
   unit 1665/1665, impact 13, themes 140/140, supabase PASS, OpenSpec
   50/50, sim:validate 23/23; 4 AVDs present; Maestro 2.8.0); Wave 1
@@ -69,7 +69,17 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Open Wave 8 battery via `qa:repeat` (unit×5 / P0×5 where runtime permits; native repeats only with owned AVD + provenance; corpus + web lanes per prompt §Wave 8).
+- Recovery 2026-09-04: branch `main`, HEAD `86db9ea` == origin/main, tree clean, single worktree, ports 8081/8082 FREE, adb 0 devices, 4 AVDs present (CRBABot_API_36, Nitro_API_36, braintraining-qa36, braintraining36), Node v22.23.2 / npm 10.9.8, no campaign-owned emulator/mock/server. Product drift check: `core/ features/ lib/ supabase/` identical since 1e1f4d0; only product change is Wave 1 FAB fix `9be8bcd` (app/index.tsx setTimeout); Waves 5-7 touch only .agent/scripts/tests/docs — handoff no-drift claim VERIFIED. Wave 7 Decision B stands unless Wave 8 finds new evidence.
+- Wave 8A DONE: unit×5 collated PASS (5/5, 1691 each, ~12s each, `simulation-output/repeat/unit-5x-2026-09-04T095009493Z.json` @86db9ea); integration×5 collated PASS (5/5, 246 each, 23-27s each, `integration-5x-2026-09-04T095222974Z.json` @86db9ea). No variance anomalies; no flakes.
+- Wave 8B DONE: P0×5 collated PASS (5/5, 25/25 each, fresh dist once @86db9ea build 93.9s, `p0-5x-2026-09-04T100108414Z.json`); per-run 97/78/77/73/75s, no trend, no pathological delay, browser-only (no emulator).
+- Wave 8C PARTIAL: fresh `build:web` PASS @86db9ea; full `npm run e2e` BLOCKED by one diagnostic headroom gate (see Finding W8-1). PWA sub-lane inside that run: 5/5 PASS before the journeys failure (offline indicator, first-visit claim, apply-update, dismissed-resurface, reload-no-rejection). web:verify repetitions still pending.
+- Finding W8-1 (EXPECTED_KNOWN_GAP, NOT product regression): `three-months-in` step 3 `section switch (max of 6)` misses the WM2.4 15% diagnostic headroom floor while HOLDING the 800ms hard ceiling. Four consecutive file-level samples @86db9ea, emulator OFF, ports free: worst 745/781/774/751ms (2.4-6.9% headroom); per-switch diag shows overview→todos dominates (774/751) with others 264-556ms. Historical band on this host is 625-797 (overnight 642 fast outlier; backup-closure 781; final-consolidation 753; D14 batch 735-773; parallel-headless 751/770; post-parallel 736; post-integration 797) — current 745-781 sits inside it. No product-code change in the switch path since predecessor (only Wave 1 FAB setTimeout). No progressive slowdown, no pathological one-off. Test left UNCHANGED (temporary diag log added/verified/reverted; `git diff` clean for the spec). Artifacts preserved under `.cursor/playwright-output/e2e-failures/three-months-in-*`. Disposition: record, continue battery, Wave 10 decides (no product fix without measured bottleneck signal; floor may be miscalibrated for this host).
+- Wave 8C remainder DONE: chromium+pwa 121 passed / 7 skipped (expected internal-parser opt-in gates) / 0 failed; web:verify #1 PASS (exit 0, 118.7s, port released). Full `npm run e2e` remains blocked only by Finding W8-1 (journeys P2 headroom gate; ceiling held).
+- Wave 8D DONE: sim:validate 23/23; repeat sim×1 PASS; deterministic full library 22/23 explicit PASS (all scenarios incl. 356-step disaster-recovery + soak) + smoke covered by repeat gate (harness timeout killed the wrapper at smoke tail, ENVIRONMENT, server cleaned, hygiene PASS); seeded sample PASS (smoke, seed 20260904, run_mtmvdu6q_bwlbni2h). Raw `sim:run` without a server fails with ERR_CONNECTION_REFUSED by design (needs owned server; qa-simulation owns it) — operator error, not a finding.
+- Wave 8E DONE: dist-sync dummy-env build PASS; e2e:sync 40 passed / 6 skipped (expected live-restore gates) / 0 failed — matches historical 40/46. Outbox/reconnect regression intact (P5 offline 6/6 + broken-backend 6/6 incl. backoff/requeue/partial-failure).
+- Wave 8F DONE: corpus matrix 20/20 (corpus/byte-repro 2/2, backfill scope-6→7, restart, perf all hot paths 0.6-18.8ms, migrationFixtures 5/5 incl. TRUE v21/v23, migrations 10/10); timezone matrix PASS (5 zones); emulator-OFF clean-env perf recorded.
+- Wave 8G: native-smoke×3 first attempt BLOCKED×3 (ENVIRONMENT — dirty tree: plan + spec line-ending flag; owned boot/stop worked 3/3, no leak, adb empty, hygiene PASS). Interim commit to restore clean-tree gate, then rerun.
+- Exact next action: Rerun native-smoke×3 on Nitro_API_36 from clean tree, then lifecycle/auth/persistence + secondary-AVD smoke.
 - Remaining definition of done: Wave 8 battery;
   Wave 9 adversarial verification; Wave 10 sweep; prompt COMPLETED;
   clean pushed main.
