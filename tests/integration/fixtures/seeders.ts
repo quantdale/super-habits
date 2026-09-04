@@ -1,8 +1,9 @@
 import { vi } from 'vitest';
+import { createId } from '@/lib/id';
 import type { TestDatabase } from '../helpers/db';
 
 /**
- * Fixture seeders (task 2.11): SMALL / TYPICAL / HEAVY corpora built by
+ * Fixture seeders (task 2.11): SMALL / TYPICAL / HEAVY / MATURE corpora built by
  * calling the REAL feature data-layer functions with an injected clock.
  *
  * ## Clock injection (design decision)
@@ -27,9 +28,9 @@ import type { TestDatabase } from '../helpers/db';
  *
  * ## Contract for downstream tests
  *
- * - `seedSmall()` / `seedTypical()` / `seedHeavy()` return the seeded,
- *   version-11 `TestDatabase`. Rows written before the seed's "today"
- *   (2026-07-01) keep their backdated timestamps.
+ * - `seedSmall()` / `seedTypical()` / `seedHeavy()` / `seedMature()` return
+ *   the seeded, current-schema `TestDatabase`. Rows written before the
+ *   seed's "today" (2026-07-01) keep their backdated timestamps.
  * - Tests must import this module (or `./fixtures` index) BEFORE running a
  *   seeder so the clock mock is registered. `seedX()` is self-contained:
  *   it resets modules and re-imports everything, so a preceding static import
@@ -63,6 +64,21 @@ type BuildSeedConfig = {
   /** Create one pomodoro session every N days (1 = daily). */
   pomodoroEveryNDays: number;
   routineCount: number;
+  /** Mature-corpus extras below (0/false for SMALL/TYPICAL/HEAVY). */
+  /** Fraction of habits archived at the end. */
+  archiveShare: number;
+  /** Fraction of habits paused at the end. */
+  pauseShare: number;
+  /** Daily-recurrence todo series roots to create. */
+  recurringTodoCount: number;
+  /** Distinct saved-meal catalog entries to upsert. */
+  savedMealCount: number;
+  /** Planning projects to create (mixed statuses). */
+  projectCount: number;
+  /** Goals per project. */
+  goalsPerProject: number;
+  /** Interrupted sessions, legacy metadata, UTC keys, extra tombstones. */
+  edgeStates: boolean;
 };
 
 const SMALL_CONFIG: BuildSeedConfig = {
@@ -75,6 +91,13 @@ const SMALL_CONFIG: BuildSeedConfig = {
   workoutLogEveryNDays: 1,
   pomodoroEveryNDays: 1,
   routineCount: 1,
+  archiveShare: 0,
+  pauseShare: 0,
+  recurringTodoCount: 0,
+  savedMealCount: 0,
+  projectCount: 0,
+  goalsPerProject: 0,
+  edgeStates: false,
 };
 
 const TYPICAL_CONFIG: BuildSeedConfig = {
@@ -87,6 +110,13 @@ const TYPICAL_CONFIG: BuildSeedConfig = {
   workoutLogEveryNDays: 4,
   pomodoroEveryNDays: 2,
   routineCount: 2,
+  archiveShare: 0,
+  pauseShare: 0,
+  recurringTodoCount: 0,
+  savedMealCount: 0,
+  projectCount: 0,
+  goalsPerProject: 0,
+  edgeStates: false,
 };
 
 const HEAVY_CONFIG: BuildSeedConfig = {
@@ -99,6 +129,32 @@ const HEAVY_CONFIG: BuildSeedConfig = {
   workoutLogEveryNDays: 1,
   pomodoroEveryNDays: 1,
   routineCount: 5,
+  archiveShare: 0,
+  pauseShare: 0,
+  recurringTodoCount: 0,
+  savedMealCount: 0,
+  projectCount: 0,
+  goalsPerProject: 0,
+  edgeStates: false,
+};
+
+const MATURE_CONFIG: BuildSeedConfig = {
+  days: 210,
+  habitCount: 20,
+  habitCoverage: 0.75,
+  calPerDay: 3,
+  todoCount: 600,
+  completedShare: 0.7,
+  workoutLogEveryNDays: 3,
+  pomodoroEveryNDays: 2,
+  routineCount: 8,
+  archiveShare: 0.15,
+  pauseShare: 0.1,
+  recurringTodoCount: 12,
+  savedMealCount: 10,
+  projectCount: 4,
+  goalsPerProject: 3,
+  edgeStates: true,
 };
 
 // Registers the clock mock so data layers (imported below at seed time) read
@@ -130,6 +186,24 @@ async function openFreshDatabase(): Promise<TestDatabase> {
  * The returned database is fully seeded; the clock ends on the base day.
  */
 async function buildSeed(config: BuildSeedConfig): Promise<TestDatabase> {
+  // Rebind the time mock on EVERY seed. Mock registrations survive
+  // vi.resetModules(), so without this the static factory above can keep
+  // serving a previous seed's clock instance to freshly imported data
+  // layers — backfilled created_at/updated_at then silently freeze on the
+  // prior run's base day (invisible to count/key assertions, fatal to
+  // byte-reproducibility). The factory resolves './clock' lazily on each
+  // invocation, so whatever generation the data layers land in, they
+  // share the clock this seed drives.
+  vi.resetModules();
+  vi.doMock('@/lib/time', async (importOriginal) => {
+    const real = await importOriginal<typeof import('@/lib/time')>();
+    const { clock: seedClock } = await import('./clock');
+    return {
+      ...real,
+      nowIso: () => seedClock.nowIso(),
+      toDateKey: (date?: Date) => seedClock.toDateKey(date),
+    };
+  });
   const db = await openFreshDatabase();
 
   const { clock } = await import('./clock');
@@ -138,6 +212,8 @@ async function buildSeed(config: BuildSeedConfig): Promise<TestDatabase> {
   const caloriesData = await import('@/features/calories/calories.data');
   const workoutData = await import('@/features/workout/workout.data');
   const pomodoroData = await import('@/features/pomodoro/pomodoro.data');
+  const projectsData = await import('@/features/projects/projects.data');
+  const goalsData = await import('@/features/goals/goals.data');
 
   clock.set(seedDayDate(0));
 
@@ -158,6 +234,11 @@ async function buildSeed(config: BuildSeedConfig): Promise<TestDatabase> {
     'Tidy desk',
     'Run 3k',
     'Evening tea',
+    'Stretch hips',
+    'Read news',
+    'Practice guitar',
+    'Water garden',
+    'Review flashcards',
   ];
   const habitIds: string[] = [];
   for (let i = 0; i < config.habitCount; i++) {
@@ -250,6 +331,15 @@ async function buildSeed(config: BuildSeedConfig): Promise<TestDatabase> {
     await todosData.removeTodo(pendingTodos[pendingTodos.length - 1].id);
   }
 
+  // --- Recurring series (daily roots; instances spawn on completion) ---
+  for (let r = 0; r < (config.recurringTodoCount ?? 0); r++) {
+    await todosData.addTodo({
+      title: `Daily review ${r + 1}`,
+      priority: 'normal',
+      recurrence: 'daily',
+    });
+  }
+
   // --- Day-by-day history: habits, calories, workouts, pomodoros ---
   for (let offset = config.days - 1; offset >= 0; offset--) {
     clock.set(seedDayDate(offset));
@@ -313,6 +403,109 @@ async function buildSeed(config: BuildSeedConfig): Promise<TestDatabase> {
     }
   }
 
+  // --- Habit lifecycle depth (mature users pause/archive old habits) ---
+  const archiveCount = Math.floor(habitIds.length * (config.archiveShare ?? 0));
+  const pauseCount = Math.floor(habitIds.length * (config.pauseShare ?? 0));
+  for (let i = 0; i < habitIds.length && i < archiveCount + pauseCount; i++) {
+    if (i < archiveCount) await habitsData.archiveHabit(habitIds[i]);
+    else await habitsData.pauseHabit(habitIds[i]);
+  }
+
+  // --- Saved-meal catalog (distinct names: upsert dedupes NOCASE) ---
+  const savedMealCatalog = [
+    { foodName: 'Overnight oats', calories: 350, protein: 12, carbs: 58, fats: 8, fiber: 9 },
+    { foodName: 'Grilled chicken bowl', calories: 520, protein: 42, carbs: 40, fats: 18, fiber: 6 },
+    { foodName: 'Veggie stir fry', calories: 380, protein: 14, carbs: 52, fats: 12, fiber: 11 },
+    { foodName: 'Protein smoothie', calories: 290, protein: 28, carbs: 32, fats: 6, fiber: 5 },
+    { foodName: 'Tuna sandwich', calories: 410, protein: 30, carbs: 38, fats: 14, fiber: 4 },
+    { foodName: 'Lentil soup', calories: 330, protein: 18, carbs: 48, fats: 7, fiber: 13 },
+    { foodName: 'Beef tacos', calories: 560, protein: 32, carbs: 44, fats: 26, fiber: 8 },
+    { foodName: 'Quinoa salad', calories: 360, protein: 13, carbs: 50, fats: 12, fiber: 10 },
+    { foodName: 'Pancake stack', calories: 480, protein: 11, carbs: 82, fats: 12, fiber: 3 },
+    { foodName: 'Salmon poke', calories: 540, protein: 36, carbs: 46, fats: 20, fiber: 7 },
+  ];
+  for (let s = 0; s < (config.savedMealCount ?? 0); s++) {
+    const meal = savedMealCatalog[s % savedMealCatalog.length];
+    await caloriesData.upsertSavedMeal({ ...meal, mealType: 'dinner' });
+  }
+
+  // --- Planning depth (projects with mixed statuses + goals) ---
+  const projectNames = [
+    'Home renovation',
+    'Learn Spanish',
+    'Side business',
+    'Health overhaul',
+    'Garden project',
+  ];
+  for (let p = 0; p < (config.projectCount ?? 0); p++) {
+    const projectStatus = p % 4 === 3 ? 'completed' : p % 4 === 2 ? 'archived' : 'active';
+    const projectId = await projectsData.addProject({
+      name: projectNames[p % projectNames.length],
+      status: projectStatus,
+    });
+    for (let g = 0; g < (config.goalsPerProject ?? 0); g++) {
+      await goalsData.addGoal({
+        projectId,
+        title: `Goal ${p + 1}.${g + 1}`,
+        horizon: 'month',
+        status: g === 0 && p % 2 === 0 ? 'completed' : 'active',
+        progressPercent: (p * 17 + g * 23) % 100,
+      });
+    }
+  }
+
+  // --- Edge states: interrupted work, legacy metadata, UTC keys, tombstones ---
+  if (config.edgeStates) {
+    const nowMs = clock.now().getTime();
+    // Interrupted Focus: live intent whose deadline passed with no logged row.
+    await pomodoroData.savePomodoroActiveTimer({
+      startedAtIso: new Date(nowMs - 25 * 60 * 1000).toISOString(),
+      mode: 'focus',
+      totalSeconds: 25 * 60,
+      completedFocus: 0,
+      notificationId: null,
+    });
+    // Pending focus log awaiting retry.
+    await pomodoroData.enqueuePendingPomodoroLog({
+      startedAtIso: new Date(nowMs - 90 * 60 * 1000).toISOString(),
+      endedAtIso: new Date(nowMs - 65 * 60 * 1000).toISOString(),
+      durationSeconds: 25 * 60,
+      type: 'focus',
+    });
+    // Interrupted Workout: draft with partial progress, never logged.
+    await workoutData.saveWorkoutSessionDraft({
+      routineId: routineIds[0],
+      startedAtIso: new Date(nowMs - 40 * 60 * 1000).toISOString(),
+      phaseIndex: 1,
+      elapsedAdjustSeconds: 120,
+      dispositions: { 0: 'completed' },
+      enteredSets: { 0: { weight: '60', reps: '8' } },
+      remainingSeconds: 30,
+    });
+    // Pre-cutover backup metadata as left by an old client. Fresh
+    // databases have no marker until backfill runs, so INSERT (an old
+    // client that ran backfill carries the era value forward).
+    await db.runAsync(`INSERT INTO app_meta (key, value) VALUES ('backup.scope_version', '6')`);
+    // Pre-cutover UTC date key (migration 5 deliberately never backfills).
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        createId('hcmp'),
+        habitIds[0],
+        '2025-06-15T00:00:00.000Z',
+        1,
+        '2025-06-15T00:00:00.000Z',
+        '2025-06-15T00:00:00.000Z',
+      ],
+    );
+    // Extra tombstones across the tail of the pending list.
+    if (pendingTodos.length > 3) {
+      await todosData.removeTodo(pendingTodos[pendingTodos.length - 2].id);
+      await todosData.removeTodo(pendingTodos[pendingTodos.length - 3].id);
+    }
+  }
+
   return db;
 }
 
@@ -329,4 +522,15 @@ export function seedTypical(): Promise<TestDatabase> {
 /** Three months at volume (J8 scale): 200 todos, 15 habits daily, ~360 meals, 5 routines, ~90 logs, ~90 pomodoros. */
 export function seedHeavy(): Promise<TestDatabase> {
   return buildSeed(HEAVY_CONFIG);
+}
+
+/**
+ * Mature 7-month user: 600 todos (+12 recurring series), 20 habits with
+ * pause/archive lifecycle, ~630 meals + saved-meal catalog, 8 routines +
+ * ~70 logs, ~105 pomodoros, projects/goals planning, and the edge-state
+ * stage (interrupted Focus/Workout, legacy backup metadata, pre-cutover
+ * UTC date keys, extra tombstones). See `corpus.test.ts` for the manifest.
+ */
+export function seedMature(): Promise<TestDatabase> {
+  return buildSeed(MATURE_CONFIG);
 }

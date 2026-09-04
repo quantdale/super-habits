@@ -56,8 +56,8 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   observed); Maestro 2.8.0. No tree drift: `app core features lib
 scripts supabase` identical to `1e1f4d0` (only tracked diff since
   Planned-From is the ACTIVE prompt itself).
-- In progress: Wave 3 historical DB corpus (workstream plan
-  next).
+- In progress: Wave 4 corpus-backed certification (workstream
+  plan next).
 - Important modified files: `.agent/execplans/certification-infrastructure-v2.md`
   (this plan).
 - Last successful validation: planner-era `agent:plan:validate:all` PASS +

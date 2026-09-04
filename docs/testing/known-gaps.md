@@ -181,11 +181,15 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **2026-08-26 re-verify:** this campaign re-ran the synthetic historical-fixture laboratory (3/3) and the migration-forward suites on the final tree; all pass. Real-corpus proof remains explicitly open as stated above — synthetic coverage is not a substitute for a captured real-world database file.
 
+**2026-09-04 note (certification infrastructure v2, wave 3):** the synthetic side is now a mature-user corpus, not just era shapes — `seedMature()` in `tests/integration/fixtures/seeders.ts` builds ~9k deterministic rows (210 days, 20 habits with pause/archive lifecycle, 600 + 12 recurring todos, calorie diary + saved-meal catalog, 8 routines + 70 logs, 105 pomodoros, projects/goals, 4933 pending outbox intents) plus edge states (interrupted Focus/Workout, `backup.scope_version = 6`, one pre-cutover UTC date key, tombstones), with an exact-count manifest and a byte-reproducibility proof in `tests/integration/corpus.test.ts`. Captured real-world data is still open (no personal data was used).
+
 ### 6. Pre-cutover UTC date keys
 
 **Reason:** migration 5 deliberately does not backfill, so real installs contain a mix of UTC-format and local date keys. Fixtures can simulate this, but no real corpus exists to validate against.
 
 **Closing path:** obtain/anonymise a real corpus, or accept fixture-only simulation (documented as such).
+
+**2026-09-04 note:** fixture-only simulation now includes a deterministic pre-cutover UTC date-key row plus the migration-5 no-backfill semantics in every MATURE corpus (`tests/integration/corpus.test.ts`); the real-corpus half stays open.
 
 ### 7. Authorization
 

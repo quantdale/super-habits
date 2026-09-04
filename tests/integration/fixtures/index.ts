@@ -8,4 +8,4 @@
  * self-contained (own module reset, fresh database, shared clock).
  */
 export { clock } from './clock';
-export { seedHeavy, seedSmall, seedTypical } from './seeders';
+export { seedHeavy, seedMature, seedSmall, seedTypical } from './seeders';
