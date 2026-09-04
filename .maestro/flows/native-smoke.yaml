@@ -17,12 +17,20 @@ tags:
     timeout: 10000
 # index: 0 targets the tab-rail item — the rail renders before section
 # content, whose stats/onboarding chips can repeat labels like Habits/Focus.
+# Settle waits before each section tap: on a slow emulator Maestro aims taps
+# from a still-settling hierarchy and the tap lands on stale coordinates
+# (Wave 8: tap COMPLETED on the right element but the section never
+# activated). No assertion semantics change.
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn:
     text: 'To Do'
     index: 0
 - extendedWaitUntil:
     visible: 'Offline-first task manager.'
     timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn:
     text: 'Habits'
 # Small screens fit only down to the day strip; the groups render below it.
@@ -34,12 +42,16 @@ tags:
     # Today's rhythm summary remains below the check-in controls.
     visible: 'Anytime'
     timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn:
     text: 'Focus'
     index: 0
 - extendedWaitUntil:
     visible: 'Classic sequence: focus → short breaks → long break — durations saved on device.'
     timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn:
     text: 'Workout'
     index: 0
@@ -48,12 +60,16 @@ tags:
 - extendedWaitUntil:
     visible: 'Build a training plan, start a guided workout, and track your progress.'
     timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn:
     text: 'Calories'
     index: 0
 - extendedWaitUntil:
     visible: 'Switch between manual entry and a diary grouped by meal.'
     timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 8000
 - tapOn:
     text: 'Today'
     index: 0

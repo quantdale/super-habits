@@ -15,9 +15,20 @@ tags:
 - extendedWaitUntil:
     visible: 'Add something'
     timeout: 10000
+# Let the sheet finish opening and its autofocus pop the keyboard BEFORE
+# hideKeyboard: on a slow emulator the keyboard is not up yet when the
+# sheet header first appears, and hideKeyboard then acts as BACK and
+# dismisses the sheet (Wave 8: sheet gone, 'Describe it' unfindable).
+- waitForAnimationToEnd:
+    timeout: 8000
+- hideKeyboard
+# Fail fast with a clear signal if the sheet did not survive keyboard
+# dismissal, instead of scrolling the underlying section for 20s.
+- extendedWaitUntil:
+    visible: 'Add something'
+    timeout: 5000
 # The sheet autofocuses its input, so the soft keyboard covers the bottom
 # actions on short screens. Dismiss it before reaching Describe it.
-- hideKeyboard
 - scrollUntilVisible:
     element: 'Describe it'
     direction: DOWN
