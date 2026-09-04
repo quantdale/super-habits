@@ -1,7 +1,7 @@
 # ExecPlan: Wave 2 — Auth-Mock Lifecycle Automation
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -51,10 +51,12 @@ coverage; changing mock protocol or app auth code without new evidence.
 
 ## Current Checkpoint
 
-- Current milestone: implementation starting (audit complete, plan opened).
-- Completed: audit (mock protocol, flow tags/order, env vars, provisioner
-  shape, provenance constraints).
-- In progress: live proof — auth lane via `--auth-mock` on Nitro.
+- Current milestone: COMPLETE — `--auth-mock` productized, auth
+  3/3 ×2 with full proof on Nitro, install-only verified live,
+  provenance separation audited clean.
+- Completed: audit + all implementation + verification (see
+  Progress and Validation Ledger).
+- In progress: none.
 - Important modified files: `scripts/native-avd.mjs`
   (`parseMockLog`, `assertMockProof`, `addCleartextAttr`,
   `reverseSpecPresent`), `tests/nativeAuthMock.test.ts` (new, 6
@@ -64,16 +66,13 @@ coverage; changing mock protocol or app auth code without new evidence.
 --build-metadata`, owned mock child + bounded readiness +
   stale-port refusal, per-target reverse lifecycle, per-target
   log-slice proof, TEST-ONLY records, finally-level teardown).
-- Important modified files: none yet.
 - Last successful validation: Wave 1 closure (Nitro + CRBABot 2/2 @45dc256).
 - Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit always-install correction, push,
-  verify auth lane on Nitro (expect install-only + 3/3 green),
-  then repeat for the ×2 proof.
+- Exact next action: None — task complete.
 - 2026-09-04 — self-review catch before the fix even ran: the
   committed `ensureInstalled` kept an early trust return when
   build+installed both matched, preserving the exact staleness
@@ -81,9 +80,8 @@ coverage; changing mock protocol or app auth code without new evidence.
   entirely). Corrected to always (re)install the verified host
   APK when the host build matches; only `--no-provision` keeps
   legacy trust-the-device behavior.
-- Remaining definition of done: helpers tested; provisioner + runner
-  extended; auth 3/3 ×2 with per-run proof on Nitro; no stale mock/
-  reverse/emulator left; ledger + commit/push; plan COMPLETED.
+- Remaining definition of done: Complete — see Progress; plan
+  validated; commits pushed.
 
 ## Progress
 
@@ -91,8 +89,12 @@ coverage; changing mock protocol or app auth code without new evidence.
 - [x] Pure helpers + unit tests (6/6 + 8/8 green; typecheck 0).
 - [x] Provisioner `--mock-auth-url` + mock metadata + cleartext patch.
 - [x] Runner `--auth-mock` lifecycle + proof + TEST-ONLY records.
-- [ ] Auth 3/3 ×2 with proof on Nitro; hygiene verified.
-- [ ] Plan validated; committed/pushed; COMPLETED.
+- [x] Auth 3/3 ×2 with proof on Nitro (install-only, APK
+      5642673B, reports 051734202Z + 052007449Z,
+      signup=1/put=1/unauth=0/same-UID/verify); hygiene verified
+      (adb empty, ports closed, tree clean, canonical metadata
+      untouched).
+- [x] Plan validated; committed/pushed; COMPLETED.
 
 ## Surprises & Discoveries
 
@@ -198,6 +200,21 @@ native-auth-mock-server` process may persist (kill only exact owned
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: audit done; implementing.
-- Follow-up: none yet.
+- Status: Completed.
+- Summary: `qa-native.mjs --auth-mock` owns the full auth-lane
+  lifecycle (mock spawn/readiness/stale-refusal, per-target
+  reverse with remove-all prophylaxis, mock-aware TEST-ONLY
+  provision into a separate metadata file, per-target log-slice
+  proof, bounded same-target retry on zero-traffic attempts,
+  finally-level teardown). Supporting work: faithful mock PUT
+  handler + universal request logging, deterministic 127.0.0.1
+  device URL, `--install-only` hash-verified reinstall (closes
+  the snapshot-revert staleness hole for all lanes),
+  serial/AVD depinning, per-target Wave 6 records with attempt
+  - mockState. Proof: auth 3/3 ×2 on Nitro with
+    signup=1/put=1/unauth=0/same-UID/verify; 21/21 + 9/9 unit
+    tests; typecheck 0. Incidental finding fixed en route: the
+    03-protect verify field sits above the viewport after the form
+    swap (scroll-UP-to-code in the flow, same class as Wave 1).
+- Follow-up: multi-target+mock composition certified on demand;
+  install-only reuse statistics belong to Wave 5/8 reporting.
