@@ -15,13 +15,15 @@ tags:
 - extendedWaitUntil:
     visible: 'Add something'
     timeout: 10000
-# Let the sheet finish opening and its autofocus pop the keyboard BEFORE
-# hideKeyboard: on a slow emulator the keyboard is not up yet when the
-# sheet header first appears, and hideKeyboard then acts as BACK and
-# dismisses the sheet (Wave 8: sheet gone, 'Describe it' unfindable).
+# Let the sheet finish opening and its autofocus pop the keyboard. Then tap
+# the sheet's own static header to drop the keyboard: hideKeyboard acts as
+# BACK when the keyboard is not up yet and dismisses the whole sheet
+# (Wave 8 screenshot proof: sheet open at 'Add something', gone 20s later).
+# Tapping 'Add something' only blurs the input — the sheet always survives —
+# and 'Add something' exists only in the sheet (no Overview ambiguity).
 - waitForAnimationToEnd:
     timeout: 8000
-- hideKeyboard
+- tapOn: 'Add something'
 # Fail fast with a clear signal if the sheet did not survive keyboard
 # dismissal, instead of scrolling the underlying section for 20s.
 - extendedWaitUntil:

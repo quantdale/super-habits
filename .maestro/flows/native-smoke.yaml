@@ -73,9 +73,13 @@ tags:
 - tapOn:
     text: 'Today'
     index: 0
+# Return-visit render runs under full six-section mount plus Maestro polling
+# load: Wave 8 failure dumps prove the tap navigates correctly and
+# 'Customize' renders with valid bounds, but after the 10s window. 30s
+# matches the launch 'Today' budget above; assertions unchanged.
 - extendedWaitUntil:
     visible: 'Customize'
-    timeout: 10000
+    timeout: 30000
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Close settings'
