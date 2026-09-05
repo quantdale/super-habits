@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
@@ -12,6 +13,7 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
+import { TextField } from '@/core/ui/TextField';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { parseNumericInput } from '@/lib/numericInput';
 // import { spacing, radius } from '@/core/theme/designTokens';
@@ -49,7 +51,7 @@ import type {
 import type { FrequentFood, MacroTargets } from '@/features/calories/calories.domain';
 
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
-import { toDateKey } from '@/lib/time';
+import { isValidDateKey, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
@@ -143,6 +145,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [entryDateKey, setEntryDateKey] = useState<string>(() => toDateKey());
+  const [showEntryDatePicker, setShowEntryDatePicker] = useState(false);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [isSavingEntry, setIsSavingEntry] = useState(false);
   const entrySubmitGuard = useRef(createSubmitGuard());
@@ -392,6 +396,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setFats('');
     setFiber('');
     setMealType('breakfast');
+    setEntryDateKey(toDateKey());
+    setShowEntryDatePicker(false);
     setEditingEntryId(null);
     setCalorieError(null);
   };
@@ -450,6 +456,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setFats(String(entry.fats));
     setFiber(String(entry.fiber ?? 0));
     setMealType(entry.meal_type);
+    setEntryDateKey(entry.consumed_on);
+    setShowEntryDatePicker(false);
     setEditingEntryId(entry.id);
     setCalorieError(null);
     setEntryModalVisible(true);
@@ -576,6 +584,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         const fiberN = parseNumericInput(fiber) ?? 0;
 
         if (editingEntryId) {
+          if (!isValidDateKey(entryDateKey)) {
+            setCalorieError('Consumed date must be a valid calendar date (YYYY-MM-DD).');
+            return;
+          }
           await updateCalorieEntry(editingEntryId, {
             foodName: food.trim(),
             protein: proteinN,
@@ -583,6 +595,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             fats: fatsN,
             fiber: fiberN,
             mealType,
+            consumedOn: entryDateKey,
           });
         } else {
           await addCalorieEntry({
@@ -864,6 +877,53 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         }}
         scroll
       >
+        {editingEntryId ? (
+          <View className="mb-1">
+            <Text className="mb-1 text-sm font-medium">Consumed on</Text>
+            {Platform.OS === 'web' ? (
+              <TextField
+                label="Date (YYYY-MM-DD)"
+                accessibilityLabel="Consumed date"
+                value={entryDateKey}
+                onChangeText={(t) => {
+                  setCalorieError(null);
+                  setEntryDateKey(t.trim());
+                }}
+              />
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => setShowEntryDatePicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change consumed date"
+                  className="py-2"
+                >
+                  <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                    {formatDayContext(entryDateKey)}
+                  </Text>
+                </Pressable>
+                {showEntryDatePicker ? (
+                  <DateTimePicker
+                    value={
+                      isValidDateKey(entryDateKey)
+                        ? new Date(entryDateKey + 'T12:00:00')
+                        : new Date()
+                    }
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowEntryDatePicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setCalorieError(null);
+                        setEntryDateKey(toDateKey(selectedDate));
+                      }
+                    }}
+                  />
+                ) : null}
+              </>
+            )}
+          </View>
+        ) : null}
         <CaloriesEntryFields
           fieldIdPrefix="cal-edit"
           food={food}

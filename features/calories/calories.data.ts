@@ -218,27 +218,38 @@ export async function updateCalorieEntry(
     fats: number;
     fiber: number;
     mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    /**
+     * Moves the entry to another local-calendar day IN PLACE: the row id,
+     * created_at, and the single update outbox intent are preserved (never
+     * delete+create), so diary aggregates on BOTH the source and destination
+     * days self-correct from `consumed_on` at query time.
+     */
+    consumedOn?: string;
   },
 ): Promise<'updated' | 'not_found'> {
+  if (updates.consumedOn !== undefined && !isValidDateKey(updates.consumedOn)) {
+    throw new Error('Consumed date must be a valid calendar date (YYYY-MM-DD).');
+  }
   const db = await getDatabase();
   const now = nowIso();
   const calories = kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
+  const dayMove = updates.consumedOn !== undefined ? ', consumed_on = ?' : '';
   const result = await runSyncedMutation<'updated' | 'not_found'>({
     db,
     record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
       const update = await transactionDb.runAsync(
         `UPDATE calorie_entries SET
-       food_name = ?,
-       calories = ?,
-       protein = ?,
-       carbs = ?,
-       fats = ?,
-       fiber = ?,
-       meal_type = ?,
-       updated_at = ?
-     WHERE id = ?
-       AND deleted_at IS NULL`,
+        food_name = ?,
+        calories = ?,
+        protein = ?,
+        carbs = ?,
+        fats = ?,
+        fiber = ?,
+        meal_type = ?,
+        updated_at = ?${dayMove}
+      WHERE id = ?
+        AND deleted_at IS NULL`,
         [
           updates.foodName,
           calories,
@@ -248,6 +259,7 @@ export async function updateCalorieEntry(
           updates.fiber,
           updates.mealType,
           now,
+          ...(updates.consumedOn !== undefined ? [updates.consumedOn] : []),
           id,
         ],
       );

@@ -153,4 +153,35 @@ test.describe('Calories diary day navigation', () => {
     await page.getByRole('button', { name: 'Copy a previous day' }).click();
     await expect(page.getByText('No earlier logged days')).toBeVisible();
   });
+
+  test('entry day correction moves the entry in place and fixes both day totals', async ({
+    page,
+  }) => {
+    await seedPastDayEntry(page, dateKeyOffset(-1), 'Misfiled ramen');
+    const today = dateKeyOffset(0);
+
+    // Yesterday holds the misfiled 300 kcal entry.
+    await page.getByRole('button', { name: 'Previous day', exact: true }).click();
+    await expect(page.getByLabel('Daily log').getByText('Misfiled ramen')).toBeVisible();
+
+    // Edit → change the consumed day to today.
+    await page.getByLabel('Edit Misfiled ramen').click();
+    await expect(page.getByLabel('Consumed date')).toHaveValue(dateKeyOffset(-1));
+    await page.getByLabel('Consumed date').fill(today);
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+
+    // Yesterday's ledger is empty again…
+    await expect(page.getByText('No meals logged on this day')).toBeVisible({ timeout: 15_000 });
+
+    // …and today holds the SAME entry; macros are preserved (kcal is
+    // recomputed from macros on save — the shipped update contract).
+    await page.getByRole('button', { name: 'Next day', exact: true }).click();
+    await expect(page.getByLabel('Daily log').getByText('Misfiled ramen')).toBeVisible();
+    await expect(page.getByText(/kcal · P 10g · C 50g · F 6g/)).toBeVisible();
+
+    // Identity survives a hard reload: one row, now on today.
+    await page.reload({ waitUntil: 'load' });
+    await goToTab(page, 'calories');
+    await expect(page.getByLabel('Daily log').getByText('Misfiled ramen')).toBeVisible();
+  });
 });
