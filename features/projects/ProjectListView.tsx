@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { listProjects, listProjectRollups } from '@/features/projects/projects.data';
+import {
+  listProjects,
+  listProjectRollups,
+  reorderProjects,
+} from '@/features/projects/projects.data';
 import {
   computeProjectProgress,
   filterProjectRows,
   sortProjectRows,
+  swapProjectInOrder,
   type ProjectListRow,
   type ProjectSortKey,
   type ProjectStatusFilter,
@@ -41,38 +46,47 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>('all');
   const [sortKey, setSortKey] = useState<ProjectSortKey>('manual');
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        // Bounded: one project list + three grouped aggregate queries (no N+1).
-        const [list, rollups] = await Promise.all([listProjects(), listProjectRollups()]);
-        if (!active) return;
-        setRows(
-          list.map((project) => {
-            const r = rollups[project.id];
-            const progress = r
-              ? computeProjectProgress({ todos: r.todos, goals: r.goals, habits: r.habits })
-              : null;
-            return {
-              project,
-              progressPercent: progress?.percent ?? 0,
-              linkedCounts: {
-                todos: r?.todos.total ?? 0,
-                goals: r?.goals.count ?? 0,
-                habits: r?.habits.habitCount ?? 0,
-              },
-            };
-          }),
-        );
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+  const loadSeq = useRef(0);
+  const loadProjects = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    // Bounded: one project list + three grouped aggregate queries (no N+1).
+    const [list, rollups] = await Promise.all([listProjects(), listProjectRollups()]);
+    if (seq !== loadSeq.current) return;
+    setRows(
+      list.map((project) => {
+        const r = rollups[project.id];
+        const progress = r
+          ? computeProjectProgress({ todos: r.todos, goals: r.goals, habits: r.habits })
+          : null;
+        return {
+          project,
+          progressPercent: progress?.percent ?? 0,
+          linkedCounts: {
+            todos: r?.todos.total ?? 0,
+            goals: r?.goals.count ?? 0,
+            habits: r?.habits.habitCount ?? 0,
+          },
+        };
+      }),
+    );
+    setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  const manualOrderActive = sortKey === 'manual' && statusFilter === 'all';
+  const moveProject = useCallback(
+    async (index: number, direction: -1 | 1) => {
+      const ids = rows.map((row) => row.project.id);
+      const next = swapProjectInOrder(ids, index, direction);
+      if (!next) return;
+      await reorderProjects(next);
+      void loadProjects();
+    },
+    [rows, loadProjects],
+  );
 
   const visible = useMemo(
     () => sortProjectRows(filterProjectRows(rows, statusFilter), sortKey),
@@ -162,7 +176,7 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
           icon={<Text style={{ fontSize: 18 }}>•</Text>}
         />
       ) : (
-        visible.map((row) => {
+        visible.map((row, index) => {
           const { project, progressPercent, linkedCounts } = row;
           return (
             <Pressable
@@ -198,6 +212,22 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
                 <Text className="text-sm font-bold" style={{ color: tokens.text }}>
                   {progressPercent}%
                 </Text>
+                {manualOrderActive ? (
+                  <View className="flex-row gap-1">
+                    <IconButton
+                      icon="arrow-upward"
+                      size={18}
+                      onPress={() => void moveProject(index, -1)}
+                      accessibilityLabel={`Move ${project.name} up`}
+                    />
+                    <IconButton
+                      icon="arrow-downward"
+                      size={18}
+                      onPress={() => void moveProject(index, 1)}
+                      accessibilityLabel={`Move ${project.name} down`}
+                    />
+                  </View>
+                ) : null}
               </View>
               <View
                 className="mt-2 h-2 w-full overflow-hidden rounded-full"

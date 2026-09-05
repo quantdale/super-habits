@@ -139,13 +139,13 @@ The Command Center is an experimental overlay-first quick-command shell, not a g
 
 - The primary user-facing entry is the global Add action; `Describe it` inside Add opens the advanced command flow.
 - The Command Center remains a global overlay (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`), but it has no standalone floating launcher and no `/command` route.
-- Supported draft kinds are limited to `create_todo` and `create_habit`.
+- Supported draft kinds cover ten intents: `create_todo`, `complete_todo`, `create_habit`, `log_habit`, `log_calorie_entry`, `log_workout_routine`, `start_focus_session`, `create_project`, `update_goal_progress`, and `add_todo_to_daily_plan`.
 - The flow is parse -> review -> confirm before write.
 - Default parser mode is `mock`.
 - Optional model-backed parsing uses `remote_with_fallback`, but only on internal-capable builds after a tester enables it locally.
 - The local parser remains the fallback and guardrail path when remote parsing is disabled or unavailable.
 - Todo due dates stay limited to `today`, `tomorrow`, or explicit `YYYY-MM-DD`.
-- The CommandScreen's Ask mode toggle is gated behind `AI_ASK_EXPERIMENT_ENABLED` (false by default); Create mode is the primary surface.
+- The CommandScreen's Ask/Auto modes are gated behind `AI_ASK_EXPERIMENT_ENABLED` (currently `true`, enabled 2026-08-05 alongside the deployed ask edge function); Create mode remains the primary surface.
 - The Command Center copy stays intentionally experimental and draft-focused; it does not imply broad production AI availability.
 
 Relevant env vars for the optional real parser path:

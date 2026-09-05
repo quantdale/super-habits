@@ -324,7 +324,7 @@ Current verified baselines:
 ### E2E Tests (Playwright)
 
 - Config: `playwright.config.ts`
-- Files: `e2e/*.spec.ts` (14 spec files)
+- Files: `e2e/*.spec.ts` + `e2e/journeys/*.spec.ts` (inventory drifts — verify with `npx playwright test --list`)
 - Runs against the **static web export** in `dist/` served by `node scripts/serve-e2e.js` on `http://localhost:8081`.
 - `workers: 1` locally because OPFS + SQLite hold one lock per origin.
 - `clearDatabase()` runs in `test.beforeEach`.

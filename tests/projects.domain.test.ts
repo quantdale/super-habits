@@ -5,6 +5,7 @@ import {
   daysUntilDate,
   filterProjectRows,
   sortProjectRows,
+  swapProjectInOrder,
   type ProjectListRow,
 } from '@/features/projects/projects.domain';
 import type { Project } from '@/core/db/types';
@@ -159,5 +160,16 @@ describe('filterProjectRows / sortProjectRows', () => {
     ];
     expect(sortProjectRows(named, 'name').map((r) => r.project.name)).toEqual(['Alpha', 'Beta']);
     expect(sortProjectRows(named, 'manual').map((r) => r.project.id)).toEqual(['1', '2']);
+  });
+
+  it('swaps neighbours for manual moves and refuses out-of-bounds moves', () => {
+    expect(swapProjectInOrder(['a', 'b', 'c'], 1, -1)).toEqual(['b', 'a', 'c']);
+    expect(swapProjectInOrder(['a', 'b', 'c'], 1, 1)).toEqual(['a', 'c', 'b']);
+    expect(swapProjectInOrder(['a', 'b', 'c'], 0, -1)).toBeNull();
+    expect(swapProjectInOrder(['a', 'b', 'c'], 2, 1)).toBeNull();
+    expect(swapProjectInOrder([], 0, 1)).toBeNull();
+    const original = ['a', 'b'];
+    swapProjectInOrder(original, 0, 1);
+    expect(original).toEqual(['a', 'b']);
   });
 });

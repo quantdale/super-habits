@@ -43,3 +43,7 @@ The engine gates execution on `engineSupport`, so `calorie.log`/`pomodoro.log` r
 3. Where any leg is not genuinely shipped, keep the path hidden but relabel with honest terminology and a recorded product reason — the label must never claim "deferred engine" for executed code or vice versa.
 
 Product intent favors exposure for `calorie.log`/`pomodoro.log` targets (the effects and their exactly-once proofs exist); triggers are exposed only with proven emission.
+
+## D7 — Projects manual order activation (Wave 10)
+
+The Wave 10 orphan re-grep found `reorderProjects` still had zero app callers while the Projects list already offers a "Manual" sort reading `sort_order`. Decision: activate it with explicit move up/down controls (no drag-only gesture; works on native and web), shown only while Manual sort is active with no status filter, because any other view is not showing the persisted manual order. The existing `reorderProjects` contract (full-order write, per-row durable update intent, `runBackupMutation`) is unchanged; the UI persists the full manual id list after a pure `swapProjectInOrder` swap.

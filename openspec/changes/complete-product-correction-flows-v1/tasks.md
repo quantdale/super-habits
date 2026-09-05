@@ -42,3 +42,8 @@
 - [x] 7.1 Real-SQLite contract tests for `progress.data` and `activityTimeline.data`.
 - [x] 7.2 E2E for all Planning Hub views with data oracles.
 - [x] 7.3 Repair vacuous-assertion leads (Workout/Habits specs) with existing oracle helpers. (Workout strengthened in Wave 4; Habits increment now asserts the 1-of-1 label + `habit_completions` row oracle.)
+
+## 8. Projects manual order (Wave 10 residual E2 orphan)
+
+- [x] 8.1 Activate `reorderProjects` from the Projects list: move up/down controls while Manual sort is active with no status filter; pure `swapProjectInOrder` domain helper.
+- [x] 8.2 Tests: unit (bounds/edge), real-SQL integration (persisted `sort_order` + one coalesced update intent per project), E2E move → restart → row/intent oracles.

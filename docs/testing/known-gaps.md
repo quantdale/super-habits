@@ -224,6 +224,24 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** opt in on demand — `E2E_COMMAND_INTERNAL_OBSERVATION=true` against an internal-capable build with a reachable backend.
 
+### 12. Command shell internal-rollout suite — env-gated opt-in lane
+
+**Reason:** the `Command shell internal rollout` describe in `e2e/command.spec.ts` is skipped unless the build is internal-capable (`EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT=true` with a remote parser mode) and a remote backend is configured. The standard lane and CI never set the gates, so it shows as skipped there — an opt-in lane attribute; the mock-parser shell surface is asserted by the earlier describes in the same file.
+
+**Closing path:** opt in on demand, same gates as entries 10–11.
+
+### 13. Ask provider-unavailable journey step — skipped on remote-configured builds
+
+**Reason:** `e2e/journeys/command-center-v2.spec.ts` “shows provider-unavailable Ask state without changing local data” skips when `EXPO_PUBLIC_SUPABASE_URL` is present, because remote Ask builds route through the mock edge route and can never surface the provider-unavailable state. The assertion runs on the standard local-only `dist/` lane and is skipped only in `dist-sync`/`journeys-sync` runs — a lane attribute, not a coverage hole.
+
+**Closing path:** none needed; keep the runtime gate.
+
+### 14. Calories week-strip calendar skip (Sunday)
+
+**Reason:** the week-strip test in `e2e/calories-day-navigation.spec.ts` skips when the browser-local day is Sunday, because a Sunday start leaves no selectable future day in the strip. Structural calendar dependency; the unchanged assertions run on every other weekday.
+
+**Closing path:** none needed; keep the calendar gate (do not fake the clock for this suite).
+
 ---
 
 ## Related

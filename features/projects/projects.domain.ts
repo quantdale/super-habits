@@ -201,6 +201,26 @@ export function filterProjectRows(
   return rows.filter((row) => row.project.status === statusFilter);
 }
 
+/**
+ * Manual-order move used by the Projects list: swaps the item at `index` with
+ * its neighbour in the full manual id order, or returns null when the move
+ * would leave the list bounds. The caller persists the returned full order.
+ */
+export function swapProjectInOrder(
+  orderedIds: string[],
+  index: number,
+  direction: -1 | 1,
+): string[] | null {
+  const target = index + direction;
+  if (index < 0 || index >= orderedIds.length || target < 0 || target >= orderedIds.length) {
+    return null;
+  }
+  const next = [...orderedIds];
+  const [moved] = next.splice(index, 1);
+  next.splice(target, 0, moved);
+  return next;
+}
+
 export function sortProjectRows(rows: ProjectListRow[], sortKey: ProjectSortKey): ProjectListRow[] {
   const copy = [...rows];
   switch (sortKey) {

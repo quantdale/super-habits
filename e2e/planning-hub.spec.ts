@@ -163,4 +163,60 @@ test.describe('Planning Hub', () => {
       page.getByRole('button', { name: /^Home renovation, Active, 0 percent progress/ }),
     ).toBeVisible({ timeout: 20_000 });
   });
+
+  test('manual project order: move up swaps live, persists sort_order, and survives restart', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    await openPlanHub(page);
+    await page.getByRole('tab', { name: 'Projects' }).click();
+    await expect(page.getByText('No projects yet')).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole('button', { name: 'Create project' }).click();
+    await page.getByPlaceholder('Project name').fill('Alpha');
+    await page.getByRole('button', { name: 'Create Project' }).click();
+    await expect(
+      page.getByRole('button', { name: /^Alpha, Active, 0 percent progress/ }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole('button', { name: 'Create project' }).click();
+    await page.getByPlaceholder('Project name').fill('Beta');
+    await page.getByRole('button', { name: 'Create Project' }).click();
+    await expect(
+      page.getByRole('button', { name: /^Beta, Active, 0 percent progress/ }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    const rowButtons = page.getByRole('button', { name: /percent progress/ });
+    await expect(rowButtons).toHaveCount(2);
+    await expect(rowButtons.first()).toHaveText(/Alpha/);
+
+    // Manual sort is the default and no filter is active → move controls show.
+    await page.getByRole('button', { name: 'Move Beta up' }).click();
+    await expect(rowButtons.first()).toHaveText(/Beta/, { timeout: 20_000 });
+
+    // Row + durable intent oracles (UI steps are done — queryRows navigates away).
+    const order = await queryRows(
+      page,
+      `SELECT name, sort_order FROM projects WHERE deleted_at IS NULL ORDER BY sort_order ASC`,
+    );
+    expect(order).toEqual([
+      { name: 'Beta', sort_order: 1 },
+      { name: 'Alpha', sort_order: 2 },
+    ]);
+    const intents = await queryRows(
+      page,
+      `SELECT id, operation FROM sync_outbox WHERE entity = 'projects'`,
+    );
+    expect(intents).toHaveLength(2);
+    expect(new Set(intents.map((intent) => intent.operation))).toEqual(new Set(['update']));
+
+    // Fresh mount: the manual order re-reads from SQLite, not component state.
+    await returnToApp(page);
+    await goToTab(page, 'overview');
+    await openPlanHub(page);
+    await page.getByRole('tab', { name: 'Projects' }).click();
+    const afterRestart = page.getByRole('button', { name: /percent progress/ });
+    await expect(afterRestart.first()).toHaveText(/Beta/, { timeout: 20_000 });
+  });
 });
