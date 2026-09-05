@@ -843,11 +843,19 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           setRoutineModal(null);
           void startRoutineById(routineId);
         }}
+        onRenamed={(name) => {
+          setRoutineModal((current) => (current ? { ...current, routineName: name } : current));
+          void refresh();
+        }}
       />
       <WorkoutHistoryDetailModal
         visible={detailLogId !== null}
         logId={detailLogId}
         onClose={() => setDetailLogId(null)}
+        onDeleted={() => {
+          setDetailLogId(null);
+          void refresh();
+        }}
       />
       <MenuSheet
         visible={chooserVisible}

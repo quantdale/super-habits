@@ -2,22 +2,22 @@
 
 ## 1. Todos recurrence management
 
-- [ ] 1.1 Data layer: series-scope template update, stop-series (clear marker on all rows + soft-delete future pending), restart with fresh recurrence_id; domain helpers pure-tested.
-- [ ] 1.2 UI: edit sheet scope options + stop/restart controls with unambiguous labels and confirmation; honest recurring Linked-Actions copy.
-- [ ] 1.3 Tests: unit + integration coverage for every semantics branch (daily chain, completed instance, no-resurrection rollover, restart, outbox intents).
+- [x] 1.1 Data layer: series-scope template update, stop-series (clear marker on all rows + soft-delete future pending), restart with fresh recurrence_id; domain helpers pure-tested.
+- [x] 1.2 UI: edit sheet scope options + stop/restart controls with unambiguous labels and confirmation; honest recurring Linked-Actions copy.
+- [x] 1.3 Tests: unit + integration coverage for every semantics branch (daily chain, completed instance, no-resurrection rollover, restart, outbox intents).
 
 ## 2. Calories day correction
 
-- [ ] 2.1 Data layer: `consumedOn` in `updateCalorieEntry` with validation and single outbox intent.
-- [ ] 2.2 UI: date control in the edit modal (existing picker pattern), both Form/Diary refresh paths.
-- [ ] 2.3 Tests: move yesterday↔today, month boundary, atomic multi-field save, idempotent re-save, failed-save no-op, aggregate refresh, outbox.
+- [x] 2.1 Data layer: `consumedOn` in `updateCalorieEntry` with validation and single outbox intent.
+- [x] 2.2 UI: date control in the edit modal (existing picker pattern), both Form/Diary refresh paths.
+- [x] 2.3 Tests: move yesterday↔today, month boundary, atomic multi-field save, idempotent re-save, failed-save no-op, aggregate refresh, outbox.
 
 ## 3. Workout correction
 
-- [ ] 3.1 Activate `updateRoutine` edit UI; template/history isolation proof.
-- [ ] 3.2 Activate custom-exercise edit/archive/restore + archived listing UI.
-- [ ] 3.3 Contract-completed accidental-log deletion path (cascade + durable intents + restore inertness) with confirm UI; completed numerics immutable.
-- [ ] 3.4 Tests for each newly mutable field and the delete cascade.
+- [x] 3.1 Activate `updateRoutine` edit UI; template/history isolation proof.
+- [x] 3.2 Activate custom-exercise edit/archive/restore + archived listing UI.
+- [x] 3.3 Contract-completed accidental-log deletion path (cascade + durable intents + restore inertness) with confirm UI; completed numerics immutable.
+- [x] 3.4 Tests for each newly mutable field and the delete cascade.
 
 ## 4. Pomodoro management and correction
 

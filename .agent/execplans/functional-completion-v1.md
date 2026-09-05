@@ -26,19 +26,20 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 
 ## Current Checkpoint
 
-- Current milestone: Wave 3 COMPLETE (Calories day correction) → Wave 4 (Workout correction) starting.
+- Current milestone: Wave 4 COMPLETE (Workout correction) → Wave 5 (Pomodoro correction depth) starting.
 - Completed:
   - Wave 0 — truth/hygiene/gates/E1–E6 (all CONFIRMED; commit `3e05490`).
   - Wave 1 — OpenSpec change `complete-product-correction-flows-v1` (design D1–D6, 6 specs, tasks; openspec 51/51; commit `62356b5`).
   - Wave 2 — Todos recurring-series correction (data+UI+6 unit+3 integration+E2E; todos 9/9; P0 25/25; commit `0065ae9`).
-  - Wave 3 — Calories day correction: `updateCalorieEntry` accepts validated `consumedOn` (isValidDateKey; throws on bad key BEFORE touching the DB), in-place move preserving id + single coalesced update intent; edit modal gains a “Consumed on” control (web TextField labeled “Consumed date”, native DateTimePicker) shown only in edit mode — the add/form flow is untouched. Real-SQL integration (3: move preserves identity + coalesced outbox update; month boundary + idempotent re-save; invalid key no-op) and E2E (diary wrong-day → move to today → both ledgers correct → identity survives reload). Discovered: kcal is recomputed from macros on update (existing contract; E2E asserts macros, not stale kcal). Gates: typecheck 0, lint 0, calories unit 22/22, day-navigation spec 5/5.
+  - Wave 3 — Calories day correction (integration 3; E2E day-navigation 5/5; commit `de9632e`).
+  - Wave 4 — Workout correction: `deleteWorkoutLog` (hard-delete cascade per the `saved_meals` exception — the three log tables have no `deleted_at`; one durable delete intent per removed row, verified) wired to a confirmed “Delete session” action in Session detail; `updateRoutine` activated via Rename routine (top of builder; history keeps snapshot names — proven); new `CustomExerciseManagerModal` (edit/archive/restore + archived list) wired to `updateCustomExercise`/`archiveCustomExercise`/new `restoreCustomExercise`; design.md D3 amended (hard-delete rationale). E2E strengthened the vacuous “completes a workout” (real workout_logs oracle) + 3 new journeys (rename, accidental-log delete, manager). Fixed a weekend-dependent strict-mode flake in gym-v2 reschedules by scoping to the schedule panel (selector fix, assertion kept).
 - In progress: none.
-- Important modified files: `features/calories/calories.data.ts`, `features/calories/CaloriesScreen.tsx`, `tests/integration/caloriesDayMove.test.ts`, `e2e/calories-day-navigation.spec.ts`.
-- Last successful validation: as above (2026-09-05); prior full-suite state still valid except unrun full Vitest for Wave 3 changes (planned in next gate batch).
-- Current failures: None. Two TEST_BUGs fixed in-flight (stale 300-kcal expectation vs recompute contract; both strengthened to macro assertions).
+- Important modified files: `features/workout/workout.data.ts`, `WorkoutHistoryDetail.tsx`, `WorkoutScreen.tsx`, `RoutineDetailScreen.tsx`, `CustomExerciseManager.tsx` (new), `tests/integration/workoutCorrection.test.ts`, `e2e/workout.spec.ts`, `e2e/workout-gym-v2.spec.ts`, `openspec/.../design.md`.
+- Last successful validation: typecheck 0; lint 0; full Vitest 1953/1953 (179 files); workout specs 12/12 + gym-v2 7/7 (2026-09-05).
+- Current failures: None. Two TEST_BUGs fixed in-flight (kcal-recompute assertion; weekend 'Rest day' strict-mode collision).
 - Relevant quarantines: None.
 - Blockers: None (externals unchanged).
-- Exact next action: Wave 4 — audit `workout.data.ts` (updateRoutine/updateCustomExercise/archiveCustomExercise/listCustomExercises already exist; log-delete path missing), then build routine-edit UI, custom-exercise manage UI, and confirmed accidental-log delete with cascade + tests.
+- Exact next action: Wave 5 — Pomodoro preset authoring UI over `savePomodoroPresets` + post-hoc session note and linked-task correction from focus history via `setPomodoroSessionMeta`; add integration + E2E coverage.
 - Remaining definition of done: terminal condition A of `.agent/EXECUTION_PROMPT.md` §9.
 
 ## Progress
@@ -47,7 +48,7 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 - [x] Wave 1 — OpenSpec contracts + design decisions D1–D6 (commit `62356b5`, openspec 51/51)
 - [x] Wave 2 — Todos recurring-series correction (unit 6 + integration 3 + E2E; full Vitest 1946/1946; todos spec 9/9; P0 25/25)
 - [x] Wave 3 — Calories day-correction (integration 3 + E2E 5/5 day-navigation; unit 22/22)
-- [ ] Wave 4 — Workout correction
+- [x] Wave 4 — Workout correction (integration 4; E2E workout 12/12 incl. rename/delete/manager; gym-v2 flake scoped; full Vitest 1953/1953)
 - [ ] Wave 5 — Pomodoro correction depth
 - [ ] Wave 6 — Weekly Review surfacing + Linked Actions policy
 - [ ] Wave 7 — Planning-surface test floor
@@ -58,10 +59,14 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 
 - Engine runtime skips `pomodoro.log`/`calorie.log` legacy rules ("unsupported") despite implemented effects — policy likely gates execution too (`linkedActions.engine` + policy resolution). Wave 6 must audit the gate path before choosing A (authorable) vs B (honest deferral).
 - `web:hygiene` and the whole `qa:fast` chain work cleanly on this Windows host; native lanes use existing `scripts/qa-native*.mjs`.
+- E2E (web): nested `core/ui/Modal` stacks (routine builder + exercise picker) can transiently misroute clicks after the inner dialog closes — a close/re-layout race causes tests to hang for the full timeout (~50% flake). Deterministic pattern: don't click builder controls immediately after closing the nested picker; seed at the DB layer (`queryRows`) or re-open the dialog first. Also: `returnToApp` lands on Overview — always `goToTab` again after `queryRows`/`returnToApp`; wait for a UI signal (e.g. session card) before `queryRows` so the harness connection never races the write transaction.
+- Durable outbox coalesces intents per (entity, id) — `sync_outbox` holds one row with the latest operation; assert that shape in tests.
+- The three completed-log tables (`workout_logs`, `workout_session_exercises`, `workout_session_sets`) have no `deleted_at`; corrections there must follow the hard-delete + per-row delete-intent exception (design D3 amendment).
 
 ## Decision Log
 
 - 2026-09-05 — Master orchestration plan + per-wave workstream plans (proven shape from prior campaigns) — single source for campaign checkpoint; workstream plans own implementation detail.
+- 2026-09-05 — Wave 4: accidental completed-session delete uses the saved_meals hard-delete exception + durable per-row delete intents instead of soft delete (no `deleted_at` columns exist; remote-schema mirroring out of scope) — user-visible contract unchanged (design D3 amendment records the evidence).
 
 ## Validation Ledger
 

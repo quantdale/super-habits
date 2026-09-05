@@ -4,6 +4,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import {
   computePersonalRecords,
@@ -12,7 +14,7 @@ import {
   formatWorkoutTime,
   type LoggedSet,
 } from './workout.domain';
-import { getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
+import { deleteWorkoutLog, getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type { WorkoutModality, WorkoutSessionSet } from '@/core/db/types';
 
@@ -80,16 +82,19 @@ type Props = {
   visible: boolean;
   logId: string | null;
   onClose: () => void;
+  onDeleted: () => void;
 };
 
 /**
  * Per-session history detail: every logged exercise with its recorded sets,
  * session totals, and any personal records recorded in the session.
  */
-export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
+export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }: Props) {
   const { tokens } = useAppTheme();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [detail, setDetail] = useState<WorkoutLogDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!logId) return;
@@ -147,6 +152,24 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
       modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
     })),
   );
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!logId || !detail) return;
+    const confirmed = await confirm({
+      title: 'Delete logged session',
+      message: `Delete “${detail.routineName ?? 'this workout'}” permanently? Every set recorded in this session is removed from history, volume, and personal records. Your routine template stays intact. This cannot be undone.`,
+      confirmLabel: 'Delete session',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await deleteWorkoutLog(logId);
+      onDeleted();
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirm, detail, logId, onDeleted]);
 
   return (
     <Modal visible={visible} onClose={onClose} title="Session detail" scroll>
@@ -301,6 +324,23 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose }: Props) {
               ))
             )}
           </View>
+
+          <View className="mt-6 border-t pt-4" style={{ borderColor: tokens.border }}>
+            <Text className="mb-2 text-xs" style={{ color: tokens.textMuted }}>
+              Logged this by mistake? Deleting removes this session from history, volume, and
+              personal records — your routine template and past sessions stay untouched.
+            </Text>
+            <Button
+              label="Delete session"
+              accessibilityLabel="Delete logged session"
+              variant="danger"
+              loading={deleting}
+              onPress={() => {
+                void handleDeleteSession();
+              }}
+            />
+          </View>
+          {confirmationDialog}
         </>
       )}
     </Modal>

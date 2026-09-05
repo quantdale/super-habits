@@ -148,7 +148,13 @@ test.describe('Workout Gym V2', () => {
     await move.getByRole('textbox', { name: 'New date' }).fill(target);
     await move.getByRole('button', { name: 'Move workout', exact: true }).click();
 
-    await expect(page.getByText('Rest day', { exact: true })).toBeVisible();
+    // Scope to the Workout schedule panel — on days with no habits the
+    // (hidden) Overview habits card can also render the phrase 'Rest day'.
+    const restPanel = page.getByText(
+      'Recover, or choose a different routine for today without changing your weekly template.',
+    );
+    await expect(restPanel).toBeVisible();
+    await expect(restPanel.locator('xpath=..')).toContainText('Rest day');
     await page.getByText('Plan week', { exact: true }).click();
     const plan = page.getByRole('dialog');
     await expect(plan.getByRole('button', { name: /Reschedule Day$/ }).first()).not.toHaveAttribute(

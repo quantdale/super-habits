@@ -20,6 +20,7 @@ import {
   updateSetPrescription,
   listCustomExercises,
   createCustomExercise,
+  updateRoutine,
 } from './workout.data';
 import type { RoutineExercise, RoutineExerciseSet } from './types';
 import type { CustomExercise, WorkoutModality, WorkoutProgressionMode } from '@/core/db/types';
@@ -39,6 +40,7 @@ import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { RoutineExerciseCard } from './RoutineExerciseCard';
+import { CustomExerciseManagerModal } from './CustomExerciseManager';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -86,6 +88,7 @@ type Props = {
   onClose: () => void;
   onStartWorkout: () => void | Promise<void>;
   onUseAsTemplate?: () => void | Promise<void>;
+  onRenamed?: (name: string) => void | Promise<void>;
 };
 
 export function RoutineDetailModal({
@@ -95,6 +98,7 @@ export function RoutineDetailModal({
   onClose,
   onStartWorkout,
   onUseAsTemplate,
+  onRenamed,
 }: Props) {
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -117,6 +121,8 @@ export function RoutineDetailModal({
   const [customUnilateral, setCustomUnilateral] = useState(false);
   const [customSupportsExternalLoad, setCustomSupportsExternalLoad] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
+  const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  const [managerVisible, setManagerVisible] = useState(false);
   const pendingBuilderMutationsRef = useRef<Promise<void>>(Promise.resolve());
 
   const refresh = useCallback(async () => {
@@ -196,6 +202,17 @@ export function RoutineDetailModal({
       .then(setCustomExercises)
       .catch(() => setCustomExercises([]));
   }, [pickerVisible]);
+
+  const handleRenameRoutine = useCallback(async () => {
+    const trimmed = (renameDraft ?? '').trim();
+    if (!trimmed || trimmed === routineName) {
+      setRenameDraft(null);
+      return;
+    }
+    await updateRoutine(routineId, { name: trimmed });
+    setRenameDraft(null);
+    await onRenamed?.(trimmed);
+  }, [onRenamed, renameDraft, routineId, routineName]);
 
   // Collapse the open exercise when the modal closes, without an effect:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders
@@ -392,6 +409,41 @@ export function RoutineDetailModal({
           <Text className="mt-1 text-sm" style={{ color: COLOR }}>
             Add exercises, tune work and rest intervals, then start the routine when it is ready.
           </Text>
+        </View>
+
+        <View className="mb-4">
+          {renameDraft === null ? (
+            <Button
+              label="Rename routine"
+              accessibilityLabel="Rename routine"
+              variant="ghost"
+              onPress={() => setRenameDraft(routineName)}
+            />
+          ) : (
+            <View className="gap-2">
+              <TextField
+                label="Routine name"
+                accessibilityLabel="Routine name"
+                value={renameDraft}
+                onChangeText={setRenameDraft}
+              />
+              <Button
+                label="Save name"
+                accessibilityLabel="Save routine name"
+                color={COLOR}
+                onPress={() => void handleRenameRoutine()}
+              />
+              <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+                Renaming only affects the routine template — completed sessions keep their history.
+              </Text>
+            </View>
+          )}
+          <Button
+            label="Manage custom exercises"
+            accessibilityLabel="Manage custom exercises"
+            variant="ghost"
+            onPress={() => setManagerVisible(true)}
+          />
         </View>
 
         {Platform.OS === 'web' ? (
@@ -1205,6 +1257,15 @@ export function RoutineDetailModal({
           />
         </View>
       </Modal>
+      <CustomExerciseManagerModal
+        visible={managerVisible}
+        onClose={() => setManagerVisible(false)}
+        onChanged={() => {
+          void listCustomExercises()
+            .then(setCustomExercises)
+            .catch(() => setCustomExercises([]));
+        }}
+      />
       {confirmationDialog}
     </>
   );

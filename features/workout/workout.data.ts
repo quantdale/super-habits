@@ -363,6 +363,69 @@ export async function deleteRoutine(routineId: string): Promise<void> {
 
 // --- Exercises ---
 
+/**
+ * Permanently removes an accidentally logged workout session. Follows the
+ * `saved_meals` hard-delete exception: none of the three log tables carries a
+ * `deleted_at` column, so the local rows are hard-deleted and every removed
+ * row records a durable remote delete intent in the same transaction.
+ * Routine templates and historical logs of other sessions are untouched.
+ */
+export async function deleteWorkoutLog(logId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const { changed } = await runSyncedMutation({
+    db,
+    record: { entity: 'workout_logs', id: logId, updatedAt: now, operation: 'delete' },
+    mutate: async (transactionDb, enqueue) => {
+      const existing = await transactionDb.getFirstAsync<{ id: string }>(
+        'SELECT id FROM workout_logs WHERE id = ?',
+        [logId],
+      );
+      if (!existing) return { changed: false, value: false };
+      const exerciseRows = await transactionDb.getAllAsync<{ id: string }>(
+        'SELECT id FROM workout_session_exercises WHERE log_id = ?',
+        [logId],
+      );
+      const setRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM workout_session_sets
+         WHERE session_exercise_id IN (
+           SELECT id FROM workout_session_exercises WHERE log_id = ?
+         )`,
+        [logId],
+      );
+      await transactionDb.runAsync(
+        `DELETE FROM workout_session_sets
+         WHERE session_exercise_id IN (
+           SELECT id FROM workout_session_exercises WHERE log_id = ?
+         )`,
+        [logId],
+      );
+      await transactionDb.runAsync('DELETE FROM workout_session_exercises WHERE log_id = ?', [
+        logId,
+      ]);
+      await transactionDb.runAsync('DELETE FROM workout_logs WHERE id = ?', [logId]);
+      for (const setRow of setRows) {
+        enqueue({
+          entity: 'workout_session_sets',
+          id: setRow.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      }
+      for (const exerciseRow of exerciseRows) {
+        enqueue({
+          entity: 'workout_session_exercises',
+          id: exerciseRow.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      }
+      return { changed: true, value: true };
+    },
+  });
+  return changed;
+}
+
 export async function addExercise(input: {
   routineId: string;
   name: string;
@@ -2064,6 +2127,25 @@ export async function archiveCustomExercise(id: string): Promise<void> {
       return { changed: true, value: undefined };
     },
   });
+}
+
+export async function restoreCustomExercise(id: string): Promise<boolean> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const { changed } = await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const result = await transactionDb.runAsync(
+        `UPDATE custom_exercises SET deleted_at = NULL, updated_at = ?
+         WHERE id = ? AND deleted_at IS NOT NULL`,
+        [now, id],
+      );
+      if (result.changes !== 1) return { changed: false, value: false };
+      enqueue({ entity: 'custom_exercises', id, updatedAt: now, operation: 'update' });
+      return { changed: true, value: true };
+    },
+  });
+  return changed;
 }
 
 export type RoutineExerciseUpdate = Partial<{
