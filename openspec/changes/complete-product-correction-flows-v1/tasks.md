@@ -39,6 +39,6 @@
 
 ## 7. Planning-surface test floor
 
-- [ ] 7.1 Real-SQLite contract tests for `progress.data` and `activityTimeline.data`.
-- [ ] 7.2 E2E for all Planning Hub views with data oracles.
-- [ ] 7.3 Repair vacuous-assertion leads (Workout/Habits specs) with existing oracle helpers.
+- [x] 7.1 Real-SQLite contract tests for `progress.data` and `activityTimeline.data`.
+- [x] 7.2 E2E for all Planning Hub views with data oracles.
+- [x] 7.3 Repair vacuous-assertion leads (Workout/Habits specs) with existing oracle helpers. (Workout strengthened in Wave 4; Habits increment now asserts the 1-of-1 label + `habit_completions` row oracle.)

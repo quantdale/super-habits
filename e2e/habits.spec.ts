@@ -79,7 +79,16 @@ test.describe('Habits', () => {
       .getByRole('button', { name: /Meditate: \d+ of \d+ today\. Tap to add one/ })
       .first()
       .click();
-    await expect(page.getByText('Meditate').first()).toBeVisible();
+    await expect(
+      page
+        .getByRole('button', {
+          name: /Meditate: 1 of 1 today\. Tap to add one\. Long press to remove one\./,
+        })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
+    // Persisted fact, not just UI chrome: the tap wrote exactly one
+    // completion row (same oracle style as the sibling target-history test).
+    await expectRows(page, 'SELECT count FROM habit_completions', [{ count: 1 }]);
   });
 
   test('habit persists after reload', async ({ page }) => {
