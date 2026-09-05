@@ -207,6 +207,16 @@ no generic orchestrator, no PR-CI slowdown, no historical-log rewrites).
   harness-attributed, product exonerated); auth re-probe PASS with
   full mock proof (W8-3 resolved); sweep inventories clean; externals
   re-verified; prompt COMPLETED; clean pushed main.
+- 2026-09-05 — closure reconciliation session: incoming handoff claimed an
+  ACTIVE Wave-8 resume at `86db9ea`; Git truth is `bb376bd` == origin/main,
+  tree clean — Waves 8/9/10 already closed and pushed. Verified closure
+  claims against disk: `agent:plan:validate:all` 48/48 PASS, `web:hygiene`
+  PASS (8081/8082 FREE), `adb devices` empty, no mock on :4545, product
+  drift `1e1f4d0..bb376bd` = `app/index.tsx` only (Wave-1 FAB fix).
+  One unbacked closure claim found and repaired: "final report appended"
+  — appended `## Final report (campaign COMPLETED 2026-09-05)` to
+  `.agent/EXECUTION_PROMPT.md` (this plan is the detailed ledger). No
+  product or test changes. Campaign remains COMPLETED; next action None.
 
 ## Changed Files / Areas
 
