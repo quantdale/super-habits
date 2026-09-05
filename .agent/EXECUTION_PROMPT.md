@@ -1,7 +1,7 @@
 # Super Habits Functional Completion V1
 
-**Status:** ACTIVE
-**Exact next action:** Begin Wave 0 (current-head re-baseline and evidence re-verification) below.
+**Status:** COMPLETED
+**Exact next action:** None — terminal condition A closed 2026-09-05; full evidence in the final report below.
 **Planned-From:** `76f79d90a499f3ab0e2213edd965d23393a7840c`
 **Target branch:** `main`
 **Campaign:** Super Habits Functional Completion V1
@@ -118,3 +118,80 @@ Invalid stops: one green suite, implementation without its E2E/journey oracle, n
 ## 10. Final report structure (append as `## Final report (campaign COMPLETED <date>)`)
 
 Baseline SHA → closure commits by scope; per-wave evidence table (E-reference → flow shipped → tests → proof); contract decisions (series semantics, pomodoro session decision, log-correction decision, policy reconciliation outcome); validation battery table (command/outcome/date); native certification table (device/APK/tag/count/artifacts); failure classifications with artifacts; plan/OpenSpec lifecycle states; docs reconciled; residual blockers; exact next action.
+
+---
+
+## Final report (campaign COMPLETED 2026-09-05)
+
+### Baseline → closure commits
+
+Baseline `76f79d9` → closure chain on `main` (each pushed): `192e496` (plan), `3e05490` (Wave 0 truth/gates), `62356b5` (Wave 1 OpenSpec contracts), `0065ae9` (Wave 2 Todos series), `de9632e` (Wave 3 Calories day move), `29aacba` (Wave 4 Workout correction), `14ca4ad` (Wave 5 Pomodoro correction), `21b20e4` (Wave 6 Weekly Review + Linked Actions), `73c26cd` (Wave 7 planning test floor), `bf6fd8d` (Wave 8 ladder evidence), `6b596f2` (Wave 9 adversarial repairs), `c949458` (Wave 10 docs truth + projects reorder), plus this closure commit. `HEAD == origin/main` at close.
+
+### Per-wave evidence (E-reference → flow → tests → proof)
+
+| E   | Flow shipped                                                                            | Tests                                                                   | Proof                                                         |
+| --- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| E1  | Recurring-series edit/complete-future/pause (Todos editor)                              | 6 unit + 3 integration + E2E                                            | todos spec 9/9; series row/intent oracles                     |
+| E2  | Last orphan `reorderProjects` activated (Projects manual order) + all prior activations | domain unit + real-SQL integration + hub journey                        | `projects-manual-reorder` spec; row/intent/restart oracles    |
+| E3  | Weekly Review entry on Progress + durable history delete                                | executor +3 tests + `weekly-review.spec.ts`                             | guided flow → oracle → delete coalesced-intent oracle         |
+| E4  | Planning surfaces proven with real SQL                                                  | `progressData` 3 + `activityTimelineData` 3 + `planning-hub` 3 journeys | exact window matrices, row + outbox + restart oracles         |
+| E5  | Linked Actions policy ↔ engine parity; log targets authorable                           | policy 4 + `linkedActionLogTargets` 3 + 2 E2E                           | author→fire→effect for pomodoro/calorie paths                 |
+| E6  | README/AGENTS/known-gaps/structure docs truth                                           | —                                                                       | draft-kind list, Ask gating, dynamic inventories, skips 12–14 |
+| —   | Calories day correction                                                                 | 3 integration + 5 E2E                                                   | post-reload row oracle (W9-3)                                 |
+| —   | Workout rename / custom-exercise manager / log delete                                   | 4 integration + 3 E2E                                                   | cascade = one durable delete intent per removed row           |
+| —   | Pomodoro preset manager + session meta correction                                       | 3 integration + 2 E2E                                                   | app_meta + single coalesced update-intent oracles             |
+
+### Contract decisions
+
+- Series semantics: editing a recurring todo edits the template; "complete/adjust future" re-materializes instances forward; two-phase save surfaces template-update failure with a retry message (W9-1).
+- Pomodoro session decision: metadata-only correction (`setPomodoroSessionMeta`, undefined=keep/null=clear), no migration, no duration rewrite.
+- Log-correction decision: completed workout-log tables have no `deleted_at` — corrections use the documented hard-delete exception with one durable delete intent per removed row (design D3 amendment); delete of an already-absent row is a no-op (W9-2).
+- Policy reconciliation: `LINKED_ACTION_SUPPORTED_RULE_PATHS` is the single execution gate (D6 premise corrected by audit); only emitted triggers are authorable; drift guarded by `tests/linkedActionsPolicy.test.ts`.
+
+### Validation battery (final tree `c949458`, 2026-09-05)
+
+| Command                                                           | Outcome                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck` / `npm run lint -- --max-warnings 0`          | PASS 0/0                                                                                                                                                                                                                                                                                                                                                        |
+| `npx vitest run`                                                  | PASS 1977/1977 (185 files, both projects)                                                                                                                                                                                                                                                                                                                       |
+| `npm run openspec:validate`                                       | PASS (all specs incl. `projects-manual-reorder`)                                                                                                                                                                                                                                                                                                                |
+| `npm run agent:plan:validate:all`                                 | PASS                                                                                                                                                                                                                                                                                                                                                            |
+| `npx playwright test --project=chromium e2e/planning-hub.spec.ts` | PASS 3/3                                                                                                                                                                                                                                                                                                                                                        |
+| Full `npm run e2e` battery (chromium+journeys+simulation+pwa) ×2  | 206 passed / 43 skipped / 1 documented flake / 0 product failures — J8 15%-headroom floor at 692/697 ms under battery load (known-gaps 15); the 800 ms ceiling never breached; same test passes standalone on the final tree at 646 ms (19.3% headroom, 7/7 incl. the 4 aborted successors); product diff vs last green battery touches no mounted section code |
+| `sim:run --mode deterministic` (owned :8081 server)               | PASS 23/23                                                                                                                                                                                                                                                                                                                                                      |
+| `npm run web:verify` / `npm run web:hygiene`                      | PASS / 8081+8082 FREE                                                                                                                                                                                                                                                                                                                                           |
+| `qa:repeat --suite p0 --times 3`                                  | PASS 3/3 (Wave 8)                                                                                                                                                                                                                                                                                                                                               |
+
+### Native certification (owned Nitro_API_36, credential-free canonical APK)
+
+| Source                        | Tag                       | Result      | Artifact                                                             |
+| ----------------------------- | ------------------------- | ----------- | -------------------------------------------------------------------- |
+| `73c26cd` (SHA 3C03C258…7908) | smoke / persistence 11/11 | PASS / PASS | `…064222041Z` / `…065339570Z`                                        |
+| `c949458` (rebuilt final)     | smoke                     | PASS        | `native-android-smoke-Nitro_API_36-2026-09-05T072915791Z.json`       |
+| `c949458` (rebuilt final)     | persistence               | PASS        | `native-android-persistence-Nitro_API_36-2026-09-05T074043358Z.json` |
+
+Emulators owned, stopped, no leaks; no production credentials used.
+
+### Failure classifications (all preserved, none weakened)
+
+- PRODUCT_BUG ×2: modal-layer stacking made Progress→Weekly Review unclickable (fixed in `openWeeklyReview`, Wave 6); recurring-template save failure was swallowed (fixed Wave 9 repair W9-1).
+- TEST_BUG ×6 fixed in-flight: Playwright strict-mode collisions (`.first()`/`exact`), habit creation-date write gate, `rule_history` NOT NULL, orphan-vs-soft-deleted label semantics, weekend-dependent gym-v2 selector (scoped, assertion preserved).
+- ENVIRONMENT: raw `sim:run` without an owned static server (by design — helper added); bare native run without `--avd` correctly refuses.
+- Expected skips: 43 pre-existing @sync/internal-parser/capability gates, now all registered in `docs/testing/known-gaps.md` (entries 12–14 added).
+- FLAKY_TEST ×1 (documented, artifacts preserved in `.cursor/playwright-output/e2e-failures/three-months-in-P2-…`): J8 headroom floor 692/697 ms in-battery vs 646 ms standalone on the identical final tree; zero mounted-section perf diff vs the last green battery; registered as known-gap 15 with a re-verify-before-touching-product rule. Assertion unchanged.
+
+### Plan / OpenSpec lifecycle
+
+`.agent/EXECUTION_PROMPT.md` ACTIVE → COMPLETED; `.agent/execplans/functional-completion-v1.md` ACTIVE → COMPLETED (validator PASS). OpenSpec change `complete-product-correction-flows-v1` — 7 specs (6 correction-flow + `projects-manual-reorder`), tasks fully checked, validate green; archive follows the repo's normal openspec workflow.
+
+### Docs reconciled
+
+`README.md` (draft kinds, Ask gating), `AGENTS.md` (dynamic E2E inventory, `ppre` prefix), `docs/testing/known-gaps.md` (12–14), design D3/D6 amendments, integration-helper comment fix.
+
+### Residual blockers (externals, evaluated never gating)
+
+iOS device lane (no macOS host), disposable Supabase backend (`SUPABASE_ACCESS_TOKEN`), internal-parser live lanes, real-corpus fixtures; `e2e:sync` remains the opt-in CI main/nightly remote-boundary lane.
+
+### Exact next action
+
+None — campaign closed. `HEAD == origin/main`, tree clean, ports free, no owned processes.

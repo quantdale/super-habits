@@ -242,6 +242,12 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** none needed; keep the calendar gate (do not fake the clock for this suite).
 
+### 15. J8 section-switch headroom floor fails under full-battery host load (documented flake)
+
+**Reason:** the P2 "Tom, the Weekend Returner" switch-budget step (`e2e/journeys/three-months-in.spec.ts`, WM2.4 sustained-headroom gate) requires ≥15% headroom under the 800 ms section-switch ceiling. On this Windows host during back-to-back full `npm run e2e` batteries it measured 692 ms (13.5%) and 697 ms (12.9%) — failing the floor while comfortably under the ceiling — yet passed standalone on the same tree at 646 ms (19.3%). The product diff between the last green battery and the failing tree touched no mounted section code (verified: one save-handler try/catch in `TodosScreen.tsx` plus Planning-hub-only files), so the sensitivity is host noise (Defender/user browsers) accumulating across the 18-minute single-worker battery, not a performance regression.
+
+**Closing path:** keep the ceiling and floor assertions exactly as they are — they are a genuine regression alarm. When a full battery runs on a loaded host, re-verify a floor failure standalone (`npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts -g "Tom"`) and classify with the recorded per-switch numbers before touching product code; the permanent fix is running the battery on a quiet host or CI, not relaxing the budget.
+
 ---
 
 ## Related
