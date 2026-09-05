@@ -64,7 +64,9 @@ import {
   listTodos,
   removeTodo,
   saveTodoLinkedActionRules,
+  stopRecurringSeries,
   toggleTodo,
+  updateRecurringSeriesTemplate,
   updateTodo,
   updateTodoOrder,
 } from '@/features/todos/todos.data';
@@ -98,6 +100,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const [priority, setPriority] = useState<TodoPriority>('normal');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [editRecurrenceScope, setEditRecurrenceScope] = useState<'instance' | 'series'>('instance');
   const [items, setItems] = useState<Todo[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -188,8 +191,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     () => (editingId ? (items.find((item) => item.id === editingId) ?? null) : null),
     [editingId, items],
   );
-  const isRecurringLinkedActionSource =
-    editingTodo?.recurrence === 'daily' || (!editingId && isRecurring);
+  const isRecurringLinkedActionSource = editingTodo?.recurrence === 'daily' || isRecurring;
   const overdueTasksCount = useMemo(() => {
     const today = toDateKey();
     return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
@@ -233,7 +235,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   useActiveForegroundRefresh(isActive, loadTodosOnFocus, dayGeneration);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     // Invalidate any in-flight linked-action load for a previous edit target
     // so its setLinkedActionRows/setLinkedActionsError can never land after
     // this reset (cancel-mid-load race).
@@ -243,6 +245,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     setDueDate(null);
     setPriority('normal');
     setIsRecurring(false);
+    setEditRecurrenceScope('instance');
     setEditingId(null);
     setEditProjectId(null);
     setEditGoalId(null);
@@ -251,13 +254,13 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     setLinkedActionRows([]);
     setLinkedActionsError(null);
     setLinkedActionsLoading(false);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     if (isSubmitting) return;
     setModalVisible(false);
     resetForm();
-  };
+  }, [isSubmitting, resetForm]);
 
   const openNewTodoModal = () => {
     resetForm();
@@ -300,7 +303,17 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           priority,
           projectId: editProjectId,
           goalId: editGoalId,
+          ...(isRecurring && editingTodo?.recurrence !== 'daily'
+            ? { recurrence: 'daily' as const }
+            : {}),
         });
+        if (editRecurrenceScope === 'series' && editingTodo?.recurrence_id) {
+          await updateRecurringSeriesTemplate(editingTodo.recurrence_id, {
+            title: title.trim(),
+            notes: notes.trim() || null,
+            priority,
+          });
+        }
         if (!isRecurringLinkedActionSource) {
           await saveTodoLinkedActionRules(editingId, linkedActionRules);
         }
@@ -419,6 +432,23 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     },
     [confirm, refresh],
   );
+
+  const requestStopRecurring = useCallback(() => {
+    const target = editingTodo;
+    const recurrenceId = target?.recurrence_id;
+    if (!target || !recurrenceId) return;
+    closeModal();
+    void (async () => {
+      const confirmed = await confirm({
+        title: 'Stop repeating',
+        message: `"${target.title}" will stop creating new daily copies. Completed history and any copy already due today stay in place.`,
+        confirmLabel: 'Stop repeating',
+      });
+      if (!confirmed) return;
+      await stopRecurringSeries(recurrenceId);
+      void refresh();
+    })();
+  }, [editingTodo, confirm, closeModal, refresh]);
 
   const handleQuickAdd = useCallback(
     async (quickTitle: string) => {
@@ -1022,7 +1052,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 </View>
               </View>
             ) : null}
-            {!editingId ? (
+            {!editingId || editingTodo?.recurrence !== 'daily' ? (
               <Pressable
                 onPress={() => {
                   setTodoError(null);
@@ -1054,6 +1084,42 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   Repeat daily
                 </Text>
               </Pressable>
+            ) : null}
+            {editingId && editingTodo?.recurrence === 'daily' ? (
+              <View className="mb-3">
+                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+                  Apply changes to
+                </Text>
+                <View className="mb-1 flex-row flex-wrap gap-2">
+                  <PillChip
+                    label="This task"
+                    active={editRecurrenceScope === 'instance'}
+                    color={COLOR}
+                    onPress={() => setEditRecurrenceScope('instance')}
+                  />
+                  <PillChip
+                    label="This & future tasks"
+                    active={editRecurrenceScope === 'series'}
+                    color={COLOR}
+                    onPress={() => setEditRecurrenceScope('series')}
+                  />
+                </View>
+                <Text className="mb-2 text-xs" style={{ color: tokens.textMuted }}>
+                  {editRecurrenceScope === 'series'
+                    ? 'This copy and the daily ones after it change. Completed copies keep their original text.'
+                    : 'Only this copy changes. Future daily copies keep the old text.'}
+                </Text>
+                <Pressable
+                  onPress={requestStopRecurring}
+                  accessibilityRole="button"
+                  accessibilityLabel="Stop repeating this task"
+                  className="py-2"
+                >
+                  <Text className="text-sm" style={{ color: colorText }}>
+                    Stop repeating (keeps history)
+                  </Text>
+                </Pressable>
+              </View>
             ) : null}
             {Platform.OS === 'web' ? (
               <TextField
@@ -1113,7 +1179,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           >
             {isRecurringLinkedActionSource ? (
               <Text className="text-sm" style={{ color: colorText }}>
-                Recurring tasks cannot be Linked Action sources yet.
+                {
+                  "Linked actions attach to one task copy, and each day's repeat is a new copy \u2014 recurring tasks can't be sources yet."
+                }
               </Text>
             ) : linkedActionsLoading ? (
               <Text className="text-sm" style={{ color: colorText }}>

@@ -125,7 +125,56 @@ test.describe('Todos', () => {
     await page.getByText('Repeat daily', { exact: true }).click({ force: true });
 
     await expect(
-      page.getByText('Recurring tasks cannot be Linked Action sources yet.', { exact: true }),
+      page.getByText(
+        "Linked actions attach to one task copy, and each day's repeat is a new copy \u2014 recurring tasks can't be sources yet.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+  });
+
+  test('recurring series: template edit preserves history; stop ends the series', async ({
+    page,
+  }) => {
+    await openNewTodoModal(page);
+    await page.getByPlaceholder(/Add a task/i).fill('Daily stretch');
+    await page.getByText('Repeat daily', { exact: true }).click({ force: true });
+    await submitTodoModal(page);
+    await expect(page.getByText('Daily stretch').filter({ visible: true }).last()).toBeVisible();
+
+    // Completing today's copy spawns the next daily copy.
+    await page
+      .getByRole('checkbox', { name: 'Mark complete: Daily stretch' })
+      .first()
+      .click({ force: true });
+    await expect(page.getByText('Daily stretch').filter({ visible: true }).last()).toBeVisible();
+    // Wait for the post-completion refresh: the remaining visible copy must
+    // be the spawned pending one (1 pending / 1 completed), not a stale row.
+    await expect(page.getByText('1 pending, 1 completed')).toBeVisible();
+
+    // Series-scope rename on the pending copy: history keeps the old title.
+    await page.getByLabel('More actions for Daily stretch').first().click({ force: true });
+    await page.getByRole('button', { name: 'Edit', exact: true }).click({ force: true });
+    await expect(page.getByText('This & future tasks', { exact: true })).toBeVisible();
+    await page.getByText('This & future tasks', { exact: true }).click({ force: true });
+    await page.getByPlaceholder(/Add a task/i).fill('Morning stretch');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click({ force: true });
+    await expect(page.getByText('Morning stretch').filter({ visible: true }).last()).toBeVisible();
+    await expect(page.getByText('Daily stretch', { exact: true })).not.toBeVisible();
+    await page.getByRole('button', { name: 'Show completed tasks' }).click();
+    await expect(page.getByText('Daily stretch').filter({ visible: true }).last()).toBeVisible();
+    await page.getByRole('button', { name: 'Hide completed tasks' }).click();
+
+    // Stopping removes the future copy without touching completed history.
+    await page.getByLabel('More actions for Morning stretch').first().click({ force: true });
+    await page.getByRole('button', { name: 'Edit', exact: true }).click({ force: true });
+    await page.getByText('Stop repeating (keeps history)', { exact: true }).click({ force: true });
+    const stopDialog = page.getByRole('dialog');
+    await expect(stopDialog.getByText(/will stop creating new daily copies/)).toBeVisible();
+    await stopDialog.getByRole('button', { name: 'Stop repeating', exact: true }).click();
+    await expect(page.getByText('No pending tasks', { exact: true }).last()).toBeVisible();
+    await page.getByRole('button', { name: 'Show completed tasks' }).click();
+    await expect(
+      page.getByRole('checkbox', { name: 'Mark incomplete: Daily stretch' }).first(),
     ).toBeVisible();
   });
 });

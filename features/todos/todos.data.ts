@@ -440,6 +440,14 @@ export async function updateTodo(
     priority?: TodoPriority;
     projectId?: string | null;
     goalId?: string | null;
+    /**
+     * Only STARTS a daily series (fresh recurrence id — a restart never
+     * reattaches to a stopped chain). Clearing recurrence is deliberately
+     * NOT supported here: ending a series is `stopRecurringSeries` so the
+     * whole series transitions atomically instead of leaving one stray
+     * 'daily' row that rollover would respawn.
+     */
+    recurrence?: TodoRecurrence;
   },
 ): Promise<void> {
   const db = await getDatabase();
@@ -468,12 +476,26 @@ export async function updateTodo(
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
-      const current = await transactionDb.getFirstAsync<Pick<Todo, 'project_id' | 'goal_id'>>(
-        `SELECT project_id, goal_id FROM todos WHERE id = ? AND deleted_at IS NULL`,
+      const current = await transactionDb.getFirstAsync<
+        Pick<Todo, 'project_id' | 'goal_id' | 'recurrence' | 'recurrence_id' | 'due_date'>
+      >(
+        `SELECT project_id, goal_id, recurrence, recurrence_id, due_date
+         FROM todos WHERE id = ? AND deleted_at IS NULL`,
         [id],
       );
       if (!current) {
         return { changed: false, value: undefined };
+      }
+
+      // Restart: starting recurrence on a non-recurring task begins a NEW
+      // series chain (fresh recurrence id); stopped chains stay ended.
+      if (updates.recurrence === 'daily' && current.recurrence !== 'daily') {
+        fields.push('recurrence = ?', 'recurrence_id = ?');
+        values.push('daily', createId('rec'));
+        if (updates.dueDate === undefined && current.due_date === null) {
+          fields.push('due_date = ?');
+          values.push(toDateKey());
+        }
       }
 
       // H9: validate and reconcile project/goal associations via the shared
@@ -512,6 +534,140 @@ export async function updateTodo(
       await syncReminderSafely({ id, title: updated.title, dueDate: updated.due_date });
     } else {
       await cancelReminderSafely(id);
+    }
+  }
+}
+
+/**
+ * Applies a template edit to the remaining life of a daily series: every live
+ * (non-deleted, non-completed) instance sharing the recurrence id receives the
+ * field changes, so subsequently spawned copies (which are copied from the
+ * active instance) inherit them too. Completed history rows are NEVER
+ * rewritten. One durable update intent is enqueued per touched row.
+ */
+export async function updateRecurringSeriesTemplate(
+  recurrenceId: string,
+  updates: { title?: string; notes?: string | null; priority?: TodoPriority },
+): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+
+  const fields: string[] = ['updated_at = ?'];
+  const values: (string | null)[] = [now];
+  if (updates.title !== undefined) {
+    fields.push('title = ?');
+    values.push(updates.title);
+  }
+  if (updates.notes !== undefined) {
+    fields.push('notes = ?');
+    values.push(updates.notes);
+  }
+  if (updates.priority !== undefined) {
+    fields.push('priority = ?');
+    values.push(updates.priority);
+  }
+
+  const outcome = await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const targets = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM todos
+         WHERE recurrence_id = ? AND completed = 0 AND deleted_at IS NULL`,
+        [recurrenceId],
+      );
+      if (targets.length === 0) {
+        return { changed: false, value: undefined };
+      }
+      for (const target of targets) {
+        await transactionDb.runAsync(`UPDATE todos SET ${fields.join(', ')} WHERE id = ?`, [
+          ...values,
+          target.id,
+        ]);
+        enqueue({ entity: 'todos', id: target.id, updatedAt: now, operation: 'update' });
+      }
+      return { changed: true, value: undefined };
+    },
+  });
+
+  if (outcome.changed) {
+    const refreshed = await db.getAllAsync<{ id: string; title: string; due_date: string }>(
+      `SELECT id, title, due_date FROM todos
+       WHERE recurrence_id = ? AND completed = 0 AND deleted_at IS NULL AND due_date IS NOT NULL`,
+      [recurrenceId],
+    );
+    for (const row of refreshed) {
+      await syncReminderSafely({ id: row.id, title: row.title, dueDate: row.due_date });
+    }
+  }
+}
+
+/**
+ * Ends a daily series permanently:
+ * - clears the recurrence marker on EVERY row of the series (pending,
+ *   completed, and already soft-deleted). The day-rollover scan keys on any
+ *   'daily' row of a recurrence id regardless of completion or deletion, so
+ *   a surviving marker anywhere would resurrect the series.
+ * - soft-deletes pending copies due after today (completed history and
+ *   today's copy stay visible).
+ * Durable intents mirror `removeTodo` ('delete' for freshly soft-deleted
+ * future copies, 'update' for other rows whose state changed locally).
+ */
+export async function stopRecurringSeries(recurrenceId: string): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+  const todayKey = toDateKey();
+
+  const outcome = await runBackupMutation<void>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const members = await transactionDb.getAllAsync<{
+        id: string;
+        completed: 0 | 1;
+        deleted_at: string | null;
+        due_date: string | null;
+      }>(`SELECT id, completed, deleted_at, due_date FROM todos WHERE recurrence_id = ?`, [
+        recurrenceId,
+      ]);
+      if (members.length === 0) {
+        return { changed: false, value: undefined };
+      }
+      for (const member of members) {
+        if (member.deleted_at !== null) {
+          // Already deleted locally and remotely; clear the marker without
+          // re-enqueueing the existing delete intent.
+          await transactionDb.runAsync(`UPDATE todos SET recurrence = NULL WHERE id = ?`, [
+            member.id,
+          ]);
+          continue;
+        }
+        const endsFuture =
+          member.completed === 0 && member.due_date !== null && member.due_date > todayKey;
+        if (endsFuture) {
+          await transactionDb.runAsync(
+            `UPDATE todos SET recurrence = NULL, deleted_at = ?, updated_at = ? WHERE id = ?`,
+            [now, now, member.id],
+          );
+          enqueue({ entity: 'todos', id: member.id, updatedAt: now, operation: 'delete' });
+        } else {
+          await transactionDb.runAsync(
+            `UPDATE todos SET recurrence = NULL, updated_at = ? WHERE id = ?`,
+            [now, member.id],
+          );
+          enqueue({ entity: 'todos', id: member.id, updatedAt: now, operation: 'update' });
+        }
+      }
+      return { changed: true, value: undefined };
+    },
+  });
+
+  if (outcome.changed) {
+    const cancelled = await db.getAllAsync<{ id: string }>(
+      `SELECT id FROM todos
+       WHERE recurrence_id = ? AND deleted_at IS NOT NULL AND deleted_at = ?`,
+      [recurrenceId, now],
+    );
+    for (const row of cancelled) {
+      await cancelReminderSafely(row.id);
     }
   }
 }

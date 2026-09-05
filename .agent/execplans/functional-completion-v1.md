@@ -26,34 +26,28 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 
 ## Current Checkpoint
 
-- Current milestone: Wave 0 COMPLETE → Wave 1 (OpenSpec contracts) starting.
+- Current milestone: Wave 2 COMPLETE (Todos recurring-series correction) → Wave 3 (Calories day-correction) starting.
 - Completed:
-  - Git/plan truth: starting HEAD `192e496e259a73fe1c5a0045f999d4212bba8237` == `origin/main`, branch `main`, tree clean, single worktree; `agent:plans` shows all 48 discovered plans COMPLETED.
-  - Hygiene: `web:hygiene` PASS (8081/8082 free).
-  - Baseline gates: `qa:fast` PASS — typecheck 0 errors, lint 0 (max-warnings 0), Vitest unit 1691 passed / 128 files, journey-label-parity OK (2026-09-05).
-  - E1–E6 re-verification (all at `192e496`):
-    - E1 CONFIRMED — `updateTodo` (`features/todos/todos.data.ts:434-443`) accepts no recurrence fields; "Repeat daily" toggle renders only when `!editingId` (`features/todos/TodosScreen.tsx:1025-1057`); completion re-spawns tomorrow's instance (`todos.data.ts:683-701`); recurring Linked-Action-source dead-end copy (`TodosScreen.tsx:1114-1117`).
-    - E2 CONFIRMED — zero non-test UI callers for `savePomodoroPresets` (`features/pomodoro/pomodoro.presets.store.ts:88`), `updateRoutine` (`features/workout/workout.data.ts:195`), `updateCustomExercise` (`:1988`), `archiveCustomExercise` (`:2051`), archived listing `listCustomExercises(includeArchived)` (`:1934`), `deleteWeeklyReview` (`features/weekly-review/weeklyReview.data.ts:120`), `reorderProjects` (`features/projects/projects.data.ts:214`, callers = integration test only). `setPomodoroSessionMeta` (`features/pomodoro/pomodoro.data.ts:230`) is called only by `SessionNotePrompt.tsx:27` with `note` only. `updateCalorieEntry` (`features/calories/calories.data.ts:212-221`) has no `consumedOn`. Workout data layer exposes no `updateWorkoutLog`/`deleteWorkoutLog`-style path (grep-verified absent).
-    - E3 CONFIRMED — `openWeeklyReview` behavioral call-sites: `app/_layout.tsx:160-162` ← `core/notifications/notificationResponseDispatcher.ts:216` only. Disposition ledger line 28 verified verbatim.
-    - E4 CONFIRMED — no E2E spec drives Weekly Review guided flow (only settings-ripple reminder preference); no Planning Hub E2E spec; `tests/activityTimeline.test.ts` mocks `core/db/client`; `progress.data` only mocked via `ask.retrieval.test.ts` (real-SQL coverage absent). Vacuous-assertion leads to confirm when touching those specs in Wave 7.
-    - E5 CONFIRMED — `calorie.log`/`pomodoro.log` effects implemented (`core/linked-actions/linkedActions.effects.ts:68,100`); policy marks triggers `calorie.entry_logged`/`workout.completed`/`pomodoro.focus_completed` and target features `calories`/`pomodoro` and entities `calorie_log`/`pomodoro_session` as `deferred`/`hidden` (`linkedActions.policy.ts:79-99,108,110,119,121`).
-    - E6 CONFIRMED — `README.md:142` ("limited to create_todo and create_habit") and `:148` ("false by default") contradict `features/command/types.ts:9` (`AI_ASK_EXPERIMENT_ENABLED = true`) and the 10-kind `DraftKind` union (`:13-23`).
+  - Wave 0: Git/plan truth (`192e496` start == origin/main, clean, single worktree, 48 plans COMPLETED), `web:hygiene` PASS, `qa:fast` PASS (unit 1691/128 files), and E1–E6 re-verification — **all six CONFIRMED** against the tree at `192e496` (original per-E evidence: commit `3e05490`).
+  - Wave 1: OpenSpec change `complete-product-correction-flows-v1` — proposal, design D1–D6 (series semantics; calorie `consumedOn` in-place move; workout routine/exercise activation + accidental-log delete with immutable completed numerics; Pomodoro preset authoring + metadata-only session correction, no migration 25; Weekly Review Plan/Progress entry + delete; Linked Actions expose-with-proof vs honest relabel), six capability specs, tasks. `openspec:validate` 51/51. Commit `62356b5`.
+  - Wave 2: data layer `updateRecurringSeriesTemplate` (live non-completed instances only, per-row intents), `stopRecurringSeries` (marker cleared on ALL series rows incl. completed/deleted to block rollover resurrection; future pending copies soft-deleted; intents mirror `removeTodo`), `updateTodo({recurrence:'daily'})` restart (fresh `rec_` id, default due today; never clears recurrence). UI: This task / This & future tasks scope chips, confirmed “Stop repeating”, restart toggle on edit, honest recurring Linked-Actions copy. Tests: 6 unit + 3 real-SQL integration + new E2E journey; old dead-end selector updated.
 - In progress: none.
-- Important modified files: none yet (only this plan).
-- Last successful validation: `qa:fast` PASS + `web:hygiene` PASS at `192e496` (2026-09-05).
-- Current failures: None.
+- Important modified files: `features/todos/todos.data.ts`, `features/todos/TodosScreen.tsx`, `tests/todos.recurringSeries.data.test.ts`, `tests/integration/recurringSeriesCorrection.test.ts`, `e2e/todos.spec.ts`.
+- Last successful validation: typecheck 0, lint 0 (max-warnings 0), full Vitest 1946/1946 (177 files), todos chromium 9/9, `e2e:journeys:p0` 25/25 on fresh `dist/` (2026-09-05).
+- Current failures: None. (One TEST_BUG fixed in-flight: the new E2E edited a stale row before post-completion refresh — replaced with the stable “1 pending, 1 completed” oracle; assertion strengthened, not weakened.)
 - Relevant quarantines: None.
-- Blockers: None. Known externals (evaluate, never gate): iOS/macOS, disposable Supabase token, internal parser lanes, anonymized real corpus.
-- Discovery (Wave 6 input): `tests/linkedActions.engine.test.ts` logs "Skipping unsupported linked action rule" for `pomodoro.log` targets — the engine appears to _gate execution_ on policy, not just authoring. Wave 6 must determine the exact gate location before choosing policy option A vs B.
-- Nuance (Wave 2 input): `TodosScreen.tsx:170-171` reads `filters.projectId`/`goalId` for the "has active filters" badge only; query wiring of the project/goal filter branches is not proven — verify in Wave 2.
-- Exact next action: Author the Wave-1 OpenSpec change(s) at `openspec/changes/<slug>/` defining correction contracts (series-edit semantics, pomodoro session correction decision, workout-log correction cascade decision, weekly-review management, calorie day-move semantics, Linked Actions policy decision), plus per-workstream ExecPlans; then commit.
-- Remaining definition of done: terminal condition A of `.agent/EXECUTION_PROMPT.md` §9 — Waves 1–7 landed with contracts+implementations+oracle tests; Wave 8 ladder green; adversarial PASS; E6 docs reconciled; plans/prompt COMPLETED; pushed clean; hygiene clean.
+- Blockers: None. Externals unchanged (iOS/macOS, disposable Supabase, parser lanes, real corpus); native lanes scheduled for Wave 8 — probe Android availability then.
+- Discovery (Wave 6 input): `tests/linkedActions.engine.test.ts` logs “Skipping unsupported linked action rule” for `pomodoro.log` — the engine gates execution on policy `engineSupport`; option A requires flipping trigger+feature+entity+effect rows together plus end-to-end exactly-once proof.
+- Discovery (Wave 7 input): RN-web `MenuSheet` does not expose `role=dialog`; E2E must target its items via `getByRole('button', { name })` (see todos.spec pattern).
+- Residual (recorded, not dropped): TodosScreen `filters.projectId`/`goalId` are read only for the active-filter badge; wiring the toolbar filter vs removing the branches is dispositioned in the Wave 10 sweep per prompt Wave 2.
+- Exact next action: Wave 3 — add `consumedOn` to `updateCalorieEntry` (validation, single outbox intent), date control in the calorie edit modal, aggregate/outbox/E2E coverage.
+- Remaining definition of done: terminal condition A of `.agent/EXECUTION_PROMPT.md` §9.
 
 ## Progress
 
 - [x] Wave 0 — Re-baseline: Git/plan truth, hygiene, qa:fast, E1–E6 re-verification (all CONFIRMED) — 2026-09-05
-- [ ] Wave 1 — OpenSpec contracts + workstream ExecPlans
-- [ ] Wave 2 — Todos recurring-series correction
+- [x] Wave 1 — OpenSpec contracts + design decisions D1–D6 (commit `62356b5`, openspec 51/51)
+- [x] Wave 2 — Todos recurring-series correction (unit 6 + integration 3 + E2E; full Vitest 1946/1946; todos spec 9/9; P0 25/25)
 - [ ] Wave 3 — Calories day-correction
 - [ ] Wave 4 — Workout correction
 - [ ] Wave 5 — Pomodoro correction depth
