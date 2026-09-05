@@ -188,7 +188,8 @@ export function resetTestModules(): void {
  *
  * Resets the module registry — clearing `core/db/client.ts`'s cached
  * `dbPromise` — then re-imports the client and runs the real bootstrap DDL +
- * `runMigrations()` (version 11) against a new in-process database.
+ * `runMigrations()` (through the current schema version) against a new
+ * in-process database.
  *
  * Data-layer modules must be dynamically imported AFTER calling this (see
  * the header comment); `freshDatabase` itself does not import them.

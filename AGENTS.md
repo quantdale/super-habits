@@ -256,6 +256,7 @@ Current exceptions:
 | `routine_exercise_sets`            | `eset`  |
 | `workout_session_exercises`        | `wsex`  |
 | `pomodoro_sessions`                | `pom`   |
+| pomodoro preset (app_meta payload) | `ppre`  |
 | guest profile (`app_meta`)         | `guest` |
 | recurring todo series              | `rec`   |
 

@@ -1,7 +1,7 @@
 import { type Page, expect, test } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { ensureAppContext } from './helpers/dbHarness';
+import { ensureAppContext, queryRows } from './helpers/dbHarness';
 import { seedSql } from './helpers/seed';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -179,9 +179,14 @@ test.describe('Calories diary day navigation', () => {
     await expect(page.getByLabel('Daily log').getByText('Misfiled ramen')).toBeVisible();
     await expect(page.getByText(/kcal · P 10g · C 50g · F 6g/)).toBeVisible();
 
-    // Identity survives a hard reload: one row, now on today.
+    // Identity survives a hard reload: exactly one row, now on today.
     await page.reload({ waitUntil: 'load' });
     await goToTab(page, 'calories');
     await expect(page.getByLabel('Daily log').getByText('Misfiled ramen')).toBeVisible();
+    const rows = await queryRows(
+      page,
+      `SELECT id, consumed_on FROM calorie_entries WHERE food_name = 'Misfiled ramen' AND deleted_at IS NULL;`,
+    );
+    expect(rows).toEqual([{ id: `cal_e2e_${dateKeyOffset(-1)}`, consumed_on: today }]);
   });
 });

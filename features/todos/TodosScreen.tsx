@@ -308,11 +308,19 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             : {}),
         });
         if (editRecurrenceScope === 'series' && editingTodo?.recurrence_id) {
-          await updateRecurringSeriesTemplate(editingTodo.recurrence_id, {
-            title: title.trim(),
-            notes: notes.trim() || null,
-            priority,
-          });
+          try {
+            await updateRecurringSeriesTemplate(editingTodo.recurrence_id, {
+              title: title.trim(),
+              notes: notes.trim() || null,
+              priority,
+            });
+          } catch {
+            setTodoError(
+              'This task was saved, but the recurring series update failed. Save again to retry the series.',
+            );
+            void refresh();
+            return;
+          }
         }
         if (!isRecurringLinkedActionSource) {
           await saveTodoLinkedActionRules(editingId, linkedActionRules);
