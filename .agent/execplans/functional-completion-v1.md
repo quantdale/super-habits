@@ -26,7 +26,7 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 
 ## Current Checkpoint
 
-- Current milestone: Wave 5 COMPLETE (Pomodoro correction depth) → Wave 6 (Weekly Review surfacing + Linked Actions policy) starting.
+- Current milestone: Wave 6 COMPLETE (Weekly Review surfacing + Linked Actions policy honesty) → Wave 7 (Planning-surface test floor) starting.
 - Completed:
   - Wave 0 — truth/hygiene/gates/E1–E6 (all CONFIRMED; commit `3e05490`).
   - Wave 1 — OpenSpec change `complete-product-correction-flows-v1` (design D1–D6, 6 specs, tasks; openspec 51/51; commit `62356b5`).
@@ -34,13 +34,14 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
   - Wave 3 — Calories day correction (integration 3; E2E day-navigation 5/5; commit `de9632e`).
   - Wave 4 — Workout correction: `deleteWorkoutLog` (hard-delete cascade per the `saved_meals` exception — the three log tables have no `deleted_at`; one durable delete intent per removed row, verified) wired to a confirmed “Delete session” action in Session detail; `updateRoutine` activated via Rename routine (top of builder; history keeps snapshot names — proven); new `CustomExerciseManagerModal` (edit/archive/restore + archived list) wired to `updateCustomExercise`/`archiveCustomExercise`/new `restoreCustomExercise`; design.md D3 amended (hard-delete rationale). E2E strengthened the vacuous “completes a workout” (real workout_logs oracle) + 3 new journeys (rename, accidental-log delete, manager). Fixed a weekend-dependent strict-mode flake in gym-v2 reschedules by scoping to the schedule panel (selector fix, assertion kept).
   - Wave 5 — Pomodoro correction depth (no migration; metadata-only per design D4): new `PomodoroPresetManagerModal` (create/edit/delete custom presets through `savePomodoroPresets` onto the app_meta recoverable-settings path; built-ins protected with delete/edit refused) opened from a “Manage presets” action on the Presets card; `RecentSessionsList` rows became pressable (optional `onEdit`) opening new `SessionMetaEditModal`, which edits the note and relinks/unlinks the task-link through the existing `setPomodoroSessionMeta` contract (undefined=keep, null=clear; single coalesced update intent verified; missing row and empty edit are no-ops). Integration `pomodoroCorrection.test.ts` 3/3 (incl. `user_backup_settings` intent); E2E +2 journeys (preset authoring with app_meta oracle + reload persistence; seeded session corrected to note+link with row and single-intent oracles) — pomodoro spec 6/6, momentum-garden 4/4 unaffected.
+  - Wave 6 — Weekly Review surfacing + Linked Actions policy honesty (no migration). Weekly Review: Progress view of the Planning Hub gained the disposition-ledger entry (header Card + “Open weekly review” → `openWeeklyReview`; modal kept). History delete wired: `ReviewHistoryView` rows expand with a confirmed danger delete → `deleteWeeklyReview` (SELECT-guarded no-op for missing/already-deleted ids, single coalesced durable delete intent; rollups progress/momentum/timeline already filter `deleted_at IS NULL`). Product fix: `openWeeklyReview` now closes the Plan hub and Settings overlays first (same convention as `openHabit`) — stacked drawers previously painted the hub’s Momentum chart over the review modal’s own buttons, which E2E proved was unclickable. Linked Actions: audit recorded that execution gating is the `LINKED_ACTION_SUPPORTED_RULE_PATHS` table (policy `engineSupport` was descriptive-only; the design D6 premise was disproven) and that only the task-completed and habit-completed-for-day events ever dispatch; exposed `calorie.log`/`pomodoro.log` targets on those two emitted triggers (4 paths) with produce-new editor authoring (inline food/calorie and focus-minute templates, validation, hydration, non-orphan) and honest comments for unemitted triggers; parity guarded by `linkedActionsPolicy.test.ts` (4). Proofs: `weeklyReviewExecutor.test.ts` +3 delete-contract tests; `linkedActionLogTargets.test.ts` 3/3; E2E `weekly-review.spec.ts` (Progress entry → guided flow → oracle → revisit → confirmed delete with coalesced-delete oracle) and `linked-actions-log.spec.ts` (author→fire→effect for pomodoro 1800 s focus row + applied execution + “30m” history surface; calorie inline template → today’s entry + applied execution + create intent). E1 copy already honest from Wave 2 — no recurring-source exposure.
 - In progress: none.
-- Important modified files: `features/pomodoro/PomodoroPresetManager.tsx` (new), `SessionMetaEditModal.tsx` (new), `PomodoroScreen.tsx`, `RecentSessionsList.tsx`, `tests/integration/pomodoroCorrection.test.ts` (new), `e2e/pomodoro.spec.ts`, `openspec/.../tasks.md` (4.1–4.3 checked).
-- Last successful validation: typecheck 0; lint 0; full Vitest 1956/1956 (180 files); pomodoro E2E 6/6 + momentum-garden 4/4 (2026-09-05).
-- Current failures: None. Two TEST_BUGs fixed in-flight (kcal-recompute assertion; weekend 'Rest day' strict-mode collision).
+- Important modified files: `core/providers/NavigationProvider.tsx`, `features/planning-hub/PlanningHubScreen.tsx`, `features/weekly-review/{ReviewHistoryView.tsx,weeklyReview.data.ts}`, `core/linked-actions/{linkedActions.supportedPaths.ts,linkedActions.policy.ts,linkedActionsEditor.types.ts,linkedActionsEditor.model.ts,LinkedActionsEditorSection.tsx}`, `e2e/{weekly-review.spec.ts,linked-actions-log.spec.ts}` (new), `tests/integration/{weeklyReviewExecutor.test.ts,linkedActionLogTargets.test.ts}`, `tests/linkedActionsPolicy.test.ts`, `openspec/.../tasks.md` (5.1–5.3, 6.1–6.3 checked).
+- Last successful validation: typecheck 0; lint 0; full Vitest 1969/1969 (182 files); E2E weekly-review 1/1 + linked-actions-log 2/2; P0 journeys 25/25 (2026-09-05).
+- Current failures: None. Three TEST_BUGs fixed in-flight (missing explicit trigger-chip click — the chain-reaction pattern is mandatory; modal renders the heading twice — scope with `.first()`; `queryRows` navigates to the harness document, so close the modal before querying).
 - Relevant quarantines: None.
 - Blockers: None (externals unchanged).
-- Exact next action: Wave 6 — surface Weekly Review from Plan/Progress (disposition line 28: keep modal), disposition `deleteWeeklyReview`, and reconcile the Linked Actions policy with the engine (audit the runtime gate that skips `pomodoro.log`/`calorie.log` before choosing authorable vs honest deferral).
+- Exact next action: Wave 7 — raise the Planning-surface test floor: real-SQL/data-oracle contracts for `progress.data` and `activityTimeline.data`, E2E covering every Planning Hub view (Today brief + guided plan, Projects, Goals, Progress, Timeline), and repair any vacuous assertions found.
 - Remaining definition of done: terminal condition A of `.agent/EXECUTION_PROMPT.md` §9.
 
 ## Progress
@@ -51,14 +52,16 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 - [x] Wave 3 — Calories day-correction (integration 3 + E2E 5/5 day-navigation; unit 22/22)
 - [x] Wave 4 — Workout correction (integration 4; E2E workout 12/12 incl. rename/delete/manager; gym-v2 flake scoped; full Vitest 1953/1953)
 - [x] Wave 5 — Pomodoro correction depth (integration 3; E2E pomodoro 6/6 incl. preset authoring + session correction; full Vitest 1956/1956)
-- [ ] Wave 6 — Weekly Review surfacing + Linked Actions policy
+- [x] Wave 6 — Weekly Review surfacing + Linked Actions policy (integration +3, policy suite +4, E2E +3 journeys; overlay-stacking product fix in NavigationProvider; full Vitest 1969/1969; P0 25/25)
 - [ ] Wave 7 — Planning-surface test floor
 - [ ] Wave 8 — Regression ladder
 - [ ] Wave 9 — Adversarial verification
 
 ## Surprises & Discoveries
 
-- Engine runtime skips `pomodoro.log`/`calorie.log` legacy rules ("unsupported") despite implemented effects — policy likely gates execution too (`linkedActions.engine` + policy resolution). Wave 6 must audit the gate path before choosing A (authorable) vs B (honest deferral).
+- Engine runtime skips `pomodoro.log`/`calorie.log` legacy rules ("unsupported") despite implemented effects — policy likely gates execution too (`linkedActions.engine` + policy resolution). Wave 6 must audit the gate path before choosing A (authorable) vs B (honest deferral). RESOLVED in Wave 6: the gate is the `LINKED_ACTION_SUPPORTED_RULE_PATHS` table, not `linkedActions.policy.ts`; chose A (authorable) for the two emitted triggers, honest-hidden for unemitted ones.
+- Stacked `core/ui/Modal` drawers share one modal layer with no z-index ordering: opening the Weekly Review from the Plan hub left the hub’s Momentum chart SVG intercepting pointer events over the review modal’s Next button (real user impact, not a test flake). Convention fix: `openWeeklyReview` dismisses hub/Settings first (mirrors `openHabit` closing Settings).
+- `queryRows`/DB-harness calls navigate the Playwright page away from the app — any still-open modal is gone afterwards; finish UI steps before row oracles or `returnToApp` first.
 - `web:hygiene` and the whole `qa:fast` chain work cleanly on this Windows host; native lanes use existing `scripts/qa-native*.mjs`.
 - E2E (web): nested `core/ui/Modal` stacks (routine builder + exercise picker) can transiently misroute clicks after the inner dialog closes — a close/re-layout race causes tests to hang for the full timeout (~50% flake). Deterministic pattern: don't click builder controls immediately after closing the nested picker; seed at the DB layer (`queryRows`) or re-open the dialog first. Also: `returnToApp` lands on Overview — always `goToTab` again after `queryRows`/`returnToApp`; wait for a UI signal (e.g. session card) before `queryRows` so the harness connection never races the write transaction.
 - Durable outbox coalesces intents per (entity, id) — `sync_outbox` holds one row with the latest operation; assert that shape in tests.
@@ -68,12 +71,16 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 
 - 2026-09-05 — Master orchestration plan + per-wave workstream plans (proven shape from prior campaigns) — single source for campaign checkpoint; workstream plans own implementation detail.
 - 2026-09-05 — Wave 4: accidental completed-session delete uses the saved_meals hard-delete exception + durable per-row delete intents instead of soft delete (no `deleted_at` columns exist; remote-schema mirroring out of scope) — user-visible contract unchanged (design D3 amendment records the evidence).
+- 2026-09-05 — Wave 6 (D6): expose `calorie.log`/`pomodoro.log` as authorable targets on the two triggers the app actually emits (task completion / habit completed-for-day); unemitted triggers stay hidden with audit comments. Policy file keeps descriptive labels only; the supported-paths table is the single execution gate, drift-guarded by `tests/linkedActionsPolicy.test.ts`.
+- 2026-09-05 — Wave 6: `openWeeklyReview` dismisses the Plan hub and Settings overlays (existing `openHabit` convention) because same-layer modal stacking made the review’s controls unclickable when opened from Progress.
+- 2026-09-05 — Wave 6: `deleteWeeklyReview` SELECT-guards so deleting a missing or deleted id is a true no-op (no stale outbox intent), matching the Wave-5 pomodoro correction contract.
 
 ## Validation Ledger
 
 - 2026-09-05 — `npm run agent:plans` — PASS — 48/48 COMPLETED predecessors.
 - 2026-09-05 — `npm run web:hygiene` — PASS — 8081/8082 free.
 - 2026-09-05 — `npm run qa:fast` — PASS — typecheck 0, lint 0, Vitest unit 1691/1691 (128 files), label parity OK.
+- 2026-09-05 — Wave 6 gates — PASS — typecheck 0; lint 0; full Vitest 1969/1969 (182 files); `npx playwright test --project=chromium e2e/weekly-review.spec.ts e2e/linked-actions-log.spec.ts` 3/3; `npm run e2e:journeys:p0` 25/25.
 
 ## Changed Files / Areas
 

@@ -1,3 +1,7 @@
+// Honest capability labels for the Linked Actions surfaces. Execution gating
+// itself is the rule-path whitelist in linkedActions.supportedPaths.ts; this
+// table describes each component for editors and diagnostics and MUST stay
+// consistent with it (enforced by tests/linkedActionsPolicy.test.ts).
 import type {
   LinkedActionDirectionPolicy,
   LinkedActionEffectType,
@@ -76,6 +80,11 @@ const LINKED_ACTION_TRIGGER_POLICIES: Record<LinkedActionTriggerType, LinkedActi
     retriggerPolicy: 'suppress_linked_action_origin',
     directionSupport: { oneWay: true, bidirectionalPeer: true },
   },
+  // Wave 6 audit (Functional Completion V1, design D6): these triggers have NO
+  // emission site in any data layer (only `todo.completed` and
+  // `habit.completed_for_day` dispatch `processSourceAction`). The engine
+  // cannot observe an event nobody emits, so they stay hidden until the data
+  // layer ships emission — the label describes the full shipped path.
   'calorie.entry_logged': {
     engineSupport: 'deferred',
     authoringSupport: 'hidden',
@@ -105,9 +114,11 @@ const LINKED_ACTION_TARGET_FEATURE_POLICIES: Record<
 > = {
   todos: { engineSupport: 'implemented', authoringSupport: 'visible' },
   habits: { engineSupport: 'implemented', authoringSupport: 'visible' },
-  calories: { engineSupport: 'deferred', authoringSupport: 'hidden' },
+  // Wave 6 (D6): calorie.log/pomodoro.log effects are executed by the engine,
+  // exactly-once proven, and now on supported rule paths with emitted triggers.
+  calories: { engineSupport: 'implemented', authoringSupport: 'visible' },
   workout: { engineSupport: 'implemented', authoringSupport: 'visible' },
-  pomodoro: { engineSupport: 'deferred', authoringSupport: 'hidden' },
+  pomodoro: { engineSupport: 'implemented', authoringSupport: 'visible' },
 };
 
 const LINKED_ACTION_TARGET_ENTITY_POLICIES: Record<
@@ -116,9 +127,9 @@ const LINKED_ACTION_TARGET_ENTITY_POLICIES: Record<
 > = {
   todo: { engineSupport: 'implemented', authoringSupport: 'visible' },
   habit: { engineSupport: 'implemented', authoringSupport: 'visible' },
-  calorie_log: { engineSupport: 'deferred', authoringSupport: 'hidden' },
+  calorie_log: { engineSupport: 'implemented', authoringSupport: 'visible' },
   workout_routine: { engineSupport: 'implemented', authoringSupport: 'visible' },
-  pomodoro_session: { engineSupport: 'deferred', authoringSupport: 'hidden' },
+  pomodoro_session: { engineSupport: 'implemented', authoringSupport: 'visible' },
 };
 
 const LINKED_ACTION_EFFECT_POLICIES: Record<LinkedActionEffectType, LinkedActionEffectPolicy> = {
@@ -144,8 +155,8 @@ const LINKED_ACTION_EFFECT_POLICIES: Record<LinkedActionEffectType, LinkedAction
     directionSupport: { oneWay: true, bidirectionalPeer: true },
   },
   'calorie.log': {
-    engineSupport: 'deferred',
-    authoringSupport: 'hidden',
+    engineSupport: 'implemented',
+    authoringSupport: 'visible',
     progressSemantics: 'completion_only',
     retriggerPolicy: 'suppress_linked_action_origin',
     directionSupport: { oneWay: true, bidirectionalPeer: false },
@@ -158,8 +169,8 @@ const LINKED_ACTION_EFFECT_POLICIES: Record<LinkedActionEffectType, LinkedAction
     directionSupport: { oneWay: true, bidirectionalPeer: true },
   },
   'pomodoro.log': {
-    engineSupport: 'deferred',
-    authoringSupport: 'hidden',
+    engineSupport: 'implemented',
+    authoringSupport: 'visible',
     progressSemantics: 'completion_only',
     retriggerPolicy: 'suppress_linked_action_origin',
     directionSupport: { oneWay: true, bidirectionalPeer: false },
@@ -257,7 +268,9 @@ export const LINKED_ACTION_SUPPORTED_TARGET_ENTITY_TYPES_BY_FEATURE: Partial<
 > = {
   todos: ['todo'],
   habits: ['habit'],
+  calories: ['calorie_log'],
   workout: ['workout_routine'],
+  pomodoro: ['pomodoro_session'],
 };
 
 export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY: Partial<
@@ -265,5 +278,7 @@ export const LINKED_ACTION_SUPPORTED_EFFECT_TYPES_BY_TARGET_ENTITY: Partial<
 > = {
   todo: ['todo.complete'],
   habit: ['habit.increment', 'habit.ensure_daily_target'],
+  calorie_log: ['calorie.log'],
   workout_routine: ['workout.log'],
+  pomodoro_session: ['pomodoro.log'],
 };

@@ -59,6 +59,38 @@ export const LINKED_ACTION_SUPPORTED_RULE_PATHS = [
     targetEntityType: 'workout_routine',
     effectType: 'workout.log',
   },
+  {
+    sourceFeature: 'todos',
+    sourceEntityType: 'todo',
+    triggerType: 'todo.completed',
+    targetFeature: 'calories',
+    targetEntityType: 'calorie_log',
+    effectType: 'calorie.log',
+  },
+  {
+    sourceFeature: 'todos',
+    sourceEntityType: 'todo',
+    triggerType: 'todo.completed',
+    targetFeature: 'pomodoro',
+    targetEntityType: 'pomodoro_session',
+    effectType: 'pomodoro.log',
+  },
+  {
+    sourceFeature: 'habits',
+    sourceEntityType: 'habit',
+    triggerType: 'habit.completed_for_day',
+    targetFeature: 'calories',
+    targetEntityType: 'calorie_log',
+    effectType: 'calorie.log',
+  },
+  {
+    sourceFeature: 'habits',
+    sourceEntityType: 'habit',
+    triggerType: 'habit.completed_for_day',
+    targetFeature: 'pomodoro',
+    targetEntityType: 'pomodoro_session',
+    effectType: 'pomodoro.log',
+  },
 ] as const satisfies readonly {
   sourceFeature: LinkedActionFeature;
   sourceEntityType: LinkedActionSourceEntityType;

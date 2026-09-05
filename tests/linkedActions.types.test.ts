@@ -142,8 +142,7 @@ describe('core/linked-actions/linkedActions.types', () => {
       rawTargetFeature: 'pomodoro',
       rawTargetEntityType: 'pomodoro_session',
       rawEffectType: 'pomodoro.log',
-      unsupportedReason:
-        'This linked action uses an unsupported target and must be removed or replaced.',
+      unsupportedReason: 'Trigger pomodoro.focus_completed is not currently supported.',
     });
   });
 

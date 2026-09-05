@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { LinkedActionTargetPickerModal } from '@/core/linked-actions/LinkedActionTargetPickerModal';
 import {
+  applyLinkedActionEffectType,
   applyLinkedActionTargetFeature,
   countLinkedActionEditorRowErrors,
   createEmptyLinkedActionEditorRow,
@@ -13,6 +14,7 @@ import {
   getLinkedActionFeatureLabel,
   getLinkedActionTriggerLabel,
   getLinkedActionTriggerOptions,
+  isProduceNewLinkedActionEffect,
   validateLinkedActionEditorRow,
 } from '@/core/linked-actions/linkedActionsEditor.model';
 import type {
@@ -27,6 +29,7 @@ import { LINKED_ACTION_SUPPORTED_TARGET_FEATURES } from '@/core/linked-actions/l
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { PillChip } from '@/core/ui/PillChip';
+import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
 import {
   POMODORO_SECTION_KEY,
@@ -170,6 +173,9 @@ function RuleRow({
   const selectedEffectDescription = row.effectType
     ? getLinkedActionEffectDescription(row.effectType)
     : null;
+  const produceNewEffect = isProduceNewLinkedActionEffect(row.effectType);
+  const calorieParams = row.calorieLogParams;
+  const pomodoroParams = row.pomodoroLogParams;
   const rowValidation =
     row.mode === 'existing' && countLinkedActionEditorRowErrors(row) === 0
       ? {}
@@ -294,54 +300,70 @@ function RuleRow({
           </View>
         </View>
 
-        <View
-          className="rounded-2xl border px-4 py-3"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-        >
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            Target item
-          </Text>
-          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            {row.isOrphaned
-              ? row.orphanedTarget?.message
-              : (targetSelectionSummary?.description ??
-                (allowCreateNewTarget
-                  ? 'Pick an existing target item or use the create-new handoff.'
-                  : 'Pick an existing target item from the target feature.'))}
-          </Text>
-          {targetSelectionSummary ? (
-            <>
-              <Text className="mt-3 text-sm font-semibold" style={{ color: tokens.text }}>
-                {targetSelectionSummary.title}
-              </Text>
-              {targetSelectionSummary.actionLabel && targetSelectionSummary.actionPress ? (
-                <View className="mt-3">
-                  <Button
-                    label={targetSelectionSummary.actionLabel}
-                    onPress={targetSelectionSummary.actionPress}
-                    variant="ghost"
-                  />
-                </View>
-              ) : null}
-            </>
-          ) : null}
-          <View className="mt-3">
-            <Button
-              label={
-                row.isOrphaned
-                  ? 'Choose replacement target'
-                  : row.targetSelection
-                    ? 'Change target item'
-                    : 'Choose target item'
-              }
-              onPress={() =>
-                onOpenTargetPicker(row.id, row.targetFeature ?? allowedTargetFeatures[0])
-              }
-              disabled={!row.targetFeature}
-              color={row.targetFeature ? getFeatureAccentColor(row.targetFeature) : undefined}
-            />
+        {produceNewEffect ? (
+          <View
+            className="rounded-2xl border px-4 py-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              Target item
+            </Text>
+            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              {row.effectType === 'calorie.log'
+                ? 'This effect creates a brand-new calorie entry each time it fires — no existing item is targeted.'
+                : 'This effect creates a brand-new focus session log each time it fires — no existing item is targeted.'}
+            </Text>
           </View>
-        </View>
+        ) : (
+          <View
+            className="rounded-2xl border px-4 py-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          >
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              Target item
+            </Text>
+            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              {row.isOrphaned
+                ? row.orphanedTarget?.message
+                : (targetSelectionSummary?.description ??
+                  (allowCreateNewTarget
+                    ? 'Pick an existing target item or use the create-new handoff.'
+                    : 'Pick an existing target item from the target feature.'))}
+            </Text>
+            {targetSelectionSummary ? (
+              <>
+                <Text className="mt-3 text-sm font-semibold" style={{ color: tokens.text }}>
+                  {targetSelectionSummary.title}
+                </Text>
+                {targetSelectionSummary.actionLabel && targetSelectionSummary.actionPress ? (
+                  <View className="mt-3">
+                    <Button
+                      label={targetSelectionSummary.actionLabel}
+                      onPress={targetSelectionSummary.actionPress}
+                      variant="ghost"
+                    />
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+            <View className="mt-3">
+              <Button
+                label={
+                  row.isOrphaned
+                    ? 'Choose replacement target'
+                    : row.targetSelection
+                      ? 'Change target item'
+                      : 'Choose target item'
+                }
+                onPress={() =>
+                  onOpenTargetPicker(row.id, row.targetFeature ?? allowedTargetFeatures[0])
+                }
+                disabled={!row.targetFeature}
+                color={row.targetFeature ? getFeatureAccentColor(row.targetFeature) : undefined}
+              />
+            </View>
+          </View>
+        )}
 
         <View>
           <Text className="mb-2 text-sm font-medium" style={{ color: tokens.text }}>
@@ -356,7 +378,7 @@ function RuleRow({
                     label={option.label}
                     active={row.effectType === option.value}
                     color={getFeatureAccentColor(selectedTargetFeature)}
-                    onPress={() => onChange({ ...row, effectType: option.value })}
+                    onPress={() => onChange(applyLinkedActionEffectType(row, option.value))}
                   />
                 ))}
               </View>
@@ -389,6 +411,72 @@ function RuleRow({
             </Text>
           )}
         </View>
+
+        {row.effectType === 'calorie.log' && calorieParams ? (
+          <View className="gap-3">
+            <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+              Calorie entry template
+            </Text>
+            <TextField
+              label="Food name"
+              accessibilityLabel="Linked rule food name"
+              value={calorieParams.foodName}
+              onChangeText={(text) =>
+                onChange({
+                  ...row,
+                  calorieLogParams: { ...calorieParams, foodName: text },
+                })
+              }
+            />
+            <TextField
+              label="Calories"
+              accessibilityLabel="Linked rule calories"
+              value={calorieParams.calories}
+              keyboardType="numeric"
+              onChangeText={(text) =>
+                onChange({
+                  ...row,
+                  calorieLogParams: { ...calorieParams, calories: text },
+                })
+              }
+            />
+            <View className="flex-row flex-wrap">
+              {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((mealType) => (
+                <PillChip
+                  key={mealType}
+                  label={mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+                  active={calorieParams.mealType === mealType}
+                  color={getFeatureAccentColor('calories')}
+                  onPress={() =>
+                    onChange({
+                      ...row,
+                      calorieLogParams: { ...calorieParams, mealType },
+                    })
+                  }
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+        {row.effectType === 'pomodoro.log' && pomodoroParams ? (
+          <View className="gap-3">
+            <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+              Focus session template
+            </Text>
+            <TextField
+              label="Focus minutes"
+              accessibilityLabel="Linked rule focus minutes"
+              value={pomodoroParams.focusMinutes}
+              keyboardType="numeric"
+              onChangeText={(text) =>
+                onChange({
+                  ...row,
+                  pomodoroLogParams: { focusMinutes: text },
+                })
+              }
+            />
+          </View>
+        ) : null}
 
         <ValidationError message={validationErrors[0] ?? null} />
       </View>

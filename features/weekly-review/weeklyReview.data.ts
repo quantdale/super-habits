@@ -116,13 +116,18 @@ export async function saveWeeklyReview(input: {
   return outcome.value;
 }
 
-/** Soft-delete a review (future use). */
+/** Soft-delete a review from the history view (durable delete intent). */
 export async function deleteWeeklyReview(id: string): Promise<void> {
   const db = await getDatabase();
   const now = nowIso();
   await runBackupMutation<void>({
     db,
     mutate: async (transactionDb, enqueue) => {
+      const existing = await transactionDb.getFirstAsync<{ id: string }>(
+        `SELECT id FROM weekly_reviews WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      if (!existing) return { value: undefined, changed: false };
       await transactionDb.runAsync(
         `UPDATE weekly_reviews SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
         [now, now, id],

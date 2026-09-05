@@ -27,15 +27,15 @@
 
 ## 5. Weekly Review discoverability and management
 
-- [ ] 5.1 Planning Hub Progress entry opening the existing modal.
-- [ ] 5.2 History delete wired to `deleteWeeklyReview` with confirmation.
-- [ ] 5.3 Tests: E2E guided flow (open → complete → revisit → delete) + real-SQL persistence oracles.
+- [x] 5.1 Planning Hub Progress entry opening the existing modal.
+- [x] 5.2 History delete wired to `deleteWeeklyReview` with confirmation.
+- [x] 5.3 Tests: E2E guided flow (open → complete → revisit → delete) + real-SQL persistence oracles.
 
 ## 6. Linked Actions policy reconciliation
 
-- [ ] 6.1 Audit trigger event emission for calorie/workout/pomodoro triggers; record findings.
-- [ ] 6.2 Apply decision (expose with proof or honest relabel) to policy + editor rows.
-- [ ] 6.3 Integration exactly-once proof per exposed path + E2E author→fire→effect.
+- [x] 6.1 Audit trigger event emission for calorie/workout/pomodoro triggers; record findings.
+- [x] 6.2 Apply decision (expose with proof or honest relabel) to policy + editor rows.
+- [x] 6.3 Integration exactly-once proof per exposed path + E2E author→fire→effect.
 
 ## 7. Planning-surface test floor
 

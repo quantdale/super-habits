@@ -109,11 +109,11 @@ export function getLinkedActionEffectDescription(effectType: LinkedActionEffectT
     case 'habit.ensure_daily_target':
       return 'Brings the selected habit up to its daily target for the source date.';
     case 'calorie.log':
-      return 'Creates a new calorie log entry. Detailed field editing stays outside the current habits-linked flow.';
+      return "Creates a new calorie entry from this rule's inline template each time it fires.";
     case 'workout.log':
       return 'Creates a workout completion log for the selected routine.';
     case 'pomodoro.log':
-      return 'Creates a pomodoro session log. Session template editing stays outside the current habits-linked flow.';
+      return "Creates a focus session log with the rule's duration each time it fires.";
   }
 }
 
@@ -196,11 +196,26 @@ export function createEmptyLinkedActionEditorRow(
     targetEntityType: null,
     targetSelection: null,
     effectType: null,
+    calorieLogParams: null,
+    pomodoroLogParams: null,
     isUnsupported: false,
     unsupportedTarget: null,
     isOrphaned: false,
     orphanedTarget: null,
   };
+}
+
+/** Effects that create a fresh row instead of targeting an existing item. */
+const PRODUCE_NEW_EFFECT_TYPES: readonly LinkedActionEffectType[] = ['calorie.log', 'pomodoro.log'];
+
+export function isProduceNewLinkedActionEffect(effectType: LinkedActionEffectType | null) {
+  return effectType !== null && PRODUCE_NEW_EFFECT_TYPES.includes(effectType);
+}
+
+function parseIntegerInRange(value: string, min: number, max: number): number | null {
+  if (!/^\d+$/.test(value.trim())) return null;
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
 }
 
 export function createLinkedActionEditorRowFromRule(
@@ -221,6 +236,8 @@ export function createLinkedActionEditorRowFromRule(
       targetEntityType: null,
       targetSelection: null,
       effectType: null,
+      calorieLogParams: null,
+      pomodoroLogParams: null,
       isUnsupported: true,
       unsupportedTarget: {
         feature: input.rule.rawTargetFeature,
@@ -233,7 +250,23 @@ export function createLinkedActionEditorRowFromRule(
     };
   }
 
-  const isOrphaned = input.targetSelection?.kind !== 'existing';
+  const isOrphaned =
+    !isProduceNewLinkedActionEffect(input.rule.target.effect.type) &&
+    input.targetSelection?.kind !== 'existing';
+
+  const ruleEffect = input.rule.target.effect;
+  const calorieLogParams =
+    ruleEffect.type === 'calorie.log'
+      ? {
+          foodName: ruleEffect.foodName,
+          calories: String(ruleEffect.calories),
+          mealType: ruleEffect.mealType,
+        }
+      : null;
+  const pomodoroLogParams =
+    ruleEffect.type === 'pomodoro.log'
+      ? { focusMinutes: String(Math.max(1, Math.round(ruleEffect.durationSeconds / 60))) }
+      : null;
 
   return {
     id: nextEditorRowId(),
@@ -249,6 +282,8 @@ export function createLinkedActionEditorRowFromRule(
     targetEntityType: input.rule.target.entityType,
     targetSelection: input.targetSelection,
     effectType: input.rule.target.effect.type,
+    calorieLogParams,
+    pomodoroLogParams,
     isUnsupported: false,
     unsupportedTarget: null,
     isOrphaned,
@@ -276,6 +311,60 @@ function buildLinkedActionRuleTargetFromEditorRow(
 
   if (!row.targetFeature || !row.targetEntityType || !row.effectType) {
     throw new Error('Linked action row is missing a target feature, entity, or effect.');
+  }
+
+  if (row.effectType === 'calorie.log') {
+    const params = row.calorieLogParams;
+    if (!params) {
+      throw new Error('Add the calorie entry template before saving this linked action.');
+    }
+    const foodName = params.foodName.trim();
+    const calories = parseIntegerInRange(params.calories, 1, 10000);
+    if (!foodName || foodName.length > 120) {
+      throw new Error('Add a food name (max 120 characters) for the calorie entry.');
+    }
+    if (calories === null) {
+      throw new Error('Enter calories as a whole number between 1 and 10000.');
+    }
+    return {
+      feature: row.targetFeature,
+      entityType: row.targetEntityType,
+      entityId: null,
+      effect: {
+        kind: 'log',
+        type: 'calorie.log',
+        dateStrategy: 'today',
+        templateSource: 'inline',
+        savedMealId: null,
+        foodName,
+        calories,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+        mealType: params.mealType,
+      },
+    };
+  }
+
+  if (row.effectType === 'pomodoro.log') {
+    const focusMinutes = row.pomodoroLogParams
+      ? parseIntegerInRange(row.pomodoroLogParams.focusMinutes, 1, 240)
+      : null;
+    if (focusMinutes === null) {
+      throw new Error('Enter focus minutes as a whole number between 1 and 240.');
+    }
+    return {
+      feature: row.targetFeature,
+      entityType: row.targetEntityType,
+      entityId: null,
+      effect: {
+        kind: 'log',
+        type: 'pomodoro.log',
+        sessionType: 'focus',
+        durationSeconds: focusMinutes * 60,
+      },
+    };
   }
 
   if (row.targetSelection?.kind !== 'existing') {
@@ -329,7 +418,7 @@ function buildLinkedActionRuleTargetFromEditorRow(
         },
       };
     default:
-      throw new Error(`The ${row.effectType} effect is not supported in this editor yet.`);
+      throw new Error('This effect is not supported in this editor yet.');
   }
 }
 
@@ -367,10 +456,29 @@ export function applyLinkedActionTargetFeature(
     targetEntityType: getLinkedActionTargetEntityTypeForFeature(targetFeature),
     targetSelection: targetFeatureChanged ? null : row.targetSelection,
     effectType: targetFeatureChanged ? null : row.effectType,
+    calorieLogParams: targetFeatureChanged ? null : row.calorieLogParams,
+    pomodoroLogParams: targetFeatureChanged ? null : row.pomodoroLogParams,
     isUnsupported: false,
     unsupportedTarget: null,
     isOrphaned: false,
     orphanedTarget: null,
+  };
+}
+
+/** Selecting an effect initializes inline parameters for produce-new effects. */
+export function applyLinkedActionEffectType(
+  row: LinkedActionEditorRowDraft,
+  effectType: LinkedActionEffectType,
+): LinkedActionEditorRowDraft {
+  return {
+    ...row,
+    effectType,
+    calorieLogParams:
+      effectType === 'calorie.log'
+        ? (row.calorieLogParams ?? { foodName: '', calories: '', mealType: 'snack' })
+        : null,
+    pomodoroLogParams:
+      effectType === 'pomodoro.log' ? (row.pomodoroLogParams ?? { focusMinutes: '25' }) : null,
   };
 }
 
@@ -390,13 +498,34 @@ export function validateLinkedActionEditorRow(
   if (!row.targetFeature) {
     errors.targetFeature = 'Select a target feature.';
   }
-  if (!row.targetSelection) {
+  const produceNewEffect = isProduceNewLinkedActionEffect(row.effectType);
+  if (!produceNewEffect && !row.targetSelection) {
     errors.targetSelection = row.isOrphaned
       ? LINKED_ACTION_ORPHANED_RULE_MESSAGE
       : 'Choose an existing target item or an explicit create-new handoff.';
   }
   if (!row.effectType) {
     errors.effectType = 'Select an effect.';
+  }
+  if (row.effectType === 'calorie.log') {
+    const params = row.calorieLogParams;
+    const foodName = params?.foodName.trim() ?? '';
+    if (!foodName || foodName.length > 120) {
+      errors.calorieParams = 'Add a food name (max 120 characters).';
+    } else if (
+      !params ||
+      !/^\d+$/.test(params.calories.trim()) ||
+      Number(params.calories.trim()) < 1 ||
+      Number(params.calories.trim()) > 10000
+    ) {
+      errors.calorieParams = 'Enter calories as a whole number between 1 and 10000.';
+    }
+  }
+  if (row.effectType === 'pomodoro.log') {
+    const raw = row.pomodoroLogParams?.focusMinutes.trim() ?? '';
+    if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 240) {
+      errors.pomodoroParams = 'Enter focus minutes as a whole number between 1 and 240.';
+    }
   }
 
   return errors;

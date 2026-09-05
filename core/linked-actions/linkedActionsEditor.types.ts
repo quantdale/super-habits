@@ -2,6 +2,7 @@ import type {
   LinkedActionDirectionPolicy,
   LinkedActionEffectType,
   LinkedActionFeature,
+  LinkedActionMealType,
   LinkedActionRuleDefinition,
   LinkedActionRuleStatus,
   LinkedActionSourceEntityType,
@@ -33,6 +34,13 @@ export type LinkedActionEditorRowDraft = {
   targetEntityType: LinkedActionTargetEntityType | null;
   targetSelection: LinkedActionTargetPickerSelection | null;
   effectType: LinkedActionEffectType | null;
+  /** Inline effect parameters for produce-new effects (no existing target row). */
+  calorieLogParams: {
+    foodName: string;
+    calories: string;
+    mealType: LinkedActionMealType;
+  } | null;
+  pomodoroLogParams: { focusMinutes: string } | null;
   isUnsupported: boolean;
   unsupportedTarget: {
     feature: string;
@@ -55,6 +63,8 @@ export type LinkedActionEditorRowValidation = {
   targetFeature?: string;
   targetSelection?: string;
   effectType?: string;
+  calorieParams?: string;
+  pomodoroParams?: string;
   unsupported?: string;
 };
 

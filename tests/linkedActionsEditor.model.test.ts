@@ -4,6 +4,7 @@ import {
   TODO_LINKED_ACTIONS_EDITOR_CONFIG,
 } from '@/core/linked-actions/linkedActionsEditor.config';
 import {
+  applyLinkedActionEffectType,
   applyLinkedActionTargetFeature,
   countLinkedActionEditorRowErrors,
   createEmptyLinkedActionEditorRow,
@@ -30,6 +31,7 @@ import type {
   LinkedActionRuleDefinition,
   LinkedActionSupportedRuleDefinition,
   LinkedActionSourceEntityType,
+  LinkedActionTargetEntityType,
   LinkedActionTriggerType,
 } from '@/core/linked-actions/linkedActions.types';
 
@@ -162,6 +164,14 @@ describe('linkedActionsEditor.model', () => {
             targetFeature: 'habits',
             expectedEffects: ['habit.increment'],
           },
+          {
+            targetFeature: 'calories',
+            expectedEffects: ['calorie.log'],
+          },
+          {
+            targetFeature: 'pomodoro',
+            expectedEffects: ['pomodoro.log'],
+          },
         ],
       },
       {
@@ -181,6 +191,14 @@ describe('linkedActionsEditor.model', () => {
           {
             targetFeature: 'workout',
             expectedEffects: ['workout.log'],
+          },
+          {
+            targetFeature: 'calories',
+            expectedEffects: ['calorie.log'],
+          },
+          {
+            targetFeature: 'pomodoro',
+            expectedEffects: ['pomodoro.log'],
           },
         ],
       },
@@ -210,17 +228,21 @@ describe('linkedActionsEditor.model', () => {
         expect(isLinkedActionTargetFeatureEngineSupported(target.targetFeature)).toBe(true);
 
         const triggerType = flow.shippedTriggers[0] ?? null;
+        const targetEntityTypeByFeature: Record<string, string> = {
+          todos: 'todo',
+          habits: 'habit',
+          workout: 'workout_routine',
+          calories: 'calorie_log',
+          pomodoro: 'pomodoro_session',
+        };
         const supportedEffectTypes = getSupportedLinkedActionEffectTypesForPath({
           sourceFeature: flow.sourceFeature,
           sourceEntityType: flow.sourceEntityType,
           triggerType,
           targetFeature: target.targetFeature,
-          targetEntityType:
-            target.targetFeature === 'workout'
-              ? 'workout_routine'
-              : target.targetFeature === 'habits'
-                ? 'habit'
-                : 'todo',
+          targetEntityType: targetEntityTypeByFeature[
+            target.targetFeature
+          ] as LinkedActionTargetEntityType,
         });
         const editorEffectTypes = getLinkedActionEffectOptionsForSource({
           sourceFeature: flow.sourceFeature,
@@ -561,5 +583,122 @@ describe('linkedActionsEditor.model', () => {
     expect(repairedRow.orphanedTarget).toBeNull();
     expect(repairedRow.effectType).toBe('habit.ensure_daily_target');
     expect(repairedRow.targetFeature).toBe('habits');
+  });
+
+  it('authors a pomodoro.log rule from todos without an existing target item', () => {
+    const empty = createEmptyLinkedActionEditorRow({
+      key: 'todo_1',
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
+      label: 'Task',
+      description: '',
+    });
+    let row = applyLinkedActionTargetFeature(
+      { ...empty, triggerType: 'todo.completed' },
+      'pomodoro',
+    );
+    row = applyLinkedActionEffectType(row, 'pomodoro.log');
+
+    expect(row.targetSelection).toBeNull();
+    expect(row.pomodoroLogParams).toEqual({ focusMinutes: '25' });
+    expect(validateLinkedActionEditorRow(row)).toEqual({});
+
+    const input = createSaveLinkedActionRuleInputFromEditorRow(row);
+    expect(input.target).toEqual({
+      feature: 'pomodoro',
+      entityType: 'pomodoro_session',
+      entityId: null,
+      effect: {
+        kind: 'log',
+        type: 'pomodoro.log',
+        sessionType: 'focus',
+        durationSeconds: 1500,
+      },
+    });
+
+    const invalid = { ...row, pomodoroLogParams: { focusMinutes: '0' } };
+    expect(validateLinkedActionEditorRow(invalid).pomodoroParams).toBe(
+      'Enter focus minutes as a whole number between 1 and 240.',
+    );
+    expect(() => createSaveLinkedActionRuleInputFromEditorRow(invalid)).toThrow(
+      'Enter focus minutes as a whole number between 1 and 240.',
+    );
+  });
+
+  it('authors a calorie.log rule from an inline food template', () => {
+    const empty = createEmptyLinkedActionEditorRow({
+      key: 'todo_1',
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
+      label: 'Task',
+      description: '',
+    });
+    let row = applyLinkedActionTargetFeature(
+      { ...empty, triggerType: 'todo.completed' },
+      'calories',
+    );
+    row = applyLinkedActionEffectType(row, 'calorie.log');
+
+    expect(validateLinkedActionEditorRow(row).calorieParams).toBe(
+      'Add a food name (max 120 characters).',
+    );
+
+    row = {
+      ...row,
+      calorieLogParams: { foodName: 'Post-run smoothie', calories: '250', mealType: 'snack' },
+    };
+    expect(validateLinkedActionEditorRow(row)).toEqual({});
+
+    const input = createSaveLinkedActionRuleInputFromEditorRow(row);
+    expect(input.target).toEqual({
+      feature: 'calories',
+      entityType: 'calorie_log',
+      entityId: null,
+      effect: {
+        kind: 'log',
+        type: 'calorie.log',
+        dateStrategy: 'today',
+        templateSource: 'inline',
+        savedMealId: null,
+        foodName: 'Post-run smoothie',
+        calories: 250,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+        mealType: 'snack',
+      },
+    });
+
+    expect(
+      validateLinkedActionEditorRow({
+        ...row,
+        calorieLogParams: { foodName: 'X', calories: '0', mealType: 'snack' },
+      }).calorieParams,
+    ).toBe('Enter calories as a whole number between 1 and 10000.');
+  });
+
+  it('hydrates a persisted pomodoro.log rule without flagging it orphaned', () => {
+    const row = createLinkedActionEditorRowFromRule({
+      rule: buildSupportedRule({
+        target: {
+          feature: 'pomodoro',
+          entityType: 'pomodoro_session',
+          entityId: null,
+          effect: { kind: 'log', type: 'pomodoro.log', sessionType: 'focus', durationSeconds: 900 },
+        },
+        rawTargetFeature: 'pomodoro',
+        rawTargetEntityType: 'pomodoro_session',
+        rawEffectType: 'pomodoro.log',
+      }),
+      targetSelection: null,
+    });
+
+    expect(row.isOrphaned).toBe(false);
+    expect(row.pomodoroLogParams).toEqual({ focusMinutes: '15' });
+    expect(countLinkedActionEditorRowErrors(row)).toBe(0);
+    expect(createSaveLinkedActionRuleInputFromEditorRow(row).target.entityId).toBeNull();
   });
 });

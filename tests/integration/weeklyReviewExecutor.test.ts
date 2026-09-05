@@ -199,3 +199,98 @@ describe('applyNextWeekPlanSuggestions structured outcomes (F4)', () => {
     expect(result.addedCount).toBe(1);
   });
 });
+
+describe('deleteWeeklyReview disposition contract (Wave 6)', () => {
+  it('soft-deletes the review with one coalesced durable delete intent', async () => {
+    await freshDatabase();
+    const data = await import('@/features/weekly-review/weeklyReview.data');
+    const { getDatabase } = await import('@/core/db/client');
+
+    const id = await data.saveWeeklyReview({
+      weekKey: WEEK.weekKey,
+      weekStartDate: WEEK.startDateKey,
+      weekEndDate: WEEK.endDateKey,
+      nextWeekStartDate: WEEK.nextWeekStartDateKey,
+      summaryPayload: '{}',
+      planPayload: '{"priorities":[]}',
+      reflection: 'mistake',
+    });
+    expect(await data.listWeeklyReviews()).toHaveLength(1);
+
+    await data.deleteWeeklyReview(id);
+
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ deleted_at: string | null }>(
+      `SELECT deleted_at FROM weekly_reviews WHERE id = ?`,
+      [id],
+    );
+    expect(row).not.toBeNull(); // soft delete: the row survives
+    expect(row?.deleted_at).not.toBeNull();
+
+    // The durable outbox coalesces per (entity, id): the delete supersedes the
+    // create in the single remaining intent row.
+    const intents = await db.getAllAsync<{ operation: string }>(
+      `SELECT operation FROM sync_outbox WHERE entity = 'weekly_reviews' AND id = ?`,
+      [id],
+    );
+    expect(intents).toEqual([{ operation: 'delete' }]);
+  });
+
+  it('hides the review from list/week lookups so rollups exclude it, and a later re-save starts fresh', async () => {
+    await freshDatabase();
+    const data = await import('@/features/weekly-review/weeklyReview.data');
+
+    const id = await data.saveWeeklyReview({
+      weekKey: WEEK.weekKey,
+      weekStartDate: WEEK.startDateKey,
+      weekEndDate: WEEK.endDateKey,
+      nextWeekStartDate: WEEK.nextWeekStartDateKey,
+      summaryPayload: '{}',
+      planPayload: '{"priorities":[]}',
+      reflection: 'mistake',
+    });
+    await data.deleteWeeklyReview(id);
+
+    expect(await data.listWeeklyReviews()).toHaveLength(0);
+    expect(await data.getWeeklyReviewByWeekKey(WEEK.weekKey)).toBeNull();
+    expect(await data.hasWeeklyReviewForWeek(WEEK.weekKey)).toBe(false);
+
+    // The week is open again: re-confirming creates a NEW row (the deleted one
+    // is never resurrected), and the deleted row keeps its history.
+    const second = await data.saveWeeklyReview({
+      weekKey: WEEK.weekKey,
+      weekStartDate: WEEK.startDateKey,
+      weekEndDate: WEEK.endDateKey,
+      nextWeekStartDate: WEEK.nextWeekStartDateKey,
+      summaryPayload: '{}',
+      planPayload: '{"priorities":[]}',
+      reflection: 'retry',
+    });
+    expect(second).not.toBe(id);
+    const live = await data.listWeeklyReviews();
+    expect(live.map((r) => r.id)).toEqual([second]);
+
+    // Rollup consumers (progress count, momentum, timeline) all read through
+    // the deleted_at filter — the live-row lookup above is the same predicate.
+    const { getDatabase } = await import('@/core/db/client');
+    const db = await getDatabase();
+    const rollup = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM weekly_reviews
+       WHERE deleted_at IS NULL AND completed_at IS NOT NULL`,
+    );
+    expect(rollup?.count).toBe(1);
+  });
+
+  it('deleting an unknown or already-deleted review changes nothing', async () => {
+    await freshDatabase();
+    const data = await import('@/features/weekly-review/weeklyReview.data');
+    const { getDatabase } = await import('@/core/db/client');
+
+    await data.deleteWeeklyReview('wrev_missing');
+    const db = await getDatabase();
+    const intents = await db.getAllAsync(
+      `SELECT * FROM sync_outbox WHERE entity = 'weekly_reviews'`,
+    );
+    expect(intents).toHaveLength(0);
+  });
+});

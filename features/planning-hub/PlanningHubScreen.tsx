@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
+import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { spacing } from '@/core/theme/designTokens';
+import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import type { PlanningHubView } from '@/core/providers/navigationContext';
 import { ProjectListView } from '@/features/projects/ProjectListView';
@@ -31,6 +34,7 @@ const TABS: { key: PlanningHubView; label: string }[] = [
 ];
 
 export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
+  const { openWeeklyReview } = useAppNavigation();
   const [view, setView] = useState<PlanningHubView>(initialView);
   const [detail, setDetail] = useState<Detail>(null);
   // Bumped after a guided-flow save so the briefing and the full editor
@@ -76,6 +80,18 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
           <GoalListView onOpenGoal={(id) => setDetail({ kind: 'goal', id })} />
         ) : view === 'progress' ? (
           <View className="gap-3">
+            <Card
+              variant="header"
+              accentColor={SECTION_COLORS.todos}
+              headerTitle="Weekly Review"
+              headerSubtitle="Reflect on the finished week and carry priorities, todos, and goals into the next one."
+            >
+              <Button
+                label="Open weekly review"
+                accessibilityLabel="Open weekly review"
+                onPress={openWeeklyReview}
+              />
+            </Card>
             <MomentumDetailView />
             <ProgressInsightsView />
           </View>

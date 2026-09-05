@@ -127,8 +127,13 @@ describe('linked actions target picker providers', () => {
     expect(getLinkedActionTargetPickerProviders()).toHaveLength(5);
   });
 
-  it('limits the Todo editor flow to existing todo and habit targets without create-new handoff', () => {
-    expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures).toEqual(['todos', 'habits']);
+  it('exposes the shipped Todo editor targets without create-new handoff', () => {
+    expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTargetFeatures).toEqual([
+      'todos',
+      'habits',
+      'calories',
+      'pomodoro',
+    ]);
     expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowedTriggerTypes).toEqual(['todo.completed']);
     expect(TODO_LINKED_ACTIONS_EDITOR_CONFIG.allowCreateNewTarget).toBe(false);
   });

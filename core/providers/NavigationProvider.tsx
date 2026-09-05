@@ -26,7 +26,15 @@ export function NavigationProvider({ children }: PropsWithChildren) {
 
   const openSettings = useCallback(() => setIsSettingsOpen(true), []);
   const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
-  const openWeeklyReview = useCallback(() => setIsWeeklyReviewOpen(true), []);
+  // The review is a full-screen overlay stacked in the same modal layer as the
+  // Plan hub and Settings drawers — opening it must dismiss those, or their
+  // content paints over the review's own controls (same convention as openHabit
+  // closing Settings).
+  const openWeeklyReview = useCallback(() => {
+    setIsPlanningHubOpen(false);
+    setIsSettingsOpen(false);
+    setIsWeeklyReviewOpen(true);
+  }, []);
   const closeWeeklyReview = useCallback(() => setIsWeeklyReviewOpen(false), []);
   const openPlanningHub = useCallback((initialView: PlanningHubView = 'today') => {
     setPlanningHubInitialView(initialView);
