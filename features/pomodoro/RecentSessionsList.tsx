@@ -1,11 +1,13 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type { PomodoroSession } from './types';
 import { formatSessionDuration, formatSessionTime } from './pomodoro.domain';
 
 type Props = {
   sessions: PomodoroSession[];
+  /** When provided, rows become pressable for post-hoc note/link correction. */
+  onEdit?: (session: PomodoroSession) => void;
 };
 
 const MAX_ROWS = 10;
@@ -14,7 +16,7 @@ const MAX_ROWS = 10;
  * Recent completed-session history with durable per-row metadata (linked
  * todo snapshot, completion note) surfaced next to each row.
  */
-export function RecentSessionsList({ sessions }: Props) {
+export function RecentSessionsList({ sessions, onEdit }: Props) {
   const { tokens } = useAppTheme();
   const rows = sessions.filter((s) => s.session_type === 'focus').slice(0, MAX_ROWS);
 
@@ -31,12 +33,8 @@ export function RecentSessionsList({ sessions }: Props) {
       {rows.map((session) => {
         const linkedTodoTitle = session.linked_todo_title ?? null;
         const note = session.note ?? null;
-        return (
-          <View
-            key={session.id}
-            className="rounded-2xl border px-3 py-2"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-          >
+        const rowContent = (
+          <>
             <View className="flex-row items-center justify-between">
               <Text
                 className="flex-1 text-sm font-medium"
@@ -61,6 +59,26 @@ export function RecentSessionsList({ sessions }: Props) {
                 “{note}”
               </Text>
             ) : null}
+          </>
+        );
+        const rowStyle = {
+          borderColor: tokens.border,
+          backgroundColor: tokens.surfaceElevated,
+        };
+        return onEdit ? (
+          <Pressable
+            key={session.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit focus session from ${formatSessionTime(session.started_at)}`}
+            onPress={() => onEdit(session)}
+            className="rounded-2xl border px-3 py-2"
+            style={rowStyle}
+          >
+            {rowContent}
+          </Pressable>
+        ) : (
+          <View key={session.id} className="rounded-2xl border px-3 py-2" style={rowStyle}>
+            {rowContent}
           </View>
         );
       })}

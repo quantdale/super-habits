@@ -26,20 +26,21 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 
 ## Current Checkpoint
 
-- Current milestone: Wave 4 COMPLETE (Workout correction) → Wave 5 (Pomodoro correction depth) starting.
+- Current milestone: Wave 5 COMPLETE (Pomodoro correction depth) → Wave 6 (Weekly Review surfacing + Linked Actions policy) starting.
 - Completed:
   - Wave 0 — truth/hygiene/gates/E1–E6 (all CONFIRMED; commit `3e05490`).
   - Wave 1 — OpenSpec change `complete-product-correction-flows-v1` (design D1–D6, 6 specs, tasks; openspec 51/51; commit `62356b5`).
   - Wave 2 — Todos recurring-series correction (data+UI+6 unit+3 integration+E2E; todos 9/9; P0 25/25; commit `0065ae9`).
   - Wave 3 — Calories day correction (integration 3; E2E day-navigation 5/5; commit `de9632e`).
   - Wave 4 — Workout correction: `deleteWorkoutLog` (hard-delete cascade per the `saved_meals` exception — the three log tables have no `deleted_at`; one durable delete intent per removed row, verified) wired to a confirmed “Delete session” action in Session detail; `updateRoutine` activated via Rename routine (top of builder; history keeps snapshot names — proven); new `CustomExerciseManagerModal` (edit/archive/restore + archived list) wired to `updateCustomExercise`/`archiveCustomExercise`/new `restoreCustomExercise`; design.md D3 amended (hard-delete rationale). E2E strengthened the vacuous “completes a workout” (real workout_logs oracle) + 3 new journeys (rename, accidental-log delete, manager). Fixed a weekend-dependent strict-mode flake in gym-v2 reschedules by scoping to the schedule panel (selector fix, assertion kept).
+  - Wave 5 — Pomodoro correction depth (no migration; metadata-only per design D4): new `PomodoroPresetManagerModal` (create/edit/delete custom presets through `savePomodoroPresets` onto the app_meta recoverable-settings path; built-ins protected with delete/edit refused) opened from a “Manage presets” action on the Presets card; `RecentSessionsList` rows became pressable (optional `onEdit`) opening new `SessionMetaEditModal`, which edits the note and relinks/unlinks the task-link through the existing `setPomodoroSessionMeta` contract (undefined=keep, null=clear; single coalesced update intent verified; missing row and empty edit are no-ops). Integration `pomodoroCorrection.test.ts` 3/3 (incl. `user_backup_settings` intent); E2E +2 journeys (preset authoring with app_meta oracle + reload persistence; seeded session corrected to note+link with row and single-intent oracles) — pomodoro spec 6/6, momentum-garden 4/4 unaffected.
 - In progress: none.
-- Important modified files: `features/workout/workout.data.ts`, `WorkoutHistoryDetail.tsx`, `WorkoutScreen.tsx`, `RoutineDetailScreen.tsx`, `CustomExerciseManager.tsx` (new), `tests/integration/workoutCorrection.test.ts`, `e2e/workout.spec.ts`, `e2e/workout-gym-v2.spec.ts`, `openspec/.../design.md`.
-- Last successful validation: typecheck 0; lint 0; full Vitest 1953/1953 (179 files); workout specs 12/12 + gym-v2 7/7 (2026-09-05).
+- Important modified files: `features/pomodoro/PomodoroPresetManager.tsx` (new), `SessionMetaEditModal.tsx` (new), `PomodoroScreen.tsx`, `RecentSessionsList.tsx`, `tests/integration/pomodoroCorrection.test.ts` (new), `e2e/pomodoro.spec.ts`, `openspec/.../tasks.md` (4.1–4.3 checked).
+- Last successful validation: typecheck 0; lint 0; full Vitest 1956/1956 (180 files); pomodoro E2E 6/6 + momentum-garden 4/4 (2026-09-05).
 - Current failures: None. Two TEST_BUGs fixed in-flight (kcal-recompute assertion; weekend 'Rest day' strict-mode collision).
 - Relevant quarantines: None.
 - Blockers: None (externals unchanged).
-- Exact next action: Wave 5 — Pomodoro preset authoring UI over `savePomodoroPresets` + post-hoc session note and linked-task correction from focus history via `setPomodoroSessionMeta`; add integration + E2E coverage.
+- Exact next action: Wave 6 — surface Weekly Review from Plan/Progress (disposition line 28: keep modal), disposition `deleteWeeklyReview`, and reconcile the Linked Actions policy with the engine (audit the runtime gate that skips `pomodoro.log`/`calorie.log` before choosing authorable vs honest deferral).
 - Remaining definition of done: terminal condition A of `.agent/EXECUTION_PROMPT.md` §9.
 
 ## Progress
@@ -49,7 +50,7 @@ No Production Hardening V3 / Certification V3, no two-way sync, no persistence r
 - [x] Wave 2 — Todos recurring-series correction (unit 6 + integration 3 + E2E; full Vitest 1946/1946; todos spec 9/9; P0 25/25)
 - [x] Wave 3 — Calories day-correction (integration 3 + E2E 5/5 day-navigation; unit 22/22)
 - [x] Wave 4 — Workout correction (integration 4; E2E workout 12/12 incl. rename/delete/manager; gym-v2 flake scoped; full Vitest 1953/1953)
-- [ ] Wave 5 — Pomodoro correction depth
+- [x] Wave 5 — Pomodoro correction depth (integration 3; E2E pomodoro 6/6 incl. preset authoring + session correction; full Vitest 1956/1956)
 - [ ] Wave 6 — Weekly Review surfacing + Linked Actions policy
 - [ ] Wave 7 — Planning-surface test floor
 - [ ] Wave 8 — Regression ladder

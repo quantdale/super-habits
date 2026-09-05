@@ -72,6 +72,8 @@ import { PomodoroPresetSelector } from './PomodoroPresetSelector';
 import { TodoAssociationPicker } from './TodoAssociationPicker';
 import { SessionNotePrompt } from './SessionNotePrompt';
 import { RecentSessionsList } from './RecentSessionsList';
+import { PomodoroPresetManagerModal } from './PomodoroPresetManager';
+import { SessionMetaEditModal } from './SessionMetaEditModal';
 import {
   usePomodoroCommandBridge,
   type PomodoroCommandStartResult,
@@ -121,6 +123,8 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     linkedTodoTitle: string | null;
   } | null>(null);
   const [showLinkTodo, setShowLinkTodo] = useState(false);
+  const [presetManagerVisible, setPresetManagerVisible] = useState(false);
+  const [metaEditSession, setMetaEditSession] = useState<PomodoroSession | null>(null);
   const [interruptedNotice, setInterruptedNotice] = useState<AbandonNotice | null>(null);
   const [logSaveFailed, setLogSaveFailed] = useState(false);
   const notificationIdRef = useRef<string | null>(null);
@@ -1123,6 +1127,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
               onSelect={(p) => void handleSelectPreset(p)}
               disabled={isRunning || isPaused}
             />
+            <View className="mt-2 self-start">
+              <Button
+                label="Manage presets"
+                accessibilityLabel="Manage presets"
+                variant="ghost"
+                onPress={() => setPresetManagerVisible(true)}
+              />
+            </View>
           </Card>
         </ScreenSection>
       ) : null}
@@ -1146,7 +1158,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             headerSubtitle="Recent sessions, garden view, and the last 52 weeks of activity."
             className="mb-0"
           >
-            <RecentSessionsList sessions={sessions} />
+            <RecentSessionsList
+              sessions={sessions}
+              onEdit={(session) => {
+                setMetaEditSession(session);
+                if (todos.length === 0) void loadTodos();
+              }}
+            />
             <View className="mt-4">
               <GardenGrid sessions={sessions} />
             </View>
@@ -1156,6 +1174,25 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           </Card>
         </ScreenSection>
       ) : null}
+
+      <PomodoroPresetManagerModal
+        visible={presetManagerVisible}
+        presets={presets}
+        onClose={() => setPresetManagerVisible(false)}
+        onChanged={() => void refresh()}
+      />
+      <SessionMetaEditModal
+        visible={metaEditSession !== null}
+        session={metaEditSession}
+        todos={todos}
+        todosLoading={todosLoading}
+        onClose={() => setMetaEditSession(null)}
+        onRetryLoadTodos={() => void loadTodos()}
+        onSaved={() => {
+          setMetaEditSession(null);
+          void refresh();
+        }}
+      />
     </Screen>
   );
 }

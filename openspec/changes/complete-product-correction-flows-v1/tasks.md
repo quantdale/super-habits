@@ -21,9 +21,9 @@
 
 ## 4. Pomodoro management and correction
 
-- [ ] 4.1 Preset authoring UI wired to `savePomodoroPresets` (built-ins protected).
-- [ ] 4.2 Post-hoc session note/relink from history via `setPomodoroSessionMeta`.
-- [ ] 4.3 Tests: preset CRUD + persistence/recovery; relink/unlink single-intent semantics.
+- [x] 4.1 Preset authoring UI wired to `savePomodoroPresets` (built-ins protected).
+- [x] 4.2 Post-hoc session note/relink from history via `setPomodoroSessionMeta`.
+- [x] 4.3 Tests: preset CRUD + persistence/recovery; relink/unlink single-intent semantics.
 
 ## 5. Weekly Review discoverability and management
 
