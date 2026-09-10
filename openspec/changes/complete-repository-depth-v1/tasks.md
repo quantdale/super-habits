@@ -1,0 +1,47 @@
+# Tasks: Complete Repository Depth & Truth V1
+
+## 1. Durability and consolidation
+
+- [ ] 1.1 Bootstrap: run `migrateLegacySessionMeta` after sync hydrate, best-effort, before account/restore/backup cycles.
+- [ ] 1.2 Integration coverage: real-SQLite promotion (apply-once, no-clobber, orphans, idempotent re-run, outbox intent); verify bootstrap wiring.
+- [ ] 1.3 Consolidate `cancelTodoReminderSafely` into the todos data layer (delete the private duplicate).
+- [ ] 1.4 Use `WEEKLY_REVIEW_REMINDER_DATA_VERSION` in the weekly-review reminder scheduler.
+- [ ] 1.5 Remove the dead `getBackfillStatus` export; keep the correct live implementation as the single source.
+- [ ] 1.6 Adopt `createPreferencePrecedenceGuard` where an ad-hoc equivalent exists (Calories view mode); evaluate other persisted preferences.
+
+## 2. Daily plan deletion
+
+- [ ] 2.1 UI: confirmed danger delete in expanded plan-history rows wired to `softDeleteDailyPlan`; refresh list and counters.
+- [ ] 2.2 Integration coverage for the delete contract (row soft-deleted, counters exclude it, no other entity touched, one coalesced intent).
+- [ ] 2.3 E2E journey: seeded past plan → history → delete → row/intent oracles + list absence.
+
+## 3. Test floor
+
+- [ ] 3.1 Integration: Todo bulk operations (complete/remove/priority/project) with real SQL + coalesced intents.
+- [ ] 3.2 Integration: planning detail/history queries (`listRecentDailyPlans`, `listDailyPlansInRange`, `getDailyPlanAdherence`, `setGoalProgress`, `listTodosForGoal`, `listHabitsForProject`, `listGoalsForProject`, `getProject`, `getWeeklyReviewById`).
+- [ ] 3.3 Integration: Workout Gym V2 mutators/queries (body weight update/delete, reschedule + overrides, exercise order, session totals, last-performed, performance rows, logged-set reads).
+- [ ] 3.4 Integration: Pomodoro active timer get/set/clear + started-at; habit unarchive + linked-rule persistence.
+- [ ] 3.5 E2E oracles: add data-layer oracles to `todos.spec.ts`, `calories.spec.ts`, `workout-gym-v2.spec.ts`, `settings.spec.ts`.
+- [ ] 3.6 E2E: direct Overview spec (next best action + customize cards persistence); planning history journey (see 2.3).
+- [ ] 3.7 Unit: motion preference get/set contract.
+
+## 4. Documentation truth
+
+- [ ] 4.1 AGENTS.md: tab labels, Settings buckets, lint gate, E2E projects, version pins, Vitest projects, schema snapshot version, EAS profiles, module exceptions, createId prefixes.
+- [ ] 4.2 README.md: section labels/deep-link wording.
+- [ ] 4.3 `docs/PROJECT_STRUCTURE_MAP.md` + `docs/knowledge-base/PROJECT_STRUCTURE_MAP.md`: test inventory, synced-writer scope, backup status, launcher claim, module exceptions, prefixes.
+- [ ] 4.4 `docs/testing/known-gaps.md`: archived path, gap counts.
+- [ ] 4.5 `docs/ui-ux/README.md`: document ledger + first-tab label.
+- [ ] 4.6 Verify all corrected claims against code and the final test inventory.
+
+## 5. Bounded dead-code removal
+
+- [ ] 5.1 Remove zero-reference, zero-test UI components and exports only; re-grep after each removal.
+- [ ] 5.2 Record intentionally retained test-covered dead APIs with rationale (no test weakening).
+
+## 6. Regression ladder and delivery
+
+- [ ] 6.1 Fast gates: typecheck, lint, unit+integration, label parity, openspec validate, theme/schema/impact validators.
+- [ ] 6.2 Web: fresh `build:web`, focused specs, full `npm run e2e`, simulation deterministic, `web:verify`/`web:hygiene`.
+- [ ] 6.3 Native: Android smoke + persistence on the canonical API-36 target when available; classify honestly otherwise.
+- [ ] 6.4 ExecPlan close-out (validation ledger, outcomes) + commit + push + CI verification.

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Journey-label parity guard (WM2.4, openspec
  * harden-warm-momentum-2-4-reliability-performance-completion-v1).
