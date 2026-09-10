@@ -48,8 +48,8 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Current Checkpoint
 
-- Current milestone: Waves 2–5 implemented; focused re-verification and formal 4.6
-  claim-verification are the remaining pre-ladder work.
+- Current milestone: Wave 6 regression ladder — deterministic simulation, web verify,
+  and native lanes remain; then close/push/CI.
 - Completed:
   - Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix, campaign
     artifacts (commit `8d05e03`).
@@ -80,13 +80,18 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
     `getPendingManifestForDiagnostics`, `getBackupDirtyFlag`, `clearWeeklyPlanEntry`,
     `listScheduleOverrides`, `getOrCreateDailyPlan`, `isDailyPlanStatus`,
     `countCompletedTodos` (and its stale test mock key).
-- In progress: deterministic simulation lane running; then web verify/hygiene and the native
-  smoke/persistence lane.
+- In progress: web `build:web`/`web:verify`/`web:hygiene`; then the native smoke/persistence
+  lane on the canonical `Nitro_API_36` AVD (current APK provenance is stale at
+  `d7935a0`, so auto-provision will rebuild from the final tree).
+- Git reconciliation (2026-09-11): tree clean; `HEAD == 65641af`, `origin/main == c65b96a`;
+  four local commits are ahead and unpushed (`8d05e03`, `939ff38`, `4723df5`, `65641af`).
+  Push happens at task 6.4 after the remaining ladder and CI verification.
 - Important modified files: see Changed Files below.
-- Last successful validation: full `npm run e2e` battery 243 passed / 13 skipped / 1 failed;
-  the single failure (`habits.spec.ts` rule-history oracle) passed standalone on the identical
-  tree and is registered as known-gap 16 (FLAKY_TEST under battery load); full Vitest 2001
-  passed / 1 skipped (193 files); focused chromium batch 32/32; static validators green.
+- Last successful validation: fast gates PASS 2026-09-11 (typecheck/lint 0, label parity,
+  OpenSpec 52/52, themes 140, schema contract, impact map 13); deterministic simulation
+  23/23 PASS 2026-09-11; full `npm run e2e` battery 243 passed / 13 skipped / 1 failed
+  (flake, known-gap 16); full Vitest 2001 passed / 1 skipped (193 files); focused
+  chromium batch 32/32; static validators green.
 - Current failures: None open. The full-battery habits rule-history failure passed
   standalone on the identical tree → classified FLAKY_TEST (host-load commit race,
   known-gap 16, assertions unchanged).
@@ -94,11 +99,12 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: await the full `npm run e2e` battery result, then run
-  `qa:simulation` (deterministic), `web:verify`/`web:hygiene`, and the native
-  smoke/persistence lane; then close the plan, commit, push, and verify CI.
-- Remaining definition of done: tasks 6.2–6.4 (full ladder, native evidence or honest
-  ENVIRONMENT classification, plan COMPLETED + validated, commit/push/CI).
+- Exact next action: run `npm run qa:simulation` (deterministic lane), then
+  `web:verify`/`web:hygiene`, and the native smoke/persistence lane on the canonical
+  `Nitro_API_36` AVD; then close the plan, commit, push, and verify CI.
+- Remaining definition of done: tasks 6.2–6.4 (simulation + web + native lanes, native
+  evidence or honest ENVIRONMENT classification, plan COMPLETED + validated,
+  commit/push/CI).
 
 ## Progress
 
@@ -158,6 +164,13 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   workout-gym-v2) — 30 passed / 2 failed → fixes → the 2 fixed tests PASS individually.
 - 2026-09-10 — `openspec validate` — PASS — 52/52 (includes the new change).
 - 2026-09-10 — `agent:plan:validate` — PASS — this plan valid ACTIVE.
+- 2026-09-11 — `npm run openspec:validate` / `validate:themes` /
+  `supabase:schema:validate` / `qa:impact:validate` — PASS — 52/52, 140 checks, schema
+  contract, 13 rules (final tree `65641af` + plan edit).
+- 2026-09-11 — `npm run typecheck` + `npm run lint` + `node scripts/journey-label-parity.mjs`
+  — PASS — 0/0 + rail parity OK.
+- 2026-09-11 — `npm run qa:simulation -- --all` — PASS — 23/23 deterministic scenarios
+  (fresh `build:web`, owned :8081 server, `sim:validate` clean).
 - 2026-09-10 — full `npx vitest run` — PASS — 2001 passed / 1 skipped (193 files, both projects).
 - 2026-09-10 — `npm run openspec:validate` / `validate:themes` / `supabase:schema:validate` /
   `qa:impact:validate` — PASS — 52/52, 140 checks, schema contract, 13 rules.
