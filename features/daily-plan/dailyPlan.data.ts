@@ -29,15 +29,6 @@ export async function getDailyPlan(dateKey: string): Promise<DailyPlan | null> {
   );
 }
 
-export async function getOrCreateDailyPlan(dateKey: string = toDateKey()): Promise<DailyPlan> {
-  // Deprecated for UI use: preserved for internal callers/tests only.
-  // UI (DailyPlanView) must use getDailyPlan (read-only) + in-memory draft and
-  // explicit upsertDailyPlan on save to keep pristine devices safe.
-  const existing = await getDailyPlan(dateKey);
-  if (existing) return existing;
-  return upsertDailyPlan(dateKey, {});
-}
-
 export type DailyPlanUpdate = {
   intention?: string;
   topTodoIds?: string[];

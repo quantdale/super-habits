@@ -11,7 +11,7 @@ Apply this when writing any UI, navigation, or platform-specific code.
 
 - Single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. There are no `app/(tabs)/`, no `app/settings.tsx`, no `app/command.tsx`.
 - Root layout: app/_layout.tsx — wraps everything in AppProviders and mounts the global command-center host (`GlobalCommandCenterHost`)
-- Sections: app/index.tsx renders all six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items
+- Sections: app/index.tsx renders all six sections (Today, To Do, Habits, Focus, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items
 - Settings is a full-screen **modal** (via `NavigationProvider.openSettings`), not a route
 - Command Center is a **global overlay** only (no `/command` route); `COMMAND_EXPERIMENT_ENABLED` is true
 - Navigation between sections: use `NavigationContext.activeSection` / `setActiveSection`; do not use expo-router's `<Link>` or `router.push()` for section switching

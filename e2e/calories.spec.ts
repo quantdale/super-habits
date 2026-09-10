@@ -1,7 +1,15 @@
 import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
+import { queryRows } from './helpers/dbHarness';
 import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from './helpers/forms';
+
+function localTodayKey(): string {
+  const date = new Date();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
 
 test.describe('Calories', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,6 +40,15 @@ test.describe('Calories', () => {
     await expect(page.locator('body')).toContainText('Chicken breast', { timeout: 15_000 });
     await expect(page.locator('body')).toContainText('147 kcal', { timeout: 15_000 });
     await expect(page.getByText('Today: 147 kcal')).toBeVisible();
+
+    // Row oracle: the entry persisted on today's date with the computed kcal.
+    const rows = await queryRows(
+      page,
+      `SELECT food_name, calories, consumed_on FROM calorie_entries WHERE deleted_at IS NULL`,
+    );
+    expect(rows).toEqual([
+      { food_name: 'Chicken breast', calories: 147, consumed_on: localTodayKey() },
+    ]);
   });
 
   test('selects different meal types', async ({ page }) => {
@@ -64,6 +81,13 @@ test.describe('Calories', () => {
     await expect(page.locator('body')).toContainText('Oats', { timeout: 15_000 });
     await expect(page.locator('body')).toContainText('235 kcal', { timeout: 15_000 });
     await expect(page.locator('body')).toContainText('Logged', { timeout: 15_000 });
+
+    // Row oracle: exactly one live entry survived the reload.
+    const rows = await queryRows(
+      page,
+      `SELECT food_name, calories FROM calorie_entries WHERE deleted_at IS NULL`,
+    );
+    expect(rows).toEqual([{ food_name: 'Oats', calories: 235 }]);
   });
 
   test('macro targets modal edits protein/carbs/fats only and re-renders the bars', async ({
@@ -89,6 +113,14 @@ test.describe('Calories', () => {
     await page.reload({ waitUntil: 'load' });
     await goToTab(page, 'calories');
     await expect(page.getByText('Protein 0g / 180g')).toBeVisible({ timeout: 15_000 });
+
+    const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'calorie_targets'`);
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(String(rows[0]?.value))).toMatchObject({
+      protein: 180,
+      carbs: 220,
+      fats: 70,
+    });
   });
 
   test('macro targets modal rejects grams over 999', async ({ page }) => {
@@ -105,5 +137,9 @@ test.describe('Calories', () => {
     await page.getByText('Save goals', { exact: true }).click();
 
     await expect(page.getByText('Goal: 1500 kcal ✎')).toBeVisible({ timeout: 15_000 });
+
+    const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'calorie_goal'`);
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(String(rows[0]?.value))).toMatchObject({ calories: 1500 });
   });
 });

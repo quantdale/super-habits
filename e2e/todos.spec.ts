@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import { goToTab, openNewTodoModal, submitTodoModal } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
+import { queryRows } from './helpers/dbHarness';
 import { clickSwipeDeleteAction, swipeLeftToRevealRowActions } from './helpers/gestures';
 
 test.describe('Todos', () => {
@@ -25,6 +26,12 @@ test.describe('Todos', () => {
     await page.getByPlaceholder(/Add a task/i).fill('Buy groceries');
     await submitTodoModal(page);
     await expect(page.getByText('Buy groceries')).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      `SELECT title, completed FROM todos WHERE deleted_at IS NULL`,
+    );
+    expect(rows).toEqual([{ title: 'Buy groceries', completed: 0 }]);
   });
 
   test('completes a todo', async ({ page }) => {
@@ -44,6 +51,12 @@ test.describe('Todos', () => {
       page.getByRole('checkbox', { name: 'Mark incomplete: Read a book' }).first(),
     ).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('Read a book').first()).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      `SELECT title, completed FROM todos WHERE deleted_at IS NULL`,
+    );
+    expect(rows).toEqual([{ title: 'Read a book', completed: 1 }]);
   });
 
   test('deletes a todo', async ({ page }) => {
@@ -59,6 +72,10 @@ test.describe('Todos', () => {
     await expect(deleteDialog.getByText('Delete "Delete me"?')).toBeVisible();
     await deleteDialog.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(page.getByText('Delete me', { exact: true })).not.toBeVisible();
+
+    const rows = await queryRows(page, `SELECT deleted_at FROM todos`);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.deleted_at).not.toBeNull();
   });
 
   test('todo persists after hard reload', async ({ page }) => {
@@ -117,6 +134,16 @@ test.describe('Todos', () => {
     await expect(
       page.getByText('No pending tasks', { exact: true }).filter({ visible: true }).last(),
     ).toBeVisible();
+
+    // Row oracle: completing the source completed the linked target too.
+    const rows = await queryRows(
+      page,
+      `SELECT title, completed FROM todos WHERE deleted_at IS NULL ORDER BY created_at ASC`,
+    );
+    expect(rows).toEqual([
+      { title: 'Linked target task', completed: 1 },
+      { title: 'Linked source task', completed: 1 },
+    ]);
   });
 
   test('recurring todos show linked-actions disabled message', async ({ page }) => {
@@ -176,5 +203,18 @@ test.describe('Todos', () => {
     await expect(
       page.getByRole('checkbox', { name: 'Mark incomplete: Daily stretch' }).first(),
     ).toBeVisible();
+
+    // Row oracle: completed history keeps its original title, and the stopped
+    // future copy is tombstoned — no live pending row remains.
+    const live = await queryRows(
+      page,
+      `SELECT title, completed FROM todos WHERE deleted_at IS NULL ORDER BY created_at ASC`,
+    );
+    expect(live).toEqual([{ title: 'Daily stretch', completed: 1 }]);
+    const stopped = await queryRows(
+      page,
+      `SELECT title FROM todos WHERE deleted_at IS NOT NULL ORDER BY created_at ASC`,
+    );
+    expect(stopped).toEqual([{ title: 'Morning stretch' }]);
   });
 });

@@ -18,8 +18,8 @@ Read this before writing any code that touches the database or data layer.
 
 ## Schema version
 
-- Current stored version: **22** (`app_meta.db_schema_version`)
-- Next migration number: **23** (add `if (version < 23) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Current stored version: **24** (`app_meta.db_schema_version`)
+- Next migration number: **25** (add `if (version < 25) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations are append-only `if (version < N)` blocks inside `runMigrations()` in `core/db/client.ts` — there are no numbered migration files. `core/db/migrations/` holds only a Supabase reference SQL (`001_initial_supabase.sql`), never runtime code.
 - schema.sql is a partial REFERENCE ONLY snapshot — not executed at runtime; bootstrap DDL plus migrations are authoritative
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
@@ -37,7 +37,7 @@ Exported shapes include: **Todo**, **Habit**, **HabitCompletion**, **PomodoroSes
 ## Soft delete rule
 
 NEVER: DELETE FROM todos WHERE id = ?
-ALWAYS: UPDATE todos SET deleted_at = datetime('now') WHERE id = ?
+ALWAYS: UPDATE todos SET deleted_at = '<nowIso()>' WHERE id = ?
 ALWAYS: SELECT ... FROM todos WHERE deleted_at IS NULL
 
 Hard deletion permanently destroys data with no recovery. The app has
@@ -81,7 +81,7 @@ cutover used UTC calendar dates; no automatic backfill.
 ## Adding a new table
 
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 15) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 25) { ... }` — bump N+1 when the version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/
@@ -95,7 +95,7 @@ Data layer (`features/habits/habits.data.ts`):
 
 - **Increment:** SELECT → if no row: INSERT (new row, count=1); if row exists: UPDATE (count+1).
 - **Decrement:** SELECT → if count === 1: DELETE (hard delete — allowed exception); else UPDATE (count−1).
-- Hard delete is the allowed exception for this table — it is not a synced entity; **no** `syncEngine.enqueue()` needed.
+- Hard delete is the allowed exception for this table; `habit_completions` rows are still a synced backup entity, so the corresponding durable outbox delete intent is written through the normal mutation path.
 
 Do not use INSERT OR REPLACE for this flow. Do not introduce duplicate INSERTs for the same (habit_id, date_key).
 
@@ -106,7 +106,7 @@ The E2E suite includes `e2e/infrastructure.spec.ts`, which verifies (among other
 - COEP is `require-corp` (not `credentialless`)
 - COOP is `same-origin`
 - `crossOriginIsolated` is `true` (required for SQLite WASM on web)
-- Service worker / shell cache behavior (e.g. `superhabits-shell-v3` / `CACHE_VERSION` in `public/sw.js` — see spec assertions)
+- Service worker / shell cache behavior (versioned `CACHE_VERSION` cache name in `public/sw.js` — see spec assertions)
 - Localhost serves assets from network (SW dev bypass active)
 - OPFS lock: second context/tab surfaces lock-related errors when another holds the DB
 - No `[db] initializeDatabase failed` (or equivalent) on clean load

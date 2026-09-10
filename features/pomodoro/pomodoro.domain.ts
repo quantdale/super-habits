@@ -74,9 +74,6 @@ export function applySettingsToTimerState(
   return { settings: nextSettings, totalSeconds: duration, remaining: duration };
 }
 
-/** Kept for backward compatibility with existing tests */
-export const FOCUS_SECONDS = DEFAULT_SETTINGS.focusMinutes * 60;
-
 /**
  * Get duration in seconds for a given mode and settings.
  */

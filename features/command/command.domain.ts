@@ -408,10 +408,6 @@ function parseHabitDraft(input: ParseCommandInput): ParseCommandResult {
   };
 }
 
-export function isDraftReady(draft: DraftAiAction): boolean {
-  return draft.status === 'ready';
-}
-
 /**
  * Keep preflight intentionally narrow so remote parsing remains the primary
  * parse path whenever a command is not obviously out of scope.

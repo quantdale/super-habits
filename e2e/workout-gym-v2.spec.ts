@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
+import { queryRows } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
 
 async function tomorrowDateKey(page: Parameters<typeof goToTab>[0]): Promise<string> {
@@ -162,6 +163,20 @@ test.describe('Workout Gym V2', () => {
       'true',
     );
     await plan.getByLabel('Close').click();
+
+    // Row oracle: two date overrides exist — a rest day on the source date and
+    // the moved workout on the target date.
+    const overrides = await queryRows(
+      page,
+      `SELECT o.date_key, o.override_kind, r.name AS routine_name
+       FROM workout_schedule_overrides o
+       LEFT JOIN workout_routines r ON r.id = o.routine_id
+       WHERE o.deleted_at IS NULL ORDER BY o.date_key ASC`,
+    );
+    expect(overrides).toHaveLength(2);
+    expect(overrides[0]?.override_kind).toBe('rest');
+    expect(overrides[1]?.override_kind).toBe('workout');
+    expect(overrides[1]?.routine_name).toBe('Reschedule Day');
   });
 
   test('runs a guided strength set, records a PR, and survives reload', async ({ page }) => {
@@ -226,6 +241,20 @@ test.describe('Workout Gym V2', () => {
     await page.waitForLoadState('load');
     await goToTab(page, 'workout');
     await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
+
+    // Row oracle: exactly one completed log persisted with the guided set.
+    const logs = await queryRows(page, `SELECT COUNT(*) AS count FROM workout_logs`);
+    expect(logs).toEqual([{ count: 1 }]);
+    const sets = await queryRows(
+      page,
+      `SELECT e.exercise_name, s.set_number, s.weight, s.reps, s.completed
+       FROM workout_session_sets s
+       JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+       ORDER BY s.set_number ASC`,
+    );
+    expect(sets).toEqual([
+      { exercise_name: 'Barbell Bench Press', set_number: 1, weight: 80, reps: 8, completed: 1 },
+    ]);
   });
 
   test('resumes an interrupted guided session with entered measurements', async ({ page }) => {
@@ -366,5 +395,19 @@ test.describe('Workout Gym V2', () => {
     await page.waitForLoadState('load');
     await goToTab(page, 'workout');
     await expect(page.getByText('Goal · 75 kg', { exact: true })).toBeVisible();
+
+    // Row oracles: the entry is soft-deleted and the goal weight persisted in
+    // the recoverable workout preferences.
+    const entries = await queryRows(page, `SELECT weight, deleted_at FROM body_weight_entries`);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.deleted_at).not.toBeNull();
+    const prefs = await queryRows(
+      page,
+      `SELECT value FROM app_meta WHERE key = 'workout_preferences'`,
+    );
+    expect(prefs).toHaveLength(1);
+    expect(JSON.parse(String(prefs[0]?.value))).toMatchObject({
+      goalWeight: { value: 75, unit: 'kg' },
+    });
   });
 });

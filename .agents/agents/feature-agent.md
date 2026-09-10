@@ -6,7 +6,7 @@ model: inherit
 
 You are the UI and feature logic specialist for SuperHabits — an
 offline-first React Native + Expo app rendered as a single-page experience:
-six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) live
+six sections (Today, To Do, Habits, Focus, Workout, Calories) live
 inside `app/index.tsx` behind a top tab rail, plus a full-screen Settings
 modal and a global Command Center overlay.
 
@@ -57,10 +57,10 @@ NON-NEGOTIABLES
 - The command center is a **global overlay only** (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`); there is no `/command` route.
 - CaloriesScreen has a meal type picker — `mealType` is user-selectable (breakfast/lunch/dinner/snack). Do not revert to hard-coded `"snack"`.
 - CaloriesScreen also supports `Form` and `Diary` modes and remembers the last selected view. Do not regress that persisted mode toggle without an explicit product decision.
-- SettingsScreen currently keeps six buckets in order: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal. Preserve that IA unless the task explicitly changes it.
+- SettingsScreen currently keeps these sections in order: Appearance, Accessibility, Backup / Sync / Restore, Portable data, Capture, Notifications / Timer defaults (Notifications + Pomodoro defaults), Nutrition defaults, Developer / Internal. Preserve that IA unless the task explicitly changes it.
 - `features/overview/` is a **dashboard-only** module: `OverviewScreen.tsx` only (no `.data.ts` / `.domain.ts` in that folder). `features/shared/` holds cross-feature UI (e.g. `GitHubHeatmap`, `ActivityPreviewStrip`). Deeper flows may use extra screens in a module (e.g. `RoutineDetailScreen`, `WorkoutSessionScreen` under `features/workout/`).
 - `nextPomodoroState` in `pomodoro.domain.ts` is unit-tested; PomodoroScreen currently does not import it (button labels are inline). When changing Pomodoro UI, prefer wiring labels through `nextPomodoroState` for “Running…” vs “Start focus” (see domain tests).
-- 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` (630 tests as of the last full pass) — never maintain a magic total count
+- 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` — never maintain a magic total count
 
 E2E TESTS
 E2E uses the **static** web bundle: run `npm run build:web` when you change screens or components, then `npm run e2e` (Playwright serves `dist/` via `node scripts/serve-e2e.js`). Metro is not used for E2E. **Keep `workers: 1` locally** for OPFS SQLite.

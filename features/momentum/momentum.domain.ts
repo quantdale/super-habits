@@ -409,8 +409,3 @@ export function formatMomentumTodaySummary(model: MomentumGardenModel): string {
   if (sources.length === 0) return 'Your garden is ready for today.';
   return `Today: activity from ${sources.map((source) => MOMENTUM_SOURCE_LABELS[source]).join(', ')}.`;
 }
-
-/** Small helper for tests and UI copy; no source writes or hidden score. */
-export function getMomentumGrowthSources(day: MomentumDay): MomentumSource[] {
-  return [...day.activeSources];
-}

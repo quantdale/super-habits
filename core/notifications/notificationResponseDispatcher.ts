@@ -247,9 +247,3 @@ export async function dispatchNotificationResponse(
 
   return classified;
 }
-
-export function isHabitReminderResponse(
-  response: NotificationResponse | null | undefined,
-): response is NotificationResponse {
-  return classifyNotificationResponse(response).kind === 'habit-reminder';
-}

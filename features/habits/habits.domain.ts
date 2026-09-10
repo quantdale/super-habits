@@ -466,12 +466,6 @@ export function calculateLongestStreak(dayCompletions: DayCompletion[]): number 
   return longest;
 }
 
-export function getStreakLabel(streak: number): string {
-  if (streak === 0) return '';
-  if (streak === 1) return '1 day';
-  return `${streak} days`;
-}
-
 export type HabitGridHabit = {
   id: string;
   name: string;
@@ -503,23 +497,6 @@ export type GridDateHeader = {
   monthLabel: string | null;
   isToday: boolean;
 };
-
-export function buildGridDateHeaders(days: number = 30): GridDateHeader[] {
-  const headers: GridDateHeader[] = [];
-  const todayKey = toDateKey();
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateKey = toDateKey(date);
-    headers.push({
-      dateKey,
-      dayLabel: String(date.getDate()),
-      monthLabel: date.getDate() === 1 ? date.toLocaleDateString('en', { month: 'short' }) : null,
-      isToday: dateKey === todayKey,
-    });
-  }
-  return headers;
-}
 
 export function buildHabitGrid(
   habits: HabitGridHabit[],

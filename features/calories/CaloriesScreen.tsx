@@ -241,7 +241,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [viewPreferenceGuard]);
 
   const todayTotals = useMemo(
     () => ({

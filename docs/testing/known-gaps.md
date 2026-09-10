@@ -254,13 +254,13 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 - Missions that probe these gaps by hand: `docs/testing/exploratory-missions.md`.
 - How a mission finding becomes a regression test or a filed defect: the "Recording findings" section of `docs/testing/exploratory-missions.md`.
-- The full design rationale for CG-1 / CG-2 and the parent's seven capability gaps: decisions D9/D10 and the "Known Gaps" section of `openspec/changes/add-real-world-user-simulation-testing/design.md`. Entries 8 and 9 of this register above were the dist-sync lane's two capability gaps and are closed by it (see their resolution notes).
+- The full design rationale for CG-1 / CG-2 and the parent harness's capability gaps: decisions D9/D10 and the "Known Gaps" section of `openspec/changes/archive/add-real-world-user-simulation-testing/design.md`. Entries 8 and 9 of this register above were the dist-sync lane's two capability gaps and are closed by it (see their resolution notes).
 
 ---
 
 ## Platform capability gaps — `add-user-simulation-platform`
 
-The user-simulation platform (`simulation/`) layers a model + multiple runners over the parent harness. Its own additional capability gaps are listed below, kept distinct from the parent's eleven above — the parent's gaps remain open (the disposable-backend lane partially closes parent gap #2 — real Supabase round-trips — which is exactly why it is report-only while it builds a flake-free track record). These four gaps exist _regardless of application behaviour_: they are properties of the platform's lanes and environment.
+The user-simulation platform (`simulation/`) layers a model + multiple runners over the parent harness. Its own additional capability gaps are listed below, kept distinct from the parent capability-gap list above (entries 1–15) — the parent's gaps remain open (the disposable-backend lane partially closes parent gap #2 — real Supabase round-trips — which is exactly why it is report-only while it builds a flake-free track record). These four gaps exist _regardless of application behaviour_: they are properties of the platform's lanes and environment.
 
 ### P1 — Native-device exploration
 

@@ -143,18 +143,6 @@ export async function countPendingTodos(filters?: PendingTodoFilters): Promise<n
   return row?.count ?? 0;
 }
 
-/** Count completed active Todos without loading the full Todo history. */
-export async function countCompletedTodos(): Promise<number> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count
-     FROM todos
-     WHERE deleted_at IS NULL
-       AND completed = 1`,
-  );
-  return row?.count ?? 0;
-}
-
 export async function addTodo(input: {
   title: string;
   notes?: string;
@@ -1159,7 +1147,12 @@ export async function bulkRemoveTodos(ids: string[]): Promise<BulkTodoOutcome> {
       const removedIds: string[] = [];
       for (const id of ids) {
         const removed = await removeTodoWithinTransaction(transactionDb, id, now, enqueue);
-        if (removed) removedIds.push(id);
+        if (!removed) continue;
+        // The tombstone itself must ride the durable outbox exactly like
+        // removeTodo's runSyncedMutation record: without it the remote copy
+        // (and any restore) resurrects a bulk-deleted todo.
+        enqueue({ entity: 'todos', id, updatedAt: now, operation: 'delete' });
+        removedIds.push(id);
       }
       return { changed: removedIds.length > 0, value: removedIds };
     },

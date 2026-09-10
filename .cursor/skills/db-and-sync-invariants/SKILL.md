@@ -33,7 +33,7 @@ Exported shapes include: **Todo**, **Habit**, **HabitCompletion**, **PomodoroSes
 
 ## Soft delete rule
 NEVER: DELETE FROM todos WHERE id = ?
-ALWAYS: UPDATE todos SET deleted_at = datetime('now') WHERE id = ?
+ALWAYS: UPDATE todos SET deleted_at = '<nowIso()>' WHERE id = ?
 ALWAYS: SELECT ... FROM todos WHERE deleted_at IS NULL
 
 Hard deletion permanently destroys data with no recovery. The app has
@@ -75,7 +75,7 @@ toDateKey(date: Date): string — returns YYYY-MM-DD using the device’s **loca
 
 ## Adding a new table
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 23) { ... }` today — bump to N+1 when version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 25) { ... }` — bump N+1 when the version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/
@@ -97,7 +97,7 @@ The E2E suite includes `e2e/infrastructure.spec.ts`, which verifies (among other
 - COEP is `require-corp` (not `credentialless`)
 - COOP is `same-origin`
 - `crossOriginIsolated` is `true` (required for SQLite WASM on web)
-- Service worker / shell cache behavior (e.g. `superhabits-shell-v3` / `CACHE_VERSION` in `public/sw.js` — see spec assertions)
+- Service worker / shell cache behavior (versioned `CACHE_VERSION` cache name in `public/sw.js` — see spec assertions)
 - Localhost serves assets from network (SW dev bypass active)
 - OPFS lock: second context/tab surfaces lock-related errors when another holds the DB
 - No `[db] initializeDatabase failed` (or equivalent) on clean load

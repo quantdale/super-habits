@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
 import { goToTab } from './helpers/navigation';
-import { queryRows, returnToApp } from './helpers/dbHarness';
+import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 
 /**
  * Wave 7 (Functional Completion V1): the Planning Hub (Today / Projects /
@@ -218,5 +218,65 @@ test.describe('Planning Hub', () => {
     await page.getByRole('tab', { name: 'Projects' }).click();
     const afterRestart = page.getByRole('button', { name: /percent progress/ });
     await expect(afterRestart.first()).toHaveText(/Beta/, { timeout: 20_000 });
+  });
+
+  test('plan history: confirmed delete removes the plan durably and clears the editor', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    // Seed the plan directly so the journey proves the delete contract without
+    // depending on the guided-vs-editor create path (covered by test 1).
+    const dateKey = localTodayKey();
+    await runSql(
+      page,
+      `INSERT INTO daily_plans (id, date_key, intention, status, created_at, updated_at)
+       VALUES ('dplan_e2e_delete', '${dateKey}', 'Plan to delete', 'committed',
+               '2026-09-10T00:00:00.000Z', '2026-09-10T00:00:00.000Z')`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'overview');
+    await openPlanHub(page);
+
+    // The full editor sits below the guided card and both share the Intention
+    // placeholder; the editor is the last one in DOM order.
+    const intentionInput = page
+      .getByPlaceholder('What is the one thing that matters most today?')
+      .last();
+    await expect(intentionInput).toHaveValue('Plan to delete', { timeout: 20_000 });
+
+    await page.getByRole('button', { name: 'Plan history' }).click();
+    const entry = page.getByRole('button', { name: `Plan for ${dateKey}, Committed` });
+    await expect(entry).toBeVisible({ timeout: 20_000 });
+    await entry.click();
+
+    // Cancelling leaves the plan and the editor untouched.
+    await page.getByRole('button', { name: `Delete plan for ${dateKey}` }).click();
+    await expect(page.getByText('Delete daily plan', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(entry).toBeVisible();
+    await expect(intentionInput).toHaveValue('Plan to delete');
+
+    // Confirmed delete removes the entry, refreshes the editor, and persists
+    // the tombstone with a coalesced durable delete intent.
+    await page.getByRole('button', { name: `Delete plan for ${dateKey}` }).click();
+    await expect(page.getByText('Delete daily plan', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Delete plan', exact: true }).click();
+    await expect(page.getByText(/No past plans yet/)).toBeVisible({ timeout: 20_000 });
+    await expect(intentionInput).toHaveValue('', { timeout: 20_000 });
+
+    const rows = await queryRows(
+      page,
+      `SELECT deleted_at FROM daily_plans WHERE id = 'dplan_e2e_delete'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.deleted_at).not.toBeNull();
+    const live = await queryRows(page, `SELECT id FROM daily_plans WHERE deleted_at IS NULL`);
+    expect(live).toHaveLength(0);
+    const intents = await queryRows(
+      page,
+      `SELECT operation FROM sync_outbox WHERE entity = 'daily_plans'`,
+    );
+    expect(intents).toEqual([{ operation: 'delete' }]);
   });
 });

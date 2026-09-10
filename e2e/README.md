@@ -105,7 +105,7 @@ Sync/restore journeys need a `dist/` that was exported with a configuration wher
 
 ### The `journeys-sync` project (`npm run e2e:sync`)
 
-The dedicated project selects exactly the remote-boundary journey steps (J3 reconnect-push, J4 backend failures, J5 restore round-trip — all tagged `@sync`) via per-project `grep: /@sync/`, runs them against `dist-sync/` on `localhost:8082`, and is **opt-in** — the default `npm run e2e` script lists the three standard projects explicitly, so PRs never wait on (or require) the `dist-sync/` build.
+The dedicated project selects exactly the remote-boundary journey steps (J3 reconnect-push, J4 backend failures, J5 restore round-trip — all tagged `@sync`) via per-project `grep: /@sync/`, runs them against `dist-sync/` on `localhost:8082`, and is **opt-in** — the default `npm run e2e` script lists the four standard projects (chromium, journeys, simulation, pwa) explicitly, so PRs never wait on (or require) the `dist-sync/` build.
 
 ```bash
 # Build the dummy-env export FIRST (--clear avoids a Metro transform cache that

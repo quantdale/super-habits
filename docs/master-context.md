@@ -29,12 +29,12 @@ Companion docs in this folder:
 
 - Single-package Expo/React Native repository, not a monorepo.
 - Main runtime entry is `expo-router/entry` from root `package.json`.
-- App shell is a single-page Expo Router experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections (Overview, Todos, Habits, Pomodoro/Focus, Workout, Calories) render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
+- App shell is a single-page Expo Router experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections (Today, To Do, Habits, Focus, Workout, Calories) render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
 - Settings is a full-screen modal (not a route) opened via `NavigationContext.openSettings`; the Command Center is a global overlay only, mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`. There are no `/command`, `/settings`, or `/(tabs)/*` routes.
 - The command shell is limited to single-action drafting for `create_todo` and `create_habit`, with parse -> review -> confirm flow rather than assistant chat.
 - Command parser mode defaults to `mock`; optional model-backed parsing uses `remote_with_fallback`, but internal rollout now requires both an internal-capable build flag and a device-local tester opt-in before remote parsing is attempted.
 - Calories supports `Form` and `Diary` modes, and the last selected mode is remembered in AsyncStorage.
-- Settings is now organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, and Developer / Internal.
+- Settings is organized into these sections, in render order: Appearance, Accessibility, Backup / Sync / Restore, Portable data, Capture, Notifications / Timer defaults (Notifications + Pomodoro defaults), Nutrition defaults, and Developer / Internal.
 
 ### Confirmed from docs
 
@@ -187,13 +187,13 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `app/index.tsx` renders all six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
+- `app/index.tsx` renders all six sections (Today, To Do, Habits, Focus, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
 - `app/_layout.tsx` wraps the shell in `AppProviders` and mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`.
 - `NavigationContext` (`core/providers/NavigationProvider.tsx`) exposes `activeSection`, `setActiveSection`, `openSettings`, `closeSettings`, `openCommand`, `closeCommand`.
 - Settings is a full-screen modal opened via `openSettings`; the Command Center is a global overlay opened via `openCommand`.
-- The command launcher appears on Overview, Todos, Habits, Pomodoro, Workout, and Calories when the experiment flag is enabled; it opens a drawer on wide web and a bottom sheet elsewhere.
+- The Command Center is a global overlay only (no floating launcher): the single global Add action opens Quick Capture, and Add → Describe it opens the overlay as a drawer on wide web or a bottom sheet elsewhere.
 - The command launcher is suppressed during active pomodoro/workout sessions.
-- Current sections: Overview, Todos, Habits, Pomodoro, Workout, Calories.
+- Current sections: Today, To Do, Habits, Focus, Workout, Calories.
 
 ## UI / Design System Conventions
 

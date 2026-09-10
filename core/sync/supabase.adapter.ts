@@ -1,10 +1,5 @@
 import { getDatabase } from '@/core/db/client';
-import {
-  appMetaKeys,
-  getAppMetaJsonOrDefault,
-  getAppMetaText,
-  setAppMetaText,
-} from '@/core/db/appMeta';
+import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaText } from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
 import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
@@ -375,18 +370,3 @@ export class SupabaseSyncAdapter implements SyncAdapter {
 }
 
 export { BACKUP_MANIFEST_RECORD_ID, BACKUP_SETTINGS_RECORD_ID };
-
-export async function getPendingManifestForDiagnostics(): Promise<BackupManifest | null> {
-  const db = await getDatabase();
-  return getAppMetaJsonOrDefault<BackupManifest | null>(
-    db,
-    appMetaKeys.backupPendingManifest,
-    null,
-  );
-}
-
-export async function getBackupDirtyFlag(): Promise<boolean> {
-  const db = await getDatabase();
-  const value = await getAppMetaText(db, appMetaKeys.backupDirty);
-  return value === '1';
-}

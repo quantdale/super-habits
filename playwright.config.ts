@@ -147,7 +147,7 @@ export default defineConfig({
       //
       // This project is OPT-IN via `npm run e2e:sync` and is deliberately NOT
       // part of the default run — the default `npm run e2e` script lists the
-      // three standard projects explicitly, so PR feedback never waits on the
+      // four standard projects explicitly, so PR feedback never waits on the
       // dist-sync build. Main/nightly CI builds dist-sync/ first, then runs
       // this lane. `E2E_BASE_URL`/`E2E_DIST_DIR` are set by the e2e:sync script
       // so the DB harness (APP_BASE_URL, wa-sqlite asset dir) and globalSetup

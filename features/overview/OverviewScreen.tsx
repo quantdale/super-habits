@@ -281,7 +281,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
         setIsRefreshing(false);
       }
     }
-  }, []);
+  }, [cardLayoutPrecedence]);
 
   useActiveForegroundRefresh(
     isActive,

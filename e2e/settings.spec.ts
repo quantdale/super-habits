@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures';
 import { clearDatabase } from './helpers/db';
+import { queryRows } from './helpers/dbHarness';
 import { goToTab, openNewTodoModal, submitTodoModal } from './helpers/navigation';
 import { openSettingsScreen } from './helpers/commandObservation';
 
@@ -54,5 +55,12 @@ test.describe('Settings backup restore', () => {
         'Restore is only available on an empty device. Any local user data — including history such as focus sessions or workout logs — blocks import.',
       ),
     ).toBeVisible();
+
+    // Row oracle: the synced row behind the disclosure really exists.
+    const rows = await queryRows(
+      page,
+      `SELECT COUNT(*) AS count FROM todos WHERE deleted_at IS NULL`,
+    );
+    expect(rows).toEqual([{ count: 1 }]);
   });
 });

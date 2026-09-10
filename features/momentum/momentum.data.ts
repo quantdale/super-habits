@@ -232,6 +232,3 @@ export async function getMomentumGarden(
   };
   return buildMomentumGarden(input);
 }
-
-/** Explicit alias for callers that want to name the cross-domain read model. */
-export const buildMomentumReadModel = getMomentumGarden;

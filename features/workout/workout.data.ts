@@ -2309,37 +2309,6 @@ export async function upsertWeeklyPlanEntry(input: {
   requestWorkoutReminderReconciliation();
 }
 
-export async function clearWeeklyPlanEntry(weekday: number): Promise<void> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<{ id: string }>(
-    'SELECT id FROM workout_weekly_plan WHERE weekday = ? AND deleted_at IS NULL',
-    [weekday],
-  );
-  if (!row) return;
-  const now = nowIso();
-  await runBackupMutation({
-    db,
-    mutate: async (transactionDb, enqueue) => {
-      const result = await transactionDb.runAsync(
-        `UPDATE workout_weekly_plan SET deleted_at = ?, updated_at = ?
-         WHERE id = ? AND deleted_at IS NULL`,
-        [now, now, row.id],
-      );
-      if (result.changes !== 1) return { changed: false, value: undefined };
-      enqueue({ entity: 'workout_weekly_plan', id: row.id, updatedAt: now, operation: 'delete' });
-      return { changed: true, value: undefined };
-    },
-  });
-  requestWorkoutReminderReconciliation();
-}
-
-export async function listScheduleOverrides(): Promise<WorkoutScheduleOverride[]> {
-  const db = await getDatabase();
-  return db.getAllAsync<WorkoutScheduleOverride>(
-    `SELECT * FROM workout_schedule_overrides WHERE deleted_at IS NULL ORDER BY date_key ASC`,
-  );
-}
-
 export async function setWorkoutScheduleOverride(input: {
   dateKey: string;
   overrideKind: WorkoutPlanKind;

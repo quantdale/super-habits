@@ -23,8 +23,7 @@ const { listHabits, getCompletionHistory, getAllHabitCompletionsForRange } = vi.
   getCompletionHistory: vi.fn(),
   getAllHabitCompletionsForRange: vi.fn(),
 }));
-const { countCompletedTodos, countPendingTodos, listPendingTodos, listTodos } = vi.hoisted(() => ({
-  countCompletedTodos: vi.fn(),
+const { countPendingTodos, listPendingTodos, listTodos } = vi.hoisted(() => ({
   countPendingTodos: vi.fn(),
   listPendingTodos: vi.fn(),
   listTodos: vi.fn(),
@@ -60,7 +59,6 @@ vi.mock('@/features/habits/habits.data', () => ({
   getAllHabitCompletionsForRange,
 }));
 vi.mock('@/features/todos/todos.data', () => ({
-  countCompletedTodos,
   countPendingTodos,
   listPendingTodos,
   listTodos,

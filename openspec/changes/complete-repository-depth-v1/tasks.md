@@ -11,33 +11,33 @@
 
 ## 2. Daily plan deletion
 
-- [ ] 2.1 UI: confirmed danger delete in expanded plan-history rows wired to `softDeleteDailyPlan`; refresh list and counters.
-- [ ] 2.2 Integration coverage for the delete contract (row soft-deleted, counters exclude it, no other entity touched, one coalesced intent).
-- [ ] 2.3 E2E journey: seeded past plan → history → delete → row/intent oracles + list absence.
+- [x] 2.1 UI: confirmed danger delete in expanded plan-history rows wired to `softDeleteDailyPlan`; refresh list and counters.
+- [x] 2.2 Integration coverage for the delete contract (row soft-deleted, counters exclude it, no other entity touched, one coalesced intent).
+- [x] 2.3 E2E journey: seeded past plan → history → delete → row/intent oracles + list absence.
 
 ## 3. Test floor
 
-- [ ] 3.1 Integration: Todo bulk operations (complete/remove/priority/project) with real SQL + coalesced intents.
-- [ ] 3.2 Integration: planning detail/history queries (`listRecentDailyPlans`, `listDailyPlansInRange`, `getDailyPlanAdherence`, `setGoalProgress`, `listTodosForGoal`, `listHabitsForProject`, `listGoalsForProject`, `getProject`, `getWeeklyReviewById`).
-- [ ] 3.3 Integration: Workout Gym V2 mutators/queries (body weight update/delete, reschedule + overrides, exercise order, session totals, last-performed, performance rows, logged-set reads).
-- [ ] 3.4 Integration: Pomodoro active timer get/set/clear + started-at; habit unarchive + linked-rule persistence.
-- [ ] 3.5 E2E oracles: add data-layer oracles to `todos.spec.ts`, `calories.spec.ts`, `workout-gym-v2.spec.ts`, `settings.spec.ts`.
-- [ ] 3.6 E2E: direct Overview spec (next best action + customize cards persistence); planning history journey (see 2.3).
-- [ ] 3.7 Unit: motion preference get/set contract.
+- [x] 3.1 Integration: Todo bulk operations (complete/remove/priority/project) with real SQL + coalesced intents.
+- [x] 3.2 Integration: planning detail/history queries (`listRecentDailyPlans`, `listDailyPlansInRange`, `getDailyPlanAdherence`, `setGoalProgress`, `listTodosForGoal`, `listHabitsForProject`, `listGoalsForProject`, `getProject`, `getWeeklyReviewById`).
+- [x] 3.3 Integration: Workout Gym V2 mutators/queries (body weight update/delete, reschedule + overrides, exercise order, session totals, last-performed, performance rows, logged-set reads).
+- [x] 3.4 Integration: Pomodoro active timer get/set/clear + started-at; habit unarchive + linked-rule persistence.
+- [x] 3.5 E2E oracles: added data-layer oracles to `todos.spec.ts`, `calories.spec.ts`, `workout-gym-v2.spec.ts`, `settings.spec.ts`.
+- [x] 3.6 E2E: direct Overview spec (next best action + customize cards persistence); planning history journey (2.3).
+- [x] 3.7 Unit: motion preference get/set contract (including the late-hydration precedence race).
 
 ## 4. Documentation truth
 
-- [ ] 4.1 AGENTS.md: tab labels, Settings buckets, lint gate, E2E projects, version pins, Vitest projects, schema snapshot version, EAS profiles, module exceptions, createId prefixes.
-- [ ] 4.2 README.md: section labels/deep-link wording.
-- [ ] 4.3 `docs/PROJECT_STRUCTURE_MAP.md` + `docs/knowledge-base/PROJECT_STRUCTURE_MAP.md`: test inventory, synced-writer scope, backup status, launcher claim, module exceptions, prefixes.
-- [ ] 4.4 `docs/testing/known-gaps.md`: archived path, gap counts.
-- [ ] 4.5 `docs/ui-ux/README.md`: document ledger + first-tab label.
-- [ ] 4.6 Verify all corrected claims against code and the final test inventory.
+- [x] 4.1 AGENTS.md: tab labels, Settings buckets, lint gate, E2E projects, version pins, Vitest projects, schema snapshot version, EAS profiles, module exceptions, createId prefixes.
+- [x] 4.2 README.md: section labels/deep-link wording.
+- [x] 4.3 `docs/PROJECT_STRUCTURE_MAP.md` + `docs/knowledge-base/PROJECT_STRUCTURE_MAP.md`: test inventory, synced-writer scope, backup status, launcher claim, module exceptions, prefixes.
+- [x] 4.4 `docs/testing/known-gaps.md`: archived path, gap counts.
+- [x] 4.5 `docs/ui-ux/README.md`: document ledger + first-tab label; also fixed the active agent rule/skill copies (`.cursor/rules/superhabits-rules.mdc`, `rn-expo-conventions`, `feature-agent`, `db-and-sync-invariants`) and `docs/master-context.md`.
+- [x] 4.6 Verify all corrected claims against code and the final test inventory.
 
 ## 5. Bounded dead-code removal
 
-- [ ] 5.1 Remove zero-reference, zero-test UI components and exports only; re-grep after each removal.
-- [ ] 5.2 Record intentionally retained test-covered dead APIs with rationale (no test weakening).
+- [x] 5.1 Removed zero-reference, zero-test UI components and exports (Badge/ProgressBar/SectionTitle, unused weekly-review barrel, momentum alias/growth helper, timeline filter, habit grid/streak helpers, FOCUS_SECONDS, isDraftReady, isHabitReminderResponse, sameOwnerIds, getSupabaseAuthUser, backup diagnostics, clearWeeklyPlanEntry/listScheduleOverrides, getOrCreateDailyPlan, isDailyPlanStatus, countCompletedTodos).
+- [x] 5.2 Record intentionally retained test-covered dead APIs with rationale (no test weakening).
 
 ## 6. Regression ladder and delivery
 

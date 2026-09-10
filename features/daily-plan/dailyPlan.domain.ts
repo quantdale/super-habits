@@ -1,7 +1,6 @@
 import type { DailyPlanStatus } from '@/core/db/types';
 import { dateKeyToLocalDate } from '@/lib/time';
 import {
-  DAILY_PLAN_STATUS_VALUES,
   ENERGY_SCORE_MAX,
   ENERGY_SCORE_MIN,
   FOCUS_TARGET_MAX_MINUTES,
@@ -92,10 +91,6 @@ export function computeAdherenceStreaks(
   if (byDate.get(todayKey) === 'completed') completedStreak += 1;
 
   return { committedStreak, completedStreak };
-}
-
-export function isDailyPlanStatus(value: string | undefined | null): value is DailyPlanStatus {
-  return !!value && (DAILY_PLAN_STATUS_VALUES as readonly string[]).includes(value);
 }
 
 /**

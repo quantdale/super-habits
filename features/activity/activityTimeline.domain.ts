@@ -34,14 +34,6 @@ export function categoryOf(source: ActivityTimelineSource): ActivityTimelineCate
   return SOURCE_CATEGORY[source];
 }
 
-export function filterTimeline(
-  items: ActivityTimelineItem[],
-  filter: 'all' | ActivityTimelineCategory,
-): ActivityTimelineItem[] {
-  if (filter === 'all') return items;
-  return items.filter((item) => item.category === filter);
-}
-
 /** Entity-type chips → timeline sources. Projects/goals live under planning. */
 export const SOURCE_FILTER_SOURCES: Record<
   Exclude<ActivityTimelineSourceFilter, 'all'>,

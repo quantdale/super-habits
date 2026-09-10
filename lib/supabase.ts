@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { resolveAuthRuntime, resolveSupabaseAuthOptions } from '@/lib/supabaseAuthOptions';
 
@@ -119,16 +119,6 @@ export async function getSupabaseAuthEvidence(): Promise<SupabaseAuthEvidence> {
       verifiedEmail: null,
     };
   }
-}
-
-export async function getSupabaseAuthUser(): Promise<User | null> {
-  if (!supabase) return null;
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error) throw error;
-  return user;
 }
 
 export type SupabaseAuthErrorKind =

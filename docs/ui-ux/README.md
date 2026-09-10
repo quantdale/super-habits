@@ -114,7 +114,7 @@ This plan is specifically designed around the existing Super Habits architecture
 
 `app/index.tsx` currently exposes six primary sections:
 
-1. Overview
+1. Today
 2. To Do
 3. Habits
 4. Focus
@@ -298,6 +298,8 @@ This directory is the implementation source of truth for the UI overhaul:
 - [`07-information-architecture.md`](./07-information-architecture.md) — Today-first IA and navigation model.
 - [`08-warm-momentum-2-1.md`](./08-warm-momentum-2-1.md) — Warm Momentum 2.1 visual-system contract (tokens, primitives, states, one global Add).
 - [`09-warm-momentum-2-2.md`](./09-warm-momentum-2-2.md) — Warm Momentum 2.2 interaction-primitives/tablet-density/accessibility-order contract.
+- [`10-warm-momentum-2-3.md`](./10-warm-momentum-2-3.md) — Warm Momentum 2.3 data-entry/modal determinism contract.
+- [`11-warm-momentum-2-4.md`](./11-warm-momentum-2-4.md) — Warm Momentum 2.4 reliability/performance completion contract.
 - [`2026-09-01-friction-inventory.md`](./2026-09-01-friction-inventory.md) — baseline per-surface friction inventory for the 2.0 campaign.
 - [`2026-09-01-feature-disposition-ledger.md`](./2026-09-01-feature-disposition-ledger.md) — disposition of each feature surface across campaigns.
 - [`2026-09-01-mobbin-pattern-ledger.md`](./2026-09-01-mobbin-pattern-ledger.md) — transferable reference UI patterns (principles, not trade dress).

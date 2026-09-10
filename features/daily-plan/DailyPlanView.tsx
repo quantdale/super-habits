@@ -401,7 +401,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           {showHistory ? 'Hide plan history' : 'Plan history'}
         </Text>
       </Pressable>
-      {showHistory ? <DailyPlanHistoryView /> : null}
+      {showHistory ? <DailyPlanHistoryView onPlanDeleted={() => void refresh()} /> : null}
     </View>
   );
 }

@@ -20,23 +20,14 @@ repository's shipped behavior, proofs, and documentation all tell the same true 
 ## Context
 
 - Baseline: `HEAD == origin/main == c65b96ac407d5bc74f9011997e6a58463878ff7f`, tree clean,
-  campaign `Super Habits Functional Completion V1` COMPLETED; all discovered plans
-  COMPLETED; no ACTIVE planner prompt or native campaign exists.
+  campaign `Super Habits Functional Completion V1` COMPLETED; no ACTIVE planner prompt.
 - User directive: skip the planner handoff; choose the work autonomously and drive it to
-  completion. Repository rules still apply: durable ExecPlan (this file), OpenSpec change
-  `complete-repository-depth-v1`, append-only migrations, soft delete, durable outbox,
-  no test weakening, evidence-led completion.
-- Audits performed for this plan (read-only agents + direct verification):
-  orphan-capability census, test-floor matrix, docs-truth diff, plus environment check.
-- Environment: repo pins Node `.nvmrc` 22.23.2 / engines `<23`; host default was Node
-  24.3.0. Portable Node 22.23.2 extracted to
-  `%LOCALAPPDATA%\tools\node-v22.23.2-win-x64` (outside the repo) and used for gates.
-  `better-sqlite3` loads under both runtimes, so no rebuild is required.
-- Key audited gaps to close: `migrateLegacySessionMeta` never invoked; `softDeleteDailyPlan`
-  unreachable; `cancelTodoReminderSafely` private duplicate; `WEEKLY_REVIEW_REMINDER_DATA_VERSION`
-  unused; dead `getBackfillStatus` with private live duplicate; `createPreferencePrecedenceGuard`
-  unadopted; zero-oracle specs (todos/calories/workout-gym-v2/settings), no Overview E2E,
-  bulk/planning/workout/pomodoro-timer/motion test gaps; ~20 confirmed doc discrepancies.
+  completion. Repository rules still apply (durable ExecPlan, OpenSpec change, append-only
+  migrations, soft delete, durable outbox, no test weakening, evidence-led completion).
+- Environment: portable Node 22.23.2 at `%LOCALAPPDATA%\tools\node-v22.23.2-win-x64`
+  (repo engines pin `<23`); `better-sqlite3` loads under both host and pinned runtimes.
+  Windows CRLF: run `npx prettier --write` on edited files before the lint gate.
+- Campaign driver artifacts: `openspec/changes/complete-repository-depth-v1/`.
 
 ## Scope
 
@@ -57,60 +48,75 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Current Checkpoint
 
-- Current milestone: Wave 1 COMPLETE — durability migration wired + verified, consolidations
-  landed; Wave 2 (daily-plan deletion) is next.
+- Current milestone: Waves 2–5 implemented; focused re-verification and formal 4.6
+  claim-verification are the remaining pre-ladder work.
 - Completed:
   - Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix, campaign
     artifacts (commit `8d05e03`).
-  - Wave 1 — `migrateLegacySessionMeta` runs in `AppProviders` after `syncEngine.hydrate()`
-    (best-effort, retried next launch); new real-SQL integration suite 3/3; todos data
-    layer uses the shared `cancelTodoReminderSafely` (private duplicate deleted); the
-    weekly-review scheduler uses `WEEKLY_REVIEW_REMINDER_DATA_VERSION`; dead
-    `getBackfillStatus` removed; preference-precedence guard adopted in Calories view
-    mode, Overview card layout, and the motion singleton, with a new motion contract test
-    (4/4, includes the late-hydration race).
-- In progress: committing Wave 1.
-- Important modified files: `core/providers/AppProviders.tsx`,
-  `tests/integration/pomodoroSessionMetaMigration.test.ts` (new), `features/todos/todos.data.ts`,
-  `core/notifications/weeklyReviewReminderScheduler.ts`, `core/backup/backupBackfill.ts`,
-  `features/calories/CaloriesScreen.tsx`, `features/overview/OverviewScreen.tsx`,
-  `core/theme/motion.ts`, `tests/motionPreference.test.ts` (new).
-- Last successful validation: focused eslint `--max-warnings 0` clean; unit suites 53/53
-  (todos 30, motion 4, weekly-review scheduler, pomodoro data); integration promotion 3/3;
-  `npx tsc --noEmit` clean (2026-09-10).
-- Current failures: None.
-- Relevant quarantines: None.
+  - Wave 1 — bootstrap runs `migrateLegacySessionMeta`; real-SQL integration 3/3;
+    `cancelTodoReminderSafely` consolidated; `WEEKLY_REVIEW_REMINDER_DATA_VERSION` used;
+    dead `getBackfillStatus` removed; precedence guard adopted (Calories, Overview layout,
+    motion) with motion contract tests 4/4 (commit `939ff38`).
+  - Wave 2 — daily-plan deletion: confirmed danger delete in `DailyPlanHistoryView`
+    (reusing `softDeleteDailyPlan` + `useConfirmationDialog`), parent editor refresh via
+    `onPlanDeleted`; integration `dailyPlanDeletion.test.ts` 2/2; E2E journey in
+    `planning-hub.spec.ts` (cancel + confirm + tombstone/intent oracles) passed in the
+    focused batch.
+  - Wave 3 — new real-SQL suites: `todoBulk.data.test.ts` 3/3, `planningDetails.data.test.ts`
+    5/5, `workoutQueries.data.test.ts` 4/4, `pomodoroActiveTimer.data.test.ts` 2/2,
+    `habitLifecycleRules.data.test.ts` 2/2, plus Wave 1/2 suites; E2E data oracles added to
+    `todos.spec.ts`, `calories.spec.ts`, `settings.spec.ts`, `workout-gym-v2.spec.ts`; new
+    `overview.spec.ts` (Next Best Action + customize persistence). Focused batch: 30
+    passed / 2 failed → both fixed (calorie goal JSON is an object; the hero needs a
+    due-today/overdue todo, now seeded via SQL) → both pass on re-run.
+  - Wave 4 — docs truth: AGENTS.md, README.md, `docs/PROJECT_STRUCTURE_MAP.md`,
+    `docs/knowledge-base/PROJECT_STRUCTURE_MAP.md`, `docs/testing/known-gaps.md`,
+    `docs/ui-ux/README.md`, `docs/master-context.md`, and the active agent rule/skill copies
+    under `.cursor/` and `.agents/` corrected to code reality.
+  - Wave 5 — zero-reference, zero-test removals: `core/ui/{Badge,ProgressBar,SectionTitle}.tsx`,
+    `features/weekly-review/index.ts`, `buildMomentumReadModel`, `getMomentumGrowthSources`,
+    `filterTimeline`, `getStreakLabel`, `buildGridDateHeaders`, `FOCUS_SECONDS`,
+    `isDraftReady`, `isHabitReminderResponse`, `sameOwnerIds`, `getSupabaseAuthUser`,
+    `getPendingManifestForDiagnostics`, `getBackupDirtyFlag`, `clearWeeklyPlanEntry`,
+    `listScheduleOverrides`, `getOrCreateDailyPlan`, `isDailyPlanStatus`,
+    `countCompletedTodos` (and its stale test mock key).
+- In progress: typecheck/lint verification of Wave 5 and the rebuilt focused E2E batch.
+- Important modified files: see Changed Files below.
+- Last successful validation: all new integration suites green (18 tests across 6 files);
+  focused E2E fixes 2/2; motion 4/4; `tsc` clean at Wave 3 checkpoint.
+- Current failures: None open (two E2E oracle mismatches fixed).
+- Relevant quarantines: known-gap 15 (J8 headroom floor under battery load) unchanged.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: implement Wave 2.1 (confirmed danger delete in
-  `features/daily-plan/DailyPlanHistoryView.tsx` wired to `softDeleteDailyPlan`).
-- Remaining definition of done: all Wave 2–6 tasks checked; full regression ladder green
-  under Node 22.23.2; docs corrected and verified; ExecPlan COMPLETED and
-  `agent:plan:validate` PASS; commit pushed and CI result recorded.
+- Exact next action: run `tsc` + eslint on the Wave 5 tree, rebuild `dist/`, re-run the
+  focused E2E batch (expecting all green), then execute the full regression ladder.
+- Remaining definition of done: tasks 4.6 and 6.1–6.4 (full ladder, native evidence or
+  honest ENVIRONMENT classification, plan COMPLETED + validated, commit/push/CI).
 
 ## Progress
 
 - [x] Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix (2026-09-10)
 - [x] Wave 1 — durability wiring + consolidations (2026-09-10)
-- [ ] Wave 2 — daily plan deletion
-- [ ] Wave 3 — test floor
-- [ ] Wave 4 — documentation truth
-- [ ] Wave 5 — bounded dead-code removal
+- [x] Wave 2 — daily plan deletion (2026-09-10)
+- [x] Wave 3 — test floor (2026-09-10)
+- [x] Wave 4 — documentation truth (2026-09-10)
+- [x] Wave 5 — bounded dead-code removal (2026-09-10)
 - [ ] Wave 6 — regression ladder + delivery
 
 ## Surprises & Discoveries
 
-- `qa:fast` fails at HEAD on Windows because Vitest cannot transform an imported `.mjs`
-  that starts with a shebang (CRLF working copy); CI on Linux was green. Removing the
-  shebang is the robust cross-platform fix.
-- Host default Node (24.3.0) violates the repo's engines pin (`<23`); a portable 22.23.2
-  runtime is required for legitimate gates. `better-sqlite3` is ABI-compatible with both,
-  so no native rebuild is needed.
-- The audit backlog in `.agent/hardening-evidence/audit-reports.md` is largely closed
-  already (F9–F12 verified fixed in code); do not reopen it wholesale.
-- `getDailyPlanAdherence` is live (`DailyPlanView`), unlike the audit's orphan shortlist
-  implying planning rollups were unused.
+- **P1 product bug found by the new test floor:** `bulkRemoveTodos` tombstoned rows locally
+  without enqueueing the `todos` delete intent, so the remote copy (and any restore) would
+  resurrect bulk-deleted todos. Fixed by enqueueing one delete intent per removed row
+  inside the same transaction; the new integration test is the regression proof.
+- `qa:fast` failed at HEAD on Windows because Vitest cannot transform an imported `.mjs`
+  that starts with a shebang (CRLF working copy); removing the shebang is the fix.
+- Host default Node 24.3.0 violates the engines pin; portable 22.23.2 is used for gates.
+- The Overview Next Best Action intentionally stays hidden for plain pending todos; it
+  needs an overdue/due-today task (or another ranked signal) — the E2E now seeds one.
+- The calorie goal is stored as a JSON object (`{ calories, protein, carbs, fats }`), not a
+  scalar; the E2E oracle asserts the object shape.
 
 ## Decision Log
 
@@ -118,46 +124,65 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   artifacts (OpenSpec change + ExecPlan) directly and execute them.
 - 2026-09-10 — Remove the shebang from `scripts/journey-label-parity.mjs` rather than
   weakening the test import or skipping the suite; the script is only ever run via `node`.
-- 2026-09-10 — Run the legacy session-metadata promotion at bootstrap (not screen-scoped)
-  so durability does not depend on visiting the Focus surface.
-- 2026-09-10 — Delete dead `getBackfillStatus`; keep the live `backupRestore` helper (it
-  has the correct `BACKUP_SCOPE_VERSION` comparison) as the single implementation.
+- 2026-09-10 — Run the legacy session-metadata promotion at bootstrap (not screen-scoped).
+- 2026-09-10 — Delete dead `getBackfillStatus`; keep the live `backupRestore` helper.
 - 2026-09-10 — Adopt the precedence guard only where an ad-hoc equivalent or demonstrable
-  race exists (Calories view mode, Overview card layout, motion singleton); other
-  AsyncStorage preferences (theme, command mode, reminders) keep their existing flows and
-  are recorded as evaluated-but-unchanged.
-- 2026-09-10 — Daily-plan deletion reuses `softDeleteDailyPlan` + `useConfirmationDialog`,
-  matching the weekly-review history delete pattern; no new route or surface.
+  race exists (Calories view mode, Overview card layout, motion singleton).
+- 2026-09-10 — Daily-plan deletion reuses `softDeleteDailyPlan` + `useConfirmationDialog`.
+- 2026-09-10 — Dead-code scope is zero-reference AND zero-test only; test-covered dead
+  APIs stay (no test weakening), recorded in tasks 5.2. Deliberately retained families:
+  redundant lifecycle wrappers (`setTodoCompletionState`, `setGoalStatus`, `setProjectStatus`,
+  `commitDailyPlan`, `completeDailyPlan`, `listPomodoroSessions`, `listWorkoutLogs`), the
+  legacy Linked Actions CRUD/policy surface (19+ tests), and pure domain helpers whose
+  tests encode contracted semantics (pomodoro state/parse, PR classification, macro donut,
+  overview CTA/visibility, momentum sources, timeline filters). They are unused in
+  production but removing them would delete their contracts without a product change.
+- 2026-09-10 — E2E oracle fixes: seed due-today data via `runSql` for the hero; assert the
+  calorie-goal object shape.
 
 ## Validation Ledger
 
-- 2026-09-10 — `npx vitest run tests/journeyLabelParity.test.ts --project unit` — PASS —
-  3/3 after shebang removal (failed 1/1 before).
-- 2026-09-10 — `node scripts/journey-label-parity.mjs` — PASS — rail labels agree.
-- 2026-09-10 — `npm run qa:fast` — FAIL (pre-fix baseline) — blocked only by the
-  journey-label-parity import; Unit 1691+ tests otherwise green; will re-run after fixes.
-- 2026-09-10 — `npx vitest run tests/integration/pomodoroSessionMetaMigration.test.ts
---project integration` — PASS — 3/3 (promote-once/no-clobber/orphans, real SQLite).
-- 2026-09-10 — `npx vitest run tests/motionPreference.test.ts --project unit` — PASS —
-  4/4 including the late-hydration precedence race.
-- 2026-09-10 — `npx tsc --noEmit` — PASS — 0 errors after Wave 1 edits.
-- 2026-09-10 — `npx vitest run tests/todos.data.test.ts --project unit` — PASS — 30/30.
-- 2026-09-10 — `npx vitest run tests/calories.data.test.ts --project unit` — PASS —
-  22/22 after the guard adoption.
-- 2026-09-10 — Wave 1 focused suite — PASS — `eslint --max-warnings 0` clean; unit
-  53/53 (todos/motion/weekly-review scheduler/pomodoro data); integration 3/3.
+- 2026-09-10 — shebang fix + label parity — PASS — unit 3/3, script green.
+- 2026-09-10 — Wave 1 focused suite — PASS — eslint 0; unit 53/53; integration 3/3.
+- 2026-09-10 — `pomodoroSessionMetaMigration` — PASS — 3/3 real SQLite.
+- 2026-09-10 — `dailyPlanDeletion` — PASS — 2/2 real SQLite.
+- 2026-09-10 — `todoBulk` / `planningDetails` / `workoutQueries` / `pomodoroActiveTimer` /
+  `habitLifecycleRules` — PASS — 3/3, 5/5, 4/4, 2/2, 2/2.
+- 2026-09-10 — Focused chromium batch (planning-hub, todos, calories, settings, overview,
+  workout-gym-v2) — 30 passed / 2 failed → fixes → the 2 fixed tests PASS individually.
+- 2026-09-10 — `openspec validate` — PASS — 52/52 (includes the new change).
+- 2026-09-10 — `agent:plan:validate` — PASS — this plan valid ACTIVE.
 
 ## Changed Files / Areas
 
-- `scripts/journey-label-parity.mjs` — shebang removed (Windows/CRLF Vitest import fix).
+- `scripts/journey-label-parity.mjs` — shebang removed.
 - `openspec/changes/complete-repository-depth-v1/` — proposal, design, tasks, 2 specs.
 - `.agent/execplans/repository-completion-and-truth-v1.md` — this plan.
-- Wave 1: `core/providers/AppProviders.tsx`,
-  `tests/integration/pomodoroSessionMetaMigration.test.ts`,
-  `features/todos/todos.data.ts`, `core/notifications/weeklyReviewReminderScheduler.ts`,
-  `core/backup/backupBackfill.ts`, `features/calories/CaloriesScreen.tsx`,
-  `features/overview/OverviewScreen.tsx`, `core/theme/motion.ts`,
+- Wave 1: `core/providers/AppProviders.tsx`, `features/todos/todos.data.ts`,
+  `core/notifications/weeklyReviewReminderScheduler.ts`, `core/backup/backupBackfill.ts`,
+  `features/calories/CaloriesScreen.tsx`, `features/overview/OverviewScreen.tsx`,
+  `core/theme/motion.ts`, `tests/integration/pomodoroSessionMetaMigration.test.ts`,
   `tests/motionPreference.test.ts`.
+- Wave 2: `features/daily-plan/DailyPlanHistoryView.tsx`, `features/daily-plan/DailyPlanView.tsx`,
+  `tests/integration/dailyPlanDeletion.test.ts`, `e2e/planning-hub.spec.ts`.
+- Wave 3: `tests/integration/{todoBulk,planningDetails,workoutQueries,pomodoroActiveTimer,habitLifecycleRules}.data.test.ts`
+  (note: `pomodoroActiveTimer` and `habitLifecycleRules` use `.data.` naming), `e2e/{todos,calories,settings,workout-gym-v2}.spec.ts`,
+  `e2e/overview.spec.ts`.
+- Wave 4: `AGENTS.md`, `README.md`, `docs/PROJECT_STRUCTURE_MAP.md`,
+  `docs/knowledge-base/PROJECT_STRUCTURE_MAP.md`, `docs/testing/known-gaps.md`,
+  `docs/ui-ux/README.md`, `docs/master-context.md`, `.cursor/rules/superhabits-rules.mdc`,
+  `.cursor/agents/feature-agent.md`, `.agents/agents/feature-agent.md`,
+  `.cursor/skills/rn-expo-conventions/SKILL.md`, `.agents/skills/rn-expo-conventions/SKILL.md`,
+  `.cursor/skills/db-and-sync-invariants/SKILL.md`, `.agents/skills/db-and-sync-invariants/SKILL.md`,
+  `playwright.config.ts`, `e2e/README.md`.
+- Wave 5: deleted `core/ui/{Badge,ProgressBar,SectionTitle}.tsx`, `features/weekly-review/index.ts`;
+  trimmed exports in `features/momentum/momentum.{data,domain}.ts`,
+  `features/activity/activityTimeline.domain.ts`, `features/habits/habits.domain.ts`,
+  `features/pomodoro/pomodoro.domain.ts`, `features/command/command.domain.ts`,
+  `core/notifications/notificationResponseDispatcher.ts`, `core/auth/account.domain.ts`,
+  `lib/supabase.ts`, `core/sync/supabase.adapter.ts`, `features/workout/workout.data.ts`,
+  `features/daily-plan/dailyPlan.{data,domain}.ts`, `features/todos/todos.data.ts`,
+  `tests/ask.retrieval.test.ts`.
 
 ## Recovery / Resume Instructions
 
@@ -167,10 +192,12 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 4. Run `npm run agent:resume -- --plan .agent/execplans/repository-completion-and-truth-v1.md`.
 5. Use Node 22.23.2 for all gates:
    `$env:PATH = "$env:LOCALAPPDATA\tools\node-v22.23.2-win-x64;" + $env:PATH`.
-6. Continue from `Exact next action`; checkpoint this plan at every milestone/failure.
+6. After any edit batch, run `npx prettier --write` on changed files before the lint gate.
+7. Continue from `Exact next action`; checkpoint this plan at every milestone/failure.
 
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Waves 0–1 landed; durability promotion now runs and is real-SQL proven.
-- Follow-up: Wave 2 daily-plan deletion; see tasks.
+- Summary: Waves 0–5 landed; a P1 bulk-delete sync gap was found and fixed; durability
+  promotion, daily-plan deletion, test floor, docs truth, and bounded cleanup complete.
+- Follow-up: focused re-verification then the full regression ladder and delivery.

@@ -350,9 +350,3 @@ export function isValidAccountEmail(email: string): boolean {
 export function isValidAccountOtp(token: string): boolean {
   return /^\d{6}$/.test(token.trim());
 }
-
-export function sameOwnerIds(left: string[], right: string[]): boolean {
-  const a = [...new Set(left)].sort();
-  const b = [...new Set(right)].sort();
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}

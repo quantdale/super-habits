@@ -68,7 +68,7 @@ SuperHabits is an offline-first productivity app that runs as a Progressive Web 
 
 Key product facts:
 
-- Six tab surfaces: **Overview**, **Todos**, **Habits**, **Pomodoro**, **Workout**, and **Calories**.
+- Six tab surfaces (rail labels; internal section keys in parentheses): **Today** (`overview`), **To Do** (`todos`), **Habits**, **Focus** (`pomodoro`), **Workout**, and **Calories**.
 - A single-page experience: the six sections are rendered inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items. Settings is a full-screen **modal**; the Command Center is a **global overlay** (no `/command` route).
 - Local **SQLite** is the source of truth; writes may optionally be pushed to **Supabase** as a backup.
 - Workout is a Gym V2 training workspace: built-in/custom exercise identity, typed prescriptions, weekly planning and date overrides, modality-aware guided sessions, progression, body-weight tracking, exercise progress, and durable recovery all live inside the existing Workout tab.
@@ -84,15 +84,15 @@ Key product facts:
   exercises, weekly plans, date overrides, body weight, and modality-rich
   workout history; hard-delete entities remote-delete; restore requires a
   completely empty device and never replays historical side effects.
-- Settings is organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal.
+- Settings is organized into these sections, in render order: Appearance, Accessibility, Backup / Sync / Restore, Portable data, Capture, Notifications / Timer defaults (Notifications + Pomodoro defaults), Nutrition defaults, Developer / Internal.
 
 ## Technology Stack
 
 - **Runtime:** Expo SDK `~55.0.28`, React Native `0.83.10`, React `19.2.0`
 - **Language:** TypeScript `~5.9.2` (strict mode)
-- **Routing:** Expo Router `^55.0.7` (file-based routing in `app/`)
+- **Routing:** Expo Router `~55.0.17` (file-based routing in `app/`)
 - **Styling:** NativeWind `^4.2.3` + Tailwind CSS `^3.4.19`
-- **Database:** `expo-sqlite` (`^55.0.11`); WAL mode on native, SQLite WASM + OPFS on web
+- **Database:** `expo-sqlite` (`~55.0.18`); WAL mode on native, SQLite WASM + OPFS on web
 - **State:** Local `useState` only; section switching via `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`).
 - **Backup/Auth:** Supabase (`@supabase/supabase-js`) with anonymous sign-in, email-change protection, and no-create existing-account OTP recovery
 - **Networking:** `@react-native-community/netinfo`
@@ -104,38 +104,38 @@ Key product facts:
 
 ## Key Configuration Files
 
-| File                   | Purpose                                                                                                                    |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `package.json`         | Dependencies, scripts, version `1.0.0`, main `expo-router/entry`                                                           |
-| `app.json`             | Expo config: scheme `superhabits`, Android package `com.dale16.superhabits`, web static export, COOP/COEP headers, plugins |
-| `eas.json`             | EAS Build profiles (`development`, `preview` APK, `production`); CLI `>= 18.5.0`                                           |
-| `vercel.json`          | Static web PWA deploy: `npm run build:web` → `dist/`, SPA rewrite, COOP/COEP headers                                       |
-| `tsconfig.json`        | Expo TS base, strict, `@/*` → `./*`, Vitest globals                                                                        |
-| `metro.config.js`      | Metro + NativeWind, `.wasm` asset extension, dev COOP/COEP middleware                                                      |
-| `babel.config.js`      | Presets: `babel-preset-expo`, `nativewind/babel`; plugin: `react-native-reanimated/plugin` (must be last)                  |
-| `tailwind.config.js`   | NativeWind preset, content paths, per-tab colors (`todos`, `habits`, `focus`, `workout`, `calories`, `brand`, `surface`)   |
-| `vitest.config.ts`     | Node env, `tests/**/*.test.ts` + `core/**/__tests__/**/*.test.ts`, `@/` alias, `__DEV__ = true`                            |
-| `playwright.config.ts` | E2E against `http://localhost:8081`, Chromium, `workers: 1` locally, serial files, `scripts/serve-e2e.js`                  |
-| `scripts/serve-e2e.js` | Static server for E2E; serves `dist/` with `require-corp` COEP and SPA fallback                                            |
-| `.env` / `.env.local`  | Optional Supabase and command-parser environment variables (no committed secrets)                                          |
+| File                   | Purpose                                                                                                                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`         | Dependencies, scripts, version `1.0.0`, main `expo-router/entry`                                                                                                                                          |
+| `app.json`             | Expo config: scheme `superhabits`, Android package `com.dale16.superhabits`, web static export, COOP/COEP headers, plugins                                                                                |
+| `eas.json`             | EAS Build profiles (`development`, `preview` APK, `production`, `e2e-test`); CLI `>= 18.5.0`                                                                                                              |
+| `vercel.json`          | Static web PWA deploy: `npm run build:web` → `dist/`, SPA rewrite, COOP/COEP headers                                                                                                                      |
+| `tsconfig.json`        | Expo TS base, strict, `@/*` → `./*`, Vitest globals                                                                                                                                                       |
+| `metro.config.js`      | Metro + NativeWind, `.wasm` asset extension, dev COOP/COEP middleware                                                                                                                                     |
+| `babel.config.js`      | Presets: `babel-preset-expo`, `nativewind/babel`; plugin: `react-native-reanimated/plugin` (must be last)                                                                                                 |
+| `tailwind.config.js`   | NativeWind preset, content paths, per-tab colors (`todos`, `habits`, `focus`, `workout`, `calories`, `brand`, `surface`)                                                                                  |
+| `vitest.config.ts`     | Two projects (unit + integration); unit: `tests/**/*.test.ts` + `core/**/__tests__/**/*.test.ts`; integration: `tests/integration/**/*.test.ts` against real better-sqlite3; `@/` alias, `__DEV__ = true` |
+| `playwright.config.ts` | E2E against `http://localhost:8081`, Chromium, `workers: 1` locally, serial files, `scripts/serve-e2e.js`                                                                                                 |
+| `scripts/serve-e2e.js` | Static server for E2E; serves `dist/` with `require-corp` COEP and SPA fallback                                                                                                                           |
+| `.env` / `.env.local`  | Optional Supabase and command-parser environment variables (no committed secrets)                                                                                                                         |
 
 ## Directory Structure
 
-| Path         | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`       | Expo Router only. Single-page entry: `_layout.tsx` mounts `GlobalCommandCenterHost` + `NavigationProvider`; `index.tsx` renders all six sections behind `NavigationContext.activeSection`. No business logic.                                                                                                                                                                                                                                                                                                                                                             |
-| `features/`  | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions: `overview/` is screen-only; `settings/` is a screen plus `settingsRestorePreview.ts`; `command/` is an overlay-first shell; `shared/` holds cross-feature UI and shared types (`activityTypes.ts`).                                                                                                                                                                                                                        |
-| `core/`      | Cross-cutting infrastructure: DB client/migrations, entity types, `app_meta` key registry (`core/db/appMeta.ts`), account ownership/coordinator (`core/auth/`), sync engine + restore, **backup completeness v2 (`core/backup/`: validators, canonical checksums, settings allowlist, backfill, checkpoint, restore)**, linked actions, in-app notices (`core/notifications/` + `core/providers/InAppNoticeProvider.tsx` + `core/ui/InAppNoticeBanner.tsx`), theme system (`core/theme/`), providers, PWA service-worker registration, shared UI primitives (`core/ui/`). |
-| `lib/`       | No DB access, no feature imports — but not all pure: `supabase.ts` has auth side effects (module-scope client), `notifications.ts` registers a module-scope notification handler, `useForegroundRefresh.ts` is React hooks. Includes `id.ts`, `time.ts`, `validation.ts`, etc.                                                                                                                                                                                                                                                                                            |
-| `constants/` | Design tokens such as `sectionColors.ts`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `tests/`     | Vitest unit tests for domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider tests.                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `e2e/`       | Playwright E2E specs and helpers. Runs against the static web export in `dist/`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `public/`    | Static PWA assets: `sw.js`, `manifest.json`, icons.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `assets/`    | App icons and splash images.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `scripts/`   | Build/test helpers such as `serve-e2e.js`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `supabase/`  | Supabase Edge Functions (`supabase/functions/parse-ai-command/`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `patches/`   | `patch-package` patches for Metro / React Native CLI plugins.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `docs/`      | Architecture maps, knowledge base, and agent workflows.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Path         | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`       | Expo Router only. Single-page entry: `_layout.tsx` mounts `GlobalCommandCenterHost` + `NavigationProvider`; `index.tsx` renders all six sections behind `NavigationContext.activeSection`. No business logic.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `features/`  | Product feature modules. Standard pattern: `{feature}.data.ts`, `{feature}.domain.ts`, `{Feature}Screen.tsx`, optional `types.ts`. Exceptions use view/screen variants (e.g. `planning-hub/PlanningHubScreen.tsx`, `daily-plan/DailyPlanView.tsx`, `projects/ProjectListView.tsx`): `overview/` is screen-only; `settings/` is a screen plus `settingsRestorePreview.ts`; `command/` is an overlay-first shell; `shared/` holds cross-feature UI and shared types (`activityTypes.ts`); planning modules (`daily-plan/`, `goals/`, `projects/`, `progress/`, `activity/`, `momentum/`, `planning-hub/`, `weekly-review/`) and `quick-capture/` follow the same layering without a `{Feature}Screen.tsx` name. |
+| `core/`      | Cross-cutting infrastructure: DB client/migrations, entity types, `app_meta` key registry (`core/db/appMeta.ts`), account ownership/coordinator (`core/auth/`), sync engine + restore, **backup completeness v2 (`core/backup/`: validators, canonical checksums, settings allowlist, backfill, checkpoint, restore)**, linked actions, in-app notices (`core/notifications/` + `core/providers/InAppNoticeProvider.tsx` + `core/ui/InAppNoticeBanner.tsx`), theme system (`core/theme/`), providers, PWA service-worker registration, shared UI primitives (`core/ui/`).                                                                                                                                     |
+| `lib/`       | No DB access, no feature imports — but not all pure: `supabase.ts` has auth side effects (module-scope client), `notifications.ts` registers a module-scope notification handler, `useForegroundRefresh.ts` is React hooks. Includes `id.ts`, `time.ts`, `validation.ts`, etc.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `constants/` | Design tokens such as `sectionColors.ts`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `tests/`     | Vitest unit tests for domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider tests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `e2e/`       | Playwright E2E specs and helpers. Runs against the static web export in `dist/`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `public/`    | Static PWA assets: `sw.js`, `manifest.json`, icons.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `assets/`    | App icons and splash images.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `scripts/`   | Build/test helpers such as `serve-e2e.js`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `supabase/`  | Supabase Edge Functions (`supabase/functions/parse-ai-command/`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `patches/`   | `patch-package` patches for Metro / React Native CLI plugins.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `docs/`      | Architecture maps, knowledge base, and agent workflows.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ## Architecture & Runtime
 
@@ -144,7 +144,7 @@ Key product facts:
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
 - Current stored schema version: **24** (`app_meta.db_schema_version`), including durable processed-notification-action state, the SQLite sync outbox and its durable owner binding, the planning entities (16–19), the hardening-wave-v2 durable-state promotion (20: habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 (`daily_plans.top_todo_titles`), Gym V2's routine/session/catalog/planning/body-weight tables (22), deep Gym V2 semantic metadata (23: aliases, instructions, unilateral and external-load snapshots), and hot-path range indexes (24: `pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`, partial `idx_todos_pending_sort`). Next migration: add a new `if (version < 25) { ... }` block.
-- `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v14 outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
+- `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v15 owner-bound outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 
 ### Sync
@@ -163,9 +163,10 @@ Key product facts:
 1. `GestureHandlerRootView`
 2. `initializeDatabase()`
 3. Service worker registration (web only)
-4. Account coordinator ownership inspection and safe anonymous bootstrap (`core/auth/accountCoordinator.ts`), when Supabase env vars are present
-5. Sync engine hydrate
-6. Account refresh, then Restore preview check and optional restore prompt
+4. Sync engine hydrate
+5. One-time best-effort promotion of pre-v20 device-local Pomodoro session notes/associations into durable `pomodoro_sessions` columns (`migrateLegacySessionMeta`)
+6. Account coordinator ownership inspection and safe anonymous bootstrap (`core/auth/accountCoordinator.ts`), when Supabase env vars are present
+7. Account refresh, then Restore preview check and optional restore prompt
 
 Any component that calls a `*.data.ts` function must be a descendant of `AppProviders`.
 
@@ -173,7 +174,7 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 
 - Single-page model: `app/` contains only `_layout.tsx` and `index.tsx`. There are no `app/(tabs)/`, `app/settings.tsx`, or `app/command.tsx` routes.
 - `app/_layout.tsx` mounts `GlobalCommandCenterHost` (overlay host only; no standalone floating launcher) and `NavigationProvider`. Ordinary entry is Add → Describe it; Settings may open the advanced capture overlay explicitly.
-- `app/index.tsx` renders the six sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) behind `NavigationContext.activeSection`, with a top tab rail of plain `Pressable` items.
+- `app/index.tsx` renders the six sections (Today, To Do, Habits, Focus, Workout, Calories) behind `NavigationContext.activeSection`, with a top tab rail of plain `Pressable` items.
 - Settings is a full-screen **modal** opened via `openSettings`; the Command Center is a **global overlay** opened via `openCommand`. Old URLs `/settings`, `/command`, and `/(tabs)/*` no longer exist.
 
 ### Linked Actions
@@ -212,13 +213,13 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 
 Violating these can cause silent data corruption or break the app on cold start.
 
-1. **Soft delete only** for main entities. Use `UPDATE ... SET deleted_at = datetime('now')` and `WHERE deleted_at IS NULL`. Do not use `DELETE FROM` on synced entity tables.
+1. **Soft delete only** for main entities. Use `UPDATE ... SET deleted_at = '<nowIso()>'` and `WHERE deleted_at IS NULL`. Do not use `DELETE FROM` on synced entity tables.
 2. **Sync enqueue on every applicable write.** All 21 `BACKUP_ENTITIES` (see `core/backup/backup.types.ts`) ride the durable outbox through `runSyncedMutation`/`runBackupMutation` — including `pomodoro_sessions`, `workout_logs`, the nested workout tables, `saved_meals`, `linked_action_rules`, planning entities, custom exercises, weekly plans, date overrides, and body weight. Only local operational state stays unsynced: `linked_action_events`, `linked_action_executions`, and `processed_notification_actions`.
 3. **DB singleton.** `getDatabase()` in `core/db/client.ts` is the only entrypoint. Never open a second SQLite connection or access the DB before initialization.
 4. **IDs via `createId(prefix)` from `lib/id.ts`.** Format: `{prefix}_{timestamp_ms}_{8_random_chars}`. Never use `Math.random()`, `crypto.randomUUID()`, or `Date.now()` alone.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
 6. **Migrations are append-only.** Never edit existing migration blocks. Add a new `if (version < N+1) { ... }` block in `runMigrations()` in `core/db/client.ts`.
-7. **`schema.sql` is a reference-only partial snapshot** (not runtime authority) — the runtime truth is the bootstrap DDL + append-only migration blocks in `core/db/client.ts`; the snapshot records the current v14 outbox addition but may omit runtime-only details.
+7. **`schema.sql` is a reference-only partial snapshot** (not runtime authority) — the runtime truth is the bootstrap DDL + append-only migration blocks in `core/db/client.ts`; the snapshot records the v15 owner-bound outbox addition but may omit runtime-only details.
 8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0; the corresponding durable outbox delete intent is still synced. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`) and its remote delete intent is synced. These are local hard-delete exceptions, not unsynced entities.
 
 ## Feature Module Pattern
@@ -241,24 +242,37 @@ Current exceptions:
 - `features/command/` is an overlay-first shell with its own provider, screen, parser, config, and executor files.
 - `features/shared/` holds cross-feature UI (`GitHubHeatmap`, etc.) and shared types (`activityTypes.ts`, used by 4 domain layers).
 - `features/workout/` includes nested screens (`RoutineDetailScreen`, `WorkoutSessionScreen`).
+- Planning modules (`features/daily-plan/`, `goals/`, `projects/`, `progress/`, `activity/`, `momentum/`, `planning-hub/`, `weekly-review/`) and `quick-capture/` use view/screen variants (`*View.tsx`, `*Screen.tsx`, `*Modal.tsx`) instead of the `{Feature}Screen.tsx` name.
 
 ## Entity ID Prefixes (`createId`)
 
-| Entity                             | Prefix  |
-| ---------------------------------- | ------- |
-| `todos`                            | `todo`  |
-| `habits`                           | `habit` |
-| `habit_completions`                | `hcmp`  |
-| `calorie_entries`                  | `cal`   |
-| `saved_meals`                      | `smeal` |
-| `workout_routines`, `workout_logs` | `wrk`   |
-| `routine_exercises`                | `ex`    |
-| `routine_exercise_sets`            | `eset`  |
-| `workout_session_exercises`        | `wsex`  |
-| `pomodoro_sessions`                | `pom`   |
-| pomodoro preset (app_meta payload) | `ppre`  |
-| guest profile (`app_meta`)         | `guest` |
-| recurring todo series              | `rec`   |
+| Entity                                                     | Prefix                    |
+| ---------------------------------------------------------- | ------------------------- |
+| `todos`                                                    | `todo`                    |
+| `habits`                                                   | `habit`                   |
+| `habit_completions`                                        | `hcmp`                    |
+| `calorie_entries`                                          | `cal`                     |
+| `saved_meals`                                              | `smeal`                   |
+| `workout_routines`, `workout_logs`                         | `wrk`                     |
+| `routine_exercises`                                        | `ex`                      |
+| `routine_exercise_sets`                                    | `eset`                    |
+| `workout_session_exercises`                                | `wsex`                    |
+| `workout_session_sets`                                     | `sset`                    |
+| `workout_weekly_plan`                                      | `wplan`                   |
+| `workout_schedule_overrides`                               | `wover`                   |
+| `body_weight_entries`                                      | `bw`                      |
+| `custom_exercises`                                         | `cex`                     |
+| `pomodoro_sessions`                                        | `pom`                     |
+| pomodoro preset (app_meta payload)                         | `ppre`                    |
+| guest profile (`app_meta`)                                 | `guest`                   |
+| recurring todo series                                      | `rec`                     |
+| `projects`                                                 | `proj`                    |
+| `goals`                                                    | `goal`                    |
+| `daily_plans`                                              | `dplan`                   |
+| `weekly_reviews`                                           | `wrev`                    |
+| `linked_action_rules`                                      | `link`                    |
+| linked-action chains/events/executions (local operational) | `lchain`, `levt`, `lexec` |
+| command history/drafts (`app_meta` local)                  | `cmd`                     |
 
 ## Build, Run, and Test Commands
 
@@ -277,7 +291,7 @@ npm run web:hygiene  # report web test ports / free an exact owned PID (read-onl
 
 # Quality gates
 npm run typecheck    # tsc --noEmit
-npm run lint         # eslint . --max-warnings 25
+npm run lint         # eslint . --max-warnings 0
 npm run lint:fix     # eslint . --fix
 npm run format       # prettier --write .
 npm run format:check # prettier --check .
@@ -287,7 +301,7 @@ npm test             # vitest run
 npm run build:web    # npx expo export -p web → dist/ (one-shot, finite)
 
 # E2E (requires dist/ to be up to date)
-npm run e2e          # playwright test (chromium + journeys + simulation projects)
+npm run e2e          # playwright test (chromium + journeys + simulation + pwa projects)
 npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — opt-in, main/nightly only
 npm run e2e:report   # open HTML report
 npm run e2e:headed   # visible browser for debugging
@@ -304,7 +318,7 @@ npm run qa:native:targeted
 Current verified baselines:
 
 - `npm run typecheck`: 0 errors at the last verified baseline
-- `npm run lint`: 0 errors at the last verified baseline (warnings allowed)
+- `npm run lint`: 0 errors and 0 warnings (`--max-warnings 0`) at the last verified baseline
 - Test counts are intentionally volatile; verify current Vitest and Playwright inventories with `npx vitest list` and `npx playwright test --list` before relying on them. Recoverable Account V1 coverage is in `tests/account.*`, `tests/integration/account*`, and `e2e/journeys/recoverable-account-v1.spec.ts`.
 
 > The simulation platform (`simulation/`) adds scenario/runner/repro layers on top of the journey suite — see `simulation/README.md` and `docs/testing/known-gaps.md`.
@@ -315,9 +329,9 @@ Current verified baselines:
 
 ### Unit Tests (Vitest)
 
-- Config: `vitest.config.ts`
-- Files: `tests/*.test.ts` and `core/**/__tests__/**/*.test.ts`
-- Setup: `tests/setup.ts`
+- Config: `vitest.config.ts` (two projects: `unit` and `integration`)
+- Files: unit — `tests/**/*.test.ts` + `core/**/__tests__/**/*.test.ts`; integration — `tests/integration/**/*.test.ts` executed against real better-sqlite3 through `tests/integration/helpers/db.ts`
+- Setup: `tests/setup.ts` (unit) / `tests/integration/setup.ts` (integration)
 - Coverage emphasis: domain logic, data-layer contracts, command parser/config/executor, linked actions, restore flows, sync engine, and selected DB/provider behavior. Component rendering tests are still limited.
 - Every new `*.domain.ts` function should have a Vitest test.
 
@@ -440,7 +454,7 @@ eas build -p android --profile preview
      `npm run sim:run -- --mode deterministic --scenario @p0` (deterministic
      scenario subset, ≤ 10 min budget).
    - **main lane:** full `npm run e2e` (feature + full journeys + simulation
-     self-test) + `npm run sim:run -- --mode deterministic` (full library) +
+     self-test + pwa) + `npm run sim:run -- --mode deterministic` (full library) +
      `dist-sync/` build with DUMMY Supabase env (never PRs, never quality) +
      `npm run e2e:sync` (the dedicated `journeys-sync` project runs the
      remote-boundary journey steps against `dist-sync/` on :8082).

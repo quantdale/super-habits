@@ -113,10 +113,10 @@ Optional platform commands:
 
 ## Routes and Surfaces
 
-The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Today (`overview` internally), Todos, Habits, Pomodoro, Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a top tab rail of plain `Pressable` items:
+The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Today (`overview` internally), To Do (`todos`), Habits, Focus (`pomodoro`), Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a top tab rail of plain `Pressable` items:
 
 - Today
-- Todos
+- To Do
 - Habits
 - Focus
 - Workout
@@ -178,7 +178,7 @@ This repo is configured for static Expo web export.
 Recommended validation after deploy:
 
 1. Confirm build output includes `dist/index.html`
-2. Open a deep link (for example `/todos`) and verify it resolves to the app shell
+2. Open a path that does not map to a file (for example `/todos`) and verify the SPA rewrite serves the app shell
 
 ### EAS Android APK Build (Preview)
 
