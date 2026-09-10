@@ -15,6 +15,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { TextField } from '@/core/ui/TextField';
 import { createSubmitGuard } from '@/lib/submitGuard';
+import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
 import { parseNumericInput } from '@/lib/numericInput';
 // import { spacing, radius } from '@/core/theme/designTokens';
 import {
@@ -151,11 +152,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [isSavingEntry, setIsSavingEntry] = useState(false);
   const entrySubmitGuard = useRef(createSubmitGuard());
   const [viewMode, setViewMode] = useState<CaloriesViewMode>('form');
-  /** True once the user (or the persisted-value hydration) has chosen a view.
-   *  The AsyncStorage hydration resolves asynchronously; on a slow cold start
-   *  it can settle AFTER the user already tapped the view switch, and a plain
-   *  setViewMode(stored) would silently revert their choice. */
-  const viewChoiceMadeRef = useRef(false);
+  /** AsyncStorage hydration resolves asynchronously; on a slow cold start it
+   *  can settle AFTER the user already tapped the view switch, and a plain
+   *  setViewMode(stored) would silently revert their choice. The shared
+   *  precedence guard owns the F-05 contract (see lib/preferencePrecedence). */
+  const viewPreferenceGuard = useMemo(() => createPreferencePrecedenceGuard(), []);
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
   const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
   const [targetsSheetVisible, setTargetsSheetVisible] = useState(false);
@@ -224,9 +225,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
     AsyncStorage.getItem(CALORIES_VIEW_MODE_STORAGE_KEY)
       .then((storedValue) => {
-        if (!active || viewChoiceMadeRef.current) return;
+        if (!active || !viewPreferenceGuard.shouldApplyPersisted()) return;
         if (storedValue === 'form' || storedValue === 'diary') {
-          viewChoiceMadeRef.current = true;
+          viewPreferenceGuard.markChoiceMade();
           setViewMode(storedValue);
         }
       })
@@ -402,20 +403,23 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setCalorieError(null);
   };
 
-  const setAndPersistViewMode = useCallback((nextMode: CaloriesViewMode) => {
-    // A manual choice always wins over the still-pending AsyncStorage
-    // hydration (see viewChoiceMadeRef).
-    viewChoiceMadeRef.current = true;
-    setViewMode(nextMode);
-    if (nextMode === 'form') {
-      // The form always logs to today: drop any diary day selection so the
-      // Today-labeled totals can never silently show a past day.
-      setFollowsToday(true);
-      setSelectedDateKey(toDateKey());
-      setCopyStatus(null);
-    }
-    void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
-  }, []);
+  const setAndPersistViewMode = useCallback(
+    (nextMode: CaloriesViewMode) => {
+      // A manual choice always wins over the still-pending AsyncStorage
+      // hydration (see viewPreferenceGuard).
+      viewPreferenceGuard.markChoiceMade();
+      setViewMode(nextMode);
+      if (nextMode === 'form') {
+        // The form always logs to today: drop any diary day selection so the
+        // Today-labeled totals can never silently show a past day.
+        setFollowsToday(true);
+        setSelectedDateKey(toDateKey());
+        setCopyStatus(null);
+      }
+      void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
+    },
+    [viewPreferenceGuard],
+  );
 
   /** Shared prefill for saved-meal and frequent-food chips; identical tap path. */
   const applyMealToDraft = useCallback((meal: MealPrefillSource) => {

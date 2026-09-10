@@ -2,12 +2,12 @@
 
 ## 1. Durability and consolidation
 
-- [ ] 1.1 Bootstrap: run `migrateLegacySessionMeta` after sync hydrate, best-effort, before account/restore/backup cycles.
-- [ ] 1.2 Integration coverage: real-SQLite promotion (apply-once, no-clobber, orphans, idempotent re-run, outbox intent); verify bootstrap wiring.
-- [ ] 1.3 Consolidate `cancelTodoReminderSafely` into the todos data layer (delete the private duplicate).
-- [ ] 1.4 Use `WEEKLY_REVIEW_REMINDER_DATA_VERSION` in the weekly-review reminder scheduler.
-- [ ] 1.5 Remove the dead `getBackfillStatus` export; keep the correct live implementation as the single source.
-- [ ] 1.6 Adopt `createPreferencePrecedenceGuard` where an ad-hoc equivalent exists (Calories view mode); evaluate other persisted preferences.
+- [x] 1.1 Bootstrap: run `migrateLegacySessionMeta` after sync hydrate, best-effort, before account/restore/backup cycles.
+- [x] 1.2 Integration coverage: real-SQLite promotion (apply-once, no-clobber, orphans, idempotent re-run, outbox intent); verify bootstrap wiring.
+- [x] 1.3 Consolidate `cancelTodoReminderSafely` into the todos data layer (delete the private duplicate).
+- [x] 1.4 Use `WEEKLY_REVIEW_REMINDER_DATA_VERSION` in the weekly-review reminder scheduler.
+- [x] 1.5 Remove the dead `getBackfillStatus` export; keep the correct live implementation as the single source.
+- [x] 1.6 Adopt `createPreferencePrecedenceGuard` where an ad-hoc equivalent exists (Calories view mode); evaluate other persisted preferences.
 
 ## 2. Daily plan deletion
 

@@ -57,40 +57,42 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Current Checkpoint
 
-- Current milestone: Wave 0 nearly complete — shebang test-breaking fix landed, Node 22
-  runtime ready, campaign artifacts authored; committing baseline and starting Wave 1.
+- Current milestone: Wave 1 COMPLETE — durability migration wired + verified, consolidations
+  landed; Wave 2 (daily-plan deletion) is next.
 - Completed:
-  - Reconciled local `main` from `ba64576` (97 behind) to `c65b96a` == `origin/main`.
-  - Audited the tree (orphans, test floor, docs truth) and verified top findings by hand.
-  - Root-caused `qa:fast` failure at HEAD on Windows: importing
-    `scripts/journey-label-parity.mjs` (with `#!/usr/bin/env node`) through Vitest breaks
-    under CRLF; removed the shebang (script is always invoked via `node`). Test now passes
-    (3/3) and the guard script still runs green.
-  - Portable Node 22.23.2 installed; `better-sqlite3` loads under both runtimes.
-  - Artifacts: `openspec/changes/complete-repository-depth-v1/{proposal,design,tasks}.md`
-    - 2 specs; this ExecPlan.
-- In progress: baseline commit for Wave 0 + artifacts.
-- Important modified files: `scripts/journey-label-parity.mjs` (shebang removed).
-- Last successful validation: `npx vitest run tests/journeyLabelParity.test.ts --project
-unit` PASS 3/3 (2026-09-10); `node scripts/journey-label-parity.mjs` PASS.
+  - Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix, campaign
+    artifacts (commit `8d05e03`).
+  - Wave 1 — `migrateLegacySessionMeta` runs in `AppProviders` after `syncEngine.hydrate()`
+    (best-effort, retried next launch); new real-SQL integration suite 3/3; todos data
+    layer uses the shared `cancelTodoReminderSafely` (private duplicate deleted); the
+    weekly-review scheduler uses `WEEKLY_REVIEW_REMINDER_DATA_VERSION`; dead
+    `getBackfillStatus` removed; preference-precedence guard adopted in Calories view
+    mode, Overview card layout, and the motion singleton, with a new motion contract test
+    (4/4, includes the late-hydration race).
+- In progress: committing Wave 1.
+- Important modified files: `core/providers/AppProviders.tsx`,
+  `tests/integration/pomodoroSessionMetaMigration.test.ts` (new), `features/todos/todos.data.ts`,
+  `core/notifications/weeklyReviewReminderScheduler.ts`, `core/backup/backupBackfill.ts`,
+  `features/calories/CaloriesScreen.tsx`, `features/overview/OverviewScreen.tsx`,
+  `core/theme/motion.ts`, `tests/motionPreference.test.ts` (new).
+- Last successful validation: focused eslint `--max-warnings 0` clean; unit suites 53/53
+  (todos 30, motion 4, weekly-review scheduler, pomodoro data); integration promotion 3/3;
+  `npx tsc --noEmit` clean (2026-09-10).
 - Current failures: None.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit Wave 0 + artifacts, then implement Wave 1.1 (wire
-  `migrateLegacySessionMeta` into `AppProviders` after `syncEngine.hydrate()`).
-- Remaining definition of done: all Wave 1–6 tasks checked; full regression ladder green
-  under Node 22.23.2 (typecheck, lint 0 warnings, unit+integration, openspec validate,
-  theme/schema/impact validators, build:web + full e2e, deterministic simulation,
-  web:verify/hygiene, native smoke/persistence where a target exists or honest
-  ENVIRONMENT classification); docs corrected and verified; ExecPlan COMPLETED and
+- Exact next action: implement Wave 2.1 (confirmed danger delete in
+  `features/daily-plan/DailyPlanHistoryView.tsx` wired to `softDeleteDailyPlan`).
+- Remaining definition of done: all Wave 2–6 tasks checked; full regression ladder green
+  under Node 22.23.2; docs corrected and verified; ExecPlan COMPLETED and
   `agent:plan:validate` PASS; commit pushed and CI result recorded.
 
 ## Progress
 
 - [x] Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix (2026-09-10)
-- [ ] Wave 1 — durability wiring + consolidations
+- [x] Wave 1 — durability wiring + consolidations (2026-09-10)
 - [ ] Wave 2 — daily plan deletion
 - [ ] Wave 3 — test floor
 - [ ] Wave 4 — documentation truth
@@ -120,6 +122,10 @@ unit` PASS 3/3 (2026-09-10); `node scripts/journey-label-parity.mjs` PASS.
   so durability does not depend on visiting the Focus surface.
 - 2026-09-10 — Delete dead `getBackfillStatus`; keep the live `backupRestore` helper (it
   has the correct `BACKUP_SCOPE_VERSION` comparison) as the single implementation.
+- 2026-09-10 — Adopt the precedence guard only where an ad-hoc equivalent or demonstrable
+  race exists (Calories view mode, Overview card layout, motion singleton); other
+  AsyncStorage preferences (theme, command mode, reminders) keep their existing flows and
+  are recorded as evaluated-but-unchanged.
 - 2026-09-10 — Daily-plan deletion reuses `softDeleteDailyPlan` + `useConfirmationDialog`,
   matching the weekly-review history delete pattern; no new route or surface.
 
@@ -130,12 +136,28 @@ unit` PASS 3/3 (2026-09-10); `node scripts/journey-label-parity.mjs` PASS.
 - 2026-09-10 — `node scripts/journey-label-parity.mjs` — PASS — rail labels agree.
 - 2026-09-10 — `npm run qa:fast` — FAIL (pre-fix baseline) — blocked only by the
   journey-label-parity import; Unit 1691+ tests otherwise green; will re-run after fixes.
+- 2026-09-10 — `npx vitest run tests/integration/pomodoroSessionMetaMigration.test.ts
+--project integration` — PASS — 3/3 (promote-once/no-clobber/orphans, real SQLite).
+- 2026-09-10 — `npx vitest run tests/motionPreference.test.ts --project unit` — PASS —
+  4/4 including the late-hydration precedence race.
+- 2026-09-10 — `npx tsc --noEmit` — PASS — 0 errors after Wave 1 edits.
+- 2026-09-10 — `npx vitest run tests/todos.data.test.ts --project unit` — PASS — 30/30.
+- 2026-09-10 — `npx vitest run tests/calories.data.test.ts --project unit` — PASS —
+  22/22 after the guard adoption.
+- 2026-09-10 — Wave 1 focused suite — PASS — `eslint --max-warnings 0` clean; unit
+  53/53 (todos/motion/weekly-review scheduler/pomodoro data); integration 3/3.
 
 ## Changed Files / Areas
 
 - `scripts/journey-label-parity.mjs` — shebang removed (Windows/CRLF Vitest import fix).
 - `openspec/changes/complete-repository-depth-v1/` — proposal, design, tasks, 2 specs.
 - `.agent/execplans/repository-completion-and-truth-v1.md` — this plan.
+- Wave 1: `core/providers/AppProviders.tsx`,
+  `tests/integration/pomodoroSessionMetaMigration.test.ts`,
+  `features/todos/todos.data.ts`, `core/notifications/weeklyReviewReminderScheduler.ts`,
+  `core/backup/backupBackfill.ts`, `features/calories/CaloriesScreen.tsx`,
+  `features/overview/OverviewScreen.tsx`, `core/theme/motion.ts`,
+  `tests/motionPreference.test.ts`.
 
 ## Recovery / Resume Instructions
 
@@ -150,5 +172,5 @@ unit` PASS 3/3 (2026-09-10); `node scripts/journey-label-parity.mjs` PASS.
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: Campaign opened; baseline reconciled; Wave 0 fix landed.
-- Follow-up: Wave 1 implementation; see tasks.
+- Summary: Waves 0–1 landed; durability promotion now runs and is real-SQL proven.
+- Follow-up: Wave 2 daily-plan deletion; see tasks.

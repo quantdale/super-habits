@@ -19,7 +19,7 @@ import type { SyncRecord } from '@/core/sync/sync.engine';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import { parseTopTodoIds, serializeTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import {
-  cancelTodoDueReminder,
+  cancelTodoReminderSafely,
   syncTodoDueReminder,
   type TodoReminderSnapshot,
 } from '@/core/notifications/todoReminderScheduler';
@@ -60,14 +60,6 @@ async function syncReminderSafely(todo: TodoReminderSnapshot): Promise<void> {
     await syncTodoDueReminder(todo);
   } catch {
     // Ignore reminder scheduling failures.
-  }
-}
-
-async function cancelReminderSafely(todoId: string): Promise<void> {
-  try {
-    await cancelTodoDueReminder(todoId);
-  } catch {
-    // Ignore reminder cancellation failures.
   }
 }
 
@@ -529,11 +521,11 @@ export async function updateTodo(
   }>(`SELECT title, due_date, completed FROM todos WHERE id = ? AND deleted_at IS NULL`, [id]);
   if (updated) {
     if (updated.completed === 1) {
-      await cancelReminderSafely(id);
+      await cancelTodoReminderSafely(id);
     } else if (updated.due_date) {
       await syncReminderSafely({ id, title: updated.title, dueDate: updated.due_date });
     } else {
-      await cancelReminderSafely(id);
+      await cancelTodoReminderSafely(id);
     }
   }
 }
@@ -667,7 +659,7 @@ export async function stopRecurringSeries(recurrenceId: string): Promise<void> {
       [recurrenceId, now],
     );
     for (const row of cancelled) {
-      await cancelReminderSafely(row.id);
+      await cancelTodoReminderSafely(row.id);
     }
   }
 }
@@ -831,7 +823,7 @@ async function setTodoCompletion(
 
   // Keep the device-local due-date reminder in sync with completion state.
   if (next === 1) {
-    await cancelReminderSafely(current.id);
+    await cancelTodoReminderSafely(current.id);
   } else if (previous === 1 && current.due_date) {
     await syncReminderSafely({ id: current.id, title: current.title, dueDate: current.due_date });
   }
@@ -974,7 +966,7 @@ export async function bulkSetTodoCompletion(
   for (const { row, previous } of outcome.value) {
     const next = completed;
     if (next === 1) {
-      await cancelReminderSafely(row.id);
+      await cancelTodoReminderSafely(row.id);
     } else if (previous === 1 && row.due_date) {
       await syncReminderSafely({ id: row.id, title: row.title, dueDate: row.due_date });
     }
@@ -1173,7 +1165,7 @@ export async function bulkRemoveTodos(ids: string[]): Promise<BulkTodoOutcome> {
     },
   });
   for (const id of outcome.value) {
-    await cancelReminderSafely(id);
+    await cancelTodoReminderSafely(id);
   }
   return { changed: outcome.value.length, skipped: ids.length - outcome.value.length };
 }
@@ -1191,7 +1183,7 @@ export async function removeTodo(id: string): Promise<void> {
   });
   if (!result.changed) return;
 
-  await cancelReminderSafely(id);
+  await cancelTodoReminderSafely(id);
 }
 
 export async function completeTodoFromLinkedAction(

@@ -38,6 +38,7 @@ import { Card } from '@/core/ui/Card';
 import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
 import { WorkoutReminderHost } from '@/core/notifications/WorkoutReminderHost';
 import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroCommandBridge';
+import { migrateLegacySessionMeta } from '@/features/pomodoro/pomodoro.sessionMeta';
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);
@@ -137,6 +138,18 @@ export function AppProviders({ children }: PropsWithChildren) {
         console.error('[sync] hydrate failed', e);
       });
       if (!cancelled) setSyncHydrated(true);
+
+      // Promote pre-migration-20 device-local Pomodoro session notes and
+      // associations into the durable `pomodoro_sessions` columns. Best-effort
+      // and idempotent: the AsyncStorage keys are retired only after a
+      // successful pass, so a failure leaves local use available and retries
+      // on the next launch. Runs after hydrate so its outbox intents allocate
+      // against the restored durable revision.
+      try {
+        await migrateLegacySessionMeta();
+      } catch (e) {
+        console.error('[pomodoro] legacy session metadata promotion failed', e);
+      }
 
       try {
         // A hung network must never wedge the startup gate: bound each

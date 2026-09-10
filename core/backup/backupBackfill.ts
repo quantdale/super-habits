@@ -184,18 +184,3 @@ export async function ensureBackupBackfill(): Promise<BackfillResult> {
 
   return 'running';
 }
-
-export async function getBackfillStatus(): Promise<{
-  status: 'idle' | 'running' | 'complete';
-  scopeVersion: number | null;
-}> {
-  const db = await getDatabase();
-  const statusValue = await getAppMetaText(db, appMetaKeys.backupBackfillStatus);
-  const scopeVersionValue = await getAppMetaText(db, appMetaKeys.backupScopeVersion);
-  const status =
-    statusValue === 'complete' ? 'complete' : statusValue === 'running' ? 'running' : 'idle';
-  return {
-    status,
-    scopeVersion: scopeVersionValue === null ? null : parseInt(scopeVersionValue, 10),
-  };
-}

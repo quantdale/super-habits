@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
+
 /**
  * Semantic motion presets ("Warm Momentum" design DNA — docs/ui-ux/02-design-dna.md §10).
  *
@@ -35,19 +37,28 @@ let preference: MotionPreference = 'system';
 let hydrated = false;
 const listeners = new Set<() => void>();
 
+/** AsyncStorage hydration must never overwrite a newer explicit choice (F-05). */
+const preferencePrecedence = createPreferencePrecedenceGuard();
+
 function notifyListeners() {
   for (const listener of listeners) {
     listener();
   }
 }
 
-function hydratePreference() {
+/**
+ * Load the persisted preference once. Exported for the hooks and the
+ * preference-precedence contract test; a later explicit choice always wins
+ * over an in-flight hydration (F-05).
+ */
+export function hydrateMotionPreference() {
   if (hydrated) {
     return;
   }
   hydrated = true;
   AsyncStorage.getItem(STORAGE_KEY)
     .then((stored) => {
+      if (!preferencePrecedence.shouldApplyPersisted()) return;
       if (stored === 'system' || stored === 'reduced' || stored === 'full') {
         preference = stored;
         notifyListeners();
@@ -60,6 +71,7 @@ function hydratePreference() {
 
 /** Persist and apply the user's motion preference (Settings → Accessibility). */
 export function setMotionPreference(next: MotionPreference): void {
+  preferencePrecedence.markChoiceMade();
   preference = next;
   notifyListeners();
   AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {
@@ -81,7 +93,7 @@ export function useReducedMotion(): boolean {
   const [systemReduced, setSystemReduced] = useState(false);
 
   useEffect(() => {
-    hydratePreference();
+    hydrateMotionPreference();
     listeners.add(listener);
     return () => {
       listeners.delete(listener);

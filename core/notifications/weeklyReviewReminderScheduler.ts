@@ -3,7 +3,10 @@ import {
   cancelScheduledNotification,
   scheduleWeeklyReviewReminderNotification,
 } from '@/lib/notifications';
-import { WEEKLY_REVIEW_REMINDER_DATA_KIND } from '@/lib/notificationConstants';
+import {
+  WEEKLY_REVIEW_REMINDER_DATA_KIND,
+  WEEKLY_REVIEW_REMINDER_DATA_VERSION,
+} from '@/lib/notificationConstants';
 import { getWeeklyReviewReminder } from './notificationPreferences';
 
 /**
@@ -36,7 +39,7 @@ export async function syncWeeklyReviewReminder(): Promise<WeeklyReviewReminderSy
     identifier: WEEKLY_REVIEW_REMINDER_IDENTIFIER,
     title: 'Weekly review',
     body: 'Take a few minutes to close out your week and plan the next one.',
-    data: { kind: WEEKLY_REVIEW_REMINDER_DATA_KIND, version: 1 },
+    data: { kind: WEEKLY_REVIEW_REMINDER_DATA_KIND, version: WEEKLY_REVIEW_REMINDER_DATA_VERSION },
     jsWeekday: preference.weekday,
     hour: preference.hour,
     minute: preference.minute,

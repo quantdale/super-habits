@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -17,6 +17,7 @@ import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildDateRangeOldestFirst, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
 import { spacing, layout } from '@/core/theme/designTokens';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
@@ -235,6 +236,9 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const [momentum, setMomentum] = useState<MomentumGardenModel | null>(null);
   const refreshRequestRef = useRef(0);
   const mountedRef = useRef(true);
+  /** Card-layout hydration must never overwrite an explicit customize action
+   *  that landed while the async layout load was still in flight (F-05). */
+  const cardLayoutPrecedence = useMemo(() => createPreferencePrecedenceGuard(), []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -250,7 +254,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     try {
       const [nextLayout, nextLoad] = await Promise.all([loadCardLayout(), loadSummaries()]);
       if (!isCurrent()) return;
-      setCardLayout(nextLayout);
+      if (cardLayoutPrecedence.shouldApplyPersisted()) setCardLayout(nextLayout);
       setSummaries(nextLoad.summaries);
       setNextBestAction(nextLoad.nextBestAction);
       setLoadError(null);
@@ -287,12 +291,16 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     dayGeneration,
   );
 
-  const handleLayoutChange = useCallback((next: OverviewCardId[]) => {
-    setCardLayout(next);
-    saveCardLayout(next).catch((err) =>
-      console.error('[OverviewScreen] saveCardLayout failed', err),
-    );
-  }, []);
+  const handleLayoutChange = useCallback(
+    (next: OverviewCardId[]) => {
+      cardLayoutPrecedence.markChoiceMade();
+      setCardLayout(next);
+      saveCardLayout(next).catch((err) =>
+        console.error('[OverviewScreen] saveCardLayout failed', err),
+      );
+    },
+    [cardLayoutPrecedence],
+  );
 
   const renderCard = useCallback(
     (id: OverviewCardId) => {
