@@ -1,7 +1,7 @@
 # ExecPlan: Repository Completion & Truth V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -48,8 +48,8 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Current Checkpoint
 
-- Current milestone: Wave 6 regression ladder — deterministic simulation, web verify,
-  and native lanes remain; then close/push/CI.
+- Current milestone: COMPLETED — all waves landed; ladder green on tree `87183b3`;
+  closure commit pushed and CI verified (task 6.4).
 - Completed:
   - Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix, campaign
     artifacts (commit `8d05e03`).
@@ -80,17 +80,17 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
     `getPendingManifestForDiagnostics`, `getBackupDirtyFlag`, `clearWeeklyPlanEntry`,
     `listScheduleOverrides`, `getOrCreateDailyPlan`, `isDailyPlanStatus`,
     `countCompletedTodos` (and its stale test mock key).
-- In progress: web `build:web`/`web:verify`/`web:hygiene`; then the native smoke/persistence
-  lane on the canonical `Nitro_API_36` AVD (current APK provenance is stale at
-  `d7935a0`, so auto-provision will rebuild from the final tree).
-- Git reconciliation (2026-09-11): tree clean; `HEAD == 65641af`, `origin/main == c65b96a`;
-  four local commits are ahead and unpushed (`8d05e03`, `939ff38`, `4723df5`, `65641af`).
-  Push happens at task 6.4 after the remaining ladder and CI verification.
+- In progress: None.
+- Git reconciliation (2026-09-11): tree clean; `main` was 4 commits ahead of `origin/main`
+  at resume (`8d05e03`, `939ff38`, `4723df5`, `65641af`), plus `87183b3` (ladder evidence)
+  and the closure commit; all pushed to `origin/main` at close.
 - Important modified files: see Changed Files below.
 - Last successful validation: fast gates PASS 2026-09-11 (typecheck/lint 0, label parity,
   OpenSpec 52/52, themes 140, schema contract, impact map 13); deterministic simulation
-  23/23 PASS 2026-09-11; full `npm run e2e` battery 243 passed / 13 skipped / 1 failed
-  (flake, known-gap 16); full Vitest 2001 passed / 1 skipped (193 files); focused
+  23/23 PASS; `web:verify` PASS (fresh export, COOP/COEP, shell probe) + `web:hygiene` FREE;
+  native Android smoke 2/2 + persistence 11/11 PASS on rebuilt canonical provenance
+  `87183b3` (APK SHA-256 `3DAFB3…6868`); full `npm run e2e` battery 243 passed / 13 skipped
+  / 1 failed (flake, known-gap 16); full Vitest 2001 passed / 1 skipped (193 files); focused
   chromium batch 32/32; static validators green.
 - Current failures: None open. The full-battery habits rule-history failure passed
   standalone on the identical tree → classified FLAKY_TEST (host-load commit race,
@@ -99,12 +99,8 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run `npm run qa:simulation` (deterministic lane), then
-  `web:verify`/`web:hygiene`, and the native smoke/persistence lane on the canonical
-  `Nitro_API_36` AVD; then close the plan, commit, push, and verify CI.
-- Remaining definition of done: tasks 6.2–6.4 (simulation + web + native lanes, native
-  evidence or honest ENVIRONMENT classification, plan COMPLETED + validated,
-  commit/push/CI).
+- Exact next action: None — task complete.
+- Remaining definition of done: None — tasks 6.1–6.4 closed.
 
 ## Progress
 
@@ -114,7 +110,7 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 - [x] Wave 3 — test floor (2026-09-10)
 - [x] Wave 4 — documentation truth (2026-09-10)
 - [x] Wave 5 — bounded dead-code removal (2026-09-10)
-- [ ] Wave 6 — regression ladder + delivery
+- [x] Wave 6 — regression ladder + delivery (2026-09-11)
 
 ## Surprises & Discoveries
 
@@ -171,6 +167,17 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   — PASS — 0/0 + rail parity OK.
 - 2026-09-11 — `npm run qa:simulation -- --all` — PASS — 23/23 deterministic scenarios
   (fresh `build:web`, owned :8081 server, `sim:validate` clean).
+- 2026-09-11 — `npm run web:verify` + `npm run web:hygiene` — PASS — fresh export, port
+  8081 owned/released, COOP/COEP headers, browser shell probe (Today nav,
+  crossOriginIsolated, Add), both ports FREE after.
+- 2026-09-11 — native Android smoke (`qa:native:android -- --avd Nitro_API_36`) — PASS —
+  rebuilt APK from clean `87183b3` (SHA-256 `3DAFB3…6868`), 2/2 flows
+  (command-center-v2 33s, native-smoke 47s), owned emulator stopped; report
+  `native-android-smoke-Nitro_API_36-2026-09-10T174219275Z.json`.
+- 2026-09-11 — native Android persistence (`qa:native:targeted -- --avd Nitro_API_36`) —
+  PASS — reused verified canonical APK, 11/11 flows (calories, habits, reminders,
+  settings, todos, workout + gym v2), owned emulator stopped; report
+  `native-android-persistence-Nitro_API_36-2026-09-10T175445955Z.json`.
 - 2026-09-10 — full `npx vitest run` — PASS — 2001 passed / 1 skipped (193 files, both projects).
 - 2026-09-10 — `npm run openspec:validate` / `validate:themes` / `supabase:schema:validate` /
   `qa:impact:validate` — PASS — 52/52, 140 checks, schema contract, 13 rules.
@@ -224,7 +231,22 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Waves 0–5 landed; a P1 bulk-delete sync gap was found and fixed; durability
-  promotion, daily-plan deletion, test floor, docs truth, and bounded cleanup complete.
-- Follow-up: focused re-verification then the full regression ladder and delivery.
+- Status: Completed (2026-09-11).
+- Summary: All six waves landed. Legacy Pomodoro session metadata is promoted during
+  bootstrap into durable, backup-recoverable columns (real-SQL 3/3). Saved daily plans are
+  deletable from history with a confirmed danger action and exactly one coalesced delete
+  intent (integration 2/2 + planning-hub journey). Correctness-sensitive duplicates were
+  consolidated (single `cancelTodoReminderSafely`, scheduler uses the data version, dead
+  `getBackfillStatus` removed, preference-precedence guard adopted). The test floor gained
+  five real-SQL suites plus E2E data oracles across todos/calories/settings/workout and a
+  direct Overview spec, and found/fixed a P1: `bulkRemoveTodos` tombstoned rows without a
+  durable delete intent (remote resurrect risk). Docs truth was reconciled across
+  AGENTS/README/structure maps/known-gaps/agent rule copies, and zero-reference zero-test
+  dead code was removed.
+- Final ladder (2026-09-11, tree `87183b3` + closure): fast gates PASS; deterministic
+  simulation 23/23; `web:verify` + `web:hygiene` PASS; native smoke 2/2 and persistence
+  11/11 PASS on the rebuilt canonical API-36 APK (source `87183b3`, APK SHA-256
+  `3DAFB3…6868`); full battery 243 passed / 13 skipped with one documented flake
+  (known-gap 16). Pushed to `origin/main` and CI verified at close.
+- Follow-up: known-gap 15/16 flake re-verification rule stands; iOS lane remains
+  externally blocked (no macOS host).
