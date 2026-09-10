@@ -248,6 +248,24 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** keep the ceiling and floor assertions exactly as they are — they are a genuine regression alarm. When a full battery runs on a loaded host, re-verify a floor failure standalone (`npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts -g "Tom"`) and classify with the recorded per-switch numbers before touching product code; the permanent fix is running the battery on a quiet host or CI, not relaxing the budget.
 
+### 16. Habit target-edit rule-history commit race under full-battery load (documented flake)
+
+**Reason:** during the 2026-09-10 full `npm run e2e` battery, `e2e/habits.spec.ts`
+“target edits keep a prior completed date complete” read `habits.rule_history` while it
+still contained only the initial interval (`2026-08-10`, target 1) — the target-2 edit
+interval (`2026-08-11`) had not committed by the time the SQL oracle ran, even though the
+edit modal had closed. The identical test passed standalone on the identical tree (6.0 s)
+immediately after, and the campaign touched no habit-edit or rule-history code (the
+changes were bootstrap promotion, daily-plan deletion, test oracles, docs, and zero-test
+dead-code removal). Classification: `FLAKY_TEST` (async commit racing the oracle under
+accumulated single-worker battery load), same host-load class as known gap 15.
+
+**Closing path:** keep the test and its strict rule-history oracle unchanged. When it
+fails in a battery, re-verify standalone (`npx playwright test --project=chromium
+e2e/habits.spec.ts -g "target edits keep a prior completed date complete"`) and classify
+before touching product code; if it becomes reproducible standalone, treat the
+modal-close-vs-commit ordering in the habit edit save path as a product bug.
+
 ---
 
 ## Related

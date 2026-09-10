@@ -68,7 +68,7 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
     `todos.spec.ts`, `calories.spec.ts`, `settings.spec.ts`, `workout-gym-v2.spec.ts`; new
     `overview.spec.ts` (Next Best Action + customize persistence). Focused batch: 30
     passed / 2 failed → both fixed (calorie goal JSON is an object; the hero needs a
-    due-today/overdue todo, now seeded via SQL) → both pass on re-run.
+    due-today/overdue task, now seeded via SQL) → both pass on re-run.
   - Wave 4 — docs truth: AGENTS.md, README.md, `docs/PROJECT_STRUCTURE_MAP.md`,
     `docs/knowledge-base/PROJECT_STRUCTURE_MAP.md`, `docs/testing/known-gaps.md`,
     `docs/ui-ux/README.md`, `docs/master-context.md`, and the active agent rule/skill copies
@@ -80,19 +80,25 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
     `getPendingManifestForDiagnostics`, `getBackupDirtyFlag`, `clearWeeklyPlanEntry`,
     `listScheduleOverrides`, `getOrCreateDailyPlan`, `isDailyPlanStatus`,
     `countCompletedTodos` (and its stale test mock key).
-- In progress: typecheck/lint verification of Wave 5 and the rebuilt focused E2E batch.
+- In progress: deterministic simulation lane running; then web verify/hygiene and the native
+  smoke/persistence lane.
 - Important modified files: see Changed Files below.
-- Last successful validation: all new integration suites green (18 tests across 6 files);
-  focused E2E fixes 2/2; motion 4/4; `tsc` clean at Wave 3 checkpoint.
-- Current failures: None open (two E2E oracle mismatches fixed).
+- Last successful validation: full `npm run e2e` battery 243 passed / 13 skipped / 1 failed;
+  the single failure (`habits.spec.ts` rule-history oracle) passed standalone on the identical
+  tree and is registered as known-gap 16 (FLAKY_TEST under battery load); full Vitest 2001
+  passed / 1 skipped (193 files); focused chromium batch 32/32; static validators green.
+- Current failures: None open. The full-battery habits rule-history failure passed
+  standalone on the identical tree → classified FLAKY_TEST (host-load commit race,
+  known-gap 16, assertions unchanged).
 - Relevant quarantines: known-gap 15 (J8 headroom floor under battery load) unchanged.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: run `tsc` + eslint on the Wave 5 tree, rebuild `dist/`, re-run the
-  focused E2E batch (expecting all green), then execute the full regression ladder.
-- Remaining definition of done: tasks 4.6 and 6.1–6.4 (full ladder, native evidence or
-  honest ENVIRONMENT classification, plan COMPLETED + validated, commit/push/CI).
+- Exact next action: await the full `npm run e2e` battery result, then run
+  `qa:simulation` (deterministic), `web:verify`/`web:hygiene`, and the native
+  smoke/persistence lane; then close the plan, commit, push, and verify CI.
+- Remaining definition of done: tasks 6.2–6.4 (full ladder, native evidence or honest
+  ENVIRONMENT classification, plan COMPLETED + validated, commit/push/CI).
 
 ## Progress
 
@@ -152,6 +158,14 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   workout-gym-v2) — 30 passed / 2 failed → fixes → the 2 fixed tests PASS individually.
 - 2026-09-10 — `openspec validate` — PASS — 52/52 (includes the new change).
 - 2026-09-10 — `agent:plan:validate` — PASS — this plan valid ACTIVE.
+- 2026-09-10 — full `npx vitest run` — PASS — 2001 passed / 1 skipped (193 files, both projects).
+- 2026-09-10 — `npm run openspec:validate` / `validate:themes` / `supabase:schema:validate` /
+  `qa:impact:validate` — PASS — 52/52, 140 checks, schema contract, 13 rules.
+- 2026-09-10 — `npx eslint . --max-warnings 0` + `npx tsc --noEmit` — PASS — 0/0.
+- 2026-09-10 — focused chromium batch (6 specs) — PASS — 32/32.
+- 2026-09-10 — full `npm run e2e` — 243 passed / 13 skipped / 1 failed — the failure
+  (`habits.spec.ts` rule-history oracle) passed standalone (6.0 s) on the identical tree;
+  classified FLAKY_TEST and registered as known-gap 16 (assertions unchanged).
 
 ## Changed Files / Areas
 
