@@ -1,7 +1,7 @@
 # ExecPlan: Repository Completion & Truth V1
 
 Plan-Version: 2
-Status: COMPLETED
+Status: BLOCKED
 
 ## Purpose / User Outcome
 
@@ -48,8 +48,9 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Current Checkpoint
 
-- Current milestone: COMPLETED — all waves landed; ladder green on tree `87183b3`;
-  closure commit pushed and CI verified (task 6.4).
+- Current milestone: all waves and the full local/web/native ladder landed; pushed as
+  `cf50f8a`. Only CI verification remains and it is externally blocked at the GitHub
+  account level (actions billing), so the plan is BLOCKED, not COMPLETED.
 - Completed:
   - Wave 0 — baseline reconciliation, audits, Node 22 runtime, shebang fix, campaign
     artifacts (commit `8d05e03`).
@@ -80,10 +81,11 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
     `getPendingManifestForDiagnostics`, `getBackupDirtyFlag`, `clearWeeklyPlanEntry`,
     `listScheduleOverrides`, `getOrCreateDailyPlan`, `isDailyPlanStatus`,
     `countCompletedTodos` (and its stale test mock key).
-- In progress: None.
+- In progress: None — all local implementation and validation work is done.
 - Git reconciliation (2026-09-11): tree clean; `main` was 4 commits ahead of `origin/main`
   at resume (`8d05e03`, `939ff38`, `4723df5`, `65641af`), plus `87183b3` (ladder evidence)
-  and the closure commit; all pushed to `origin/main` at close.
+  and closure commits; pushed to `origin/main` (`c65b96a..cf50f8a`), `HEAD == origin/main`
+  at this correction. Any post-correction commit is a docs-only lifecycle fix.
 - Important modified files: see Changed Files below.
 - Last successful validation: fast gates PASS 2026-09-11 (typecheck/lint 0, label parity,
   OpenSpec 52/52, themes 140, schema contract, impact map 13); deterministic simulation
@@ -92,15 +94,26 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   `87183b3` (APK SHA-256 `3DAFB3…6868`); full `npm run e2e` battery 243 passed / 13 skipped
   / 1 failed (flake, known-gap 16); full Vitest 2001 passed / 1 skipped (193 files); focused
   chromium batch 32/32; static validators green.
-- Current failures: None open. The full-battery habits rule-history failure passed
-  standalone on the identical tree → classified FLAKY_TEST (host-load commit race,
-  known-gap 16, assertions unchanged).
+- Current failures: CI run `34511232099` (push `cf50f8a`) — the three jobs never started;
+  the run annotation reports GitHub Actions billing ("recent account payments have failed
+  or your spending limit needs to be increased"). Identical 3–5 s failures on the
+  scheduled runs `34396050327`, `34270690483`, `34159133235`, `34053090831` (2026-09-06 →
+  09-09) prove this is pre-existing and account-wide, not caused by this campaign.
+  Classified ENVIRONMENT / external blocker.
+- The full-battery habits rule-history failure passed standalone on the identical tree →
+  classified FLAKY_TEST (host-load commit race, known-gap 16, assertions unchanged).
 - Relevant quarantines: known-gap 15 (J8 headroom floor under battery load) unchanged.
-- Blockers: None.
-- Condition required to unblock: None.
-- Exact resume action after unblock: None.
-- Exact next action: None — task complete.
-- Remaining definition of done: None — tasks 6.1–6.4 closed.
+- Blockers: GitHub Actions cannot start any job for this repository while the account's
+  billing/spending-limit issue persists (external; already failing before this campaign).
+- Condition required to unblock: GitHub account billing restored / spending limit raised,
+  so Actions jobs can start again.
+- Exact resume action after unblock: `gh run rerun 34511232099` (or re-run the latest
+  `main` push workflow), confirm the quality and e2e jobs for `87183b3`/`cf50f8a`, then set
+  this plan back to COMPLETED (or close with the rerun evidence) and commit the lifecycle
+  correction.
+- Exact next action: no local work remains; wait for the external billing unblock, then
+  perform the CI-verification resume action above.
+- Remaining definition of done: task 6.4 CI verification only (externally blocked).
 
 ## Progress
 
@@ -178,6 +191,10 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   PASS — reused verified canonical APK, 11/11 flows (calories, habits, reminders,
   settings, todos, workout + gym v2), owned emulator stopped; report
   `native-android-persistence-Nitro_API_36-2026-09-10T175445955Z.json`.
+- 2026-09-11 — `git push origin main` — PASS — `c65b96a..cf50f8a`, `HEAD == origin/main`.
+- 2026-09-11 — `gh run view 34511232099` — FAIL (ENVIRONMENT) — CI jobs never started;
+  GitHub Actions billing annotation; same account-wide 3–5 s failures on 2026-09-06 →
+  09-09 schedule runs. External blocker recorded; not a product/test failure.
 - 2026-09-10 — full `npx vitest run` — PASS — 2001 passed / 1 skipped (193 files, both projects).
 - 2026-09-10 — `npm run openspec:validate` / `validate:themes` / `supabase:schema:validate` /
   `qa:impact:validate` — PASS — 52/52, 140 checks, schema contract, 13 rules.
@@ -231,7 +248,8 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
 
 ## Outcomes & Retrospective
 
-- Status: Completed (2026-09-11).
+- Status: Blocked (2026-09-11) — every product, test, web, simulation, and native
+  milestone is complete and validated; only CI verification is externally blocked.
 - Summary: All six waves landed. Legacy Pomodoro session metadata is promoted during
   bootstrap into durable, backup-recoverable columns (real-SQL 3/3). Saved daily plans are
   deletable from history with a confirmed danger action and exactly one coalesced delete
@@ -247,6 +265,9 @@ campaigns; no test weakening; no broad refactors beyond the named consolidations
   simulation 23/23; `web:verify` + `web:hygiene` PASS; native smoke 2/2 and persistence
   11/11 PASS on the rebuilt canonical API-36 APK (source `87183b3`, APK SHA-256
   `3DAFB3…6868`); full battery 243 passed / 13 skipped with one documented flake
-  (known-gap 16). Pushed to `origin/main` and CI verified at close.
+  (known-gap 16). Pushed to `origin/main` (`c65b96a..cf50f8a`). CI verification is
+  externally blocked by the GitHub account's Actions billing state (jobs never start;
+  pre-existing since at least 2026-09-06), recorded as ENVIRONMENT with the resume action
+  in the checkpoint.
 - Follow-up: known-gap 15/16 flake re-verification rule stands; iOS lane remains
   externally blocked (no macOS host).

@@ -44,4 +44,4 @@
 - [x] 6.1 Fast gates: typecheck, lint, unit+integration, label parity, openspec validate, theme/schema/impact validators.
 - [x] 6.2 Web: fresh `build:web`, focused specs, full `npm run e2e`, simulation deterministic, `web:verify`/`web:hygiene`.
 - [x] 6.3 Native: Android smoke + persistence on the canonical API-36 target when available; classify honestly otherwise.
-- [x] 6.4 ExecPlan close-out (validation ledger, outcomes) + commit + push + CI verification.
+- [ ] 6.4 ExecPlan close-out (validation ledger, outcomes) + commit + push + CI verification — close-out/commit/push done; CI verification externally BLOCKED (GitHub Actions billing; jobs never start).
