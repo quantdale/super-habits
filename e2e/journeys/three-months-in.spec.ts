@@ -529,7 +529,9 @@ const TAB_LABELS_NAMES: Record<SectionName, string> = {
 
 /** Unique, always-rendered content marker per section (used for switch completion). */
 const SECTION_MARKERS: Record<SectionName, string> = {
-  overview: 'Customize',
+  // The redesigned Overview's customize toggle is an icon button; "Plan today"
+  // is the always-rendered hero text on every load state.
+  overview: 'Plan today',
   todos: 'Offline-first task manager.',
   habits: "Today's rhythm",
   pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',
