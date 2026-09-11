@@ -45,7 +45,7 @@ Notifications.setNotificationHandler({
 async function ensureAndroidNotificationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
-    name: 'default',
+    name: 'General',
     importance: Notifications.AndroidImportance.HIGH,
   });
 }

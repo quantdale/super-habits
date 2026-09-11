@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "superhabits",
+    "name": "SuperHabits",
     "slug": "superhabits",
     "scheme": "superhabits",
     "version": "1.0.0",
@@ -10,11 +10,19 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./assets/splash-icon.png",
+        "backgroundColor": "#0a0f1a"
+      }
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dale16.superhabits"
+      "bundleIdentifier": "com.dale16.superhabits",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +32,14 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.dale16.superhabits"
+      "package": "com.dale16.superhabits",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
+      ]
     },
     "plugins": [
       [
@@ -40,7 +55,9 @@
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "./plugins/withAndroidCxxRuntime",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio",
+      "expo-asset"
     ],
     "web": {
       "favicon": "./assets/favicon.png",

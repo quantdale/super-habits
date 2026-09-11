@@ -77,3 +77,8 @@ supabase/.temp/
 
 # Editor debug traces
 .cursor/debug-*.log
+
+# Local native verification evidence (screenshots / UI dumps / Gradle logs)
+# produced by adb-driven QA sessions — keep on disk, never commit.
+.cursor/native-verify/
+/android-build.log
