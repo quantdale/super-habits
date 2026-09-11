@@ -32,7 +32,7 @@ describe('corpus restart over the same file', { timeout: 120_000 }, () => {
 
       // Reopen the same file: migrations must be idempotent no-ops here.
       const reopened: CorpusDb = await freshDatabase(file);
-      expect(await metaValue(reopened, 'db_schema_version')).toBe('24');
+      expect(await metaValue(reopened, 'db_schema_version')).toBe('25');
 
       // Full manifest re-verified after restart.
       expect(await count(reopened, 'SELECT COUNT(*) AS n FROM todos')).toBe(612);

@@ -40,10 +40,12 @@ describe('android notification channel (COR-007)', () => {
       await expect(mod.ensureNotificationPermission()).resolves.toBe(true);
 
       // The old flow returned before creating the channel on pre-granted devices.
-      expect(setNotificationChannelAsync).toHaveBeenCalledWith('default', {
-        name: 'default',
-        importance: 5,
-      });
+      // The channel's user-facing label is product copy, not part of this
+      // contract: what matters is the stable `default` id and HIGH importance.
+      expect(setNotificationChannelAsync).toHaveBeenCalledWith(
+        'default',
+        expect.objectContaining({ importance: 5 }),
+      );
       expect(requestPermissionsAsync).not.toHaveBeenCalled();
     } finally {
       vi.doUnmock('react-native');

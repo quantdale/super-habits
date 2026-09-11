@@ -163,14 +163,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 24', async () => {
+  it('bootstraps from zero and reaches stored schema version 25', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('24');
+    expect(row?.value).toBe('25');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -366,7 +366,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('24');
+      expect(v1?.value).toBe('25');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -377,7 +377,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('24');
+      expect(v2?.value).toBe('25');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -488,7 +488,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       const index = await db.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_todos_pending_sort'",
@@ -624,7 +624,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       const todo = await db.getFirstAsync<{ title: string }>(
         'SELECT title FROM todos WHERE id = ?',

@@ -41,7 +41,7 @@ describe('tests/integration/fixtures', { timeout: 30_000 }, () => {
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(version?.value).toBe('24');
+    expect(version?.value).toBe('25');
     await db.closeAsync();
   });
 

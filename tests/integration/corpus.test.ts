@@ -20,7 +20,7 @@ import { seedMature } from './fixtures';
  * | planning             | 4 projects (mixed statuses) + 12 goals               |
  * | sync_outbox          | 4933 pending intents (never drained: restart input)  |
  * | backup.scope_version | '6' (pre-cutover marker; current code writes '7')    |
- * | schema               | 24                                                   |
+ * | schema               | 25                                                   |
  *
  * Counts are exact on purpose: any product change that shifts them must
  * update this manifest consciously, like journey oracles. Determinism is
@@ -163,7 +163,7 @@ describe('tests/integration/corpus', { timeout: 120_000 }, () => {
     expect(JSON.parse(pendingLogs ?? '[]')).toHaveLength(1);
 
     const version = await metaValue(db, 'db_schema_version');
-    expect(version).toBe('24');
+    expect(version).toBe('25');
     await db.closeAsync();
   });
 

@@ -1,0 +1,62 @@
+appId: com.dale16.superhabits
+tags:
+  - native
+  - reward
+---
+# Native reward loop: one habit check-in must pay base XP plus the complete-day
+# bonus (10 + 25 = 35), surface the day-complete state, and unlock the first
+# badge. Assertions target the durable read model rather than the 2.8 s
+# celebration banner, so a slow emulator cannot turn a correct award into a
+# flake (the banner itself is covered by e2e/gamification.spec.ts on web).
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Today'
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    index: 0
+- scrollUntilVisible:
+    element: 'Add anytime habit'
+    direction: DOWN
+- tapOn: 'Add anytime habit'
+# Index 1 targets the input: index 0 is the visible label (tapping it focuses
+# nothing and drops typed text).
+- tapOn:
+    text: 'Habit name'
+    index: 1
+- inputText: 'Reward loop'
+- hideKeyboard
+- scrollUntilVisible:
+    element: 'Create habit'
+    direction: DOWN
+- tapOn: 'Create habit'
+- extendedWaitUntil:
+    visible: 'Reward loop: 0 of 1 today.*'
+    timeout: 8000
+- tapOn: 'Reward loop: 0 of 1 today.*'
+- assertVisible: 'Reward loop: 1 of 1 today.*'
+- tapOn:
+    text: 'Today'
+    index: 0
+# The reward card sits below Today's Plan. Scroll to the card itself (a stable
+# clickable node) rather than to a text label deep inside it, accept partial
+# visibility, then read the award from the achievements drawer hero, which
+# opens scrolled to the top.
+- scrollUntilVisible:
+    element: 'Level & Streaks card — open achievements'
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn: 'Level & Streaks card — open achievements'
+- extendedWaitUntil:
+    visible: '.*35 of 50 XP towards level 2.*'
+    timeout: 15000
+# The drawer's own week hint reports the complete day; the dashboard pill with
+# the same wording sits behind the open drawer and is correctly not visible.
+- assertVisible: '.*Every habit is done today.*'
+- scrollUntilVisible:
+    element: 'Bronze Complete days'
+    direction: DOWN
+- assertVisible: 'Bronze Complete days'

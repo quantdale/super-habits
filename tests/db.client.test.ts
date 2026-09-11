@@ -370,10 +370,10 @@ describe('core/db/client', () => {
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 through v24 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(15);
+    // v10 through v25 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(16);
 
-    const upToDate = await loadDbClient({ schemaVersion: '24' });
+    const upToDate = await loadDbClient({ schemaVersion: '25' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });
@@ -445,7 +445,7 @@ describe('core/db/client', () => {
         String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
         Array.isArray(args) &&
         args[0] === 'db_schema_version' &&
-        args[1] === '24',
+        args[1] === '25',
     );
     expect(versionBump).toBeDefined();
   });

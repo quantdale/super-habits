@@ -168,7 +168,7 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       const version = await db.getFirstAsync<{ value: string }>(
         "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       // Valid legacy rows imported; 'garbage' skipped; the newer duplicate
       // intent won (latest-wins by revision order).
@@ -207,7 +207,7 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       const reopenedVersion = await reopened.getFirstAsync<{ value: string }>(
         "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
       );
-      expect(reopenedVersion?.value).toBe('24');
+      expect(reopenedVersion?.value).toBe('25');
       await reopened.closeAsync();
     } finally {
       rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
@@ -257,7 +257,7 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       const version = await db.getFirstAsync<{ value: string }>(
         "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       // Both plans survived the table rebuild, including the tombstone.
       const live = await db.getFirstAsync<{ intention: string }>(
@@ -357,7 +357,7 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       const version = await db.getFirstAsync<{ value: string }>(
         "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       // Promotion columns exist and legacy rows read as explicit unknowns.
       const session = await db.getFirstAsync<{
@@ -461,7 +461,7 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       const version = await db.getFirstAsync<{ value: string }>(
         "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       // Every pre-Gym row kept its id and user data, including the tombstone.
       const todo = await db.getFirstAsync<{ title: string; completed: number }>(
@@ -608,7 +608,7 @@ describe('historical SQLite upgrade fixtures (synthetic)', () => {
       const version = await db.getFirstAsync<{ value: string }>(
         "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
       );
-      expect(version?.value).toBe('24');
+      expect(version?.value).toBe('25');
 
       // Gym rows kept ids, timestamps, and user data across the upgrade.
       const custom = await db.getFirstAsync<{

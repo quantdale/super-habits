@@ -1164,7 +1164,7 @@ describe('backup completeness v2 restore', () => {
     const version = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
     );
-    expect(version?.value).toBe('24');
+    expect(version?.value).toBe('25');
     const metaAfter = await targetDb.getAllAsync<{ key: string; value: string }>(
       'SELECT key, value FROM app_meta ORDER BY key ASC',
     );

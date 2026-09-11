@@ -951,6 +951,50 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       `);
     });
   }
+
+  // Migration 25: local gamification state (XP ledger, consumed streak
+  // freezes, completed daily quests, unlocked badges).
+  //
+  // Deliberately OUTSIDE the backup scope and the account user-table list:
+  // rewards are a pure function of the authoritative feature tables above, so
+  // a restore/import rebuilds nothing stale, an unbound device still has the
+  // full loop, and `gamification_events` alone can recompute every streak,
+  // level, and quest board. `UNIQUE(event_kind, source_key)` is the
+  // idempotency contract that makes one real action worth XP exactly once.
+  if (version < 25) {
+    await applyMigration(db, 25, async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS gamification_events (
+          id TEXT PRIMARY KEY NOT NULL,
+          event_kind TEXT NOT NULL,
+          source_key TEXT NOT NULL,
+          date_key TEXT NOT NULL,
+          xp INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          UNIQUE(event_kind, source_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_gamification_events_date_xp
+          ON gamification_events (date_key, xp);
+        CREATE TABLE IF NOT EXISTS gamification_streak_freezes (
+          date_key TEXT PRIMARY KEY NOT NULL,
+          saved_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS gamification_quests (
+          date_key TEXT NOT NULL,
+          quest_id TEXT NOT NULL,
+          completed_at TEXT NOT NULL,
+          PRIMARY KEY (date_key, quest_id)
+        );
+        CREATE TABLE IF NOT EXISTS gamification_badges (
+          badge_id TEXT PRIMARY KEY NOT NULL,
+          family TEXT NOT NULL,
+          tier INTEGER NOT NULL,
+          unlocked_at TEXT NOT NULL,
+          date_key TEXT NOT NULL
+        );
+      `);
+    });
+  }
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {
