@@ -3,12 +3,21 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+  Nunito_900Black,
+  useFonts,
+} from '@expo-google-fonts/nunito';
 import { AppProviders } from '@/core/providers/AppProviders';
 import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
 import { NavigationProvider } from '@/core/providers/NavigationProvider';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { BootSplash } from '@/core/ui/BootSplash';
 import { InAppNoticeBanner } from '@/core/ui/InAppNoticeBanner';
 import { UpdateAvailableBanner } from '@/core/ui/UpdateAvailableBanner';
 import { ConnectivityIndicator } from '@/core/ui/ConnectivityIndicator';
@@ -17,6 +26,8 @@ import {
   GlobalCommandCenterHost,
 } from '@/features/command/CommandCenterProvider';
 import { AskConversationProvider } from '@/features/command/AskConversationContext';
+import { GamificationProvider } from '@/features/gamification/GamificationProvider';
+import { RewardCelebrationOverlay } from '@/features/gamification/RewardCelebrationOverlay';
 import * as Notifications from 'expo-notifications';
 import {
   dispatchNotificationResponse,
@@ -80,19 +91,31 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   return (
     <AppProviders>
-      <NavigationProvider>
-        <AskConversationProvider>
-          <CommandCenterProvider>
-            <ThemedRoot />
-          </CommandCenterProvider>
-        </AskConversationProvider>
-      </NavigationProvider>
+      <GamificationProvider>
+        <NavigationProvider>
+          <AskConversationProvider>
+            <CommandCenterProvider>
+              <ThemedRoot />
+            </CommandCenterProvider>
+          </AskConversationProvider>
+        </NavigationProvider>
+      </GamificationProvider>
     </AppProviders>
   );
 }
 
 function ThemedRoot() {
   const { tokens } = useAppTheme();
+  // The display family must be ready before the first screen paints: on native
+  // an unloaded custom family renders text invisibly rather than falling back.
+  const [fontsLoaded, fontError] = useFonts({
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
+  });
+  const showBootSplash = !fontsLoaded && !fontError;
 
   return (
     <>
@@ -105,11 +128,17 @@ function ThemedRoot() {
       <StatusBar style={tokens.statusBarStyle} />
       <Stack screenOptions={{ headerShown: false }} />
       <GlobalCommandCenterHost />
+      <RewardCelebrationOverlay />
       <InAppNoticeBanner />
       <UpdateAvailableBanner />
       <ConnectivityIndicator />
       <NotificationResponseHost />
       <TodoReminderHost />
+      {showBootSplash ? (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="auto">
+          <BootSplash />
+        </View>
+      ) : null}
     </>
   );
 }

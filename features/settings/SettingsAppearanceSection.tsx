@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { Text } from '@/core/ui/Text';
+import { View } from 'react-native';
 import type { ResolvedTheme, ThemeMode } from '@/core/providers/themeContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { DARK_THEME_IDS, LIGHT_THEME_IDS, THEME_REGISTRY, type ThemeId } from '@/core/theme';

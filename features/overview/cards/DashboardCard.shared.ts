@@ -20,8 +20,12 @@ type CardNavigation = ReturnType<typeof useAppNavigation>;
  */
 export function openCardTarget(
   navigation: CardNavigation,
-  meta: Pick<OverviewCardMeta, 'section' | 'planningHubView'>,
+  meta: Pick<OverviewCardMeta, 'section' | 'planningHubView' | 'overlay'>,
 ) {
+  if (meta.overlay === 'achievements') {
+    navigation.openAchievements();
+    return;
+  }
   if (meta.section) {
     const appSection = APP_SECTION_BY_CARD_SECTION[meta.section];
     if (appSection) {

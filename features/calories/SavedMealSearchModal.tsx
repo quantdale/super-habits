@@ -1,8 +1,10 @@
+import { Text } from '@/core/ui/Text';
 import { useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, TextInput, Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { PillChip } from '@/core/ui/PillChip';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
@@ -24,7 +26,6 @@ type Props = {
 
 export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDeleted }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
-  const colorText = sectionAccents.calories.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -72,9 +73,10 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
             value={query}
             onChangeText={setQuery}
             placeholder="Search meals..."
-            className="rounded-xl border px-3 py-2.5 text-sm"
+            className="rounded-2xl border px-4 py-3 text-base"
             style={{
-              backgroundColor: tokens.surfaceElevated,
+              minHeight: 48,
+              backgroundColor: tokens.surfaceSunken,
               borderColor: tokens.border,
               color: tokens.text,
             }}
@@ -85,31 +87,17 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
         </View>
 
         {categories.length > 0 ? (
-          <View className="mb-3 flex-row flex-wrap gap-2">
-            {[null, ...categories].map((category) => {
-              const active = activeCategory === category;
-              return (
-                <Pressable
-                  key={category ?? '__all__'}
-                  onPress={() => setActiveCategory(category)}
-                  accessibilityRole="button"
-                  accessibilityLabel={category ? `Filter by ${category}` : 'Show all categories'}
-                  accessibilityState={{ selected: active }}
-                  className="rounded-full border px-3 py-1.5"
-                  style={{
-                    borderColor: active ? sectionAccents.calories.text : tokens.border,
-                    backgroundColor: active ? sectionAccents.calories.tint : tokens.surfaceElevated,
-                  }}
-                >
-                  <Text
-                    className="text-xs font-medium"
-                    style={{ color: active ? colorText : tokens.textMuted }}
-                  >
-                    {category ?? 'All'}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View className="mb-3 flex-row flex-wrap">
+            {[null, ...categories].map((category) => (
+              <PillChip
+                key={category ?? '__all__'}
+                label={category ?? 'All'}
+                accessibilityLabel={category ? `Filter by ${category}` : 'Show all categories'}
+                active={activeCategory === category}
+                color={sectionAccents.calories.fill}
+                onPress={() => setActiveCategory(category)}
+              />
+            ))}
           </View>
         ) : null}
 
@@ -121,7 +109,6 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
             description={
               query ? 'Try a shorter search term.' : 'Meals you reuse will show up here.'
             }
-            icon={<Text style={{ fontSize: 22, color: sectionAccents.calories.text }}>⌕</Text>}
           />
         ) : (
           <View className="gap-2 pb-2">
@@ -134,11 +121,8 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
                 }}
                 onLongPress={() => handleDelete(meal)}
                 delayLongPress={500}
-                className="flex-row items-center justify-between rounded-2xl border px-4 py-3"
-                style={{
-                  borderColor: tokens.border,
-                  backgroundColor: tokens.surfaceElevated,
-                }}
+                className="flex-row items-center justify-between rounded-2xl px-4 py-3"
+                style={{ backgroundColor: sectionAccents.calories.tint }}
               >
                 <View className="flex-1">
                   <View className="flex-row flex-wrap items-center gap-2">
@@ -148,7 +132,7 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
                     {parseMealCategory(meal.food_name).category ? (
                       <View
                         className="rounded-full px-2 py-0.5"
-                        style={{ backgroundColor: sectionAccents.calories.tint }}
+                        style={{ backgroundColor: tokens.surface }}
                       >
                         <Text
                           className="text-[10px] font-semibold"

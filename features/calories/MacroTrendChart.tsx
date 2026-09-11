@@ -1,7 +1,9 @@
+import { Text } from '@/core/ui/Text';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { buildMacroTrendPoints, summarizeMacroTrend } from './calories.domain';
 import type { DailySummary } from './types';
@@ -19,34 +21,18 @@ function WindowToggle({
   value: WindowDays;
   onChange: (next: WindowDays) => void;
 }) {
-  const { tokens } = useAppTheme();
   return (
-    <View
-      className="flex-row self-start rounded-full border p-0.5"
-      style={{ borderColor: tokens.border }}
-    >
-      {WINDOW_OPTIONS.map((option) => {
-        const active = option === value;
-        return (
-          <Pressable
-            key={option}
-            onPress={() => onChange(option)}
-            accessibilityRole="button"
-            accessibilityLabel={`${option}-day trend`}
-            accessibilityState={{ selected: active }}
-            className="rounded-full px-3 py-1"
-            style={active ? { backgroundColor: COLOR } : undefined}
-          >
-            <Text
-              className="text-xs font-semibold"
-              style={{ color: active ? tokens.textOnAccent : tokens.textMuted }}
-            >
-              {option}d
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <SegmentedControl
+      options={WINDOW_OPTIONS.map((option) => ({
+        value: String(option),
+        label: `${option}d`,
+        accessibilityLabel: `${option}-day trend`,
+      }))}
+      value={String(value)}
+      onChange={(next) => onChange(Number(next) as WindowDays)}
+      accentColor={COLOR}
+      accessibilityLabel="Macro trend window"
+    />
   );
 }
 
@@ -82,10 +68,12 @@ export function MacroTrendChart({ summaries }: { summaries: DailySummary[] }) {
   return (
     <View className="w-full">
       <View className="mb-2 flex-row items-center justify-between">
-        <Text className="text-[13px] font-semibold" style={{ color: tokens.textMuted }}>
+        <Text variant="label" tone="muted">
           Daily kcal ({windowDays}-day)
         </Text>
-        <WindowToggle value={windowDays} onChange={setWindowDays} />
+        <View className="w-[150px]">
+          <WindowToggle value={windowDays} onChange={setWindowDays} />
+        </View>
       </View>
 
       <BarChart

@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Text, View, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { Screen } from '@/core/ui/Screen';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
@@ -12,6 +13,7 @@ import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { typography } from '@/core/theme/designTokens';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useCommandLauncherSuppressed } from '@/features/command/commandCenterContext';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import {
   listPomodoroSessionsForDateRange,
   recordCompletedPomodoroSession,
@@ -95,6 +97,7 @@ function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
 export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { register: registerCommandTimer } = usePomodoroCommandBridge();
+  const { recordAction } = useGamification();
   const dayGeneration = useDayRolloverGeneration();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
@@ -356,6 +359,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           // never mis-attach to a later session, then prompt for a note.
           setPendingAssociation(null);
           setNotePromptSessionId(result.id);
+          recordAction('focus', result.id);
         }
       } catch (err) {
         console.error('[PomodoroScreen] logPomodoroSession failed', err);
@@ -372,7 +376,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       }
       void loadHistory();
     },
-    [loadHistory],
+    [loadHistory, recordAction],
   );
 
   const runCompletionEffects = useCallback(() => {

@@ -1,6 +1,11 @@
 import type { MaterialIcons } from '@expo/vector-icons';
 
-import { POMODORO_SECTION_KEY, SECTION_COLORS, type SectionKey } from '@/constants/sectionColors';
+import {
+  POMODORO_SECTION_KEY,
+  REWARD_COLORS,
+  SECTION_COLORS,
+  type SectionKey,
+} from '@/constants/sectionColors';
 import type { PlanningHubView } from '@/core/providers/navigationContext';
 
 import type { OverviewCardId } from './overview.domain';
@@ -14,6 +19,8 @@ export type OverviewCardMeta = {
   /** Primary section deep-link target, or a planning-hub view fallback. */
   section?: SectionKey;
   planningHubView?: PlanningHubView;
+  /** Full-screen overlay this card opens instead of a section/planning view. */
+  overlay?: 'achievements';
 };
 
 export const OVERVIEW_CARD_META: Record<OverviewCardId, OverviewCardMeta> = {
@@ -24,6 +31,14 @@ export const OVERVIEW_CARD_META: Record<OverviewCardId, OverviewCardMeta> = {
     icon: 'event-note',
     accentColor: SECTION_COLORS[POMODORO_SECTION_KEY],
     planningHubView: 'today',
+  },
+  progress: {
+    id: 'progress',
+    title: 'Level & Streaks',
+    subtitle: 'XP, quests, badges',
+    icon: 'military-tech',
+    accentColor: REWARD_COLORS.accent,
+    overlay: 'achievements',
   },
   todos: {
     id: 'todos',

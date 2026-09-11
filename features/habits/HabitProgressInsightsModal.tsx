@@ -1,9 +1,11 @@
+import { Text } from '@/core/ui/Text';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { Modal } from '@/core/ui/Modal';
+import { StatBlock } from '@/core/ui/StatBlock';
 import { getCompletionHistory } from '@/features/habits/habits.data';
 import {
   calculateHabitProgressInsights,
@@ -43,17 +45,15 @@ function RateCard({ rate }: { rate: HabitInsightRate }) {
   return (
     <Card accentColor={SECTION_COLORS.habits} className="mb-3">
       <View accessible accessibilityLabel={rateAccessibleLabel(rate)}>
-        <View className="flex-row items-baseline justify-between gap-3">
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            Last {rate.windowDays} days
-          </Text>
-          <Text className="text-lg font-bold tabular-nums" style={{ color: SECTION_COLORS.habits }}>
+        <View className="flex-row items-center justify-between gap-3">
+          <Text variant="titleMd">Last {rate.windowDays} days</Text>
+          <Text variant="titleLg" style={{ color: SECTION_COLORS.habits }}>
             {rate.percentage === null ? '—' : `${rate.percentage}%`}
           </Text>
         </View>
         <View
           className="mt-2 h-2 overflow-hidden rounded-full"
-          style={{ backgroundColor: tokens.border }}
+          style={{ backgroundColor: tokens.surfaceSunken }}
           accessibilityElementsHidden
           importantForAccessibility="no"
         >
@@ -65,7 +65,7 @@ function RateCard({ rate }: { rate: HabitInsightRate }) {
             }}
           />
         </View>
-        <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" className="mt-2">
           {rateDescription(rate)}
         </Text>
       </View>
@@ -119,18 +119,18 @@ function HistoryRow({
     <View
       accessible
       accessibilityLabel={accessibleLabel}
-      className="flex-row items-center justify-between gap-3 border-b py-3"
-      style={{ borderColor: tokens.border }}
+      className="mb-2 flex-row items-center justify-between gap-3 rounded-2xl px-3 py-3"
+      style={{ backgroundColor: tokens.surfaceSunken }}
     >
       <View className="min-w-0 flex-1">
-        <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+        <Text variant="bodyMd" style={{ color: tokens.text }}>
           {day.dateKey}
         </Text>
-        <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" className="mt-0.5">
           {day.scheduled ? `Target ${day.targetPerDay}` : 'Off day'} · Actual {day.count}
         </Text>
       </View>
-      <Text className="text-xs font-semibold" style={{ color: statusColor }}>
+      <Text variant="label" style={{ color: statusColor }}>
         {status.label}
       </Text>
     </View>
@@ -170,7 +170,7 @@ export function HabitProgressInsightsModal({
       {!insights && !error ? (
         <View className="items-center py-8" accessible accessibilityLabel="Loading habit progress">
           <ActivityIndicator color={SECTION_COLORS.habits} />
-          <Text className="mt-3 text-sm" style={{ color: tokens.textMuted }}>
+          <Text variant="bodyMd" tone="muted" className="mt-3">
             Loading progress…
           </Text>
         </View>
@@ -178,7 +178,7 @@ export function HabitProgressInsightsModal({
 
       {error ? (
         <View accessible accessibilityRole="alert" className="py-4">
-          <Text className="text-sm" style={{ color: tokens.dangerText }}>
+          <Text variant="bodyMd" style={{ color: tokens.dangerText }}>
             {error}
           </Text>
           <View className="mt-4">
@@ -189,52 +189,79 @@ export function HabitProgressInsightsModal({
 
       {insights ? (
         <>
-          <View
-            accessible
-            accessibilityLabel={`Current streak: ${insights.currentStreak} scheduled occurrences. Longest streak: ${insights.longestStreak} scheduled occurrences. ${insights.totalCompletedOccurrences} of ${insights.totalEligibleOccurrences} eligible scheduled occurrences complete.`}
-            className="mb-4 rounded-2xl p-4"
-            style={{ backgroundColor: `${SECTION_COLORS.habits}12` }}
+          <Card
+            variant="header"
+            accentColor={SECTION_COLORS.habits}
+            headerTitle="Consistency summary"
+            headerSubtitle="Streaks and eligible check-ins"
           >
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              Consistency summary
-            </Text>
-            <Text className="mt-2 text-sm" style={{ color: tokens.text }}>
-              Current streak: {insights.currentStreak} scheduled occurrence
-              {insights.currentStreak === 1 ? '' : 's'}
-            </Text>
-            <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
-              Longest streak: {insights.longestStreak} scheduled occurrence
-              {insights.longestStreak === 1 ? '' : 's'}
-            </Text>
-            <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-              {insights.totalCompletedOccurrences} of {insights.totalEligibleOccurrences} eligible
-              scheduled occurrences complete · actual {insights.totalActual} of target{' '}
-              {insights.totalTarget}
-            </Text>
-          </View>
+            <View
+              accessible
+              accessibilityLabel={`Current streak: ${insights.currentStreak} scheduled occurrences. Longest streak: ${insights.longestStreak} scheduled occurrences. ${insights.totalCompletedOccurrences} of ${insights.totalEligibleOccurrences} eligible scheduled occurrences complete.`}
+            >
+              <View className="flex-row flex-wrap gap-3">
+                <StatBlock
+                  accentColor={SECTION_COLORS.habits}
+                  className="min-w-[100px] flex-1"
+                  value={insights.currentStreak}
+                  label="Current streak"
+                  detail="scheduled occurrences"
+                />
+                <StatBlock
+                  accentColor={SECTION_COLORS.habits}
+                  className="min-w-[100px] flex-1"
+                  value={insights.longestStreak}
+                  label="Longest streak"
+                  detail="scheduled occurrences"
+                />
+                <StatBlock
+                  accentColor={SECTION_COLORS.habits}
+                  className="min-w-[100px] flex-1"
+                  value={`${insights.totalCompletedOccurrences}/${insights.totalEligibleOccurrences}`}
+                  label="Complete"
+                  detail="eligible scheduled occurrences"
+                />
+              </View>
+              <Text variant="bodyMd" style={{ color: tokens.text }}>
+                Current streak: {insights.currentStreak} scheduled occurrence
+                {insights.currentStreak === 1 ? '' : 's'}
+              </Text>
+              <Text variant="bodyMd" className="mt-1" style={{ color: tokens.text }}>
+                Longest streak: {insights.longestStreak} scheduled occurrence
+                {insights.longestStreak === 1 ? '' : 's'}
+              </Text>
+              <Text variant="caption" tone="muted" className="mt-3">
+                {insights.totalCompletedOccurrences} of {insights.totalEligibleOccurrences} eligible
+                scheduled occurrences complete · actual {insights.totalActual} of target{' '}
+                {insights.totalTarget}
+              </Text>
+            </View>
+          </Card>
 
-          <Text className="mb-3 text-base font-semibold" style={{ color: tokens.text }}>
+          <Text variant="titleMd" className="mb-3">
             Scheduled completion rate
           </Text>
           <RateCard rate={insights.last7} />
           <RateCard rate={insights.last30} />
           <RateCard rate={insights.last90} />
 
-          <Card accentColor={SECTION_COLORS.habits} className="mb-4">
+          <Card
+            variant="header"
+            accentColor={SECTION_COLORS.habits}
+            headerTitle="Recent trend"
+            className="mb-4"
+          >
             <View accessible accessibilityLabel={trendDescription(insights)}>
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                Recent trend
-              </Text>
-              <Text className="mt-2 text-sm" style={{ color: tokens.text }}>
+              <Text variant="bodyMd" style={{ color: tokens.text }}>
                 {trendDescription(insights)}
               </Text>
             </View>
           </Card>
 
-          <Text className="mb-2 text-base font-semibold" style={{ color: tokens.text }}>
+          <Text variant="titleMd" className="mb-2">
             Recent target vs actual
           </Text>
-          <Text className="mb-2 text-xs" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted" className="mb-2">
             Scheduled rows use the target active on that date. Off-day activity is shown but stays
             neutral.
           </Text>

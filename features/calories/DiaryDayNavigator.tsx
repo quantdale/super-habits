@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
@@ -8,8 +9,6 @@ import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { Modal } from '@/core/ui/Modal';
 import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
 import type { DailySummary } from './types';
-
-const COLOR_FALLBACK = '#888';
 
 function addDays(dateKey: string, days: number): string {
   const d = dateKeyToLocalDate(dateKey);
@@ -58,7 +57,7 @@ type Props = {
 
 /** Pick a previous logged day to duplicate into the diary's selected day. */
 export function CopyDayModal({ visible, summaries, targetDateKey, onCopy, onClose }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
 
   const candidates = useMemo(() => {
     const today = toDateKey();
@@ -76,7 +75,7 @@ export function CopyDayModal({ visible, summaries, targetDateKey, onCopy, onClos
       </Text>
       {candidates.length === 0 ? (
         <EmptyStateCard
-          accentColor={COLOR_FALLBACK}
+          accentColor={sectionAccents.calories.fill}
           title="No earlier logged days"
           description="Log food on a previous day first, then copy it here."
         />
@@ -91,8 +90,8 @@ export function CopyDayModal({ visible, summaries, targetDateKey, onCopy, onClos
               }}
               accessibilityRole="button"
               accessibilityLabel={`Copy ${formatNavLabel(summary.dateKey)} into ${formatNavLabel(targetDateKey)}`}
-              className="flex-row items-center justify-between rounded-2xl border px-4 py-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              className="flex-row items-center justify-between rounded-2xl px-4 py-3"
+              style={{ backgroundColor: sectionAccents.calories.tint }}
             >
               <Text className="text-sm font-medium" style={{ color: tokens.text }}>
                 {formatNavLabel(summary.dateKey)}
@@ -150,7 +149,7 @@ export function DiaryDayNavigator({
   return (
     <Card
       variant="header"
-      accentColor={sectionAccents.calories.tint}
+      accentColor={sectionAccents.calories.fill}
       headerTitle={formatNavLabel(selectedDateKey)}
       headerSubtitle={
         selectedSummary
@@ -164,7 +163,7 @@ export function DiaryDayNavigator({
           onPress={() => onSelectDate(addDays(selectedDateKey, -1))}
           accessibilityRole="button"
           accessibilityLabel="Previous day"
-          className="h-10 w-10 items-center justify-center rounded-xl border"
+          className="h-12 w-12 items-center justify-center rounded-2xl border"
           style={{ borderColor: tokens.border }}
         >
           <MaterialIcons name="chevron-left" size={20} color={tokens.text} />
@@ -186,7 +185,7 @@ export function DiaryDayNavigator({
           accessibilityRole="button"
           accessibilityLabel="Next day"
           disabled={selectedDateKey >= today}
-          className="h-10 w-10 items-center justify-center rounded-xl border"
+          className="h-12 w-12 items-center justify-center rounded-2xl border"
           style={{ borderColor: tokens.border, opacity: selectedDateKey >= today ? 0.4 : 1 }}
         >
           <MaterialIcons name="chevron-right" size={20} color={tokens.text} />

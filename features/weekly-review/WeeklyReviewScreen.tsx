@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput } from 'react-native';
+import { View, Pressable, TextInput } from 'react-native';
 import { Screen } from '@/core/ui/Screen';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';

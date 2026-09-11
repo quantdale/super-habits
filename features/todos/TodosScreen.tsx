@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, View, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DraggableFlatList, {
@@ -7,6 +7,7 @@ import DraggableFlatList, {
   ScaleDecorator,
 } from 'react-native-draggable-flatlist';
 import { Screen } from '@/core/ui/Screen';
+import { Text } from '@/core/ui/Text';
 import { Modal } from '@/core/ui/Modal';
 import { Card } from '@/core/ui/Card';
 import { LinkedActionsEditorSection } from '@/core/linked-actions/LinkedActionsEditorSection';
@@ -26,6 +27,8 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
+import { SegmentedControl } from '@/core/ui/SegmentedControl';
+import { SparkIllustration } from '@/core/ui/illustrations/SparkIllustration';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
@@ -37,6 +40,7 @@ import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { validateTodo } from '@/lib/validation';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import type { Todo, TodoPriority, TodoViewMode } from './types';
 import { TodoItem } from './TodoItem';
 import { TodoQuickCapture } from './TodoQuickCapture';
@@ -76,13 +80,10 @@ import { listGoals } from '@/features/goals/goals.data';
 
 const COLOR = SECTION_COLORS.todos;
 const TODO_LINKED_ACTION_SOURCE_KEY = 'todo-linked-actions-source';
-const VIEW_MODE_OPTIONS: readonly {
-  mode: TodoViewMode;
-  icon: keyof typeof MaterialIcons.glyphMap;
-}[] = [
-  { mode: 'content', icon: 'view-agenda' },
-  { mode: 'list', icon: 'format-list-bulleted' },
-  { mode: 'grid', icon: 'grid-view' },
+const VIEW_MODE_OPTIONS: readonly { mode: TodoViewMode; label: string }[] = [
+  { mode: 'content', label: 'Cards' },
+  { mode: 'list', label: 'List' },
+  { mode: 'grid', label: 'Grid' },
 ];
 
 export function TodosScreen({ isActive }: { isActive: boolean }) {
@@ -90,7 +91,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const dayGeneration = useDayRolloverGeneration();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const colorText = sectionAccents.todos.text;
+  const todosAccent = sectionAccents.todos.fill;
   const { showNotice } = useInAppNotices();
+  const { recordAction } = useGamification();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const reducedMotion = useReducedMotion();
   const settleDuration = useMotionDuration('feedback');
@@ -196,6 +199,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     const today = toDateKey();
     return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
   }, [pendingTasks]);
+  const dueTodayCount = useMemo(
+    () => pendingTasks.filter((todo) => todo.due_date === todayKey).length,
+    [pendingTasks, todayKey],
+  );
 
   const refresh = useCallback(() => listTodos().then(setItemsIfChanged), [setItemsIfChanged]);
 
@@ -406,6 +413,8 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
+      // Only the completion direction earns XP; un-completing never removes it.
+      if (todo.completed === 0) recordAction('todo', todo.id);
       if (todo.completed === 0 && !reducedMotion) {
         // Hold the just-completed row in the list while the settle animation
         // plays, then let the normal refresh remove it.
@@ -423,7 +432,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       }
       void refresh();
     },
-    [refresh, reducedMotion, settleDuration, showNotice],
+    [recordAction, refresh, reducedMotion, settleDuration, showNotice],
   );
 
   const requestDeleteTodo = useCallback(
@@ -561,25 +570,27 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           accessibilityRole="checkbox"
           accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${todo.title}`}
           accessibilityState={{ checked: selected }}
-          className="mb-2 flex-row items-center gap-3 rounded-2xl border px-4 py-3"
+          className="mb-2 flex-row items-center gap-3 rounded-[22px] border-2 px-4 py-3"
           style={{
-            borderColor: selected ? COLOR : tokens.border,
-            backgroundColor: tokens.surfaceElevated,
+            borderColor: selected ? todosAccent : tokens.border,
+            backgroundColor: selected ? sectionAccents.todos.tint : tokens.surfaceElevated,
           }}
         >
           <View
-            className={`h-5 w-5 items-center justify-center rounded border-2 ${
-              selected ? 'border-todos bg-todos' : ''
-            }`}
-            style={
-              !selected
-                ? { borderColor: tokens.border, backgroundColor: tokens.surface }
-                : undefined
-            }
+            className="h-7 w-7 items-center justify-center rounded-full border-2"
+            style={{
+              borderColor: selected ? todosAccent : tokens.borderStrong,
+              backgroundColor: selected ? todosAccent : 'transparent',
+            }}
           >
-            {selected ? <MaterialIcons name="check" size={14} color={tokens.textOnAccent} /> : null}
+            {selected ? <MaterialIcons name="check" size={16} color={tokens.onSolid} /> : null}
           </View>
-          <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={2}>
+          <Text
+            variant="bodyMd"
+            className="min-w-0 flex-1"
+            style={{ color: tokens.text }}
+            numberOfLines={2}
+          >
             {todo.title}
           </Text>
         </Pressable>
@@ -587,11 +598,13 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     },
     [
       selectedIds,
+      sectionAccents.todos.tint,
+      todosAccent,
       tokens.border,
-      tokens.surface,
+      tokens.borderStrong,
+      tokens.onSolid,
       tokens.surfaceElevated,
       tokens.text,
-      tokens.textOnAccent,
       toggleSelected,
     ],
   );
@@ -656,101 +669,119 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const todosEmptyCardSubtitle = totallyEmpty || emptyPending;
   const noPendingTasksCard = (
     <EmptyStateCard
-      accentColor={SECTION_COLORS.todos}
+      accentColor={todosAccent}
       className="mb-0"
-      icon={<MaterialIcons name="checklist" size={22} color={colorText} />}
       title="No pending tasks"
       description="Offline-first task manager."
-    />
+      illustration={<SparkIllustration color={todosAccent} size={124} />}
+    >
+      <Button label="Add your first task" icon="add" onPress={openNewTodoModal} />
+    </EmptyStateCard>
+  );
+
+  const hero = (
+    <View>
+      <PageHeader
+        eyebrow="TO DO"
+        title="Todos"
+        subtitle={
+          selectionMode
+            ? `${selectedIds.length} selected`
+            : todosEmptyCardSubtitle
+              ? undefined
+              : 'Offline-first task manager.'
+        }
+        actions={
+          <IconButton
+            icon={selectionMode ? 'close' : 'playlist-add-check'}
+            onPress={() => {
+              if (selectionMode) exitSelectionMode();
+              else setSelectionMode(true);
+            }}
+            accessibilityLabel={
+              selectionMode ? 'Exit multi-select mode' : 'Enter multi-select mode'
+            }
+            selected={selectionMode}
+            accentColor={colorText}
+          />
+        }
+      />
+      <View className="mt-3 flex-row flex-wrap items-center justify-between gap-2">
+        <View
+          className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5"
+          style={{ backgroundColor: sectionAccents.todos.tint }}
+        >
+          <MaterialIcons name="insights" size={14} color={colorText} />
+          <Text variant="label" style={{ color: colorText, fontSize: 12 }}>
+            {pendingTasks.length} pending · {dueTodayCount} due today
+          </Text>
+        </View>
+        <View style={{ width: 216 }}>
+          <SegmentedControl
+            options={VIEW_MODE_OPTIONS.map(({ mode, label }) => ({
+              value: mode,
+              label,
+              accessibilityLabel: `${mode} view`,
+            }))}
+            value={viewMode}
+            onChange={setViewMode}
+            accentColor={todosAccent}
+            accessibilityLabel="Task view"
+          />
+        </View>
+      </View>
+    </View>
   );
 
   return (
     <View className="flex-1">
-      <Screen>
+      <Screen scroll={totallyEmpty} hero={hero}>
         <View className="flex-1">
           <ScreenSection>
-            <PageHeader
-              title="Todos"
-              subtitle={
-                selectionMode
-                  ? `${selectedIds.length} selected`
-                  : todosEmptyCardSubtitle
-                    ? undefined
-                    : 'Offline-first task manager.'
-              }
-              actions={
-                <>
-                  <IconButton
-                    icon={selectionMode ? 'close' : 'playlist-add-check'}
-                    onPress={() => {
-                      if (selectionMode) exitSelectionMode();
-                      else setSelectionMode(true);
-                    }}
-                    accessibilityLabel={
-                      selectionMode ? 'Exit multi-select mode' : 'Enter multi-select mode'
-                    }
-                    selected={selectionMode}
-                    accentColor={colorText}
-                  />
-                  {VIEW_MODE_OPTIONS.map(({ mode, icon }) => (
-                    <IconButton
-                      key={mode}
-                      icon={icon}
-                      onPress={() => setViewMode(mode)}
-                      accessibilityLabel={`${mode} view`}
-                      selected={viewMode === mode}
-                      accentColor={colorText}
-                    />
-                  ))}
-                </>
-              }
-            />
-          </ScreenSection>
-
-          <ScreenSection>
-            <Card accentColor={SECTION_COLORS.todos} className="mb-0" innerClassName="p-0">
-              <View className="p-4">
-                <View className="flex-row items-start gap-3">
-                  <View
-                    className="h-11 w-11 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: `${COLOR}18` }}
-                  >
-                    <MaterialIcons name="checklist" size={22} color={colorText} />
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                      Today&apos;s queue
-                    </Text>
-                    <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
-                      {pendingTasks.length} pending, {completedTasks.length} completed
-                    </Text>
-                  </View>
+            <Card accentColor={todosAccent} className="mb-0" innerClassName="p-4">
+              <View className="flex-row items-start gap-3">
+                <View
+                  className="h-11 w-11 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: `${todosAccent}1F` }}
+                >
+                  <MaterialIcons name="checklist" size={22} color={colorText} />
                 </View>
-                <View className="mt-4 flex-row flex-wrap gap-2">
-                  <View className="rounded-full bg-todos-light px-3 py-1.5">
-                    <Text className="text-xs font-semibold text-todos-dark">
-                      {pendingTasks.length} open
-                    </Text>
-                  </View>
+                <View className="min-w-0 flex-1">
+                  <Text variant="titleMd" style={{ color: tokens.text }}>
+                    Today&apos;s queue
+                  </Text>
+                  <Text variant="bodyMd" tone="muted" className="mt-0.5">
+                    {pendingTasks.length} pending, {completedTasks.length} completed
+                  </Text>
+                </View>
+              </View>
+              <View className="mt-4 flex-row flex-wrap gap-2">
+                <View
+                  className="rounded-full px-3 py-1.5"
+                  style={{ backgroundColor: sectionAccents.todos.tint }}
+                >
+                  <Text variant="label" style={{ color: colorText, fontSize: 12 }}>
+                    {pendingTasks.length} open
+                  </Text>
+                </View>
+                <View
+                  className="rounded-full px-3 py-1.5"
+                  style={{ backgroundColor: tokens.surfaceSunken }}
+                >
+                  <Text variant="label" tone="muted" style={{ fontSize: 12 }}>
+                    {recurringTasksCount} daily
+                  </Text>
+                </View>
+                {overdueTasksCount > 0 ? (
                   <View
                     className="rounded-full px-3 py-1.5"
-                    style={{ backgroundColor: tokens.surfaceElevated }}
+                    style={{ backgroundColor: tokens.dangerBackground }}
                   >
-                    <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
-                      {recurringTasksCount} daily
+                    <Text variant="label" style={{ color: tokens.dangerText, fontSize: 12 }}>
+                      {overdueTasksCount} overdue
                     </Text>
                   </View>
-                  {overdueTasksCount > 0 ? (
-                    <View
-                      className="rounded-full px-3 py-1.5"
-                      style={{ backgroundColor: tokens.dangerBackground }}
-                    >
-                      <Text className="text-xs font-semibold" style={{ color: tokens.dangerText }}>
-                        {overdueTasksCount} overdue
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
+                ) : null}
               </View>
             </Card>
           </ScreenSection>
@@ -771,14 +802,15 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 onFiltersChange={setFilters}
                 sort={sortMode}
                 onSortChange={setSortMode}
-                accentColor={colorText}
+                accentColor={todosAccent}
               />
               {selectionMode ? (
                 <View className="mb-3">
                   {dueGroups.overdue.length > 0 ? (
                     <Text
-                      className="mb-2 px-1 text-xs font-semibold"
-                      style={{ color: tokens.dangerText }}
+                      variant="label"
+                      className="mb-2 px-1 uppercase tracking-wide"
+                      style={{ color: tokens.dangerText, fontSize: 12 }}
                     >
                       Overdue ({dueGroups.overdue.length})
                     </Text>
@@ -786,8 +818,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   {dueGroups.overdue.map(renderSelectableRow)}
                   {dueGroups.today.length > 0 ? (
                     <Text
-                      className="mb-2 px-1 text-xs font-semibold"
-                      style={{ color: tokens.text }}
+                      variant="label"
+                      className="mb-2 px-1 uppercase tracking-wide"
+                      style={{ color: tokens.text, fontSize: 12 }}
                     >
                       Today ({dueGroups.today.length})
                     </Text>
@@ -795,8 +828,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   {dueGroups.today.map(renderSelectableRow)}
                   {dueGroups.upcoming.length > 0 ? (
                     <Text
-                      className="mb-2 px-1 text-xs font-semibold"
-                      style={{ color: tokens.textMuted }}
+                      variant="label"
+                      className="mb-2 px-1 uppercase tracking-wide"
+                      style={{ color: tokens.textMuted, fontSize: 12 }}
                     >
                       Upcoming ({dueGroups.upcoming.length})
                     </Text>
@@ -804,8 +838,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   {dueGroups.upcoming.map(renderSelectableRow)}
                   {dueGroups.noDue.length > 0 ? (
                     <Text
-                      className="mb-2 px-1 text-xs font-semibold"
-                      style={{ color: tokens.textMuted }}
+                      variant="label"
+                      className="mb-2 px-1 uppercase tracking-wide"
+                      style={{ color: tokens.textMuted, fontSize: 12 }}
                     >
                       No date ({dueGroups.noDue.length})
                     </Text>
@@ -820,7 +855,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                       projects={projectOptions}
                       onAssignProject={(projectId) => void handleBulkAssignProject(projectId)}
                       onExit={exitSelectionMode}
-                      accentColor={colorText}
+                      accentColor={todosAccent}
                     />
                   </View>
                 </View>
@@ -828,11 +863,11 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 <View className="mb-4">
                   {visiblePending.length === 0 ? (
                     <EmptyStateCard
-                      accentColor={SECTION_COLORS.todos}
+                      accentColor={todosAccent}
                       className="mb-0"
-                      icon={<MaterialIcons name="search-off" size={22} color={colorText} />}
                       title="No matching tasks"
                       description="Try a different search or reset the filters."
+                      illustration={<SparkIllustration color={todosAccent} size={124} />}
                     />
                   ) : null}
                   {(['overdue', 'today', 'upcoming', 'noDue'] as const).map((groupKey) => {
@@ -847,9 +882,11 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                     return (
                       <View key={groupKey} className="mb-4">
                         <Text
-                          className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide"
+                          variant="label"
+                          className="mb-2 px-1 uppercase tracking-wide"
                           style={{
                             color: groupKey === 'overdue' ? tokens.dangerText : tokens.textMuted,
+                            fontSize: 12,
                           }}
                           accessibilityLabel={`${labels[groupKey]} group, ${groupItems.length} tasks`}
                         >
@@ -874,101 +911,98 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   })}
                 </View>
               ) : (
-                <>
-                  <TodoQuickCapture onSubmit={handleQuickAdd} onOpenDetails={openNewTodoModal} />
-                  <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
-                    <View>
-                      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                        Pending
-                      </Text>
-                      <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
-                        Swipe to edit or delete. Drag to reorder.
-                      </Text>
-                    </View>
-                    {hasCompleted ? (
-                      <Pressable
-                        onPress={() => setShowCompleted((v) => !v)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
-                        accessibilityState={{ expanded: showCompleted }}
-                        aria-expanded={showCompleted}
-                        className="rounded-full border px-3 py-2.5"
-                        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                      >
-                        <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
-                          {showCompleted ? 'Hide' : 'Show'} completed ({completedTasks.length})
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  <DraggableFlatList
-                    key={viewMode}
-                    data={visiblePending}
-                    keyExtractor={todoKeyExtractor}
-                    containerStyle={{ flex: 1 }}
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
-                    activationDistance={10}
-                    numColumns={viewMode === 'grid' ? gridColumns : 1}
-                    onDragBegin={handleDragBegin}
-                    onDragEnd={handleDragEnd}
-                    ListEmptyComponent={
-                      hasCompleted ? (
-                        <View className="mb-3">{noPendingTasksCard}</View>
-                      ) : (
-                        <EmptyStateCard
-                          accentColor={SECTION_COLORS.todos}
-                          className="mb-0"
-                          title="Nothing to show here"
-                        />
-                      )
-                    }
-                    ListFooterComponent={
-                      hasCompleted ? (
-                        <View className="pt-3">
-                          {showCompleted
-                            ? [
-                                <View
-                                  key="completed-header"
-                                  className="mb-4 flex-row items-center justify-between gap-3 px-1"
-                                >
-                                  <View>
-                                    <Text
-                                      className="text-base font-semibold"
-                                      style={{ color: tokens.text }}
-                                    >
-                                      Completed
-                                    </Text>
-                                    <Text
-                                      className="mt-0.5 text-xs"
-                                      style={{ color: tokens.textMuted }}
-                                    >
-                                      Completed tasks stay here until you toggle them back.
-                                    </Text>
-                                  </View>
-                                </View>,
-                                ...completedTasks.map((item) => (
-                                  <TodoItem
-                                    key={item.id}
-                                    todo={item}
-                                    onLongPress={() => {}}
-                                    isActive={false}
-                                    onToggle={() => handleToggleTodo(item)}
-                                    onDelete={() => void requestDeleteTodo(item)}
-                                    onEdit={() => {
-                                      void startEdit(item);
-                                    }}
-                                    viewMode={viewMode}
-                                    cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
-                                  />
-                                )),
-                              ]
-                            : null}
+                <DraggableFlatList
+                  key={viewMode}
+                  data={visiblePending}
+                  keyExtractor={todoKeyExtractor}
+                  containerStyle={{ flex: 1 }}
+                  contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
+                  activationDistance={10}
+                  numColumns={viewMode === 'grid' ? gridColumns : 1}
+                  onDragBegin={handleDragBegin}
+                  onDragEnd={handleDragEnd}
+                  // The quick-add well and the Pending header scroll with the
+                  // rows instead of sitting above the list: on short viewports
+                  // fixed chrome above the list collapses the list to zero
+                  // height, leaving rows unreachable (and undraggable).
+                  ListHeaderComponent={
+                    <>
+                      <TodoQuickCapture
+                        onSubmit={handleQuickAdd}
+                        onOpenDetails={openNewTodoModal}
+                      />
+                      <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
+                        <View className="min-w-0 flex-1">
+                          <Text variant="titleMd" style={{ color: tokens.text }}>
+                            Pending
+                          </Text>
+                          <Text variant="caption" tone="muted" className="mt-0.5">
+                            Swipe to edit or delete. Drag to reorder.
+                          </Text>
                         </View>
-                      ) : null
-                    }
-                    renderItem={renderTodoItem}
-                  />
-                </>
+                        {hasCompleted ? (
+                          <PillChip
+                            label={`${showCompleted ? 'Hide' : 'Show'} completed (${completedTasks.length})`}
+                            accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
+                            active={showCompleted}
+                            color={todosAccent}
+                            onPress={() => setShowCompleted((v) => !v)}
+                          />
+                        ) : null}
+                      </View>
+                    </>
+                  }
+                  ListEmptyComponent={
+                    hasCompleted ? (
+                      <View className="mb-3">{noPendingTasksCard}</View>
+                    ) : (
+                      <EmptyStateCard
+                        accentColor={todosAccent}
+                        className="mb-0"
+                        title="Nothing to show here"
+                      />
+                    )
+                  }
+                  ListFooterComponent={
+                    hasCompleted ? (
+                      <View className="pt-3">
+                        {showCompleted
+                          ? [
+                              <View
+                                key="completed-header"
+                                className="mb-4 flex-row items-center justify-between gap-3 px-1"
+                              >
+                                <View>
+                                  <Text variant="titleMd" style={{ color: tokens.text }}>
+                                    Completed
+                                  </Text>
+                                  <Text variant="caption" tone="muted" className="mt-0.5">
+                                    Completed tasks stay here until you toggle them back.
+                                  </Text>
+                                </View>
+                              </View>,
+                              ...completedTasks.map((item) => (
+                                <TodoItem
+                                  key={item.id}
+                                  todo={item}
+                                  onLongPress={() => {}}
+                                  isActive={false}
+                                  onToggle={() => handleToggleTodo(item)}
+                                  onDelete={() => void requestDeleteTodo(item)}
+                                  onEdit={() => {
+                                    void startEdit(item);
+                                  }}
+                                  viewMode={viewMode}
+                                  cardWidth={viewMode === 'grid' ? gridCardWidth : undefined}
+                                />
+                              )),
+                            ]
+                          : null}
+                      </View>
+                    ) : null
+                  }
+                  renderItem={renderTodoItem}
+                />
               )}
             </ScreenSection>
           ) : null}
@@ -1014,7 +1048,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             </View>
             {projectOptions.length > 0 ? (
               <View className="mb-3">
-                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+                <Text variant="label" style={{ color: tokens.text, marginBottom: 4 }}>
                   Project
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
@@ -1038,7 +1072,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             ) : null}
             {goalOptions.length > 0 ? (
               <View className="mb-3">
-                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+                <Text variant="label" style={{ color: tokens.text, marginBottom: 4 }}>
                   Goal
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
@@ -1073,29 +1107,26 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 className="mb-3 flex-row items-center gap-2 py-2"
               >
                 <View
-                  className={`h-5 w-5 items-center justify-center rounded border-2 ${
-                    isRecurring ? 'border-todos bg-todos' : ''
-                  }`}
-                  style={
-                    !isRecurring
-                      ? { borderColor: tokens.border, backgroundColor: tokens.surface }
-                      : undefined
-                  }
+                  className="h-6 w-6 items-center justify-center rounded-full border-2"
+                  style={{
+                    borderColor: isRecurring ? todosAccent : tokens.borderStrong,
+                    backgroundColor: isRecurring ? todosAccent : 'transparent',
+                  }}
                 >
                   {isRecurring ? (
-                    <Text className="text-xs font-bold" style={{ color: tokens.textOnAccent }}>
+                    <Text variant="label" style={{ color: tokens.onSolid, fontSize: 12 }}>
                       ↻
                     </Text>
                   ) : null}
                 </View>
-                <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                <Text variant="bodyMd" tone="muted">
                   Repeat daily
                 </Text>
               </Pressable>
             ) : null}
             {editingId && editingTodo?.recurrence === 'daily' ? (
               <View className="mb-3">
-                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+                <Text variant="label" style={{ color: tokens.text, marginBottom: 4 }}>
                   Apply changes to
                 </Text>
                 <View className="mb-1 flex-row flex-wrap gap-2">
@@ -1112,7 +1143,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                     onPress={() => setEditRecurrenceScope('series')}
                   />
                 </View>
-                <Text className="mb-2 text-xs" style={{ color: tokens.textMuted }}>
+                <Text variant="caption" tone="muted" style={{ marginBottom: 8 }}>
                   {editRecurrenceScope === 'series'
                     ? 'This copy and the daily ones after it change. Completed copies keep their original text.'
                     : 'Only this copy changes. Future daily copies keep the old text.'}
@@ -1123,7 +1154,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   accessibilityLabel="Stop repeating this task"
                   className="py-2"
                 >
-                  <Text className="text-sm" style={{ color: colorText }}>
+                  <Text variant="bodyMd" style={{ color: colorText }}>
                     Stop repeating (keeps history)
                   </Text>
                 </Pressable>

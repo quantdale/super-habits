@@ -13,7 +13,7 @@ import {
   replaceLinkedActionRulesForSourceEntity,
 } from '@/core/linked-actions/linkedActions.data';
 import { createId } from '@/lib/id';
-import { nowIso, toDateKey } from '@/lib/time';
+import { nowIso, toDateKey, dateKeyToLocalDate } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
@@ -24,6 +24,22 @@ import {
   type TodoReminderSnapshot,
 } from '@/core/notifications/todoReminderScheduler';
 import { getTomorrowDateKey } from './todos.domain';
+
+/**
+ * Due date for the next instance spawned when a daily series row completes.
+ * A future-dated instance (e.g. tomorrow's copy completed early) rolls the
+ * chain forward one day from its own date; today/overdue/null rows keep the
+ * classic "spawn tomorrow" behaviour. Without this, completing a future copy
+ * would look for an instance on the *same* future date, find itself, and stop
+ * the series (boundary chain contract).
+ */
+function nextRecurringSpawnDueDate(completedDueDate: string | null): string {
+  const tomorrow = getTomorrowDateKey();
+  if (!completedDueDate || completedDueDate < tomorrow) return tomorrow;
+  const next = dateKeyToLocalDate(completedDueDate);
+  next.setDate(next.getDate() + 1);
+  return toDateKey(next);
+}
 
 export type TodoLinkedActionsDispatchResult = Pick<
   LinkedActionProcessResult,
@@ -817,13 +833,13 @@ async function setTodoCompletion(
   }
 
   if (next === 1 && current.recurrence === 'daily' && current.recurrence_id) {
-    const tomorrow = getTomorrowDateKey();
+    const spawnDueDate = nextRecurringSpawnDueDate(current.due_date);
     const existing = await db.getFirstAsync<{ id: string }>(
       `SELECT id FROM todos
        WHERE recurrence_id = ?
          AND due_date = ?
          AND deleted_at IS NULL`,
-      [current.recurrence_id, tomorrow],
+      [current.recurrence_id, spawnDueDate],
     );
     if (!existing) {
       await createRecurringInstance({
@@ -831,7 +847,7 @@ async function setTodoCompletion(
         notes: current.notes,
         priority: current.priority,
         recurrenceId: current.recurrence_id,
-        dueDate: tomorrow,
+        dueDate: spawnDueDate,
       });
     }
   }
@@ -960,13 +976,13 @@ export async function bulkSetTodoCompletion(
     }
 
     if (next === 1 && row.recurrence === 'daily' && row.recurrence_id) {
-      const tomorrow = getTomorrowDateKey();
+      const spawnDueDate = nextRecurringSpawnDueDate(row.due_date);
       const existing = await db.getFirstAsync<{ id: string }>(
         `SELECT id FROM todos
          WHERE recurrence_id = ?
            AND due_date = ?
            AND deleted_at IS NULL`,
-        [row.recurrence_id, tomorrow],
+        [row.recurrence_id, spawnDueDate],
       );
       if (!existing) {
         await createRecurringInstance({
@@ -974,7 +990,7 @@ export async function bulkSetTodoCompletion(
           notes: row.notes,
           priority: row.priority,
           recurrenceId: row.recurrence_id,
-          dueDate: tomorrow,
+          dueDate: spawnDueDate,
         });
       }
     }

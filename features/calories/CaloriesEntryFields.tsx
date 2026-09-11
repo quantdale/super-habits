@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
+import { radius, spacing } from '@/core/theme/designTokens';
 import type { MealType } from './types';
 
 type MealOption = {
@@ -107,23 +109,23 @@ export function CaloriesEntryFields({
           />
         </View>
       </View>
-      <View className="mb-3">
+      <View
+        className="mb-3"
+        style={{
+          backgroundColor: tokens.surfaceSunken,
+          borderRadius: radius.lg,
+          padding: spacing.md,
+        }}
+      >
         <View className="flex-row items-center gap-3">
-          <Text className="text-sm font-medium" style={{ color: tokens.textMuted }}>
+          <Text variant="bodyMd" tone="muted">
             Calories (kcal)
           </Text>
-          <Text
-            className="flex-1 rounded-xl border px-3 py-2 text-right text-base"
-            style={{
-              color: tokens.text,
-              borderColor: tokens.border,
-              backgroundColor: tokens.surfaceElevated,
-            }}
-          >
+          <Text variant="metric" style={{ flex: 1, textAlign: 'right', color: tokens.text }}>
             {computedKcal > 0 ? computedKcal : '—'}
           </Text>
         </View>
-        <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>
           Auto-calculated from protein, carbs, fat, and fiber.
         </Text>
       </View>

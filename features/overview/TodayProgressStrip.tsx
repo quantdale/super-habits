@@ -1,10 +1,10 @@
+import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { Card } from '@/core/ui/Card';
+import { radius, spacing } from '@/core/theme/designTokens';
 
 import type {
   CaloriesSummary,
@@ -40,7 +40,7 @@ export function TodayProgressStrip({
   workout,
   calories,
 }: TodayProgressStripProps) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { sectionAccents } = useAppTheme();
   const navigation = useAppNavigation();
 
   const focusMinutesToday =
@@ -119,45 +119,53 @@ export function TodayProgressStrip({
   ];
 
   return (
-    <Card className="mb-0">
-      <View className="flex-row flex-wrap items-center">
-        <View className="mr-1 flex-row items-center gap-1 py-2 pl-1 pr-2">
-          <MaterialIcons name="today" size={16} color={sectionAccents[POMODORO_SECTION_KEY].text} />
-          <Text
-            className="text-xs font-semibold uppercase tracking-[0.6px]"
-            style={{ color: tokens.textMuted }}
-          >
-            Today
-          </Text>
-        </View>
+    <View>
+      <Text
+        variant="label"
+        tone="muted"
+        style={{ letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing.sm }}
+      >
+        Today at a glance
+      </Text>
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         {metrics.map((metric) => {
           const meta = OVERVIEW_CARD_META[metric.id];
+          const hue = sectionAccents[metric.id].fill;
           return (
             <Pressable
               key={metric.id}
               accessibilityRole="button"
               accessibilityLabel={`${metric.spoken}. Open ${meta.title}`}
               onPress={() => openCardTarget(navigation, meta)}
-              className="min-h-[44px] justify-center rounded-lg px-2 active:opacity-70"
+              style={({ pressed }) => ({
+                flex: 1,
+                minWidth: 0,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.sm,
+                borderRadius: radius.md,
+                alignItems: 'center',
+                gap: 2,
+                backgroundColor: `${hue}1A`,
+                borderWidth: 1.5,
+                borderColor: `${hue}33`,
+                opacity: pressed ? 0.85 : 1,
+              })}
             >
-              <View className="flex-row items-baseline gap-1.5">
-                <Text
-                  className="text-base font-bold tabular-nums"
-                  style={{ color: sectionAccents[metric.id].text }}
-                >
-                  {metric.value}
-                </Text>
-                <Text
-                  className="text-[11px] uppercase tracking-[0.6px]"
-                  style={{ color: tokens.textMuted }}
-                >
-                  {metric.label}
-                </Text>
-              </View>
+              <MaterialIcons name={meta.icon} size={18} color={hue} />
+              <Text
+                variant="titleMd"
+                style={{ color: hue, fontSize: 19, lineHeight: 24 }}
+                numberOfLines={1}
+              >
+                {metric.value}
+              </Text>
+              <Text variant="caption" tone="muted" style={{ fontSize: 10.5 }} numberOfLines={1}>
+                {metric.label}
+              </Text>
             </Pressable>
           );
         })}
       </View>
-    </Card>
+    </View>
   );
 }

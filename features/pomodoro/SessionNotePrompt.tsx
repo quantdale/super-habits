@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { setPomodoroSessionMeta } from './pomodoro.data';

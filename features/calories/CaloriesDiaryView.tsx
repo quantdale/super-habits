@@ -1,19 +1,21 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { memo, useMemo, useState } from 'react';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { layout, spacing } from '@/core/theme/designTokens';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { Text } from '@/core/ui/Text';
 import { TextField } from '@/core/ui/TextField';
 import { FrequentFoodChips, SavedMealChips } from './SavedMealChips';
 import { QuickAddKcal } from './QuickAddKcal';
 import { EntryMacroShareLine } from './EntryMacroShareLine';
 import { CopyDayModal, DiaryDayNavigator } from './DiaryDayNavigator';
 import { filterSavedMeals } from './calories.domain';
+import { StaggerItem } from './CalorieStaggerItem';
 import type { FrequentFood } from './calories.domain';
 import type { CalorieEntry, DailySummary, MealType, SavedMeal } from './types';
 
@@ -22,6 +24,14 @@ export type MealSection = {
   label: string;
   entries: CalorieEntry[];
   totalCalories: number;
+};
+
+/** Material glyph per meal group: emoji-free, icon-led section headers. */
+const MEAL_ICONS: Record<MealType, keyof typeof MaterialIcons.glyphMap> = {
+  breakfast: 'free-breakfast',
+  lunch: 'lunch-dining',
+  dinner: 'dinner-dining',
+  snack: 'cookie',
 };
 
 function formatEntryTimestamp(timestamp: string) {
@@ -55,7 +65,7 @@ function DiaryActionButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      className="h-11 w-11 items-center justify-center rounded-2xl border"
+      className="h-12 w-12 items-center justify-center rounded-2xl border"
       style={{ borderColor: tokens.border, backgroundColor }}
     >
       <MaterialIcons name={icon} size={18} color={color} />
@@ -80,24 +90,30 @@ function DiaryMealGroupCard({
   const colorText = sectionAccents.calories.text;
 
   return (
-    <Card className="mb-3" innerClassName="p-0">
+    <Card accentColor={sectionAccents.calories.fill} className="mb-3" innerClassName="p-0">
       <Pressable onPress={onToggle} className="px-4 py-4">
         <View className="flex-row items-center justify-between gap-3">
+          <View
+            className="h-11 w-11 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: sectionAccents.calories.tint }}
+          >
+            <MaterialIcons name={MEAL_ICONS[section.mealType]} size={22} color={colorText} />
+          </View>
           <View className="min-w-0 flex-1">
             <View className="flex-row flex-wrap items-center gap-2">
               <View
                 className="rounded-full px-3 py-1"
                 style={{ backgroundColor: sectionAccents.calories.tint }}
               >
-                <Text className="text-xs font-semibold" style={{ color: colorText }}>
+                <Text variant="label" style={{ color: colorText }}>
                   {section.label}
                 </Text>
               </View>
-              <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
+              <Text variant="caption" tone="muted">
                 {formatMealCount(section.entries.length)}
               </Text>
             </View>
-            <Text className="mt-3 text-lg font-semibold" style={{ color: tokens.text }}>
+            <Text variant="titleLg" className="mt-2">
               {section.totalCalories} kcal
             </Text>
           </View>
@@ -110,12 +126,12 @@ function DiaryMealGroupCard({
       </Pressable>
 
       {!collapsed ? (
-        <View className="gap-3 border-t px-4 pb-4 pt-3" style={{ borderColor: tokens.border }}>
+        <View className="gap-3 px-4 pb-4 pt-3">
           {section.entries.map((entry) => (
             <View
               key={entry.id}
-              className="rounded-2xl border px-4 py-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              className="rounded-2xl px-4 py-3"
+              style={{ backgroundColor: sectionAccents.calories.tint }}
             >
               <View className="flex-row items-start justify-between gap-3">
                 <View className="min-w-0 flex-1">
@@ -214,7 +230,7 @@ const DiaryQuickAddSearch = memo(function DiaryQuickAddSearch({
   onBrowseSavedMeals: () => void;
   onManualAdd: (query: string) => void;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const [query, setQuery] = useState('');
   const matches = useMemo(() => {
     if (!query.trim()) return [];
@@ -238,18 +254,15 @@ const DiaryQuickAddSearch = memo(function DiaryQuickAddSearch({
       {query.trim() ? (
         matches.length > 0 ? (
           <View className="mb-3 gap-2">
-            <Text className="text-xs font-semibold uppercase" style={{ color: tokens.textMuted }}>
+            <Text variant="label" tone="muted" style={{ textTransform: 'uppercase' }}>
               Matches
             </Text>
             {matches.map((meal) => (
               <Pressable
                 key={meal.id}
                 onPress={() => handleSelect(meal)}
-                className="rounded-2xl border px-4 py-3"
-                style={{
-                  borderColor: tokens.border,
-                  backgroundColor: tokens.surfaceElevated,
-                }}
+                className="rounded-2xl px-4 py-3"
+                style={{ backgroundColor: sectionAccents.calories.tint }}
               >
                 <Text className="text-sm font-medium" style={{ color: tokens.text }}>
                   {meal.food_name}
@@ -263,8 +276,8 @@ const DiaryQuickAddSearch = memo(function DiaryQuickAddSearch({
           </View>
         ) : (
           <View
-            className="mb-3 rounded-2xl border px-4 py-3"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+            className="mb-3 rounded-2xl px-4 py-3"
+            style={{ backgroundColor: tokens.surfaceSunken }}
           >
             <Text className="text-sm" style={{ color: tokens.textMuted }}>
               No saved meal matches “{query.trim()}”. Use Manual add to log it as a new food.
@@ -370,7 +383,6 @@ function areDiaryQuickAddDataEqual(
 
 export function CaloriesDiaryView({
   accentColor,
-  colorText,
   todayCard,
   recentMeals,
   frequentFoods,
@@ -436,29 +448,43 @@ export function CaloriesDiaryView({
         <EmptyStateCard
           accentColor={accentColor}
           className="mb-0"
-          icon={<MaterialIcons name="menu-book" size={22} color={colorText} />}
           title="No meals logged on this day"
           description="Use quick add, manual add, or copy a previous day to start it."
-        />
+        >
+          <Button
+            label="Add entry"
+            icon="add"
+            color={accentColor}
+            onPress={() => onManualAdd('')}
+          />
+        </EmptyStateCard>
       ) : (
         <>
           <View className="mb-4 px-1">
-            <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-              Daily log
-            </Text>
-            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            <Text variant="titleMd">Daily log</Text>
+            <Text variant="caption" tone="muted" className="mt-1">
               Entries are grouped by stored meal type and default to expanded.
             </Text>
           </View>
-          {groupedEntries.map((section) => (
-            <DiaryMealGroupCard
-              key={section.mealType}
-              section={section}
-              collapsed={collapsedMeals[section.mealType] ?? false}
-              onToggle={() => onToggleMealGroup(section.mealType)}
-              onEdit={onEditEntry}
-              onDelete={onDeleteEntry}
+          <View className="mb-4">
+            <Button
+              label="Add entry"
+              icon="add"
+              color={accentColor}
+              fullWidth
+              onPress={() => onManualAdd('')}
             />
+          </View>
+          {groupedEntries.map((section, index) => (
+            <StaggerItem key={section.mealType} index={index}>
+              <DiaryMealGroupCard
+                section={section}
+                collapsed={collapsedMeals[section.mealType] ?? false}
+                onToggle={() => onToggleMealGroup(section.mealType)}
+                onEdit={onEditEntry}
+                onDelete={onDeleteEntry}
+              />
+            </StaggerItem>
           ))}
         </>
       )}

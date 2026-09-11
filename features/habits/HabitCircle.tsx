@@ -1,6 +1,10 @@
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useReducedMotion } from '@/core/theme/motion';
+import { springs } from '@/core/theme/designTokens';
 import type { Habit } from './types';
 import { calculateHabitProgress } from '@/features/habits/habits.domain';
 import { ProgressRing } from '@/features/habits/ProgressRing';
@@ -13,7 +17,7 @@ type HabitCircleProps = {
   showStreak?: boolean;
   /** When false, parent renders the habit name (e.g. Avocation-style row). */
   showName?: boolean;
-  /** Outer ring fits around this diameter (default 56). */
+  /** Outer ring fits around this diameter (minimum 64). */
   size?: number;
   scheduledToday?: boolean;
   /**
@@ -25,7 +29,7 @@ type HabitCircleProps = {
   onDecrement: () => void;
 };
 
-const DEFAULT_SIZE = 56;
+const MIN_SIZE = 64;
 
 export function HabitCircle({
   habit,
@@ -33,90 +37,136 @@ export function HabitCircle({
   streak,
   showStreak = true,
   showName = true,
-  size = DEFAULT_SIZE,
+  size = MIN_SIZE,
   scheduledToday = true,
   dayPhrase,
   onIncrement,
   onDecrement,
 }: HabitCircleProps) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
+  const reducedMotion = useReducedMotion();
+  const diameter = Math.max(MIN_SIZE, size);
   const progress = scheduledToday ? calculateHabitProgress(todayCount, habit.target_per_day) : 0;
+  const isComplete = scheduledToday && progress >= 1;
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
   const habitColor = habit.color ?? tokens.textMuted;
-  const iconTint = `${habitColor}18`;
+  const iconTint = `${habitColor}1F`;
 
-  const strokeWidth = Math.max(3, Math.round(size / 14));
-  const ringSize = size + strokeWidth * 2;
-  const iconSize = Math.round(size * 0.5);
+  const strokeWidth = Math.max(5, Math.round(diameter / 10));
+  const ringSize = diameter + strokeWidth * 2;
+
+  // Spring check-off: the ring pulses once when a check-in lands, so the
+  // gesture has a physical result even before the count re-renders. Reduced
+  // motion skips the pulse entirely — the count is the information.
+  const [pulse] = useState(() => new Animated.Value(1));
+  const previousCount = useRef(todayCount);
+  useEffect(() => {
+    const increased = todayCount > previousCount.current;
+    previousCount.current = todayCount;
+    if (!increased || reducedMotion) return;
+    const animation = Animated.sequence([
+      Animated.spring(pulse, { toValue: 1.12, useNativeDriver: true, ...springs.pop }),
+      Animated.spring(pulse, { toValue: 1, useNativeDriver: true, ...springs.press }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [pulse, reducedMotion, todayCount]);
 
   return (
-    <View className="items-center" style={{ width: Math.max(64, ringSize) }}>
-      <Pressable
-        onPress={scheduledToday ? onIncrement : undefined}
-        onLongPress={scheduledToday ? onDecrement : undefined}
-        disabled={!scheduledToday}
-        delayLongPress={400}
-        style={{ width: ringSize, height: ringSize }}
-        className="items-center justify-center"
-        accessibilityRole="button"
-        accessibilityLabel={
-          scheduledToday
-            ? `${habit.name}: ${todayCount} of ${habit.target_per_day} ${dayPhrase ?? 'today'}. Tap to add one. Long press to remove one.`
-            : `${habit.name}: not scheduled ${dayPhrase ?? 'today'}. Rest day.`
-        }
-        accessibilityState={{ disabled: !scheduledToday }}
-      >
-        <View
-          style={{
-            position: 'absolute',
-            width: ringSize,
-            height: ringSize,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+    <View className="items-center" style={{ width: Math.max(72, ringSize) }}>
+      <Animated.View style={{ transform: [{ scale: pulse }] }}>
+        <Pressable
+          onPress={scheduledToday ? onIncrement : undefined}
+          onLongPress={scheduledToday ? onDecrement : undefined}
+          disabled={!scheduledToday}
+          delayLongPress={400}
+          style={{ width: ringSize, height: ringSize }}
+          className="items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={
+            scheduledToday
+              ? `${habit.name}: ${todayCount} of ${habit.target_per_day} ${dayPhrase ?? 'today'}. Tap to add one. Long press to remove one.`
+              : `${habit.name}: not scheduled ${dayPhrase ?? 'today'}. Rest day.`
+          }
+          accessibilityState={{ disabled: !scheduledToday }}
         >
-          <ProgressRing
-            size={ringSize}
-            strokeWidth={strokeWidth}
-            progress={progress}
-            backgroundColor={tokens.border}
-            progressColor={habitColor}
-          />
-        </View>
-        <View
-          style={{
-            position: 'absolute',
-            left: (ringSize - size) / 2,
-            top: (ringSize - size) / 2,
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor: scheduledToday ? iconTint : tokens.surfaceElevated,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <MaterialIcons
-            name={iconName}
-            size={iconSize}
-            color={scheduledToday ? habitColor : tokens.iconMuted}
-          />
-        </View>
-      </Pressable>
+          <View
+            style={{
+              position: 'absolute',
+              width: ringSize,
+              height: ringSize,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ProgressRing
+              size={ringSize}
+              strokeWidth={strokeWidth}
+              progress={progress}
+              backgroundColor={tokens.surfaceSunken}
+              progressColor={habitColor}
+            />
+          </View>
+          <View
+            style={{
+              position: 'absolute',
+              left: (ringSize - diameter) / 2,
+              top: (ringSize - diameter) / 2,
+              width: diameter,
+              height: diameter,
+              borderRadius: diameter / 2,
+              backgroundColor: isComplete
+                ? habitColor
+                : scheduledToday
+                  ? iconTint
+                  : tokens.surfaceSunken,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {isComplete ? (
+              <MaterialIcons name="check" size={30} color={tokens.onSolid} />
+            ) : habit.target_per_day > 1 ? (
+              <Text
+                variant="titleMd"
+                style={{ color: scheduledToday ? habitColor : tokens.iconMuted }}
+              >
+                {todayCount}/{habit.target_per_day}
+              </Text>
+            ) : (
+              <MaterialIcons
+                name={iconName}
+                size={28}
+                color={scheduledToday ? habitColor : tokens.iconMuted}
+              />
+            )}
+          </View>
+        </Pressable>
+      </Animated.View>
       {!scheduledToday ? (
-        <Text className="mt-1 text-[10px] font-medium" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ marginTop: 4 }}>
           Rest day
         </Text>
       ) : null}
-      {showStreak && streak > 0 && (
-        <Text className="mt-0.5 text-xs font-medium text-amber-500">
-          {streak > 2 ? '🔥' : '⚡'} {streak}
-        </Text>
-      )}
+      {showStreak && streak > 0 ? (
+        <View
+          className="mt-1 flex-row items-center gap-1 rounded-full px-2 py-1"
+          style={{ backgroundColor: sectionAccents.habits.tint }}
+        >
+          <MaterialIcons
+            name={streak > 2 ? 'local-fire-department' : 'bolt'}
+            size={12}
+            color={sectionAccents.habits.text}
+          />
+          <Text variant="caption" style={{ color: sectionAccents.habits.text }}>
+            {streak}
+          </Text>
+        </View>
+      ) : null}
       {showName ? (
         <Text
-          className="mt-2 text-center text-xs font-medium leading-4"
-          style={{ color: tokens.text }}
+          variant="caption"
+          style={{ color: tokens.text, textAlign: 'center', marginTop: 8 }}
           numberOfLines={2}
         >
           {habit.name}

@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.coordinator';

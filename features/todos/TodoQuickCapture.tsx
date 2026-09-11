@@ -1,10 +1,10 @@
+import { Text } from '@/core/ui/Text';
 import { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text, TextInput, View } from 'react-native';
-import { SECTION_COLORS } from '@/constants/sectionColors';
-import { opacity } from '@/core/theme';
+import { Animated, Pressable, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { spacing, radius, size } from '@/core/theme/designTokens';
+import { useReducedMotion } from '@/core/theme/motion';
+import { opacity, radius, size, spacing, springs } from '@/core/theme/designTokens';
 
 type Props = {
   /** Creates the task; resolves after persistence so the input only clears on success. */
@@ -15,15 +15,26 @@ type Props = {
 
 /**
  * Persistent single-line quick capture pinned above the pending list. Enter or
- * the add button creates a task with just a title; the optional details action
- * keeps advanced task editing reachable without another floating action.
+ * the chunky circular add button creates a task with just a title; the optional
+ * details action keeps advanced task editing reachable without another
+ * floating action. The add button sinks and springs back under the finger.
  */
 export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pressScale] = useState(() => new Animated.Value(1));
   const trimmed = title.trim();
   const canSubmit = trimmed.length > 0 && !isSubmitting;
+
+  const settle = (toValue: number) => {
+    if (reducedMotion) {
+      pressScale.setValue(toValue);
+      return;
+    }
+    Animated.spring(pressScale, { toValue, useNativeDriver: true, ...springs.press }).start();
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -40,11 +51,11 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
     <View className="mb-4 flex-row items-center" style={{ gap: spacing.sm }}>
       <TextInput
         accessibilityLabel="Quick add task title"
-        className="flex-1 text-base"
+        className="min-w-0 flex-1 text-base"
         style={{
           minHeight: size.touchTargetMin,
-          borderRadius: radius.lg,
-          borderWidth: 1,
+          borderRadius: radius.full,
+          borderWidth: 2,
           borderColor: tokens.border,
           backgroundColor: tokens.surfaceElevated,
           color: tokens.text,
@@ -58,37 +69,43 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
         returnKeyType="done"
         onSubmitEditing={() => void handleSubmit()}
       />
-      <Pressable
-        onPress={() => void handleSubmit()}
-        disabled={!canSubmit}
-        accessibilityRole="button"
-        accessibilityLabel="Add task"
-        accessibilityState={{ disabled: !canSubmit }}
-        className="items-center justify-center"
-        style={{
-          width: size.touchTargetMin,
-          height: size.touchTargetMin,
-          borderRadius: radius.lg,
-          backgroundColor: SECTION_COLORS.todos,
-          opacity: canSubmit ? 1 : opacity.disabled,
-        }}
-      >
-        <MaterialIcons name="add" size={24} color={tokens.textOnAccent} />
-      </Pressable>
+      <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+        <Pressable
+          onPress={() => void handleSubmit()}
+          onPressIn={() => settle(0.88)}
+          onPressOut={() => settle(1)}
+          disabled={!canSubmit}
+          accessibilityRole="button"
+          accessibilityLabel="Add task"
+          accessibilityState={{ disabled: !canSubmit }}
+          className="items-center justify-center"
+          style={{
+            width: size.touchTargetMin,
+            height: size.touchTargetMin,
+            borderRadius: radius.full,
+            backgroundColor: sectionAccents.todos.fill,
+            opacity: canSubmit ? 1 : opacity.disabled,
+          }}
+        >
+          <MaterialIcons name="add" size={26} color={tokens.textOnAccent} />
+        </Pressable>
+      </Animated.View>
       {onOpenDetails ? (
         <Pressable
           onPress={onOpenDetails}
           accessibilityRole="button"
           accessibilityLabel="Add task"
           accessibilityHint="Open task details"
-          className="justify-center"
+          className="items-center justify-center border"
           style={{
             minHeight: size.touchTargetMin,
-            borderRadius: radius.md,
-            paddingHorizontal: spacing.sm,
+            borderRadius: radius.full,
+            borderColor: tokens.border,
+            paddingHorizontal: spacing.md,
+            backgroundColor: tokens.surface,
           }}
         >
-          <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
+          <Text variant="label" tone="muted">
             Details
           </Text>
         </Pressable>

@@ -1,15 +1,8 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
@@ -18,9 +11,13 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildDateRangeOldestFirst, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
-import { spacing, layout } from '@/core/theme/designTokens';
+import { Button } from '@/core/ui/Button';
+import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
+import { spacing, layout, radius } from '@/core/theme/designTokens';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import { GamificationCard } from './cards/GamificationCard';
 import { getMomentumGarden } from '@/features/momentum/momentum.data';
 import { MomentumCard } from '@/features/momentum/MomentumCard';
 import type { MomentumGardenModel } from '@/features/momentum/momentum.types';
@@ -222,9 +219,6 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const { openPlanningHub, setActiveSection, openSettings } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
-  const { width: viewportWidth } = useWindowDimensions();
-  const compactHeader = Platform.OS === 'web' && viewportWidth < 600;
-  const stackedHeader = compactHeader || (Platform.OS !== 'web' && viewportWidth < 1200);
 
   const [cardLayout, setCardLayout] = useState<OverviewCardId[]>([]);
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -307,6 +301,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
       switch (id) {
         case 'plan':
           return <TodayPlanCard summary={summaries.plan} loading={isLoading} />;
+        case 'progress':
+          return <GamificationCard />;
         case 'todos':
           return <TodosCard summary={summaries.todos} loading={isLoading} />;
         case 'habits':
@@ -373,12 +369,27 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
 
   return (
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[tokens.canvasTint, tokens.background]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 420,
+          borderBottomLeftRadius: radius.xl * 2,
+          borderBottomRightRadius: radius.xl * 2,
+        }}
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.lg,
-          paddingBottom: spacing.xxl,
+          paddingHorizontal: layout.pagePadding,
+          paddingTop: spacing.md,
+          paddingBottom: 180,
         }}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
@@ -388,97 +399,100 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
             onRefresh={() => {
               void refresh();
             }}
-            tintColor={sectionAccents[POMODORO_SECTION_KEY].text}
-            colors={[sectionAccents[POMODORO_SECTION_KEY].text]}
+            tintColor={sectionAccents[POMODORO_SECTION_KEY].fill}
+            colors={[sectionAccents[POMODORO_SECTION_KEY].fill]}
           />
         }
       >
         <View className="mx-auto w-full" style={{ maxWidth: layout.contentMaxWidth }}>
-          <View className="flex-row flex-wrap items-start justify-between gap-4">
+          <View style={{ gap: spacing.md }}>
             <View
-              className="min-w-0 flex-1"
-              style={stackedHeader ? { flexBasis: '100%' } : undefined}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: spacing.md,
+              }}
             >
-              <Text className="text-2xl font-bold leading-tight" style={{ color: tokens.text }}>
-                Today
-              </Text>
-              <Text className="mt-1.5 text-sm leading-6" style={{ color: tokens.textMuted }}>
-                {greeting} · {todayHeading}
-              </Text>
-            </View>
-            <View
-              className={`flex-row flex-wrap items-center gap-2 pt-0.5 ${
-                stackedHeader ? 'w-full justify-start' : 'shrink-0'
-              }`}
-            >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={isCustomizing ? 'Done customizing' : 'Customize dashboard'}
-                accessibilityState={{ selected: isCustomizing }}
-                onPress={() => setIsCustomizing((prev) => !prev)}
-                className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
-                style={{
-                  minHeight: 48,
-                  backgroundColor: isCustomizing
-                    ? `${sectionAccents[POMODORO_SECTION_KEY].text}1f`
-                    : tokens.surfaceElevated,
-                }}
-              >
-                <MaterialIcons
-                  name="tune"
-                  size={18}
-                  color={sectionAccents[POMODORO_SECTION_KEY].text}
-                />
-                {!compactHeader ? (
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
-                  >
-                    {isCustomizing ? 'Done' : 'Customize'}
-                  </Text>
-                ) : null}
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open settings"
-                onPress={openSettings}
-                className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
-                style={{ minHeight: 48, backgroundColor: tokens.surfaceElevated }}
-              >
-                <MaterialIcons
-                  name="settings"
-                  size={18}
-                  color={sectionAccents[POMODORO_SECTION_KEY].text}
-                />
-                {!compactHeader ? (
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
-                  >
-                    Settings
-                  </Text>
-                ) : null}
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Plan today"
-                onPress={() => openPlanningHub('today')}
-                className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 active:opacity-80"
-                style={{ minHeight: 48, backgroundColor: tokens.surfaceElevated }}
-              >
-                <MaterialIcons
-                  name="event-note"
-                  size={18}
-                  color={sectionAccents[POMODORO_SECTION_KEY].text}
-                />
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
-                  className="text-sm font-semibold"
-                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
+                  variant="label"
+                  tone="muted"
+                  style={{ letterSpacing: 1.2, textTransform: 'uppercase' }}
                 >
-                  Plan
+                  {todayHeading}
                 </Text>
-              </Pressable>
+                <Text variant="titleXl">{greeting}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={isCustomizing ? 'Done customizing' : 'Customize dashboard'}
+                  accessibilityState={{ selected: isCustomizing }}
+                  onPress={() => setIsCustomizing((prev) => !prev)}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: radius.full,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isCustomizing
+                      ? sectionAccents[POMODORO_SECTION_KEY].fill
+                      : tokens.surface,
+                    borderWidth: 1.5,
+                    borderColor: isCustomizing
+                      ? sectionAccents[POMODORO_SECTION_KEY].fill
+                      : tokens.border,
+                  }}
+                >
+                  <MaterialIcons
+                    name={isCustomizing ? 'check' : 'tune'}
+                    size={20}
+                    color={isCustomizing ? tokens.onSolid : tokens.text}
+                  />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open settings"
+                  onPress={openSettings}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: radius.full,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: tokens.surface,
+                    borderWidth: 1.5,
+                    borderColor: tokens.border,
+                  }}
+                >
+                  <MaterialIcons name="settings" size={20} color={tokens.text} />
+                </Pressable>
+              </View>
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Plan today"
+              onPress={() => openPlanningHub('today')}
+              style={{
+                alignSelf: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.sm,
+                minHeight: 44,
+                paddingHorizontal: spacing.lg,
+                borderRadius: radius.full,
+                backgroundColor: tokens.chipBackground,
+                borderWidth: 1.5,
+                borderColor: tokens.chipBorder,
+              }}
+            >
+              <MaterialIcons name="event-note" size={18} color={tokens.primary} />
+              <Text variant="label" style={{ color: tokens.primary, fontSize: 14 }}>
+                Plan today
+              </Text>
+            </Pressable>
           </View>
 
           {isCustomizing ? (
@@ -508,97 +522,50 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           ) : null}
 
           {isLoading && !isRefreshing ? (
-            <View className="mt-5 min-h-[220px] items-center justify-center">
-              <ActivityIndicator size="large" color={sectionAccents[POMODORO_SECTION_KEY].text} />
+            <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
+              <SkeletonBlock height={168} radius={radius.lg} />
+              <SkeletonBlock height={112} radius={radius.lg} />
+              <SkeletonBlock height={140} radius={radius.lg} />
             </View>
           ) : loadError ? (
-            <View
-              className="mt-5 items-center rounded-2xl border border-dashed py-8"
-              style={{ borderColor: tokens.border }}
+            <EmptyStateCard
+              accentColor={sectionAccents[POMODORO_SECTION_KEY].fill}
+              title="Your dashboard couldn't load"
+              description={loadError}
             >
-              <MaterialIcons name="error-outline" size={24} color={tokens.dangerSolid} />
-              <Text className="mt-2 text-base font-semibold" style={{ color: tokens.text }}>
-                Your dashboard couldn&apos;t load
-              </Text>
-              <Text className="mt-1 px-8 text-center text-sm" style={{ color: tokens.textMuted }}>
-                {loadError}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
+              <Button
+                label="Try again"
                 accessibilityLabel="Retry loading the dashboard"
+                icon="refresh"
                 onPress={() => {
                   void refresh();
                 }}
-                className="mt-4 rounded-xl px-4 py-2.5 active:opacity-80"
-                style={{
-                  backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
-                }}
-              >
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: sectionAccents[POMODORO_SECTION_KEY].text }}
-                >
-                  Try again
-                </Text>
-              </Pressable>
-            </View>
+              />
+            </EmptyStateCard>
           ) : (
             <View className="mt-5 gap-4">
               {cardLayout.map((id) => (
                 <View key={id}>{renderCard(id)}</View>
               ))}
               {!isCustomizing && !hasAnyData ? (
-                <View
-                  className="items-center rounded-2xl border border-dashed py-8"
-                  style={{ borderColor: tokens.border }}
+                <EmptyStateCard
+                  accentColor={sectionAccents[POMODORO_SECTION_KEY].fill}
+                  title="Nothing tracked yet"
+                  description="Start with any feature and this dashboard will begin filling in automatically."
                 >
-                  <MaterialIcons
-                    name="auto-graph"
-                    size={24}
-                    color={sectionAccents[POMODORO_SECTION_KEY].text}
-                  />
-                  <Text className="mt-2 text-base font-semibold" style={{ color: tokens.text }}>
-                    Nothing tracked yet
-                  </Text>
-                  <Text
-                    className="mt-1 px-8 text-center text-sm"
-                    style={{ color: tokens.textMuted }}
-                  >
-                    Start with any feature and this dashboard will begin filling in automatically.
-                  </Text>
-                  <View className="mt-4 flex-row flex-wrap items-center justify-center gap-2">
+                  <View className="flex-row flex-wrap items-center justify-center gap-2">
                     {starterCtas.map((cta, index) => (
-                      <Pressable
+                      <Button
                         key={cta.label}
-                        accessibilityRole="button"
-                        accessibilityLabel={cta.label}
+                        label={cta.label}
+                        size="sm"
+                        variant={index === 0 ? 'primary' : 'secondary'}
+                        color={index === 0 ? sectionAccents[POMODORO_SECTION_KEY].fill : undefined}
                         onPress={() => openCtaDestination(cta)}
-                        className="min-h-[44px] justify-center rounded-xl px-4 py-2.5 active:opacity-80"
-                        style={
-                          index === 0
-                            ? {
-                                backgroundColor: `${sectionAccents[POMODORO_SECTION_KEY].text}1f`,
-                              }
-                            : {
-                                backgroundColor: tokens.surfaceElevated,
-                                borderWidth: 1,
-                                borderColor: tokens.border,
-                              }
-                        }
-                      >
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{
-                            color:
-                              index === 0 ? sectionAccents[POMODORO_SECTION_KEY].text : tokens.text,
-                          }}
-                        >
-                          {cta.label}
-                        </Text>
-                      </Pressable>
+                      />
                     ))}
                   </View>
-                </View>
+                </EmptyStateCard>
               ) : null}
               {/* Lightweight first-run onboarding (docs/ui-ux/03-feature-
                   blueprints.md §13): an ordinary card at the very bottom —

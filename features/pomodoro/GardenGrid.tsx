@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import Svg, { Circle, Ellipse, Line, Path } from 'react-native-svg';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';

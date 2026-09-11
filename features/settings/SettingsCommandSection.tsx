@@ -1,4 +1,5 @@
-import { Pressable, Text } from 'react-native';
+import { Text } from '@/core/ui/Text';
+import { Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';

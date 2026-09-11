@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { Text } from '@/core/ui/Text';
+import { View } from 'react-native';
 
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';

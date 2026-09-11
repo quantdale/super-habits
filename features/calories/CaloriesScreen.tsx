@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { Modal } from '@/core/ui/Modal';
@@ -13,6 +14,8 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
+import { StatBlock } from '@/core/ui/StatBlock';
+import { Text } from '@/core/ui/Text';
 import { TextField } from '@/core/ui/TextField';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
@@ -108,25 +111,26 @@ function ViewModeSwitch({
   value: CaloriesViewMode;
   onChange: (nextValue: CaloriesViewMode) => void;
 }) {
+  // The control stretches to the hero width so both segment labels get an
+  // equal half and the sliding pill always lands exactly on its label.
   return (
-    <View className="mt-4 self-start">
-      <SegmentedControl
-        options={VIEW_MODE_OPTIONS.map((option) => ({
-          value: option.value,
-          label: option.label,
-          accessibilityLabel: `${option.label} view`,
-        }))}
-        value={value}
-        onChange={onChange}
-        accentColor={COLOR}
-        accessibilityLabel="Calories view"
-      />
-    </View>
+    <SegmentedControl
+      options={VIEW_MODE_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+        accessibilityLabel: `${option.label} view`,
+      }))}
+      value={value}
+      onChange={onChange}
+      accentColor={COLOR}
+      accessibilityLabel="Calories view"
+    />
   );
 }
 
 export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const { recordAction } = useGamification();
   const dayGeneration = useDayRolloverGeneration();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const colorText = sectionAccents.calories.text;
@@ -558,9 +562,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         },
         { maintainSavedMeal: false },
       );
+      recordAction('nutrition');
       await refresh();
     },
-    [refresh, selectedDateKey],
+    [recordAction, refresh, selectedDateKey],
   );
 
   const handleSubmit = () => {
@@ -615,6 +620,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
         resetCalorieForm();
         setEntryModalVisible(false);
+        recordAction('nutrition');
         await refresh();
       } catch (error) {
         const message =
@@ -670,29 +676,53 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       className="mb-0"
     >
       <View
-        className="mb-3 items-center rounded-xl border p-3"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+        className="mb-3 items-center rounded-2xl px-3 py-2"
+        style={{ backgroundColor: tokens.surfaceSunken }}
       >
-        <Text className="text-center text-sm font-medium" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" className="text-center">
           {consistencyText}
         </Text>
       </View>
 
-      <View className="mb-4">
-        <View className="mb-1 flex-row items-center justify-center gap-8">
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            {selectedDateKey === todayKey ? 'Today' : formatDayContext(selectedDateKey)}:{' '}
-            {caloriesTotal(entries)} kcal
+      <View className="mb-1 flex-row flex-wrap items-center justify-between gap-2">
+        <Text variant="bodyMd" tone="muted">
+          {selectedDateKey === todayKey ? 'Today' : formatDayContext(selectedDateKey)}:{' '}
+          {caloriesTotal(entries)} kcal
+        </Text>
+        <Pressable
+          onPress={() => setGoalSheetVisible(true)}
+          accessibilityRole="button"
+          className="rounded-full px-3 py-1.5"
+          style={{ backgroundColor: sectionAccents.calories.tint }}
+        >
+          <Text variant="label" style={{ color: colorText }}>
+            Goal: {goal.calories} kcal ✎
           </Text>
-          <Pressable onPress={() => setGoalSheetVisible(true)}>
-            <Text className="text-sm font-medium" style={{ color: colorText }}>
-              Goal: {goal.calories} kcal ✎
-            </Text>
-          </Pressable>
-        </View>
+        </Pressable>
+      </View>
+
+      <View className="mb-3 flex-row gap-2">
+        <StatBlock
+          accentColor={COLOR}
+          value={caloriesTotal(entries)}
+          label="Consumed"
+          className="flex-1"
+        />
+        <StatBlock accentColor={COLOR} value={goal.calories} label="Goal" className="flex-1" />
+        <StatBlock
+          accentColor={COLOR}
+          value={
+            goalProgress.over ? caloriesTotal(entries) - goal.calories : goalProgress.remaining
+          }
+          label={goalProgress.over ? 'Over' : 'Remaining'}
+          className="flex-1"
+        />
+      </View>
+
+      <View className="mb-4">
         <View
-          className="h-2 w-full overflow-hidden rounded-full"
-          style={{ backgroundColor: tokens.border }}
+          className="h-2.5 w-full overflow-hidden rounded-full"
+          style={{ backgroundColor: tokens.surfaceSunken }}
         >
           {/* Over-target stays informational (blueprint Gate F): accent fill,
               factual caption in the neutral-caution tone — never danger red. */}
@@ -702,27 +732,27 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           />
         </View>
         {goalProgress.over ? (
-          <Text className="mt-1 text-center text-xs" style={{ color: tokens.warningText }}>
+          <Text variant="caption" tone="warning" className="mt-1 text-center">
             {caloriesTotal(entries) - goal.calories} kcal over goal
           </Text>
         ) : null}
       </View>
 
-      <View className="mb-4 gap-2">
+      <View className="mb-4 gap-3">
         {macroTargetBars.map(({ key, label, actual, target, progress }) =>
           target > 0 ? (
             <View key={key}>
               <View className="mb-1 flex-row items-center justify-between">
-                <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
+                <Text variant="caption" tone="muted">
                   {label} {actual}g / {target}g
                 </Text>
-                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                <Text variant="caption" tone="muted">
                   {progress.over ? `${actual - target}g over` : `${progress.remaining}g left`}
                 </Text>
               </View>
               <View
-                className="h-1.5 w-full overflow-hidden rounded-full"
-                style={{ backgroundColor: tokens.border }}
+                className="h-2 w-full overflow-hidden rounded-full"
+                style={{ backgroundColor: tokens.surfaceSunken }}
               >
                 {/* Macro over-target keeps the accent fill; the "n g over"
                     caption beside the label already carries the fact. */}
@@ -740,7 +770,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           accessibilityLabel="Edit daily macro targets"
           className="self-start"
         >
-          <Text className="text-xs font-medium" style={{ color: colorText }}>
+          <Text variant="label" style={{ color: colorText }}>
             Edit daily targets ✎
           </Text>
         </Pressable>
@@ -751,15 +781,29 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   );
 
   return (
-    <Screen scroll>
-      <ScreenSection>
-        <PageHeader
-          title="Calories"
-          subtitle="Switch between manual entry and a diary grouped by meal."
-        />
-        <ViewModeSwitch value={viewMode} onChange={setAndPersistViewMode} />
-      </ScreenSection>
-
+    <Screen
+      scroll
+      hero={
+        <View>
+          <PageHeader
+            eyebrow={
+              viewMode === 'diary' && selectedDateKey !== todayKey
+                ? formatDayContext(selectedDateKey)
+                : 'TODAY'
+            }
+            title={
+              goalProgress.over
+                ? `${caloriesTotal(entries) - goal.calories} kcal over`
+                : `${goalProgress.remaining} kcal left`
+            }
+            subtitle="Switch between manual entry and a diary grouped by meal."
+          />
+          <View className="mt-4">
+            <ViewModeSwitch value={viewMode} onChange={setAndPersistViewMode} />
+          </View>
+        </View>
+      }
+    >
       {viewMode === 'form' ? (
         <CaloriesFormView
           accentColor={COLOR}

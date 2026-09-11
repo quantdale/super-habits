@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { Button } from '@/core/ui/Button';

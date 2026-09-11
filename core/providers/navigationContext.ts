@@ -28,6 +28,9 @@ export type NavigationContextValue = {
   isQuickCaptureOpen: boolean;
   openQuickCapture: () => void;
   closeQuickCapture: () => void;
+  isAchievementsOpen: boolean;
+  openAchievements: () => void;
+  closeAchievements: () => void;
 };
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);

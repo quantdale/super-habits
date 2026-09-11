@@ -1,6 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, Text, View, useWindowDimensions, type ViewProps } from 'react-native';
+import {
+  Animated,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type ViewProps,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +17,8 @@ import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors'
 import { useAppTheme } from '@/core/providers/themeContext';
 import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { Modal } from '@/core/ui/Modal';
+import { Text } from '@/core/ui/Text';
+import { elevation, layout, radius, size, spacing } from '@/core/theme/designTokens';
 import { OverviewScreen } from '@/features/overview/OverviewScreen';
 import { TodosScreen } from '@/features/todos/TodosScreen';
 import { HabitsScreen } from '@/features/habits/HabitsScreen';
@@ -18,22 +29,27 @@ import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { WeeklyReviewScreen } from '@/features/weekly-review/WeeklyReviewScreen';
 import { PlanningHubScreen } from '@/features/planning-hub/PlanningHubScreen';
 import { QuickCaptureOverlay } from '@/features/quick-capture/QuickCaptureOverlay';
-import { spacing, radius, size } from '@/core/theme/designTokens';
+import { AchievementsScreen } from '@/features/gamification/AchievementsScreen';
 
 type NavItem = {
   name: AppSection;
   label: string;
   icon: keyof typeof MaterialIcons.glyphMap;
-  sectionKey?: 'todos' | 'habits' | 'focus' | 'workout' | 'calories';
+  sectionKey?: keyof typeof SECTION_COLORS;
 };
 
+/**
+ * Six sections in product order. Labels are part of the test/observability
+ * contract (`journey-label-parity`), so they stay verbatim while the rail they
+ * render into is free to change shape.
+ */
 const NAV_ITEMS: NavItem[] = [
-  { name: 'overview', label: 'Today', icon: 'dashboard' },
-  { name: 'todos', label: 'To Do', icon: 'check-circle-outline', sectionKey: 'todos' },
-  { name: 'habits', label: 'Habits', icon: 'loop', sectionKey: 'habits' },
+  { name: 'overview', label: 'Today', icon: 'today' },
+  { name: 'todos', label: 'To Do', icon: 'checklist', sectionKey: 'todos' },
+  { name: 'habits', label: 'Habits', icon: 'auto-awesome', sectionKey: 'habits' },
   { name: 'pomodoro', label: 'Focus', icon: 'timer', sectionKey: POMODORO_SECTION_KEY },
   { name: 'workout', label: 'Workout', icon: 'fitness-center', sectionKey: 'workout' },
-  { name: 'calories', label: 'Calories', icon: 'restaurant-menu', sectionKey: 'calories' },
+  { name: 'calories', label: 'Calories', icon: 'restaurant', sectionKey: 'calories' },
 ];
 
 const NAV_TAB_COUNT = NAV_ITEMS.length;
@@ -52,40 +68,24 @@ const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolea
   calories: memo(CaloriesScreen),
 };
 
-type TopTabItemProps = {
-  isFocused?: boolean;
-  compact?: boolean;
-  label: string;
-  icon: string;
-  color: string;
-  surfaceColor: string;
-  tabRailColor: string;
-  tabRailBorderColor: string;
-  inactiveColor: string;
-  focusRingColor: string;
-  onPress?: () => void;
+type TabButtonProps = {
+  item: NavItem;
+  isFocused: boolean;
+  accent: string;
+  layout: 'bar' | 'rail';
+  onPress: () => void;
 };
 
-function TopTabItem({
-  isFocused,
-  compact,
-  label,
-  icon,
-  color,
-  surfaceColor,
-  tabRailColor,
-  tabRailBorderColor,
-  inactiveColor,
-  focusRingColor,
-  onPress,
-}: TopTabItemProps) {
-  // RN 0.83's Pressable style callback only exposes `pressed`, so keyboard
-  // focus is tracked via onFocus/onBlur (functional on web) to draw the ring.
+/** One navigation destination: icon over label, with a tinted active capsule. */
+function TabButton({ item, isFocused, accent, layout: layoutRole, onPress }: TabButtonProps) {
+  const { tokens } = useAppTheme();
   const [keyboardFocused, setKeyboardFocused] = useState(false);
+  const isRail = layoutRole === 'rail';
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={item.label}
       accessibilityState={{ selected: isFocused }}
       focusable
       onPress={onPress}
@@ -93,77 +93,83 @@ function TopTabItem({
       onBlur={() => setKeyboardFocused(false)}
       style={[
         {
-          flex: compact ? undefined : 1,
-          width: compact ? '32.8%' : undefined,
-          flexDirection: 'row',
+          flex: isRail ? undefined : 1,
+          width: isRail ? '100%' : undefined,
           alignItems: 'center',
           justifyContent: 'center',
-          gap: spacing.xs,
+          gap: 2,
           minWidth: 0,
-          flexShrink: compact ? 0 : 1,
-          backgroundColor: isFocused ? surfaceColor : tabRailColor,
-          borderBottomWidth: isFocused ? 0 : 1,
-          borderBottomColor: tabRailBorderColor,
-          borderTopLeftRadius: isFocused ? radius.lg : radius.sm,
-          borderTopRightRadius: isFocused ? radius.lg : radius.sm,
-          marginTop: isFocused ? 0 : 3,
-          marginBottom: isFocused ? -1 : 0,
-          zIndex: isFocused ? 2 : 0,
-          paddingVertical: compact ? spacing.sm : spacing.md,
-          paddingHorizontal: compact ? spacing.xs : spacing.sm,
+          paddingVertical: isRail ? spacing.sm : spacing.xs,
+          paddingHorizontal: isRail ? spacing.sm : 2,
           minHeight: size.touchTargetMin,
+          borderRadius: radius.md,
+          backgroundColor: isFocused ? `${accent}1F` : 'transparent',
         },
-        // Visible keyboard-focus indication on web so the tab rail stays
-        // fully keyboard-operable.
         keyboardFocused && Platform.OS === 'web'
-          ? { outlineColor: focusRingColor, outlineStyle: 'solid', outlineWidth: 2 }
+          ? { outlineColor: tokens.accent, outlineStyle: 'solid', outlineWidth: 2 }
           : null,
       ]}
     >
       <MaterialIcons
-        name={icon as keyof typeof MaterialIcons.glyphMap}
-        size={16}
-        color={isFocused ? color : inactiveColor}
+        name={item.icon}
+        size={isRail ? 26 : 23}
+        color={isFocused ? accent : tokens.iconMuted}
       />
       <Text
+        variant="caption"
         style={{
-          fontSize: 12,
-          color: isFocused ? color : inactiveColor,
-          fontWeight: isFocused ? '600' : '400',
-          flexShrink: compact ? 0 : 1,
+          color: isFocused ? accent : tokens.textMuted,
+          fontSize: isRail ? 12 : 10.5,
+          letterSpacing: 0.1,
         }}
         numberOfLines={1}
       >
-        {label}
+        {item.label}
       </Text>
     </Pressable>
   );
 }
 
+/** Cross-fades the active section while keeping every visited section mounted. */
 function SectionContainer({
   children,
   isActive,
   ...rest
 }: { isActive: boolean; children: React.ReactNode } & ViewProps) {
+  const [opacity] = useState(() => new Animated.Value(isActive ? 1 : 0));
+  const [translate] = useState(() => new Animated.Value(isActive ? 0 : 12));
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: isActive ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translate, {
+        toValue: isActive ? 0 : 12,
+        duration: 240,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isActive, opacity, translate]);
+
   return (
-    <View
+    <Animated.View
       {...rest}
       aria-hidden={!isActive}
       style={[
+        StyleSheet.absoluteFill,
         {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          opacity: isActive ? 1 : 0,
+          opacity,
+          transform: [{ translateY: translate }],
           pointerEvents: isActive ? 'auto' : 'none',
           zIndex: isActive ? 1 : 0,
         },
       ]}
     >
       {children}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -179,18 +185,17 @@ export default function Index() {
     closeWeeklyReview,
     isPlanningHubOpen,
     planningHubInitialView,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    openPlanningHub: _openPlanningHub,
     closePlanningHub,
     isQuickCaptureOpen,
     openQuickCapture,
     closeQuickCapture,
+    isAchievementsOpen,
+    closeAchievements,
   } = useAppNavigation();
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop, bottom: safeAreaBottom } = useSafeAreaInsets();
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
-  const compactNavigation = screenWidth < 600;
-  const showQuickCaptureLabel = Platform.OS === 'web' && screenWidth >= 960;
+  const useSideRail = screenWidth >= layout.railBreakpoint;
 
   const currentIndex = useMemo(
     () => NAV_ITEMS.findIndex((item) => item.name === activeSection),
@@ -248,68 +253,162 @@ export default function Index() {
     [navigateToIndex],
   );
 
-  return (
-    <View
-      className="flex-1 flex-col"
-      style={{ backgroundColor: tokens.background, paddingTop: safeAreaTop }}
-    >
-      <View
-        accessibilityLabel="Section tabs"
-        accessibilityRole="tablist"
-        style={{
-          flexDirection: 'row',
-          flexWrap: compactNavigation ? 'wrap' : 'nowrap',
-          width: '100%',
-          alignItems: 'stretch',
-          backgroundColor: tokens.tabRail,
-          borderBottomWidth: 1,
-          borderBottomColor: tokens.tabRailBorder,
-          paddingHorizontal: 4,
-          paddingTop: 4,
-          gap: 2,
-          zIndex: 10,
-        }}
-      >
+  const sections = (
+    <GestureDetector gesture={pan}>
+      <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
         {NAV_ITEMS.map((item) => {
-          const color =
-            item.name === 'overview'
-              ? overviewColor
-              : item.sectionKey
-                ? sectionAccents[item.sectionKey].text
-                : tokens.text;
+          const ScreenComponent = SECTION_SCREENS[item.name];
+          const isActive = activeSection === item.name;
+          const isMounted = mountedSections[item.name] || isActive;
           return (
-            <TopTabItem
-              key={item.name}
-              isFocused={activeSection === item.name}
-              compact={compactNavigation}
-              label={item.label}
-              icon={item.icon}
-              color={color}
-              surfaceColor={tokens.background}
-              tabRailColor={tokens.tabRail}
-              tabRailBorderColor={tokens.tabRailBorder}
-              inactiveColor={tokens.iconMuted}
-              focusRingColor={tokens.accent}
-              onPress={() => setActiveSection(item.name)}
-            />
+            <SectionContainer key={item.name} isActive={isActive}>
+              {isMounted ? <ScreenComponent isActive={isActive} /> : null}
+            </SectionContainer>
           );
         })}
       </View>
+    </GestureDetector>
+  );
 
-      <GestureDetector gesture={pan}>
-        <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
-          {NAV_ITEMS.map((item) => {
-            const ScreenComponent = SECTION_SCREENS[item.name];
-            const isActive = activeSection === item.name;
-            const isMounted = mountedSections[item.name] || isActive;
-            return (
-              <SectionContainer key={item.name} isActive={isActive}>
-                {isMounted ? <ScreenComponent isActive={isActive} /> : null}
-              </SectionContainer>
-            );
-          })}
+  const navItems = NAV_ITEMS.map((item) => {
+    const accent =
+      item.name === 'overview'
+        ? overviewColor
+        : item.sectionKey
+          ? sectionAccents[item.sectionKey].fill
+          : tokens.primary;
+    return (
+      <TabButton
+        key={item.name}
+        item={item}
+        isFocused={activeSection === item.name}
+        accent={accent}
+        layout={useSideRail ? 'rail' : 'bar'}
+        onPress={() => setActiveSection(item.name)}
+      />
+    );
+  });
+
+  return (
+    <View
+      className="flex-1"
+      style={{
+        flex: 1,
+        flexDirection: useSideRail ? 'row' : 'column',
+        backgroundColor: tokens.background,
+        paddingTop: safeAreaTop,
+      }}
+    >
+      {useSideRail ? (
+        <View
+          accessibilityLabel="Section tabs"
+          accessibilityRole="tablist"
+          style={{
+            width: 104,
+            paddingHorizontal: spacing.sm,
+            paddingVertical: spacing.lg,
+            gap: spacing.sm,
+            backgroundColor: tokens.tabRail,
+            borderRightWidth: 1,
+            borderRightColor: tokens.tabRailBorder,
+          }}
+        >
+          <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <LinearGradient
+                colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <MaterialIcons name="bolt" size={24} color={tokens.buttonText} />
+            </View>
+          </View>
+          {navItems}
         </View>
-      </GestureDetector>
+      ) : null}
+
+      <View style={{ flex: 1 }}>{sections}</View>
+
+      {!useSideRail ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: spacing.md,
+            right: spacing.md,
+            bottom: Math.max(safeAreaBottom, spacing.sm),
+            zIndex: 20,
+          }}
+        >
+          <View
+            accessibilityLabel="Section tabs"
+            accessibilityRole="tablist"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              paddingHorizontal: spacing.xs,
+              paddingVertical: spacing.xs,
+              borderRadius: radius.xl,
+              backgroundColor: tokens.tabRail,
+              borderWidth: 1,
+              borderColor: tokens.tabRailBorder,
+              ...elevation.level2,
+              shadowColor: tokens.glow,
+              shadowOpacity: 0.18,
+            }}
+          >
+            {navItems}
+          </View>
+        </View>
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Quick capture"
+        onPress={() => {
+          // Open the sheet after the opening gesture completes. Creating
+          // the modal window synchronously inside the press lets the
+          // gesture's release re-target to freshly laid-out sheet content
+          // under the finger, skipping the sheet straight into advanced
+          // capture on small screens.
+          setTimeout(() => openQuickCapture(), 0);
+        }}
+        style={{
+          position: 'absolute',
+          right: useSideRail ? spacing.xl : spacing.lg,
+          bottom: useSideRail
+            ? Math.max(safeAreaBottom, spacing.xl)
+            : Math.max(safeAreaBottom, spacing.sm) + size.tabBarHeight + spacing.md,
+          width: size.fab,
+          height: size.fab,
+          borderRadius: radius.full,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          zIndex: 21,
+          ...elevation.level2,
+          shadowColor: tokens.glow,
+          shadowOpacity: 0.35,
+        }}
+      >
+        <LinearGradient
+          colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <MaterialIcons name="add" size={30} color={tokens.buttonText} />
+      </Pressable>
 
       <Modal
         visible={isSettingsOpen}
@@ -351,37 +450,15 @@ export default function Index() {
         <QuickCaptureOverlay />
       </Modal>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Quick capture"
-        onPress={() => {
-          // Open the sheet after the opening gesture completes. Creating
-          // the modal window synchronously inside the press lets the
-          // gesture's release re-target to freshly laid-out sheet content
-          // under the finger, skipping the sheet straight into advanced
-          // capture on small screens.
-          setTimeout(() => openQuickCapture(), 0);
-        }}
-        className={`absolute right-4 items-center justify-center shadow-lg ${
-          showQuickCaptureLabel ? 'flex-row gap-2 rounded-2xl px-4 py-3' : 'h-14 w-14 rounded-full'
-        }`}
-        style={{
-          bottom: safeAreaBottom + 16,
-          backgroundColor: SECTION_COLORS.focus,
-          shadowColor: tokens.shadowColor,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.2,
-          shadowRadius: 12,
-          elevation: 6,
-        }}
+      <Modal
+        visible={isAchievementsOpen}
+        onClose={closeAchievements}
+        title="Level & Achievements"
+        scroll
+        modalLayout="drawer"
       >
-        <MaterialIcons name="add" size={26} color={tokens.textOnAccent} />
-        {showQuickCaptureLabel ? (
-          <Text className="text-sm font-semibold" style={{ color: tokens.textOnAccent }}>
-            Add
-          </Text>
-        ) : null}
-      </Pressable>
+        <AchievementsScreen />
+      </Modal>
     </View>
   );
 }

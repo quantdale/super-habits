@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
@@ -191,7 +192,6 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
         accentColor={gardenAccent.fill}
         title="Your garden is ready"
         description="Meaningful work will appear here as it accumulates."
-        icon={<Text style={{ color: gardenAccent.text }}>•</Text>}
       />
     );
   }

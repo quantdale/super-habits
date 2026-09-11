@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { Card } from '@/core/ui/Card';
@@ -105,7 +106,6 @@ export function ProgressInsightsView() {
         accentColor={SECTION_COLORS.todos}
         title="No progress data yet"
         description="Complete tasks, habits, and sessions to start seeing weekly comparisons."
-        icon={<Text style={{ fontSize: 18 }}>•</Text>}
       />
     );
   }

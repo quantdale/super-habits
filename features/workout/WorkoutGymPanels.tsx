@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';

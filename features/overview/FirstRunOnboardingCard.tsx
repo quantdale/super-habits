@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import type { AppSection } from '@/core/providers/navigationContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';

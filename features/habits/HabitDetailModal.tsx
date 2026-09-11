@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Modal } from '@/core/ui/Modal';
 import { Card } from '@/core/ui/Card';
@@ -22,6 +23,7 @@ import {
   parseHabitReminderTime,
 } from '@/features/habits/habitReminders.domain';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
 
 type Props = {
@@ -123,7 +125,7 @@ export function HabitDetailModal({
     <Modal visible onClose={onClose} title={`${habit.name} history`} scroll>
       {!loaded ? (
         <Card accentColor={accent}>
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+          <Text variant="bodyMd" tone="muted">
             Loading history...
           </Text>
         </Card>
@@ -131,12 +133,17 @@ export function HabitDetailModal({
         <EmptyStateCard accentColor={accent} title="No history available" />
       ) : (
         <>
-          <Card accentColor={accent}>
+          <Card
+            variant="header"
+            accentColor={accent}
+            headerTitle="Streaks & consistency"
+            headerSubtitle="How this habit is trending right now"
+          >
             <View className="flex-row flex-wrap gap-3">
               <StatBlock
                 accentColor={accent}
                 className="min-w-[100px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>🔥</Text>}
+                icon={<MaterialIcons name="local-fire-department" size={20} color={accent} />}
                 value={stats.currentStreak}
                 label="Current streak"
                 detail="days"
@@ -144,7 +151,7 @@ export function HabitDetailModal({
               <StatBlock
                 accentColor={accent}
                 className="min-w-[100px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>🏆</Text>}
+                icon={<MaterialIcons name="emoji-events" size={20} color={accent} />}
                 value={stats.bestStreak}
                 label="Best streak"
                 detail="days"
@@ -152,21 +159,20 @@ export function HabitDetailModal({
               <StatBlock
                 accentColor={accent}
                 className="min-w-[100px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>📊</Text>}
+                icon={<MaterialIcons name="insights" size={20} color={accent} />}
                 value={`${stats.consistency30}%`}
                 label="Last 30 days"
                 detail="consistency"
               />
             </View>
           </Card>
-          <Card accentColor={accent}>
-            <View className="mb-2 flex-row items-center gap-2">
-              <MaterialIcons name="event-repeat" size={18} color={accent} />
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                Schedule
-              </Text>
-            </View>
-            <Text className="text-sm" style={{ color: tokens.text }}>
+          <Card
+            variant="header"
+            accentColor={accent}
+            headerTitle="Schedule"
+            headerRight={<MaterialIcons name="event-repeat" size={22} color={tokens.onSolid} />}
+          >
+            <Text variant="titleMd" style={{ color: tokens.text }}>
               {scheduleLine.label}
             </Text>
             {reminderLabel ? (
@@ -175,25 +181,28 @@ export function HabitDetailModal({
                 accessible
                 accessibilityLabel={`Reminder at ${reminderLabel}`}
               >
-                <Text style={{ fontSize: 14 }}>🔔</Text>
-                <Text className="text-sm" style={{ color: tokens.text }}>
+                <MaterialIcons name="notifications-none" size={16} color={accent} />
+                <Text variant="bodyMd" style={{ color: tokens.text }}>
                   {reminderLabel}
                 </Text>
               </View>
             ) : (
-              <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+              <Text variant="caption" tone="muted" className="mt-1">
                 No reminder set.
               </Text>
             )}
           </Card>
-          <Card accentColor={accent}>
-            <View className="mb-2 flex-row items-center gap-2">
-              <MaterialIcons name="calendar-month" size={18} color={accent} />
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                Completion calendar
-              </Text>
-            </View>
-            <GitHubHeatmap days={stats.heatmapDays} color={accent} label="Habit history" />
+          <Card
+            variant="header"
+            accentColor={accent}
+            headerTitle="Completion calendar"
+            headerRight={<MaterialIcons name="calendar-month" size={22} color={tokens.onSolid} />}
+          >
+            <GitHubHeatmap
+              days={stats.heatmapDays}
+              color={SECTION_COLORS.habits}
+              label="Habit history"
+            />
           </Card>
           {onOpenInsights ? (
             <Button
@@ -206,11 +215,8 @@ export function HabitDetailModal({
             <Button label="Edit habit" color={accent} onPress={() => onEdit(habit)} />
           ) : null}
           {onTogglePause || onToggleArchive ? (
-            <Card accentColor={accent}>
-              <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
-                Lifecycle
-              </Text>
-              <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
+            <Card variant="header" accentColor={accent} headerTitle="Lifecycle">
+              <Text variant="caption" tone="muted" className="mb-3">
                 Paused habits keep their history but are hidden from the active list. Archived
                 habits are kept out of sight until restored. This state is saved with your backup.
               </Text>

@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { PillChip } from '@/core/ui/PillChip';
@@ -194,7 +195,6 @@ export function ActivityTimelineView() {
           accentColor={SECTION_COLORS.todos}
           title="Nothing to show yet"
           description="Your completed tasks, habits, focus sessions, workouts, and plans will appear here."
-          icon={<Text style={{ fontSize: 18 }}>•</Text>}
         />
       ) : (
         groups.map((group) => (

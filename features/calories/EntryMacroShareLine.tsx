@@ -1,4 +1,5 @@
-import { Text } from 'react-native';
+import { Text } from '@/core/ui/Text';
+
 import { useAppTheme } from '@/core/providers/themeContext';
 import { macroKcalShares } from './calories.domain';
 

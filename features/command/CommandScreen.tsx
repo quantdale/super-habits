@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenSection } from '@/core/ui/ScreenSection';

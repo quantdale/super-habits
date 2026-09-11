@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
@@ -182,14 +183,12 @@ export function GoalListView({ onOpenGoal }: GoalListViewProps) {
           accentColor={SECTION_COLORS.todos}
           title="No goals yet"
           description="Set measurable outcomes and track manual progress toward them."
-          icon={<Text style={{ fontSize: 18 }}>•</Text>}
         />
       ) : !isLoading && visible.length === 0 ? (
         <EmptyStateCard
           accentColor={SECTION_COLORS.todos}
           title="No matching goals"
           description="Try a different status or horizon filter."
-          icon={<Text style={{ fontSize: 18 }}>•</Text>}
         />
       ) : (
         visible.map(({ goal, projectName }) => (

@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type { PomodoroSession } from './types';
 import { formatSessionDuration, formatSessionTime } from './pomodoro.domain';

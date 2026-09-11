@@ -1,7 +1,7 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { Text } from '@/core/ui/Text';
 import { memo } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
@@ -10,6 +10,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import type { ActivityDay } from '@/features/shared/activityTypes';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
+import { StaggerItem } from './CalorieStaggerItem';
 import { EntryMacroShareLine } from './EntryMacroShareLine';
 import { FrequentFoodChips, SavedMealChips } from './SavedMealChips';
 import { QuickAddKcal } from './QuickAddKcal';
@@ -37,9 +38,18 @@ const CalorieEntrySwipeRow = memo(
         onEdit={onEdit}
         onDelete={onDelete}
       >
-        <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-          {entry.food_name} - {entry.calories} kcal
-        </Text>
+        <View className="flex-row items-baseline justify-between gap-3">
+          <Text
+            className="min-w-0 flex-1 text-base font-semibold"
+            style={{ color: tokens.text }}
+            numberOfLines={1}
+          >
+            {entry.food_name}
+          </Text>
+          <Text className="text-sm font-semibold" style={{ color: accentColor }}>
+            {entry.calories} kcal
+          </Text>
+        </View>
         <Text className="mt-1 text-sm capitalize" style={{ color: tokens.textMuted }}>
           {entry.meal_type} · P {entry.protein}g / C {entry.carbs}g / F {entry.fats}g / Fiber{' '}
           {entry.fiber}g
@@ -133,8 +143,6 @@ export function CaloriesFormView({
   onEditEntry,
   onDeleteEntry,
 }: CaloriesFormViewProps) {
-  const { tokens } = useAppTheme();
-
   const addEntryFooter = (
     <Button
       label="Add entry"
@@ -162,16 +170,15 @@ export function CaloriesFormView({
           <FrequentFoodChips foods={frequentFoods} onSelect={onSelectFrequentFood} />
           <QuickAddKcal onSubmit={onQuickAddKcal} accentColor={accentColor} />
           {allSavedMeals.length > 0 ? (
-            <Pressable
-              onPress={onBrowseSavedMeals}
-              className="mb-3 self-start flex-row items-center gap-2 rounded-full border px-3 py-2"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-            >
-              <MaterialIcons name="search" size={16} color={colorText} />
-              <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
-                Browse saved meals ({allSavedMeals.length})
-              </Text>
-            </Pressable>
+            <View className="mb-3 self-start">
+              <Button
+                label={`Browse saved meals (${allSavedMeals.length})`}
+                variant="secondary"
+                icon="search"
+                size="sm"
+                onPress={onBrowseSavedMeals}
+              />
+            </View>
           ) : null}
           <CaloriesEntryFields
             fieldIdPrefix="cal-entry"
@@ -230,22 +237,21 @@ export function CaloriesFormView({
       {entries.length > 0 ? (
         <ScreenSection>
           <View className="mb-4 px-1">
-            <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-              Logged today
-            </Text>
-            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            <Text variant="titleMd">Logged today</Text>
+            <Text variant="caption" tone="muted" className="mt-1">
               Swipe an entry to edit or remove it.
             </Text>
           </View>
 
-          {entries.map((entry) => (
-            <CalorieEntrySwipeRow
-              key={entry.id}
-              entry={entry}
-              accentColor={accentColor}
-              onEdit={() => onEditEntry(entry)}
-              onDelete={() => onDeleteEntry(entry)}
-            />
+          {entries.map((entry, index) => (
+            <StaggerItem key={entry.id} index={index}>
+              <CalorieEntrySwipeRow
+                entry={entry}
+                accentColor={accentColor}
+                onEdit={() => onEditEntry(entry)}
+                onDelete={() => onDeleteEntry(entry)}
+              />
+            </StaggerItem>
           ))}
         </ScreenSection>
       ) : null}

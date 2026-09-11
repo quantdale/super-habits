@@ -22,6 +22,7 @@ export function NavigationProvider({ children }: PropsWithChildren) {
   const [isPlanningHubOpen, setIsPlanningHubOpen] = useState(false);
   const [planningHubInitialView, setPlanningHubInitialView] = useState<PlanningHubView>('today');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
+  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [pendingHabitFocusId, setPendingHabitFocusId] = useState<string | null>(null);
 
   const openSettings = useCallback(() => setIsSettingsOpen(true), []);
@@ -43,6 +44,16 @@ export function NavigationProvider({ children }: PropsWithChildren) {
   const closePlanningHub = useCallback(() => setIsPlanningHubOpen(false), []);
   const openQuickCapture = useCallback(() => setIsQuickCaptureOpen(true), []);
   const closeQuickCapture = useCallback(() => setIsQuickCaptureOpen(false), []);
+  // The achievements overlay is a full-screen modal in the same layer as
+  // Settings/Plan: opening it must dismiss those so their content cannot paint
+  // over its own controls (same convention as openWeeklyReview).
+  const openAchievements = useCallback(() => {
+    setIsSettingsOpen(false);
+    setIsPlanningHubOpen(false);
+    setIsQuickCaptureOpen(false);
+    setIsAchievementsOpen(true);
+  }, []);
+  const closeAchievements = useCallback(() => setIsAchievementsOpen(false), []);
   const setActiveSection = useCallback((section: AppSection) => {
     setMountedSections((current) => (current[section] ? current : { ...current, [section]: true }));
     setActiveSectionState(section);
@@ -85,6 +96,9 @@ export function NavigationProvider({ children }: PropsWithChildren) {
         isQuickCaptureOpen,
         openQuickCapture,
         closeQuickCapture,
+        isAchievementsOpen,
+        openAchievements,
+        closeAchievements,
       }}
     >
       {children}

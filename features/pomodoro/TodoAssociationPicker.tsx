@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React from 'react';
-import { Text, View, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import type { Todo } from '@/core/db/types';

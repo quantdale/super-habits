@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useMemo } from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
 
@@ -25,16 +26,17 @@ export function MacroDonutChart({
   sectionColor,
 }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
-  const ringNeutral = tokens.border;
+  // A recessed groove reads as "remaining" behind the amber progress arc.
+  const ringNeutral = tokens.surfaceSunken;
   const consumed = totalKcal;
   const goal = Math.max(0, goalKcal);
 
   const macroChips = useMemo<{ label: string; key: MacroChipKey; color: string }[]>(
     () => [
-      { label: 'Protein', key: 'protein', color: sectionAccents.todos.text },
+      { label: 'Protein', key: 'protein', color: sectionAccents.calories.text },
       { label: 'Carbs', key: 'carbs', color: sectionAccents.calories.text },
-      { label: 'Fats', key: 'fats', color: sectionAccents.workout.text },
-      { label: 'Fiber', key: 'fiber', color: sectionAccents.habits.text },
+      { label: 'Fats', key: 'fats', color: sectionAccents.calories.text },
+      { label: 'Fiber', key: 'fiber', color: sectionAccents.calories.text },
     ],
     [sectionAccents],
   );
@@ -74,17 +76,19 @@ export function MacroDonutChart({
         radius={80}
         innerRadius={55}
         showText={false}
+        curvedStartEdges
+        curvedEndEdges
+        edgesRadius={6}
+        innerCircleColor="transparent"
         centerLabelComponent={() => (
           <View className="items-center px-1">
-            <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
-              {Math.round(consumed)}
-            </Text>
+            <Text variant="titleLg">{Math.round(consumed)}</Text>
             {goal > 0 ? (
-              <Text className="text-xs" style={{ color: tokens.textMuted }}>
+              <Text variant="caption" tone="muted">
                 / {Math.round(goal)}
               </Text>
             ) : null}
-            <Text className="text-xs" style={{ color: tokens.textMuted }}>
+            <Text variant="caption" tone="muted">
               kcal
             </Text>
           </View>
@@ -93,10 +97,12 @@ export function MacroDonutChart({
       <View className="mt-3 flex-row justify-around px-2">
         {macroChips.map((m) => (
           <View key={m.label} className="items-center">
-            <Text style={{ fontSize: 15, fontWeight: '700', color: m.color }}>
+            <Text variant="label" style={{ color: m.color }}>
               {Math.round(macroValues[m.key])}g
             </Text>
-            <Text style={{ fontSize: 11, color: tokens.textMuted }}>{m.label}</Text>
+            <Text variant="caption" tone="muted">
+              {m.label}
+            </Text>
           </View>
         ))}
       </View>

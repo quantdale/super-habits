@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
-import { spacing, radius } from '@/core/theme/designTokens';
+import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
+import { Text } from '@/core/ui/Text';
+import { radius, spacing } from '@/core/theme/designTokens';
 
 import { openCardTarget } from './DashboardCard.shared';
 import type { OverviewCardMeta } from '../overviewCards';
@@ -22,19 +24,11 @@ type DashboardCardProps = {
 function CardSkeleton() {
   const { tokens } = useAppTheme();
   return (
-    <View className="gap-2">
-      <View
-        className="h-8 w-24 animate-pulse rounded-lg"
-        style={{ backgroundColor: tokens.surfaceElevated }}
-      />
-      <View
-        className="h-4 w-full animate-pulse rounded-md"
-        style={{ backgroundColor: tokens.surfaceElevated }}
-      />
-      <View
-        className="h-4 w-2/3 animate-pulse rounded-md"
-        style={{ backgroundColor: tokens.surfaceElevated }}
-      />
+    <View style={{ gap: spacing.sm }}>
+      <SkeletonBlock height={34} width="45%" radius={radius.sm} />
+      <SkeletonBlock height={16} width="100%" radius={radius.sm} />
+      <SkeletonBlock height={16} width="70%" radius={radius.sm} />
+      <View style={{ height: 1, backgroundColor: tokens.border, opacity: 0.4 }} />
     </View>
   );
 }
@@ -42,11 +36,15 @@ function CardSkeleton() {
 /**
  * Shared dashboard card shell: deep-links to the card's section on press,
  * renders a loading skeleton or per-card empty state, and lays out content.
+ *
+ * Pop treatment: the whole tile is tinted with the card's own hue, carries a
+ * colored shadow, and leads with a filled icon bubble — so a glance down the
+ * Today feed reads as colored signposts instead of a list of identical boxes.
  */
 export function DashboardCard({ meta, loading = false, empty, children }: DashboardCardProps) {
   const { tokens, sectionAccents } = useAppTheme();
   const navigation = useAppNavigation();
-  const textColor = sectionAccents[meta.section ?? 'focus'].text;
+  const accent = sectionAccents[meta.section ?? 'focus'].fill;
 
   const handlePress = () => {
     openCardTarget(navigation, meta);
@@ -55,35 +53,53 @@ export function DashboardCard({ meta, loading = false, empty, children }: Dashbo
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${meta.title} card — open ${meta.section ?? meta.planningHubView}`}
+      accessibilityLabel={
+        meta.overlay === 'achievements'
+          ? `${meta.title} card — open achievements`
+          : `${meta.title} card — open ${meta.section ?? meta.planningHubView}`
+      }
       onPress={handlePress}
-      className="active:opacity-90"
+      style={({ pressed }) => ({ opacity: pressed ? 0.94 : 1 })}
     >
       <Card accentColor={meta.accentColor} className="mb-0" innerClassName="p-0">
-        <View className="flex-1" style={{ padding: spacing.lg }}>
-          <View className="flex-row items-center" style={{ gap: spacing.md }}>
+        <View style={{ padding: spacing.lg }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             <View
-              className="items-center justify-center"
               style={{
-                width: 40,
-                height: 40,
+                width: 46,
+                height: 46,
                 borderRadius: radius.md,
-                backgroundColor: `${meta.accentColor}18`,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: `${accent}22`,
+                borderWidth: 1.5,
+                borderColor: `${accent}33`,
               }}
             >
-              <MaterialIcons name={meta.icon} size={20} color={textColor} />
+              <MaterialIcons name={meta.icon} size={23} color={accent} />
             </View>
-            <View className="min-w-0 flex-1">
-              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="titleMd" numberOfLines={1}>
                 {meta.title}
               </Text>
-              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+              <Text variant="caption" tone="muted" numberOfLines={1}>
                 {meta.subtitle}
               </Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={tokens.textMuted} />
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: radius.full,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: tokens.surfaceSunken,
+              }}
+            >
+              <MaterialIcons name="chevron-right" size={22} color={tokens.textMuted} />
+            </View>
           </View>
-          <View className="mt-4">
+          <View style={{ marginTop: spacing.lg }}>
             {loading ? <CardSkeleton /> : empty !== undefined ? empty : children}
           </View>
         </View>
@@ -96,12 +112,21 @@ export function DashboardCard({ meta, loading = false, empty, children }: Dashbo
 export function CardEmptyMessage({ title, description }: { title: string; description?: string }) {
   const { tokens } = useAppTheme();
   return (
-    <View className="py-1">
-      <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+    <View
+      style={{
+        alignItems: 'center',
+        gap: spacing.xs,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        borderRadius: radius.md,
+        backgroundColor: tokens.surfaceSunken,
+      }}
+    >
+      <Text variant="bodyMd" style={{ color: tokens.text, textAlign: 'center' }}>
         {title}
       </Text>
       {description ? (
-        <Text className="mt-1 text-xs leading-5" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
           {description}
         </Text>
       ) : null}

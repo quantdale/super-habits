@@ -1,10 +1,15 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { Text } from '@/core/ui/Text';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { Button } from '@/core/ui/Button';
+import { PillChip } from '@/core/ui/PillChip';
 
 /** Same upper bound as the macro-form kcal validation (lib/validation.ts). */
 const MAX_QUICK_ADD_KCAL = 9999;
+
+/** One-tap kcal presets rendered as chunky chips above the manual input. */
+const QUICK_ADD_PRESETS = [100, 200, 300, 500] as const;
 
 /**
  * Compact kcal-only logger shown next to the recent/frequent chips.
@@ -24,6 +29,22 @@ export function QuickAddKcal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const saveKcal = (kcal: number) => {
+    if (saving) return;
+    setError(null);
+    setSaving(true);
+    void (async () => {
+      try {
+        await onSubmit(kcal);
+        setKcalText('');
+      } catch {
+        setError('Could not save entry.');
+      } finally {
+        setSaving(false);
+      }
+    })();
+  };
+
   const handleSubmit = () => {
     if (saving) return;
     const parsed = Number(kcalText.trim());
@@ -35,32 +56,30 @@ export function QuickAddKcal({
       setError('Calories cannot exceed 9999 kcal.');
       return;
     }
-    setError(null);
-    setSaving(true);
-    void (async () => {
-      try {
-        await onSubmit(parsed);
-        setKcalText('');
-      } catch {
-        setError('Could not save entry.');
-      } finally {
-        setSaving(false);
-      }
-    })();
+    saveKcal(parsed);
   };
 
   return (
     <View className="mb-3">
-      <Text
-        className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px]"
-        style={{ color: tokens.textMuted }}
-      >
+      <Text variant="label" tone="muted" className="mb-1.5" style={{ textTransform: 'uppercase' }}>
         Quick add calories
       </Text>
+      <View className="mb-2 flex-row flex-wrap">
+        {QUICK_ADD_PRESETS.map((preset) => (
+          <PillChip
+            key={preset}
+            label={`${preset}`}
+            accessibilityLabel={`Quick add ${preset} kilocalories`}
+            active={false}
+            color={accentColor}
+            onPress={() => saveKcal(preset)}
+          />
+        ))}
+      </View>
       <View className="flex-row items-center gap-2">
         <TextInput
           accessibilityLabel="Quick add calories"
-          className="min-h-[44px] flex-1 rounded-2xl border px-4 text-sm"
+          className="min-h-[48px] flex-1 rounded-2xl border px-4 text-sm"
           keyboardType="number-pad"
           onChangeText={(value) => {
             setKcalText(value);
@@ -72,31 +91,22 @@ export function QuickAddKcal({
           returnKeyType="done"
           style={{
             borderColor: tokens.border,
-            backgroundColor: tokens.surfaceElevated,
+            backgroundColor: tokens.surfaceSunken,
             color: tokens.text,
           }}
           value={kcalText}
         />
-        <Pressable
+        <Button
+          label="Add"
           accessibilityLabel="Add quick-calorie entry"
-          accessibilityRole="button"
-          disabled={saving}
+          size="sm"
+          color={accentColor}
+          loading={saving}
           onPress={handleSubmit}
-          className="h-11 min-h-[44px] flex-row items-center justify-center gap-1 rounded-2xl px-4"
-          style={{ backgroundColor: accentColor, opacity: saving ? 0.4 : 1 }}
-        >
-          <MaterialIcons name="add" size={18} color={tokens.textOnAccent} />
-          <Text className="text-sm font-semibold" style={{ color: tokens.textOnAccent }}>
-            Add
-          </Text>
-        </Pressable>
+        />
       </View>
       {error ? (
-        <Text
-          className="mt-1 text-xs"
-          style={{ color: tokens.dangerText }}
-          accessibilityLabel="Quick add error"
-        >
+        <Text variant="caption" tone="danger" className="mt-1" accessibilityLabel="Quick add error">
           {error}
         </Text>
       ) : null}

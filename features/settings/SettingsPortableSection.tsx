@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
 import { Card } from '@/core/ui/Card';

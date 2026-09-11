@@ -18,6 +18,7 @@ import { timestampToLocalDateKey } from '@/lib/time';
 
 export const OVERVIEW_CARD_IDS = [
   'plan',
+  'progress',
   'todos',
   'habits',
   'focus',
@@ -31,6 +32,7 @@ export type OverviewCardId = (typeof OVERVIEW_CARD_IDS)[number];
 
 export const DEFAULT_CARD_LAYOUT: OverviewCardId[] = [
   'plan',
+  'progress',
   'todos',
   'habits',
   'focus',

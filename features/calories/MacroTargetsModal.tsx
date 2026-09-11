@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Modal } from '@/core/ui/Modal';
+import { Text } from '@/core/ui/Text';
 import { TextField } from '@/core/ui/TextField';
 import type { MacroTargets } from './calories.domain';
 

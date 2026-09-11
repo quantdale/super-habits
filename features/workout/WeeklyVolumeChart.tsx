@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type { WeeklyVolumePoint } from './workout.domain';

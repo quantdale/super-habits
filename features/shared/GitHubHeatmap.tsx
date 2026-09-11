@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useEffect, useMemo, useState } from 'react';
-import { InteractionManager, View, Text, type ViewStyle } from 'react-native';
+import { InteractionManager, View, type ViewStyle } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { HorizontalScrollArea } from '@/core/ui/HorizontalScrollArea';
 import type { HeatmapDay } from './activityTypes';

@@ -11,6 +11,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { useMotionDuration } from '@/core/theme/motion';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import {
   applyRestDefault,
   buildPreviousSetLookup,
@@ -95,6 +96,7 @@ type Props = {
 
 export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Props) {
   const { tokens } = useAppTheme();
+  const { recordAction } = useGamification();
   // Loaded from app_meta; zero-rest sets inherit this default. Adjustments
   // during the session stay session-local until explicitly saved (the
   // persisted preference is only rewritten by "Save as default").
@@ -743,6 +745,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(resume ? { activeDurationSeconds: Math.max(0, elapsedSecondsRef.current) } : {}),
       });
       clearDraft();
+      // Reward after the log is durable: the workout is worth XP whether it was
+      // a quick complete or a fully logged session.
+      recordAction('workout');
       setSavedOutcome({ newRecords });
     } finally {
       setIsSaving(false);

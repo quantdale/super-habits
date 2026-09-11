@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinkedActionsEditorSection } from '@/core/linked-actions/LinkedActionsEditorSection';
@@ -14,6 +14,7 @@ import type {
 import { Screen } from '@/core/ui/Screen';
 import { Modal } from '@/core/ui/Modal';
 import { Card } from '@/core/ui/Card';
+import { Text } from '@/core/ui/Text';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { IconButton } from '@/core/ui/IconButton';
 import { PageHeader } from '@/core/ui/PageHeader';
@@ -26,10 +27,12 @@ import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
+import { SparkIllustration } from '@/core/ui/illustrations/SparkIllustration';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import type { Habit, HabitCategory, HabitIcon } from './types';
 import {
   addHabit,
@@ -117,6 +120,14 @@ const TIME_GROUPS = [
   { key: 'evening' as const, label: 'Evening', icon: '🌙' },
 ] as const;
 
+/** Material group glyph per time of day (Pop group header band). */
+const GROUP_ICONS: Record<HabitCategory, keyof typeof MaterialIcons.glyphMap> = {
+  anytime: 'all-inclusive',
+  morning: 'wb-sunny',
+  afternoon: 'wb-twilight',
+  evening: 'nightlight-round',
+};
+
 /** Mon-start single-letter labels for the day strip (index 0 = Monday). */
 const WEEKDAY_STRIP_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
@@ -161,6 +172,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { consumePendingHabitFocus } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { showNotice } = useInAppNotices();
+  const { recordAction } = useGamification();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -606,9 +618,12 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
+      // Fast path only: the reward is idempotent per (day, habit), so a replay
+      // of this handler can never double-award.
+      recordAction('habit', habitId);
       void refresh();
     },
-    [refresh, showNotice],
+    [recordAction, refresh, showNotice],
   );
 
   const handleDecrement = useCallback(
@@ -709,24 +724,44 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     return out;
   }, [activeHabits, countsByHabitDate]);
 
-  return (
-    <Screen scroll padded>
-      <ScreenSection>
-        <PageHeader
-          title="Habits"
-          subtitle="Track daily consistency."
-          actions={
-            <IconButton
-              icon={editMode ? 'close' : 'edit'}
-              onPress={() => setEditMode((e) => !e)}
-              accessibilityLabel={editMode ? 'Exit habit edit mode' : 'Enter habit edit mode'}
-              selected={editMode}
-              accentColor={sectionAccents.habits.text}
-            />
-          }
-        />
-      </ScreenSection>
+  const heroSubtitle =
+    todayProgress === null
+      ? 'Rest day · Track daily consistency.'
+      : `${completedTodayCount} of ${scheduledTodayCount} done today · Track daily consistency.`;
 
+  return (
+    <Screen
+      scroll
+      padded
+      hero={
+        <View className="gap-2">
+          <PageHeader
+            eyebrow="TODAY"
+            title="Habits"
+            subtitle={heroSubtitle}
+            actions={
+              <IconButton
+                icon={editMode ? 'close' : 'edit'}
+                onPress={() => setEditMode((e) => !e)}
+                accessibilityLabel={editMode ? 'Exit habit edit mode' : 'Enter habit edit mode'}
+                selected={editMode}
+                accentColor={sectionAccents.habits.text}
+              />
+            }
+          />
+          {habitsLoaded ? (
+            <View accessibilityLabel="Check-in day">
+              <HabitDayStrip
+                days={stripDays}
+                selectedDateKey={selectedDateKey}
+                todayKey={todayKey}
+                onSelect={setSelectedDateKey}
+              />
+            </View>
+          ) : null}
+        </View>
+      }
+    >
       <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
         <SegmentedControl
           options={(
@@ -746,38 +781,23 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           accentColor={COLOR}
           accessibilityLabel="Habit status filter"
         />
-        <View className="flex-row flex-wrap gap-2">
+        <View className="flex-row flex-wrap">
           {(
             [
               { key: 'default', label: 'Default order' },
               { key: 'name', label: 'Name' },
               { key: 'streak', label: 'Streak' },
             ] as { key: HabitSortMode; label: string }[]
-          ).map((option) => {
-            const active = sortMode === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Sort habits by ${option.label}`}
-                accessibilityState={{ selected: active }}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  active
-                    ? { backgroundColor: tokens.textMuted, borderColor: tokens.textMuted }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setSortMode(option.key)}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: active ? (tokens.surface ?? '#fff') : tokens.textMuted }}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          ).map((option) => (
+            <PillChip
+              key={option.key}
+              label={option.label}
+              accessibilityLabel={`Sort habits by ${option.label}`}
+              active={sortMode === option.key}
+              color={COLOR}
+              onPress={() => setSortMode(option.key)}
+            />
+          ))}
         </View>
       </ScreenSection>
 
@@ -795,12 +815,14 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             accentColor={SECTION_COLORS.habits}
             title="No habits yet"
             description="Pick a time of day and tap Add to create your first habit."
-            icon={
-              <View className="h-11 w-11 items-center justify-center rounded-xl bg-habits-light">
-                <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
-              </View>
-            }
-          />
+            illustration={<SparkIllustration color={SECTION_COLORS.habits} />}
+          >
+            <Button
+              label="Add a habit"
+              color={SECTION_COLORS.habits}
+              onPress={() => openAddModal('anytime')}
+            />
+          </EmptyStateCard>
         ) : null}
 
         {habitsLoaded
@@ -813,286 +835,299 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 <Card
                   key={group.key}
                   accentColor={SECTION_COLORS.habits}
-                  className="mb-0"
-                  innerClassName="p-0"
+                  variant="header"
+                  headerTitle={group.label}
+                  headerSubtitle={`${groupHabits.length} ${groupHabits.length === 1 ? 'habit' : 'habits'}`}
+                  headerRight={
+                    <MaterialIcons name={GROUP_ICONS[group.key]} size={24} color={tokens.onSolid} />
+                  }
                 >
-                  <View className="p-4">
-                    <View className="mb-4 flex-row items-center justify-between gap-3">
-                      <View className="flex-row items-center gap-3">
-                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-habits-light">
-                          <Text style={{ fontSize: 18 }}>{group.icon}</Text>
-                        </View>
-                        <View>
-                          <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                            {group.label}
-                          </Text>
-                          <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
-                            {groupHabits.length} {groupHabits.length === 1 ? 'habit' : 'habits'}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    <View className="flex-row flex-wrap justify-center gap-x-4 gap-y-5">
-                      {editMode
-                        ? groupHabits.map((habit) => (
+                  <View className="flex-row flex-wrap justify-center gap-x-4 gap-y-5">
+                    {editMode
+                      ? groupHabits.map((habit) => (
+                          <View
+                            key={habit.id}
+                            className="items-center"
+                            style={{ width: 104, alignItems: 'center' }}
+                          >
+                            <Card
+                              accentColor={habit.color ?? DEFAULT_HABIT_COLOR}
+                              className="mb-0 w-full"
+                              innerClassName="items-center px-3 py-4"
+                            >
+                              <View
+                                className="mb-3 h-14 w-14 items-center justify-center rounded-full"
+                                style={{
+                                  backgroundColor: `${habit.color ?? DEFAULT_HABIT_COLOR}18`,
+                                }}
+                              >
+                                <MaterialIcons
+                                  name={habit.icon ?? DEFAULT_HABIT_ICON}
+                                  size={24}
+                                  color={habit.color ?? DEFAULT_HABIT_COLOR}
+                                />
+                              </View>
+                              <Text
+                                variant="caption"
+                                style={{ color: tokens.text, textAlign: 'center' }}
+                                numberOfLines={2}
+                              >
+                                {habit.name}
+                              </Text>
+                              <View className="mt-3 w-full gap-1.5">
+                                <Pressable
+                                  onPress={() => {
+                                    void openEditModal(habit);
+                                  }}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Edit ${habit.name}`}
+                                  className="min-h-[44px] w-full items-center justify-center rounded-full px-3"
+                                  style={{ backgroundColor: COLOR }}
+                                >
+                                  <Text variant="caption" style={{ color: tokens.textOnAccent }}>
+                                    Edit
+                                  </Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() => {
+                                    void handleDeleteHabit(habit);
+                                  }}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Delete ${habit.name}`}
+                                  className="min-h-[44px] w-full items-center justify-center rounded-full px-3"
+                                  style={{ backgroundColor: tokens.dangerSolid }}
+                                >
+                                  <Text variant="caption" style={{ color: tokens.textOnAccent }}>
+                                    Delete
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            </Card>
+                          </View>
+                        ))
+                      : groupHabits.map((habit) => {
+                          // Grid reflects the selected check-in day (today by
+                          // default); writes go through the same data functions.
+                          const displayCount = countsByHabitDate[habit.id]?.[selectedDateKey] ?? 0;
+                          const streak = streakMap[habit.id] ?? 0;
+                          // Write gate mirrors the data layer: paused/
+                          // archived habits, lifecycle-masked dates, and
+                          // pre-creation dates accept no check-ins.
+                          const actionableOnSelected =
+                            (habit.status ?? 'active') === 'active' &&
+                            isHabitActionableOn(
+                              habit.rule_history,
+                              selectedDateKey,
+                              habit.target_per_day,
+                              habitCreationDateKey(habit.created_at),
+                              habit.lifecycle_history,
+                            );
+                          const currentRule = getHabitRuleForDate(
+                            habit.rule_history,
+                            selectedDateKey,
+                            habit.target_per_day,
+                          );
+                          const isQuantitative = habit.target_per_day > 1;
+                          return (
                             <View
                               key={habit.id}
-                              className="items-center"
-                              style={{ width: 104, alignItems: 'center' }}
+                              className="items-center justify-center"
+                              style={{ width: 92, alignItems: 'center' }}
                             >
-                              <Card
-                                accentColor={habit.color ?? DEFAULT_HABIT_COLOR}
-                                className="mb-0 w-full"
-                                innerClassName="items-center px-3 py-4"
+                              <HabitCircle
+                                habit={habit}
+                                todayCount={displayCount}
+                                streak={streak}
+                                size={64}
+                                showName={false}
+                                showStreak={false}
+                                scheduledToday={actionableOnSelected}
+                                dayPhrase={
+                                  viewingPastDay
+                                    ? `on ${formatStripDateLabel(selectedDateKey)}`
+                                    : undefined
+                                }
+                                onIncrement={() => handleIncrement(habit.id, selectedDateKey)}
+                                onDecrement={() => handleDecrement(habit.id, selectedDateKey)}
+                              />
+                              {isQuantitative && actionableOnSelected ? (
+                                <>
+                                  <Text
+                                    variant="caption"
+                                    className="mt-1 w-[92px] text-center tabular-nums"
+                                    style={{ color: tokens.text, fontSize: 11 }}
+                                    accessibilityLabel={`${habit.name}: ${displayCount} of ${habit.target_per_day} done`}
+                                  >
+                                    {displayCount} / {habit.target_per_day}
+                                  </Text>
+                                  {/* Visible −/+ so decrement is not
+                                    long-press-only; hitSlop keeps the touch
+                                    target at 44pt inside the 84pt column. */}
+                                  <View className="mt-1 flex-row items-center gap-2">
+                                    <Pressable
+                                      onPress={() => handleDecrement(habit.id, selectedDateKey)}
+                                      disabled={displayCount <= 0}
+                                      hitSlop={8}
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Remove one ${habit.name}`}
+                                      accessibilityState={{ disabled: displayCount <= 0 }}
+                                      className="h-8 w-8 items-center justify-center rounded-full border"
+                                      style={{
+                                        borderColor: tokens.border,
+                                        backgroundColor: tokens.surfaceElevated,
+                                        opacity: displayCount <= 0 ? 0.4 : 1,
+                                      }}
+                                    >
+                                      <Text
+                                        variant="label"
+                                        style={{ color: tokens.text, fontSize: 18, lineHeight: 20 }}
+                                      >
+                                        −
+                                      </Text>
+                                    </Pressable>
+                                    <Pressable
+                                      onPress={() => handleIncrement(habit.id, selectedDateKey)}
+                                      hitSlop={8}
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Add one ${habit.name}`}
+                                      className="h-8 w-8 items-center justify-center rounded-full border"
+                                      style={{
+                                        borderColor: SECTION_COLORS.habits,
+                                        backgroundColor: `${SECTION_COLORS.habits}18`,
+                                      }}
+                                    >
+                                      <Text
+                                        variant="label"
+                                        style={{
+                                          color: sectionAccents.habits.text,
+                                          fontSize: 18,
+                                          lineHeight: 20,
+                                        }}
+                                      >
+                                        +
+                                      </Text>
+                                    </Pressable>
+                                  </View>
+                                </>
+                              ) : null}
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Open ${habit.name} history`}
+                                className="mt-2 w-[92px] items-center"
+                                onPress={() => setDetailHabit(habit)}
                               >
-                                <View
-                                  className="mb-3 h-14 w-14 items-center justify-center rounded-full"
-                                  style={{
-                                    backgroundColor: `${habit.color ?? DEFAULT_HABIT_COLOR}18`,
-                                  }}
-                                >
-                                  <MaterialIcons
-                                    name={habit.icon ?? DEFAULT_HABIT_ICON}
-                                    size={24}
-                                    color={habit.color ?? DEFAULT_HABIT_COLOR}
-                                  />
-                                </View>
                                 <Text
-                                  className="text-center text-xs font-medium"
-                                  style={{ color: tokens.text }}
+                                  variant="caption"
+                                  style={{
+                                    color: tokens.textMuted,
+                                    textAlign: 'center',
+                                    fontSize: 11,
+                                  }}
                                   numberOfLines={2}
                                 >
                                   {habit.name}
                                 </Text>
-                                <View className="mt-3 flex-row gap-1">
-                                  <Pressable
-                                    onPress={() => {
-                                      void openEditModal(habit);
-                                    }}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={`Edit ${habit.name}`}
-                                    className="rounded-full px-3 py-1.5"
-                                    style={{ backgroundColor: COLOR }}
-                                  >
-                                    <Text
-                                      className="text-xs font-medium"
-                                      style={{ color: tokens.textOnAccent }}
-                                    >
-                                      Edit
-                                    </Text>
-                                  </Pressable>
-                                  <Pressable
-                                    onPress={() => {
-                                      void handleDeleteHabit(habit);
-                                    }}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={`Delete ${habit.name}`}
-                                    className="rounded-full px-3 py-1.5"
-                                    style={{ backgroundColor: tokens.dangerSolid }}
-                                  >
-                                    <Text
-                                      className="text-xs font-medium"
-                                      style={{ color: tokens.textOnAccent }}
-                                    >
-                                      Delete
-                                    </Text>
-                                  </Pressable>
-                                </View>
-                              </Card>
-                            </View>
-                          ))
-                        : groupHabits.map((habit) => {
-                            // Grid reflects the selected check-in day (today by
-                            // default); writes go through the same data functions.
-                            const displayCount =
-                              countsByHabitDate[habit.id]?.[selectedDateKey] ?? 0;
-                            const streak = streakMap[habit.id] ?? 0;
-                            // Write gate mirrors the data layer: paused/
-                            // archived habits, lifecycle-masked dates, and
-                            // pre-creation dates accept no check-ins.
-                            const actionableOnSelected =
-                              (habit.status ?? 'active') === 'active' &&
-                              isHabitActionableOn(
-                                habit.rule_history,
-                                selectedDateKey,
-                                habit.target_per_day,
-                                habitCreationDateKey(habit.created_at),
-                                habit.lifecycle_history,
-                              );
-                            const currentRule = getHabitRuleForDate(
-                              habit.rule_history,
-                              selectedDateKey,
-                              habit.target_per_day,
-                            );
-                            const isQuantitative = habit.target_per_day > 1;
-                            return (
-                              <View
-                                key={habit.id}
-                                className="items-center justify-center"
-                                style={{ width: 84, alignItems: 'center' }}
+                              </Pressable>
+                              <Text
+                                variant="caption"
+                                className="mt-0.5 w-[92px] text-center"
+                                style={{ color: tokens.textMuted, fontSize: 10, lineHeight: 16 }}
+                                numberOfLines={1}
                               >
-                                <HabitCircle
-                                  habit={habit}
-                                  todayCount={displayCount}
-                                  streak={streak}
-                                  size={60}
-                                  showName={false}
-                                  showStreak={false}
-                                  scheduledToday={actionableOnSelected}
-                                  dayPhrase={
-                                    viewingPastDay
-                                      ? `on ${formatStripDateLabel(selectedDateKey)}`
-                                      : undefined
-                                  }
-                                  onIncrement={() => handleIncrement(habit.id, selectedDateKey)}
-                                  onDecrement={() => handleDecrement(habit.id, selectedDateKey)}
-                                />
-                                {isQuantitative && actionableOnSelected ? (
-                                  <>
-                                    <Text
-                                      className="mt-1 w-[84px] text-center text-[11px] font-semibold tabular-nums"
-                                      style={{ color: tokens.text }}
-                                      accessibilityLabel={`${habit.name}: ${displayCount} of ${habit.target_per_day} done`}
-                                    >
-                                      {displayCount} / {habit.target_per_day}
-                                    </Text>
-                                    {/* Visible −/+ so decrement is not
-                                    long-press-only; hitSlop keeps the touch
-                                    target at 44pt inside the 84pt column. */}
-                                    <View className="mt-1 flex-row items-center gap-2">
-                                      <Pressable
-                                        onPress={() => handleDecrement(habit.id, selectedDateKey)}
-                                        disabled={displayCount <= 0}
-                                        hitSlop={6}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Remove one ${habit.name}`}
-                                        accessibilityState={{ disabled: displayCount <= 0 }}
-                                        className="h-8 w-8 items-center justify-center rounded-full border"
-                                        style={{
-                                          borderColor: tokens.border,
-                                          backgroundColor: tokens.surfaceElevated,
-                                          opacity: displayCount <= 0 ? 0.4 : 1,
-                                        }}
-                                      >
-                                        <Text
-                                          className="text-base font-bold leading-5"
-                                          style={{ color: tokens.text }}
-                                        >
-                                          −
-                                        </Text>
-                                      </Pressable>
-                                      <Pressable
-                                        onPress={() => handleIncrement(habit.id, selectedDateKey)}
-                                        hitSlop={6}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Add one ${habit.name}`}
-                                        className="h-8 w-8 items-center justify-center rounded-full border"
-                                        style={{
-                                          borderColor: SECTION_COLORS.habits,
-                                          backgroundColor: `${SECTION_COLORS.habits}18`,
-                                        }}
-                                      >
-                                        <Text
-                                          className="text-base font-bold leading-5"
-                                          style={{ color: sectionAccents.habits.text }}
-                                        >
-                                          +
-                                        </Text>
-                                      </Pressable>
-                                    </View>
-                                  </>
-                                ) : null}
-                                <Pressable
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Open ${habit.name} history`}
-                                  className="mt-2 w-[84px] items-center"
-                                  onPress={() => setDetailHabit(habit)}
+                                {formatHabitSchedule(currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS)}
+                              </Text>
+                              {parseHabitReminderTime(habit.reminder_time) ? (
+                                <View
+                                  className="mt-0.5 w-[92px] flex-row items-center justify-center gap-1"
+                                  accessible
+                                  accessibilityLabel={`Reminder ${formatHabitReminderTime(parseHabitReminderTime(habit.reminder_time)!)}`}
                                 >
+                                  <MaterialIcons
+                                    name="notifications-none"
+                                    size={11}
+                                    color={sectionAccents.habits.text}
+                                  />
                                   <Text
-                                    className="text-center text-[11px] font-medium leading-4"
-                                    style={{ color: tokens.textMuted }}
-                                    numberOfLines={2}
+                                    variant="caption"
+                                    style={{
+                                      color: sectionAccents.habits.text,
+                                      fontSize: 10,
+                                      lineHeight: 16,
+                                    }}
                                   >
-                                    {habit.name}
-                                  </Text>
-                                </Pressable>
-                                <Text
-                                  className="mt-0.5 w-[84px] text-center text-[10px] leading-4"
-                                  style={{ color: tokens.textMuted }}
-                                  numberOfLines={1}
-                                >
-                                  {formatHabitSchedule(currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS)}
-                                </Text>
-                                {parseHabitReminderTime(habit.reminder_time) ? (
-                                  <Text
-                                    className="mt-0.5 w-[84px] text-center text-[10px] leading-4"
-                                    style={{ color: sectionAccents.habits.text }}
-                                    accessibilityLabel={`Reminder ${formatHabitReminderTime(parseHabitReminderTime(habit.reminder_time)!)}`}
-                                  >
-                                    🔔{' '}
                                     {formatHabitReminderTime(
                                       parseHabitReminderTime(habit.reminder_time)!,
                                     )}
                                   </Text>
-                                ) : null}
-                                {streak > 0 ? (
-                                  <View className="mt-1 flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1">
-                                    <Text style={{ fontSize: 10 }}>{streak > 2 ? '🔥' : '⚡'}</Text>
-                                    <Text className="text-[10px] font-semibold text-amber-600">
-                                      {streak}
-                                    </Text>
-                                  </View>
-                                ) : null}
-                                <Pressable
-                                  onPress={() => setInsightsHabit(habit)}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`View progress for ${habit.name}`}
-                                  className="mt-1 min-h-[36px] w-[84px] items-center justify-center rounded-full border px-2 py-1"
-                                  style={{
-                                    borderColor: SECTION_COLORS.habits,
-                                    backgroundColor: tokens.surfaceElevated,
-                                  }}
+                                </View>
+                              ) : null}
+                              {streak > 0 ? (
+                                <View
+                                  className="mt-1 flex-row items-center gap-1 rounded-full px-2 py-1"
+                                  style={{ backgroundColor: sectionAccents.habits.tint }}
                                 >
+                                  <MaterialIcons
+                                    name={streak > 2 ? 'local-fire-department' : 'bolt'}
+                                    size={11}
+                                    color={sectionAccents.habits.text}
+                                  />
                                   <Text
-                                    className="text-[10px] font-semibold"
-                                    style={{ color: sectionAccents.habits.text }}
+                                    variant="caption"
+                                    style={{ color: sectionAccents.habits.text, fontSize: 10 }}
                                   >
-                                    Progress
+                                    {streak}
                                   </Text>
-                                </Pressable>
-                              </View>
-                            );
-                          })}
+                                </View>
+                              ) : null}
+                              <Pressable
+                                onPress={() => setInsightsHabit(habit)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`View progress for ${habit.name}`}
+                                className="mt-1 min-h-[44px] w-[92px] items-center justify-center rounded-full border px-2 py-1"
+                                style={{
+                                  borderColor: SECTION_COLORS.habits,
+                                  backgroundColor: tokens.surfaceElevated,
+                                }}
+                              >
+                                <Text
+                                  variant="caption"
+                                  style={{ color: sectionAccents.habits.text, fontSize: 10 }}
+                                >
+                                  Progress
+                                </Text>
+                              </Pressable>
+                            </View>
+                          );
+                        })}
 
-                      <View className="items-center" style={{ width: editMode ? 104 : 84 }}>
-                        <Pressable
-                          onPress={() => handleAddHabitToGroup(group.key)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Add ${group.label.toLowerCase()} habit`}
-                          className="h-[68px] w-[68px] shrink-0 grow-0 items-center justify-center rounded-2xl border-2 border-dashed"
+                    <View className="items-center" style={{ width: editMode ? 104 : 92 }}>
+                      <Pressable
+                        onPress={() => handleAddHabitToGroup(group.key)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Add ${group.label.toLowerCase()} habit`}
+                        className="h-[72px] w-[72px] shrink-0 grow-0 items-center justify-center rounded-3xl border-2 border-dashed"
+                        style={{
+                          borderColor: SECTION_COLORS.habits + '66',
+                          backgroundColor: `${SECTION_COLORS.habits}14`,
+                        }}
+                      >
+                        <Text
                           style={{
-                            borderColor: SECTION_COLORS.habits + '60',
-                            backgroundColor: `${SECTION_COLORS.habits}18`,
+                            fontSize: 26,
+                            color: sectionAccents.habits.text,
+                            lineHeight: 30,
                           }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 24,
-                              color: sectionAccents.habits.text,
-                              lineHeight: 28,
-                            }}
-                          >
-                            +
-                          </Text>
-                        </Pressable>
-                        <Text
-                          className="mt-2 text-[11px] font-semibold"
-                          style={{ color: sectionAccents.habits.text }}
-                        >
-                          Add
+                          +
                         </Text>
-                      </View>
+                      </Pressable>
+                      <Text
+                        variant="caption"
+                        className="mt-2"
+                        style={{ color: sectionAccents.habits.text }}
+                      >
+                        Add
+                      </Text>
                     </View>
                   </View>
                 </Card>
@@ -1112,10 +1147,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
               </View>
               <View className="min-w-0 flex-1">
-                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                  Today&apos;s rhythm
-                </Text>
-                <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
+                <Text variant="titleMd">Today&apos;s rhythm</Text>
+                <Text variant="bodyMd" tone="muted" className="mt-0.5">
                   {habits.length} habits across your daily routine
                 </Text>
               </View>
@@ -1159,7 +1192,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                   }}
                 >
                   <Text
-                    className="text-sm font-bold tabular-nums"
+                    variant="titleMd"
+                    className="tabular-nums"
                     style={{ color: tokens.text }}
                     importantForAccessibility="no"
                   >
@@ -1168,12 +1202,12 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 </View>
               </View>
               <View className="min-w-0 flex-1">
-                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                <Text variant="bodyLg" style={{ color: tokens.text }}>
                   {todayProgress === null
                     ? 'Rest day'
                     : `${completedTodayCount} of ${scheduledTodayCount} scheduled`}
                 </Text>
-                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                <Text variant="caption" tone="muted" className="mt-0.5">
                   {todayProgress === null
                     ? 'No habits due today.'
                     : todayProgress >= 100
@@ -1189,7 +1223,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               <StatBlock
                 accentColor={SECTION_COLORS.habits}
                 className="min-w-[148px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>⚡</Text>}
+                icon={<MaterialIcons name="bolt" size={20} color={sectionAccents.habits.text} />}
                 value={overallStreak}
                 label="Best streak"
                 detail="days in a row"
@@ -1197,7 +1231,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               <StatBlock
                 accentColor={SECTION_COLORS.habits}
                 className="min-w-[148px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>📊</Text>}
+                icon={
+                  <MaterialIcons name="insights" size={20} color={sectionAccents.habits.text} />
+                }
                 value={`${consistencyPct}%`}
                 label="Consistency"
                 detail="over the last year"
@@ -1205,7 +1241,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               <StatBlock
                 accentColor={SECTION_COLORS.habits}
                 className="min-w-[148px] flex-1"
-                icon={<Text style={{ fontSize: 20 }}>🗓️</Text>}
+                icon={
+                  <MaterialIcons
+                    name="calendar-month"
+                    size={20}
+                    color={sectionAccents.habits.text}
+                  />
+                }
                 value={todayProgress === null ? 'Rest' : `${todayProgress}%`}
                 label="Today"
                 detail={
@@ -1218,17 +1260,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           </View>
         </Card>
       </ScreenSection>
-
-      {habitsLoaded ? (
-        <ScreenSection className="pb-0" accessibilityLabel="Check-in day">
-          <HabitDayStrip
-            days={stripDays}
-            selectedDateKey={selectedDateKey}
-            todayKey={todayKey}
-            onSelect={setSelectedDateKey}
-          />
-        </ScreenSection>
-      ) : null}
 
       <ScreenSection className="mb-0 pt-1">
         <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
@@ -1261,7 +1292,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             max={99}
             placeholder="1"
           />
-          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+          <Text variant="label" className="mb-1">
             Schedule
           </Text>
           <View className="mb-2 flex-row flex-wrap">
@@ -1316,7 +1347,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                     }}
                   >
                     <Text
-                      className="text-sm font-semibold"
+                      variant="caption"
                       style={{ color: selected ? tokens.textOnAccent : tokens.textMuted }}
                     >
                       {weekday.label}
@@ -1329,10 +1360,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           <View className="mb-3 mt-1 rounded-2xl border p-3" style={{ borderColor: tokens.border }}>
             <View className="flex-row items-center justify-between gap-3">
               <View className="min-w-0 flex-1">
-                <Text className="text-sm font-medium" style={{ color: tokens.text }}>
-                  Reminder
-                </Text>
-                <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                <Text variant="label">Reminder</Text>
+                <Text variant="caption" tone="muted" className="mt-0.5">
                   {Platform.OS === 'web'
                     ? 'Native reminders are available on Android and iOS only.'
                     : reminderPermission === 'denied'
@@ -1388,10 +1417,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                         backgroundColor: tokens.surfaceElevated,
                       }}
                     >
-                      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      <Text variant="bodyMd" tone="muted">
                         Time
                       </Text>
-                      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                      <Text variant="titleMd" style={{ color: tokens.text }}>
                         {reminderTime}
                       </Text>
                     </Pressable>
@@ -1457,7 +1486,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             ) : null}
             {reminderPermission === 'denied' || reminderPermission === 'unsupported' ? (
               <Text
-                className="mt-1 text-xs"
+                variant="caption"
+                className="mt-1"
                 style={{ color: tokens.dangerText }}
                 accessibilityRole="alert"
                 accessibilityLabel="Notification permission error"
@@ -1469,7 +1499,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               </Text>
             ) : null}
           </View>
-          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+          <Text variant="label" className="mb-1">
             Category
           </Text>
           <View className="mb-3 flex-row flex-wrap">
@@ -1487,7 +1517,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               />
             ))}
           </View>
-          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+          <Text variant="label" className="mb-1">
             Icon
           </Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
@@ -1516,7 +1546,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               </Pressable>
             ))}
           </View>
-          <Text className="mb-1 text-sm font-medium" style={{ color: tokens.text }}>
+          <Text variant="label" className="mb-1">
             Color
           </Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
@@ -1551,7 +1581,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           headerSubtitle="Optional explicit rules that run when this habit completes for the day."
         >
           {linkedActionsLoading ? (
-            <Text className="text-sm" style={{ color: sectionAccents.habits.text }}>
+            <Text variant="bodyMd" style={{ color: sectionAccents.habits.text }}>
               Loading linked actions...
             </Text>
           ) : (

@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Card } from '@/core/ui/Card';
 import { TextField } from '@/core/ui/TextField';
 import { PillChip } from '@/core/ui/PillChip';
-import { useAppTheme } from '@/core/providers/themeContext';
 import type { TodoDueWindow, TodoSortMode, TodoListFilters } from './todos.domain';
 import type { TodoPriority } from './types';
 
@@ -41,10 +40,11 @@ type Props = {
 };
 
 /**
- * Search + filter + sort toolbar for the todo list. Search stays visible;
- * sort/due/priority chips collapse behind a "Filters" toggle that shows the
- * active-filter count. Purely presentational: all query logic lives in
- * todos.domain.ts (applyTodoListQuery).
+ * Search + filter + sort toolbar for the todo list, floated in a tinted Pop
+ * card so it reads as one control cluster rather than a grey form. Search
+ * stays visible; sort/due/priority chips collapse behind a "Filters" toggle
+ * that shows the active-filter count. Purely presentational: all query logic
+ * lives in todos.domain.ts (applyTodoListQuery).
  */
 export function TodoListToolbar({
   search,
@@ -55,7 +55,6 @@ export function TodoListToolbar({
   onSortChange,
   accentColor,
 }: Props) {
-  const { tokens } = useAppTheme();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount =
     ((filters.priority ?? 'all') !== 'all' ? 1 : 0) +
@@ -67,75 +66,73 @@ export function TodoListToolbar({
 
   return (
     <View className="mb-3">
-      <TextField
-        label=""
-        value={search}
-        onChangeText={onSearchChange}
-        placeholder="Search tasks..."
-      />
-      <View className="mt-2 flex-row flex-wrap gap-2">
-        <PillChip
-          label={activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
-          active={filtersOpen}
-          color={accentColor}
-          onPress={() => setFiltersOpen((open) => !open)}
+      <Card accentColor={accentColor} className="mb-0" innerClassName="p-3">
+        <TextField
+          label=""
+          value={search}
+          onChangeText={onSearchChange}
+          placeholder="Search tasks..."
         />
-        {hasActiveQuery ? (
-          <Pressable
-            onPress={() => {
-              onSearchChange('');
-              onFiltersChange({ priority: 'all', dueWindow: 'all' });
-              onSortChange('manual');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search, filters, and sorting"
-            className="flex-row items-center gap-1 rounded-full px-3 py-1.5"
-            style={{ backgroundColor: tokens.surfaceElevated }}
-          >
-            <MaterialIcons name="clear" size={14} color={tokens.textMuted} />
-            <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
-              Reset
-            </Text>
-          </Pressable>
+        <View className="flex-row flex-wrap items-center gap-2">
+          <PillChip
+            label={activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
+            active={filtersOpen}
+            color={accentColor}
+            onPress={() => setFiltersOpen((open) => !open)}
+          />
+          {hasActiveQuery ? (
+            <PillChip
+              label="Reset"
+              icon="✕"
+              accessibilityLabel="Clear search, filters, and sorting"
+              active={false}
+              color={accentColor}
+              onPress={() => {
+                onSearchChange('');
+                onFiltersChange({ priority: 'all', dueWindow: 'all' });
+                onSortChange('manual');
+              }}
+            />
+          ) : null}
+        </View>
+        {filtersOpen ? (
+          <>
+            <View className="mt-1 flex-row flex-wrap gap-2">
+              {SORT_OPTIONS.map((option) => (
+                <PillChip
+                  key={`sort-${option.value}`}
+                  label={`⇅ ${option.label}`}
+                  active={sort === option.value}
+                  color={accentColor}
+                  onPress={() => onSortChange(option.value)}
+                />
+              ))}
+            </View>
+            <View className="mt-1 flex-row flex-wrap gap-2">
+              {DUE_WINDOW_OPTIONS.map((option) => (
+                <PillChip
+                  key={`due-${option.value}`}
+                  label={option.label}
+                  active={(filters.dueWindow ?? 'all') === option.value}
+                  color={accentColor}
+                  onPress={() => onFiltersChange({ ...filters, dueWindow: option.value })}
+                />
+              ))}
+            </View>
+            <View className="mt-1 flex-row flex-wrap gap-2">
+              {PRIORITY_OPTIONS.map((option) => (
+                <PillChip
+                  key={`prio-${option.value}`}
+                  label={option.label}
+                  active={(filters.priority ?? 'all') === option.value}
+                  color={accentColor}
+                  onPress={() => onFiltersChange({ ...filters, priority: option.value })}
+                />
+              ))}
+            </View>
+          </>
         ) : null}
-      </View>
-      {filtersOpen ? (
-        <>
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {SORT_OPTIONS.map((option) => (
-              <PillChip
-                key={`sort-${option.value}`}
-                label={`⇅ ${option.label}`}
-                active={sort === option.value}
-                color={accentColor}
-                onPress={() => onSortChange(option.value)}
-              />
-            ))}
-          </View>
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {DUE_WINDOW_OPTIONS.map((option) => (
-              <PillChip
-                key={`due-${option.value}`}
-                label={option.label}
-                active={(filters.dueWindow ?? 'all') === option.value}
-                color={accentColor}
-                onPress={() => onFiltersChange({ ...filters, dueWindow: option.value })}
-              />
-            ))}
-          </View>
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {PRIORITY_OPTIONS.map((option) => (
-              <PillChip
-                key={`prio-${option.value}`}
-                label={option.label}
-                active={(filters.priority ?? 'all') === option.value}
-                color={accentColor}
-                onPress={() => onFiltersChange({ ...filters, priority: option.value })}
-              />
-            ))}
-          </View>
-        </>
-      ) : null}
+      </Card>
     </View>
   );
 }

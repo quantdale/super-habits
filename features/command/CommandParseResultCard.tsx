@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { Text } from '@/core/ui/Text';
+import { View } from 'react-native';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { useAppTheme } from '@/core/providers/themeContext';

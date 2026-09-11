@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useLayoutEffect, useRef } from 'react';
-import { Dimensions, Platform, View, Text } from 'react-native';
+import { Dimensions, Platform, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';

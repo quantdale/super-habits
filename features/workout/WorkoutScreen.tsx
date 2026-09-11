@@ -81,6 +81,7 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import { SwipeableCard } from '@/core/ui/SwipeableCard';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import { validateRoutineName } from '@/lib/validation';
 import {
   BodyWeightCard,
@@ -152,6 +153,7 @@ function RoutineSwipeRow({
 
 export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
+  const { recordAction } = useGamification();
   const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.workout.text;
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -1081,6 +1083,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 onCompleteWorkout={() => {
                   void (async () => {
                     await completeRoutine(routine.id);
+                    recordAction('workout');
                     void refresh();
                   })();
                 }}

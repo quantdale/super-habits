@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
@@ -166,14 +167,12 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
           accentColor={SECTION_COLORS.todos}
           title="No projects yet"
           description="Group related tasks, habits, and goals under a project to see progress in one place."
-          icon={<Text style={{ fontSize: 18 }}>•</Text>}
         />
       ) : !isLoading && visible.length === 0 ? (
         <EmptyStateCard
           accentColor={SECTION_COLORS.todos}
           title="No matching projects"
           description="Try a different status filter."
-          icon={<Text style={{ fontSize: 18 }}>•</Text>}
         />
       ) : (
         visible.map((row, index) => {

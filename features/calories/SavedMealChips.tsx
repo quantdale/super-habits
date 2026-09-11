@@ -1,16 +1,20 @@
+import { Text } from '@/core/ui/Text';
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { PillChip } from '@/core/ui/PillChip';
 import type { FrequentFood } from './calories.domain';
 import type { SavedMeal } from './types';
 
 type Props = {
   meals: SavedMeal[];
   onSelect: (meal: SavedMeal) => void;
+  color?: string;
 };
 
-export function SavedMealChips({ meals, onSelect }: Props) {
-  const { tokens } = useAppTheme();
+export function SavedMealChips({ meals, onSelect, color }: Props) {
+  const { sectionAccents } = useAppTheme();
+  const accent = color ?? sectionAccents.calories.fill;
 
   if (meals.length === 0) return null;
 
@@ -18,28 +22,21 @@ export function SavedMealChips({ meals, onSelect }: Props) {
     <View className="mb-3">
       <Text
         className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px]"
-        style={{ color: tokens.textMuted }}
+        style={{ color: sectionAccents.calories.text }}
       >
         Recent foods
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-        <View className="flex-row gap-2">
+        <View className="flex-row items-center pr-1 pt-1">
           {meals.map((meal) => (
-            <Pressable
+            <PillChip
               key={meal.id}
-              onPress={() => onSelect(meal)}
-              accessibilityRole="button"
+              label={`${meal.food_name} · ${meal.calories} kcal`}
               accessibilityLabel={`Log ${meal.food_name}, ${meal.calories} kcal`}
-              className="min-h-[44px] flex-row items-center gap-2 rounded-2xl border px-3 py-2.5"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-            >
-              <Text className="text-sm font-medium" style={{ color: tokens.text }}>
-                {meal.food_name}
-              </Text>
-              <Text className="text-xs" style={{ color: tokens.textMuted }}>
-                {meal.calories} kcal
-              </Text>
-            </Pressable>
+              active={false}
+              color={accent}
+              onPress={() => onSelect(meal)}
+            />
           ))}
         </View>
       </ScrollView>
@@ -50,14 +47,16 @@ export function SavedMealChips({ meals, onSelect }: Props) {
 type FrequentProps = {
   foods: FrequentFood[];
   onSelect: (food: FrequentFood) => void;
+  color?: string;
 };
 
 /**
  * "Frequent" chips: most-logged foods of the last ~30 days. Tapping reuses
  * the exact recent-chip prefill/add path via `onSelect`.
  */
-export function FrequentFoodChips({ foods, onSelect }: FrequentProps) {
-  const { tokens } = useAppTheme();
+export function FrequentFoodChips({ foods, onSelect, color }: FrequentProps) {
+  const { sectionAccents } = useAppTheme();
+  const accent = color ?? sectionAccents.calories.fill;
 
   if (foods.length === 0) return null;
 
@@ -65,28 +64,21 @@ export function FrequentFoodChips({ foods, onSelect }: FrequentProps) {
     <View className="mb-3">
       <Text
         className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px]"
-        style={{ color: tokens.textMuted }}
+        style={{ color: sectionAccents.calories.text }}
       >
         Frequent foods
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-        <View className="flex-row gap-2">
+        <View className="flex-row items-center pr-1 pt-1">
           {foods.map((food) => (
-            <Pressable
+            <PillChip
               key={food.foodName.toLowerCase()}
-              onPress={() => onSelect(food)}
-              accessibilityRole="button"
+              label={`${food.foodName} · ${food.logCount}×`}
               accessibilityLabel={`Log ${food.foodName}, logged ${food.logCount} times recently`}
-              className="min-h-[44px] flex-row items-center gap-2 rounded-2xl border px-3 py-2.5"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-            >
-              <Text className="text-sm font-medium" style={{ color: tokens.text }}>
-                {food.foodName}
-              </Text>
-              <Text className="text-xs" style={{ color: tokens.textMuted }}>
-                {food.logCount}×
-              </Text>
-            </Pressable>
+              active={false}
+              color={accent}
+              onPress={() => onSelect(food)}
+            />
           ))}
         </View>
       </ScrollView>

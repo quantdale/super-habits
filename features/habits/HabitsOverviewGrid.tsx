@@ -1,8 +1,10 @@
+import { Text } from '@/core/ui/Text';
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
+import { radius } from '@/core/theme/designTokens';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { SECTION_COLORS } from '@/constants/sectionColors';
@@ -15,7 +17,7 @@ type Props = {
 function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const heatmapLegend: { label: string; color: string }[] = [
-    { label: 'None', color: tokens.border },
+    { label: 'None', color: tokens.surfaceSunken },
     { label: 'Some', color: `${SECTION_COLORS.habits}55` },
     { label: 'Most', color: `${SECTION_COLORS.habits}99` },
     { label: 'All', color: SECTION_COLORS.habits },
@@ -32,27 +34,22 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
         <View className="w-full min-w-0 p-4">
           <View className="mb-4 flex-row items-start gap-3">
             <View
-              className="h-11 w-11 items-center justify-center rounded-xl"
-              style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
+              className="h-11 w-11 items-center justify-center"
+              style={{
+                backgroundColor: sectionAccents.habits.tint,
+                borderRadius: radius.md,
+              }}
             >
               <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                Consistency
-              </Text>
-              <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
+              <Text variant="titleMd">Consistency</Text>
+              <Text variant="bodyMd" tone="muted" style={{ marginTop: 2 }}>
                 All habits over the last 52 weeks
               </Text>
             </View>
             <View className="items-end">
-              <Text
-                style={{
-                  fontSize: 28,
-                  fontWeight: '700',
-                  color: sectionAccents.habits.text,
-                }}
-              >
+              <Text variant="metric" style={{ color: sectionAccents.habits.text }}>
                 {consistencyPercent}%
               </Text>
             </View>
@@ -70,13 +67,15 @@ function HabitsOverviewGridInner({ consistencyPercent, heatmapDays }: Props) {
               <View key={l.label} className="flex-row items-center gap-1">
                 <View
                   style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 2,
+                    width: 12,
+                    height: 12,
+                    borderRadius: radius.full,
                     backgroundColor: l.color,
                   }}
                 />
-                <Text style={{ fontSize: 11, color: tokens.textMuted }}>{l.label}</Text>
+                <Text variant="caption" tone="muted">
+                  {l.label}
+                </Text>
               </View>
             ))}
           </View>

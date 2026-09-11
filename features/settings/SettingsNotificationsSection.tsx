@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Switch, TextInput, View } from 'react-native';
 import { getNotificationPermissionState, requestTodoReminderPermission } from '@/lib/notifications';
 import {
   getDailyPlanReminderTime,
