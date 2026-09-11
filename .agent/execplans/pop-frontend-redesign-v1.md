@@ -76,29 +76,25 @@ the full local ladder is green, and the campaign is committed and pushed.
 
 ## Current Checkpoint
 
-- Current milestone: W9 regression ladder — final full Chromium battery in
-  flight; all targeted fixes verified (P0 journeys 25/25, Vitest 2055/2055,
-  lint PASS, typecheck PASS).
+- Current milestone: W9 final battery green (one documented known-gap
+  flake); W10 commits landed on `main`; native smoke running on the committed
+  revision (owned `superhabits` AVD).
 - Completed:
-  - W0–W8 as recorded below.
-  - Fixed the redesign-surfaced regressions: Todos list height/virtualization,
-    recurring-chain spawn semantics (+ real-SQLite regression test), Calories
-    row name/kcal split, section-helper + heading selectors for the new shell,
-    and merged-kcal assertions in determinism/journey specs.
-  - P0 journey lane 25/25 PASS; past-midnight freshness + writes PASS after
-    the ACTIVE_SECTION_SELECTOR/SECTION_HEADINGS updates.
-- In progress: final `--project=chromium` battery on the frozen tree.
-- Current failures: habits.spec.ts:222 is the documented known-gap flake
-  (register §3: intermittent, passes standalone; re-verify before touching
-  product code); portable-backup failures in the prior battery passed
-  standalone → load flake.
-- Exact next action: read the final battery; then `npm run web:verify`,
-  `npm run web:hygiene`, deterministic simulation, OpenSpec/plan validators,
-  native Android smoke on an owned AVD, refresh release-doc numbers, complete
-  the ExecPlan, and commit/push in coherent scopes.
-- Remaining definition of done: final battery evidence; web:verify/hygiene;
-  sim green; release doc numbers refreshed; plan COMPLETED; commits pushed;
-  native lane evidence or explicit ENVIRONMENT blocker.
+  - All W0–W8 work recorded below.
+  - Final gates: typecheck PASS, lint PASS, Vitest 2055/2055, Chromium
+    135/1/7 (only `habits.spec.ts:222`, known-gap register §3), P0 journeys
+    25/25, deterministic simulation 23/23, web:verify PASS, OpenSpec 52/52,
+    plan validators PASS, impact map valid, themes 140/140.
+  - Commits: `437b103` (Pop primitives), `67651ea` (gamification + schema 25),
+    `25478c0` (shell + six sections), `9416f2d` (QA selector alignment),
+    `7ef0523` (release metadata/docs), `79f7799` (agent docs/nav spec/design
+    doc/plan), `8f7ea1e` (test setup mocks). Tree clean.
+- In progress: native Android smoke (`--avd superhabits`) on `8f7ea1e`.
+- Exact next action: read the native report; record the evidence in this plan
+  and `docs/release/app-store-readiness.md`; push `main`; confirm
+  `HEAD == origin/main`; update lifecycle to COMPLETED.
+- Remaining definition of done: native evidence (or ENVIRONMENT blocker);
+  push; final plan COMPLETED status.
 
 ## Delegation Log
 
@@ -190,6 +186,16 @@ the delegated work is running.
 tests/integration/recurringSeriesCorrection.test.ts
 tests/integration/todoReminderActions.test.ts` — PASS 13/13 (includes the
   new chain-advance regression test).
+- 2026-09-12 — `npm test` — PASS 2055/2055 (196 files) in an isolated run.
+- 2026-09-12 — `npx playwright test --project=chromium` — PASS 135/1/7;
+  single failure = habits.spec.ts:222 (known-gap §3).
+- 2026-09-12 — `npm run e2e:journeys:p0` — PASS 25/25.
+- 2026-09-12 — `npm run qa:simulation -- --all --mode deterministic` — PASS
+  23/23 scenarios.
+- 2026-09-12 — `npm run web:verify` — PASS (fresh export, COOP/COEP, probe,
+  ports released).
+- 2026-09-12 — `npm run openspec:validate` 52/52; `agent:plan:validate:all`
+  PASS; `qa:impact:validate` PASS (13 rules); `validate:themes` 140/140.
 
 ## Changed Files / Areas
 
