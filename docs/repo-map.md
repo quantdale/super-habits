@@ -18,7 +18,7 @@ Use with:
 ## App Shell and Routing
 
 - `app/_layout.tsx` - root providers, `GlobalCommandCenterHost` (command overlay), in-app notices
-- `app/index.tsx` - single-page entry: renders all six sections behind `NavigationContext.activeSection`, top tab rail, settings modal
+- `app/index.tsx` - single-page entry: renders all six sections behind `NavigationContext.activeSection`, section switcher, settings modal
 
 ## Core Infrastructure
 

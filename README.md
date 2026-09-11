@@ -113,7 +113,7 @@ Optional platform commands:
 
 ## Routes and Surfaces
 
-The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Today (`overview` internally), To Do (`todos`), Habits, Focus (`pomodoro`), Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a top tab rail of plain `Pressable` items:
+The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — Today (`overview` internally), To Do (`todos`), Habits, Focus (`pomodoro`), Workout, Calories — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection`, switched by a section switcher of plain `Pressable` items — a floating bottom tab bar on narrow viewports and a left side rail on wide viewports:
 
 - Today
 - To Do

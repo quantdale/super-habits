@@ -7,7 +7,7 @@ model: inherit
 You are the UI and feature logic specialist for SuperHabits — an
 offline-first React Native + Expo app rendered as a single-page experience:
 six sections (Today, To Do, Habits, Focus, Workout, Calories) live
-inside `app/index.tsx` behind a top tab rail, plus a full-screen Settings
+inside `app/index.tsx` behind a section switcher, plus a full-screen Settings
 modal and a global Command Center overlay.
 
 BEFORE TOUCHING ANY CODE

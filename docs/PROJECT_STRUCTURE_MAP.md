@@ -10,7 +10,7 @@ Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABI
 
 Current shell truth:
 
-- The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — `overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories` — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection` (from `core/providers/NavigationProvider.tsx`), with a top tab rail of plain `Pressable` items.
+- The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections — `overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories` — are rendered inside `app/index.tsx` behind `NavigationContext.activeSection` (from `core/providers/NavigationProvider.tsx`), with a section switcher of plain `Pressable` items.
 - `app/_layout.tsx` mounts the global command-center host (`GlobalCommandCenterHost`); the Command Center is a global overlay only — there is no `/command` route.
 - Settings is a full-screen modal (not a route); the Command Center is a global overlay with no floating launcher (the vestigial `useCommandLauncherSuppressed` hook is still called by the Focus/Workout screens but renders nothing).
 - Calories supports `form` and `diary` modes and remembers the last selected mode in AsyncStorage (`superhabits.calories.viewMode`).

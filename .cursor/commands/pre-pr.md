@@ -96,7 +96,7 @@ reload once and re-check.
 
 ### 2c — All 6 sections
 
-The app is a single page: `app/index.tsx` renders all six sections behind the top tab rail. Navigate to BASE_URL, then click each tab-rail item to activate its section (`NavigationContext.activeSection`). Take a screenshot → save as the path in the table. Check for blank/error state.
+The app is a single page: `app/index.tsx` renders all six sections behind the section switcher. Navigate to BASE_URL, then click each tab-rail item to activate its section (`NavigationContext.activeSection`). Take a screenshot → save as the path in the table. Check for blank/error state.
 
 | Section | Expected | Screenshot | Status |
 |-----|----------|------------|--------|

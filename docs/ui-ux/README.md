@@ -300,6 +300,7 @@ This directory is the implementation source of truth for the UI overhaul:
 - [`09-warm-momentum-2-2.md`](./09-warm-momentum-2-2.md) — Warm Momentum 2.2 interaction-primitives/tablet-density/accessibility-order contract.
 - [`10-warm-momentum-2-3.md`](./10-warm-momentum-2-3.md) — Warm Momentum 2.3 data-entry/modal determinism contract.
 - [`11-warm-momentum-2-4.md`](./11-warm-momentum-2-4.md) — Warm Momentum 2.4 reliability/performance completion contract.
+- [`12-pop-design-system.md`](./12-pop-design-system.md) — **current** Pop design language (Nunito type, chunky geometry, section hues, tactile motion) that replaced Warm Momentum across the app; read this before touching UI.
 - [`2026-09-01-friction-inventory.md`](./2026-09-01-friction-inventory.md) — baseline per-surface friction inventory for the 2.0 campaign.
 - [`2026-09-01-feature-disposition-ledger.md`](./2026-09-01-feature-disposition-ledger.md) — disposition of each feature surface across campaigns.
 - [`2026-09-01-mobbin-pattern-ledger.md`](./2026-09-01-mobbin-pattern-ledger.md) — transferable reference UI patterns (principles, not trade dress).

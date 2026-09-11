@@ -29,7 +29,7 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 ## Routing and navigation
 
 - Root provider wrapper + single-page shell: `app/_layout.tsx` and `app/index.tsx`
-- Six sections (`overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories`) render inside `app/index.tsx`, switched by `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`) with a top tab rail of plain `Pressable` items
+- Six sections (`overview`, `todos`, `habits`, `pomodoro`, `workout`, `calories`) render inside `app/index.tsx`, switched by `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`) with a section switcher of plain `Pressable` items
 - Settings is a full-screen modal (`isSettingsOpen` / `openSettings` / `closeSettings`), not a route
 - Global command-center host: `app/_layout.tsx` mounts `GlobalCommandCenterHost`; the Command Center is a global overlay only (`features/command/CommandCenterProvider.tsx`) — no `/command` route
 - Command Center has no standalone launcher; the single global Add action opens Quick Capture, and Add → Describe it opens Command Center as a drawer on wide web or a bottom sheet elsewhere
@@ -43,8 +43,8 @@ Companion map for the unified knowledge base. Canonical structure guidance remai
 ## Quality baseline
 
 - Test inventories drift; verify them with `npx vitest list` and `npx playwright test --list` rather than relying on hard-coded counts (the authoritative current baselines live in `AGENTS.md`).
-- Runtime schema version: 24 (migration 22 adds Gym V2 routine/session fields plus custom exercise, weekly-plan, schedule-override, and body-weight tables; migration 23 adds semantic aliases/instructions and unilateral/external-load snapshots; migration 24 adds hot-path range indexes for pomodoro_sessions.started_at, workout_logs.completed_at, habit_completions.date_key, and a partial pending-todos index; migration 21 adds `daily_plans.top_todo_titles`; 16–19 planning entities; 20 hardening-wave-v2 durable-state promotion)
-- Next migration slot: `if (version < 25)`
+- Runtime schema version: 25 (migration 25 adds the local-only reward ledger — `gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges`; migration 22 adds Gym V2 routine/session fields plus custom exercise, weekly-plan, schedule-override, and body-weight tables; migration 23 adds semantic aliases/instructions and unilateral/external-load snapshots; migration 24 adds hot-path range indexes for pomodoro_sessions.started_at, workout_logs.completed_at, habit_completions.date_key, and a partial pending-todos index; migration 21 adds `daily_plans.top_todo_titles`; 16–19 planning entities; 20 hardening-wave-v2 durable-state promotion)
+- Next migration slot: `if (version < 26)`
 
 ---
 

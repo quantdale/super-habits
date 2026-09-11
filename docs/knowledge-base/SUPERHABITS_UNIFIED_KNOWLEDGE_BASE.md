@@ -59,7 +59,7 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **Workout/Gym V2** (exercise identity, typed routines, weekly planning, guided training, progression, analytics, and body weight), and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a top tab rail of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **Workout/Gym V2** (exercise identity, typed routines, weekly planning, guided training, progression, analytics, and body weight), and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a section switcher of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **24**. Next migration: `if (version < 25)`. Migration 13 adds durable `processed_notification_actions` state, migration 14 adds the durable `sync_outbox` table, and migration 15 adds its enqueue-time owner binding; migrations 16–19 add the planning entities and habit schedule history, migration 20 is the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 adds `daily_plans.top_todo_titles`, migration 22 adds Gym V2 routine/session columns plus custom exercises, weekly plan, date overrides, and body-weight tables, migration 23 adds deep Gym V2 semantic metadata (aliases, instructions, unilateral and external-load snapshots), and migration 24 adds hot-path range indexes for the unbounded history tables (`pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`) plus the partial pending-todos index `idx_todos_pending_sort`. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
@@ -77,7 +77,7 @@
 
 **Calories shell:** `CaloriesScreen` now supports **`Form`** and **`Diary`** modes and remembers the last selected mode in AsyncStorage (`superhabits.calories.viewMode`).
 
-**UI:** NativeWind + `core/ui` primitives; top tab rail of plain `Pressable` items inside `app/index.tsx`.
+**UI:** NativeWind + `core/ui` primitives; section switcher of plain `Pressable` items inside `app/index.tsx`.
 
 **Quality:** `npm run typecheck`, `npm run lint`, unit/integration tests, static web export, Playwright, and simulation inventories are point-in-time and must be re-queried with `npx vitest list` and `npx playwright test --list`. CI runs quality (`typecheck` + `lint` + `test`) then the configured E2E/simulation lanes; live performance/native verdicts remain in their evidence plans rather than being implied by an inventory count.
 
@@ -136,10 +136,10 @@
 
 #### `app/` (2 files)
 
-| File          | Role                                                                                                                          |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `_layout.tsx` | Root layout; `AppProviders`, `StatusBar`, hides header; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`                |
-| `index.tsx`   | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items |
+| File          | Role                                                                                                                              |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `_layout.tsx` | Root layout; `AppProviders`, `StatusBar`, hides header; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`                    |
+| `index.tsx`   | Single page: renders all six sections behind `NavigationContext.activeSection` with a section switcher of plain `Pressable` items |
 
 #### `features/` (unique source files)
 
@@ -460,18 +460,18 @@ Shared foreground trigger used by feature screens:
 | ----------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | npm `main`  | `package.json` → `"expo-router/entry"` | Expo Router bootstraps `app/` tree                                                                                                     |
 | Root layout | `app/_layout.tsx`                      | Imports `@/global.css`; wraps tree in `AppProviders`; `StatusBar style="dark"`; mounts `GlobalCommandCenterHost` + `InAppNoticeBanner` |
-| Index       | `app/index.tsx`                        | Single page: renders all six sections behind `NavigationContext.activeSection` with a top tab rail of plain `Pressable` items          |
+| Index       | `app/index.tsx`                        | Single page: renders all six sections behind `NavigationContext.activeSection` with a section switcher of plain `Pressable` items      |
 
 ### `app/_layout.tsx`
 
 - Imports: `@/global.css`, `@/core/providers/AppProviders`, `GlobalCommandCenterHost`, and `@/core/ui/InAppNoticeBanner`
 - Renders: `AppProviders` → themed root → `StatusBar` → `GlobalCommandCenterHost` and `InAppNoticeBanner`
 
-### `app/index.tsx` — single page with top tab rail
+### `app/index.tsx` — single page with section switcher
 
 #### Layout model
 
-- The six sections render behind a `NavigationContext.activeSection` state; the top tab rail is a row of plain `Pressable` items (Overview, Todos, Habits, Pomodoro, Workout, Calories).
+- The six sections render behind a `NavigationContext.activeSection` state; the section switcher is a row of plain `Pressable` items (Overview, Todos, Habits, Pomodoro, Workout, Calories).
 - The tab rail colors come from `useAppTheme()` tokens (`tokens.tabRail`, `tokens.tabRailBorder`, `tokens.background`) instead of hard-coded shell constants.
 - `overview` uses a muted slate accent that shifts with theme; the other five sections use their section colors from `SECTION_COLORS` / `SECTION_TEXT_COLORS`.
 - `TopTabItem` keeps the row-style icon + label layout, active rounded top corners, and inset inactive tabs, but the actual surface colors are theme-driven.

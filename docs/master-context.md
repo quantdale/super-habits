@@ -29,7 +29,7 @@ Companion docs in this folder:
 
 - Single-package Expo/React Native repository, not a monorepo.
 - Main runtime entry is `expo-router/entry` from root `package.json`.
-- App shell is a single-page Expo Router experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections (Today, To Do, Habits, Focus, Workout, Calories) render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
+- App shell is a single-page Expo Router experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections (Today, To Do, Habits, Focus, Workout, Calories) render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a section switcher of plain `Pressable` items.
 - Settings is a full-screen modal (not a route) opened via `NavigationContext.openSettings`; the Command Center is a global overlay only, mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`. There are no `/command`, `/settings`, or `/(tabs)/*` routes.
 - The command shell is limited to single-action drafting for `create_todo` and `create_habit`, with parse -> review -> confirm flow rather than assistant chat.
 - Command parser mode defaults to `mock`; optional model-backed parsing uses `remote_with_fallback`, but internal rollout now requires both an internal-capable build flag and a device-local tester opt-in before remote parsing is attempted.
@@ -187,7 +187,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `app/index.tsx` renders all six sections (Today, To Do, Habits, Focus, Workout, Calories) behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items.
+- `app/index.tsx` renders all six sections (Today, To Do, Habits, Focus, Workout, Calories) behind a `NavigationContext.activeSection` state, with a section switcher of plain `Pressable` items.
 - `app/_layout.tsx` wraps the shell in `AppProviders` and mounts `GlobalCommandCenterHost` + `InAppNoticeBanner`.
 - `NavigationContext` (`core/providers/NavigationProvider.tsx`) exposes `activeSection`, `setActiveSection`, `openSettings`, `closeSettings`, `openCommand`, `closeCommand`.
 - Settings is a full-screen modal opened via `openSettings`; the Command Center is a global overlay opened via `openCommand`.

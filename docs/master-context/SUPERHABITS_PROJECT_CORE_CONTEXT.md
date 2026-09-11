@@ -17,7 +17,7 @@ Primary product modules:
 - Workout
 - Calories
 
-The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items. Settings is a full-screen modal (not a route); the Command Center is a global overlay only (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`). There are no `/settings`, `/command`, or `/(tabs)/*` routes.
+The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`. The six sections render inside `app/index.tsx` behind a `NavigationContext.activeSection` state, with a section switcher of plain `Pressable` items. Settings is a full-screen modal (not a route); the Command Center is a global overlay only (mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`). There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
 ## What this app is
 
@@ -27,7 +27,7 @@ The app is beyond prototype stage: it has working features, a structured archite
 
 Current shell reality to preserve:
 
-- all six sections render in `app/index.tsx` behind `NavigationContext.activeSection`, with a plain `Pressable` top tab rail
+- all six sections render in `app/index.tsx` behind `NavigationContext.activeSection`, with a plain `Pressable` section switcher
 - the command center is a global overlay with no `/command` page route; settings is a full-screen modal with no `/settings` route
 - calories supports `Form` and `Diary` modes and remembers the last selected view
 - settings is organized into six buckets: Appearance, Backup / Sync / Restore, AI / Command, Notifications / Timer defaults, Nutrition defaults, Developer / Internal
@@ -243,7 +243,7 @@ If remote mode is disabled, listeners are skipped and the in-memory queue can gr
 
 ## Navigation
 
-- `app/index.tsx` renders all six sections behind a `NavigationContext.activeSection` state, with a top tab rail of plain `Pressable` items
+- `app/index.tsx` renders all six sections behind a `NavigationContext.activeSection` state, with a section switcher of plain `Pressable` items
 - `app/_layout.tsx` wraps the shell in `AppProviders`, mounts `GlobalCommandCenterHost`, and renders the global command-center overlay
 - `NavigationContext` (`core/providers/NavigationProvider.tsx`) exposes `activeSection`, `setActiveSection`, `openSettings`, `closeSettings`, `openCommand`, `closeCommand`
 - settings is a full-screen modal opened via `openSettings`; the command center is a global overlay opened via `openCommand`

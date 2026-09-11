@@ -24,7 +24,7 @@ Phase 2 — Plan (list every file to create or modify):
 - New domain file: features/{name}/{name}.domain.ts
 - New screen: features/{name}/{name}Screen.tsx
 - Section render: add the section to app/index.tsx behind NavigationContext.activeSection
-- Tab entry: add a Pressable to the top tab rail in app/index.tsx
+- Tab entry: add a Pressable to the section switcher in app/index.tsx
 - New tests: tests/{name}.domain.test.ts
 
 Phase 3 — Wait for plan approval.

@@ -8,7 +8,7 @@ Define the app's single-page navigation model: all six feature sections (Overvie
 
 ### Requirement: Single root entry point with section state
 
-The app SHALL render all six primary sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) from a single root screen, with exactly one section visible at a time driven by local `activeSection` state — not by URL changes. The root screen SHALL render a top tab rail and a shared content container.
+The app SHALL render all six primary sections (Overview, Todos, Habits, Pomodoro, Workout, Calories) from a single root screen, with exactly one section visible at a time driven by local `activeSection` state — not by URL changes. The root screen SHALL render a section switcher and a shared content container. On narrow viewports the switcher is a floating bottom tab bar; on wide viewports it is a left side rail.
 
 #### Scenario: App boots to the Overview section
 
@@ -17,7 +17,7 @@ The app SHALL render all six primary sections (Overview, Todos, Habits, Pomodoro
 
 #### Scenario: Tapping a tab switches the visible section
 
-- **WHEN** the user taps the "Habits" tab in the top rail
+- **WHEN** the user taps the "Habits" tab in the section switcher
 - **THEN** `activeSection` becomes `habits` and only the Habits section is visible.
 
 ### Requirement: Section switching through NavigationContext

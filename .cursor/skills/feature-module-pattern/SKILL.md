@@ -15,7 +15,7 @@ features/{featureName}/
   {featureName}Screen.tsx     ← React Native screen component
 
 Section render (single-page, no per-feature route):
-  app/index.tsx — add the section to the top tab rail behind `NavigationContext.activeSection`
+  app/index.tsx — add the section to the section switcher behind `NavigationContext.activeSection`
 
 ## Exceptions (current repo)
 - **`features/overview/`** — `OverviewScreen.tsx` only (dashboard section). No `{overview}.data.ts` / `{overview}.domain.ts` in this folder; it composes data from existing modules.
@@ -60,7 +60,7 @@ Each feature may include `types.ts` that re-exports entity types from `@/core/db
 ## Section registration (app/index.tsx) — rules
 - The single-page shell (`app/index.tsx`) renders each feature's Screen behind `NavigationContext.activeSection`
 - No per-feature route files exist; do not recreate `app/(tabs)/{name}.tsx`
-- Register the section in the top tab rail (a plain `Pressable` that calls `setActiveSection`) in `app/index.tsx`
+- Register the section in the section switcher (a plain `Pressable` that calls `setActiveSection`) in `app/index.tsx`
 
 ## Shared UI components (core/ui/)
 - Button: variants = "primary" | "ghost" | "danger"
@@ -113,7 +113,7 @@ overview:
 - [ ] Create {name}.data.ts with CRUD functions (getDatabase, soft delete, enqueue)
 - [ ] Create {name}.domain.ts with pure logic functions
 - [ ] Create {name}Screen.tsx using shared UI components
-- [ ] Register the section in app/index.tsx (add a Pressable to the top tab rail that calls `setActiveSection`)
+- [ ] Register the section in app/index.tsx (add a Pressable to the section switcher that calls `setActiveSection`)
 - [ ] Add TypeScript types to core/db/types.ts
 - [ ] Add migration to core/db/client.ts (version N+1)
 - [ ] Write Vitest tests for all domain functions in tests/
