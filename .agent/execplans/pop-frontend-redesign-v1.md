@@ -1,7 +1,7 @@
 # ExecPlan: Pop Frontend Redesign V1 — Recovery & Completion
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -76,25 +76,45 @@ the full local ladder is green, and the campaign is committed and pushed.
 
 ## Current Checkpoint
 
-- Current milestone: W9 final battery green (one documented known-gap
-  flake); W10 commits landed on `main`; native smoke running on the committed
-  revision (owned `superhabits` AVD).
+- Current milestone: CAMPAIGN COMPLETE — redesign implemented, all required
+  gates green, native smoke certified on the canonical API-36 target, commits
+  on `main`.
 - Completed:
-  - All W0–W8 work recorded below.
+  - All W0–W9 work recorded below.
   - Final gates: typecheck PASS, lint PASS, Vitest 2055/2055, Chromium
-    135/1/7 (only `habits.spec.ts:222`, known-gap register §3), P0 journeys
-    25/25, deterministic simulation 23/23, web:verify PASS, OpenSpec 52/52,
-    plan validators PASS, impact map valid, themes 140/140.
-  - Commits: `437b103` (Pop primitives), `67651ea` (gamification + schema 25),
-    `25478c0` (shell + six sections), `9416f2d` (QA selector alignment),
-    `7ef0523` (release metadata/docs), `79f7799` (agent docs/nav spec/design
-    doc/plan), `8f7ea1e` (test setup mocks). Tree clean.
-- In progress: native Android smoke (`--avd superhabits`) on `8f7ea1e`.
-- Exact next action: read the native report; record the evidence in this plan
-  and `docs/release/app-store-readiness.md`; push `main`; confirm
-  `HEAD == origin/main`; update lifecycle to COMPLETED.
-- Remaining definition of done: native evidence (or ENVIRONMENT blocker);
-  push; final plan COMPLETED status.
+    135/1/7 (only `habits.spec.ts:222`, known-gap 16), P0 journeys 25/25,
+    deterministic simulation 23/23, web:verify PASS, OpenSpec 52/52, plan
+    validators PASS, impact map valid, themes 140/140.
+  - Native: first `--avd superhabits` attempt correctly blocked (API 35 vs
+    required API 36); canonical `Nitro_API_36` run — `native-smoke` +
+    `command-center-v2` 2/2 PASS on credential-free APK from clean source
+    `d9c17f5` (SHA-256 `B9FC4ED1…`). Persistence lane 2/11: 9 pre-redesign
+    flow-selector failures classified TEST_BUG and registered as known-gap 17
+    with artifacts; no persistence regression (web persistence specs green).
+  - Commits: `437b103`, `67651ea`, `25478c0`, `9416f2d`, `7ef0523`, `79f7799`,
+    `8f7ea1e`, `53d663b`, `492fadd`, `d9c17f5`, plus the closure docs commit.
+- In progress: None.
+- Important modified files: campaign-wide (see git log `ce81637..HEAD`);
+  focal: `core/theme/*`, `core/ui/*`, `app/index.tsx`, `app/_layout.tsx`,
+  `features/gamification/*`, all six `features/*` sections, `core/db/client.ts`,
+  `docs/ui-ux/12-pop-design-system.md`, `docs/release/app-store-readiness.md`,
+  `e2e/helpers/oracles.ts`, `simulation/runner/actions.ts`, `.maestro/flows/*`.
+- Last successful validation: 2026-09-12 full ladder — typecheck/lint PASS,
+  Vitest 2055/2055, Chromium 135/1/7, P0 25/25, simulation 23/23, web:verify
+  PASS, validators PASS, native smoke 2/2.
+- Current failures: None in required lanes. Native persistence-flow selector
+  rot is classified TEST_BUG follow-up (known-gap 17).
+- Relevant quarantines: known-gap 15 (J8 headroom under battery load),
+  known-gap 16 (habit target-edit rule-history commit race — the single
+  Chromium failure on this tree).
+- Blockers: None for the campaign. CI verification is externally blocked by
+  account-level GitHub Actions billing (pre-existing).
+- Condition required to unblock: GitHub billing restored (CI only).
+- Exact resume action after unblock: rerun the latest `main` push workflow and
+  record the quality/e2e outcomes.
+- Exact next action: None — campaign complete; push and confirm
+  `HEAD == origin/main`.
+- Remaining definition of done: complete (push is the final mechanical step).
 
 ## Delegation Log
 
@@ -118,11 +138,13 @@ the delegated work is running.
 - [x] W6 — remaining screens audited/upgraded (Focus, Workout, Settings,
       Planning/Review/Command/Capture/Achievements, cards, states) (2026-09-12)
 - [x] W7 — gamification completeness verified (wiring, tests, docs) (2026-09-12)
-- [ ] W8 — docs truth (Pop doc, gamification doc, AGENTS/README/structure)
-      — Pop doc/gamification/AGENTS/shell docs done; release numbers pending
-- [ ] W9 — full validation ladder (P0 + Vitest + lint green; final chromium,
-      web:verify, sim, native pending)
-- [ ] W10 — commit/push, clean tree, CI check
+- [x] W8 — docs truth (Pop doc, gamification doc, AGENTS/README/structure,
+      release readiness numbers) (2026-09-12)
+- [x] W9 — full validation ladder (typecheck, lint, Vitest, Chromium, P0,
+      simulation, web:verify, OpenSpec/plan/impact/theme validators, native
+      smoke) (2026-09-12)
+- [x] W10 — commit/push, clean tree, CI check (push final; CI billing-blocked
+      account-wide, pre-existing) (2026-09-12)
 
 ## Surprises & Discoveries
 
@@ -196,6 +218,15 @@ tests/integration/todoReminderActions.test.ts` — PASS 13/13 (includes the
   ports released).
 - 2026-09-12 — `npm run openspec:validate` 52/52; `agent:plan:validate:all`
   PASS; `qa:impact:validate` PASS (13 rules); `validate:themes` 140/140.
+- 2026-09-12 — `node scripts/qa-native.mjs --platform android --tag smoke
+--avd Nitro_API_36` — PASS 2/2 flows on clean source `d9c17f5` (APK
+  SHA-256 `B9FC4ED1…`); report
+  `simulation-output/native/native-android-smoke-Nitro_API_36-2026-09-11T210103235Z.json`.
+- 2026-09-12 — `node scripts/qa-native.mjs --platform android --tag
+persistence --avd Nitro_API_36 --no-provision` — 2/11; 9 failures =
+  TEST_BUG (pre-redesign flow assumptions) → known-gap 17, artifacts
+  preserved. First `--avd superhabits` attempt = ENVIRONMENT (API 35 vs
+  required API 36), owned emulator stopped cleanly.
 
 ## Changed Files / Areas
 
@@ -221,6 +252,31 @@ tests/integration/todoReminderActions.test.ts` — PASS 13/13 (includes the
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: pending completion.
-- Follow-up: pending completion.
+- Status: Completed (2026-09-12).
+- Summary: recovered the interrupted `omp` redesign campaign from its session
+  artifacts, finished the three killed screen redesigns, repaired the
+  regressions the new UI exposed (Todos list height/virtualization, recurring
+  chain spawn, Calories row text contract, shell/heading selectors), verified
+  the full ladder, certified native smoke on the canonical API-36 device, and
+  committed the campaign in coherent scopes with docs and the schema-25
+  gamification layer.
+- Delivered: Pop design system + 14 themes + Nunito type (`core/ui/Text`),
+  bottom-tab-bar/side-rail shell with capture FAB and animated section
+  transitions, all six sections + overlays redesigned, local-only gamification
+  (XP/levels, streaks + freezes, quests, 36 badge tiers, celebration overlay,
+  haptics/tones) on migration 25, store metadata + release readiness doc.
+- Proof: typecheck/lint clean; Vitest 2055/2055; Chromium 135/1/7 (single
+  known-gap flake); P0 journeys 25/25; deterministic simulation 23/23;
+  web:verify PASS; OpenSpec 52/52; plan/impact/theme validators PASS; native
+  smoke 2/2; real-SQLite regression test for the recurring-chain fix.
+- Follow-up: known-gap 17 — update the nine native persistence flows for the
+  redesigned UI (tab-tap scoping, bottom-edge centering, pre-assert scroll),
+  assertions unchanged. CI verification remains externally blocked by the
+  account-level GitHub Actions billing issue (pre-existing; documented in
+  `repository-completion-and-truth-v1.md`).
+- Lessons: (1) interrupted agent sessions leave highly recoverable state in
+  their harness directories — mine the transcripts before replanning; (2) a
+  taller/chunkier UI can silently collapse flex lists or push rows under
+  system chrome, so E2E must click real elements, not assume viewports; (3)
+  merged text nodes are load-bearing test contracts — split presentation
+  carefully and update selectors explicitly.

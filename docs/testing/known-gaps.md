@@ -266,6 +266,41 @@ e2e/habits.spec.ts -g "target edits keep a prior completed date complete"`) and 
 before touching product code; if it becomes reproducible standalone, treat the
 modal-close-vs-commit ordering in the habit edit save path as a product bug.
 
+### 17. Native persistence flows need a dedicated selector pass after the Pop redesign (TEST_BUG)
+
+**Reason:** on 2026-09-12, `node scripts/qa-native.mjs --platform android --tag
+persistence --avd Nitro_API_36 --no-provision` (source `d9c17f5`, canonical
+credential-free APK `B9FC4ED1…`) ran 11 flows against the redesigned UI:
+`calories-persistence` and `settings-persistence` passed, while 9 flows
+(`habit-*`, `todo-persistence`, `workout-persistence`,
+`workout-gym-v2-persistence`) failed on pre-redesign interaction assumptions,
+not on data persistence (all the corresponding web persistence specs pass in
+the Chromium battery, and the same APK passed `native-smoke` + `command-center-v2`
+2/2):
+
+- The habit add tile sits at the bottom edge of the taller Habits layout;
+  `scrollUntilVisible` stops with it under the emulator's system taskbar, and
+  the tap is delivered to the launcher's home button
+  (`LAUNCHER_TASKBAR_HOME_BUTTON_TAP` in the flow logcat), backgrounding the app.
+- The To-Do tab bars/hero are taller, so the first pending row can render just
+  below the fold; the flow asserts Maestro on-screen visibility without
+  scrolling first.
+- Workout flows still use unscoped `text: 'Workout', index: 0` tab taps; the
+  redesigned shell's bottom tab bar can be preceded in the hierarchy by
+  inactive section content (e.g. the Overview "Workout" chip), so the scope
+  must be the `Section tabs` landmark (proven by the updated `native-smoke` flow).
+
+Artifacts (gitignored): `simulation-output/native/native-android-persistence*
+.json` and `simulation-output/native/debug-android-persistence-*/`.
+Classification: `TEST_BUG` (flow selector/tap rot), not a persistence
+regression; the required native lane for a UI/navigation change (`smoke`) passed.
+
+**Closing path:** update the nine flows on a device session (scope tab taps to
+`Section tabs`, `centerElement: true` on bottom-edge scroll targets, and a
+`scrollUntilVisible` before on-screen visibility asserts), keep every
+persistence assertion unchanged, then re-run `npm run qa:native:targeted` from a
+clean committed source.
+
 ---
 
 ## Related
