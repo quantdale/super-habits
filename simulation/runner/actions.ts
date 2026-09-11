@@ -425,9 +425,12 @@ export async function actionLogCalories(
   await page
     .getByRole('button', { name: 'Save calorie entry', exact: true })
     .click({ force: true });
-  await expect(activeScopedText(page, `${step.food} - ${cal} kcal`)).toBeVisible({
+  await expect(activeScopedText(page, step.food)).toBeVisible({
     timeout: 15_000,
   });
+  // The Pop row renders the food name and its kcal as separate nodes; assert
+  // both so a row is only accepted when the exact entry is on screen.
+  await expect(activeScopedText(page, `${cal} kcal`)).toBeVisible({ timeout: 15_000 });
   return `logCalories food=${JSON.stringify(step.food)} kcal=${cal}`;
 }
 

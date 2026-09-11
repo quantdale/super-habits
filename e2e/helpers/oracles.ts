@@ -9,21 +9,26 @@ import { TAB_LABELS } from './navigation';
 
 const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
   // The redesigned Overview dashboard renders no "Overview" heading and its
-  // hero copy varies (time-of-day greeting); the dashboard-customize toggle
-  // is Overview-only chrome that is always rendered.
-  overview: 'Customize',
+  // hero copy varies (time-of-day greeting), and the customize toggle is an
+  // icon button (aria-label only). "Plan today" is the hero's always-rendered
+  // text on every load state.
+  overview: 'Plan today',
   todos: 'Todos',
   habits: 'Habits',
+  // The redesigned Pomodoro hero keeps the product name as its title.
   pomodoro: 'Pomodoro',
   workout: 'Workout',
-  calories: 'Calories',
+  // The redesigned Calories hero leads with the kcal-remaining number, so the
+  // section's stable identity string is the preserved hero subtitle.
+  calories: 'Switch between manual entry and a diary grouped by meal.',
 };
 
 /** The single-page shell keeps every section mounted; this matches the
  * section container itself rather than nested Views that inherit pointer
- * interaction styles. */
+ * interaction styles. `position: absolute; inset: 0` is emitted as RNW atomic
+ * classes, so the inline-style probe keys on the animated visibility trio. */
 export const ACTIVE_SECTION_SELECTOR =
-  'div[style*="position: absolute"][style*="pointer-events: auto"][style*="z-index: 1"]';
+  'div[style*="pointer-events: auto"][style*="z-index: 1"][style*="opacity: 1"]';
 
 /**
  * Oracles: assertions that go beyond what the UI shows.

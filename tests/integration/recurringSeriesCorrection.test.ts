@@ -50,6 +50,36 @@ describe('recurring series correction (real SQLite)', () => {
     expect(renamed?.title).toBe('Morning stretch');
   });
 
+  it('completing a spawned future instance rolls the chain one day further', async () => {
+    db = await freshDatabase();
+    const todos = await import('@/features/todos/todos.data');
+
+    const id = await todos.addTodo({ title: 'Chain', recurrence: 'daily' });
+    const first = await db.getFirstAsync<{ recurrence_id: string }>(
+      'SELECT recurrence_id FROM todos WHERE id = ?',
+      [id],
+    );
+
+    await todos.toggleTodo({ id } as never);
+    const spawned = await db.getFirstAsync<{ id: string; due_date: string }>(
+      `SELECT id, due_date FROM todos
+       WHERE recurrence_id = ? AND completed = 0 AND deleted_at IS NULL`,
+      [first!.recurrence_id],
+    );
+    expect(spawned).not.toBeNull();
+
+    // Completing the future copy must not be blocked by its own existence: the
+    // series advances to the day-after instance (boundary chain E2E contract).
+    await todos.toggleTodo({ id: spawned!.id } as never);
+    const pending = await db.getAllAsync<{ id: string; due_date: string }>(
+      `SELECT id, due_date FROM todos
+       WHERE recurrence_id = ? AND completed = 0 AND deleted_at IS NULL`,
+      [first!.recurrence_id],
+    );
+    expect(pending).toHaveLength(1);
+    expect(pending[0].due_date > spawned!.due_date).toBe(true);
+  });
+
   it('stopping ends the series forever: no rollover respawn, history stays visible', async () => {
     db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');

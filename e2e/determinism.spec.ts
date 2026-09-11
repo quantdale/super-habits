@@ -43,17 +43,18 @@ test.describe('WM2.3 data-entry determinism', () => {
       // closed — either way the second write must not happen.
     });
 
-    await expect(page.getByText('Guarded oats - 235 kcal', { exact: true })).toBeVisible({
+    await expect(page.getByText('Guarded oats', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText('Today: 235 kcal')).toBeVisible({ timeout: 15_000 });
 
-    // Exactly one row: the full row label (name + kcal) appears exactly once
-    // in the Form view's daily log; a duplicate entry would render a second
-    // "Guarded oats - 235 kcal" row and "Today: 470 kcal".
-    await expect(page.getByText('Guarded oats - 235 kcal', { exact: true })).toHaveCount(1, {
+    // Exactly one row: the food name and its kcal appear exactly once in the
+    // Form view's daily log; a duplicate entry would render a second
+    // "Guarded oats" row and "Today: 470 kcal".
+    await expect(page.getByText('Guarded oats', { exact: true })).toHaveCount(1, {
       timeout: 15_000,
     });
+    await expect(page.getByText('235 kcal', { exact: true })).toHaveCount(1, { timeout: 15_000 });
     await expect(page.getByText('Today: 470 kcal')).toHaveCount(0);
   });
 

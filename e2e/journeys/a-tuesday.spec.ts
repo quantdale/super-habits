@@ -259,7 +259,8 @@ defineJourney({
         // The handler commits the ledger and saved-meal index before refreshing
         // the mounted screen. Wait for that visible commit before entering the
         // separate SQLite harness for the row-level assertions below.
-        await expect(page.getByText('Scrambled eggs 🍳 - 124 kcal', { exact: true })).toBeVisible();
+        await expect(page.getByText('Scrambled eggs 🍳', { exact: true }).first()).toBeVisible();
+        await expect(page.locator('body')).toContainText('124 kcal');
 
         const today = await todayKey(page);
         // Row-level: exactly one breakfast entry with the computed kcal.
@@ -288,7 +289,8 @@ defineJourney({
         // Immediate UI: the entry appears in "Logged today" and the daily total.
         await returnToApp(page);
         await switchTab(page, 'calories');
-        await expect(page.getByText('Scrambled eggs 🍳 - 124 kcal', { exact: true })).toBeVisible();
+        await expect(page.getByText('Scrambled eggs 🍳', { exact: true }).first()).toBeVisible();
+        await expect(page.locator('body')).toContainText('124 kcal');
         await expect(page.getByText('Today: 724 kcal', { exact: true })).toBeVisible();
 
         // Second surface: Overview daily total = seeded + 124 logged. The
