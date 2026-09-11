@@ -67,6 +67,7 @@
     "postinstall": "patch-package && simple-git-hooks"
   },
   "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.6.0",
@@ -75,11 +76,14 @@
     "@supabase/supabase-js": "^2.101.1",
     "date-fns": "^4.1.0",
     "expo": "~55.0.28",
+    "expo-asset": "~55.0.20",
+    "expo-audio": "~55.0.18",
     "expo-constants": "~55.0.17",
     "expo-crypto": "^55.0.16",
     "expo-document-picker": "~55.0.15",
     "expo-file-system": "~55.0.24",
     "expo-font": "~55.0.8",
+    "expo-haptics": "~55.0.18",
     "expo-keep-awake": "~55.0.8",
     "expo-linear-gradient": "~55.0.16",
     "expo-linking": "~55.0.16",

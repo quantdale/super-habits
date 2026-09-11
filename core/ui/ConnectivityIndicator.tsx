@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 import { useAppTheme } from '@/core/providers/themeContext';
 

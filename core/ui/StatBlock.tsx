@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { Card } from '@/core/ui/Card';
-import { useAppTheme } from '@/core/providers/themeContext';
+import { Text } from '@/core/ui/Text';
+import { radius, spacing } from '@/core/theme/designTokens';
 
 type StatBlockProps = {
   accentColor: string;
@@ -13,6 +14,10 @@ type StatBlockProps = {
   align?: 'center' | 'start';
 };
 
+/**
+ * Compact metric tile: a big colored number over a small caps label. Pop keeps
+ * the number loud and the label quiet so a row of tiles scans instantly.
+ */
 export function StatBlock({
   accentColor,
   icon,
@@ -22,28 +27,50 @@ export function StatBlock({
   className,
   align = 'center',
 }: StatBlockProps) {
-  const { tokens } = useAppTheme();
-  const alignClassName = align === 'start' ? 'items-start text-left' : 'items-center text-center';
-
   return (
     <Card
       variant="stat"
       accentColor={accentColor}
+      flat
       className={['mb-0', className].filter(Boolean).join(' ')}
     >
-      <View className={[alignClassName, 'py-1'].join(' ')}>
-        {icon ? <View className="mb-0.5">{icon}</View> : null}
-        <Text className="text-xl font-bold tabular-nums" style={{ color: accentColor }}>
+      <View
+        style={{
+          alignItems: align === 'start' ? 'flex-start' : 'center',
+          gap: spacing.xs,
+          paddingVertical: spacing.xs,
+        }}
+      >
+        {icon ? (
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: radius.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: `${accentColor}1F`,
+            }}
+          >
+            {icon}
+          </View>
+        ) : null}
+        <Text variant="titleLg" style={{ color: accentColor, fontSize: 26 }}>
           {value}
         </Text>
         <Text
-          className="mt-0.5 text-xs uppercase tracking-[0.6px]"
-          style={{ color: tokens.textMuted }}
+          variant="label"
+          tone="muted"
+          style={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11 }}
         >
           {label}
         </Text>
         {detail ? (
-          <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+          <Text
+            variant="caption"
+            tone="muted"
+            style={{ textAlign: align === 'start' ? 'left' : 'center' }}
+          >
             {detail}
           </Text>
         ) : null}

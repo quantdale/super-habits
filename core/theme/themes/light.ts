@@ -1,25 +1,31 @@
 import { createTheme } from '@/core/theme/createTheme';
 
-/** The app's existing default. Migrated verbatim + new interaction roles. */
+/**
+ * Pop Light — the default. A soft lavender canvas, crisp white cards, and a
+ * vivid violet brand. Chosen so the app reads as a friendly consumer product
+ * rather than a grey productivity tool.
+ */
 export const light = createTheme({
   id: 'light',
   name: 'Light',
   appearance: 'light',
-  description: 'The airy lavender-white workspace. General use, default.',
-  primary: '#7C3AED',
-  secondary: '#ede9fe',
-  accent: '#6D28D9',
-  button: '#7C3AED',
-  buttonText: '#ffffff',
-  buttonHover: '#6D28D9',
-  buttonActive: '#5B21B6',
-  background: '#f8f7ff',
-  surface: '#ffffff',
-  surfaceElevated: '#f8f7ff',
-  border: '#e2e8f0',
-  tabRail: '#eeecf8',
-  tabRailBorder: '#d4d0ee',
-  text: '#0f172a',
-  // Nudged from #64748b (4.47:1, an AA miss on surfaceElevated) to #5d6c83 (5.01:1).
-  textMuted: '#5d6c83',
+  description: 'Lavender canvas, white cards, vivid violet brand. Default.',
+  primary: '#6C4CF5',
+  secondary: '#EDE7FF',
+  accent: '#C026D3',
+  button: '#6C4CF5',
+  buttonText: '#FFFFFF',
+  buttonHover: '#5B3AE0',
+  buttonActive: '#4A2BC4',
+  background: '#F5F3FF',
+  surface: '#FFFFFF',
+  surfaceElevated: '#FBFAFF',
+  border: '#E7E3F7',
+  tabRail: '#FFFFFF',
+  tabRailBorder: '#ECE8F8',
+  text: '#16123A',
+  textMuted: '#655F8A',
+  iconMuted: '#8C86B0',
+  overlayScrim: 'rgba(20, 14, 60, 0.45)',
+  shadowColor: '#2A1E6B',
 });

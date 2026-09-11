@@ -54,6 +54,25 @@ export const SECTION_TEXT_COLORS = {
 export type SectionAccent = { fill: string; text: string; tint: string };
 
 /**
+ * Reward-layer accents (gamification). These are semantic, not section
+ * identities: XP/level, streak, badges, and streak-freeze each keep one color
+ * everywhere — dashboard card, achievements screen, and celebration overlay —
+ * so a reward reads the same wherever it appears.
+ */
+export const REWARD_COLORS = {
+  /** XP, levels, and quest progress. */
+  accent: '#6366F1',
+  streak: '#F97316',
+  badge: '#F59E0B',
+  /** A freeze-protected day, matching the "saved" state in the week strip. */
+  frozen: '#38BDF8',
+  /** Complete-day celebration, aligned with the Habits section green. */
+  day: '#10B981',
+  /** Quest completion. */
+  quest: '#8B5CF6',
+} as const;
+
+/**
  * Section identity colors are theme-invariant by default (a Todos card is
  * blue in every theme) — but `text`/`tint` must adapt to appearance: the
  * light-mode 700-level text and *-50 pastel tints go muddy or illegible on

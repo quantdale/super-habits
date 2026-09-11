@@ -1,9 +1,17 @@
 /**
- * Non-color design tokens ("Warm Momentum" design DNA — docs/ui-ux/02-design-dna.md).
+ * Non-color design tokens for the "Pop" design language.
  *
- * These values are theme-independent: they describe geometry, rhythm, and
- * hierarchy, not appearance. Color semantics stay in `ThemeTokens`; features
- * should ask for `spacing.lg`, not `16`, and `radius.lg`, not `16`.
+ * Theme-independent by definition: geometry, rhythm, type scale, and motion
+ * envelopes. Color semantics live in `ThemeTokens`; features ask for
+ * `spacing.lg` or `typography.titleLg`, never for raw numbers.
+ *
+ * Pop's rules of thumb:
+ * - big radii (nothing below 10, cards at 24–32) so every surface reads soft;
+ * - one type family (Nunito) mapped per role, with weight carried by the
+ *   family itself rather than `fontWeight` (RN does not reliably synthesise
+ *   weight for a custom family);
+ * - chunky touch targets (56pt buttons) and generous page gutters, because the
+ *   layout should feel like a native app, not a dense dashboard.
  */
 
 /** 4-point base grid spacing scale. */
@@ -26,46 +34,63 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
-/** Corner-radius roles. Equivalent components always share radius. */
+/** Corner-radius roles. Pop keeps every surface generously rounded. */
 export const radius = {
-  /** Compact inputs / small tags. */
-  sm: 8,
-  /** List rows / controls. */
-  md: 12,
-  /** Default cards / buttons. */
-  lg: 16,
-  /** Hero panels / sheets. */
-  xl: 24,
+  /** Chips, small tags, inline pills. */
+  xs: 10,
+  /** Inputs and compact controls. */
+  sm: 14,
+  /** List rows and standard controls. */
+  md: 20,
+  /** Default cards and buttons. */
+  lg: 26,
+  /** Hero panels, sheets, celebration surfaces. */
+  xl: 34,
   /** Pills, avatars, circular status. */
   full: 9999,
 } as const;
 
-/**
- * Semantic typography roles. Sizes/weights are nominal baselines; RN font
- * scaling still applies. Use weight and size before color for hierarchy.
- */
-export const typography = {
-  /** Rare hero values / celebratory moments. */
-  display: { fontSize: 32, fontWeight: '700' as const },
-  /** Primary screen title. */
-  titleLg: { fontSize: 24, fontWeight: '700' as const },
-  /** Card/section title. */
-  titleMd: { fontSize: 20, fontWeight: '700' as const },
-  /** Primary reading/body. */
-  bodyLg: { fontSize: 16, fontWeight: '400' as const },
-  /** Normal rows and descriptions. */
-  bodyMd: { fontSize: 14, fontWeight: '400' as const },
-  /** Controls, chips, metadata labels. */
-  label: { fontSize: 13, fontWeight: '600' as const },
-  /** Secondary metadata. */
-  caption: { fontSize: 12, fontWeight: '500' as const },
-  /** Key number/value. */
-  metric: { fontSize: 28, fontWeight: '700' as const },
+/** Weight-specific families: RN needs the weight baked into the family name. */
+export const fonts = {
+  regular: 'Nunito_400Regular',
+  medium: 'Nunito_600SemiBold',
+  semibold: 'Nunito_700Bold',
+  bold: 'Nunito_800ExtraBold',
+  black: 'Nunito_900Black',
 } as const;
 
+export type FontFamilyRole = keyof typeof fonts;
+
 /**
- * Elevation levels. Prefer borders for level-1 surfaces; reserve stronger
- * shadow for floating elements. Dark mode relies more on tonal separation.
+ * Semantic typography roles. `fontWeight` is retained for call sites that read
+ * it directly, but rendering is driven by `fontFamily`.
+ */
+export const typography = {
+  /** Screen hero values and celebratory numbers. */
+  display: { fontSize: 38, fontFamily: fonts.black, fontWeight: '900', letterSpacing: -0.8 },
+  /** Section hero title. */
+  titleXl: { fontSize: 30, fontFamily: fonts.black, fontWeight: '900', letterSpacing: -0.5 },
+  /** Screen title. */
+  titleLg: { fontSize: 25, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.3 },
+  /** Card / sheet title. */
+  titleMd: { fontSize: 20, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.2 },
+  /** Primary reading text. */
+  bodyLg: { fontSize: 16, fontFamily: fonts.medium, fontWeight: '600' },
+  /** Standard rows and descriptions. */
+  bodyMd: { fontSize: 15, fontFamily: fonts.medium, fontWeight: '600' },
+  /** Controls, chips, metadata labels. */
+  label: { fontSize: 13, fontFamily: fonts.bold, fontWeight: '700', letterSpacing: 0.2 },
+  /** Secondary metadata. */
+  caption: { fontSize: 12, fontFamily: fonts.semibold, fontWeight: '700' },
+  /** Key number/value. */
+  metric: { fontSize: 34, fontFamily: fonts.black, fontWeight: '900', letterSpacing: -0.5 },
+} as const;
+
+export type TypographyRole = keyof typeof typography;
+
+/**
+ * Elevation levels. Pop uses *colored* shadows: components pass the surface's
+ * own accent as `shadowColor`, so a card floats in its own hue instead of grey.
  */
 export const elevation = {
   /** Page background. */
@@ -79,30 +104,43 @@ export const elevation = {
   /** Ordinary card/row surface. */
   level1: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   /** Floating action, sticky control, popover, active timer. */
   level2: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
+    elevation: 5,
   },
   /** Modal/sheet/dialog. */
   level3: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.18,
+    shadowRadius: 36,
+    elevation: 9,
   },
 } as const;
 
-/** Component sizing roles. Frequent mobile targets stay ≥ 44 logical points. */
+/**
+ * Press/transition springs in the `Animated.spring` shape (speed/bounciness),
+ * so screens can share the same physical feel without re-deriving constants.
+ */
+export const springs = {
+  /** Button and card press-in. */
+  press: { speed: 40, bounciness: 6 },
+  /** Check-off pop / value change. */
+  pop: { speed: 26, bounciness: 12 },
+  /** Sheet and card entrance. */
+  enter: { speed: 18, bounciness: 8 },
+} as const;
+
+/** Component sizing roles. Frequent mobile targets stay ≥ 48 logical points. */
 export const size = {
   /** Inline metadata icons. */
   iconXs: 16,
@@ -114,19 +152,25 @@ export const size = {
   iconLg: 28,
   iconXl: 32,
   /** Minimum frequent touch target (WCAG/HIG guidance). */
-  touchTargetMin: 44,
+  touchTargetMin: 48,
   /** Standard button height. */
-  buttonHeight: 48,
+  buttonHeight: 56,
+  /** Bottom tab bar content height (excluding safe area). */
+  tabBarHeight: 66,
+  /** Floating action button diameter. */
+  fab: 60,
 } as const;
 
 /** Layout/content-width roles. */
 export const layout = {
   /** Phone horizontal page padding. */
-  pagePadding: 16,
+  pagePadding: 20,
   /** Max reading/content width on tablet/desktop before centering. */
-  contentMaxWidth: 720,
+  contentMaxWidth: 760,
   /** Max width for centered modal-style content. */
-  modalMaxWidth: 448,
+  modalMaxWidth: 460,
+  /** Width at which the shell switches from bottom tabs to a side rail. */
+  railBreakpoint: 900,
 } as const;
 
 /** Shared opacity states. */

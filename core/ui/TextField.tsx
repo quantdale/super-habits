@@ -1,4 +1,5 @@
-import { Platform, Text, TextInput, View } from 'react-native';
+import { Text } from '@/core/ui/Text';
+import { Platform, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { resolveTextFieldA11y } from '@/core/ui/textFieldA11y';
 

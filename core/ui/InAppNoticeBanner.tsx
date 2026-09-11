@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppNavigation } from '@/core/providers/navigationContext';
-import { Pressable, SafeAreaView, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, View } from 'react-native';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 

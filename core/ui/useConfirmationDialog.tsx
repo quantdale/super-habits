@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Platform, Text, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from './Button';
 import { Modal } from './Modal';

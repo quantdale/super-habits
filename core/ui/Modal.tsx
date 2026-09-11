@@ -1,18 +1,20 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
+  Animated,
   Modal as RNModal,
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  useWindowDimensions,
+  StyleSheet,
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { Text } from '@/core/ui/Text';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
-import { spacing, radius, layout } from '@/core/theme/designTokens';
+import { elevation, layers, layout, radius, size, spacing } from '@/core/theme/designTokens';
+import { useReducedMotion } from '@/core/theme/motion';
 
 export type ModalLayout = 'dialog' | 'drawer' | 'bottom-sheet';
 
@@ -32,8 +34,19 @@ export type ModalProps = {
 // navigation-bar inset. Keep scrollable dialog actions above that bar when
 // the reported inset is zero.
 const ANDROID_MODAL_NAVIGATION_FALLBACK = 64;
-const MODAL_FOOTER_HEIGHT_RESERVE = 80;
+const MODAL_FOOTER_HEIGHT_RESERVE = 88;
 
+/**
+ * Pop overlay surface.
+ *
+ * The shell is a full-screen scrim plus a rounded panel that springs into
+ * place: `bottom-sheet` rises from the bottom edge with a grab handle,
+ * `drawer` slides in from the right on wide screens and behaves like a large
+ * sheet on phones, `dialog` is the centered card.
+ *
+ * The close affordance is always the same circular button so muscle memory
+ * holds across every overlay in the app.
+ */
 export function Modal({
   visible,
   onClose,
@@ -44,166 +57,212 @@ export function Modal({
   footer,
 }: ModalProps) {
   const { tokens } = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const closeFocusRing = useKeyboardFocusRing(tokens.accent);
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const { bottom: safeAreaBottom } = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+  const [progress] = useState(() => new Animated.Value(0));
+
   const isDrawer = modalLayout === 'drawer';
   const isBottomSheet = modalLayout === 'bottom-sheet';
   const modalBottomInset =
     Platform.OS === 'android'
-      ? Math.max(safeAreaBottom, ANDROID_MODAL_NAVIGATION_FALLBACK)
-      : safeAreaBottom;
-  const modalMaxHeight = isBottomSheet
-    ? Math.max(0, windowHeight * 0.92 - modalBottomInset)
-    : Math.max(0, windowHeight - 32 - modalBottomInset);
-  const scrollBottomPadding =
-    Platform.OS === 'android' ? modalBottomInset + 24 : safeAreaBottom + (isBottomSheet ? 24 : 0);
-  const scrollMaxHeight = Math.max(
-    0,
-    Math.min(
-      (modalLayout === 'dialog' ? windowHeight * 0.88 : windowHeight * 0.92) -
-        (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0),
-      modalMaxHeight - 88,
-    ),
-  );
+      ? Math.max(insets.bottom, ANDROID_MODAL_NAVIGATION_FALLBACK)
+      : insets.bottom;
+  const scrollBottomPadding = Platform.OS === 'android' ? 32 : insets.bottom + 24;
 
-  const overlayStyle = isDrawer
-    ? {
-        alignItems: 'flex-end' as const,
-        justifyContent: 'flex-start' as const,
-        paddingTop: spacing.lg,
-        paddingRight: spacing.lg,
-        paddingBottom: spacing.lg + modalBottomInset,
-        paddingLeft: spacing.lg,
-      }
-    : isBottomSheet
-      ? {
-          alignItems: 'stretch' as const,
-          justifyContent: 'flex-end' as const,
-          paddingTop: 0,
-          paddingRight: 0,
-          paddingBottom: modalBottomInset,
-          paddingLeft: 0,
-        }
-      : {
-          alignItems: 'center' as const,
-          justifyContent: 'center' as const,
-          paddingTop: spacing.lg,
-          paddingRight: spacing.lg,
-          paddingBottom: spacing.lg + modalBottomInset,
-          paddingLeft: spacing.lg,
-        };
+  useEffect(() => {
+    if (!visible) {
+      progress.setValue(0);
+      return;
+    }
+    if (reducedMotion) {
+      progress.setValue(1);
+      return;
+    }
+    const animation = Animated.spring(progress, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 16,
+      bounciness: 6,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reducedMotion, visible]);
 
-  const shellStyle = isDrawer
-    ? { width: Math.min(windowWidth - spacing.xxl * 2, 520) }
-    : isBottomSheet
-      ? { width: '100%' as const, maxWidth: layout.contentMaxWidth, alignSelf: 'center' as const }
-      : { width: '100%' as const, maxWidth: 448 };
+  const slideOffset = isBottomSheet ? 64 : isDrawer ? 48 : 24;
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [slideOffset, 0],
+  });
+  const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [slideOffset, 0] });
+  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
 
-  const surfaceStyle = {
-    width: '100%' as const,
-    overflow: 'hidden' as const,
-    backgroundColor: tokens.surface,
-    borderColor: tokens.border,
-    borderWidth: 1,
-    shadowColor: tokens.shadowColor,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 4,
-    borderTopLeftRadius: isBottomSheet ? radius.xl : radius.lg,
-    borderTopRightRadius: isBottomSheet ? radius.xl : radius.lg,
-    borderBottomLeftRadius: isBottomSheet ? 0 : radius.lg,
-    borderBottomRightRadius: isBottomSheet ? 0 : radius.lg,
-    maxHeight: modalMaxHeight,
-  };
+  const sheetRadius = { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl };
 
-  const bodyContainerStyle = isBottomSheet
-    ? {
-        maxHeight: Math.max(
-          0,
-          windowHeight * 0.82 - (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0) - modalBottomInset,
-        ),
-      }
-    : undefined;
   return (
-    <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View
-        className="flex-1"
-        accessibilityViewIsModal={visible}
-        accessibilityElementsHidden={!visible}
-        importantForAccessibility={visible ? 'yes' : 'no-hide-descendants'}
-        pointerEvents={visible ? 'auto' : 'none'}
-        style={{ backgroundColor: tokens.overlayScrim, ...overlayStyle }}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss dialog"
-          className="absolute inset-0"
-          onPress={onClose}
-        />
-        {/* Keep the sheet shell non-clickable so descendant ScrollViews can claim
-            vertical gestures on native. The backdrop is a sibling, so it still
-            owns outside taps without requiring an event-stopping Pressable here. */}
-        <View style={shellStyle}>
-          <View style={surfaceStyle}>
+    <RNModal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <View style={styles.root} accessibilityViewIsModal>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: tokens.overlayScrim, opacity: progress },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            onPress={onClose}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.positioner,
+            isBottomSheet
+              ? { justifyContent: 'flex-end' }
+              : isDrawer
+                ? {
+                    justifyContent: 'flex-end',
+                    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+                  }
+                : { justifyContent: 'center', alignItems: 'center' },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.panel,
+              {
+                backgroundColor: tokens.surface,
+                borderColor: tokens.border,
+                paddingBottom: isBottomSheet ? Math.max(modalBottomInset, spacing.lg) : 0,
+                maxHeight: isBottomSheet ? '92%' : '86%',
+                ...(isBottomSheet ? sheetRadius : null),
+                ...elevation.level3,
+                shadowColor: tokens.shadowColor,
+                opacity: progress,
+                transform: isBottomSheet
+                  ? [{ translateY }]
+                  : isDrawer
+                    ? [{ translateX }]
+                    : [{ scale }],
+              },
+            ]}
+          >
+            {isBottomSheet ? (
+              <View style={{ alignItems: 'center', paddingTop: spacing.sm }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 5,
+                    borderRadius: radius.full,
+                    backgroundColor: tokens.borderStrong,
+                  }}
+                />
+              </View>
+            ) : null}
+
             <View
-              className={`flex-row items-center px-5 pb-4 pt-5 ${title ? 'justify-between' : 'justify-end'}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingHorizontal: spacing.xl,
+                paddingTop: isBottomSheet ? spacing.md : spacing.xl,
+                paddingBottom: spacing.md,
+              }}
             >
-              {title ? (
-                <Text className="flex-1 pr-2 text-xl font-bold" style={{ color: tokens.text }}>
-                  {title}
-                </Text>
-              ) : null}
+              <View style={{ minWidth: 0, flex: 1 }}>
+                {title ? (
+                  <Text variant="titleMd" numberOfLines={2}>
+                    {title}
+                  </Text>
+                ) : null}
+              </View>
               <Pressable
-                onPress={onClose}
                 accessibilityRole="button"
                 accessibilityLabel="Close"
-                hitSlop={4}
                 onFocus={closeFocusRing.onFocus}
                 onBlur={closeFocusRing.onBlur}
-                className="h-11 w-11 items-center justify-center rounded-full"
+                onPress={onClose}
                 style={[
-                  { backgroundColor: tokens.surfaceElevated },
-                  // Visible keyboard-focus indication on web (Design DNA §15).
+                  {
+                    width: size.touchTargetMin,
+                    height: size.touchTargetMin,
+                    borderRadius: radius.full,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: tokens.surfaceSunken,
+                  },
                   closeFocusRing.focusRingStyle,
                 ]}
               >
-                <MaterialIcons name="close" size={24} color={tokens.iconMuted} />
+                <MaterialIcons name="close" size={22} color={tokens.text} />
               </Pressable>
             </View>
+
             {scroll ? (
               <ScrollView
+                style={{ flexGrow: 0 }}
+                contentContainerStyle={{
+                  paddingHorizontal: spacing.xl,
+                  paddingBottom: (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0) + scrollBottomPadding,
+                }}
                 keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator
-                style={bodyContainerStyle ?? { maxHeight: scrollMaxHeight }}
-                contentContainerStyle={[
-                  isDrawer ? { flexGrow: 1 } : null,
-                  scrollBottomPadding > 0 ? { paddingBottom: scrollBottomPadding } : null,
-                ]}
+                keyboardDismissMode="on-drag"
+                nestedScrollEnabled
               >
-                <View className="px-5 pb-5">{children}</View>
+                {children}
               </ScrollView>
             ) : (
-              <View className="px-5 pb-5" style={bodyContainerStyle}>
+              <View
+                style={{
+                  flexShrink: 1,
+                  paddingHorizontal: spacing.xl,
+                  paddingBottom: scrollBottomPadding,
+                }}
+              >
                 {children}
               </View>
             )}
+
             {footer ? (
               <View
-                className="border-t px-5 pt-3"
                 style={{
-                  borderTopColor: tokens.border,
+                  paddingHorizontal: spacing.xl,
+                  paddingTop: spacing.md,
+                  paddingBottom: Math.max(modalBottomInset, spacing.lg),
                   borderTopWidth: 1,
-                  paddingBottom: Math.max(16, safeAreaBottom + 16),
+                  borderTopColor: tokens.border,
+                  backgroundColor: tokens.surface,
                 }}
               >
                 {footer}
               </View>
             ) : null}
-          </View>
+          </Animated.View>
         </View>
       </View>
     </RNModal>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  positioner: {
+    flex: 1,
+  },
+  panel: {
+    width: '100%',
+    maxWidth: layout.modalMaxWidth + 60,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    overflow: 'hidden',
+    zIndex: layers.modal,
+  },
+});

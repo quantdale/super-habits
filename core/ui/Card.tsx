@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { Text, View } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { spacing } from '@/core/theme/designTokens';
+import { elevation, radius, spacing } from '@/core/theme/designTokens';
 
 export type CardVariant = 'standard' | 'header' | 'stat';
 
 type CardProps = {
   children: ReactNode;
+  /** Tints the surface and its shadow with this hue — the Pop card identity. */
   accentColor?: string;
   className?: string;
   variant?: CardVariant;
@@ -17,23 +18,29 @@ type CardProps = {
   headerRight?: ReactNode;
   /** Merged onto the outer card `View` (border/elevation applied first). */
   style?: StyleProp<ViewStyle>;
-  /** Standard variant only: replaces default inner `p-4` when set (e.g. `p-0`). */
+  /** Standard variant only: replaces default inner padding when set (e.g. `p-0`). */
   innerClassName?: string;
+  /** Uses the flat tinted treatment with no shadow (list rows, dense groups). */
+  flat?: boolean;
 };
 
-const PAD = 'p-4';
-
-function withAlpha(color: string, opacity: number) {
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-    return color;
-  }
-
+/** Adds an alpha channel to a hex color; non-hex values pass through. */
+function withAlpha(color: string, opacity: number): string {
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return color;
   const red = Number.parseInt(color.slice(1, 3), 16);
   const green = Number.parseInt(color.slice(3, 5), 16);
   const blue = Number.parseInt(color.slice(5, 7), 16);
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+/**
+ * The Pop surface: generously rounded, softly colored, and floating in its own
+ * hue. An `accentColor` tints both the fill and the shadow, so a Habits card
+ * reads green and a Focus card reads violet at a glance.
+ *
+ * `header` keeps a saturated accent band above the body for cards that need a
+ * title strip; `stat` is the compact numeric tile.
+ */
 export function Card({
   children,
   accentColor,
@@ -44,185 +51,85 @@ export function Card({
   headerRight,
   style,
   innerClassName,
+  flat = false,
 }: CardProps) {
   const { tokens } = useAppTheme();
   const extra = className?.trim() ?? '';
   const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
   const marginClass = hasConsumerVerticalMargin ? '' : 'mb-4';
-  const accentTint = accentColor ? withAlpha(accentColor, 0.08) : undefined;
-  const accentHeaderTint = accentColor ? withAlpha(accentColor, 0.06) : tokens.surfaceElevated;
 
-  const rootBase = [
-    'relative',
-    'overflow-hidden',
-    'rounded-2xl',
-    marginClass,
-    'shadow-sm',
-    'shadow-black/5',
-    extra,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const tint = accentColor ? withAlpha(accentColor, 0.1) : tokens.surface;
+  const outline = accentColor ? withAlpha(accentColor, 0.28) : tokens.border;
+  const shadow = accentColor ?? tokens.glow;
 
   const rootStyle: StyleProp<ViewStyle> = [
-    {
-      elevation: 1,
-      backgroundColor: tokens.surface,
-      borderColor: tokens.border,
-      borderWidth: 1,
-      shadowColor: tokens.shadowColor,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.05,
-      shadowRadius: 14,
-    },
+    { borderRadius: radius.lg, borderWidth: 1.5, borderColor: outline, backgroundColor: tint },
+    flat
+      ? null
+      : {
+          ...elevation.level1,
+          shadowColor: shadow,
+          shadowOpacity: 0.16,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 },
+        },
     style,
   ];
 
+  const rootClass = ['overflow-hidden', marginClass, extra].filter(Boolean).join(' ');
+
   if (variant === 'header') {
+    const bandColor = accentColor ?? tokens.primary;
     return (
-      <View className={rootBase} style={rootStyle}>
-        {accentColor ? (
-          <>
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 4,
-                backgroundColor: accentColor,
-              }}
-            />
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 4,
-                left: 0,
-                right: 0,
-                height: 72,
-                backgroundColor: accentTint,
-              }}
-            />
-          </>
-        ) : null}
+      <View className={rootClass} style={rootStyle}>
         <View
-          className={`flex-row items-start justify-between gap-3 px-4 pb-3 pt-5`}
-          style={{ backgroundColor: accentHeaderTint }}
+          style={{
+            backgroundColor: bandColor,
+            paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.lg,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: spacing.md,
+          }}
         >
-          <View className="min-w-0 flex-1 pr-2">
-            <Text
-              className="text-base font-semibold"
-              style={{ color: tokens.text }}
-              numberOfLines={2}
-            >
-              {headerTitle ?? ''}
-            </Text>
+          <View className="min-w-0 flex-1">
+            {headerTitle ? (
+              <Text variant="titleMd" style={{ color: tokens.onSolid }} numberOfLines={1}>
+                {headerTitle}
+              </Text>
+            ) : null}
             {headerSubtitle ? (
               <Text
-                className="mt-0.5 text-sm"
-                style={{ color: tokens.textMuted }}
+                variant="caption"
+                style={{ color: withAlpha(tokens.onSolid, 0.82), marginTop: 2 }}
                 numberOfLines={2}
               >
                 {headerSubtitle}
               </Text>
             ) : null}
           </View>
-          {headerRight != null ? (
-            <View
-              className="shrink-0 self-start rounded-full px-3 py-2"
-              style={{
-                backgroundColor: accentColor ?? tokens.surface,
-                borderColor: accentColor ? withAlpha(accentColor, 0.22) : tokens.border,
-                borderWidth: accentColor ? 0 : 1,
-              }}
-            >
-              <View className="flex-row items-center justify-center">{headerRight}</View>
-            </View>
-          ) : null}
+          {headerRight ? <View className="shrink-0">{headerRight}</View> : null}
         </View>
-        <View className="px-4 pb-4 pt-2" style={{ backgroundColor: tokens.surface }}>
-          {children}
-        </View>
+        <View className={innerClassName ?? 'p-4'}>{children}</View>
       </View>
     );
   }
 
   if (variant === 'stat') {
     return (
-      <View className={rootBase} style={rootStyle}>
-        {accentColor ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 4,
-              backgroundColor: accentColor,
-            }}
-          />
-        ) : null}
-        <View className="relative">
-          {accentColor ? (
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '56%',
-                backgroundColor: accentTint,
-              }}
-            />
-          ) : null}
-          <View
-            className={`relative ${PAD} items-center justify-center bg-transparent`}
-            style={{ zIndex: 1 }}
-          >
-            {children}
-          </View>
-        </View>
+      <View
+        className={['items-center', rootClass].filter(Boolean).join(' ')}
+        style={[rootStyle, { paddingVertical: spacing.lg, paddingHorizontal: spacing.md }]}
+      >
+        {children}
       </View>
     );
   }
 
-  const bodyClass = innerClassName !== undefined ? innerClassName : PAD;
-
   return (
-    <View className={rootBase} style={rootStyle}>
-      {accentColor ? (
-        <>
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 4,
-              backgroundColor: accentColor,
-            }}
-          />
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 4,
-              left: 0,
-              right: 0,
-              height: 64,
-              backgroundColor: accentTint,
-            }}
-          />
-        </>
-      ) : null}
-      <View className={bodyClass} style={{ padding: spacing.lg }}>
-        {children}
-      </View>
+    <View className={rootClass} style={rootStyle}>
+      <View className={innerClassName ?? 'p-[18px]'}>{children}</View>
     </View>
   );
 }

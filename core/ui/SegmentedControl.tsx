@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useReducedMotion } from '@/core/theme/motion';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
-import { size } from '@/core/theme/designTokens';
+import { radius, size, spacing } from '@/core/theme/designTokens';
 import { nextSegmentValue } from '@/core/ui/segmentedControl.model';
 
 type SegmentOption<T extends string> = {
@@ -23,17 +25,14 @@ type SegmentedControlProps<T extends string> = {
 };
 
 /**
- * Shared segmented control for switching between 2–N mutually exclusive
- * modes/views (exactly-one selection). Distinguishable from filter chips
- * (`PillChip`, zero/one/many), status badges (informational), and action
- * chips (trigger): this primitive only ever represents a single-select
- * view/mode switch.
+ * Pop segmented control: a sunken tray with a solid pill that *slides* between
+ * options, so switching modes reads as physical motion rather than a repaint.
  *
- * Accessibility contract:
+ * Accessibility contract (unchanged from the previous implementation):
  * - group announces its `accessibilityLabel` (role `tablist`);
  * - each option is a `tab` with `accessibilityState.selected`;
- * - on web, Left/Right arrows move selection while focus is inside the
- *   group, and the focused option keeps a visible focus ring (2px outline).
+ * - on web, Left/Right arrows move selection while focus is inside the group,
+ *   and the focused option keeps a visible focus ring.
  */
 export function SegmentedControl<T extends string>({
   options,
@@ -43,15 +42,37 @@ export function SegmentedControl<T extends string>({
   accessibilityLabel,
 }: SegmentedControlProps<T>) {
   const { tokens } = useAppTheme();
-  const resolvedAccent = accentColor ?? tokens.accent;
+  const reducedMotion = useReducedMotion();
+  const resolvedAccent = accentColor ?? tokens.primary;
   const ring = useKeyboardFocusRing(resolvedAccent);
   const containerRef = useRef<View>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const [indicator] = useState(() => new Animated.Value(0));
+
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const segmentWidth = options.length > 0 ? trackWidth / options.length : 0;
+
+  useEffect(() => {
+    const target = selectedIndex * segmentWidth;
+    if (reducedMotion || segmentWidth === 0) {
+      indicator.setValue(target);
+      return;
+    }
+    Animated.spring(indicator, {
+      toValue: target,
+      useNativeDriver: true,
+      speed: 22,
+      bounciness: 8,
+    }).start();
+  }, [indicator, reducedMotion, segmentWidth, selectedIndex]);
 
   const moveSelection = useCallback(
     (direction: -1 | 1) => {
       const next = nextSegmentValue(options, value, direction);
-      if (next === value) return;
-      onChange(next);
+      if (next !== value) onChange(next);
     },
     [options, value, onChange],
   );
@@ -75,9 +96,34 @@ export function SegmentedControl<T extends string>({
       ref={containerRef}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      className="flex-row flex-wrap rounded-2xl border p-1"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+      onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width - spacing.xs * 2)}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.xs,
+        borderRadius: radius.full,
+        borderWidth: 1.5,
+        borderColor: tokens.border,
+        backgroundColor: tokens.surfaceSunken,
+      }}
     >
+      {segmentWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              left: spacing.xs,
+              top: spacing.xs,
+              bottom: spacing.xs,
+              width: segmentWidth,
+              borderRadius: radius.full,
+              backgroundColor: resolvedAccent,
+              transform: [{ translateX: indicator }],
+            },
+          ]}
+        />
+      ) : null}
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -92,22 +138,23 @@ export function SegmentedControl<T extends string>({
             }}
             onFocus={ring.onFocus}
             onBlur={ring.onBlur}
-            className="items-center rounded-xl px-3"
             style={[
               {
-                flexGrow: 1,
-                flexBasis: 'auto',
-                minHeight: size.touchTargetMin,
+                flex: 1,
+                minHeight: size.touchTargetMin - 6,
                 justifyContent: 'center',
-                backgroundColor: active ? resolvedAccent : undefined,
+                alignItems: 'center',
+                borderRadius: radius.full,
                 opacity: option.disabled ? 0.4 : 1,
+                zIndex: 1,
               },
               ring.focusRingStyle,
             ]}
           >
             <Text
-              className={`text-[13px] ${active ? 'font-semibold' : 'font-medium'}`}
-              style={active ? { color: tokens.textOnAccent } : { color: tokens.textMuted }}
+              variant="label"
+              style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 13.5 }}
+              numberOfLines={1}
             >
               {option.label}
             </Text>

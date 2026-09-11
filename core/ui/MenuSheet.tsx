@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import type { ReactNode } from 'react';
-import { Modal as RNModal, Pressable, Text, View } from 'react-native';
+import { Modal as RNModal, Pressable, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';

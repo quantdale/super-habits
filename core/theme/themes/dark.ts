@@ -1,24 +1,31 @@
 import { createTheme } from '@/core/theme/createTheme';
 
-/** The app's existing Dark. Migrated verbatim + new interaction roles. */
+/**
+ * Pop Dark — the default dark appearance. Deep indigo-black canvas, plum
+ * surfaces, and a bright violet brand so saturated accents stay legible
+ * without glare.
+ */
 export const dark = createTheme({
   id: 'dark',
   name: 'Dark',
   appearance: 'dark',
-  description: 'The cool indigo night mode. General use, low light.',
+  description: 'Deep indigo canvas, plum surfaces, bright violet brand.',
   primary: '#A78BFA',
-  secondary: '#2b2350',
-  accent: '#C4B5FD',
-  button: '#7C3AED',
-  buttonText: '#ffffff',
-  buttonHover: '#6D28D9',
-  buttonActive: '#5B21B6',
-  background: '#0f1221',
-  surface: '#171a2a',
-  surfaceElevated: '#111427',
-  border: '#334155',
-  tabRail: '#1a1f34',
-  tabRailBorder: '#2e3552',
-  text: '#e2e8f0',
-  textMuted: '#a6b0c2',
+  secondary: '#241F45',
+  accent: '#F472B6',
+  button: '#6D4BE8',
+  buttonText: '#FFFFFF',
+  buttonHover: '#5E3CD6',
+  buttonActive: '#4F2FC0',
+  background: '#0C0A1D',
+  surface: '#171436',
+  surfaceElevated: '#1F1B42',
+  border: '#2A2550',
+  tabRail: '#171436',
+  tabRailBorder: '#2A2550',
+  text: '#F3F1FF',
+  textMuted: '#A9A4C9',
+  iconMuted: '#8F89B8',
+  overlayScrim: 'rgba(6, 4, 20, 0.72)',
+  shadowColor: '#04021A',
 });

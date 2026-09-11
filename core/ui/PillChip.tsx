@@ -1,7 +1,9 @@
-import React from 'react';
-import { Pressable, Text } from 'react-native';
+import { useState } from 'react';
+import { Animated, Pressable } from 'react-native';
+import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { spacing, radius, size } from '@/core/theme/designTokens';
+import { useReducedMotion } from '@/core/theme/motion';
+import { radius, size, spacing, springs, typography } from '@/core/theme/designTokens';
 
 type Props = {
   label: string;
@@ -12,39 +14,61 @@ type Props = {
   icon?: string; // optional emoji or text prefix
 };
 
+/**
+ * Pop chip: a fat pill that fills with its accent when selected and springs
+ * down slightly under the finger. Used for filters, time-of-day pickers, and
+ * quick presets, where a tap must feel immediate.
+ */
 export function PillChip({ label, accessibilityLabel, active, color, onPress, icon }: Props) {
   const { tokens } = useAppTheme();
+  const reducedMotion = useReducedMotion();
+  const [scale] = useState(() => new Animated.Value(1));
+
+  const settle = (toValue: number) => {
+    if (reducedMotion) {
+      scale.setValue(toValue);
+      return;
+    }
+    Animated.spring(scale, { toValue, useNativeDriver: true, ...springs.press }).start();
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ selected: active }}
-      className="mb-2 mr-2 flex-row items-center gap-1"
-      style={{
-        borderRadius: radius.full,
-        borderWidth: 1,
-        paddingHorizontal: spacing.lg - 2,
-        paddingVertical: spacing.sm,
-        minHeight: size.touchTargetMin - 4,
-        ...(active
-          ? {
-              backgroundColor: color,
-              borderColor: color,
-            }
-          : {
-              borderColor: tokens.border,
-              backgroundColor: tokens.surfaceElevated,
-            }),
-      }}
+    <Animated.View
+      style={{ transform: [{ scale }], marginRight: spacing.sm, marginBottom: spacing.sm }}
     >
-      {icon ? <Text className="text-[13px]">{icon}</Text> : null}
-      <Text
-        className={`text-[13px] ${active ? 'font-semibold' : 'font-medium'}`}
-        style={active ? { color: tokens.textOnAccent } : { color: tokens.textMuted }}
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => settle(0.94)}
+        onPressOut={() => settle(1)}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={{ selected: active }}
+        style={{
+          borderRadius: radius.full,
+          borderWidth: 1.5,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.sm + 2,
+          minHeight: size.touchTargetMin,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: spacing.xs,
+          backgroundColor: active ? color : tokens.surface,
+          borderColor: active ? color : tokens.border,
+        }}
       >
-        {label}
-      </Text>
-    </Pressable>
+        {icon ? (
+          <Text style={{ ...typography.label, color: active ? tokens.onSolid : tokens.textMuted }}>
+            {icon}
+          </Text>
+        ) : null}
+        <Text
+          variant="label"
+          style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 14 }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
