@@ -44,6 +44,24 @@ vi.mock('expo-sqlite', () => ({
   }),
 }));
 
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+}));
+
+vi.mock('expo-audio', () => ({
+  createAudioPlayer: vi.fn(() => ({
+    volume: 1,
+    play: vi.fn(),
+    pause: vi.fn(),
+    seekTo: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn(),
+  })),
+  setAudioModeAsync: vi.fn().mockResolvedValue(undefined),
+}));
+
 /** Avoid loading @react-native-async-storage via real `lib/supabase` when tests import sync.engine. */
 vi.mock('@/lib/supabase', () => ({
   supabase: null,
