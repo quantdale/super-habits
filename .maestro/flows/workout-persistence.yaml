@@ -27,6 +27,11 @@ tags:
 - pressKey: enter
 - waitForAnimationToEnd:
     timeout: 2000
+# Plain scroll (a no-op when already visible): the description sits directly
+# below the name, but the focused-field scroll can leave it just off-screen.
+- scrollUntilVisible:
+    element: 'New routine description'
+    direction: DOWN
 - tapOn: 'New routine description'
 - inputText: 'Native routine'
 - pressKey: enter

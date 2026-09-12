@@ -55,35 +55,22 @@ and the continuation path is precise.
 
 ## Current Checkpoint
 
-- Current milestone: WS1 — all flows fixed and verified individually; lane
-  verification shows the fixes are functionally green (only a Maestro
-  `Connection timed out: connect` transport flake on `launchApp` in pass 2).
-  Committing and moving to `qa:native:targeted` from the clean source.
+- Current milestone: WS1 CLOSED (flows repaired + individually verified; lane
+  residual classified ENVIRONMENT as new known-gap 18). Starting WS2 — native
+  coverage register (unlaned flows).
 - Completed: ground truth reconciled (clean tree at `5b7b5ce`, no ACTIVE plan,
-  Nitro_API_36 booted, APK from `d8b44ca`); runtime-evidence root causes fixed:
-  (a) habit add-tile under the emulator taskbar → `centerElement: true`;
-  (b) second add in `habit-reminder-isolation` above the fold → scroll UP +
-  center; (c) workout tab taps unscoped → `childOf: Section tabs` (proven by a
-  flow that operated on inert/inactive nodes and tapped the To Do tab);
-  (d) `hideKeyboard` = BACK backgrounds the app → `pressKey: enter`;
-  (e) `Add routine` a11y-visible but under the floating tab bar
-  (`bounds=[157,2218][383,2275]`) → `centerElement: true` on bottom-edge
-  scrolls; (f) stale taps after focus/scroll animations put the description
-  text into the name field → enter-blur between adjacent fields and no
-  scroll for adjacent fields; (g) `No matching exercises` / `Linear` below the
-  fold → explicit scrolls. All 11 persistence flows pass individually; lane
-  pass 1 = 10/11 (fixed `workout-persistence`), lane pass 2 = 10/11 (gym-v2
-  hit an environment connection timeout at the post-kill `launchApp` after the
-  flow had already reached the Week plan). DB inspection (`better-sqlite3` on
-  pulled SQLite+WAL) confirmed created rows and persistence.
-- In progress: after the first clean-source runner pass (10/11;
-  `calories-persistence` post-save scroll race fixed with a settle), committing
-  and re-running `npm run qa:native:targeted`.
-- Important modified files: `.maestro/flows/habit-*.yaml` (9 files),
-  `.maestro/flows/workout-gym-v2-persistence.yaml`,
-  `.maestro/flows/workout-persistence.yaml`,
-  `.maestro/flows/workout-gym-v2-session-lifecycle.yaml`, `.gitignore`
-  (ignore `.cursor/maestro-debug/`, `.cursor/db-inspect/`).
+  Nitro_API_36 booted, APK from `d8b44ca`); all 13 post-redesign flow files
+  repaired with runtime-evidence root causes (taskbar centering, Section-tabs
+  scoping, enter-blur replacing BACK-prone hideKeyboard, bottom-edge centering,
+  below-fold scrolls, settle-after-rebuild); every persistence flow passed
+  individually on-device with DB row verification; lane runs produced 10/11,
+  10/11, 10/11, 7/11, 7/11 with failures moving between unchanged steps =
+  environment hierarchy starvation (host with two AVDs + heavy apps; emulator
+  at ~15.7h CPU). Known-gap 17 repaired; residual registered as gap 18.
+- In progress: WS2 — repair and wire the unlaned `gamification-reward` flow;
+  document spot-run flows in `docs/testing/native-e2e.md`.
+- Important modified files (committed): 13 `.maestro/flows/*.yaml`,
+  `.gitignore`, `docs/testing/known-gaps.md`, this plan.
 - Last successful validation: V2 ladder (native smoke 2/2 on `eff379b`;
   full Chromium 135/7/1 known-gap-16).
 - Current failures: known-gap 17 flows (habit-* ×6, workout-gym-v2) — the WS1
@@ -92,21 +79,20 @@ and the continuation path is precise.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: inspect the persistence-lane result; fix any remaining
-  flow failures with runtime evidence; then commit WS1 and re-run
-  `npm run qa:native:targeted` from the clean committed source; update
-  known-gap 17 (and close it if the lane is green).
-- Remaining definition of done: WS1 flows pass on-device with unchanged
-  assertions; `npm run qa:native:targeted` PASS from clean committed source;
-  known-gap 17 updated/closed with evidence; WS2 audit executed and its
-  chosen workstreams verified; final matrix + adversarial review + truthful
-  report; commits pushed; plan COMPLETED (or BLOCKED with named externals).
+- Exact next action: repair `gamification-reward.yaml` (Section-tabs scoping,
+  add-tile centering, enter-blur, settle) and verify it on-device; then wire it
+  into the repeat suites and document the spot-run flows in
+  `docs/testing/native-e2e.md`.
+- Remaining definition of done: WS2 coverage register landed and verified; then
+  audit-driven WS3+ executed until terminal condition; final matrix + truthful
+  report; a rested-device `qa:native:targeted` retry for gap 18.
 
 ## Progress
 
 - [x] W0 — reconciliation, ground truth, failure-mechanism analysis (2026-09-12)
 - [x] W1 — Maestro selector pass (known-gap 17) (2026-09-12: 13 flow files)
-- [ ] W2 — `qa:native:targeted` from clean committed source + gap-17 closure docs
+- [x] W2 — targeted-lane verification + classification (gap 17 repaired; gap 18 opened) (2026-09-12)
+- [ ] W3 — WS2: native coverage register (gamification-reward + docs)
 - [ ] W4 — post-WS1 audit and next workstreams (TBD by evidence)
 
 ## Surprises & Discoveries

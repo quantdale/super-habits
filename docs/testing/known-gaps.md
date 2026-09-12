@@ -310,11 +310,57 @@ classification is unchanged: `TEST_BUG` selector/tap rot, not a persistence
 regression. The closing path below is unchanged and remains the dedicated
 selector pass.
 
+**2026-09-12 selector pass (Autonomous Campaign V1, source `84db226`):**
+**REPAIRED.** All thirteen post-redesign flow files were fixed with the
+closing-path techniques and verified on-device: habit add-tiles now
+`centerElement: true` (were settling under the emulator taskbar so the tap
+hit launcher home), workout tab taps scoped to the `Section tabs` landmark
+(unscoped index-0 matches hit inert Overview/stat-strip nodes; one run
+operated on inactive nodes and tapped the To Do tab), `hideKeyboard` replaced
+with `pressKey: enter` (BACK backgrounds the app on this emulator),
+bottom-edge targets centered (`Add routine` was a11y-visible under the
+floating tab bar at `bounds=[157,2218][383,2275]`, so its tap navigated),
+below-fold targets get explicit scrolls (`No matching exercises`, `Linear`,
+`Logged today`), and adjacent fields get enter-blur + settle so focus/scroll
+animations cannot shift the layout between the hierarchy read and the tap.
+Every persistence flow passed individually on Nitro_API_36 (most repeatedly),
+with rows verified in the pulled SQLite+WAL.
+
+**Residual (new):** full-lane `npm run qa:native:targeted` runs now fail
+0–4 flows per attempt at _different, unchanged_ steps (`Logged today`,
+`Native M-W-F habit`, `Add routine`, `New routine description`), including
+steps that passed in the same lane minutes earlier; failure screenshots show
+the asserted content rendered while Maestro's matcher reported "No visible
+element found", and one assertion burned 65 s against a 30 s budget. The host
+was running two AVDs and several other heavy processes, and the primary
+emulator had consumed ~15.7 h of guest CPU. Classification: `ENVIRONMENT`
+(maestro↔device hierarchy starvation under sustained host/emulator load), not
+a flow or product defect. See entry 18.
+
 **Closing path:** update the nine flows on a device session (scope tab taps to
 `Section tabs`, `centerElement: true` on bottom-edge scroll targets, and a
 `scrollUntilVisible` before on-screen visibility asserts), keep every
 persistence assertion unchanged, then re-run `npm run qa:native:targeted` from a
-clean committed source.
+clean committed source. (Executed 2026-09-12; residual lane flake tracked as
+gap 18.)
+
+### 18. Native persistence lane flaky on a loaded host/emulator (ENVIRONMENT)
+
+**Reason:** on 2026-09-12 the repaired persistence lane produced 10/11, 10/11,
+10/11, 7/11, and 7/11 across five runner attempts with failures moving between
+unchanged flows and steps (details in entry 17). Individual flows pass on the
+same device and APK, including immediately after a lane failure, so the
+selector repairs are sound; the lane itself is starved when the host is
+loaded (two booted AVDs, Gradle rebuilds, other heavy applications) and the
+primary emulator has been running for hours. Maestro reports "No visible
+element found" for content that is visibly rendered (screenshot evidence) and
+sometimes takes ~2× its own timeout for a single assertion.
+
+**Closing path:** re-run `npm run qa:native:targeted` on a rested device (fresh
+emulator boot with the host otherwise idle, single AVD) and only split the
+lane into smaller batches if the flake persists there; do not weaken or retry
+assertions. If the lane is green, delete this entry and mark gap 17 fully
+closed.
 
 ---
 
