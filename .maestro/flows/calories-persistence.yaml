@@ -42,6 +42,11 @@ tags:
     element: 'Save calorie entry'
     direction: DOWN
 - tapOn: 'Save calorie entry'
+# Let the post-save rebuild settle: scrolling while the form/list is still
+# re-rendering starves the matcher and times out even though the row renders
+# (same class as the diary-transition note below).
+- waitForAnimationToEnd:
+    timeout: 8000
 - scrollUntilVisible:
     element: 'Logged today'
     direction: DOWN

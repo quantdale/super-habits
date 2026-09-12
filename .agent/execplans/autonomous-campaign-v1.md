@@ -76,8 +76,9 @@ and the continuation path is precise.
   hit an environment connection timeout at the post-kill `launchApp` after the
   flow had already reached the Week plan). DB inspection (`better-sqlite3` on
   pulled SQLite+WAL) confirmed created rows and persistence.
-- In progress: committing WS1; then `npm run qa:native:targeted` from the
-  clean committed source.
+- In progress: after the first clean-source runner pass (10/11;
+  `calories-persistence` post-save scroll race fixed with a settle), committing
+  and re-running `npm run qa:native:targeted`.
 - Important modified files: `.maestro/flows/habit-*.yaml` (9 files),
   `.maestro/flows/workout-gym-v2-persistence.yaml`,
   `.maestro/flows/workout-persistence.yaml`,
