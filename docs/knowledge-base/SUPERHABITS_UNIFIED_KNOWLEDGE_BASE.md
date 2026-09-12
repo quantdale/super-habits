@@ -61,7 +61,7 @@
 
 **SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **Workout/Gym V2** (exercise identity, typed routines, weekly planning, guided training, progression, analytics, and body weight), and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a section switcher of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
-**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **24**. Next migration: `if (version < 25)`. Migration 13 adds durable `processed_notification_actions` state, migration 14 adds the durable `sync_outbox` table, and migration 15 adds its enqueue-time owner binding; migrations 16–19 add the planning entities and habit schedule history, migration 20 is the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 adds `daily_plans.top_todo_titles`, migration 22 adds Gym V2 routine/session columns plus custom exercises, weekly plan, date overrides, and body-weight tables, migration 23 adds deep Gym V2 semantic metadata (aliases, instructions, unilateral and external-load snapshots), and migration 24 adds hot-path range indexes for the unbounded history tables (`pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`) plus the partial pending-todos index `idx_todos_pending_sort`. Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
+**Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **25**. Next migration: `if (version < 26)`. Migration 13 adds durable `processed_notification_actions` state, migration 14 adds the durable `sync_outbox` table, and migration 15 adds its enqueue-time owner binding; migrations 16–19 add the planning entities and habit schedule history, migration 20 is the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 adds `daily_plans.top_todo_titles`, migration 22 adds Gym V2 routine/session columns plus custom exercises, weekly plan, date overrides, and body-weight tables, migration 23 adds deep Gym V2 semantic metadata (aliases, instructions, unilateral and external-load snapshots), migration 24 adds hot-path range indexes for the unbounded history tables (`pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`) plus the partial pending-todos index `idx_todos_pending_sort`, and migration 25 adds the local-only reward ledger (`gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges`). Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
 **Sync / backup:** synced writes commit their local mutation and a durable `sync_outbox` row in one SQLite transaction, then publish to the in-memory queue. The exported `syncEngine` uses **`SupabaseSyncAdapter`** (`core/sync/supabase.adapter.ts`): on `flush()`, changed rows are **upserted** to matching Supabase tables (push backup; adapter `pull` is still a stub), and revision matching prevents an old push from deleting a newer pending mutation. `flush()` is registered on a **30s interval**, web **visibility hidden**, and **NetInfo reconnect** when `isRemoteEnabled()` is true (`lib/supabase.ts`). **`remoteMode` defaults to `"enabled"`** — call `setRemoteMode("disabled")` for local-only behavior; durable pending outbox rows remain available for a later flush. If `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are unset, `supabase` is `null` and remote backup/restore stays unavailable without throwing.
 
@@ -107,7 +107,7 @@
 | Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay               |
 | Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                                      |
 | Schema version (stored) | **24** (`app_meta.db_schema_version`)                                                                                                               |
-| Next migration          | `25` (new `if (version < 25)` block in `runMigrations`)                                                                                             |
+| Next migration          | `26` (new `if (version < 26)` block in `runMigrations`)                                                                                             |
 | Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                              |
 | E2E tests               | **95** Chromium tests in **14** spec files; **`workers: 1` locally and in CI** (shared OPFS origin); static `dist/` via `node scripts/serve-e2e.js` |
 
@@ -518,7 +518,7 @@ Current `app_meta.db_schema_version`: **24**. Migration 14 added the durable
 SQLite sync outbox and migration 15 added its enqueue-time owner binding;
 migrations 16–21 added planning/hardening state, migration 22 added the
 Gym V2 workout/catalog/planning/body-weight contract, and migration 23 added
-deep Gym V2 semantic metadata. Migration 24 added hot-path range indexes. Future schema work must append migration 25 (i.e. the next `if (version < 25)` block).
+deep Gym V2 semantic metadata. Migration 24 added hot-path range indexes. Migration 25 added the local-only reward ledger (`gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges`). Future schema work must append migration 26 (i.e. the next `if (version < 26)` block).
 
 ### Bootstrap DDL (verbatim)
 
@@ -2245,7 +2245,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 | Non-negotiables | Soft delete, enqueue pattern, `createId`, `nowIso`/`toDateKey`, append-only migrations, `habit_completions` exception |
 | Workflow        | Read → plan → approval → implement → typecheck + test → report                                                        |
 
-         | Schema          | Current version **24**, next migration `version < 25`                                                                 |
+         | Schema          | Current version **25**, next migration `version < 26`                                                                 |
 
 #### `feature-agent.md`
 
@@ -2267,7 +2267,7 @@ Audits for: hard deletes, missing `syncEngine.enqueue`, wrong ID generation, tim
 
 | Skill                             | Trigger                     | Provides                                                                                                                        |
 | --------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer  | WAL, soft delete, enqueue list, ID format; schema **24** → next **`if (version < 25)`** (always confirm in `core/db/client.ts`) |
+| `db-and-sync-invariants/SKILL.md` | DB, migrations, data layer  | WAL, soft delete, enqueue list, ID format; schema **25** → next **`if (version < 26)`** (always confirm in `core/db/client.ts`) |
 | `feature-module-pattern/SKILL.md` | New features, module layout | Three-file pattern, route thin wrapper, import rules                                                                            |
 | `rn-expo-conventions/SKILL.md`    | UI, Expo Router, RN         | Routing, NativeWind, lists, notifications, platform                                                                             |
 

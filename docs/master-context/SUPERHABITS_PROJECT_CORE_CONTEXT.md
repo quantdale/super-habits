@@ -200,7 +200,7 @@ Current runtime schema version: `24`
 
 Next migration slot:
 
-- add a new `if (version < 25)` block
+- add a new `if (version < 26)` block
 - never edit previous migration blocks
 
 ## Sync model
