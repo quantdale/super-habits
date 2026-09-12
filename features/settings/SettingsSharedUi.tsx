@@ -80,19 +80,19 @@ export function SettingsRow({
       className={[!first ? 'pt-3' : '', !last ? 'border-b pb-3' : ''].filter(Boolean).join(' ')}
       style={!last ? { borderColor: tokens.border } : undefined}
     >
-      <View className="flex-row items-start gap-3">
-        <View className="min-w-0 flex-1">
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            {label}
-          </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-            {description}
-          </Text>
-        </View>
+      <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
+        <Text className="min-w-0 flex-1 text-sm font-semibold" style={{ color: tokens.text }}>
+          {label}
+        </Text>
         {statusLabel ? (
-          <SettingsStatusPill label={statusLabel} tone={statusTone} accentColor={accentColor} />
+          <View className="shrink-0">
+            <SettingsStatusPill label={statusLabel} tone={statusTone} accentColor={accentColor} />
+          </View>
         ) : null}
       </View>
+      <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+        {description}
+      </Text>
     </View>
   );
 }

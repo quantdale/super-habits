@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/ui/Text';
 import type { AccountActionResult, AccountState } from '@/core/auth/account.types';
 import { useAppTheme } from '@/core/providers/themeContext';
 import type {
@@ -482,23 +483,19 @@ function SettingsAccountCard({
 
   return (
     <Card accentColor={BACKUP_ACCENT} className="mb-0">
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="min-w-0 flex-1">
-          <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-            Backup identity
-          </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-            {accountState.message}
-          </Text>
-        </View>
-        <View className="shrink-0">
-          <SettingsStatusPill
-            label={accountStatusLabel(accountState)}
-            tone={accountStatusTone(accountState)}
-            accentColor={BACKUP_ACCENT}
-          />
-        </View>
+      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+        Backup identity
+      </Text>
+      <View className="mt-2 self-start">
+        <SettingsStatusPill
+          label={accountStatusLabel(accountState)}
+          tone={accountStatusTone(accountState)}
+          accentColor={BACKUP_ACCENT}
+        />
       </View>
+      <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+        {accountState.message}
+      </Text>
 
       {accountState.status === 'protected' && accountState.email ? (
         <Text className="mt-3 text-sm" style={{ color: tokens.text }}>

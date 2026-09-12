@@ -75,9 +75,12 @@ export function TodayProgressStrip({
     },
     {
       id: 'habits',
-      value: `${habits.completedToday}/${habits.scheduledToday}`,
+      value: habits.scheduledToday > 0 ? `${habits.completedToday}/${habits.scheduledToday}` : '—',
       label: 'Habits',
-      spoken: `Habits: ${habits.completedToday} of ${habits.scheduledToday} complete`,
+      spoken:
+        habits.scheduledToday > 0
+          ? `Habits: ${habits.completedToday} of ${habits.scheduledToday} complete`
+          : 'Habits: nothing scheduled today',
     },
     {
       id: 'focus',
