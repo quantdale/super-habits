@@ -31,6 +31,7 @@ when a release actually ships rather than letting it drift.
 | P0 journeys              | `npm run e2e:journeys:p0`                                                                           | 25 passed                                                                                                                                                                              |
 | Deterministic simulation | `npm run qa:simulation -- --all --mode deterministic`                                               | 23/23 scenarios passed                                                                                                                                                                 |
 | Live web probe           | `npm run web:verify`                                                                                | PASS (fresh export, COOP/COEP, shell probe, ports released)                                                                                                                            |
+| Visual regression audit  | temporary Playwright harness (10 scenarios)                                                         | PASS 10/10: six sections + overlays + modals at 360/390/412/768/1024/1280/1440/1920, populated/empty/stress/dark; ~20 defects fixed                                                    |
 | Native smoke             | `node scripts/qa-native.mjs --platform android --tag smoke --avd Nitro_API_36`                      | PASS 2/2 flows on credential-free APK from clean source `d9c17f5` (SHA-256 `B9FC4ED1…`), canonical Nitro_API_36 x86_64                                                                 |
 | Native persistence       | `node scripts/qa-native.mjs --platform android --tag persistence --avd Nitro_API_36 --no-provision` | 2/11 — `calories-persistence` + `settings-persistence` PASS; 9 flow-selector failures classified `TEST_BUG` (pre-redesign flow assumptions), registered as known-gap 17 with artifacts |
 
@@ -47,14 +48,18 @@ re-verify before touching the habit-edit save path.
 ### E2E result
 
 Final Chromium feature battery on the shipped `dist/` (2026-09-12):
-**135 passed, 1 failed, 7 skipped**. The single failure is
-`habits.spec.ts:222` "target edits keep a prior completed date complete" — the
-intermittent modal-close-vs-commit race registered in
-`docs/testing/known-gaps.md` §3; it passed standalone in the focused batch and
-fails intermittently under battery load. The register's rule stands: re-verify
-before touching the habit-edit save path. Two earlier battery-only failures
-(`portable-backup` import flows) passed standalone and in the final battery —
-load flakes, not reproducible on the frozen tree.
+**134 passed, 2 failed, 7 skipped**. Both failures were root-caused:
+
+- `portable-backup.spec.ts:116` — the test helper typed the todo title
+  char-by-char; the heavier redesigned modal dropped the trailing character
+  ("Alpha tas"), so the exact-title assertion found nothing when the test ran
+  after its sibling exports. Fixed by committing the value in one event
+  (`fill()`), assertions unchanged; the portable and settings files then pass
+  **8/8**.
+- `habits.spec.ts:222` — the intermittent modal-close-vs-commit race registered
+  in `docs/testing/known-gaps.md` §16; it passes standalone on the same tree
+  and remains a documented flake (re-verify before touching the habit-edit
+  save path).
 
 ## Store metadata registered in `app.json`
 

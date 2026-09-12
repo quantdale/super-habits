@@ -1,7 +1,7 @@
 # ExecPlan: Pop Visual QA V1 — Pixel-Perfect Regression Pass
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -63,48 +63,45 @@ no broad redesign.
 
 ## Current Checkpoint
 
-- Current milestone: W5–W6 complete — final harness 10/10; W7 regression
-  gates running (Vitest 2055/2055 PASS, lint PASS; full Chromium in flight),
-  then native smoke.
+- Current milestone: CAMPAIGN COMPLETE — all identified visual defects fixed
+  or accepted with rationale; regression ladder and native smoke green.
 - Completed:
-  - W0–W6 as recorded below; all inventory defects FIXED/ACCEPTED/VERIFIED.
-  - Final harness round: 10/10 tests (populated/empty sections, shell
-    overlays, plan hub, entity modals, desktop, 6 responsive widths, stress
-    content, 360 extras, dark mode).
-  - Vitest 2055/2055 PASS (196 files); `npm run lint` PASS.
-- In progress: full `--project=chromium` battery on the frozen tree.
-- Exact next action: read the Chromium results; commit the fixes; run native
-  APK smoke on the canonical API-36 target; refresh release/plan evidence;
-  push.
-- Remaining definition of done: Chromium + native smoke green; commits pushed;
-  plan COMPLETED.
-- Current failures: harness-only issues were fixed (habit group label,
-  stress SQL NOT NULL columns, drawer scroll targeting).
-- Important modified files: `core/ui/SegmentedControl.tsx`, `TextField.tsx`,
-  `Screen.tsx`, `global.css`, `features/overview/TodayProgressStrip.tsx`,
-  `features/momentum/MomentumCard.tsx`, `features/todos/TodosScreen.tsx`,
-  `features/todos/TodoListToolbar.tsx`, `features/pomodoro/PomodoroScreen.tsx`,
-  `features/workout/WorkoutGymPanels.tsx`, `features/habits/HabitCircle.tsx`,
-  `features/calories/CaloriesEntryFields.tsx`.
-- Last successful validation: typecheck PASS after each batch; focused probes
-  verified the tab geometry/focus and list-height fixes.
-- Exact next action: review the round-4 captures (stress, modals, dark), fix
-  anything new, then run the regression gates.
-- Remaining definition of done: defect inventory empty of visible defects at
-  phone/tablet/desktop + edge content + dark mode; regression gates green;
-  native smoke PASS; commits pushed; plan COMPLETED.
+  - W0–W6 (recovery, harness, defect inventory, shared + per-screen fixes,
+    edge-content/responsive/dark passes).
+  - W7: typecheck/lint PASS; Vitest 2055/2055; Chromium 134/2/7 with the two
+    failures root-caused (portable `type()` test bug fixed; habits known-gap 16
+    flake); portable + settings re-run 8/8 PASS; native smoke 2/2 PASS on
+    credential-free APK from clean source `2ac217c` (SHA-256 `D3B1D4EA…`);
+    `web:verify` PASS.
+  - W8: commit `2ac217c` landed; closure docs committed and pushed.
+- In progress: None.
+- Important modified files: see the commit and the inventory above;
+  focal: `core/ui/{SegmentedControl,TextField,Screen}.tsx`, `global.css`,
+  `features/{overview,momentum,todos,pomodoro,workout,habits,calories,projects,goals}/*`,
+  `e2e/{portable-backup,settings}.spec.ts`.
+- Last successful validation: visual harness 10/10; Vitest 2055/2055; lint 0/0;
+  typecheck clean; portable+settings 8/8; native smoke 2/2; web:verify PASS.
+- Current failures: `habits.spec.ts:222` only — known-gap 16 (documented
+  load-sensitive flake; passes standalone).
+- Relevant quarantines: known-gap 15 (J8 under load), known-gap 17 (native
+  persistence flow selectors).
+- Blockers: None.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: None — task complete.
+- Remaining definition of done: complete.
 
 ## Progress
 
 - [x] W0 — reconcile Git/prompts, open ExecPlan (2026-09-12)
 - [x] W1 — fresh export + visual harness (sections, overlays, widths) (2026-09-12)
 - [x] W2 — first defect inventory from rendered output (2026-09-12)
-- [ ] W3 — shared-component fixes (rounded/primitives/shell)
-- [ ] W4 — per-screen fixes (six sections + overlays)
-- [ ] W5 — edge content + intermediate breakpoints stress pass
-- [ ] W6 — interactive/animations/layering checks
-- [ ] W7 — regression gates + native smoke
-- [ ] W8 — commit/push, close plan
+- [x] W3 — shared-component fixes (rounded/primitives/shell) (2026-09-12)
+- [x] W4 — per-screen fixes (six sections + overlays) (2026-09-12)
+- [x] W5 — edge content + intermediate breakpoints stress pass (2026-09-12)
+- [x] W6 — interactive/animations/layering checks (2026-09-12)
+- [x] W7 — regression gates + native smoke (2026-09-12)
+- [x] W8 — commit/push, close plan (2026-09-12)
 
 ## Defect Inventory (v1 — first harness pass)
 
@@ -180,6 +177,25 @@ no broad redesign.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: pending.
-- Follow-up: pending.
+- Status: Completed (2026-09-12).
+- Summary: a full rendered-UI audit at 360/390/412/768/1024/1280/1440/1920
+  across populated/empty/stress/dark states, all six sections, the shell
+  overlays, and every entity modal found and fixed ~20 visual defects: stat
+  strip and card truncation, mid-word wrapping, a 140px To-Do list viewport,
+  clipped sort chips, the browser-default black focus ring, an over-wide
+  `SegmentedControl` focus state that outlined every option, modal tabs that
+  clipped at 360, a heavy dashes kcal readout, and the 768 breakpoint.
+- Proof: temporary harness 10/10; ~90 screenshots reviewed; typecheck/lint
+  clean; Vitest 2055/2055; Chromium 134/2/7 with both failures root-caused;
+  portable + settings 8/8 after the `type()`→`fill()` fix; native smoke 2/2
+  on `2ac217c`; web:verify PASS; commit `2ac217c` pushed.
+- Follow-up: `habits.spec.ts:222` remains the documented known-gap 16 flake
+  (standalone passes). Known-gap 17 (native persistence flow selectors)
+  unchanged. The `pageOverflowY: 12` root overflow is masked by the shell and
+  accepted with rationale.
+- Lessons: (1) flex children need `minWidth: 0` to shrink — otherwise a
+  segmented control overflows its tray at narrow widths; (2) a single focus
+  hook shared across list items outlines every item — focus state must be
+  per-instance; (3) taller fixed chrome can virtualize list rows out of the
+  DOM entirely, so move scrollable chrome into the list header; (4) `type()`
+  on heavy controlled inputs drops characters — use `fill()`.
