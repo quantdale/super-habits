@@ -51,6 +51,12 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The list keeps its scroll position; bring the new tile into view before the
+# unchanged assertion.
+- scrollUntilVisible:
+    element: 'Native Gym reminder'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native Gym reminder'
     timeout: 15000
@@ -78,6 +84,10 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+- scrollUntilVisible:
+    element: 'Native Read reminder'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native Read reminder'
     timeout: 15000

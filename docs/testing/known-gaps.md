@@ -362,6 +362,18 @@ lane into smaller batches if the flake persists there; do not weaken or retry
 assertions. If the lane is green, delete this entry and mark gap 17 fully
 closed.
 
+**2026-09-12 further systematic fixes (source `08e1c6d`, APK `595A7630…`):**
+the recurring `calories-persistence` outlier was root-caused as an unscoped
+tab tap plus a bottom-edge `Save calorie entry` tap recorded at
+`(251,2181)` — under the floating tab bar, so it navigated to To Do. Every
+remaining tab tap in the native suite is now scoped to `Section tabs`
+(Calories, Habits, Focus, To Do, Today across 13 files), the calorie Save
+control is centered before tapping, and the habit flows scroll to the created
+tile before asserting it (same post-create class as `habit-persistence`).
+Latest lane: 9/11 with only two habit post-create asserts failing; both flows
+pass on immediate re-run, and `calories-persistence` passed in-lane for the
+first time since the redesign. Residual remains `ENVIRONMENT`.
+
 ---
 
 ## Related

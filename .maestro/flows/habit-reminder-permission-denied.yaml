@@ -41,6 +41,12 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The list keeps its scroll position; bring the new tile into view before the
+# unchanged assertion.
+- scrollUntilVisible:
+    element: 'Native denied reminder'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native denied reminder'
     timeout: 5000
