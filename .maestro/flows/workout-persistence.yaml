@@ -25,6 +25,8 @@ tags:
 # Blur before the next field so no scroll/focus animation can shift the layout
 # between Maestro's hierarchy read and the tap.
 - pressKey: enter
+- waitForAnimationToEnd:
+    timeout: 2000
 - tapOn: 'New routine description'
 - inputText: 'Native routine'
 - pressKey: enter

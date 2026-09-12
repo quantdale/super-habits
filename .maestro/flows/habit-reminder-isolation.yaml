@@ -94,6 +94,9 @@ tags:
     direction: DOWN
 - tapOn: 'Delete Native Gym reminder'
 - tapOn: 'Delete habit'
+# Let the list rebuild after the delete before looking for the survivor.
+- waitForAnimationToEnd:
+    timeout: 3000
 - scrollUntilVisible:
     element: 'Native Read reminder'
     direction: DOWN
