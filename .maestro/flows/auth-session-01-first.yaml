@@ -25,6 +25,25 @@ tags:
 # Anonymous bootstrap + provisional owner binding complete asynchronously.
 # The pill is styled uppercase but its text is 'Anonymous / unprotected';
 # Maestro matches hierarchy text, so assert the raw string.
+# The Appearance theme grids are several screens tall and scrollUntilVisible's
+# own steps can be consumed by the pressable cards. Cross the grids with
+# explicit side-margin swipes first, then finish with the scoped scroll.
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
 - scrollUntilVisible:
     element: 'Anonymous / unprotected'
     direction: DOWN

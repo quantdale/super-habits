@@ -16,6 +16,25 @@ tags:
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn: 'Open settings'
+# The Appearance theme grids are several screens tall and scrollUntilVisible's
+# own steps can be consumed by the pressable cards. Cross the grids with
+# explicit side-margin swipes first, then finish with the scoped scroll.
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
 - scrollUntilVisible:
     element: 'Email for backup recovery'
     direction: DOWN
@@ -25,7 +44,9 @@ tags:
     duration: 300
 - tapOn: 'Email for backup recovery'
 - inputText: 'canary@example.test'
-- hideKeyboard
+# Enter blurs the field; hideKeyboard sends BACK on this emulator and can
+# dismiss the modal instead.
+- pressKey: enter
 - tapOn: 'Protect backup with email'
 # The form swap + keyboard dismissal can leave the new code field above the
 # viewport (only its Resend button peeks in). Scroll up to it first.
