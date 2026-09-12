@@ -13,7 +13,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Calories'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - assertVisible: 'Switch between manual entry and a diary grouped by meal.'
 - scrollUntilVisible:
     element: 'Calories entry food'
@@ -41,6 +43,11 @@ tags:
 - scrollUntilVisible:
     element: 'Save calorie entry'
     direction: DOWN
+    # Center it: the floating tab bar overlaps bottom-edge content, so
+    # a11y "visible" can still sit under the tab bar and the tap navigates.
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Save calorie entry'
 # Let the post-save rebuild settle: scrolling while the form/list is still
 # re-rendering starves the matcher and times out even though the row renders
@@ -84,7 +91,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Calories'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 # W8-4 probe (permanent): viewMode persisted as diary, so Calories opens in
 # diary; switch explicitly to Form first and prove the row survived restart
 # through the FORM read path before exercising the diary layer. The

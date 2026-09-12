@@ -17,7 +17,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Habits'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'Add anytime habit'
     direction: DOWN
@@ -60,7 +62,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Habits'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - extendedWaitUntil:
     visible: 'Native reminder M-W-F'
     timeout: 15000

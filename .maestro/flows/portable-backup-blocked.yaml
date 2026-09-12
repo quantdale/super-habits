@@ -16,7 +16,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'To Do'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - assertVisible: 'Quick add'
 - tapOn: 'Quick add task title'
 - inputText: 'Native local todo'
@@ -26,7 +28,9 @@ tags:
     timeout: 10000
 - tapOn:
     text: 'Today'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - tapOn: 'Open settings'
 - extendedWaitUntil:
     visible: 'Theme and display'

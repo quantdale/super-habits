@@ -13,7 +13,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'To Do'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - assertVisible: 'Quick add'
 # Create through the quick-capture input: the FAB shares its label with the
 # disabled submit twin and sits under the command launcher, so neither is a
@@ -33,7 +35,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'To Do'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - extendedWaitUntil:
     visible: 'Native persistence todo'
     timeout: 15000

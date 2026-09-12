@@ -17,7 +17,9 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Habits'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 # Reveal the group tiles (header+stats push them below the fold at top).
 - scrollUntilVisible:
     element: 'Add anytime habit'
@@ -107,7 +109,9 @@ tags:
 - assertNotVisible: 'Reminder 18:00'
 - tapOn:
     text: 'Focus'
-    index: 0
+    # Scope to the section switcher (unscoped index-0 can hit inert content).
+    childOf:
+      text: 'Section tabs'
 - tapOn: 'Start focus'
 - assertVisible: 'Pause'
 - pressKey: HOME
