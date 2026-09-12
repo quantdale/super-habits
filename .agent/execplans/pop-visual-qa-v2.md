@@ -53,18 +53,19 @@ meaningful defect remaining and the Pop direction preserved.
 
 ## Current Checkpoint
 
-- Current milestone: W5 — final re-verification after shared-component fixes,
-  resuming from uncommitted V2 fixes on top of `4223afa`.
-- Completed: V2 rounds 1+2 + P1–P4/P6 sweeps; shared fixes landed in working
-  tree (V2-8 raw-Text→`core/ui/Text`, V2-9 stacked backup identity card,
-  V2-10 full-width SettingsRow descriptions, V2-11 `—` empty habits stat);
-  V2-1–V2-5/V2-7/V2-12–V2-13 triaged (see inventory).
-- In progress: W8 — final tree validated (see Validation Ledger); next
-  delete temp harness, commit/push, native smoke on clean tree.
-- Important modified files: `features/overview/TodayProgressStrip.tsx`,
+- Current milestone: W8 — fixes and plan committed/pushed (`819e0e2`,
+  `157eeec`; `HEAD == origin/main`), temp harness deleted; native smoke running
+  on Nitro_API_36 from clean source `157eeec`.
+- Completed: V2 rounds 1+2 + P1–P6/W5/W6 sweeps; shared fixes landed
+  (V2-8 raw-Text→`core/ui/Text`, V2-9 stacked backup identity card, V2-10
+  full-width SettingsRow descriptions, V2-11 `—` empty habits stat);
+  V2-1–V2-7/V2-12–V2-13 triaged (see inventory); full harness re-run 25/25 on
+  fresh dist; typecheck/lint/unit/integration/affected-Chromium/P0 journeys/
+  simulation/web:verify all green.
+- In progress: native smoke (auto-provision from clean `157eeec`).
+- Important modified files: committed — `features/overview/TodayProgressStrip.tsx`,
   `features/settings/SettingsBackupSection.tsx`,
-  `features/settings/SettingsSharedUi.tsx` (all uncommitted V2 fixes); temp
-  harness `e2e/zz-probe.spec.ts`, `e2e/zz-visual-qa-v2*.spec.ts` (never commit).
+  `features/settings/SettingsSharedUi.tsx`, this plan.
 - Last successful validation: V1 ladder (see pop-visual-qa-v1.md Outcomes).
 - Current failures: None (V2-6 OPEN tooling only — re-capture with
   inner-ScrollView scrolling via v2c-01/v2d-01).
@@ -73,8 +74,9 @@ meaningful defect remaining and the Pop direction preserved.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: delete `e2e/zz-*` temp harness → commit/push the three
-  feature fixes + this plan → `npm run qa:native:smoke` on clean tree → close plan.
+- Exact next action: await/verify native smoke PASS on Nitro_API_36 → fill
+  Outcomes & Retrospective, mark COMPLETED, validate plan, commit/push → final
+  `web:hygiene`.
 - Remaining definition of done: harness rounds green; all vision defects fixed
   or accepted with rationale; color/type/spacing/dark-parity/a11y sweeps done;
   typecheck/lint/Vitest/Chromium green (minus documented flakes); native smoke
