@@ -133,7 +133,7 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
               </Pressable>
             ))}
           </View>
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row flex-wrap items-center gap-x-2 gap-y-2">
             <Text className="text-xs" style={{ color: tokens.textMuted }}>
               Sort
             </Text>

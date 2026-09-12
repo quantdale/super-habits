@@ -733,58 +733,62 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     </View>
   );
 
+  const queueCard = (
+    <Card accentColor={todosAccent} className="mb-0" innerClassName="p-4">
+      <View className="flex-row items-start gap-3">
+        <View
+          className="h-11 w-11 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: `${todosAccent}1F` }}
+        >
+          <MaterialIcons name="checklist" size={22} color={colorText} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text variant="titleMd" style={{ color: tokens.text }}>
+            Today&apos;s queue
+          </Text>
+          <Text variant="bodyMd" tone="muted" className="mt-0.5">
+            {pendingTasks.length} pending, {completedTasks.length} completed
+          </Text>
+        </View>
+      </View>
+      <View className="mt-4 flex-row flex-wrap gap-2">
+        <View
+          className="rounded-full px-3 py-1.5"
+          style={{ backgroundColor: sectionAccents.todos.tint }}
+        >
+          <Text variant="label" style={{ color: colorText, fontSize: 12 }}>
+            {pendingTasks.length} open
+          </Text>
+        </View>
+        <View
+          className="rounded-full px-3 py-1.5"
+          style={{ backgroundColor: tokens.surfaceSunken }}
+        >
+          <Text variant="label" tone="muted" style={{ fontSize: 12 }}>
+            {recurringTasksCount} daily
+          </Text>
+        </View>
+        {overdueTasksCount > 0 ? (
+          <View
+            className="rounded-full px-3 py-1.5"
+            style={{ backgroundColor: tokens.dangerBackground }}
+          >
+            <Text variant="label" style={{ color: tokens.dangerText, fontSize: 12 }}>
+              {overdueTasksCount} overdue
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </Card>
+  );
+
   return (
     <View className="flex-1">
       <Screen scroll={totallyEmpty} hero={hero}>
         <View className="flex-1">
-          <ScreenSection>
-            <Card accentColor={todosAccent} className="mb-0" innerClassName="p-4">
-              <View className="flex-row items-start gap-3">
-                <View
-                  className="h-11 w-11 items-center justify-center rounded-2xl"
-                  style={{ backgroundColor: `${todosAccent}1F` }}
-                >
-                  <MaterialIcons name="checklist" size={22} color={colorText} />
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Text variant="titleMd" style={{ color: tokens.text }}>
-                    Today&apos;s queue
-                  </Text>
-                  <Text variant="bodyMd" tone="muted" className="mt-0.5">
-                    {pendingTasks.length} pending, {completedTasks.length} completed
-                  </Text>
-                </View>
-              </View>
-              <View className="mt-4 flex-row flex-wrap gap-2">
-                <View
-                  className="rounded-full px-3 py-1.5"
-                  style={{ backgroundColor: sectionAccents.todos.tint }}
-                >
-                  <Text variant="label" style={{ color: colorText, fontSize: 12 }}>
-                    {pendingTasks.length} open
-                  </Text>
-                </View>
-                <View
-                  className="rounded-full px-3 py-1.5"
-                  style={{ backgroundColor: tokens.surfaceSunken }}
-                >
-                  <Text variant="label" tone="muted" style={{ fontSize: 12 }}>
-                    {recurringTasksCount} daily
-                  </Text>
-                </View>
-                {overdueTasksCount > 0 ? (
-                  <View
-                    className="rounded-full px-3 py-1.5"
-                    style={{ backgroundColor: tokens.dangerBackground }}
-                  >
-                    <Text variant="label" style={{ color: tokens.dangerText, fontSize: 12 }}>
-                      {overdueTasksCount} overdue
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </Card>
-          </ScreenSection>
+          {totallyEmpty || selectionMode || queryActive ? (
+            <ScreenSection>{queueCard}</ScreenSection>
+          ) : null}
 
           {totallyEmpty ? (
             <ScreenSection>
@@ -927,12 +931,13 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   // height, leaving rows unreachable (and undraggable).
                   ListHeaderComponent={
                     <>
+                      <View className="mb-3">{queueCard}</View>
                       <TodoQuickCapture
                         onSubmit={handleQuickAdd}
                         onOpenDetails={openNewTodoModal}
                       />
-                      <View className="mb-4 flex-row items-center justify-between gap-3 px-1">
-                        <View className="min-w-0 flex-1">
+                      <View className="mb-4 flex-row flex-wrap items-center justify-between gap-3 px-1">
+                        <View className="min-w-0 flex-1" style={{ flexBasis: 200 }}>
                           <Text variant="titleMd" style={{ color: tokens.text }}>
                             Pending
                           </Text>
@@ -941,13 +946,15 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                           </Text>
                         </View>
                         {hasCompleted ? (
-                          <PillChip
-                            label={`${showCompleted ? 'Hide' : 'Show'} completed (${completedTasks.length})`}
-                            accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
-                            active={showCompleted}
-                            color={todosAccent}
-                            onPress={() => setShowCompleted((v) => !v)}
-                          />
+                          <View className="ml-auto">
+                            <PillChip
+                              label={`${showCompleted ? 'Hide' : 'Show'} completed (${completedTasks.length})`}
+                              accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
+                              active={showCompleted}
+                              color={todosAccent}
+                              onPress={() => setShowCompleted((v) => !v)}
+                            />
+                          </View>
                         ) : null}
                       </View>
                     </>

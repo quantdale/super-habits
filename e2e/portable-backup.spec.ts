@@ -31,7 +31,9 @@ async function dismissStartupRestorePromptIfPresent(page: import('@playwright/te
 async function addTodoViaUi(page: import('@playwright/test').Page, title: string) {
   await goToTab(page, 'todos');
   await openNewTodoModal(page);
-  await page.getByPlaceholder(/Add a task/i).type(title);
+  // fill() commits the value in ONE input event. Char-by-char type() drops
+  // trailing characters on the heavy redesigned modal (controlled-input race).
+  await page.getByPlaceholder(/Add a task/i).fill(title);
   await submitTodoModal(page, { waitForClose: true });
 }
 

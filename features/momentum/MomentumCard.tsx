@@ -30,7 +30,14 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
   return (
     <Card accentColor={accent.fill} innerClassName="p-0">
       <View style={{ padding: spacing.lg, gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            gap: spacing.md,
+          }}
+        >
           <View
             style={{
               width: 46,
@@ -45,10 +52,8 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
           >
             <MaterialIcons name="spa" size={23} color={accent.fill} />
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="titleMd" numberOfLines={1}>
-              Momentum Garden
-            </Text>
+          <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 0 }}>
+            <Text variant="titleMd">Momentum Garden</Text>
             <Text variant="caption" tone="muted" numberOfLines={2}>
               Useful actions grow separate roots. There is no score to chase.
             </Text>

@@ -62,7 +62,7 @@ export function Screen({
       : safeAreaBottom;
   const bottomPadding = padded ? 144 + effectiveBottomInset : effectiveBottomInset;
   const wideShellStyle: { maxWidth: number } | null =
-    width > WIDE_VIEWPORT_MIN_WIDTH
+    width >= WIDE_VIEWPORT_MIN_WIDTH
       ? { maxWidth: contentMaxWidth ?? layout.contentMaxWidth }
       : null;
 

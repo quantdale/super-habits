@@ -49,7 +49,7 @@ export function HabitCircle({
   const progress = scheduledToday ? calculateHabitProgress(todayCount, habit.target_per_day) : 0;
   const isComplete = scheduledToday && progress >= 1;
   const iconName = habit.icon ?? DEFAULT_HABIT_ICON;
-  const habitColor = habit.color ?? tokens.textMuted;
+  const habitColor = habit.color ?? sectionAccents.habits.fill;
   const iconTint = `${habitColor}1F`;
 
   const strokeWidth = Math.max(5, Math.round(diameter / 10));

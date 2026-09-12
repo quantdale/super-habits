@@ -984,7 +984,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       {!activeSession ? (
         <ScreenSection>
           <View className="flex-row flex-wrap gap-3">
-            <View className="min-w-[160px] flex-1">
+            <View className="min-w-[200px] flex-1">
               <FeatureStatCard
                 accentColor={COLOR}
                 textColor={textColor}
@@ -995,7 +995,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
               />
             </View>
-            <View className="min-w-[160px] flex-1">
+            <View className="min-w-[200px] flex-1">
               <FeatureStatCard
                 accentColor={COLOR}
                 textColor={textColor}

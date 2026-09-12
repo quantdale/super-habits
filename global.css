@@ -17,3 +17,15 @@ html[data-theme='dark'] body,
 html[data-theme='dark'] #root {
   background-color: var(--sh-background, #0f1221);
 }
+
+/*
+ * Text controls: replace the browser's default black focus ring with the
+ * theme's accent so focus states match the rest of the Pop system. The accent
+ * is published as a CSS variable by ThemeProvider; the literal fallback only
+ * covers the first paint before that effect runs.
+ */
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--sh-accent, #6d28d9);
+  outline-offset: 1px;
+}

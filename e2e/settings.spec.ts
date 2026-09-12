@@ -44,7 +44,7 @@ test.describe('Settings backup restore', () => {
   test('blocks first-phase restore after synced local data exists', async ({ page }) => {
     await goToTab(page, 'todos');
     await openNewTodoModal(page);
-    await page.getByPlaceholder(/Add a task/i).type('Local todo');
+    await page.getByPlaceholder(/Add a task/i).fill('Local todo');
     await submitTodoModal(page, { waitForClose: true });
 
     await openSettingsScreen(page);

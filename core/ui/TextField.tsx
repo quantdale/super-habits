@@ -56,9 +56,11 @@ export function TextField({
 
   return (
     <View className="mb-3">
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        {label}
-      </Text>
+      {label ? (
+        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+          {label}
+        </Text>
+      ) : null}
       <TextInput
         nativeID={nativeID}
         accessibilityLabel={accessibilityLabelProp ?? label}

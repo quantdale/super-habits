@@ -122,7 +122,7 @@ export function CaloriesEntryFields({
             Calories (kcal)
           </Text>
           <Text variant="metric" style={{ flex: 1, textAlign: 'right', color: tokens.text }}>
-            {computedKcal > 0 ? computedKcal : '—'}
+            {computedKcal > 0 ? computedKcal : 0}
           </Text>
         </View>
         <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>

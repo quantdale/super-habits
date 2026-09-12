@@ -159,22 +159,21 @@ export function WorkoutWeekCard({
           return (
             <View
               key={weekday}
-              className="flex-row items-center justify-between gap-3 rounded-xl border px-3 py-2"
+              className="flex-row flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3 py-2"
               style={{ borderColor: tokens.border }}
             >
               <Text className="w-24 text-sm font-semibold" style={{ color: tokens.text }}>
                 {weekdayLabel(weekday)}
               </Text>
-              <View className="min-w-0 flex-1">
+              <View className="min-w-0 flex-1" style={{ flexBasis: 120 }}>
                 <Text
                   className="text-sm"
                   style={{ color: entry?.plan_kind === 'workout' ? COLOR : tokens.textMuted }}
-                  numberOfLines={1}
                 >
                   {routine?.name ?? (entry?.plan_kind === 'rest' ? 'Rest' : 'Not planned')}
                 </Text>
               </View>
-              <View className="flex-row gap-1">
+              <View className="ml-auto flex-row gap-1">
                 {routines.slice(0, 2).map((candidate) => (
                   <Pressable
                     key={candidate.id}

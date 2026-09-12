@@ -15,6 +15,63 @@ type SegmentOption<T extends string> = {
   disabled?: boolean;
 };
 
+type SegmentOptionProps<T extends string> = {
+  option: SegmentOption<T>;
+  active: boolean;
+  /** Accent used for the keyboard focus ring. */
+  ringColor: string;
+  onSelect: (value: T) => void;
+};
+
+/**
+ * One segment. The focus ring lives on a per-option hook: a single shared
+ * focus state at the control level would outline every option when one of them
+ * is focused (keyboard or click), which reads as a rendering defect.
+ */
+function SegmentOptionButton<T extends string>({
+  option,
+  active,
+  ringColor,
+  onSelect,
+}: SegmentOptionProps<T>) {
+  const { tokens } = useAppTheme();
+  const ring = useKeyboardFocusRing(ringColor);
+  return (
+    <Pressable
+      disabled={option.disabled}
+      accessibilityRole="tab"
+      accessibilityLabel={option.accessibilityLabel ?? option.label}
+      accessibilityState={{ selected: active, disabled: option.disabled ?? false }}
+      onPress={() => {
+        if (!option.disabled) onSelect(option.value);
+      }}
+      onFocus={ring.onFocus}
+      onBlur={ring.onBlur}
+      style={[
+        {
+          flex: 1,
+          minWidth: 0,
+          minHeight: size.touchTargetMin - 6,
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderRadius: radius.full,
+          opacity: option.disabled ? 0.4 : 1,
+          zIndex: 1,
+        },
+        ring.focusRingStyle,
+      ]}
+    >
+      <Text
+        variant="label"
+        style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 13.5 }}
+        numberOfLines={1}
+      >
+        {option.label}
+      </Text>
+    </Pressable>
+  );
+}
+
 type SegmentedControlProps<T extends string> = {
   options: readonly SegmentOption<T>[];
   value: T;
@@ -44,7 +101,6 @@ export function SegmentedControl<T extends string>({
   const { tokens } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const resolvedAccent = accentColor ?? tokens.primary;
-  const ring = useKeyboardFocusRing(resolvedAccent);
   const containerRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [indicator] = useState(() => new Animated.Value(0));
@@ -124,43 +180,15 @@ export function SegmentedControl<T extends string>({
           ]}
         />
       ) : null}
-      {options.map((option) => {
-        const active = option.value === value;
-        return (
-          <Pressable
-            key={option.value}
-            disabled={option.disabled}
-            accessibilityRole="tab"
-            accessibilityLabel={option.accessibilityLabel ?? option.label}
-            accessibilityState={{ selected: active, disabled: option.disabled ?? false }}
-            onPress={() => {
-              if (!option.disabled) onChange(option.value);
-            }}
-            onFocus={ring.onFocus}
-            onBlur={ring.onBlur}
-            style={[
-              {
-                flex: 1,
-                minHeight: size.touchTargetMin - 6,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: radius.full,
-                opacity: option.disabled ? 0.4 : 1,
-                zIndex: 1,
-              },
-              ring.focusRingStyle,
-            ]}
-          >
-            <Text
-              variant="label"
-              style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 13.5 }}
-              numberOfLines={1}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {options.map((option) => (
+        <SegmentOptionButton
+          key={option.value}
+          option={option}
+          active={option.value === value}
+          ringColor={resolvedAccent}
+          onSelect={onChange}
+        />
+      ))}
     </View>
   );
 }

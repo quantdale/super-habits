@@ -127,7 +127,7 @@ export function TodayProgressStrip({
       >
         Today at a glance
       </Text>
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         {metrics.map((metric) => {
           const meta = OVERVIEW_CARD_META[metric.id];
           const hue = sectionAccents[metric.id].fill;
@@ -138,8 +138,9 @@ export function TodayProgressStrip({
               accessibilityLabel={`${metric.spoken}. Open ${meta.title}`}
               onPress={() => openCardTarget(navigation, meta)}
               style={({ pressed }) => ({
-                flex: 1,
-                minWidth: 0,
+                flexGrow: 1,
+                flexBasis: 96,
+                minWidth: 96,
                 paddingVertical: spacing.md,
                 paddingHorizontal: spacing.sm,
                 borderRadius: radius.md,

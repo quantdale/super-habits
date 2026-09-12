@@ -67,33 +67,37 @@ export function TodoListToolbar({
   return (
     <View className="mb-3">
       <Card accentColor={accentColor} className="mb-0" innerClassName="p-3">
-        <TextField
-          label=""
-          value={search}
-          onChangeText={onSearchChange}
-          placeholder="Search tasks..."
-        />
         <View className="flex-row flex-wrap items-center gap-2">
-          <PillChip
-            label={activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
-            active={filtersOpen}
-            color={accentColor}
-            onPress={() => setFiltersOpen((open) => !open)}
-          />
-          {hasActiveQuery ? (
-            <PillChip
-              label="Reset"
-              icon="✕"
-              accessibilityLabel="Clear search, filters, and sorting"
-              active={false}
-              color={accentColor}
-              onPress={() => {
-                onSearchChange('');
-                onFiltersChange({ priority: 'all', dueWindow: 'all' });
-                onSortChange('manual');
-              }}
+          <View className="min-w-[180px] flex-1">
+            <TextField
+              label=""
+              value={search}
+              onChangeText={onSearchChange}
+              placeholder="Search tasks..."
             />
-          ) : null}
+          </View>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <PillChip
+              label={activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
+              active={filtersOpen}
+              color={accentColor}
+              onPress={() => setFiltersOpen((open) => !open)}
+            />
+            {hasActiveQuery ? (
+              <PillChip
+                label="Reset"
+                icon="✕"
+                accessibilityLabel="Clear search, filters, and sorting"
+                active={false}
+                color={accentColor}
+                onPress={() => {
+                  onSearchChange('');
+                  onFiltersChange({ priority: 'all', dueWindow: 'all' });
+                  onSortChange('manual');
+                }}
+              />
+            ) : null}
+          </View>
         </View>
         {filtersOpen ? (
           <>
