@@ -46,7 +46,15 @@ tags:
     timeout: 5000
 - assertVisible: 'Longest streak: 1 scheduled occurrence.*'
 - assertVisible: 'Scheduled completion rate'
+# The recent-history section sits below the rate cards; scroll to it rather
+# than asserting off-screen content.
+- scrollUntilVisible:
+    element: 'Recent target vs actual'
+    direction: DOWN
 - assertVisible: 'Recent target vs actual'
+- scrollUntilVisible:
+    element: 'Target met'
+    direction: DOWN
 - assertVisible: 'Target met'
 - tapOn: 'Close'
 - assertNotVisible: 'Native insights habit progress'

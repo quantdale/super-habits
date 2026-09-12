@@ -24,6 +24,25 @@ tags:
     visible: 'Theme and display'
     timeout: 10000
 # Scroll within the settings modal in stable anchors to the Portable data card.
+# The Appearance theme grids are several screens tall and scrollUntilVisible's
+# own steps can be consumed by the pressable cards. Cross the grids with
+# explicit side-margin swipes first, then finish with the scoped scroll.
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
+- swipe:
+    start: '95%, 75%'
+    end: '95%, 25%'
+    duration: 300
 - scrollUntilVisible:
     element:
       text: 'Backup status and restore'
@@ -42,10 +61,18 @@ tags:
     timeout: 10000
 - assertVisible: 'This file contains your Super Habits data. Store it somewhere you trust. The exported file is not encrypted — anyone with the file can read its contents.'
 - assertVisible: 'Export data'
+# Import sits below the fold on this viewport; scroll to it rather than
+# asserting off-screen content.
+- scrollUntilVisible:
+    element: 'Import data'
+    direction: DOWN
 - assertVisible: 'Import data'
 # Empty device: import is offered (not blocked).
 - assertNotVisible: 'Import is available only on an empty device'
 # Real OS share surface: export opens the Android share sheet.
+- scrollUntilVisible:
+    element: 'Export data'
+    direction: UP
 - tapOn: 'Export data'
 - extendedWaitUntil:
     visible: 'No apps can perform this action.'
@@ -53,6 +80,9 @@ tags:
 # Dismiss the share sheet without saving (semi-automated share smoke).
 - back
 # Real OS document picker: import selection surface opens and cancels.
+- scrollUntilVisible:
+    element: 'Import data'
+    direction: DOWN
 - tapOn: 'Import data'
 - extendedWaitUntil:
     visible: 'Recent'

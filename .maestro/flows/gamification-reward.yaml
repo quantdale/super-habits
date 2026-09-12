@@ -17,10 +17,16 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Habits'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Habits" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'Add anytime habit'
     direction: DOWN
+    # Center the bottom-edge add tile: without this the tile settles under the
+    # emulator taskbar and the tap lands on the launcher home button.
+    centerElement: true
 - tapOn: 'Add anytime habit'
 # Index 1 targets the input: index 0 is the visible label (tapping it focuses
 # nothing and drops typed text).
@@ -28,11 +34,17 @@ tags:
     text: 'Habit name'
     index: 1
 - inputText: 'Reward loop'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The list keeps its scroll position; bring the new tile into view before the
+# unchanged progress assertion.
+- scrollUntilVisible:
+    element: 'Reward loop: 0 of 1 today.*'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Reward loop: 0 of 1 today.*'
     timeout: 8000
@@ -40,7 +52,8 @@ tags:
 - assertVisible: 'Reward loop: 1 of 1 today.*'
 - tapOn:
     text: 'Today'
-    index: 0
+    childOf:
+      text: 'Section tabs'
 # The reward card sits below Today's Plan. Scroll to the card itself (a stable
 # clickable node) rather than to a text label deep inside it, accept partial
 # visibility, then read the award from the achievements drawer hero, which

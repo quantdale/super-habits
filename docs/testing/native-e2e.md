@@ -40,6 +40,13 @@ the Android API-36 navigation-bar boundary.
 | `settings-persistence.yaml`             | `native`, `persistence`, `settings`                               | Change theme mode and verify it after relaunch                                           |
 | `pomodoro-lifecycle.yaml`               | `native`, `lifecycle`, `pomodoro`                                 | Start, background, foreground, and reset a running timer                                 |
 | `pomodoro-notification-path.yaml`       | `native`, `lifecycle`, `notifications`, `pomodoro`                | Grant notification permission, start native timer scheduling path, background/foreground |
+| `command-center-v2.yaml`                | `native`, `command-v2`, `smoke`                                   | Command overlay opens, captures a quick entry, and closes cleanly                        |
+| `habit-progress-insights.yaml`          | `native`, `habits`, `habit-progress-insights`                     | Habit detail progress sheet renders real completion statistics                           |
+| `gamification-reward.yaml`              | `native`, `reward`                                                | Check-in pays base XP + the day-complete bonus and unlocks the first badge               |
+| `auth-session-0{1,2,3}-*.yaml`          | `native`, `account-v1`, `auth-persistence`                        | Anonymous session survives restart; email protection flow (auth-mock lane)               |
+| `backup-v2-settings.yaml`               | `native`, `backup-v2`                                             | Backup coverage row, V2 scope, and conservative model disclosure on a fresh install      |
+| `portable-backup.yaml`                  | `native`, `portable-backup`                                       | Portable data card, export share sheet, import document picker (cancelled)               |
+| `portable-backup-blocked.yaml`          | `native`, `portable-backup`                                       | Import blocked with a visible reason on a device that holds local data                   |
 
 Gym V2 keeps the legacy free-text path covered by the original Workout
 persistence flow and adds a focused native layer for the higher-risk platform
@@ -65,6 +72,22 @@ npm run qa:native:lifecycle
 npm run qa:native:ios
 node scripts/qa-native.mjs --platform android --flow .maestro/flows/native-smoke.yaml
 ```
+
+Focused single-tag lanes beyond the npm scripts above (the runner maps
+`--tag` directly to Maestro's `--include-tags`):
+
+```bash
+node scripts/qa-native.mjs --platform android --tag reward
+node scripts/qa-native.mjs --platform android --tag backup-v2
+node scripts/qa-native.mjs --platform android --tag portable-backup
+node scripts/qa-native.mjs --platform android --tag habit-progress-insights
+node scripts/qa-native.mjs --platform android --tag auth-persistence --auth-mock
+```
+
+The auth lane is also reachable through the repeat harness as
+`npm run qa:repeat -- --suite native-auth -- --avd <name>`; the reward lane is
+`--suite native-reward`. `habit-progress-insights` additionally runs in the EAS
+cloud workflow (`.eas/workflows/native-e2e.yml`).
 
 On the documented Windows Android lane, the runner selects the single booted
 API-36 x86_64 target, checks its package/provenance identity, and automatically

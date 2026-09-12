@@ -78,6 +78,16 @@ export const REPEAT_SUITES = {
     needsAvd: true,
     artifactHint: 'simulation-output/native/ labeled reports + debug dirs',
   },
+  'native-reward': {
+    description: 'Native reward-loop flow on one owned-selected AVD',
+    kind: 'node',
+    script: 'scripts/qa-native.mjs',
+    scriptArgs: ['--platform', 'android', '--tag', 'reward'],
+    timeoutMin: 20,
+    needsDist: false,
+    needsAvd: true,
+    artifactHint: 'simulation-output/native/ labeled reports + debug dirs',
+  },
 };
 
 /**
