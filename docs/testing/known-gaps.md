@@ -374,6 +374,19 @@ Latest lane: 9/11 with only two habit post-create asserts failing; both flows
 pass on immediate re-run, and `calories-persistence` passed in-lane for the
 first time since the redesign. Residual remains `ENVIRONMENT`.
 
+**2026-09-12 final hardening + lane (source `00d2935` flows, installed APK
+`08e1c6d`):** unscoped tab taps, the bottom-edge calorie Save tap, and the
+habit post-create tile visibility were all fixed as classes. Final direct lane:
+10/11 with a single `calories-persistence` failure at the post-save
+`Logged today` scroll — the failure screenshot shows "Logged today" and the
+saved `Native breakfast` row fully rendered while the matcher reported
+"No visible element found". The same flow passed standalone three times and
+in-lane twice on identical code. No flow change is justified against a
+rendered-but-unmatched element; the residual is hierarchy-read starvation and
+stays `ENVIRONMENT`. The official runner was last attempted at
+`08e1c6d`/`595A7630…` (9/11, same class); gap 17 remains repaired and gap 18
+owns the rested-device re-run.
+
 ---
 
 ## Related
