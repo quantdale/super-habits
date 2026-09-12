@@ -54,21 +54,24 @@ meaningful defect remaining and the Pop direction preserved.
 ## Current Checkpoint
 
 - Current milestone: W8 — fixes and plan committed/pushed (`819e0e2`,
-  `157eeec`; `HEAD == origin/main`), temp harness deleted; native smoke running
-  on Nitro_API_36 from clean source `157eeec`.
+  `157eeec`, `eff379b`; `HEAD == origin/main`), temp harness deleted; native
+  smoke PASSED on Nitro_API_36 from clean source `eff379b`.
 - Completed: V2 rounds 1+2 + P1–P6/W5/W6 sweeps; shared fixes landed
   (V2-8 raw-Text→`core/ui/Text`, V2-9 stacked backup identity card, V2-10
   full-width SettingsRow descriptions, V2-11 `—` empty habits stat);
   V2-1–V2-7/V2-12–V2-13 triaged (see inventory); full harness re-run 25/25 on
   fresh dist; typecheck/lint/unit/integration/affected-Chromium/P0 journeys/
   simulation/web:verify all green.
-- In progress: native smoke (auto-provision from clean `157eeec`).
+- In progress: full Chromium suite on `eff379b` (E2E_PORT=8083); native smoke
+  PASSED 2/2 on Nitro_API_36 from clean source `eff379b` (APK SHA-256
+  `F26B76A2F13A9B679A03AB308080CA1BBBE51D4D33023852356DDCAD01A4B636`,
+  artifact `native-android-smoke-Nitro_API_36-2026-09-12T150635219Z.json`).
 - Important modified files: committed — `features/overview/TodayProgressStrip.tsx`,
   `features/settings/SettingsBackupSection.tsx`,
   `features/settings/SettingsSharedUi.tsx`, this plan.
 - Last successful validation: V1 ladder (see pop-visual-qa-v1.md Outcomes).
-- Current failures: None (V2-6 OPEN tooling only — re-capture with
-  inner-ScrollView scrolling via v2c-01/v2d-01).
+- Current failures: None (V2-6 was tooling-only and is CLOSED — re-captured
+  with inner-ScrollView scrolling via v2c-01/v2d-01).
 - Relevant quarantines: known-gap 15 (J8 under load), 16 (habits flake), 17
   (native persistence selectors).
 - Blockers: None.
@@ -153,6 +156,8 @@ meaningful defect remaining and the Pop direction preserved.
 - 2026-09-12 — `npm run qa:simulation` — PASS 1/1 deterministic scenario.
 - 2026-09-12 — `npm run web:verify` — PASS (COOP/COEP present, crossOriginIsolated=true, port released).
 - 2026-09-12 — `npm run agent:resume` — PASS structure; Git warnings were the expected uncommitted V2 files.
+- 2026-09-12 — `qa:native smoke` on Nitro_API_36 — PASS 2/2 (command-center-v2 59s, native-smoke 1m22s); APK built from clean source `eff379b`, SHA-256 `F26B76A2F13A9B679A03AB308080CA1BBBE51D4D33023852356DDCAD01A4B636`; re-run after the first attempt was correctly blocked [ENVIRONMENT] for a dirty tree (plan checkpoint uncommitted).
+- 2026-09-12 — `npm run qa:impact:validate` — PASS (13 rules).
 
 ## Changed Files / Areas
 
