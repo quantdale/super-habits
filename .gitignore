@@ -42,6 +42,10 @@ yarn-error.*
 .cursor/playwright-output/*
 !.cursor/playwright-output/.gitkeep
 
+# Maestro/native + SQLite inspection output from agent QA sessions (dev tooling only)
+.cursor/maestro-debug/
+.cursor/db-inspect/
+
 # Playwright E2E
 /playwright-report/
 /test-results/

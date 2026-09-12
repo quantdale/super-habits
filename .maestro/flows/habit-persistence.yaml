@@ -17,6 +17,9 @@ tags:
 - scrollUntilVisible:
     element: 'Add anytime habit'
     direction: DOWN
+    # Center the bottom-edge add tile: without this the tile settles under the
+    # emulator taskbar and the tap lands on the launcher home button.
+    centerElement: true
 - tapOn: 'Add anytime habit'
 # Index 1 targets the input: index 0 is the visible label (tapping it focuses nothing and drops typed text).
 - tapOn:
@@ -28,6 +31,12 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The list keeps its scroll position; bring the new tile into view before
+# the unchanged progress assertion.
+- scrollUntilVisible:
+    element: 'Native daily habit: 0 of 1 today.*'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native daily habit: 0 of 1 today.*'
     timeout: 5000

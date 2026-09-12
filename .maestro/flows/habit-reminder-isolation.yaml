@@ -22,6 +22,9 @@ tags:
 - scrollUntilVisible:
     element: 'Add anytime habit'
     direction: DOWN
+    # Center the bottom-edge add tile: without this the tile settles under the
+    # emulator taskbar and the tap lands on the launcher home button.
+    centerElement: true
 - tapOn: 'Add anytime habit'
 # Index 1 targets the input: index 0 is the visible label (tapping it focuses nothing and drops typed text).
 - tapOn:
@@ -49,10 +52,12 @@ tags:
 - extendedWaitUntil:
     visible: 'Native Gym reminder'
     timeout: 15000
-# Second habit must NOT inherit the first one's reminder.
+# Second habit must NOT inherit the first one's reminder. The post-create
+# assert leaves the Anytime row partially above the fold, so scroll UP to it.
 - scrollUntilVisible:
     element: 'Add anytime habit'
-    direction: DOWN
+    direction: UP
+    centerElement: true
 - tapOn: 'Add anytime habit'
 - scrollUntilVisible:
     element: 'Habit name'

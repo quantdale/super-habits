@@ -13,24 +13,36 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'New routine name'
     direction: DOWN
 - tapOn: 'New routine name'
 - inputText: 'Native strength routine'
-- scrollUntilVisible:
-    element: 'New routine description'
-    direction: DOWN
+# Blur before the next field so no scroll/focus animation can shift the layout
+# between Maestro's hierarchy read and the tap.
+- pressKey: enter
 - tapOn: 'New routine description'
 - inputText: 'Native routine'
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Add routine'
     direction: DOWN
+    # Center it: the floating tab bar overlaps bottom-edge content, so
+    # a11y "visible" can still sit under the tab bar and the tap navigates.
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native strength routine routine'
     direction: DOWN
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - extendedWaitUntil:
     visible: 'Open Native strength routine routine'
     timeout: 5000
@@ -40,6 +52,7 @@ tags:
 - scrollUntilVisible:
     element: 'Add'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Add'
 - scrollUntilVisible:
     element: 'Configure Native rows exercise'
@@ -54,7 +67,10 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'Native strength routine'
     direction: DOWN

@@ -16,7 +16,10 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'New routine name'
     direction: DOWN
@@ -115,7 +118,10 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - extendedWaitUntil:
     visible: 'Workout in progress'
     timeout: 15000
@@ -147,7 +153,10 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'Recent sessions'
     direction: DOWN

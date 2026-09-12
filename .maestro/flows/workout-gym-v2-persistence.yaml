@@ -16,7 +16,10 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - swipe:
     direction: UP
 - scrollUntilVisible:
@@ -25,15 +28,25 @@ tags:
     visibilityPercentage: 50
 - tapOn: 'New routine name'
 - inputText: 'Native Gym V2 typed routine'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Add routine'
     direction: DOWN
+    # Center it: the floating tab bar overlaps bottom-edge content, so
+    # a11y "visible" can still sit under the tab bar and the tap navigates.
+    centerElement: true
+# Settle before tapping: a tap aimed from a still-settling hierarchy can land
+# on stale coordinates (documented in native-smoke).
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Add routine'
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Choose from exercise library'
 - extendedWaitUntil:
@@ -50,7 +63,10 @@ tags:
 - inputText: 'zzzz-native-custom'
 - pressKey: enter
 # Explicit proof the filter applied: with zero matches the list collapses
-# to the empty state and the create form sits near the top.
+# to the empty state (its copy can sit just below the fold on the emulator).
+- scrollUntilVisible:
+    element: 'No matching exercises'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'No matching exercises'
     timeout: 10000
@@ -96,37 +112,40 @@ tags:
     visible: 'Configure Native custom press exercise'
     timeout: 10000
 - assertVisible: 'Strength'
+- scrollUntilVisible:
+    element: 'Linear'
+    direction: DOWN
 - tapOn: 'Linear'
 - scrollUntilVisible:
     element: 'Native custom press progression increment'
     direction: DOWN
 - tapOn: 'Native custom press progression increment'
 - inputText: '2.5'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Native custom press minimum reps'
     direction: DOWN
 - tapOn: 'Native custom press minimum reps'
 - inputText: '5'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Native custom press maximum reps'
     direction: DOWN
 - tapOn: 'Native custom press maximum reps'
 - inputText: '8'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Target reps min'
     direction: DOWN
 - tapOn: 'Target reps min'
 - inputText: '5'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Target reps max'
     direction: DOWN
 - tapOn: 'Target reps max'
 - inputText: '8'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
@@ -134,7 +153,7 @@ tags:
     centerElement: true
 - tapOn: 'Target load'
 - inputText: '40'
-- hideKeyboard
+- pressKey: enter
 - assertVisible: 'Target load'
 - pressKey: BACK
 - scrollUntilVisible:
@@ -152,7 +171,10 @@ tags:
     timeout: 8000
 - tapOn:
     text: 'Workout'
-    index: 0
+    # Scope to the section switcher: the Overview stat strip also exposes
+    # "Workout" and an unscoped index-0 match can land on inert content.
+    childOf:
+      text: 'Section tabs'
 - assertVisible: 'Monday Native Gym V2 typed routine'
 - scrollUntilVisible:
     element: 'Your routines'
