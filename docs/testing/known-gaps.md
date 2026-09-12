@@ -295,6 +295,21 @@ Artifacts (gitignored): `simulation-output/native/native-android-persistence*
 Classification: `TEST_BUG` (flow selector/tap rot), not a persistence
 regression; the required native lane for a UI/navigation change (`smoke`) passed.
 
+**2026-09-12 re-run (Pop Visual QA V2, source `d8b44ca`, canonical APK
+`B9446B71…`):** partial improvement — `calories-persistence`,
+`settings-persistence`, `todo-persistence`, and `workout-persistence` now pass
+(4/11), narrowing the failures to the six `habit-*` flows and
+`workout-gym-v2-persistence`. The habit flows now fail one step later: the
+"Habit name" add-form target (`Text matching regex: Habit name, Index: 1`) is
+never reached, consistent with the add-tile tap not opening the form (the
+taskbar-tap mechanism above); `workout-gym-v2-persistence` fails at
+`Choose from exercise library`. The same source's full Chromium battery passes
+the corresponding web specs (todos, habits, workout, workout-gym-v2,
+planning-hub, settings, portable), and native smoke passed 2/2, so the
+classification is unchanged: `TEST_BUG` selector/tap rot, not a persistence
+regression. The closing path below is unchanged and remains the dedicated
+selector pass.
+
 **Closing path:** update the nine flows on a device session (scope tab taps to
 `Section tabs`, `centerElement: true` on bottom-edge scroll targets, and a
 `scrollUntilVisible` before on-screen visibility asserts), keep every

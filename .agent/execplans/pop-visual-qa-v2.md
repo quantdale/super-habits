@@ -1,7 +1,7 @@
 # ExecPlan: Pop Visual QA V2 — Post-Closure Regression Sweep
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -53,22 +53,19 @@ meaningful defect remaining and the Pop direction preserved.
 
 ## Current Checkpoint
 
-- Current milestone: W8 — fixes and plan committed/pushed (`819e0e2`,
-  `157eeec`, `eff379b`; `HEAD == origin/main`), temp harness deleted; native
-  smoke PASSED on Nitro_API_36 from clean source `eff379b`.
-- Completed: V2 rounds 1+2 + P1–P6/W5/W6 sweeps; shared fixes landed
-  (V2-8 raw-Text→`core/ui/Text`, V2-9 stacked backup identity card, V2-10
-  full-width SettingsRow descriptions, V2-11 `—` empty habits stat);
-  V2-1–V2-7/V2-12–V2-13 triaged (see inventory); full harness re-run 25/25 on
-  fresh dist; typecheck/lint/unit/integration/affected-Chromium/P0 journeys/
-  simulation/web:verify all green.
-- In progress: full Chromium suite on `eff379b` (E2E_PORT=8083); native smoke
-  PASSED 2/2 on Nitro_API_36 from clean source `eff379b` (APK SHA-256
-  `F26B76A2F13A9B679A03AB308080CA1BBBE51D4D33023852356DDCAD01A4B636`,
-  artifact `native-android-smoke-Nitro_API_36-2026-09-12T150635219Z.json`).
+- Current milestone: COMPLETE — all waves done, all gates resolved, plan
+  marked COMPLETED.
+- Completed: V2 rounds 1+2 + P1–P6/W5/W6 sweeps; four defects fixed
+  (V2-8/9/10/11); full harness 25/25; typecheck/lint/unit/integration/full
+  Chromium/P0 journeys/simulation/web:verify green; native smoke 2/2 (APK
+  `F26B76A2…`, source `eff379b`); persistence lane partially improved and its
+  remaining failures classified `EXPECTED_KNOWN_GAP` 17 (TEST_BUG) with
+  refreshed evidence in `docs/testing/known-gaps.md`.
+- In progress: None.
 - Important modified files: committed — `features/overview/TodayProgressStrip.tsx`,
   `features/settings/SettingsBackupSection.tsx`,
-  `features/settings/SettingsSharedUi.tsx`, this plan.
+  `features/settings/SettingsSharedUi.tsx`, this plan,
+  `docs/testing/known-gaps.md` (entry-17 re-run note).
 - Last successful validation: V1 ladder (see pop-visual-qa-v1.md Outcomes).
 - Current failures: None (V2-6 was tooling-only and is CLOSED — re-captured
   with inner-ScrollView scrolling via v2c-01/v2d-01).
@@ -77,14 +74,11 @@ meaningful defect remaining and the Pop direction preserved.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: await/verify native smoke PASS on Nitro_API_36 → fill
-  Outcomes & Retrospective, mark COMPLETED, validate plan, commit/push → final
-  `web:hygiene`.
-- Remaining definition of done: harness rounds green; all vision defects fixed
-  or accepted with rationale; color/type/spacing/dark-parity/a11y sweeps done;
-  typecheck/lint/Vitest/Chromium green (minus documented flakes); native smoke
-  PASS; web:verify PASS; final side-by-side review clean; commits pushed;
-  plan COMPLETED.
+- Exact next action: None — task complete (this status commit + final
+  `web:hygiene` are the closure actions).
+- Remaining definition of done: complete — harness rounds green; defects fixed
+  or accepted; sweeps done; gates green with documented flakes only; native
+  smoke PASS; web:verify PASS; review clean; commits pushed; plan COMPLETED.
 
 ## Progress
 
@@ -106,8 +100,8 @@ meaningful defect remaining and the Pop direction preserved.
 - [x] P4 — accessibility (contrast, focus, touch targets, text scaling)
 - [x] P5 — forms/keyboard/safe-area/mobile-quality checks (2026-09-12: todo/quick-capture forms, tab-bar/FAB clearance in every shot)
 - [x] P6 — App Store presentation + dev-artifact/copy sweep
-- [ ] W7 — regression gates + native smoke
-- [ ] W8 — final side-by-side review, commit/push, close plan
+- [x] W7 — regression gates + native smoke (2026-09-12: full Chromium 135/7/1 known-gap, P0 25/25, sim PASS, native smoke 2/2, web:verify PASS)
+- [x] W8 — final side-by-side review, commit/push, close plan (2026-09-12)
 
 ## Defect Inventory (v2 — rounds 1+2, 2026-09-12)
 
@@ -133,6 +127,14 @@ meaningful defect remaining and the Pop direction preserved.
   ship-readiness: color/type/spacing/dark-parity/a11y/forms/motion/copy/
   dev-artifacts + final side-by-side review. Folded into this plan as waves
   P1–P6 rather than a competing plan (single-owner discipline).
+- The persistence lane is partially greener than when known-gap 17 was filed
+  (4/11 vs 2/11); the remaining failures are selector/tap rot, not persistence
+  regressions (web equivalents pass on the same source). A dedicated Maestro
+  selector pass remains the registered closing path for gap 17 — it is not a
+  V2 defect and did not gate this plan.
+- `habits.spec.ts:222` (known-gap 16) failed twice in-battery this session and
+  passed standalone both times on the identical dist — same load-sensitive
+  class as the documented V1 observation; assertion untouched.
 
 ## Decision Log
 
@@ -157,6 +159,8 @@ meaningful defect remaining and the Pop direction preserved.
 - 2026-09-12 — `npm run web:verify` — PASS (COOP/COEP present, crossOriginIsolated=true, port released).
 - 2026-09-12 — `npm run agent:resume` — PASS structure; Git warnings were the expected uncommitted V2 files.
 - 2026-09-12 — `qa:native smoke` on Nitro_API_36 — PASS 2/2 (command-center-v2 59s, native-smoke 1m22s); APK built from clean source `eff379b`, SHA-256 `F26B76A2F13A9B679A03AB308080CA1BBBE51D4D33023852356DDCAD01A4B636`; re-run after the first attempt was correctly blocked [ENVIRONMENT] for a dirty tree (plan checkpoint uncommitted).
+- 2026-09-12 — Full Chromium battery on final dist — 135 passed / 7 skipped / 1 failed (`habits.spec.ts:222` known-gap 16), standalone re-run PASS on the identical dist; no product regressions across all 26 spec files.
+- 2026-09-12 — `npm run qa:native:targeted` (persistence, Nitro_API_36, source `d8b44ca`, APK `B9446B71…`) — 4/11 PASS (calories/settings/todo/workout persistence improved from the gap-17 baseline 2/11); 7 failures = the registered known-gap 17 selector/tap rot (`habit-*` ×6, `workout-gym-v2`) — classification `EXPECTED_KNOWN_GAP` (TEST_BUG), freshly re-documented in `docs/testing/known-gaps.md` entry 17; web equivalents of every failed flow pass in the same-source Chromium battery.
 - 2026-09-12 — `npm run qa:impact:validate` — PASS (13 rules).
 
 ## Changed Files / Areas
@@ -178,6 +182,31 @@ meaningful defect remaining and the Pop direction preserved.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: pending.
-- Follow-up: pending.
+- Status: Completed (2026-09-12).
+- Summary: a fresh application-wide visual regression pass on the closed V1
+  tree confirmed none of the V1 fixes regressed and found/fixed four new
+  defects: the shared SettingsRow description squeeze caused by wide-status
+  pills (all 23 usages; V2-10), the backup identity card squeezing its message
+  to one-word lines behind a 200px pill (V2-9), the raw RN `Text` violation in
+  `SettingsBackupSection` (V2-8), and the misleading `0/0` empty-habits
+  Overview stat now rendering an em dash with a spoken label (V2-11). Nine
+  other leads were verified not defects or accepted with rationale (V2-1–V2-7,
+  V2-12–V2-13). Color/type/spacing/dark-parity/a11y/forms/dev-artifact sweeps
+  (P1–P6) were completed in ≤3-image vision batches per the operator request.
+  The temporary `e2e/zz-*` harness was deleted and never committed.
+- Proof: harness final re-run 25/25 on fresh `dist/` (v2 10/10, v2b 7/7, v2c
+  5/5, v2d 3/3); typecheck/lint clean; Vitest 1755 unit + 300 integration;
+  full Chromium 135 passed / 7 skipped / 1 known-gap-16 flake (standalone
+  PASS); P0 journeys 25/25; deterministic simulation PASS; native smoke 2/2 on
+  Nitro_API_36 from clean source `eff379b` (APK `F26B76A2…`); web:verify PASS;
+  commits `819e0e2`, `157eeec`, `eff379b`, `d8b44ca` pushed (`HEAD ==
+origin/main`).
+- Follow-up: (1) known-gap 17 dedicated Maestro selector pass for the remaining
+  `habit-*` and `workout-gym-v2-persistence` flows; (2) known-gap 16/15/17
+  unchanged; (3) the V1 `pageOverflowY: 12` root overflow remains accepted
+  (masked by the shell).
+- Lessons: (1) stacking a title/pill/body header is the robust fix for
+  wide-pill squeeze, not narrower copy; (2) empty metrics should render the
+  no-data glyph with a spoken label rather than a numeric-looking `0/0`;
+  (3) native provenance requires a clean tree — do not edit tracked files
+  while a certification lane is provisioning.
