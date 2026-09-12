@@ -161,6 +161,7 @@ meaningful defect remaining and the Pop direction preserved.
 - 2026-09-12 — `qa:native smoke` on Nitro_API_36 — PASS 2/2 (command-center-v2 59s, native-smoke 1m22s); APK built from clean source `eff379b`, SHA-256 `F26B76A2F13A9B679A03AB308080CA1BBBE51D4D33023852356DDCAD01A4B636`; re-run after the first attempt was correctly blocked [ENVIRONMENT] for a dirty tree (plan checkpoint uncommitted).
 - 2026-09-12 — Full Chromium battery on final dist — 135 passed / 7 skipped / 1 failed (`habits.spec.ts:222` known-gap 16), standalone re-run PASS on the identical dist; no product regressions across all 26 spec files.
 - 2026-09-12 — `npm run qa:native:targeted` (persistence, Nitro_API_36, source `d8b44ca`, APK `B9446B71…`) — 4/11 PASS (calories/settings/todo/workout persistence improved from the gap-17 baseline 2/11); 7 failures = the registered known-gap 17 selector/tap rot (`habit-*` ×6, `workout-gym-v2`) — classification `EXPECTED_KNOWN_GAP` (TEST_BUG), freshly re-documented in `docs/testing/known-gaps.md` entry 17; web equivalents of every failed flow pass in the same-source Chromium battery.
+- 2026-09-12 — `npm run web:hygiene` — 8082/8083 FREE; 8081 occupied by the unrelated `D:\Documents\tryPython\brain-training` Metro (not campaign-owned; documented since V1) — no campaign-owned listeners remain.
 - 2026-09-12 — `npm run qa:impact:validate` — PASS (13 rules).
 
 ## Changed Files / Areas
