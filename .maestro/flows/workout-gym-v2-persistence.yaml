@@ -146,6 +146,14 @@ tags:
 - tapOn: 'Target reps max'
 - inputText: '8'
 - pressKey: enter
+# The reps inputs sit under Maestro's center-swipe origin, so scrollUntilVisible's
+# own swipes are consumed by the focused EditText and the list never moves.
+# Cross the remaining form with an explicit side-margin swipe (same class as the
+# auth-session/backup-v2 flows) before the scoped scroll.
+- swipe:
+    start: '5%, 72%'
+    end: '5%, 25%'
+    duration: 300
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
@@ -187,6 +195,10 @@ tags:
     visibilityPercentage: 50
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'
+- swipe:
+    start: '5%, 72%'
+    end: '5%, 25%'
+    duration: 300
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
