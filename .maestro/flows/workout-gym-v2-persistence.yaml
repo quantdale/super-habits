@@ -92,6 +92,16 @@ tags:
 - tapOn: 'Custom exercise equipment'
 - inputText: 'barbell'
 - pressKey: enter
+# The Pop type scale (restored 2026-09-13) makes the custom-exercise form
+# taller, so aliases now sits below the fold; the equipment EditText also
+# swallows center swipes, so cross with a side-margin swipe first.
+- swipe:
+    start: '5%, 72%'
+    end: '5%, 25%'
+    duration: 300
+- scrollUntilVisible:
+    element: 'Custom exercise aliases'
+    direction: DOWN
 - tapOn: 'Custom exercise aliases'
 - inputText: 'incline press'
 - pressKey: enter
