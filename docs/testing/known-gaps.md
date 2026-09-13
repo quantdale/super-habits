@@ -272,7 +272,7 @@ rule-history oracle is untouched. Verified 3/3 standalone and in the full batter
 
 **Closing path:** closed; keep the title-based post-commit guard and the strict oracle.
 
-### 17. Native persistence flows need a dedicated selector pass after the Pop redesign (TEST_BUG)
+### 17. Native persistence flows need a dedicated selector pass after the Pop redesign — CLOSED (TEST_BUG)
 
 **Reason:** on 2026-09-12, `node scripts/qa-native.mjs --platform android --tag
 persistence --avd Nitro_API_36 --no-provision` (source `d9c17f5`, canonical
