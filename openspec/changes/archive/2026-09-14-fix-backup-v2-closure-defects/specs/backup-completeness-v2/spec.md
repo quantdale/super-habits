@@ -155,11 +155,21 @@ participate directly in the import transaction.
 
 ### Requirement: Backup integrity is verified by deterministic checksums
 
-The existing checksum requirement is extended to the recoverable settings
-payload: the settings snapshot captured with a manifest generation MUST be
-canonicalized and hashed with the same deterministic SHA-256 primitive, its
-checksum MUST be certified in the manifest, and restore MUST verify it before
-importing anything.
+The checksum MUST be a SHA-256 over canonicalized rows: fixed per-entity
+column order, rows sorted by id, JSON serialization with sorted keys, nulls
+preserved, joined with newlines. The same logical dataset MUST hash
+identically across runs and runtimes. Restore MUST verify per-entity counts and
+checksums against the manifest before importing and MUST refuse mismatches.
+The requirement also covers the recoverable settings payload: the settings
+snapshot captured with a manifest generation MUST be canonicalized and hashed
+with the same deterministic SHA-256 primitive, its checksum MUST be certified
+in the manifest, and restore MUST verify it before importing anything.
+
+#### Scenario: Corrupted backup is blocked
+
+- **WHEN** a fetched row fails validation, counts or checksums mismatch, a parent is missing, or a duplicate key exists
+- **THEN** restore is blocked with a clear failure and diagnostics
+- **AND** the local database is unchanged
 
 #### Scenario: Settings integrity is verified like entity integrity
 
@@ -171,11 +181,26 @@ importing anything.
 
 ### Requirement: Ownership and RLS remain hardened for every new table
 
-The `saved_meals` global uniqueness constraint is removed and replaced by an
-owner-scoped index; the ownership/RLS contract (four authenticated owner
-policies per table, `((select auth.uid()) = user_id)`, no anon/PUBLIC, no
-`USING (true)`) is unchanged, and the schema validator MUST fail if any later
+Every new remote table MUST be owner-scoped with
+`user_id UUID NOT NULL DEFAULT auth.uid()` referencing `auth.users(id)` (no
+cascade on data relationships), RLS enabled, and exactly four authenticated
+owner policies per table using `((select auth.uid()) = user_id)` including
+UPDATE USING + WITH CHECK. Anon and PUBLIC MUST have no table privileges, and
+no `USING (true)` policy MUST be introduced after the ownership fence. Client
+restore MUST treat remote rows as untrusted and MUST ignore any row whose
+ownership contract is invalid. The settings payload MUST be bounded and MUST
+NOT allow `user_id` changes; the manifest MUST belong to the owner. No service
+role key MUST appear in the app. The `saved_meals` global uniqueness
+constraint is removed and replaced by an owner-scoped index; the ownership/RLS
+contract above is unchanged, and the schema validator MUST fail if any later
 migration reintroduces global `saved_meals` food-name uniqueness.
+
+#### Scenario: Cross-user isolation holds
+
+- **WHEN** owner A and owner B both have backups
+- **THEN** neither can read, insert, update, delete, or upsert the other's rows
+- **AND** anonymous clients cannot access any backup table
+- **AND** a restore never imports rows outside the verified owner
 
 #### Scenario: Uniqueness never becomes a cross-user channel
 

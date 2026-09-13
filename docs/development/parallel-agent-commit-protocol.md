@@ -6,7 +6,7 @@ and manipulating the index. Under concurrent agents sharing one working tree,
 that stash dance races: workers can commit sibling files under another worker's
 message, temporarily lose content, or leave orphan `lint-staged automatic
 backup` stashes behind. The parallel completion wave V2 hit exactly this
-(see `openspec/changes/complete-product-roadmap-parallel-wave-v2/HARDENING_HANDOFF.md`).
+(see `openspec/changes/archive/2026-09-14-complete-product-roadmap-parallel-wave-v2/HARDENING_HANDOFF.md`).
 
 ## Rules for any future parallel wave
 

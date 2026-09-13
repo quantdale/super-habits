@@ -1,9 +1,11 @@
+# recoverable-account Specification
+
 ## Purpose
 
 Define a recoverable, owner-preserving account boundary for the offline-first
 SQLite dataset and its optional Supabase backup.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Anonymous use remains local-first and recoverable
 
@@ -215,8 +217,6 @@ The client MUST continue to use the authenticated Supabase session for remote op
 
 - **WHEN** an anonymous account is protected and the UUID-preservation checks pass
 - **THEN** pre-existing remote rows retain their original `user_id`; row COUNTS are mutable diagnostics (they may grow or shrink through legitimate sync) and MUST NOT be treated as a security fingerprint.
-
-## MODIFIED Requirements
 
 ### Requirement: Existing-account recovery is empty-device-only
 

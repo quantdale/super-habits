@@ -1,6 +1,6 @@
 # Warm Momentum 2.4 — Reliability, Heavy-State Performance, Product Completion
 
-Campaign: `openspec/changes/harden-warm-momentum-2-4-reliability-performance-completion-v1`
+Campaign: `openspec/changes/archive/2026-09-14-harden-warm-momentum-2-4-reliability-performance-completion-v1`
 Predecessors: [WM2.1](08-warm-momentum-2-1.md) · [WM2.2](09-warm-momentum-2-2.md) · [WM2.3](10-warm-momentum-2-3.md)
 
 WM2.4 is the reliability arc of the polish campaign: it hardens what WM2.0–2.3

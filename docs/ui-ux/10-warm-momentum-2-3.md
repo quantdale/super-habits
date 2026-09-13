@@ -1,6 +1,6 @@
 # Warm Momentum 2.3 — Data-Entry Ergonomics, Shared Input Primitives, Modal-State Determinism
 
-Campaign: `openspec/changes/polish-warm-momentum-2-3-data-entry-modal-determinism-v1`
+Campaign: `openspec/changes/archive/2026-09-14-polish-warm-momentum-2-3-data-entry-modal-determinism-v1`
 Predecessors: [WM2.0](07-warm-momentum.md) · [WM2.1](08-warm-momentum-2-1.md) · [WM2.2](09-warm-momentum-2-2.md)
 
 WM2.3 turns the moment the user _enters data_ into one deterministic model:

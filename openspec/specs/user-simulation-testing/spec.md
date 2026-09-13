@@ -373,22 +373,37 @@ The suite SHALL cover the application's background work — the 30-second sync i
 
 ### Requirement: Performance-oriented user journeys
 
-The suite SHALL assert user-perceptible responsiveness at realistic data volume, using thresholds derived from a measured baseline and set loosely enough to catch cliffs rather than noise. Formal load and stress testing SHALL be recorded as out of scope rather than implied.
+The suite SHALL assert user-perceptible responsiveness at realistic data volume. Against the unchanged HEAVY fixture, the user-visible recurring-todo section-switch path SHALL complete within 800ms after all six sections have been activated, and the calorie-diary saved-meal search path SHALL reveal the matching result within 500ms after input. The timing boundaries SHALL include legitimate initialization, refresh, filtering, state-update, and rendering work experienced by the user. Formal load and stress testing SHALL be recorded as out of scope rather than implied.
 
 #### Scenario: Cold start at heavy volume stays usable
 
 - **WHEN** the app is opened cold against the HEAVY fixture
 - **THEN** Overview reaches an interactive, populated state within the agreed threshold and does not render a partially-populated state that later jumps.
 
+#### Scenario: Recurring-todo section switching stays within the D14 ceiling
+
+- **WHEN** all six sections have been activated against the unchanged HEAVY fixture and the user switches from Overview to Todos through the normal tab rail
+- **THEN** the section reaches its interactive populated state within 800ms, including recurring-todo refresh/expansion and legitimate rendering work, without duplicate daily instances or changed recurrence results.
+
 #### Scenario: Section switching stays responsive after long use
 
 - **WHEN** all six sections have been activated and the session has run through many interactions
 - **THEN** switching sections stays within the agreed threshold, with no progressive slowdown across repeated switches.
 
+#### Scenario: Calorie-diary saved-meal search stays within the D14 ceiling
+
+- **WHEN** the user enters a query in the HEAVY calorie diary saved-meal search
+- **THEN** the matching saved meal is revealed within 500ms with the existing case behavior, matching semantics, ordering, diary results, and calorie/macro values unchanged.
+
 #### Scenario: Large lists remain interactive
 
 - **WHEN** a list of 200+ todos or 600+ calorie entries is scrolled and filtered
 - **THEN** input remains responsive and the correct rows are rendered throughout.
+
+#### Scenario: Performance evidence is repeatable
+
+- **WHEN** the fixed HEAVY performance journey is run repeatedly in its configured Chromium journeys project
+- **THEN** the unchanged thresholds and assertions are evaluated on every run, timing distributions are recorded, and a quarantine is removed only after the applicable contract passes reliably rather than on a single favorable sample.
 
 ### Requirement: Exploratory testing missions
 
@@ -496,14 +511,59 @@ The capability SHALL maintain a register of what cannot currently be tested, why
 
 ### Requirement: Authentication and authorization scope statement
 
-Because the application is single-user with anonymous Supabase authentication, no roles, and no client-side authorization boundary, the capability SHALL document that no authorization test surface exists client-side rather than inventing one, and SHALL cover the session behaviour that does exist.
+Because the application uses anonymous Supabase authentication, the testing
+model SHALL distinguish the unauthenticated PostgreSQL `anon` role from a
+signed-in anonymous Auth user evaluated as `authenticated`. It SHALL cover
+client session bootstrap and the server-side owner-isolation contract for
+Supabase backup tables rather than treating authorization as out of scope.
 
 #### Scenario: Anonymous session bootstrap is covered
 
 - **WHEN** the app bootstraps with Supabase configured
-- **THEN** an anonymous session is established or the failure is handled without blocking local-first use, and the app remains fully functional when Supabase is unconfigured.
+- **THEN** an anonymous session is established or the failure is handled
+  without blocking local-first use, and the app remains fully functional when
+  Supabase is unconfigured.
+
+#### Scenario: Unauthenticated role has no backup access
+
+- **WHEN** the security harness evaluates backup-table CRUD as PostgreSQL role
+  `anon` without a signed-in Auth session
+- **THEN** SELECT, INSERT, UPDATE, and DELETE are denied for every synchronized
+  backup table.
 
 #### Scenario: Authorization is documented as out of scope, not skipped
 
 - **WHEN** the testing model is reviewed for auth coverage
-- **THEN** the absence of roles and client-side enforcement is stated explicitly, with server-side RLS identified as out-of-repo and recommended for a separate contract-testing change.
+- **THEN** it documents the client session bootstrap plus the server-side RLS
+  and grant boundary, and points to the two-user/anonymous-role security
+  harness rather than treating authorization as an untestable out-of-repo
+  concern.
+
+#### Scenario: Two-user owner isolation is covered
+
+- **WHEN** the security harness evaluates two signed-in anonymous Auth users
+  against each other's todos, habits, calorie entries, and workout routines
+- **THEN** each user can CRUD its own rows but cannot read, mutate, claim, or
+  upsert over the other user's rows, and changing `user_id` is rejected.
+
+#### Scenario: Client owner/session boundaries are covered
+
+- **WHEN** the client has a pending outbox record, no valid session, a refreshed
+  session, or a different authenticated session
+- **THEN** ownership is derived from the trusted current identity, missing or
+  mismatched identity fails closed, the durable outbox remains pending, and
+  local-first writes are not blocked by remote availability.
+
+### Requirement: Native execution is a distinct autonomous QA gate
+
+The autonomous QA model SHALL place focused native smoke and targeted native lifecycle testing after web regression, SHALL keep native flows smaller than the Playwright feature suite, and SHALL preserve the existing simulation and failure-classification model rather than duplicating it.
+
+#### Scenario: Native-sensitive change escalates to native testing
+
+- **WHEN** a change affects React Native navigation/UI, native persistence, Pomodoro lifecycle, notifications, or app lifecycle handling
+- **THEN** the recommended QA sequence includes the appropriate Android native gate and an iOS/EAS gate when available.
+
+#### Scenario: Pure domain change remains cost-conscious
+
+- **WHEN** a change affects only pure domain logic and its deterministic tests
+- **THEN** the impact map does not require a full native matrix unless another changed path is native-sensitive.
