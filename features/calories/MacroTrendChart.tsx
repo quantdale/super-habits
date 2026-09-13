@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { fonts } from '@/core/theme/designTokens';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { buildMacroTrendPoints, summarizeMacroTrend } from './calories.domain';
@@ -83,8 +84,8 @@ export function MacroTrendChart({ summaries }: { summaries: DailySummary[] }) {
         roundedTop
         xAxisThickness={1}
         yAxisThickness={0}
-        yAxisTextStyle={{ color: tokens.textMuted, fontSize: 10 }}
-        xAxisLabelTextStyle={{ color: tokens.textMuted, fontSize: 8 }}
+        yAxisTextStyle={{ color: tokens.textMuted, fontSize: 10, fontFamily: fonts.semibold }}
+        xAxisLabelTextStyle={{ color: tokens.textMuted, fontSize: 8, fontFamily: fonts.semibold }}
         noOfSections={4}
         maxValue={maxValue}
         referenceLine1Position={summary.avgCalories > 0 ? summary.avgCalories : undefined}

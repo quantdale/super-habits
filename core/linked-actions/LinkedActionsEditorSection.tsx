@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useMemo, useState } from 'react';
 import { useAppNavigation } from '@/core/providers/navigationContext';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { LinkedActionTargetPickerModal } from '@/core/linked-actions/LinkedActionTargetPickerModal';
 import {

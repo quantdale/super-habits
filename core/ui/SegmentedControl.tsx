@@ -51,7 +51,7 @@ function SegmentOptionButton<T extends string>({
         {
           flex: 1,
           minWidth: 0,
-          minHeight: size.touchTargetMin - 6,
+          minHeight: size.touchTargetMin - 4,
           justifyContent: 'center',
           alignItems: 'center',
           borderRadius: radius.full,

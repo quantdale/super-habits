@@ -39,6 +39,17 @@ const CLASSNAME_WEIGHT_FAMILIES: readonly [string, string][] = [
   ['font-normal', fonts.regular],
 ];
 
+/**
+ * NativeWind's `text-*` utilities set `font-size` (and Tailwind's paired
+ * `line-height`) through a CSS class, which loses to an inline style. When a
+ * call site expresses its size with a class, the role must not inject its own
+ * `fontSize`/`lineHeight`, or every such element collapses to the default
+ * role size (measured: `text-3xl`/`text-sm`/`text-xs` all rendered 15px on the
+ * web export before this guard). Family, colour, and `letterSpacing` still
+ * come from the role unless the call site overrides them.
+ */
+const CLASSNAME_SIZE = /(?:^|\s)text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl)(?:\s|$)/;
+
 /** Numeric CSS/RN weights collapse onto the five shipped families. */
 function familyFromWeight(weight: TextStyle['fontWeight']): string | null {
   if (weight === undefined || weight === null) return null;
@@ -98,13 +109,21 @@ export function Text({
 
   // `fontWeight` is intentionally dropped: with a weight-specific family it
   // would ask the platform to synthesise a second bold on top of Nunito's.
-  const { fontWeight: _ignoredWeight, ...roleStyle } = role;
+  const roleStyle = role as TextStyle;
+  const { fontWeight: _ignoredWeight, ...roleWithoutWeight } = roleStyle;
+  // A class-declared size wins over the role's default size (see CLASSNAME_SIZE).
+  const {
+    fontSize: _ignoredSize,
+    lineHeight: _ignoredLineHeight,
+    ...roleWithoutSize
+  } = roleWithoutWeight;
+  const baseStyle = className && CLASSNAME_SIZE.test(className) ? roleWithoutSize : roleStyle;
 
   return (
     <RNText
       {...rest}
       className={className}
-      style={[roleStyle, { fontFamily: family, color: toneColor(tone, tokens) }, style]}
+      style={[baseStyle, { fontFamily: family, color: toneColor(tone, tokens) }, style]}
     />
   );
 }

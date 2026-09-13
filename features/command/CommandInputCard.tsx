@@ -1,4 +1,5 @@
-import { Text, View, Pressable } from 'react-native';
+import { Text } from '@/core/ui/Text';
+import { Pressable, View } from 'react-native';
 
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';

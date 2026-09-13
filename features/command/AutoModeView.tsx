@@ -1,6 +1,7 @@
+import { Text } from '@/core/ui/Text';
 import { useState } from 'react';
 
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { TextField } from '@/core/ui/TextField';

@@ -7,7 +7,7 @@ import { MOMENTUM_SOURCE_LABELS } from './momentum.types';
 import { formatMomentumTodaySummary } from './momentum.domain';
 import { MomentumGardenArt } from './MomentumGardenArt';
 import type { MomentumGardenModel } from './momentum.types';
-import { radius, spacing } from '@/core/theme/designTokens';
+import { radius, size, spacing } from '@/core/theme/designTokens';
 
 type MomentumCardProps = {
   model: MomentumGardenModel;
@@ -66,7 +66,7 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
               flexDirection: 'row',
               alignItems: 'center',
               gap: spacing.xs,
-              minHeight: 40,
+              minHeight: size.touchTargetMin - 4,
               paddingHorizontal: spacing.md,
               borderRadius: radius.full,
               backgroundColor: tokens.chipBackground,

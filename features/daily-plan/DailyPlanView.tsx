@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';

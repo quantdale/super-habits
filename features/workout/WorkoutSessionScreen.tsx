@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
-import { Animated, View, Text, Pressable, Alert, TextInput } from 'react-native';
+import { Alert, Animated, Pressable, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAppTheme } from '@/core/providers/themeContext';

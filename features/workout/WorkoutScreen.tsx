@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import { useCallback, useState } from 'react';
-import { Alert, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, View, useWindowDimensions } from 'react-native';
 import { layout, spacing } from '@/core/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';

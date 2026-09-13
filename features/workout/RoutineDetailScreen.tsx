@@ -1,5 +1,6 @@
+import { Text } from '@/core/ui/Text';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, View, Text, Pressable, TextInput } from 'react-native';
+import { Platform, Pressable, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { useAppTheme } from '@/core/providers/themeContext';

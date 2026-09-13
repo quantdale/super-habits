@@ -3,6 +3,7 @@ import React, { useLayoutEffect, useRef } from 'react';
 import { Dimensions, Platform, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { fonts } from '@/core/theme/designTokens';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
   HorizontalScrollArea,
@@ -105,8 +106,12 @@ export function DailyCalorieChart({ data, goalKcal }: Props) {
             roundedTop
             xAxisThickness={1}
             yAxisThickness={0}
-            yAxisTextStyle={{ color: tokens.textMuted, fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: tokens.textMuted, fontSize: 9 }}
+            yAxisTextStyle={{ color: tokens.textMuted, fontSize: 10, fontFamily: fonts.semibold }}
+            xAxisLabelTextStyle={{
+              color: tokens.textMuted,
+              fontSize: 9,
+              fontFamily: fonts.semibold,
+            }}
             noOfSections={4}
             maxValue={maxValue}
             referenceLine1Position={goalKcal}
