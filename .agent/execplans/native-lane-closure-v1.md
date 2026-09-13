@@ -70,41 +70,35 @@ match, coherent commits pushed, and no owned emulator left booted.
 
 ## Current Checkpoint
 
-- Current milestone: WS2 — official lane re-running on a rested owned boot;
-  diagnosing the two failures from the first rested run while it runs.
-- Completed: state reconciliation; first rested lane run (9/11: `calories-
-persistence`, `workout-gym-v2-persistence` failed); deterministic on-device
-  repro + root cause for the gym failure; gym flow fixed and verified 3/3;
-  calories failure isolated to a late-render/hierarchy-starvation race (not
-  swipe-swallow) and passed 2/2 standalone; gym fix committed (`48cee09`).
-- In progress: `npm run qa:native:targeted -- --avd Nitro_API_36` on a fresh
-  owned boot (prior owned emulator shut down first; only unrelated
-  emulator-5560 remains).
-- Important modified files: `.maestro/flows/workout-gym-v2-persistence.yaml`
-  (committed), this plan.
-- Last successful validation: gym flow 3/3 PASS on-device; calories flow 2/2
-  PASS on-device.
-- Current failures: calories lane failure is intermittent and load-correlated;
-  see Surprises.
-- Relevant quarantines: known-gap 15/16 (host-load flakes, unchanged), 17
-  (repaired), 18 (this plan).
-- Blockers: None.
+- Current milestone: WS2 — all three deterministic flow defects found in the
+  rested lane run are fixed and verified standalone; official lane re-run next.
+- Completed: gym `Target load` low-anchor/margin swipe (`48cee09`, 3/3);
+  habit-schedule post-create top-of-Anytime reachability (`d5dfd8f`, 4/4);
+  calories `Logged today` low-anchor pre-scroll + `Native breakfast` poll
+  (`d5dfd8f`, 8/8, artifacts in `simulation-output/native/cal-dbg-*`).
+- In progress: official `npm run qa:native:targeted -- --avd Nitro_API_36`
+  re-run on a rested owned boot.
+- Important modified files: `.maestro/flows/*` (committed), this plan.
+- Last successful validation: standalone volumes above; emulator booted for
+  the lane; only the unrelated emulator-5560 remains after.
+- Current failures: none known in the three repaired flows.
+- Relevant quarantines: known-gap 15/16 (unchanged), 17 (repaired), 18 (this
+  plan).
+- Blockers: None for the lane.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: read the background lane outcome (report under
-  `simulation-output/native/native-android-persistence-*`); if 11/11 PASS,
-  close gap 18 in `docs/testing/known-gaps.md`, commit/push, mark plan
-  COMPLETED; if calories recurs, apply a poll-tolerant reachability step and
-  re-run.
-- Remaining definition of done: lane outcome recorded with artifacts; gap 18
-  closed or batching proven stable; register/plan updated; commits pushed;
-  no owned emulator left running.
+- Exact next action: read the lane outcome; on PASS update
+  `docs/testing/known-gaps.md` (delete gap 18, mark gap 17 fully closed),
+  commit/push, mark this plan COMPLETED. On recurrence, classify the failing
+  step from its artifacts before any further edit.
+- Remaining definition of done: lane report PASS at current source; register
+  updated; commits pushed; no owned emulator left running.
 
 ## Progress
 
 - [x] WS1 — plan committed/pushed (`b08b443`); lane launched
-- [x] WS1b — diagnosed first rested-run failures; gym flow fixed and verified
-      (`48cee09`)
+- [x] WS1b — first rested lane run diagnosed; gym fixed (`48cee09`)
+- [x] WS1c — habit-schedule + calories flow defects fixed (`d5dfd8f`)
 - [ ] WS2 — official lane outcome recorded (report path, per-flow pass/fail)
 - [ ] WS3 — register updated (gap 18 closed or batching evidence recorded)
 - [ ] WS4 — commits pushed; hygiene recorded; plan COMPLETED
@@ -119,13 +113,21 @@ persistence`, `workout-gym-v2-persistence` failed); deterministic on-device
 load` stays clipped below the fold (`[117,1908][965,1867]`). Proof: the same
   center swipe moves nothing, while a left-margin swipe (`input swipe 50 1600
 50 500 400`) brings `Target load` to `[117,391][965,425]` VISIBLE.
-- 2026-09-13 — Calories failure is a **different class**: its Form-view center
-  is a plain `ScrollView` (no input), and the failure artifact shows `Logged
-today` visible at `[62,1442][1020,1518]` while Maestro logged
-  `ElementNotFound` for ~29 s after `tapOn: 'Form view'`. Late render /
-  hierarchy starvation under sequential-lane load; absent the lane's device
-  churn it passes 2/2 standalone. Root cause for the lane's intermittent
-  calories failure is still under test (this re-run).
+- 2026-09-13 — **habit-schedule failure is a deterministic reachability bug.**
+  The habit IS created (`1 habits across your daily routine`, tile with
+  `Mon / Wed / Fri`), but it lands at the top of the Anytime group while the
+  screen is still scrolled to the bottom add tile; the flow's DOWN scroll
+  could never reach it. Fix: return to top with side-margin swipes, then the
+  scoped scroll.
+- 2026-09-13 — **calories is a reproducible starvation/reachability flap, not
+  host-load environment.** Standalone: 2/5 then 3/5 failures; a probe flow
+  showed the saved section absent from the on-screen a11y tree right after
+  the 8 s settle; `uiautomator` point probing showed two center swipes at
+  (540,1200) move nothing while a swipe from y=1900 reveals the section
+  immediately; the final diary step's UP scroll pushed a visibly rendered
+  chip (`Native breakfast` at y1409) off-screen during the diary rebuild.
+  Fixes: low-anchor (80% height) pre-scroll before each `Logged today` scroll
+  and a poll (no directional scroll) for the diary chip. 8/8 standalone.
 
 ## Decision Log
 
