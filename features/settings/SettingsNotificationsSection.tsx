@@ -28,6 +28,7 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { SettingsRow, SettingsSectionHeading, SettingsStatusPill } from './SettingsSharedUi';
+import { readableAccent, tintOver } from '@/core/theme/contrast';
 
 const ACCENT = SECTION_COLORS[POMODORO_SECTION_KEY];
 
@@ -50,6 +51,10 @@ const WEEKDAYS: WeeklyReviewWeekday[] = [0, 1, 2, 3, 4, 5, 6];
  */
 export function SettingsNotificationsSection() {
   const { tokens } = useAppTheme();
+  // Accent labels sit on an `${ACCENT}18` tint that can be nested inside
+  // another tinted card; resolve a readable variant once (target 7:1 so nested
+  // tints cannot defeat it) and use it for every accent label below.
+  const accentText = readableAccent(ACCENT, tintOver(tokens.surfaceElevated, ACCENT, 0.18), 7);
   const [todoRemindersEnabled, setTodoRemindersEnabledState] = useState(false);
   const [dailyPlanTimeInput, setDailyPlanTimeInput] = useState('08:00');
   const [weeklyEnabled, setWeeklyEnabledState] = useState(false);
@@ -450,7 +455,7 @@ export function SettingsNotificationsSection() {
               disabled={loading || saving || !todoRemindersEnabled}
               onPress={() => void handleSaveDailyPlanTime()}
             >
-              <Text className="text-sm font-semibold" style={{ color: ACCENT }}>
+              <Text className="text-sm font-semibold" style={{ color: accentText }}>
                 {saving ? 'Saving…' : 'Save'}
               </Text>
             </Pressable>
@@ -501,7 +506,7 @@ export function SettingsNotificationsSection() {
                   >
                     <Text
                       className="text-xs font-medium"
-                      style={{ color: active ? ACCENT : tokens.textMuted }}
+                      style={{ color: active ? accentText : tokens.textMuted }}
                     >
                       {WEEKDAY_LABELS[day]}
                     </Text>
@@ -538,7 +543,7 @@ export function SettingsNotificationsSection() {
               disabled={loading || saving}
               onPress={() => void handleSaveWeeklyTime()}
             >
-              <Text className="text-sm font-semibold" style={{ color: ACCENT }}>
+              <Text className="text-sm font-semibold" style={{ color: accentText }}>
                 {saving ? 'Saving…' : 'Save'}
               </Text>
             </Pressable>
@@ -601,7 +606,7 @@ export function SettingsNotificationsSection() {
               disabled={loading || saving || workoutPreferences === null}
               onPress={() => void handleSaveWorkoutReminderTime()}
             >
-              <Text className="text-sm font-semibold" style={{ color: ACCENT }}>
+              <Text className="text-sm font-semibold" style={{ color: accentText }}>
                 {saving ? 'Saving…' : 'Save'}
               </Text>
             </Pressable>
@@ -635,7 +640,7 @@ export function SettingsNotificationsSection() {
                 >
                   <Text
                     className="text-sm font-semibold"
-                    style={{ color: active ? ACCENT : tokens.textMuted }}
+                    style={{ color: active ? accentText : tokens.textMuted }}
                   >
                     {scale === 'off' ? 'Off' : scale.toUpperCase()}
                   </Text>

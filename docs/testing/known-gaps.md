@@ -394,29 +394,32 @@ stronger evidence.
 prefer computed style and semantic roles over inline-style/structure
 selectors.
 
-### 19. Settings overlay text contrast (documented, bounded follow-up)
+### 19. Settings overlay text contrast — CLOSED (2026-09-14)
 
-**Reason:** the 2026-09-14 DOM-level WCAG audit (`e2e/a11y.spec.ts`) is clean
-for the six product sections but still finds a bounded set inside the Settings
+**Reason:** the 2026-09-14 DOM-level WCAG audit (`e2e/a11y.spec.ts`) was clean
+for the six product sections but still found a bounded set inside the Settings
 overlay: status pills and mode chips painted with `tokens.iconMuted`
 (`#8C86B0`, 3.41:1 at 15px on white) or `tokens.textMuted` (`#655F8A`,
 4.23:1 on a tinted row), and the Pomodoro/Calories section accents used as
 chip text on their own tints (violet `#8B5CF6` 3.11-3.86:1 at 12-15px; amber
-`#F59E0B` 1.73-1.96:1). The shared surfaces were fixed in this campaign
+`#F59E0B` 1.73-1.96:1). The shared surfaces were fixed in the same campaign
 (`SettingsStatusPill`, `SettingsSectionHeading`, `Card` header bands,
 `PillChip`, `SegmentedControl`, `StatBlock`, `Button`, `EmptyStateCard`), so
-what remains is the residual set the fix's surface approximation could not
+what remained was the residual set the fix's surface approximation could not
 fully reach (nested tints).
 
-**Closing path:** render the Settings overlay and re-run the audit with the
-gap's assertion enabled (`e2e/a11y.spec.ts` `the Settings overlay has no AA
-contrast defects`); replace each remaining `iconMuted`/`textMuted` text usage
-with `tokens.text` or a `readableAccent` result resolved against the measured
-composite surface, then delete this entry and remove the `test.fixme`.
+**Resolution:** `SettingsStatusPill` now resolves its accent text against a
+18% tint at a 7:1 target so a nested tint cannot defeat it;
+`SettingsNotificationsSection` derives one `accentText` for every accent label
+(Save buttons, active weekday chips, effort-scale chips) and keeps the raw
+hue for tints and borders; `ThemePreviewCard`'s theme name uses `textMuted`
+rather than the icon-only `iconMuted`. The audit's Settings contrast case now
+runs unskipped in `e2e/a11y.spec.ts` (3 passed, no `test.fixme`).
 
-**Evidence:** measured list preserved in the campaign plan
-(`.agent/execplans/web-a11y-conformance-audit-v1.md`) and reproducible with the
-spec's audit harness.
+**Closing path:** closed. Keep the Settings contrast assertion enabled; a new
+overlay control that paints accent text must resolve it with
+`readableAccent`/`readableSurface` from `core/theme/contrast.ts` rather than
+using a fill hue directly.
 
 ---
 

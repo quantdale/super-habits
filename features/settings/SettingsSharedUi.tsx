@@ -50,7 +50,8 @@ export function SettingsStatusPill({
     tone === 'accent'
       ? readableAccent(
           resolvedAccentColor,
-          tintOver(tokens.surfaceElevated, resolvedAccentColor, 0.09),
+          tintOver(tokens.surfaceElevated, resolvedAccentColor, 0.18),
+          7,
         )
       : tone === 'warning'
         ? tokens.warningText

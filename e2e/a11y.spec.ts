@@ -199,6 +199,38 @@ test.describe('Accessibility conformance', () => {
     }
   });
 
+  // Dark appearances swap in brighter section/reward text variants
+  // (SECTION_TEXT_COLORS_DARK, getRewardAccents); guard them too so a future
+  // palette edit cannot regress dark legibility silently.
+  test('the six sections are AA-clean in the dark theme', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => localStorage.setItem('superhabits.theme.mode', 'dark'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+      .toBe('dark');
+    await page.waitForTimeout(3000);
+
+    for (const section of SECTIONS) {
+      if (section !== 'overview') {
+        await goToTab(page, section);
+        await page.waitForTimeout(1500);
+      }
+      const result = await page.evaluate(auditPage);
+      expect(result.contrast, `dark ${section}: WCAG AA contrast`).toEqual([]);
+      expect(result.nameless, `dark ${section}: controls without accessible names`).toEqual([]);
+      expect(result.duplicateIds, `dark ${section}: duplicate element ids`).toEqual([]);
+      expect(
+        result.hiddenFocusable,
+        `dark ${section}: focusable content inside aria-hidden`,
+      ).toEqual([]);
+    }
+  });
+
   test('the Settings overlay has no name, id, or hidden-focus defects', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('button', { name: 'Open settings' })).toBeVisible({
@@ -213,11 +245,7 @@ test.describe('Accessibility conformance', () => {
     expect(result.hiddenFocusable, 'settings: focusable content inside aria-hidden').toEqual([]);
   });
 
-  // The Settings overlay's own palette usages (status pills, mode chips, and
-  // the pomodoro default chips) still fall under AA in a handful of nested
-  // controls while the six product sections are clean. Tracked as known-gap 19
-  // in docs/testing/known-gaps.md; enable this case once that pass lands.
-  test.fixme('the Settings overlay has no AA contrast defects', async ({ page }) => {
+  test('the Settings overlay has no AA contrast defects', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2500);
     await page.getByRole('button', { name: 'Open settings' }).click();

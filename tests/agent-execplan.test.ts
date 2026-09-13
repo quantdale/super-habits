@@ -245,6 +245,9 @@ describe('agent ExecPlan tooling', () => {
     expect(result.output).toContain('BLOCKED');
   });
 
+  // Real git subprocesses (temp repos + commits) under parallel-worker load
+  // can exceed the 5s default; the assertions are deterministic, so size the
+  // bound to the operation like the integration project does (gap 9 class).
   it('reconciles Git paths and reuses date/time QA impact in resume', () => {
     const root = createRoot();
     mkdirSync(join(root, 'qa'), { recursive: true });
@@ -291,7 +294,7 @@ describe('agent ExecPlan tooling', () => {
     expect(result.output).toContain('qa:timezones');
     expect(result.output).toContain('tests/time.test.ts');
     expect(result.output).toContain('Broad regression: required');
-  });
+  }, 15_000);
 
   it('validates all versioned plans without requiring legacy plans to opt in', () => {
     const root = createRoot();

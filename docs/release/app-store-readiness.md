@@ -19,23 +19,25 @@ letting it drift.
 
 ## Verification run for this release (2026-09-14)
 
-| Gate                    | Command                                            | Result                                                                                                     |
-| ----------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Types                   | `npm run typecheck`                                | clean                                                                                                      |
-| Lint                    | `npm run lint` (`--max-warnings 0`)                | clean                                                                                                      |
-| Unit + integration      | `npm test`                                         | 2055 passed / 196 files                                                                                    |
-| Chromium E2E            | `npx playwright test --project=chromium`           | 136 passed / 7 skipped / 0 failed                                                                          |
-| Journey E2E             | `npx playwright test --project=journeys`           | 104 passed / 6 skipped / 0 failed                                                                          |
-| Simulation E2E          | `npx playwright test --project=simulation`         | 3 passed (repro replay, deterministic reproducibility, run-report schema)                                  |
-| PWA update lane         | `npx playwright test --project=pwa`                | passed (chromium + pwa run totals 140 passed)                                                              |
-| Web bundle              | `npm run build:web`                                | exported to `dist/`, 4 bundles + static routes                                                             |
-| Live web probe          | `npm run web:verify`                               | PASS in 64.7s (fresh export, HTTP 200, COOP/COEP, shell probe, port released)                              |
-| Expo config             | `npx expo-doctor`                                  | 19/20 (10 SDK-recommended patch bumps held by pinned patches — see constraints)                            |
-| Theme contrast          | `npm run validate:themes`                          | 140 checks pass                                                                                            |
-| OpenSpec                | `openspec validate --all`                          | 57 passed / 0 failed                                                                                       |
-| ExecPlans               | `npm run agent:plan:validate:all`                  | all plans PASS                                                                                             |
-| Native persistence lane | `npm run qa:native:targeted -- --avd Nitro_API_36` | **11/11 PASS** in 11m43s on credential-free APK `A4C3C900…` from source `2c1594b`                          |
-| Production deployment   | `vercel --prod`                                    | https://super-habits.vercel.app — HTTP 200, COOP/COEP, `crossOriginIsolated=true`, 0 non-Nunito text nodes |
+| Gate                    | Command                                                   | Result                                                                                                     |
+| ----------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Types                   | `npm run typecheck`                                       | clean                                                                                                      |
+| Lint                    | `npm run lint` (`--max-warnings 0`)                       | clean                                                                                                      |
+| Unit + integration      | `npm test`                                                | 2055 passed / 196 files                                                                                    |
+| Accessibility audit     | `npx playwright test --project=chromium e2e/a11y.spec.ts` | 4 passed: six sections light + dark, Settings semantics + contrast, all zero-defect                        |
+| Chromium E2E            | `npx playwright test --project=chromium`                  | 140 passed / 7 skipped / 0 failed                                                                          |
+| Journey E2E             | `npx playwright test --project=journeys`                  | 98 passed / 6 skipped in the colour-change battery; 2 load-induced failures pass standalone (gap 15 class) |
+| Simulation E2E          | `npx playwright test --project=simulation`                | 3 passed (repro replay, deterministic reproducibility, run-report schema)                                  |
+| Web bundle              | `npm run build:web`                                       | exported to `dist/`, 4 bundles + static routes                                                             |
+| Live web probe          | `npm run web:verify`                                      | PASS in 64.7s (fresh export, HTTP 200, COOP/COEP, shell probe, port released)                              |
+| Expo config             | `npx expo-doctor`                                         | 19/20 (10 SDK-recommended patch bumps held by pinned patches — see constraints)                            |
+| PWA update lane         | `npx playwright test --project=pwa`                       | passed                                                                                                     |
+| Theme contrast          | `npm run validate:themes`                                 | 140 checks pass                                                                                            |
+| OpenSpec                | `openspec validate --all`                                 | 57 passed / 0 failed                                                                                       |
+| ExecPlans               | `npm run agent:plan:validate:all`                         | all plans PASS                                                                                             |
+| Native smoke            | `npm run qa:native:android -- --avd Nitro_API_36`         | 2/2 PASS on APK `6CE22FD5…` from source `bcca6ae` (after the colour/token changes)                         |
+| Native persistence lane | `npm run qa:native:targeted -- --avd Nitro_API_36`        | **11/11 PASS** in 11m43s on credential-free APK `A4C3C900…` from source `2c1594b`                          |
+| Production deployment   | `vercel --prod`                                           | https://super-habits.vercel.app — HTTP 200, COOP/COEP, `crossOriginIsolated=true`, 0 non-Nunito text nodes |
 
 ### E2E result
 

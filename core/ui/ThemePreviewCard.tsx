@@ -62,7 +62,7 @@ export function ThemePreviewCard({ theme, selected, onPress }: ThemePreviewCardP
         </Text>
         <Text
           className="text-[10px] uppercase tracking-[0.5px]"
-          style={{ color: activeTokens.iconMuted }}
+          style={{ color: activeTokens.textMuted }}
         >
           {theme.appearance}
         </Text>

@@ -73,6 +73,8 @@ describe('native Android QA helpers', () => {
       versionCode: 1,
     });
   });
+  // Real git subprocesses (temp repo + add/commit) can exceed the 5s default
+  // under parallel-worker load; assertions are deterministic (gap 9 class).
   it('records a clean tree while ignoring generated output', () => {
     const root = createGitFixture();
     try {
@@ -86,7 +88,7 @@ describe('native Android QA helpers', () => {
     } finally {
       removeGitFixture(root);
     }
-  });
+  }, 15_000);
 
   it('rejects tracked and relevant untracked source changes', () => {
     const root = createGitFixture();
