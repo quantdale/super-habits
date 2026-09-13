@@ -70,37 +70,62 @@ match, coherent commits pushed, and no owned emulator left booted.
 
 ## Current Checkpoint
 
-- Current milestone: WS1 — plan authored, commit/push next, then the lane.
-- Completed: state reconciliation (AGENTS/PLANS/handoff/prompt/plans/native
-  reports/known-gaps); audit of the successor-campaign space (native lane
-  closure first; OpenSpec lifecycle reconciliation queued as the next
-  campaign).
-- In progress: WS1 commit + lane launch.
-- Important modified files: this plan.
-- Last successful validation: `git status` clean at `5bb090f`;
-  `agent:resume` on the predecessor plan (COMPLETED, next action = this run).
-- Current failures: None.
+- Current milestone: WS2 — official lane re-running on a rested owned boot;
+  diagnosing the two failures from the first rested run while it runs.
+- Completed: state reconciliation; first rested lane run (9/11: `calories-
+persistence`, `workout-gym-v2-persistence` failed); deterministic on-device
+  repro + root cause for the gym failure; gym flow fixed and verified 3/3;
+  calories failure isolated to a late-render/hierarchy-starvation race (not
+  swipe-swallow) and passed 2/2 standalone; gym fix committed (`48cee09`).
+- In progress: `npm run qa:native:targeted -- --avd Nitro_API_36` on a fresh
+  owned boot (prior owned emulator shut down first; only unrelated
+  emulator-5560 remains).
+- Important modified files: `.maestro/flows/workout-gym-v2-persistence.yaml`
+  (committed), this plan.
+- Last successful validation: gym flow 3/3 PASS on-device; calories flow 2/2
+  PASS on-device.
+- Current failures: calories lane failure is intermittent and load-correlated;
+  see Surprises.
 - Relevant quarantines: known-gap 15/16 (host-load flakes, unchanged), 17
   (repaired), 18 (this plan).
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit/push this plan, then run
-  `npm run qa:native:targeted -- --avd Nitro_API_36`.
+- Exact next action: read the background lane outcome (report under
+  `simulation-output/native/native-android-persistence-*`); if 11/11 PASS,
+  close gap 18 in `docs/testing/known-gaps.md`, commit/push, mark plan
+  COMPLETED; if calories recurs, apply a poll-tolerant reachability step and
+  re-run.
 - Remaining definition of done: lane outcome recorded with artifacts; gap 18
   closed or batching proven stable; register/plan updated; commits pushed;
   no owned emulator left running.
 
 ## Progress
 
-- [ ] WS1 — plan committed/pushed; lane launched
-- [ ] WS2 — lane outcome recorded (report path, per-flow pass/fail)
+- [x] WS1 — plan committed/pushed (`b08b443`); lane launched
+- [x] WS1b — diagnosed first rested-run failures; gym flow fixed and verified
+      (`48cee09`)
+- [ ] WS2 — official lane outcome recorded (report path, per-flow pass/fail)
 - [ ] WS3 — register updated (gap 18 closed or batching evidence recorded)
 - [ ] WS4 — commits pushed; hygiene recorded; plan COMPLETED
 
 ## Surprises & Discoveries
 
-- None yet.
+- 2026-09-13 — **Gym failure is a real, deterministic flow defect, not
+  environment flake.** `scrollUntilVisible` anchors its swipes at the screen
+  center. At that point in the routine editor the center (540,1200) is the
+  focused reps `EditText` (uiautomator: `EditText "5" [405,1126][675,1213]`);
+  the field consumes the drag so the parent list never scrolls and `Target
+load` stays clipped below the fold (`[117,1908][965,1867]`). Proof: the same
+  center swipe moves nothing, while a left-margin swipe (`input swipe 50 1600
+50 500 400`) brings `Target load` to `[117,391][965,425]` VISIBLE.
+- 2026-09-13 — Calories failure is a **different class**: its Form-view center
+  is a plain `ScrollView` (no input), and the failure artifact shows `Logged
+today` visible at `[62,1442][1020,1518]` while Maestro logged
+  `ElementNotFound` for ~29 s after `tapOn: 'Form view'`. Late render /
+  hierarchy starvation under sequential-lane load; absent the lane's device
+  churn it passes 2/2 standalone. Root cause for the lane's intermittent
+  calories failure is still under test (this re-run).
 
 ## Decision Log
 
